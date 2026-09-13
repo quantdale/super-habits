@@ -1,7 +1,7 @@
 # ExecPlan: Native Persistence Lane Closure V1
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -70,38 +70,39 @@ match, coherent commits pushed, and no owned emulator left booted.
 
 ## Current Checkpoint
 
-- Current milestone: WS2 — all three deterministic flow defects found in the
-  rested lane run are fixed and verified standalone; official lane re-run next.
-- Completed: gym `Target load` low-anchor/margin swipe (`48cee09`, 3/3);
-  habit-schedule post-create top-of-Anytime reachability (`d5dfd8f`, 4/4);
-  calories `Logged today` low-anchor pre-scroll + `Native breakfast` poll
-  (`d5dfd8f`, 8/8, artifacts in `simulation-output/native/cal-dbg-*`).
-- In progress: official `npm run qa:native:targeted -- --avd Nitro_API_36`
-  re-run on a rested owned boot.
-- Important modified files: `.maestro/flows/*` (committed), this plan.
-- Last successful validation: standalone volumes above; emulator booted for
-  the lane; only the unrelated emulator-5560 remains after.
-- Current failures: none known in the three repaired flows.
-- Relevant quarantines: known-gap 15/16 (unchanged), 17 (repaired), 18 (this
-  plan).
-- Blockers: None for the lane.
+- Current milestone: COMPLETE — rested single-AVD lane is 11/11 PASS at source
+  `be1fb2d`; gap 18 removed and gap 17 fully closed in the register.
+- Completed: all flow root-causes (gym `Target load` EditText-swallowed center
+  swipe; habit-schedule top-of-Anytime reachability; calories low-anchor
+  pre-scroll + diary-chip poll), standalone volumes (3/3, 4/4, 8/8), official
+  lane 11/11 in 13m27s, register update, commits.
+- In progress: none.
+- Important modified files: `docs/testing/known-gaps.md`, this plan.
+- Last successful validation: `npm run qa:native:targeted -- --avd
+Nitro_API_36` → 11/11 (report
+  `simulation-output/native/native-android-persistence-Nitro_API_36-2026-09-13T093158975Z.json`,
+  APK `EEE9D1B9…`, source `be1fb2d`).
+- Current failures: none in the lane.
+- Relevant quarantines: known-gap 15/16 (unchanged host-load flakes); 17 and
+  18 closed.
+- Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: read the lane outcome; on PASS update
-  `docs/testing/known-gaps.md` (delete gap 18, mark gap 17 fully closed),
-  commit/push, mark this plan COMPLETED. On recurrence, classify the failing
-  step from its artifacts before any further edit.
-- Remaining definition of done: lane report PASS at current source; register
-  updated; commits pushed; no owned emulator left running.
+- Exact next action: none; the campaign is closed. Next successor campaign:
+  Pop type-migration completion + UI defect sweep (raw RN `Text` with
+  `className` renders the system font in ~15 feature files), then OpenSpec
+  lifecycle reconciliation, then Vercel deployment once credentials exist.
+- Remaining definition of done: none for this plan.
 
 ## Progress
 
 - [x] WS1 — plan committed/pushed (`b08b443`); lane launched
 - [x] WS1b — first rested lane run diagnosed; gym fixed (`48cee09`)
 - [x] WS1c — habit-schedule + calories flow defects fixed (`d5dfd8f`)
-- [ ] WS2 — official lane outcome recorded (report path, per-flow pass/fail)
-- [ ] WS3 — register updated (gap 18 closed or batching evidence recorded)
-- [ ] WS4 — commits pushed; hygiene recorded; plan COMPLETED
+- [x] WS2 — official lane 11/11 PASS at `be1fb2d` (13m27s)
+- [x] WS3 — register updated (gap 18 removed; gap 17 fully closed)
+- [x] WS4 — commits land; hygiene: owned emulator stopped by the runner,
+      only the unrelated emulator-5560 remains
 
 ## Surprises & Discoveries
 
@@ -146,6 +147,25 @@ load` stays clipped below the fold (`[117,1908][965,1867]`). Proof: the same
 - 2026-09-13 — reconciliation (`git status/log`, `agent:plans`,
   `agent:resume`, `gh run list`, `adb devices`, `emulator -list-avds`,
   `web:hygiene`) — see Current Checkpoint; only external owners on :8081 and 5560.
+- 2026-09-13 — gym root cause on-device: uiautomator node at (540,1200) is
+  `EditText "5" [405,1126][675,1213]`; `input swipe 540 1200 540 400 400` moved
+  nothing, `input swipe 50 1600 50 500 400` moved `Target load` to
+  `[117,391][965,425]` VISIBLE. Flow fix verified 3/3 standalone.
+- 2026-09-13 — habit-schedule root cause on-device: after Create habit the
+  hierarchy shows `1 habits across your daily routine` with the tile
+  `Native M-W-F habit` / `Mon / Wed / Fri` only after scrolling UP; the flow
+  scrolled DOWN. Fix verified 4/4 standalone.
+- 2026-09-13 — calories root cause on-device: probe flow shows the saved
+  section absent from the on-screen a11y tree right after the 8 s settle; two
+  center swipes at (540,1200) moved nothing while a swipe from y=1900 revealed
+  `Logged today` immediately; step-048 artifact shows `Native breakfast`
+  visible at y1409 while the UP scroll reported it missing. Fixes verified 8/8
+  standalone (`simulation-output/native/cal-dbg-*`).
+- 2026-09-13 — official lane: `npm run qa:native:targeted -- --avd
+Nitro_API_36` → **11/11 PASS in 13m 27s** at source `be1fb2d`, APK SHA-256
+  `EEE9D1B9E4FA71BE3457AAD2B30EA73A9697973946CB32D90466D1E05A226939`; report
+  `simulation-output/native/native-android-persistence-Nitro_API_36-2026-09-13T093158975Z.json`;
+  runner stopped the owned emulator.
 
 ## Changed Files / Areas
 
@@ -168,6 +188,20 @@ Nitro_API_36` from a clean committed tree.
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: Pending.
-- Follow-up: Pending.
+- Status: Completed (2026-09-13).
+- Summary: the persistence lane's "loaded-host starvation" was three
+  deterministic flow defects, each proven on-device with uiautomator geometry
+  and repaired without weakening a single assertion: a center-swipe swallowed
+  by a focused reps `EditText`, a post-create habit tile above a still-scrolled
+  screen, and a calories post-save list that ignores center-anchored swipes.
+  The rested single-AVD lane is 11/11 at source `be1fb2d`; gap 18 is removed
+  and gap 17 fully closed. No product-code change was needed: the app's data
+  and rendering were correct in every failure artifact.
+- Proof: standalone 3/3 (`workout-gym-v2`), 4/4 (`habit-schedule`), 8/8
+  (`calories`); official report
+  `native-android-persistence-Nitro_API_36-2026-09-13T093158975Z.json` (1/1
+  PASS, 11/11 flows, APK `EEE9D1B9…`, source `be1fb2d`); runner stopped the
+  owned emulator; commits `48cee09`, `d5dfd8f`, `be1fb2d` (+ this closure).
+- Follow-up: known-gap 15/16 remain documented host-load flakes; the next
+  successor campaign addresses the broad raw-`Text`/system-font UI defect and
+  the remaining deferred visual-friction items.

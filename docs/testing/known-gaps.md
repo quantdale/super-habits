@@ -326,66 +326,35 @@ animations cannot shift the layout between the hierarchy read and the tap.
 Every persistence flow passed individually on Nitro_API_36 (most repeatedly),
 with rows verified in the pulled SQLite+WAL.
 
-**Residual (new):** full-lane `npm run qa:native:targeted` runs now fail
-0–4 flows per attempt at _different, unchanged_ steps (`Logged today`,
-`Native M-W-F habit`, `Add routine`, `New routine description`), including
-steps that passed in the same lane minutes earlier; failure screenshots show
-the asserted content rendered while Maestro's matcher reported "No visible
-element found", and one assertion burned 65 s against a 30 s budget. The host
-was running two AVDs and several other heavy processes, and the primary
-emulator had consumed ~15.7 h of guest CPU. Classification: `ENVIRONMENT`
-(maestro↔device hierarchy starvation under sustained host/emulator load), not
-a flow or product defect. See entry 18.
+**Residual (repaired 2026-09-13):** full-lane runs had failed 0–4 flows per
+attempt at _different_ steps, with failure screenshots showing the asserted
+content rendered while Maestro reported "No visible element found". On-device
+root-causing showed three deterministic flow defects behind that symptom — not
+host-load starvation:
+
+1. the routine editor's `Target load` scroll started on a focused reps
+   `EditText` that swallowed the center swipe (a left-margin swipe works);
+2. the new habit tile lands at the top of the Anytime group while the screen
+   is still scrolled to the bottom add tile, so the DOWN scroll could never
+   reach it;
+3. the calories form's post-save state ignores center-anchored scroll swipes
+   (a swipe anchored at 80% height moves it), and the diary chip renders
+   mid-list, so the old UP scroll pushed it off-screen.
+
+All three flows were repaired with explicit low-anchor/side-margin swipes and
+polls — every persistence assertion unchanged — verified standalone (3/3, 4/4,
+8/8) and then **11/11 PASS** in the rested single-AVD
+`npm run qa:native:targeted` lane at source `be1fb2d` (report
+`simulation-output/native/native-android-persistence-Nitro_API_36-2026-09-13T093158975Z.json`).
+Gap 18 is removed.
 
 **Closing path:** update the nine flows on a device session (scope tab taps to
 `Section tabs`, `centerElement: true` on bottom-edge scroll targets, and a
 `scrollUntilVisible` before on-screen visibility asserts), keep every
 persistence assertion unchanged, then re-run `npm run qa:native:targeted` from a
-clean committed source. (Executed 2026-09-12; residual lane flake tracked as
-gap 18.)
-
-### 18. Native persistence lane flaky on a loaded host/emulator (ENVIRONMENT)
-
-**Reason:** on 2026-09-12 the repaired persistence lane produced 10/11, 10/11,
-10/11, 7/11, and 7/11 across five runner attempts with failures moving between
-unchanged flows and steps (details in entry 17). Individual flows pass on the
-same device and APK, including immediately after a lane failure, so the
-selector repairs are sound; the lane itself is starved when the host is
-loaded (two booted AVDs, Gradle rebuilds, other heavy applications) and the
-primary emulator has been running for hours. Maestro reports "No visible
-element found" for content that is visibly rendered (screenshot evidence) and
-sometimes takes ~2× its own timeout for a single assertion.
-
-**Closing path:** re-run `npm run qa:native:targeted` on a rested device (fresh
-emulator boot with the host otherwise idle, single AVD) and only split the
-lane into smaller batches if the flake persists there; do not weaken or retry
-assertions. If the lane is green, delete this entry and mark gap 17 fully
-closed.
-
-**2026-09-12 further systematic fixes (source `08e1c6d`, APK `595A7630…`):**
-the recurring `calories-persistence` outlier was root-caused as an unscoped
-tab tap plus a bottom-edge `Save calorie entry` tap recorded at
-`(251,2181)` — under the floating tab bar, so it navigated to To Do. Every
-remaining tab tap in the native suite is now scoped to `Section tabs`
-(Calories, Habits, Focus, To Do, Today across 13 files), the calorie Save
-control is centered before tapping, and the habit flows scroll to the created
-tile before asserting it (same post-create class as `habit-persistence`).
-Latest lane: 9/11 with only two habit post-create asserts failing; both flows
-pass on immediate re-run, and `calories-persistence` passed in-lane for the
-first time since the redesign. Residual remains `ENVIRONMENT`.
-
-**2026-09-12 final hardening + lane (source `00d2935` flows, installed APK
-`08e1c6d`):** unscoped tab taps, the bottom-edge calorie Save tap, and the
-habit post-create tile visibility were all fixed as classes. Final direct lane:
-10/11 with a single `calories-persistence` failure at the post-save
-`Logged today` scroll — the failure screenshot shows "Logged today" and the
-saved `Native breakfast` row fully rendered while the matcher reported
-"No visible element found". The same flow passed standalone three times and
-in-lane twice on identical code. No flow change is justified against a
-rendered-but-unmatched element; the residual is hierarchy-read starvation and
-stays `ENVIRONMENT`. The official runner was last attempted at
-`08e1c6d`/`595A7630…` (9/11, same class); gap 17 remains repaired and gap 18
-owns the rested-device re-run.
+clean committed source. (Executed 2026-09-12; the residual lane flake was
+root-caused and repaired 2026-09-13 — see the residual note above. This entry
+is fully closed.)
 
 ---
 
