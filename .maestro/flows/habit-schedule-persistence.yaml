@@ -43,6 +43,18 @@ tags:
     element: 'Create habit'
     direction: DOWN
 - tapOn: 'Create habit'
+# The new habit lands at the TOP of the Anytime group, but the screen is still
+# scrolled to the bottom-edge add tile, so a DOWN scroll can never reach it.
+# Return to the top with explicit side-margin swipes, then finish with the
+# scoped scroll (handles a long Anytime group too).
+- swipe:
+    start: '5%, 30%'
+    end: '5%, 75%'
+    duration: 300
+- swipe:
+    start: '5%, 30%'
+    end: '5%, 75%'
+    duration: 300
 - scrollUntilVisible:
     element: 'Native M-W-F habit'
     direction: DOWN

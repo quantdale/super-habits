@@ -54,6 +54,15 @@ tags:
 # (same class as the diary-transition note below).
 - waitForAnimationToEnd:
     timeout: 8000
+# The post-save rebuild leaves the saved section below the fold. In this
+# state Maestro's center-anchored scroll swipes start in the upper half and
+# do not move the list (reproduced: two center swipes changed nothing while a
+# swipe starting at 80% height revealed the section immediately). Pre-scroll
+# from a low anchor, then finish with the scoped scroll.
+- swipe:
+    start: '50%, 80%'
+    end: '50%, 30%'
+    duration: 400
 - scrollUntilVisible:
     element: 'Logged today'
     direction: DOWN
@@ -106,6 +115,10 @@ tags:
 - waitForAnimationToEnd:
     timeout: 8000
 - tapOn: 'Form view'
+- swipe:
+    start: '50%, 80%'
+    end: '50%, 30%'
+    duration: 400
 - scrollUntilVisible:
     element: 'Logged today'
     direction: DOWN
@@ -120,16 +133,11 @@ tags:
 - tapOn: 'Diary view'
 - waitForAnimationToEnd:
     timeout: 8000
-# The saved entry chip pins to the TOP of the diary, partially under the
-# tab rail (Wave 8 screenshot proof). Scrolling DOWN pushes it further
-# off-screen so the matcher never reaches 60% visibility — scroll UP to
-# pull it fully into view.
-- swipe:
-    direction: UP
-- scrollUntilVisible:
-    element: 'Native breakfast'
-    direction: UP
-    visibilityPercentage: 60
+# The saved entry chip renders mid-list in the current diary layout, so the
+# old scroll-UP assumption (chip pinned under the tab rail) instead pushes it
+# off-screen while the diary is still rebuilding: the step-048 artifact shows
+# "Native breakfast" fully visible at y1409 while the UP scroll reported it
+# missing. Poll for the same visibility with no directional scroll.
 - extendedWaitUntil:
     visible: 'Native breakfast'
-    timeout: 15000
+    timeout: 20000
