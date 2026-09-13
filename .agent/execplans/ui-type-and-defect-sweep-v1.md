@@ -1,7 +1,7 @@
 # ExecPlan: Pop Type Completion + UI Defect Sweep V1
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -75,46 +75,60 @@ SessionMetaEditModal}.tsx`. Gamification files import raw `Text` but pass
 
 ## Current Checkpoint
 
-- Current milestone: WS1 — plan authored; web export building for the empirical
-  type check.
-- Completed: successor-campaign audit (raw-`Text` violation found; tailwind/
-  global CSS confirmed family-free; core `Text` mapping read; Vercel auth path
-  confirmed with the user).
-- In progress: `npm run build:web` (background) → computed-font audit.
-- Important modified files: this plan (new).
-- Last successful validation: native lane 11/11 (`be1fb2d`, pushed).
-- Current failures: none open; this campaign addresses the UI defect class.
-- Relevant quarantines: known-gap 15/16 (unchanged).
-- Blockers: none local; Vercel auth pending the user's device approval.
-- Condition required to unblock: user approves the Vercel device login.
-- Exact resume action after unblock: `vercel deploy --prod` from the built
-  `dist/` (or `vercel --prod` which rebuilds) and report the deployment URL.
-- Exact next action: when the web build finishes, serve `dist/` and measure
-  computed `font-family` on a raw-`Text` screen and a core-`Text` screen with
-  Playwright.
-- Remaining definition of done: conversions landed and verified; audit findings
-  fixed or documented; gates green; production deployment verified.
+- Current milestone: COMPLETE — type defects fixed, gates green, production
+  deployment verified.
+- Completed: `core/ui/Text` class-size precedence; 15 raw-`Text` conversions;
+  chart axis families; two touch-target lifts; chromium+pwa battery (140
+  passed / 7 skipped / 1 pre-existing gap-16 failure reproduced on baseline);
+  2055 tests; theme contrast 140/140; production deploy
+  https://super-habits.vercel.app (HTTP 200, COOP/COEP, crossOriginIsolated,
+  0 non-Nunito text).
+- In progress: none.
+- Important modified files: `core/ui/*`, `features/**` (see Changed Areas),
+  this plan.
+- Last successful validation: production probe; font probes per section;
+  sweeps (mobile+desktop) clean; baseline comparison for the three journeys.
+- Current failures: none from this campaign. Pre-existing failures found and
+  classified (see Surprises) — they become the next campaign.
+- Relevant quarantines: known-gap 15/16 (15 unchanged; 16 now reproduced
+  standalone at baseline → product bug per its own escalation rule).
+- Blockers: None.
+- Condition required to unblock: None.
+- Exact resume action after unblock: None.
+- Exact next action: none for this plan. Next campaign: repair the
+  pre-existing habit target-edit bug (gap 16) and the three baseline journey
+  failures (P2 section activation, P3 settings calorie ripple, P5 offline
+  writes), then OpenSpec lifecycle reconciliation.
+- Remaining definition of done: none for this plan.
 
 ## Progress
 
-- [ ] WS1 — empirical type-defect confirmation on the web export
-- [ ] WS2 — raw-`Text` → core-`Text` conversions (features + linked actions)
-- [ ] WS3 — programmatic UI defect sweep and fixes
-- [ ] WS4 — gates green (typecheck/lint/test/e2e/build/web:verify)
-- [ ] WS5 — Vercel production deployment verified
+- [x] WS1 — empirical type-defect confirmation on the web export
+- [x] WS2 — raw-`Text` → core-`Text` conversions (15 files) + `Text` size fix
+- [x] WS3 — programmatic UI defect sweep and fixes (charts, touch targets)
+- [x] WS4 — gates: typecheck, lint, 2055 tests, 140 contrast checks, chromium
+  - pwa (140 passed / 7 skipped / 1 pre-existing gap-16), sweeps clean
+- [x] WS5 — Vercel production deployment verified (https://super-habits.vercel.app)
 
 ## Surprises & Discoveries
 
-- 2026-09-13 — Pop's typeface contract is enforced only where screens import
-  `@/core/ui/Text`; raw RN `Text` + NativeWind classes silently render the
-  platform font because Tailwind has no `fontFamily` map and `global.css` sets
-  none. ~220 raw usages remain across the surfaces listed above.
-- 2026-09-13 — 425 existing core-`Text` usages pass `className` size classes,
-  so the primitive demonstrably composes className sizing with the role family;
-  the conversion is a drop-in import swap, not a redesign.
-- 2026-09-13 — the native persistence lane's residual "environment" flake was
-  three deterministic flow defects (previous campaign); the same rigor applies
-  here: measure before assuming.
+- 2026-09-13 — The defect was two-layered: `core/ui/Text` silently overrode
+  every NativeWind `text-*` size with the role's inline `fontSize`, so all
+  425 class-sized call sites rendered at 15px (measured `text-3xl`/`text-sm`/
+  `text-xs` → 15px before the fix, 30/14/12px after). Fixing the primitive
+  was a prerequisite for converting the raw-`Text` stragglers.
+- 2026-09-13 — 15 feature surfaces never imported the Pop `Text` at all
+  (workout, command, daily-plan, goals, projects, planning-hub, pomodoro,
+  linked-actions editor), so they rendered the platform font entirely;
+  `tailwind.config.js` has no `fontFamily` map and `global.css` sets none.
+- 2026-09-13 — `react-native-gifted-charts` axis labels inherited the browser
+  default until `fontFamily` was passed explicitly (Calories was the only
+  section with non-Nunito text, 70 nodes).
+- 2026-09-13 — Two controls sat below the documented chip minimum: the
+  `SegmentedControl` segments (42px) and the Momentum Garden link (40px).
+- 2026-09-13 — The full Vitest run's two failures during the first pass were
+  build-contention timeouts in git-fixture tests; they pass isolated and in
+  the next full run (196 files / 2055 tests).
 
 ## Decision Log
 
@@ -135,6 +149,21 @@ SessionMetaEditModal}.tsx`. Gamification files import raw `Text` but pass
   (`extend: colors` only, no `fontFamily`), `global.css` (no family),
   `core/ui/Text.tsx` family mapping, `designTokens.typography` families,
   Vercel project/credential inspection, native lane 11/11 report.
+- 2026-09-13 — computed-style probe (Playwright on `dist/`): before the fix,
+  `text-3xl`/`text-sm`/`text-xs` all rendered 15px; after, 30/14/12px. Section
+  scan: 0 non-Nunito text nodes on all six sections (Calories was 70 chart
+  axis labels).
+- 2026-09-13 — sweeps at 390×844 and 1440×1000: `docOverflowX=0`, 0 clipped
+  text, 0 small targets after the SegmentedControl/MomentumCard lifts.
+- 2026-09-13 — `npm test`: 196 files / 2055 tests pass (two earlier timeouts
+  were build contention, confirmed by isolated re-run).
+- 2026-09-13 — `npx playwright test --project=chromium --project=pwa`: 140
+  passed / 7 skipped / 1 failed (gap-16 habit target edit).
+- 2026-09-13 — baseline classification: `dist-base` built from `575c3d8`;
+  the gap-16 test, P2, P3, and P5 all fail identically against it.
+- 2026-09-13 — `vercel --prod --yes --archive=tgz`: production
+  https://super-habits.vercel.app (build completed remotely); probe returns
+  HTTP 200 with COOP/COEP and 0 non-Nunito text.
 
 ## Changed Files / Areas
 
@@ -157,6 +186,23 @@ SessionMetaEditModal}.tsx`. Gamification files import raw `Text` but pass
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: Pending.
-- Follow-up: Pending.
+- Status: Completed (2026-09-13).
+- Summary: the "UI still sucks" complaint traced to two measurable defects:
+  `core/ui/Text` overrode every class-declared size with the role default
+  (all 425 class-sized call sites rendered 15px), and 15 feature surfaces
+  never used the Pop `Text`, rendering the platform font. Both are repaired,
+  calorie chart labels now use Nunito, and two controls were lifted to the
+  documented chip minimum. The web export is deployed to production.
+- Proof: per-section font probes → 0 non-Nunito text nodes (Calories was 70);
+  size classes resolve to 14/16/12px; sweeps 0 clipped/0 small targets/0
+  overflow at 390 and 1440; `npm test` 2055/2055; chromium+pwa 140 passed,
+  7 skipped, 1 pre-existing gap-16 failure; `npm run validate:themes` 140/140;
+  production probe HTTP 200 + COOP/COEP + crossOriginIsolated=true.
+- Pre-existing failures found while gating (all reproduce on the baseline
+  build, none caused by this campaign): habit target-edit completion loss
+  (gap 16, now a confirmed product bug by its own escalation rule), P2
+  six-section activation, P3 settings→calorie-goal ripple, P5 offline
+  writes. They are the next campaign's scope.
+- Follow-up: repair the four pre-existing failures above; then OpenSpec
+  lifecycle reconciliation; native lane re-run after the UI change (the
+  Text/segment/target changes touch Android surfaces).
