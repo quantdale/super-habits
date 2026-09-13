@@ -3,6 +3,7 @@ import {
   SECTION_COLORS,
   SECTION_COLORS_LIGHT,
   SECTION_TEXT_COLORS,
+  SECTION_TEXT_COLORS_DARK,
   getSectionAccents,
 } from '@/constants/sectionColors';
 
@@ -16,13 +17,15 @@ describe('getSectionAccents', () => {
     });
   });
 
-  it('uses the fill itself as text and a translucent tint for dark appearance', () => {
+  it('uses the brighter 300/400 text variant and a translucent tint for dark appearance', () => {
     const accents = getSectionAccents('dark');
     expect(accents.habits).toEqual({
       fill: SECTION_COLORS.habits,
-      text: SECTION_COLORS.habits,
+      text: SECTION_TEXT_COLORS_DARK.habits,
       tint: `${SECTION_COLORS.habits}1F`,
     });
+    // The mid-tone fill itself is not readable as text on dark surfaces.
+    expect(accents.habits.text).not.toBe(accents.habits.fill);
   });
 
   it('covers every section key for both appearances', () => {
@@ -39,7 +42,7 @@ describe('getSectionAccents', () => {
     expect(accents.todos).toEqual(override);
     expect(accents.habits).toEqual({
       fill: SECTION_COLORS.habits,
-      text: SECTION_COLORS.habits,
+      text: SECTION_TEXT_COLORS_DARK.habits,
       tint: `${SECTION_COLORS.habits}1F`,
     });
   });

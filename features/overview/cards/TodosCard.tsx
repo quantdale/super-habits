@@ -1,7 +1,6 @@
 import { Text } from '@/core/ui/Text';
 import { View } from 'react-native';
 
-import { SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 
 import type { TodosSummary } from '../overview.domain';
@@ -9,7 +8,7 @@ import { OVERVIEW_CARD_META } from '../overviewCards';
 import { CardEmptyMessage, DashboardCard } from './DashboardCard';
 
 export function TodosCard({ summary, loading }: { summary: TodosSummary; loading: boolean }) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
 
   return (
     <DashboardCard
@@ -32,7 +31,7 @@ export function TodosCard({ summary, loading }: { summary: TodosSummary; loading
             </Text>
           ) : null}
           {summary.dueTodayCount > 0 ? (
-            <Text className="text-xs font-semibold" style={{ color: SECTION_COLORS.todos }}>
+            <Text className="text-xs font-semibold" style={{ color: sectionAccents.todos.text }}>
               {summary.dueTodayCount} due today
             </Text>
           ) : null}

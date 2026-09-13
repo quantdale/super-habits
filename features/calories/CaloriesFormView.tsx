@@ -29,7 +29,7 @@ const CalorieEntrySwipeRow = memo(
     onEdit: () => void;
     onDelete: () => void;
   }) {
-    const { tokens } = useAppTheme();
+    const { tokens, sectionAccents } = useAppTheme();
 
     return (
       <SwipeableCard
@@ -46,7 +46,7 @@ const CalorieEntrySwipeRow = memo(
           >
             {entry.food_name}
           </Text>
-          <Text className="text-sm font-semibold" style={{ color: accentColor }}>
+          <Text className="text-sm font-semibold" style={{ color: sectionAccents.calories.text }}>
             {entry.calories} kcal
           </Text>
         </View>

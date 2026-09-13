@@ -50,7 +50,7 @@ export function MomentumCard({ model, onViewGarden }: MomentumCardProps) {
               borderColor: `${accent.fill}33`,
             }}
           >
-            <MaterialIcons name="spa" size={23} color={accent.fill} />
+            <MaterialIcons name="spa" size={23} color={accent.text} />
           </View>
           <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 0 }}>
             <Text variant="titleMd">Momentum Garden</Text>
@@ -75,10 +75,10 @@ export function MomentumCard({ model, onViewGarden }: MomentumCardProps) {
               opacity: pressed ? 0.85 : 1,
             })}
           >
-            <Text variant="label" style={{ color: accent.fill, fontSize: 12 }}>
+            <Text variant="label" style={{ color: accent.text, fontSize: 12 }}>
               View garden
             </Text>
-            <MaterialIcons name="chevron-right" size={18} color={accent.fill} />
+            <MaterialIcons name="chevron-right" size={18} color={accent.text} />
           </Pressable>
         </View>
 

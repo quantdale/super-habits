@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Appearance } from 'react-native';
 import { type PropsWithChildren, useCallback, useEffect, useMemo, useState } from 'react';
-import { getSectionAccents } from '@/constants/sectionColors';
+import { getRewardAccents, getSectionAccents } from '@/constants/sectionColors';
 import {
   DEFAULT_DARK_THEME_ID,
   DEFAULT_LIGHT_THEME_ID,
@@ -121,6 +121,8 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     [resolvedTheme, theme.sectionOverrides],
   );
 
+  const rewardAccents = useMemo(() => getRewardAccents(resolvedTheme), [resolvedTheme]);
+
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
@@ -136,8 +138,18 @@ export function ThemeProvider({ children }: PropsWithChildren) {
   }, [resolvedTheme, themeId, tokens]);
 
   const value = useMemo(
-    () => ({ mode, resolvedTheme, themeId, theme, tokens, sectionAccents, setMode, setTheme }),
-    [mode, resolvedTheme, themeId, theme, tokens, sectionAccents, setMode, setTheme],
+    () => ({
+      mode,
+      resolvedTheme,
+      themeId,
+      theme,
+      tokens,
+      sectionAccents,
+      rewardAccents,
+      setMode,
+      setTheme,
+    }),
+    [mode, resolvedTheme, themeId, theme, tokens, sectionAccents, rewardAccents, setMode, setTheme],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

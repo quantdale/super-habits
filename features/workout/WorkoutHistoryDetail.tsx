@@ -211,7 +211,7 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose, onDeleted }
               className="flex-1 rounded-2xl border px-4 py-3"
               style={{ borderColor: `${COLOR}33`, backgroundColor: `${COLOR}14` }}
             >
-              <Text className="text-xl font-semibold" style={{ color: COLOR }}>
+              <Text className="text-xl font-semibold" style={{ color: tokens.text }}>
                 {detail.exercises.length}
               </Text>
               <Text className="text-xs" style={{ color: tokens.textMuted }}>
@@ -222,7 +222,7 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose, onDeleted }
               className="flex-1 rounded-2xl border px-4 py-3"
               style={{ borderColor: `${COLOR}33`, backgroundColor: `${COLOR}14` }}
             >
-              <Text className="text-xl font-semibold" style={{ color: COLOR }}>
+              <Text className="text-xl font-semibold" style={{ color: tokens.text }}>
                 {totalSets}
               </Text>
               <Text className="text-xs" style={{ color: tokens.textMuted }}>
@@ -233,7 +233,7 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose, onDeleted }
               className="flex-1 rounded-2xl border px-4 py-3"
               style={{ borderColor: `${COLOR}33`, backgroundColor: `${COLOR}14` }}
             >
-              <Text className="text-xl font-semibold" style={{ color: COLOR }}>
+              <Text className="text-xl font-semibold" style={{ color: tokens.text }}>
                 {formatMetricNumber(totalVolume)}
               </Text>
               <Text className="text-xs" style={{ color: tokens.textMuted }}>
@@ -245,7 +245,7 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose, onDeleted }
                 className="flex-1 rounded-2xl border px-4 py-3"
                 style={{ borderColor: `${COLOR}33`, backgroundColor: `${COLOR}14` }}
               >
-                <Text className="text-xl font-semibold" style={{ color: COLOR }}>
+                <Text className="text-xl font-semibold" style={{ color: tokens.text }}>
                   {formatWorkoutTime(detail.log.duration_seconds)}
                 </Text>
                 <Text className="text-xs" style={{ color: tokens.textMuted }}>
@@ -281,7 +281,7 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose, onDeleted }
                   {prs.some((pr) => pr.exerciseName === ex.exercise_name) ? (
                     <View className="mt-2 flex-row items-center gap-1">
                       <MaterialIcons name="emoji-events" size={16} color={COLOR} />
-                      <Text className="text-xs font-semibold" style={{ color: COLOR }}>
+                      <Text className="text-xs font-semibold" style={{ color: tokens.text }}>
                         Personal record
                       </Text>
                     </View>
@@ -306,7 +306,7 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose, onDeleted }
                   <Text className="text-sm" style={{ color: tokens.text }}>
                     {pr.exerciseName}
                   </Text>
-                  <Text className="text-sm font-semibold" style={{ color: COLOR }}>
+                  <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
                     {[
                       pr.bestTimedDurationSeconds > 0
                         ? `best ${formatWorkoutTime(pr.bestTimedDurationSeconds)}`

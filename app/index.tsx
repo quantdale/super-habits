@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Platform,
@@ -72,13 +72,23 @@ type TabButtonProps = {
   item: NavItem;
   isFocused: boolean;
   accent: string;
+  /** Contrast-safe accent for the icon/label (falls back to `accent`). */
+  accentInk?: string;
   layout: 'bar' | 'rail';
   onPress: () => void;
 };
 
 /** One navigation destination: icon over label, with a tinted active capsule. */
-function TabButton({ item, isFocused, accent, layout: layoutRole, onPress }: TabButtonProps) {
+function TabButton({
+  item,
+  isFocused,
+  accent,
+  accentInk,
+  layout: layoutRole,
+  onPress,
+}: TabButtonProps) {
   const { tokens } = useAppTheme();
+  const ink = accentInk ?? accent;
   const [keyboardFocused, setKeyboardFocused] = useState(false);
   const isRail = layoutRole === 'rail';
 
@@ -113,12 +123,12 @@ function TabButton({ item, isFocused, accent, layout: layoutRole, onPress }: Tab
       <MaterialIcons
         name={item.icon}
         size={isRail ? 26 : 23}
-        color={isFocused ? accent : tokens.iconMuted}
+        color={isFocused ? ink : tokens.iconMuted}
       />
       <Text
         variant="caption"
         style={{
-          color: isFocused ? accent : tokens.textMuted,
+          color: isFocused ? ink : tokens.textMuted,
           fontSize: isRail ? 12 : 10.5,
           letterSpacing: 0.1,
         }}
@@ -138,6 +148,7 @@ function SectionContainer({
 }: { isActive: boolean; children: React.ReactNode } & ViewProps) {
   const [opacity] = useState(() => new Animated.Value(isActive ? 1 : 0));
   const [translate] = useState(() => new Animated.Value(isActive ? 0 : 12));
+  const containerRef = useRef<View>(null);
 
   useEffect(() => {
     Animated.parallel([
@@ -154,8 +165,21 @@ function SectionContainer({
     ]).start();
   }, [isActive, opacity, translate]);
 
+  // Mounted-but-inactive sections keep their state for the cross-fade and are
+  // aria-hidden, but that alone leaves their controls in the keyboard tab
+  // order. Mark the subtree `inert` on web so focus cannot land on a control
+  // the user cannot see.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const node = containerRef.current as unknown as HTMLElement | null;
+    if (!node || typeof node.setAttribute !== 'function') return;
+    if (isActive) node.removeAttribute('inert');
+    else node.setAttribute('inert', '');
+  }, [isActive]);
+
   return (
     <Animated.View
+      ref={containerRef}
       {...rest}
       aria-hidden={!isActive}
       style={[
@@ -277,12 +301,21 @@ export default function Index() {
         : item.sectionKey
           ? sectionAccents[item.sectionKey].fill
           : tokens.primary;
+    // The active capsule tints from the fill; the icon/label use the
+    // contrast-safe variant (identical on dark themes, darker on light).
+    const accentInk =
+      item.name === 'overview'
+        ? overviewColor
+        : item.sectionKey
+          ? sectionAccents[item.sectionKey].text
+          : tokens.primary;
     return (
       <TabButton
         key={item.name}
         item={item}
         isFocused={activeSection === item.name}
         accent={accent}
+        accentInk={accentInk}
         layout={useSideRail ? 'rail' : 'bar'}
         onPress={() => setActiveSection(item.name)}
       />

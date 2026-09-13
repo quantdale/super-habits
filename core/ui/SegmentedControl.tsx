@@ -5,6 +5,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { useReducedMotion } from '@/core/theme/motion';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 import { radius, size, spacing } from '@/core/theme/designTokens';
+import { readableSurface } from '@/core/theme/contrast';
 import { nextSegmentValue } from '@/core/ui/segmentedControl.model';
 
 type SegmentOption<T extends string> = {
@@ -101,6 +102,9 @@ export function SegmentedControl<T extends string>({
   const { tokens } = useAppTheme();
   const reducedMotion = useReducedMotion();
   const resolvedAccent = accentColor ?? tokens.primary;
+  // The sliding pill carries white labels; deepen a mid-tone accent so the
+  // selected label clears WCAG AA (white on a section hue is ~2.5:1).
+  const pillColor = readableSurface(resolvedAccent, tokens.onSolid);
   const containerRef = useRef<View>(null);
   const [trackWidth, setTrackWidth] = useState(0);
   const [indicator] = useState(() => new Animated.Value(0));
@@ -174,7 +178,7 @@ export function SegmentedControl<T extends string>({
               bottom: spacing.xs,
               width: segmentWidth,
               borderRadius: radius.full,
-              backgroundColor: resolvedAccent,
+              backgroundColor: pillColor,
               transform: [{ translateX: indicator }],
             },
           ]}

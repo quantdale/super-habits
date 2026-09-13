@@ -40,14 +40,14 @@ function rateAccessibleLabel(rate: HabitInsightRate): string {
 }
 
 function RateCard({ rate }: { rate: HabitInsightRate }) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const percentage = rate.percentage ?? 0;
   return (
     <Card accentColor={SECTION_COLORS.habits} className="mb-3">
       <View accessible accessibilityLabel={rateAccessibleLabel(rate)}>
         <View className="flex-row items-center justify-between gap-3">
           <Text variant="titleMd">Last {rate.windowDays} days</Text>
-          <Text variant="titleLg" style={{ color: SECTION_COLORS.habits }}>
+          <Text variant="titleLg" style={{ color: sectionAccents.habits.text }}>
             {rate.percentage === null ? '—' : `${rate.percentage}%`}
           </Text>
         </View>

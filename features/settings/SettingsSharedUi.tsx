@@ -2,6 +2,7 @@ import { Text } from '@/core/ui/Text';
 import { MaterialIcons } from '@expo/vector-icons';
 import { View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { readableAccent, tintOver } from '@/core/theme/contrast';
 import type { SettingsStatusTone } from './settingsShared';
 
 type SettingsRowProps = {
@@ -43,14 +44,19 @@ export function SettingsStatusPill({
           ? tokens.dangerBackground
           : tokens.surfaceElevated;
 
+  // A raw accent (or the muted neutral) as 11px uppercase text lands under AA
+  // on the pill's palette; resolve against the pill's real surface.
   const textColor =
     tone === 'accent'
-      ? resolvedAccentColor
+      ? readableAccent(
+          resolvedAccentColor,
+          tintOver(tokens.surfaceElevated, resolvedAccentColor, 0.09),
+        )
       : tone === 'warning'
         ? tokens.warningText
         : tone === 'danger'
           ? tokens.dangerText
-          : tokens.iconMuted;
+          : tokens.text;
 
   return (
     <View className="rounded-full px-3 py-1.5" style={{ backgroundColor }}>
@@ -117,7 +123,7 @@ export function SettingsSectionHeading({
       <View className="min-w-0 flex-1">
         <Text
           className="text-[11px] font-semibold uppercase tracking-[1.2px]"
-          style={{ color: accentColor }}
+          style={{ color: readableAccent(accentColor, tokens.surfaceElevated) }}
         >
           {eyebrow}
         </Text>

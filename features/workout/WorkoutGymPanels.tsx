@@ -381,7 +381,7 @@ export function WorkoutProgressCard({
                 {selectedExercise}
               </Text>
               {selectedRecord ? (
-                <Text className="mt-1 text-xs" style={{ color: COLOR }}>
+                <Text className="mt-1 text-xs" style={{ color: tokens.text }}>
                   {formatRecord(selectedRecord)}
                 </Text>
               ) : null}
@@ -509,7 +509,7 @@ export function BodyWeightCard({
               : `${trend.change > 0 ? '+' : ''}${trend.change.toFixed(1)} ${trend.first?.unit ?? ''} since first entry`}
           </Text>
           {goalWeight ? (
-            <Text className="mt-1 text-xs font-semibold" style={{ color: COLOR }}>
+            <Text className="mt-1 text-xs font-semibold" style={{ color: tokens.text }}>
               Goal · {goalWeight.value} {goalWeight.unit}
             </Text>
           ) : null}
@@ -563,7 +563,7 @@ export function BodyWeightCard({
             className="rounded-lg px-2 py-1"
             style={{ backgroundColor: tokens.surfaceElevated }}
           >
-            <Text className="text-[11px] font-semibold" style={{ color: COLOR }}>
+            <Text className="text-[11px] font-semibold" style={{ color: tokens.text }}>
               Edit
             </Text>
           </Pressable>
@@ -616,7 +616,7 @@ export function WorkoutTotalsCard({
             className="min-w-[105px] flex-1 rounded-xl border px-3 py-2"
             style={{ borderColor: tokens.border }}
           >
-            <Text className="text-lg font-semibold" style={{ color: COLOR }}>
+            <Text className="text-lg font-semibold" style={{ color: tokens.text }}>
               {String(value)}
             </Text>
             <Text className="text-[11px]" style={{ color: tokens.textMuted }}>

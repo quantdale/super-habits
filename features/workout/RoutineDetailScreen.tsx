@@ -404,10 +404,10 @@ export function RoutineDetailModal({
           className="mb-4 rounded-2xl border px-4 py-3"
           style={{ borderColor: `${COLOR}33`, backgroundColor: `${COLOR}14` }}
         >
-          <Text className="text-sm font-semibold" style={{ color: COLOR }}>
+          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
             Routine builder
           </Text>
-          <Text className="mt-1 text-sm" style={{ color: COLOR }}>
+          <Text className="mt-1 text-sm" style={{ color: tokens.text }}>
             Add exercises, tune work and rest intervals, then start the routine when it is ready.
           </Text>
         </View>

@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { SectionAccent, SectionKey } from '@/constants/sectionColors';
+import type { RewardAccent, RewardKey, SectionAccent, SectionKey } from '@/constants/sectionColors';
 import type { ThemeDefinition, ThemeId, ThemeTokens } from '@/core/theme';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
@@ -12,6 +12,7 @@ export type ThemeContextValue = {
   theme: ThemeDefinition;
   tokens: ThemeTokens;
   sectionAccents: Record<SectionKey, SectionAccent>;
+  rewardAccents: Record<RewardKey, RewardAccent>;
   setMode: (nextMode: ThemeMode) => void;
   setTheme: (id: ThemeId) => void;
 };

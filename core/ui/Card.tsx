@@ -3,6 +3,7 @@ import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { elevation, radius, spacing } from '@/core/theme/designTokens';
+import { readableSurface } from '@/core/theme/contrast';
 
 export type CardVariant = 'standard' | 'header' | 'stat';
 
@@ -79,7 +80,9 @@ export function Card({
   const rootClass = ['overflow-hidden', marginClass, extra].filter(Boolean).join(' ');
 
   if (variant === 'header') {
-    const bandColor = accentColor ?? tokens.primary;
+    // White text on a mid-tone section hue measures ~2.5:1; deepen the band
+    // (hue preserved) until the title clears WCAG AA.
+    const bandColor = readableSurface(accentColor ?? tokens.primary, tokens.onSolid);
     return (
       <View className={rootClass} style={rootStyle}>
         <View
@@ -102,7 +105,7 @@ export function Card({
             {headerSubtitle ? (
               <Text
                 variant="caption"
-                style={{ color: withAlpha(tokens.onSolid, 0.82), marginTop: 2 }}
+                style={{ color: tokens.onSolid, marginTop: 2 }}
                 numberOfLines={2}
               >
                 {headerSubtitle}

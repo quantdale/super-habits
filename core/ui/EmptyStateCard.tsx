@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { Card } from '@/core/ui/Card';
 import { Text } from '@/core/ui/Text';
 import { SparkIllustration } from '@/core/ui/illustrations/SparkIllustration';
+import { useAppTheme } from '@/core/providers/themeContext';
 import { radius, spacing } from '@/core/theme/designTokens';
 
 type EmptyStateCardProps = {
@@ -33,6 +34,11 @@ export function EmptyStateCard({
   children,
   className,
 }: EmptyStateCardProps) {
+  const { tokens } = useAppTheme();
+  // Empty-state descriptions sit on an accent-tinted card that can itself be
+  // nested in another tinted card; muted text there measures ~4.3:1, so the
+  // description uses the primary text colour and keeps hierarchy via size.
+  const descriptionColor = tokens.text;
   return (
     <Card accentColor={accentColor} className={className}>
       <View style={{ alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm }}>
@@ -53,8 +59,7 @@ export function EmptyStateCard({
         {description ? (
           <Text
             variant="bodyMd"
-            tone="muted"
-            style={{ textAlign: 'center', paddingHorizontal: spacing.md }}
+            style={{ color: descriptionColor, textAlign: 'center', paddingHorizontal: spacing.md }}
           >
             {description}
           </Text>

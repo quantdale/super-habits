@@ -41,7 +41,7 @@ function StreakChip({ label, value, color }: { label: string; value: string; col
  * level, which is the only number that ever motivates a next action.
  */
 export function LevelHero({ level, streak, freezes, size = 'compact' }: LevelHeroProps) {
-  const { tokens } = useAppTheme();
+  const { tokens, rewardAccents } = useAppTheme();
   const ringSize = size === 'full' ? 108 : 84;
   const strokeWidth = size === 'full' ? 10 : 8;
 
@@ -98,11 +98,15 @@ export function LevelHero({ level, streak, freezes, size = 'compact' }: LevelHer
           />
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-          <StreakChip label="day streak" value={`${streak.current}`} color={REWARD_COLORS.streak} />
+          <StreakChip
+            label="day streak"
+            value={`${streak.current}`}
+            color={rewardAccents.streak.text}
+          />
           <StreakChip
             label={freezes.banked === 1 ? 'streak freeze' : 'streak freezes'}
             value={`${freezes.banked}`}
-            color={REWARD_COLORS.frozen}
+            color={rewardAccents.frozen.text}
           />
         </View>
         {streak.atRisk ? (

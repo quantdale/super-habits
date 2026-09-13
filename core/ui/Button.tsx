@@ -7,6 +7,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { useReducedMotion } from '@/core/theme/motion';
 import { radius, size, spacing, springs, typography } from '@/core/theme/designTokens';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
+import { readableSurface } from '@/core/theme/contrast';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -79,12 +80,22 @@ export function Button({
   const inactive = disabled || loading;
   const metrics = SIZES[sizeRole];
 
+  // A caller-supplied hue paints the solid face carrying white text; deepen it
+  // until the label clears WCAG AA (section hues measure ~4.2:1 as-is).
   const face = color ?? (variant === 'danger' ? tokens.dangerSolid : tokens.button);
+  const solidFace =
+    (variant === 'primary' || variant === 'danger') && color
+      ? readableSurface(face, tokens.buttonText)
+      : face;
   const gradient: readonly [string, string] =
-    variant === 'primary' && !color ? tokens.brandGradient : [face, face];
-  const lip = variant === 'ghost' ? tokens.surfaceActive : shade(face, 0.76);
+    variant === 'primary' && !color ? tokens.brandGradient : [solidFace, solidFace];
+  const lip = variant === 'ghost' ? tokens.surfaceActive : shade(solidFace, 0.76);
   const labelColor =
-    variant === 'primary' ? tokens.buttonText : variant === 'secondary' ? face : tokens.text;
+    variant === 'primary' || variant === 'danger'
+      ? tokens.buttonText
+      : variant === 'secondary'
+        ? readableSurface(face, tokens.chipBackground)
+        : tokens.text;
 
   const settle = (toValue: number) => {
     if (reducedMotion) {

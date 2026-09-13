@@ -133,7 +133,11 @@ export function TodayProgressStrip({
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
         {metrics.map((metric) => {
           const meta = OVERVIEW_CARD_META[metric.id];
+          // Fills paint the tint/border; text and glyphs use the contrast-safe
+          // accent variant (light themes ship a darker hue for text) so the
+          // 19px metric clears WCAG AA on its tinted tile.
           const hue = sectionAccents[metric.id].fill;
+          const ink = sectionAccents[metric.id].text;
           return (
             <Pressable
               key={metric.id}
@@ -155,10 +159,10 @@ export function TodayProgressStrip({
                 opacity: pressed ? 0.85 : 1,
               })}
             >
-              <MaterialIcons name={meta.icon} size={18} color={hue} />
+              <MaterialIcons name={meta.icon} size={18} color={ink} />
               <Text
                 variant="titleMd"
-                style={{ color: hue, fontSize: 19, lineHeight: 24 }}
+                style={{ color: ink, fontSize: 19, lineHeight: 24 }}
                 numberOfLines={1}
               >
                 {metric.value}

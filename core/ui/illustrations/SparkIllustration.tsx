@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useAppTheme } from '@/core/providers/themeContext';
 
@@ -18,15 +19,21 @@ type SparkIllustrationProps = {
 export function SparkIllustration({ color, size = 120 }: SparkIllustrationProps) {
   const { tokens } = useAppTheme();
   const hue = color ?? tokens.primary;
+  // Gradient ids must be unique per instance: several illustrations can render
+  // at once, and duplicate ids are invalid HTML and make `url(#id)` resolve to
+  // the first match.
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
+  const blobId = `sparkBlob-${uid}`;
+  const coreId = `sparkCore-${uid}`;
 
   return (
     <Svg width={size} height={size} viewBox="0 0 120 120" accessibilityElementsHidden>
       <Defs>
-        <LinearGradient id="sparkBlob" x1="0" y1="0" x2="1" y2="1">
+        <LinearGradient id={blobId} x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor={hue} stopOpacity="0.35" />
           <Stop offset="1" stopColor={hue} stopOpacity="0.12" />
         </LinearGradient>
-        <LinearGradient id="sparkCore" x1="0" y1="0" x2="0" y2="1">
+        <LinearGradient id={coreId} x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor={hue} stopOpacity="1" />
           <Stop offset="1" stopColor={hue} stopOpacity="0.72" />
         </LinearGradient>
@@ -34,10 +41,10 @@ export function SparkIllustration({ color, size = 120 }: SparkIllustrationProps)
 
       <Path
         d="M60 6c22 0 44 14 47 38 3 24-12 48-36 56-24 8-50-4-58-27C5 50 16 22 38 12c7-3 15-6 22-6Z"
-        fill="url(#sparkBlob)"
+        fill={`url(#${blobId})`}
       />
       <Ellipse cx="60" cy="104" rx="34" ry="7" fill={hue} opacity="0.16" />
-      <Circle cx="60" cy="58" r="26" fill="url(#sparkCore)" />
+      <Circle cx="60" cy="58" r="26" fill={`url(#${coreId})`} />
       <Path
         d="M60 34l6.4 14.6L82 55l-15.6 6.4L60 76l-6.4-14.6L38 55l15.6-6.4L60 34Z"
         fill={tokens.onSolid}

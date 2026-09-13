@@ -41,7 +41,7 @@ type AdherenceSummary = {
 };
 
 export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const today = dateKey ?? toDateKey();
   const { begin } = useGuardedAsyncRefresh();
   const draft = useMemo(() => createEditableFieldOwner<EditableField>(), []);
@@ -385,7 +385,7 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
           color={SECTION_COLORS.habits}
         />
       ) : (
-        <Text className="text-sm font-semibold" style={{ color: SECTION_COLORS.habits }}>
+        <Text className="text-sm font-semibold" style={{ color: sectionAccents.habits.text }}>
           Plan completed.
         </Text>
       )}

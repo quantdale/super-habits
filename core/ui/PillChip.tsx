@@ -4,6 +4,7 @@ import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useReducedMotion } from '@/core/theme/motion';
 import { radius, size, spacing, springs, typography } from '@/core/theme/designTokens';
+import { readableSurface } from '@/core/theme/contrast';
 
 type Props = {
   label: string;
@@ -53,8 +54,8 @@ export function PillChip({ label, accessibilityLabel, active, color, onPress, ic
           alignItems: 'center',
           justifyContent: 'center',
           gap: spacing.xs,
-          backgroundColor: active ? color : tokens.surface,
-          borderColor: active ? color : tokens.border,
+          backgroundColor: active ? readableSurface(color, tokens.onSolid) : tokens.surface,
+          borderColor: active ? readableSurface(color, tokens.onSolid) : tokens.border,
         }}
       >
         {icon ? (
