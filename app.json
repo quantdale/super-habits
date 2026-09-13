@@ -51,7 +51,13 @@
           }
         }
       ],
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#6D28D9"
+        }
+      ],
       "expo-sqlite",
       "@react-native-community/datetimepicker",
       "./plugins/withAndroidCxxRuntime",

@@ -1,7 +1,9 @@
 # App Store / Play Store readiness
 
-Snapshot of release state for SuperHabits 1.0.0 (schema 25). Update this file
-when a release actually ships rather than letting it drift.
+Snapshot of release state for SuperHabits 1.0.0 (schema 25). Refreshed
+2026-09-14 at source `c04cceb` (plus the Android notification-icon asset added
+the same day). Update this file when a release actually ships rather than
+letting it drift.
 
 ## What ships
 
@@ -15,51 +17,45 @@ when a release actually ships rather than letting it drift.
 | Design system | **Pop**: Nunito type via `core/ui/Text`, bottom tab bar / wide-screen side rail shell, per-section hues, tactile motion (`docs/ui-ux/12-pop-design-system.md`) |
 | Targets       | Web PWA (Vercel), iOS, Android                                                                                                                                 |
 
-## Verification run for this release
+## Verification run for this release (2026-09-14)
 
-| Gate                     | Command                                                                                             | Result                                                                                                                                                                                 |
-| ------------------------ | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Types                    | `npm run typecheck`                                                                                 | clean                                                                                                                                                                                  |
-| Lint                     | `npm run lint` (`--max-warnings 0`)                                                                 | clean                                                                                                                                                                                  |
-| Unit + integration       | `npm test`                                                                                          | 2055 passed / 196 files                                                                                                                                                                |
-| E2E                      | `npm run e2e`                                                                                       | see "E2E result" below                                                                                                                                                                 |
-| Web bundle               | `npm run build:web`                                                                                 | exported to `dist/`, 4 bundles + static routes                                                                                                                                         |
-| Expo config              | `npx expo-doctor`                                                                                   | 19/20 (see known constraints)                                                                                                                                                          |
-| Theme contrast           | `npm run validate:themes`                                                                           | 140 checks pass                                                                                                                                                                        |
-| Reward loop              | `npx playwright test e2e/gamification.spec.ts`                                                      | 4 passed: XP award, replay-idempotency, achievements overlay, feedback-preference persistence                                                                                          |
-| Rollover journeys        | `npx playwright test --project=journeys --grep "past-midnight"`                                     | 8 passed (J2a writes + J2b freshness)                                                                                                                                                  |
-| P0 journeys              | `npm run e2e:journeys:p0`                                                                           | 25 passed                                                                                                                                                                              |
-| Deterministic simulation | `npm run qa:simulation -- --all --mode deterministic`                                               | 23/23 scenarios passed                                                                                                                                                                 |
-| Live web probe           | `npm run web:verify`                                                                                | PASS (fresh export, COOP/COEP, shell probe, ports released)                                                                                                                            |
-| Visual regression audit  | temporary Playwright harness (10 scenarios)                                                         | PASS 10/10: six sections + overlays + modals at 360/390/412/768/1024/1280/1440/1920, populated/empty/stress/dark; ~20 defects fixed                                                    |
-| Native smoke             | `node scripts/qa-native.mjs --platform android --tag smoke --avd Nitro_API_36`                      | PASS 2/2 flows on credential-free APK from clean source `d9c17f5` (SHA-256 `B9FC4ED1…`), canonical Nitro_API_36 x86_64                                                                 |
-| Native persistence       | `node scripts/qa-native.mjs --platform android --tag persistence --avd Nitro_API_36 --no-provision` | 2/11 — `calories-persistence` + `settings-persistence` PASS; 9 flow-selector failures classified `TEST_BUG` (pre-redesign flow assumptions), registered as known-gap 17 with artifacts |
-
-### E2E result
-
-Final Chromium feature battery on the shipped `dist/` (2026-09-12):
-**135 passed, 1 failed, 7 skipped**. The single failure is
-`habits.spec.ts:222` "target edits keep a prior completed date complete" — the
-intermittent modal-close-vs-commit race registered in
-`docs/testing/known-gaps.md` §3. It passed standalone in a 46-test focused
-batch and fails intermittently under battery load; the register's rule stands:
-re-verify before touching the habit-edit save path.
+| Gate                    | Command                                            | Result                                                                                                     |
+| ----------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Types                   | `npm run typecheck`                                | clean                                                                                                      |
+| Lint                    | `npm run lint` (`--max-warnings 0`)                | clean                                                                                                      |
+| Unit + integration      | `npm test`                                         | 2055 passed / 196 files                                                                                    |
+| Chromium E2E            | `npx playwright test --project=chromium`           | 136 passed / 7 skipped / 0 failed                                                                          |
+| Journey E2E             | `npx playwright test --project=journeys`           | 104 passed / 6 skipped / 0 failed                                                                          |
+| Simulation E2E          | `npx playwright test --project=simulation`         | 3 passed (repro replay, deterministic reproducibility, run-report schema)                                  |
+| PWA update lane         | `npx playwright test --project=pwa`                | passed (chromium + pwa run totals 140 passed)                                                              |
+| Web bundle              | `npm run build:web`                                | exported to `dist/`, 4 bundles + static routes                                                             |
+| Live web probe          | `npm run web:verify`                               | PASS in 64.7s (fresh export, HTTP 200, COOP/COEP, shell probe, port released)                              |
+| Expo config             | `npx expo-doctor`                                  | 19/20 (10 SDK-recommended patch bumps held by pinned patches — see constraints)                            |
+| Theme contrast          | `npm run validate:themes`                          | 140 checks pass                                                                                            |
+| OpenSpec                | `openspec validate --all`                          | 57 passed / 0 failed                                                                                       |
+| ExecPlans               | `npm run agent:plan:validate:all`                  | all plans PASS                                                                                             |
+| Native persistence lane | `npm run qa:native:targeted -- --avd Nitro_API_36` | **11/11 PASS** in 11m43s on credential-free APK `A4C3C900…` from source `2c1594b`                          |
+| Production deployment   | `vercel --prod`                                    | https://super-habits.vercel.app — HTTP 200, COOP/COEP, `crossOriginIsolated=true`, 0 non-Nunito text nodes |
 
 ### E2E result
 
-Final Chromium feature battery on the shipped `dist/` (2026-09-12):
-**134 passed, 2 failed, 7 skipped**. Both failures were root-caused:
+Chromium **136 passed / 7 skipped / 0 failed**, journeys **104 / 6 / 0**, and
+the simulation lane **3 passed** on the shipped `dist/`. The previously
+documented flakes are closed:
 
-- `portable-backup.spec.ts:116` — the test helper typed the todo title
-  char-by-char; the heavier redesigned modal dropped the trailing character
-  ("Alpha tas"), so the exact-title assertion found nothing when the test ran
-  after its sibling exports. Fixed by committing the value in one event
-  (`fill()`), assertions unchanged; the portable and settings files then pass
-  **8/8**.
-- `habits.spec.ts:222` — the intermittent modal-close-vs-commit race registered
-  in `docs/testing/known-gaps.md` §16; it passes standalone on the same tree
-  and remains a documented flake (re-verify before touching the habit-edit
-  save path).
+- `habits.spec.ts` “target edits keep a prior completed date complete” was a
+  test guard firing when the save button entered its loading state, letting the
+  SQL oracle abort the in-flight OPFS write; it now waits for the modal title
+  (known-gap 16, closed as `TEST_BUG`).
+- The native persistence failures (known-gaps 17/18) were deterministic flow
+  defects — a center swipe swallowed by a focused `EditText`, a post-create
+  habit tile above a still-scrolled screen, and a calories post-save list that
+  ignores center-anchored swipes — repaired with scoped swipes/polls and
+  verified at 11/11 in the rested single-AVD lane.
+- Journey P2/P3/P5 were RN-Web-refactor rot (inline-style geometry check,
+  per-character stepper typing racing a focus-stealing re-render, and a stale
+  structural XPath); repaired with computed styles, a single-event `fill`, and
+  the semantic completion checkbox.
 
 ## Store metadata registered in `app.json`
 
@@ -70,6 +66,11 @@ Final Chromium feature battery on the shipped `dist/` (2026-09-12):
   (`android-icon-foreground.png` 512², `android-icon-background.png`, and
   `android-icon-monochrome.png` 432² for themed icons), web `favicon.png`
   plus PWA `public/icon-192.png`, `icon-512.png`, `icon-maskable-512.png`.
+- **Notification icon**: `assets/notification-icon.png` (96×96
+  white-on-transparent, derived from the app's monochrome mark), wired through
+  the `expo-notifications` plugin with colour `#6D28D9`. A prebuild emits
+  `drawable-{mdpi..xxxhdpi}/notification_icon.png`, `@color/notification_icon_color`,
+  and both FCM + local `default_notification_icon` manifest entries.
 - **Splash**: `assets/splash-icon.png` (1024²), `resizeMode: contain`,
   `backgroundColor: #ffffff`, with a dark variant (`#0a0f1a`).
 - **iOS**: bundle id `com.dale16.superhabits`, tablet support on,
@@ -94,11 +95,11 @@ Final Chromium feature battery on the shipped `dist/` (2026-09-12):
    and analytics are absent. Declare "Data Not Collected" on iOS and
    "No data collected / No data shared" on Play, with encryption in transit
    for the optional backup path.
-4. **Android notification icon**: `expo-notifications` falls back to the app
-   icon; a dedicated 96×96 white-on-transparent PNG (and its plugin config)
-   is still missing.
-5. **Version tagging + release notes**: tag `v1.0.0`, write the store release
-   notes, and confirm the EAS `submit.production` profile has credentials.
+4. ~~**Android notification icon**~~ — **delivered 2026-09-14**
+   (`assets/notification-icon.png` + plugin config + prebuild verification).
+5. **Version tagging + release notes**: write the store release notes
+   (`docs/release/release-notes-1.0.0.md` is the draft) and confirm the EAS
+   `submit.production` profile has credentials. Tag `v1.0.0` at release time.
 6. **Age rating questionnaires** (iOS 4+, Play "Everyone") and the EU DSA
    trader declaration.
 7. **Localization**: the UI ships English-only. Android channel names and the
