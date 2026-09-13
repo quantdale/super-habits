@@ -729,7 +729,11 @@ async function measureSwitch(page: Page, tab: SectionName, marker: string): Prom
       if (!leaf) return false;
       let current: HTMLElement | null = leaf;
       while (current && current !== document.body) {
-        if (current.style.position === 'absolute') {
+        // Read the *computed* position: the shell's SectionContainer applies
+        // absoluteFill through a CSS class on web (RN Web compiles
+        // StyleSheet styles), so an inline-style check never matches and the
+        // switch could never be observed as complete.
+        if (getComputedStyle(current).position === 'absolute') {
           return Number(getComputedStyle(current).opacity) > 0.5;
         }
         current = current.parentElement;
@@ -764,7 +768,9 @@ async function sectionOpacity(page: Page, markerText: string): Promise<number> {
     if (!leaf) return 0;
     let cur: HTMLElement | null = leaf;
     while (cur && cur !== document.body) {
-      if (cur.style.position === 'absolute') {
+      // See measureSwitch: the shell's absolute SectionContainer is a CSS
+      // class on web, not an inline style.
+      if (getComputedStyle(cur).position === 'absolute') {
         return Number(getComputedStyle(cur).opacity);
       }
       cur = cur.parentElement;

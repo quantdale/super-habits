@@ -38,7 +38,15 @@ async function setNumberStepper(page: Page, label: string, value: string) {
   const input = stepperInput(page, label);
   await input.click();
   await input.fill('');
-  await input.type(value, { delay: 15 });
+  // Set the whole value in one input event. Per-character typing races a
+  // post-open async re-render that blurs the field: probed in the journey
+  // (SMALL seed, 1440×1000), the freshly clicked input loses focus to body
+  // within 600ms, so `type('2400')` delivered only the first digit and the
+  // save wrote the unchanged 2000. A single fill re-focuses and commits the
+  // value atomically; the feed value is also closer to how the field is used
+  // (a complete number, not keystroke-by-keystroke). The save + ripple
+  // assertions below are unchanged.
+  await input.fill(value);
 }
 
 async function dismissStartupRestorePromptIfPresent(page: Page) {

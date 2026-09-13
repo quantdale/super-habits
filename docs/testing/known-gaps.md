@@ -248,7 +248,7 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 **Closing path:** keep the ceiling and floor assertions exactly as they are — they are a genuine regression alarm. When a full battery runs on a loaded host, re-verify a floor failure standalone (`npx playwright test --project=journeys e2e/journeys/three-months-in.spec.ts -g "Tom"`) and classify with the recorded per-switch numbers before touching product code; the permanent fix is running the battery on a quiet host or CI, not relaxing the budget.
 
-### 16. Habit target-edit rule-history commit race under full-battery load (documented flake)
+### 16. Habit target-edit rule-history commit race under full-battery load — CLOSED (TEST_BUG)
 
 **Reason:** during the 2026-09-10 full `npm run e2e` battery, `e2e/habits.spec.ts`
 “target edits keep a prior completed date complete” read `habits.rule_history` while it
@@ -260,11 +260,17 @@ changes were bootstrap promotion, daily-plan deletion, test oracles, docs, and z
 dead-code removal). Classification: `FLAKY_TEST` (async commit racing the oracle under
 accumulated single-worker battery load), same host-load class as known gap 15.
 
-**Closing path:** keep the test and its strict rule-history oracle unchanged. When it
-fails in a battery, re-verify standalone (`npx playwright test --project=chromium
-e2e/habits.spec.ts -g "target edits keep a prior completed date complete"`) and classify
-before touching product code; if it becomes reproducible standalone, treat the
-modal-close-vs-commit ordering in the habit edit save path as a product bug.
+**Resolution (2026-09-13, `baseline-failure-repair-v1`):** the flake became
+reproducible standalone and was root-caused to the **test guard**, not the product. An
+instrumented `updateHabit` probe logged `{"changed":true}` with both rule intervals
+persisted while the failing run still read target 1: the guard waited for
+`Save changes` to hide, which happens when the button enters its **loading** state, so
+the SQL oracle navigated the page away ~130 ms later and aborted the in-flight OPFS
+transaction. The test now waits for the modal title (`Edit Habit`) to hide — unchanged
+by the loading state and unmounted only after the awaited commit — and the strict
+rule-history oracle is untouched. Verified 3/3 standalone and in the full battery.
+
+**Closing path:** closed; keep the title-based post-commit guard and the strict oracle.
 
 ### 17. Native persistence flows need a dedicated selector pass after the Pop redesign (TEST_BUG)
 
@@ -355,6 +361,38 @@ persistence assertion unchanged, then re-run `npm run qa:native:targeted` from a
 clean committed source. (Executed 2026-09-12; the residual lane flake was
 root-caused and repaired 2026-09-13 — see the residual note above. This entry
 is fully closed.)
+
+### 18. Journey interaction rot after the RN-Web style/refactor generation — CLOSED (TEST_BUG)
+
+**Reason (found 2026-09-13 while gating the UI type campaign):** three journey
+steps failed identically on the baseline build (`575c3d8`) and on current
+`main`, so they had been red behind the blocked CI without being noticed:
+
+- `three-months-in.spec.ts` P2 step 3 — `sectionOpacity()`/`measureSwitch()`
+  looked for an **inline** `style.position === 'absolute'`; the shell's
+  `SectionContainer` applies `StyleSheet.absoluteFill`, which RN Web compiles
+  to a CSS class, so the active section was never observed and the poll timed
+  out at opacity 0.
+- `settings-ripple.spec.ts` P3 step 2 — `setNumberStepper` typed per
+  character; probing showed the freshly clicked input loses focus to `<body>`
+  within ~600 ms (async post-open re-render), so only the first digit landed
+  and the save wrote the unchanged 2000.
+- `the-commute.spec.ts` P5 step 3 — the todo completion toggle was clicked
+  through a structural XPath (`../../preceding-sibling::*[1]`) that no longer
+  resolves; the step hung to its 120 s budget.
+
+**Resolution (2026-09-13, `baseline-failure-repair-v1`):** computed-position
+checks in the journey helpers, a single-event `fill` for the stepper, and the
+semantic `Mark complete: <title>` checkbox — every SQL/row/geometry oracle
+unchanged. Verified per-spec (7/7, 6/6, 6/6), full `--project=journeys`
+(104 passed / 6 skipped / 0 failed), and `--project=chromium` (see the
+campaign's ExecPlan ledger). The stepper's focus theft is noted as a minor
+product observation (unseeded apps hold focus); it was not changed without
+stronger evidence.
+
+**Closing path:** closed. When a journey fails after a web-shell refactor,
+prefer computed style and semantic roles over inline-style/structure
+selectors.
 
 ---
 

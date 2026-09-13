@@ -219,13 +219,10 @@ defineJourney({
         await page.getByPlaceholder(/Add a task/i).fill('Draft reply');
         await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
         await expect(page.getByText('Draft reply').first()).toBeVisible();
-        // The completion toggle is the semantic checkbox left of the title
-        // (row child [1]; the title text itself has no onPress).
-        await page
-          .getByText('Draft reply')
-          .first()
-          .locator('xpath=../../preceding-sibling::*[1]')
-          .click();
+        // The completion toggle is a semantic checkbox; the old structural
+        // XPath (../../preceding-sibling::*[1]) no longer resolves after the
+        // list refactor and hung this step to its 120s budget.
+        await page.getByRole('checkbox', { name: 'Mark complete: Draft reply' }).click();
         // Completion moves the row into the collapsed "completed" set; the
         // deterministic immediate-UI signal is the reveal toggle appearing
         // (completed tasks render only once the user expands them).

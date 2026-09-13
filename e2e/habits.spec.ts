@@ -243,10 +243,14 @@ test.describe('Scheduled habits', () => {
     await page.getByLabel('Habit groups').getByText('Edit', { exact: true }).first().click();
     await page.getByLabel('Target per day', { exact: true }).fill('2');
     await page.getByText('Save changes', { exact: true }).locator('..').click({ force: true });
-    // The save's async mutation chain outlives the click; a SQL oracle below
-    // navigates the page away, which would abort an in-flight transaction on
-    // slower runners. The modal closes only after the edit commits.
-    await expect(page.getByText('Save changes', { exact: true })).toBeHidden({
+    // Wait for the committed close, not for `Save changes` to hide: the label
+    // disappears as soon as the button enters its loading state, and a guard on
+    // it let the SQL oracle below navigate the page away mid-transaction,
+    // aborting the OPFS write (probe: the row still read target 1 while the
+    // same save with a settle committed the new target and its rule entry).
+    // The modal title is unaffected by the loading state and unmounts only
+    // after `updateHabit` resolves, so its disappearance marks the commit.
+    await expect(page.getByText('Edit Habit', { exact: true })).toBeHidden({
       timeout: 10_000,
     });
     // Scope to the Habit groups region: the Overview habits card link shares
