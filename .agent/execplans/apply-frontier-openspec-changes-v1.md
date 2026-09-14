@@ -185,8 +185,11 @@ integration gates are green on the final tree.
   section with dispatcher tests. All 30 OpenSpec tasks are complete; specs validate
   strict; the final tree is green on typecheck, lint, 197-file Vitest, Chromium,
   P0 journeys, and the `e2e:sync` remote-boundary lane.
-- Follow-up: (1) archive the three changes via OpenSpec when requested; (2) the
-  pre-existing simulation day-rollover section-render failure should be triaged by
-  the simulation/harness owner; (3) native smoke/persistence remains available once
-  the tree is committed (clean-tree provenance); (4) known-gap 15 headroom floor
+- Follow-up: (1) DONE 2026-09-14 — the three changes were archived (2026-09-14-<slug>
+  entries under `openspec/changes/archive/`) and their deltas synced into main specs
+  (`backup-push-contracts`, `local-reward-ledger` created; `workout-correction`,
+  `gym-workout-deep-expansion` updated); (2) the pre-existing simulation day-rollover
+  section-render failure should be triaged by the simulation/harness owner; (3) native
+  smoke/persistence can now run from the pushed commit via `qa:native:provision`
+  (clean-tree provenance is available at `e7a456d`); (4) known-gap 15 headroom floor
   remains host-load sensitive and was not weakened.
