@@ -13,6 +13,7 @@ import {
   TODO_REMINDER_MARK_DONE_ACTION,
   TODO_REMINDER_SNOOZE_ACTION,
   WEEKLY_REVIEW_REMINDER_DATA_KIND,
+  WORKOUT_DAY_REMINDER_DATA_KIND,
 } from '@/lib/notificationConstants';
 import { getTodoReminderActionKey, todoReminderIdentifier } from './reminderPlanning';
 
@@ -50,10 +51,17 @@ export type WeeklyReviewReminderResponse = {
   actionIdentifier: string;
 };
 
+export type WorkoutDayReminderResponse = {
+  kind: 'workout-day-reminder';
+  action: 'open';
+  actionIdentifier: string;
+};
+
 export type ClassifiedNotificationResponse =
   | HabitReminderResponse
   | TodoReminderResponse
   | WeeklyReviewReminderResponse
+  | WorkoutDayReminderResponse
   | { kind: 'unknown'; actionIdentifier: string };
 
 export type NotificationResponseHandlers = {
@@ -74,6 +82,7 @@ export type NotificationResponseHandlers = {
   markDone: (input: { todoId: string; actionKey: string; occurrenceId: string }) => Promise<void>;
   snoozeTodo: (input: { todoId: string; actionKey: string; occurrenceId: string }) => Promise<void>;
   openWeeklyReview: () => void;
+  openWorkout: () => void;
 };
 
 export function classifyNotificationResponse(
@@ -125,6 +134,17 @@ export function classifyNotificationResponse(
         : null;
     if (action === null) return { kind: 'unknown', actionIdentifier };
     return { kind: 'weekly-review-reminder', action, actionIdentifier };
+  }
+
+  if (data?.kind === WORKOUT_DAY_REMINDER_DATA_KIND) {
+    // A schedule ping, not a completion claim: the body tap only opens the
+    // Workout section. Explicit unknown actions never navigate.
+    const action: 'open' | null =
+      actionIdentifier === DEFAULT_ACTION_IDENTIFIER || actionIdentifier.length === 0
+        ? 'open'
+        : null;
+    if (action === null) return { kind: 'unknown', actionIdentifier };
+    return { kind: 'workout-day-reminder', action, actionIdentifier };
   }
 
   if (data?.kind !== HABIT_REMINDER_DATA_KIND) {
@@ -214,6 +234,11 @@ export async function dispatchNotificationResponse(
 
   if (classified.kind === 'weekly-review-reminder') {
     handlers.openWeeklyReview();
+    return classified;
+  }
+
+  if (classified.kind === 'workout-day-reminder') {
+    handlers.openWorkout();
     return classified;
   }
 

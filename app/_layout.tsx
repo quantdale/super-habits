@@ -190,6 +190,10 @@ function NotificationResponseHost() {
               closeSettings();
               openWeeklyReview();
             },
+            openWorkout: () => {
+              closeSettings();
+              setActiveSection('workout');
+            },
           });
         } catch (error) {
           console.error('[notifications] response dispatch failed', error);

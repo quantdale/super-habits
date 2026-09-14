@@ -98,6 +98,7 @@ describe('notification response dispatcher', () => {
       snooze,
       ...todoHandlers,
       openWeeklyReview: vi.fn(),
+      openWorkout: vi.fn(),
     });
     await dispatchNotificationResponse(response(normalData, HABIT_REMINDER_MARK_COMPLETE_ACTION), {
       openHabit,
@@ -105,6 +106,7 @@ describe('notification response dispatcher', () => {
       snooze,
       ...todoHandlers,
       openWeeklyReview: vi.fn(),
+      openWorkout: vi.fn(),
     });
     await dispatchNotificationResponse(response(normalData, HABIT_REMINDER_SNOOZE_ACTION), {
       openHabit,
@@ -112,6 +114,7 @@ describe('notification response dispatcher', () => {
       snooze,
       ...todoHandlers,
       openWeeklyReview: vi.fn(),
+      openWorkout: vi.fn(),
     });
 
     expect(openHabit).toHaveBeenCalledWith('habit_gym');
@@ -226,6 +229,7 @@ describe('todo reminder response classification', () => {
       markDone,
       snoozeTodo,
       openWeeklyReview: vi.fn(),
+      openWorkout: vi.fn(),
     };
 
     await dispatchNotificationResponse(response(todoData), handlers);
@@ -264,11 +268,78 @@ describe('todo reminder response classification', () => {
       markDone,
       snoozeTodo,
       openWeeklyReview: vi.fn(),
+      openWorkout: vi.fn(),
     });
 
     expect(classified).toMatchObject({ kind: 'unknown' });
     expect(openTodo).not.toHaveBeenCalled();
     expect(markDone).not.toHaveBeenCalled();
     expect(snoozeTodo).not.toHaveBeenCalled();
+  });
+});
+
+const workoutDayData = { kind: 'workout-day-reminder' };
+
+describe('workout-day reminder response classification', () => {
+  it('classifies a body tap as an open action', () => {
+    expect(classifyNotificationResponse(response(workoutDayData))).toMatchObject({
+      kind: 'workout-day-reminder',
+      action: 'open',
+    });
+    // A payload without an explicit action identifier is a body tap too.
+    expect(classifyNotificationResponse(response(workoutDayData, ''))).toMatchObject({
+      kind: 'workout-day-reminder',
+      action: 'open',
+    });
+  });
+
+  it('treats an unrecognized action identifier as unknown, never as a body tap', () => {
+    expect(
+      classifyNotificationResponse(response(workoutDayData, 'future_workout_action')),
+    ).toMatchObject({ kind: 'unknown' });
+  });
+
+  it('dispatches openWorkout without invoking any mutation handler', async () => {
+    const openWorkout = vi.fn();
+    const openHabit = vi.fn();
+    const markComplete = vi.fn().mockResolvedValue(undefined);
+    const markDone = vi.fn().mockResolvedValue(undefined);
+
+    const classified = await dispatchNotificationResponse(
+      response({ kind: 'workout-day-reminder' }),
+      {
+        openHabit,
+        markComplete,
+        snooze: vi.fn().mockResolvedValue(undefined),
+        openTodo: vi.fn(),
+        markDone,
+        snoozeTodo: vi.fn().mockResolvedValue(undefined),
+        openWeeklyReview: vi.fn(),
+        openWorkout,
+      },
+    );
+
+    expect(classified).toMatchObject({ kind: 'workout-day-reminder', action: 'open' });
+    expect(openWorkout).toHaveBeenCalledTimes(1);
+    expect(openHabit).not.toHaveBeenCalled();
+    expect(markComplete).not.toHaveBeenCalled();
+    expect(markDone).not.toHaveBeenCalled();
+  });
+
+  it('leaves habit, todo, and weekly-review classifications unchanged', () => {
+    expect(classifyNotificationResponse(response(normalData))).toMatchObject({
+      kind: 'habit-reminder',
+      action: 'open',
+    });
+    expect(classifyNotificationResponse(response(todoData))).toMatchObject({
+      kind: 'todo-reminder',
+      action: 'open',
+    });
+    expect(
+      classifyNotificationResponse(response({ kind: 'weekly-review-reminder' })),
+    ).toMatchObject({
+      kind: 'weekly-review-reminder',
+      action: 'open',
+    });
   });
 });

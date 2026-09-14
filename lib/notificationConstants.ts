@@ -21,3 +21,4 @@ export const DAILY_PLAN_REMINDER_DATA_VERSION = 1;
 export const WEEKLY_REVIEW_REMINDER_CHANNEL_ID = 'weekly-review-reminders';
 export const WEEKLY_REVIEW_REMINDER_DATA_KIND = 'weekly-review-reminder';
 export const WEEKLY_REVIEW_REMINDER_DATA_VERSION = 1;
+export const WORKOUT_DAY_REMINDER_DATA_KIND = 'workout-day-reminder';

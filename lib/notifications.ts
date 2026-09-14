@@ -15,6 +15,7 @@ import {
   TODO_REMINDER_MARK_DONE_ACTION,
   TODO_REMINDER_SNOOZE_ACTION,
   WEEKLY_REVIEW_REMINDER_CHANNEL_ID,
+  WORKOUT_DAY_REMINDER_DATA_KIND,
 } from '@/lib/notificationConstants';
 
 export const HABIT_REMINDER_CHANNEL_ID = 'habit-reminders';
@@ -154,7 +155,7 @@ export async function scheduleWorkoutDayReminderNotification(input: {
       title: input.title,
       body: input.body,
       sound: 'default',
-      data: { kind: 'workout-day-reminder' },
+      data: { kind: WORKOUT_DAY_REMINDER_DATA_KIND },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
