@@ -53,4 +53,23 @@ describe('backup inventory coherence', () => {
       expect(BACKUP_NEVER_DELETED_ENTITIES.has(entity)).toBe(false);
     }
   });
+
+  it('classifies product-hard-deleted workout history as hard-delete', () => {
+    // `deleteWorkoutLog` removes these rows locally with no tombstone, so
+    // their queued delete intents must flush as owner-scoped remote DELETEs
+    // rather than being refused as append-only deletes.
+    for (const entity of [
+      'workout_logs',
+      'workout_session_exercises',
+      'workout_session_sets',
+    ] as const) {
+      expect(BACKUP_HARD_DELETE_ENTITIES.has(entity)).toBe(true);
+      expect(BACKUP_NEVER_DELETED_ENTITIES.has(entity)).toBe(false);
+      expect(BACKUP_SOFT_DELETE_ENTITIES.has(entity)).toBe(false);
+    }
+    // The product has no Pomodoro session delete path; those rows stay
+    // append-only and a queued delete must be refused.
+    expect(BACKUP_NEVER_DELETED_ENTITIES.has('pomodoro_sessions')).toBe(true);
+    expect(BACKUP_HARD_DELETE_ENTITIES.has('pomodoro_sessions')).toBe(false);
+  });
 });

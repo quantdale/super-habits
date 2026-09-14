@@ -1,5 +1,4 @@
 import { getDatabase } from '@/core/db/client';
-import { withSQLiteTransaction } from '@/core/db/transactions';
 import {
   Habit,
   HabitCategory,
@@ -7,7 +6,6 @@ import {
   HabitIcon,
   HabitLifecycleStatus,
 } from '@/core/db/types';
-import { claimOwnerBindingOnFirstContent } from '@/core/auth/account.data';
 import type {
   LinkedActionEffectAdapterResult,
   LinkedActionProcessResult,
@@ -17,9 +15,6 @@ import type {
 import { createId } from '@/lib/id';
 import { nowIso, timestampToLocalDateKey, toDateKey } from '@/lib/time';
 import { runBackupMutation, runSyncedMutation } from '@/core/sync/syncedMutation';
-import { appMetaKeys, setAppMetaText } from '@/core/db/appMeta';
-import { upsertSyncOutboxRecord } from '@/core/sync/syncPersistence';
-import { syncEngine } from '@/core/sync/sync.engine';
 import { linkedActionsEngine } from '@/core/linked-actions/linkedActions.engine';
 import {
   deleteLinkedActionRulesForTargetEntity,
@@ -320,103 +315,112 @@ async function runCompleteHabitFromNotification(input: {
   let shouldDispatchLinkedActions = false;
   let mutationApplied = false;
   let nextCount = 0;
-  let completionPrepared: ReturnType<typeof syncEngine.prepare> | null = null;
 
-  await db.withTransactionAsync(async () => {
-    claim = await claimNotificationActionInTransaction(db, {
-      actionKey: input.actionKey,
-      kind: 'habit-reminder',
-      actionName: 'mark_complete',
-      occurrenceId: input.occurrenceId,
-      processedAt,
-    });
-
-    const habit = await db.getFirstAsync<{
-      id: string;
-      name: string;
-      target_per_day: number;
-      created_at: string;
-      rule_history: string | null;
-      status: string | null;
-    }>(
-      `SELECT id, name, target_per_day, created_at, rule_history, status
-       FROM habits
-       WHERE id = ?
-         AND deleted_at IS NULL`,
-      [input.habitId],
-    );
-    habitName = habit?.name ?? null;
-
-    const existingCompletion = await db.getFirstAsync<{ id: string; count: number }>(
-      `SELECT id, count
-       FROM habit_completions
-       WHERE habit_id = ?
-         AND date_key = ?`,
-      [input.habitId, input.dateKey],
-    );
-    nextCount = existingCompletion?.count ?? 0;
-    completionId = existingCompletion?.id ?? null;
-
-    if (!claim.claimed) {
-      shouldDispatchLinkedActions = claim.linkedActionRequired && habit !== null;
-      return;
-    }
-
-    const todayKey = toDateKey(now);
-    // A paused/archived habit must not be completed from a stale reminder:
-    // consume the claim as a no-op and clear the linked-action requirement.
-    if (!habit || input.dateKey !== todayKey || (habit.status ?? 'active') !== 'active') {
-      await setNotificationActionLinkedRequiredInTransaction(db, input.actionKey, false);
-      return;
-    }
-
-    const creationDateKey = safeTimestampToLocalDateKey(habit.created_at);
-    const history = parseHabitRuleHistory(habit.rule_history);
-    const targetPerDay = getHabitTargetForDate(
-      history,
-      input.dateKey,
-      habit.target_per_day,
-      creationDateKey,
-    );
-    if (
-      !isHabitScheduledOn(history, input.dateKey, habit.target_per_day, creationDateKey) ||
-      nextCount >= targetPerDay
-    ) {
-      await setNotificationActionLinkedRequiredInTransaction(db, input.actionKey, false);
-      return;
-    }
-
-    const updatedAt = processedAt;
-    const updatedCompletion = await db.getFirstAsync<{ id: string; count: number }>(
-      `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
-       VALUES (?, ?, ?, 1, ?, ?)
-       ON CONFLICT(habit_id, date_key) DO UPDATE SET
-         count = count + 1,
-         updated_at = excluded.updated_at
-       RETURNING id, count`,
-      [createId('hcmp'), input.habitId, input.dateKey, updatedAt, updatedAt],
-    );
-    // Processed completion actions are user-driven content as well.
-    await claimOwnerBindingOnFirstContent(db);
-    if (updatedCompletion) {
-      completionPrepared = syncEngine.prepare({
-        entity: 'habit_completions',
-        id: updatedCompletion.id,
-        updatedAt,
-        operation: 'create',
+  await runBackupMutation({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      claim = await claimNotificationActionInTransaction(transactionDb, {
+        actionKey: input.actionKey,
+        kind: 'habit-reminder',
+        actionName: 'mark_complete',
+        occurrenceId: input.occurrenceId,
+        processedAt,
       });
-      await upsertSyncOutboxRecord(db, completionPrepared, completionPrepared.revision);
-      await setAppMetaText(db, appMetaKeys.backupDirty, '1');
-    }
-    nextCount = updatedCompletion?.count ?? nextCount + 1;
-    completionId = updatedCompletion?.id ?? completionId;
-    mutationApplied = true;
-    shouldDispatchLinkedActions = nextCount >= targetPerDay;
-    await setNotificationActionLinkedRequiredInTransaction(
-      db,
-      input.actionKey,
-      shouldDispatchLinkedActions,
-    );
+
+      const habit = await transactionDb.getFirstAsync<{
+        id: string;
+        name: string;
+        target_per_day: number;
+        created_at: string;
+        rule_history: string | null;
+        status: string | null;
+      }>(
+        `SELECT id, name, target_per_day, created_at, rule_history, status
+         FROM habits
+         WHERE id = ?
+           AND deleted_at IS NULL`,
+        [input.habitId],
+      );
+      habitName = habit?.name ?? null;
+
+      const existingCompletion = await transactionDb.getFirstAsync<{ id: string; count: number }>(
+        `SELECT id, count
+         FROM habit_completions
+         WHERE habit_id = ?
+           AND date_key = ?`,
+        [input.habitId, input.dateKey],
+      );
+      nextCount = existingCompletion?.count ?? 0;
+      completionId = existingCompletion?.id ?? null;
+
+      if (!claim.claimed) {
+        shouldDispatchLinkedActions = claim.linkedActionRequired && habit !== null;
+        return { changed: false, value: undefined };
+      }
+
+      const todayKey = toDateKey(now);
+      // A paused/archived habit must not be completed from a stale reminder:
+      // consume the claim as a no-op and clear the linked-action requirement.
+      if (!habit || input.dateKey !== todayKey || (habit.status ?? 'active') !== 'active') {
+        await setNotificationActionLinkedRequiredInTransaction(
+          transactionDb,
+          input.actionKey,
+          false,
+        );
+        return { changed: false, value: undefined };
+      }
+
+      const creationDateKey = safeTimestampToLocalDateKey(habit.created_at);
+      const history = parseHabitRuleHistory(habit.rule_history);
+      const targetPerDay = getHabitTargetForDate(
+        history,
+        input.dateKey,
+        habit.target_per_day,
+        creationDateKey,
+      );
+      if (
+        !isHabitScheduledOn(history, input.dateKey, habit.target_per_day, creationDateKey) ||
+        nextCount >= targetPerDay
+      ) {
+        await setNotificationActionLinkedRequiredInTransaction(
+          transactionDb,
+          input.actionKey,
+          false,
+        );
+        return { changed: false, value: undefined };
+      }
+
+      const updatedAt = processedAt;
+      const updatedCompletion = await transactionDb.getFirstAsync<{ id: string; count: number }>(
+        `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+         VALUES (?, ?, ?, 1, ?, ?)
+         ON CONFLICT(habit_id, date_key) DO UPDATE SET
+           count = count + 1,
+           updated_at = excluded.updated_at
+         RETURNING id, count`,
+        [createId('hcmp'), input.habitId, input.dateKey, updatedAt, updatedAt],
+      );
+      if (updatedCompletion) {
+        // Owner-stamped durable intent in the same transaction as the row it
+        // describes; the in-memory flush queue is updated after commit.
+        enqueue({
+          entity: 'habit_completions',
+          id: updatedCompletion.id,
+          updatedAt,
+          operation: 'create',
+        });
+      }
+      nextCount = updatedCompletion?.count ?? nextCount + 1;
+      completionId = updatedCompletion?.id ?? completionId;
+      mutationApplied = true;
+      shouldDispatchLinkedActions = nextCount >= targetPerDay;
+      await setNotificationActionLinkedRequiredInTransaction(
+        transactionDb,
+        input.actionKey,
+        shouldDispatchLinkedActions,
+      );
+      return { changed: true, value: undefined };
+    },
   });
 
   const status: NotificationHabitCompletionResult['status'] = claim.claimed
@@ -424,9 +428,6 @@ async function runCompleteHabitFromNotification(input: {
       ? 'applied'
       : 'noop'
     : 'duplicate';
-  if (completionPrepared) {
-    syncEngine.enqueuePrepared(completionPrepared, { durablyPersisted: true });
-  }
   if (claim.claimed) requestHabitDataRefresh();
   if (claim.claimed && habitName) requestHabitReminderReconciliation();
 
@@ -892,117 +893,117 @@ export async function incrementHabitFromLinkedAction(input: {
   executionId?: string;
 }): Promise<LinkedActionEffectAdapterResult> {
   const db = await getDatabase();
-  let completionPrepared: ReturnType<typeof syncEngine.prepare> | null = null;
-  const outcome = await withSQLiteTransaction(db, async (transactionDb) => {
-    const habit = await transactionDb.getFirstAsync<
-      Pick<Habit, 'id' | 'name' | 'deleted_at' | 'status' | 'lifecycle_history'>
-    >(
-      `SELECT id, name, deleted_at, status, lifecycle_history
-       FROM habits
-       WHERE id = ?`,
-      [input.habitId],
-    );
+  const outcome = await runBackupMutation<LinkedActionEffectAdapterResult>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const habit = await transactionDb.getFirstAsync<
+        Pick<Habit, 'id' | 'name' | 'deleted_at' | 'status' | 'lifecycle_history'>
+      >(
+        `SELECT id, name, deleted_at, status, lifecycle_history
+         FROM habits
+         WHERE id = ?`,
+        [input.habitId],
+      );
 
-    if (!habit || habit.deleted_at !== null) {
+      if (!habit || habit.deleted_at !== null) {
+        if (input.executionId) {
+          await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
+            status: 'skipped',
+            errorMessage: 'target_missing',
+          });
+        }
+        return {
+          changed: false,
+          value: {
+            status: 'skipped' as const,
+            reason: 'target_missing' as const,
+            ...(input.executionId ? { executionFinalized: true } : {}),
+          },
+        };
+      }
+
+      // A paused/archived habit (or a date inside a paused/archived interval)
+      // accepts no completion writes, even from linked actions.
+      if (
+        (habit.status ?? 'active') !== 'active' ||
+        isHabitLifecycleMaskedOn(habit.lifecycle_history, input.dateKey)
+      ) {
+        if (input.executionId) {
+          await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
+            status: 'skipped',
+            errorMessage: 'target_inactive',
+          });
+        }
+        return {
+          changed: false,
+          value: {
+            status: 'skipped' as const,
+            reason: 'target_inactive' as const,
+            targetLabel: habit.name,
+            ...(input.executionId ? { executionFinalized: true } : {}),
+          },
+        };
+      }
+
+      if (input.amount <= 0) {
+        if (input.executionId) {
+          await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
+            status: 'skipped',
+            errorMessage: 'invalid_amount',
+          });
+        }
+        return {
+          changed: false,
+          value: {
+            status: 'skipped' as const,
+            reason: 'invalid_amount' as const,
+            targetLabel: habit.name,
+            ...(input.executionId ? { executionFinalized: true } : {}),
+          },
+        };
+      }
+
+      const updatedAt = nowIso();
+      const updatedCompletion = await transactionDb.getFirstAsync<{ id: string; count: number }>(
+        `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(habit_id, date_key) DO UPDATE SET
+           count = habit_completions.count + excluded.count,
+           updated_at = excluded.updated_at
+         RETURNING id, count`,
+        [createId('hcmp'), input.habitId, input.dateKey, input.amount, updatedAt, updatedAt],
+      );
+
+      if (updatedCompletion) {
+        // Owner-stamped durable intent in the same transaction as the row it
+        // describes; the in-memory flush queue is updated after commit.
+        enqueue({
+          entity: 'habit_completions',
+          id: updatedCompletion.id,
+          updatedAt,
+          operation: 'create',
+        });
+      }
+
       if (input.executionId) {
         await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
-          status: 'skipped',
-          errorMessage: 'target_missing',
+          status: 'applied',
+          errorMessage: null,
         });
       }
       return {
-        result: {
-          status: 'skipped' as const,
-          reason: 'target_missing',
-          ...(input.executionId ? { executionFinalized: true } : {}),
-        },
-        mutated: false,
-      };
-    }
-
-    // A paused/archived habit (or a date inside a paused/archived interval)
-    // accepts no completion writes, even from linked actions.
-    if (
-      (habit.status ?? 'active') !== 'active' ||
-      isHabitLifecycleMaskedOn(habit.lifecycle_history, input.dateKey)
-    ) {
-      if (input.executionId) {
-        await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
-          status: 'skipped',
-          errorMessage: 'target_inactive',
-        });
-      }
-      return {
-        result: {
-          status: 'skipped' as const,
-          reason: 'target_inactive',
+        changed: true,
+        value: {
+          status: 'applied' as const,
           targetLabel: habit.name,
           ...(input.executionId ? { executionFinalized: true } : {}),
         },
-        mutated: false,
       };
-    }
-
-    if (input.amount <= 0) {
-      if (input.executionId) {
-        await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
-          status: 'skipped',
-          errorMessage: 'invalid_amount',
-        });
-      }
-      return {
-        result: {
-          status: 'skipped' as const,
-          reason: 'invalid_amount',
-          targetLabel: habit.name,
-          ...(input.executionId ? { executionFinalized: true } : {}),
-        },
-        mutated: false,
-      };
-    }
-
-    const updatedCompletion = await transactionDb.getFirstAsync<{ id: string; count: number }>(
-      `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(habit_id, date_key) DO UPDATE SET
-         count = habit_completions.count + excluded.count,
-         updated_at = excluded.updated_at
-       RETURNING id, count`,
-      [createId('hcmp'), input.habitId, input.dateKey, input.amount, nowIso(), nowIso()],
-    );
-
-    if (updatedCompletion) {
-      completionPrepared = syncEngine.prepare({
-        entity: 'habit_completions',
-        id: updatedCompletion.id,
-        updatedAt: nowIso(),
-        operation: 'create',
-      });
-      await upsertSyncOutboxRecord(transactionDb, completionPrepared, completionPrepared.revision);
-      await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
-    }
-
-    if (input.executionId) {
-      await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
-        status: 'applied',
-        errorMessage: null,
-      });
-    }
-    return {
-      result: {
-        status: 'applied' as const,
-        targetLabel: habit.name,
-        ...(input.executionId ? { executionFinalized: true } : {}),
-      },
-      mutated: true,
-    };
+    },
   });
 
-  if (outcome.mutated && completionPrepared) {
-    syncEngine.enqueuePrepared(completionPrepared, { durablyPersisted: true });
-  }
-  if (outcome.mutated) requestHabitReminderReconciliation();
-  return outcome.result;
+  if (outcome.changed) requestHabitReminderReconciliation();
+  return outcome.value;
 }
 
 export async function ensureHabitDailyTargetFromLinkedAction(input: {
@@ -1012,138 +1013,138 @@ export async function ensureHabitDailyTargetFromLinkedAction(input: {
   executionId?: string;
 }): Promise<LinkedActionEffectAdapterResult> {
   const db = await getDatabase();
-  let completionPrepared: ReturnType<typeof syncEngine.prepare> | null = null;
-  const outcome = await withSQLiteTransaction(db, async (transactionDb) => {
-    const habit = await transactionDb.getFirstAsync<
-      Pick<
-        Habit,
-        | 'id'
-        | 'name'
-        | 'target_per_day'
-        | 'created_at'
-        | 'rule_history'
-        | 'deleted_at'
-        | 'status'
-        | 'lifecycle_history'
-      >
-    >(
-      `SELECT id, name, target_per_day, created_at, rule_history, deleted_at, status, lifecycle_history
-       FROM habits
-       WHERE id = ?`,
-      [input.habitId],
-    );
-    if (!habit || habit.deleted_at !== null) {
-      if (input.executionId) {
-        await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
-          status: 'skipped',
-          errorMessage: 'target_missing',
-        });
+  const outcome = await runBackupMutation<LinkedActionEffectAdapterResult>({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const habit = await transactionDb.getFirstAsync<
+        Pick<
+          Habit,
+          | 'id'
+          | 'name'
+          | 'target_per_day'
+          | 'created_at'
+          | 'rule_history'
+          | 'deleted_at'
+          | 'status'
+          | 'lifecycle_history'
+        >
+      >(
+        `SELECT id, name, target_per_day, created_at, rule_history, deleted_at, status, lifecycle_history
+         FROM habits
+         WHERE id = ?`,
+        [input.habitId],
+      );
+      if (!habit || habit.deleted_at !== null) {
+        if (input.executionId) {
+          await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
+            status: 'skipped',
+            errorMessage: 'target_missing',
+          });
+        }
+        return {
+          changed: false,
+          value: {
+            status: 'skipped' as const,
+            reason: 'target_missing' as const,
+            ...(input.executionId ? { executionFinalized: true } : {}),
+          },
+        };
       }
-      return {
-        result: {
-          status: 'skipped' as const,
-          reason: 'target_missing',
-          ...(input.executionId ? { executionFinalized: true } : {}),
-        },
-        mutated: false,
-      };
-    }
 
-    // A paused/archived habit (or a date inside a paused/archived interval)
-    // accepts no completion writes, even from linked actions.
-    if (
-      (habit.status ?? 'active') !== 'active' ||
-      isHabitLifecycleMaskedOn(habit.lifecycle_history, input.dateKey)
-    ) {
+      // A paused/archived habit (or a date inside a paused/archived interval)
+      // accepts no completion writes, even from linked actions.
+      if (
+        (habit.status ?? 'active') !== 'active' ||
+        isHabitLifecycleMaskedOn(habit.lifecycle_history, input.dateKey)
+      ) {
+        if (input.executionId) {
+          await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
+            status: 'skipped',
+            errorMessage: 'target_inactive',
+          });
+        }
+        return {
+          changed: false,
+          value: {
+            status: 'skipped' as const,
+            reason: 'target_inactive' as const,
+            targetLabel: habit.name,
+            ...(input.executionId ? { executionFinalized: true } : {}),
+          },
+        };
+      }
+
+      const targetPerDay = getHabitTargetForDate(
+        parseHabitRuleHistory(habit.rule_history),
+        input.dateKey,
+        habit.target_per_day,
+        safeTimestampToLocalDateKey(habit.created_at),
+      );
+      const desiredCount = Math.max(
+        0,
+        input.minimumCount === 'target_per_day' ? targetPerDay : input.minimumCount,
+      );
+      const existing = await transactionDb.getFirstAsync<{ count: number }>(
+        `SELECT count FROM habit_completions WHERE habit_id = ? AND date_key = ?`,
+        [input.habitId, input.dateKey],
+      );
+      if (desiredCount === 0 || (existing && existing.count >= desiredCount)) {
+        if (input.executionId) {
+          await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
+            status: 'skipped',
+            errorMessage: 'already_satisfied',
+          });
+        }
+        return {
+          changed: false,
+          value: {
+            status: 'skipped' as const,
+            reason: 'already_satisfied' as const,
+            targetLabel: habit.name,
+            ...(input.executionId ? { executionFinalized: true } : {}),
+          },
+        };
+      }
+
+      const updatedAt = nowIso();
+      const updatedCompletion = await transactionDb.getFirstAsync<{ id: string; count: number }>(
+        `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(habit_id, date_key) DO UPDATE SET
+           count = MAX(habit_completions.count, excluded.count),
+           updated_at = excluded.updated_at
+         RETURNING id, count`,
+        [createId('hcmp'), input.habitId, input.dateKey, desiredCount, updatedAt, updatedAt],
+      );
+      if (updatedCompletion) {
+        // Owner-stamped durable intent in the same transaction as the row it
+        // describes; the in-memory flush queue is updated after commit.
+        enqueue({
+          entity: 'habit_completions',
+          id: updatedCompletion.id,
+          updatedAt,
+          operation: 'create',
+        });
+      }
       if (input.executionId) {
         await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
-          status: 'skipped',
-          errorMessage: 'target_inactive',
+          status: 'applied',
+          errorMessage: null,
         });
       }
       return {
-        result: {
-          status: 'skipped' as const,
-          reason: 'target_inactive',
+        changed: true,
+        value: {
+          status: 'applied' as const,
           targetLabel: habit.name,
           ...(input.executionId ? { executionFinalized: true } : {}),
         },
-        mutated: false,
       };
-    }
-
-    const targetPerDay = getHabitTargetForDate(
-      parseHabitRuleHistory(habit.rule_history),
-      input.dateKey,
-      habit.target_per_day,
-      safeTimestampToLocalDateKey(habit.created_at),
-    );
-    const desiredCount = Math.max(
-      0,
-      input.minimumCount === 'target_per_day' ? targetPerDay : input.minimumCount,
-    );
-    const existing = await transactionDb.getFirstAsync<{ count: number }>(
-      `SELECT count FROM habit_completions WHERE habit_id = ? AND date_key = ?`,
-      [input.habitId, input.dateKey],
-    );
-    if (desiredCount === 0 || (existing && existing.count >= desiredCount)) {
-      if (input.executionId) {
-        await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
-          status: 'skipped',
-          errorMessage: 'already_satisfied',
-        });
-      }
-      return {
-        result: {
-          status: 'skipped' as const,
-          reason: 'already_satisfied',
-          targetLabel: habit.name,
-          ...(input.executionId ? { executionFinalized: true } : {}),
-        },
-        mutated: false,
-      };
-    }
-
-    const updatedCompletion = await transactionDb.getFirstAsync<{ id: string; count: number }>(
-      `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(habit_id, date_key) DO UPDATE SET
-         count = MAX(habit_completions.count, excluded.count),
-         updated_at = excluded.updated_at
-       RETURNING id, count`,
-      [createId('hcmp'), input.habitId, input.dateKey, desiredCount, nowIso(), nowIso()],
-    );
-    if (updatedCompletion) {
-      completionPrepared = syncEngine.prepare({
-        entity: 'habit_completions',
-        id: updatedCompletion.id,
-        updatedAt: nowIso(),
-        operation: 'create',
-      });
-      await upsertSyncOutboxRecord(transactionDb, completionPrepared, completionPrepared.revision);
-      await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
-    }
-    if (input.executionId) {
-      await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
-        status: 'applied',
-        errorMessage: null,
-      });
-    }
-    return {
-      result: {
-        status: 'applied' as const,
-        targetLabel: habit.name,
-        ...(input.executionId ? { executionFinalized: true } : {}),
-      },
-      mutated: true,
-    };
+    },
   });
 
-  if (outcome.mutated && completionPrepared) {
-    syncEngine.enqueuePrepared(completionPrepared, { durablyPersisted: true });
-  }
-  if (outcome.mutated) requestHabitReminderReconciliation();
-  return outcome.result;
+  if (outcome.changed) requestHabitReminderReconciliation();
+  return outcome.value;
 }
 
 export async function applyRemoteHabits(

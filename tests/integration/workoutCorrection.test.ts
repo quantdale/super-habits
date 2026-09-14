@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { freshDatabase, type TestDatabase } from './helpers/db';
+import { BACKUP_HARD_DELETE_ENTITIES } from '@/core/backup/backup.types';
 
 /**
  * Workout correction paths against real SQLite: deleting an accidentally
@@ -70,6 +71,16 @@ describe('workout correction (real SQLite)', () => {
     );
     expect(intents).toHaveLength(3);
     expect(intents.every((intent) => intent.operation === 'delete')).toBe(true);
+    // Every enqueued delete intent is classified as hard-delete, so the
+    // adapter forwards an owner-scoped remote DELETE instead of refusing the
+    // batch as an illegal append-only delete and leaving the outbox stuck.
+    for (const entity of [
+      'workout_logs',
+      'workout_session_exercises',
+      'workout_session_sets',
+    ] as const) {
+      expect(BACKUP_HARD_DELETE_ENTITIES.has(entity)).toBe(true);
+    }
 
     // Template survives; history queries no longer see the deleted log.
     const routine = await workout.listRoutines();

@@ -932,6 +932,9 @@ export const BACKUP_SOFT_DELETE_ENTITIES: ReadonlySet<BackupEntity> = new Set([
 export const BACKUP_HARD_DELETE_ENTITIES: ReadonlySet<BackupEntity> = new Set([
   'habit_completions',
   'saved_meals',
+  'workout_logs',
+  'workout_session_exercises',
+  'workout_session_sets',
 ]);
 
 /**
@@ -940,9 +943,6 @@ export const BACKUP_HARD_DELETE_ENTITIES: ReadonlySet<BackupEntity> = new Set([
  * entities is a defect upstream of the sync boundary, not data to forward.
  */
 export const BACKUP_NEVER_DELETED_ENTITIES: ReadonlySet<BackupEntity> = new Set([
-  'workout_logs',
-  'workout_session_exercises',
-  'workout_session_sets',
   'pomodoro_sessions',
 ]);
 

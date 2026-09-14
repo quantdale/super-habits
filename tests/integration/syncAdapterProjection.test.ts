@@ -10,8 +10,10 @@ import { BACKUP_ENTITY_COLUMNS } from '@/core/backup/backup.types';
  */
 
 type UpsertCall = { entity: string; rows: Record<string, unknown>[] };
+type DeleteCall = { entity: string; ids: string[]; userId: string };
 
 const upserted: UpsertCall[] = [];
+const deleted: DeleteCall[] = [];
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -21,8 +23,11 @@ vi.mock('@/lib/supabase', () => ({
         return { error: null };
       }),
       delete: vi.fn(() => ({
-        in: vi.fn(() => ({
-          eq: vi.fn(async () => ({ error: null })),
+        in: vi.fn((_column: string, ids: string[]) => ({
+          eq: vi.fn(async (column: string, value: string) => {
+            if (column === 'user_id') deleted.push({ entity, ids, userId: value });
+            return { error: null };
+          }),
         })),
       })),
     })),
@@ -82,6 +87,74 @@ describe('SupabaseSyncAdapter push projection', () => {
     // Explicit local NULLs are still sent (they must overwrite remote values).
     expect(payload.deleted_at).toBeNull();
     expect(payload.project_id).toBeNull();
+
+    await db.closeAsync();
+  });
+
+  it('treats a workout-log delete as an owner-scoped hard delete, not an illegal append-only delete', async () => {
+    upserted.length = 0;
+    deleted.length = 0;
+    const db = await freshDatabase();
+    const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
+    await setLocalDatasetOwner(db as never, 'user_a');
+
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    const adapter = new SupabaseSyncAdapter();
+    await adapter.push([
+      {
+        entity: 'workout_logs',
+        id: 'wrk_deleted_accident',
+        updatedAt: '2026-08-20T12:00:00.000Z',
+        operation: 'delete',
+        ownerUserId: 'user_a',
+      },
+      {
+        entity: 'workout_session_sets',
+        id: 'sset_deleted_accident',
+        updatedAt: '2026-08-20T12:00:00.000Z',
+        operation: 'delete',
+        ownerUserId: 'user_a',
+      },
+    ]);
+
+    // The rows are gone locally, so nothing is upserted; the delete path
+    // issues one owner-scoped remote DELETE per entity instead of throwing.
+    expect(upserted).toHaveLength(0);
+    expect(deleted).toContainEqual({
+      entity: 'workout_logs',
+      ids: ['wrk_deleted_accident'],
+      userId: 'user_a',
+    });
+    expect(deleted).toContainEqual({
+      entity: 'workout_session_sets',
+      ids: ['sset_deleted_accident'],
+      userId: 'user_a',
+    });
+
+    await db.closeAsync();
+  });
+
+  it('still refuses a delete queued for a never-deleted pomodoro session', async () => {
+    upserted.length = 0;
+    deleted.length = 0;
+    const db = await freshDatabase();
+    const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
+    await setLocalDatasetOwner(db as never, 'user_a');
+
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    const adapter = new SupabaseSyncAdapter();
+    await expect(
+      adapter.push([
+        {
+          entity: 'pomodoro_sessions',
+          id: 'pom_never_deleted',
+          updatedAt: '2026-08-20T12:00:00.000Z',
+          operation: 'delete',
+          ownerUserId: 'user_a',
+        },
+      ]),
+    ).rejects.toThrow(/Illegal delete intent/);
+    expect(deleted).toHaveLength(0);
 
     await db.closeAsync();
   });

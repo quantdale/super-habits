@@ -1,9 +1,6 @@
 import { getDatabase } from '@/core/db/client';
 import type { TodoPriority } from '@/core/db/types';
-import { claimOwnerBindingOnFirstContent } from '@/core/auth/account.data';
-import { appMetaKeys, setAppMetaText } from '@/core/db/appMeta';
-import { upsertSyncOutboxRecord } from '@/core/sync/syncPersistence';
-import { syncEngine } from '@/core/sync/sync.engine';
+import { runBackupMutation } from '@/core/sync/syncedMutation';
 import { linkedActionsEngine } from '@/core/linked-actions/linkedActions.engine';
 import {
   claimNotificationActionInTransaction,
@@ -80,88 +77,99 @@ async function runCompleteTodoFromNotification(input: {
   let mutationApplied = false;
   let spawnRecurrence: SpawnRecurrencePlan | null = null;
 
-  await db.withTransactionAsync(async () => {
-    claim = await claimNotificationActionInTransaction(db, {
-      actionKey: input.actionKey,
-      kind: TODO_REMINDER_DATA_KIND,
-      actionName: 'mark_done',
-      occurrenceId: input.occurrenceId,
-      processedAt,
-    });
+  await runBackupMutation({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      claim = await claimNotificationActionInTransaction(transactionDb, {
+        actionKey: input.actionKey,
+        kind: TODO_REMINDER_DATA_KIND,
+        actionName: 'mark_done',
+        occurrenceId: input.occurrenceId,
+        processedAt,
+      });
 
-    const todo = await db.getFirstAsync<{
-      id: string;
-      title: string;
-      completed: 0 | 1;
-      notes: string | null;
-      priority: TodoPriority;
-      recurrence: string | null;
-      recurrence_id: string | null;
-    }>(
-      `SELECT id, title, completed, notes, priority, recurrence, recurrence_id
-       FROM todos
-       WHERE id = ?
-         AND deleted_at IS NULL`,
-      [input.todoId],
-    );
-    todoTitle = todo?.title ?? null;
+      const todo = await transactionDb.getFirstAsync<{
+        id: string;
+        title: string;
+        completed: 0 | 1;
+        notes: string | null;
+        priority: TodoPriority;
+        recurrence: string | null;
+        recurrence_id: string | null;
+      }>(
+        `SELECT id, title, completed, notes, priority, recurrence, recurrence_id
+         FROM todos
+         WHERE id = ?
+           AND deleted_at IS NULL`,
+        [input.todoId],
+      );
+      todoTitle = todo?.title ?? null;
 
-    if (!claim.claimed) {
-      // Replay/crash recovery: finish a pending Linked Action dispatch from
-      // the marker without re-applying the completion.
-      shouldDispatchLinkedActions = claim.linkedActionRequired && todo?.completed === 1;
-      return;
-    }
+      if (!claim.claimed) {
+        // Replay/crash recovery: finish a pending Linked Action dispatch from
+        // the marker without re-applying the completion.
+        shouldDispatchLinkedActions = claim.linkedActionRequired && todo?.completed === 1;
+        return { changed: false, value: undefined };
+      }
 
-    // Missing/deleted/already-completed todos are a safe no-op; the claim is
-    // still consumed so repeated taps cannot mutate later state changes.
-    if (!todo || todo.completed === 1) {
-      await setNotificationActionLinkedRequiredInTransaction(db, input.actionKey, false);
-      return;
-    }
+      // Missing/deleted/already-completed todos are a safe no-op; the claim is
+      // still consumed so repeated taps cannot mutate later state changes.
+      if (!todo || todo.completed === 1) {
+        await setNotificationActionLinkedRequiredInTransaction(
+          transactionDb,
+          input.actionKey,
+          false,
+        );
+        return { changed: false, value: undefined };
+      }
 
-    const result = await db.runAsync(
-      `UPDATE todos
-       SET completed = 1, completed_at = ?, updated_at = ?
-       WHERE id = ?
-         AND completed = 0
-         AND deleted_at IS NULL`,
-      [processedAt, processedAt, input.todoId],
-    );
-    if (result.changes !== 1) {
-      await setNotificationActionLinkedRequiredInTransaction(db, input.actionKey, false);
-      return;
-    }
+      const result = await transactionDb.runAsync(
+        `UPDATE todos
+         SET completed = 1, completed_at = ?, updated_at = ?
+         WHERE id = ?
+           AND completed = 0
+           AND deleted_at IS NULL`,
+        [processedAt, processedAt, input.todoId],
+      );
+      if (result.changes !== 1) {
+        await setNotificationActionLinkedRequiredInTransaction(
+          transactionDb,
+          input.actionKey,
+          false,
+        );
+        return { changed: false, value: undefined };
+      }
 
-    // Processed completion actions are user-driven content as well.
-    await claimOwnerBindingOnFirstContent(db);
-    const prepared = syncEngine.prepare({
-      entity: 'todos',
-      id: input.todoId,
-      updatedAt: processedAt,
-      operation: 'update',
-    });
-    await upsertSyncOutboxRecord(db, prepared, prepared.revision);
-    await setAppMetaText(db, appMetaKeys.backupDirty, '1');
-    mutationApplied = true;
+      // Processed completion actions are user-driven content as well: the
+      // owner-stamped durable intent shares the transaction and the in-memory
+      // flush queue is updated after commit.
+      enqueue({
+        entity: 'todos',
+        id: input.todoId,
+        updatedAt: processedAt,
+        operation: 'update',
+      });
+      mutationApplied = true;
 
-    // Daily recurring todos spawn their next instance instead of dispatching
-    // Linked Actions — identical to the in-app completion contract.
-    if (todo.recurrence === 'daily' && todo.recurrence_id) {
-      spawnRecurrence = {
-        title: todo.title,
-        notes: todo.notes,
-        priority: todo.priority,
-        recurrenceId: todo.recurrence_id,
-      };
-    } else {
-      shouldDispatchLinkedActions = true;
-    }
-    await setNotificationActionLinkedRequiredInTransaction(
-      db,
-      input.actionKey,
-      shouldDispatchLinkedActions,
-    );
+      // Daily recurring todos spawn their next instance instead of dispatching
+      // Linked Actions — identical to the in-app completion contract.
+      if (todo.recurrence === 'daily' && todo.recurrence_id) {
+        spawnRecurrence = {
+          title: todo.title,
+          notes: todo.notes,
+          priority: todo.priority,
+          recurrenceId: todo.recurrence_id,
+        };
+      } else {
+        shouldDispatchLinkedActions = true;
+      }
+      await setNotificationActionLinkedRequiredInTransaction(
+        transactionDb,
+        input.actionKey,
+        shouldDispatchLinkedActions,
+      );
+      return { changed: mutationApplied, value: undefined };
+    },
   });
 
   const status: NotificationTodoCompletionResult['status'] = claim.claimed
