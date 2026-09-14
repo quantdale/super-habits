@@ -33,6 +33,7 @@ import {
   levelFromXp,
   pickCelebration,
   planAutoFreeze,
+  shiftDateKey,
   streakFreezeState,
 } from './gamification.domain';
 import {
@@ -618,4 +619,23 @@ export async function ensureStreakFreeze(
     [savedDateKey, nowIso()],
   );
   return { savedDateKey };
+}
+
+/**
+ * One housekeeping pass in the only order that cannot misclassify a real
+ * action as a missed day: award unrewarded feature activity for yesterday and
+ * today, THEN let freeze planning look at the ledger those awards produced.
+ *
+ * The lookback is bounded to the immediately previous local day: a
+ * notification completion written before midnight and opened after it is the
+ * failure mode, and an unbounded scan would rewrite historical streaks.
+ */
+export async function runGamificationHousekeeping(
+  options: GamificationReadOptions = {},
+): Promise<void> {
+  const todayKey = options.todayKey ?? toDateKey();
+  const yesterdayKey = shiftDateKey(todayKey, -1);
+  await reconcileGamificationActivity({ todayKey: yesterdayKey });
+  await reconcileGamificationActivity({ todayKey });
+  await ensureStreakFreeze({ todayKey });
 }

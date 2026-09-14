@@ -154,6 +154,22 @@ describe('gamification ledger', () => {
     expect(second.snapshot.xpToday).toBe(reconciled.snapshot.xpToday);
   });
 
+  it('rewards a same-day unreported todo exactly once without growing the outbox', async () => {
+    const { todos, gamification } = await loadModules();
+
+    await todos.addTodo({ title: 'Take the bins out' });
+    const [todo] = await todos.listTodos();
+    await todos.toggleTodo(todo);
+
+    const outboxBefore = await countOutbox();
+    const first = await gamification.reconcileGamificationActivity();
+    expect(first.awarded).toBe(1);
+    const second = await gamification.reconcileGamificationActivity();
+    expect(second.awarded).toBe(0);
+    // Reward rows are local-only derived data: reconcile must never enqueue.
+    expect(await countOutbox()).toBe(outboxBefore);
+  });
+
   it("spends a banked freeze on yesterday's miss and keeps the streak alive", async () => {
     const { gamification, time, domain } = await loadModules();
     const today = time.toDateKey();
@@ -186,6 +202,76 @@ describe('gamification ledger', () => {
 
     // The bank is empty now, so a second pass cannot spend anything.
     expect(await gamification.ensureStreakFreeze({ todayKey: today })).toBeNull();
+  });
+
+  it('housekeeping awards an overnight reminder completion before freeze planning', async () => {
+    const { habits, gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    // Seven days of ledger run ending the day before yesterday, plus a banked
+    // freeze: without the fix, yesterday looks like a miss and burns it.
+    const run = [2, 3, 4, 5, 6, 7, 8].map((offset) => domain.shiftDateKey(today, -offset));
+    await seedLedgerDays(run);
+    const lastRunDay = run[run.length - 1];
+    await db.runAsync(
+      `INSERT INTO gamification_events (id, event_kind, source_key, date_key, xp, created_at)
+       VALUES ('gxp_housekeeping_grant', 'freeze_grant', 'freeze:7', ?, 0, ?)`,
+      [lastRunDay, `${lastRunDay}T12:00:00.000Z`],
+    );
+
+    // A reminder Mark complete wrote yesterday's completion after the ledger
+    // already closed: real activity with no reward row.
+    const yesterday = domain.shiftDateKey(today, -1);
+    const habitId = await habits.addHabit('Overnight read', 1);
+    await db.runAsync(
+      `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+       VALUES ('hcmp_overnight', ?, ?, 1, ?, ?)`,
+      [habitId, yesterday, `${yesterday}T23:00:00.000Z`, `${yesterday}T23:00:00.000Z`],
+    );
+
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+
+    const award = await db.getFirstAsync<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM gamification_events
+       WHERE date_key = ? AND event_kind = 'habit'`,
+      [yesterday],
+    );
+    expect(award?.n).toBe(1);
+    const freeze = await db.getFirstAsync<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM gamification_streak_freezes WHERE date_key = ?`,
+      [yesterday],
+    );
+    expect(freeze?.n).toBe(0);
+
+    const after = await gamification.readGamificationSnapshot({ todayKey: today });
+    expect(after.streak.current).toBe(8);
+    expect(after.week.find((day) => day.dateKey === yesterday)?.active).toBe(true);
+    expect(after.freezes).toMatchObject({ earned: 1, used: 0, banked: 1 });
+  });
+
+  it('housekeeping still spends a freeze on a genuine missed day', async () => {
+    const { gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    const run = [2, 3, 4, 5, 6, 7, 8].map((offset) => domain.shiftDateKey(today, -offset));
+    await seedLedgerDays(run);
+    const lastRunDay = run[run.length - 1];
+    await db.runAsync(
+      `INSERT INTO gamification_events (id, event_kind, source_key, date_key, xp, created_at)
+       VALUES ('gxp_housekeeping_miss_grant', 'freeze_grant', 'freeze:7', ?, 0, ?)`,
+      [lastRunDay, `${lastRunDay}T12:00:00.000Z`],
+    );
+
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+
+    const yesterday = domain.shiftDateKey(today, -1);
+    const freeze = await db.getFirstAsync<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM gamification_streak_freezes WHERE date_key = ?`,
+      [yesterday],
+    );
+    expect(freeze?.n).toBe(1);
+
+    const after = await gamification.readGamificationSnapshot({ todayKey: today });
+    expect(after.streak.current).toBe(7);
+    expect(after.week.find((day) => day.dateKey === yesterday)?.frozen).toBe(true);
   });
 
   it('awards focus, workout, and nutrition actions straight from their own tables', async () => {

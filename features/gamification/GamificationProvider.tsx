@@ -4,9 +4,8 @@ import { emitRewardFeedback, type RewardFeedbackTier } from '@/lib/rewardFeedbac
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import {
   awardGamificationAction,
-  ensureStreakFreeze,
   readGamificationSnapshot,
-  reconcileGamificationActivity,
+  runGamificationHousekeeping,
 } from './gamification.data';
 import { GamificationContext } from './gamificationContext';
 import type {
@@ -20,8 +19,9 @@ import type {
  * Owns the single gamification read model and the celebration queue.
  *
  * Two responsibilities worth stating out loud:
- *  1. housekeeping (spend a banked freeze on yesterday's gap, backfill rewards
- *     for actions that never reported themselves) runs on mount, on foreground,
+ *  1. housekeeping (backfill rewards for actions that never reported
+ *     themselves — today and the immediately previous day — before spending a
+ *     banked freeze on a genuine gap) runs on mount, on foreground,
  *     and on day rollover — throttled, because it is not user-visible work;
  *  2. `recordAction` is the *fast path* only. Correctness comes from the
  *     ledger's idempotency plus reconciliation, so a missed call from any
@@ -101,8 +101,7 @@ export function GamificationProvider({ children }: PropsWithChildren) {
       const now = Date.now();
       if (now - lastHousekeepingRef.current >= HOUSEKEEPING_MIN_INTERVAL_MS) {
         lastHousekeepingRef.current = now;
-        await ensureStreakFreeze();
-        await reconcileGamificationActivity();
+        await runGamificationHousekeeping();
       }
       const next = await readGamificationSnapshot();
       if (!mountedRef.current) return;
