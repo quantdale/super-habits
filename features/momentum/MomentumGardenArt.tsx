@@ -128,7 +128,7 @@ function GardenPlant({
       <SvgText
         x={center}
         y={143}
-        fill={tokens.textMuted}
+        fill={tokens.text}
         fontSize={8}
         fontWeight="500"
         textAnchor="middle"

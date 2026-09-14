@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures';
+import type { Page } from '@playwright/test';
 import { goToTab } from './helpers/navigation';
 
 /**
@@ -62,7 +63,20 @@ const auditPage = () => {
     let cur: Element | null = el;
     let acc: { r: number; g: number; b: number; a: number } | null = null;
     while (cur && cur !== document.documentElement) {
-      const c = parse(getComputedStyle(cur).backgroundColor);
+      const cs2 = getComputedStyle(cur);
+      // Gradient-backed surfaces paint with `background-image`; use the first
+      // stop so gradient hero/button faces are measured, not skipped.
+      const img = cs2.backgroundImage;
+      if (img && img !== 'none') {
+        const gm = img.match(/rgba?\([^)]+\)/);
+        const gc = gm ? parse(gm[0]) : null;
+        if (gc) {
+          const opaque = { r: gc.r, g: gc.g, b: gc.b, a: 1 };
+          acc = acc ? over(acc, opaque) : opaque;
+          return acc;
+        }
+      }
+      const c = parse(cs2.backgroundColor);
       if (c && c.a > 0) {
         acc = acc ? over(acc, c) : c;
         if (c.a === 1) return acc;
@@ -91,8 +105,14 @@ const auditPage = () => {
     if (rect.width === 0 || rect.height === 0) continue;
     const isIconGlyph = /material/i.test(cs.fontFamily);
     const inTabControl = !!el.closest('[role="tab"], [role="tablist"]');
+    // Gradient-faced buttons paint the face with an absolutely-positioned
+    // sibling layer, so ancestor resolution would measure the 3D lip instead.
+    // The theme validator owns buttonText-vs-button/hover/active pairs.
+    const inGradientButton = !!el
+      .closest('[role="button"]')
+      ?.querySelector('[style*="linear-gradient"]');
 
-    if (el.children.length === 0 && !isIconGlyph && !inTabControl) {
+    if (el.children.length === 0 && !isIconGlyph && !inTabControl && !inGradientButton) {
       const text = (el.textContent ?? '').trim();
       if (text) {
         const isSvgText = (el as SVGElement).ownerSVGElement != null;
@@ -174,6 +194,23 @@ const auditPage = () => {
   return { contrast, nameless, duplicateIds, hiddenFocusable };
 };
 
+async function auditSections(page: Page, label: string): Promise<void> {
+  for (const section of SECTIONS) {
+    if (section !== 'overview') {
+      await goToTab(page, section);
+      await page.waitForTimeout(1500);
+    }
+    const result = await page.evaluate(auditPage);
+    expect(result.contrast, `${label} ${section}: WCAG AA contrast`).toEqual([]);
+    expect(result.nameless, `${label} ${section}: controls without accessible names`).toEqual([]);
+    expect(result.duplicateIds, `${label} ${section}: duplicate element ids`).toEqual([]);
+    expect(
+      result.hiddenFocusable,
+      `${label} ${section}: focusable content inside aria-hidden`,
+    ).toEqual([]);
+  }
+}
+
 test.describe('Accessibility conformance', () => {
   test('the six sections have no AA contrast, name, id, or hidden-focus defects', async ({
     page,
@@ -183,20 +220,7 @@ test.describe('Accessibility conformance', () => {
       page.getByRole('tablist', { name: 'Section tabs' }).getByRole('button', { name: 'Today' }),
     ).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(3000);
-
-    for (const section of SECTIONS) {
-      if (section !== 'overview') {
-        await goToTab(page, section);
-        await page.waitForTimeout(1500);
-      }
-      const result = await page.evaluate(auditPage);
-      expect(result.contrast, `${section}: WCAG AA contrast`).toEqual([]);
-      expect(result.nameless, `${section}: controls without accessible names`).toEqual([]);
-      expect(result.duplicateIds, `${section}: duplicate element ids`).toEqual([]);
-      expect(result.hiddenFocusable, `${section}: focusable content inside aria-hidden`).toEqual(
-        [],
-      );
-    }
+    await auditSections(page, 'light');
   });
 
   // Dark appearances swap in brighter section/reward text variants
@@ -214,21 +238,30 @@ test.describe('Accessibility conformance', () => {
       .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme')))
       .toBe('dark');
     await page.waitForTimeout(3000);
+    await auditSections(page, 'dark');
+  });
 
-    for (const section of SECTIONS) {
-      if (section !== 'overview') {
-        await goToTab(page, section);
-        await page.waitForTimeout(1500);
-      }
-      const result = await page.evaluate(auditPage);
-      expect(result.contrast, `dark ${section}: WCAG AA contrast`).toEqual([]);
-      expect(result.nameless, `dark ${section}: controls without accessible names`).toEqual([]);
-      expect(result.duplicateIds, `dark ${section}: duplicate element ids`).toEqual([]);
-      expect(
-        result.hiddenFocusable,
-        `dark ${section}: focusable content inside aria-hidden`,
-      ).toEqual([]);
-    }
+  // Cyberpunk Neon replaces the whole section accent set with neon hues
+  // (sectionOverrides); guard that override path too.
+  test('the six sections are AA-clean in an override theme (cyberpunk-neon)', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => {
+      localStorage.setItem('superhabits.theme.mode', 'dark');
+      localStorage.setItem(
+        'superhabits.theme.slots.v2',
+        JSON.stringify({ lightThemeId: 'light', darkThemeId: 'cyberpunk-neon' }),
+      );
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(
+      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('button', { name: 'Today' }),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme-id')))
+      .toBe('cyberpunk-neon');
+    await page.waitForTimeout(3000);
+    await auditSections(page, 'cyberpunk');
   });
 
   test('the Settings overlay has no name, id, or hidden-focus defects', async ({ page }) => {
