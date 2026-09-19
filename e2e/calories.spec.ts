@@ -3,6 +3,7 @@ import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
 import { queryRows } from './helpers/dbHarness';
 import { clickCaloriesAddEntry, fillCalorieMacrosOnly, fillCaloriesMacros } from './helpers/forms';
+import { rapidPress } from './helpers/gestures';
 
 function localTodayKey(): string {
   const date = new Date();
@@ -129,6 +130,47 @@ test.describe('Calories', () => {
     await page.getByLabel('Protein (g)').fill('1000');
     await page.getByText('Save targets', { exact: true }).click();
     await expect(page.getByText('Macro grams must be 999 or less.')).toBeVisible();
+  });
+
+  test('double-pressing a quick-add chip logs exactly one entry', async ({ page }) => {
+    // CG-3 defect class on the quick-add path: `saveKcal` checks React
+    // `saving` state (async — both same-tick presses see `false`), so a chip
+    // double-press writes two `calorie_entries`. The shared synchronous guard
+    // drops the second press before any write begins. MAX_QUICK_ADD_KCAL +
+    // integer validation are unchanged.
+    await rapidPress(page.getByLabel('Quick add 200 kilocalories'), 2);
+
+    // The hero total only re-renders after the entry write has refreshed
+    // state, so the SQLite read below can never race the transaction commit
+    // (reading rows destroys the app page — never query before this signal).
+    // Double 200-kcal presses move the total off zero on fixed and unfixed
+    // builds alike; the strict oracle below is what distinguishes them.
+    await expect(page.getByText('Today: 0 kcal')).not.toBeVisible();
+    // Strict one-row contract: a double-press is ONE entry, never two.
+    const rows = await queryRows(
+      page,
+      "SELECT COUNT(*) AS n FROM calorie_entries WHERE food_name = 'Quick add' AND deleted_at IS NULL",
+    );
+    expect(Number(rows[0]?.n)).toBe(1);
+  });
+
+  test('macro targets modal rejects empty fields instead of saving zero', async ({ page }) => {
+    // `Number('') === 0` used to pass the non-negative check, so clearing a
+    // field silently saved 0 and hid that macro bar (`buildTargetProgress`
+    // hides non-positive targets). Empty is now invalid, not zero; daily
+    // calories stay owned by the goal modal.
+    await page.getByLabel('Edit daily macro targets').click();
+    await expect(page.getByText('Daily targets', { exact: true })).toBeVisible();
+    await page.getByLabel('Protein (g)').fill('');
+    await page.getByText('Save targets', { exact: true }).click();
+    await expect(page.getByText('Enter a value for every field.')).toBeVisible();
+
+    // No silent zero persisted: the targets row is never written.
+    const rows = await queryRows(
+      page,
+      `SELECT COUNT(*) AS n FROM app_meta WHERE key = 'calorie_targets'`,
+    );
+    expect(Number(rows[0]?.n)).toBe(0);
   });
 
   test('goal modal save updates the goal line and progress bar', async ({ page }) => {

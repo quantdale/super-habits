@@ -1,5 +1,5 @@
 import { Text } from '@/core/ui/Text';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Alert, View, useWindowDimensions } from 'react-native';
 import { layout, spacing } from '@/core/theme/designTokens';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -84,6 +84,7 @@ import { ValidationError } from '@/core/ui/ValidationError';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { useGamification } from '@/features/gamification/gamificationContext';
 import { validateRoutineName } from '@/lib/validation';
+import { createSubmitGuard } from '@/lib/submitGuard';
 import {
   BodyWeightCard,
   WorkoutProgressCard,
@@ -171,6 +172,13 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const [currentView, setCurrentView] = useState<ViewState>({ type: 'list' });
   const [routineModal, setRoutineModal] = useState<RoutineModalState | null>(null);
   const [workoutError, setWorkoutError] = useState<string | null>(null);
+  // Synchronous re-entry guards for the async write paths: React state
+  // updates are async, so two taps in the same tick would both pass a state
+  // check and persist twice (CG-3 defect class). tryStart() is synchronous
+  // and drops the second press before any write begins. Separate guards so
+  // the two forms never block each other.
+  const createRoutineGuardRef = useRef(createSubmitGuard());
+  const quickCompleteGuardRef = useRef(createSubmitGuard());
   const [draft, setDraft] = useState<WorkoutSessionDraft | null>(null);
   const [chooserVisible, setChooserVisible] = useState(false);
   const [lastPerformed, setLastPerformed] = useState<Map<string, string>>(new Map());
@@ -265,16 +273,21 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 
   const onCreate = async () => {
-    const err = validateRoutineName(name);
-    if (err) {
-      setWorkoutError(err);
-      return;
+    if (!createRoutineGuardRef.current.tryStart()) return;
+    try {
+      const err = validateRoutineName(name);
+      if (err) {
+        setWorkoutError(err);
+        return;
+      }
+      setWorkoutError(null);
+      await addRoutine(name.trim(), description.trim());
+      setName('');
+      setDescription('');
+      void refresh();
+    } finally {
+      createRoutineGuardRef.current.finish();
     }
-    setWorkoutError(null);
-    await addRoutine(name.trim(), description.trim());
-    setName('');
-    setDescription('');
-    void refresh();
   };
 
   const openRoutineModal = useCallback((routineId: string, routineName: string) => {
@@ -1082,10 +1095,15 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                 lastPerformedAt={lastPerformed.get(routine.id) ?? null}
                 onOpenDetail={() => openRoutineModal(routine.id, routine.name)}
                 onCompleteWorkout={() => {
+                  if (!quickCompleteGuardRef.current.tryStart()) return;
                   void (async () => {
-                    await completeRoutine(routine.id);
-                    recordAction('workout');
-                    void refresh();
+                    try {
+                      await completeRoutine(routine.id);
+                      recordAction('workout');
+                      void refresh();
+                    } finally {
+                      quickCompleteGuardRef.current.finish();
+                    }
                   })();
                 }}
                 onRequestDelete={async () => {

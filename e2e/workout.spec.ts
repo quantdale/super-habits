@@ -163,6 +163,47 @@ test.describe('Workout', () => {
     expect(Number(rows[0]?.n)).toBe(1);
   });
 
+  test('double-tapping Complete workout logs exactly one workout', async ({ page }) => {
+    // CG-3 defect class on the quick-complete path: `onCompleteWorkout` is
+    // fire-and-forget with no re-entry check, so two taps in the same tick
+    // both pass and each mints a fresh `wrk` log id (plus double XP). The
+    // shared synchronous guard drops the second press before any write begins.
+    await fillRoutineName(page, 'Double tap quick');
+    await page.getByText('Add routine', { exact: true }).click();
+    await expect(page.getByText('Double tap quick')).toBeVisible();
+
+    // Two complete presses in the same tick — the fastest a double-tap can land.
+    await rapidPress(page.getByText('Complete workout', { exact: true }).first(), 2);
+
+    // The session card only renders after the log write has refreshed state,
+    // so the SQLite read below can never race the transaction commit.
+    await expect(page.getByLabel(/Open session from/).first()).toBeVisible();
+    // Strict one-row contract: a double-tap is ONE workout, never two.
+    const rows = await queryRows(
+      page,
+      "SELECT COUNT(*) AS n FROM workout_logs WHERE routine_id IN (SELECT id FROM workout_routines WHERE name = 'Double tap quick')",
+    );
+    expect(Number(rows[0]?.n)).toBe(1);
+  });
+
+  test('double-tapping Add routine creates exactly one routine', async ({ page }) => {
+    // Same CG-3 class on the add-routine path: `onCreate` awaits `addRoutine`
+    // (fresh `wrk` id per call) with no in-flight guard, so a same-tick
+    // double-tap inserts two templates.
+    await fillRoutineName(page, 'Double tap routine');
+
+    // Two add presses in the same tick — the fastest a double-tap can land.
+    await rapidPress(page.getByText('Add routine', { exact: true }), 2);
+
+    await expect(page.getByText('Double tap routine')).toBeVisible();
+    // Strict one-row contract: a double-tap is ONE routine, never two.
+    const rows = await queryRows(
+      page,
+      "SELECT COUNT(*) AS n FROM workout_routines WHERE name = 'Double tap routine' AND deleted_at IS NULL",
+    );
+    expect(Number(rows[0]?.n)).toBe(1);
+  });
+
   test('quick-complete logs are labeled distinctly from timed sessions', async ({ page }) => {
     // A routine with exercises exists but was never run through the timer;
     // the quick "Complete workout" action logs a content-free session.

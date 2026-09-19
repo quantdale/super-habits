@@ -51,6 +51,12 @@ export function MacroTargetsModal({ visible, currentTargets, onSave, onClose }: 
   }
 
   const handleSave = () => {
+    // Empty is invalid, not zero: `Number('') === 0` would otherwise pass the
+    // non-negative check below, silently save 0, and hide that macro bar.
+    if (FIELDS.some(({ key }) => values[key].trim() === '')) {
+      setError('Enter a value for every field.');
+      return;
+    }
     const parsed = FIELDS.map(({ key }) => ({ key, value: Number(values[key]) }));
     if (parsed.some(({ value }) => !Number.isFinite(value) || value < 0)) {
       setError('Enter non-negative numbers for every field.');

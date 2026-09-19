@@ -1,9 +1,10 @@
 import { Text } from '@/core/ui/Text';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { PillChip } from '@/core/ui/PillChip';
+import { createSubmitGuard } from '@/lib/submitGuard';
 
 /** Same upper bound as the macro-form kcal validation (lib/validation.ts). */
 const MAX_QUICK_ADD_KCAL = 9999;
@@ -28,9 +29,15 @@ export function QuickAddKcal({
   const [kcalText, setKcalText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Synchronous re-entry guard: React state updates are async, so two chip
+  // (or Add-button) presses in the same tick would both pass a `saving`
+  // check and log two entries (CG-3 defect class). Both entry paths funnel
+  // through `saveKcal`, so one shared guard covers chips and manual Add.
+  // `saving` stays for the Add-button `loading` UI only.
+  const submitGuardRef = useRef(createSubmitGuard());
 
   const saveKcal = (kcal: number) => {
-    if (saving) return;
+    if (!submitGuardRef.current.tryStart()) return;
     setError(null);
     setSaving(true);
     void (async () => {
@@ -40,13 +47,13 @@ export function QuickAddKcal({
       } catch {
         setError('Could not save entry.');
       } finally {
+        submitGuardRef.current.finish();
         setSaving(false);
       }
     })();
   };
 
   const handleSubmit = () => {
-    if (saving) return;
     const parsed = Number(kcalText.trim());
     if (!Number.isInteger(parsed) || parsed <= 0) {
       setError('Enter whole calories greater than zero.');
