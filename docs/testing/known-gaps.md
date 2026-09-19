@@ -248,6 +248,8 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 **Closing path:** keep the ceiling and floor assertions exactly as they are — they are a genuine regression alarm. When a full battery runs on a loaded host, re-verify a floor failure standalone (`npx playwright test --project=journeys e2e/journeys/three-months-in.spec.ts -g "Tom"`) and classify with the recorded per-switch numbers before touching product code; the permanent fix is running the battery on a quiet host or CI, not relaxing the budget.
 
+**2026-09-19 note (J8 headroom Run 1, Linux host, fresh `dist/`, unchanged fixture/spec):** three consecutive focused runs measured worst-switch 767 (floor 4.1% miss), 691 (overview→todos, 13.6% miss), and 662 (overview→todos, 17.3% PASS, full 7/7). Stable ordering in the two instrumented runs: overview→todos slowest, workout→calories second (654/507), all others 334–407. A temporary CDP Profiler probe (added, measured, reverted — `git diff` clean) attributed the slowest switch as harness ~31% / browser ~53% / app JS ~16% with no app function above 2.3%: diffuse rendering over the six mounted HEAVY sections plus the rAF gate's own polling, not a component bottleneck. No narrow product win exists on a measured signal (repeat-activation refresh already no-ops via `setItemsIfChanged`; a provider-split refactor would add risk for a fraction of the 16% app share). Closed evidence-only in `.agent/execplans/j8-section-switch-headroom-v1.md` with zero product/spec/fixture changes.
+
 ### 16. Habit target-edit rule-history commit race under full-battery load — CLOSED (TEST_BUG)
 
 **Reason:** during the 2026-09-10 full `npm run e2e` battery, `e2e/habits.spec.ts`
