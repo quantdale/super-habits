@@ -78,7 +78,7 @@ Fix any defects found narrowly with evidence; no product change otherwise.
   reload + `data-theme` poll); selector survey (Ask/Auto toggle clicks are
   unique at click time; Ask card buttons are Ask/Try again, Auto card is
   Send); added 2 tests (+73 lines) to `e2e/a11y.spec.ts` reusing `auditPage`.
-- In progress: validation — rebuild `dist/`, focused new-test run.
+- In progress: none.
 - Important modified files: `e2e/a11y.spec.ts` (+73 lines, 2 tests, 16 assertions).
 - Last successful validation: full `e2e/a11y.spec.ts` 8/8 green (1.3m)
   2026-09-19 — dark overlay + Ask/Auto baselines clean, no defects found,
@@ -89,10 +89,9 @@ Fix any defects found narrowly with evidence; no product change otherwise.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
 - Exact next action: None — task complete.
-- Remaining definition of done: (1) new tests added without weakening
-  assertions; (2) focused a11y run green; (3) full `e2e/a11y.spec.ts` green;
-  (4) `qa:fast` green per impact map; (5) plan validated; (6) local commit,
-  no push; (7) hygiene (ports free).
+- Remaining definition of done: complete — new tests added without
+  weakening assertions, focused 3/3 + full a11y 8/8 + `qa:fast` green,
+  plan validated, committed locally (d153179), no push, hygiene PASS.
 
 ## Progress
 
@@ -103,7 +102,6 @@ Fix any defects found narrowly with evidence; no product change otherwise.
 - [x] Run full `e2e/a11y.spec.ts` (8/8 green).
 - [x] Run `qa:fast` (green; no product change so no broader escalation).
 - [x] Validate plan, commit locally, close.
-- [ ] Validate plan, commit locally, close.
 
 ## Surprises & Discoveries
 
