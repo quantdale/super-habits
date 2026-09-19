@@ -429,6 +429,62 @@ test.describe('Accessibility conformance', () => {
     ).toEqual([]);
   });
 
+  // Cyberpunk Neon replaces the whole section accent set with neon hues
+  // (sectionOverrides); the light/dark Command Center guards above cannot
+  // see that override path. Audit the overlay's empty Create state and a
+  // parsed todo state under cyberpunk-neon — mirroring the dark Command
+  // Center test — so a future palette/component edit in the neon overlay
+  // surface (input card, mode toggle, parse-result card, draft preview,
+  // accent-derived context copy) cannot regress legibility or control
+  // naming silently.
+  test('the Command Center overlay is AA-clean in the cyberpunk-neon theme', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => {
+      localStorage.setItem('superhabits.theme.mode', 'dark');
+      localStorage.setItem(
+        'superhabits.theme.slots.v2',
+        JSON.stringify({ lightThemeId: 'light', darkThemeId: 'cyberpunk-neon' }),
+      );
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(
+      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('button', { name: 'Today' }),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme-id')))
+      .toBe('cyberpunk-neon');
+    await openCommandScreen(page);
+    await expect(page.getByText('Command center', { exact: true })).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme-id')))
+      .toBe('cyberpunk-neon');
+    await page.waitForTimeout(1200);
+    const empty = await page.evaluate(auditPage);
+    expect(empty.contrast, 'command cyberpunk empty: WCAG AA contrast').toEqual([]);
+    expect(empty.nameless, 'command cyberpunk empty: controls without accessible names').toEqual(
+      [],
+    );
+    expect(empty.duplicateIds, 'command cyberpunk empty: duplicate element ids').toEqual([]);
+    expect(
+      empty.hiddenFocusable,
+      'command cyberpunk empty: focusable content inside aria-hidden',
+    ).toEqual([]);
+
+    await parseCommand(page, 'Add a todo to call mom tomorrow');
+    await page.waitForTimeout(1200);
+    const parsed = await page.evaluate(auditPage);
+    expect(parsed.contrast, 'command cyberpunk parsed: WCAG AA contrast').toEqual([]);
+    expect(parsed.nameless, 'command cyberpunk parsed: controls without accessible names').toEqual(
+      [],
+    );
+    expect(parsed.duplicateIds, 'command cyberpunk parsed: duplicate element ids').toEqual([]);
+    expect(
+      parsed.hiddenFocusable,
+      'command cyberpunk parsed: focusable content inside aria-hidden',
+    ).toEqual([]);
+  });
+
   // Ask and Auto mount their own cards (question input, Ask/Send buttons)
   // that the Create-mode audit never renders. Guard their empty states so a
   // future component edit there cannot regress legibility or naming silently.
