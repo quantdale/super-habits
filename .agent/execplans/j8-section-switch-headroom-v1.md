@@ -77,9 +77,7 @@ with measurements — no fake wins.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
 - Exact next action: None — task complete.
-- Remaining definition of done: All complete (validated plan; measurements +
-  attribution recorded; evidence-only rationale; required gates green; local
-  commit; no push).
+- Remaining definition of done: None — every condition is complete (validated plan, measurements, attribution, gates, local commit, no push).
 
 ## Progress
 
