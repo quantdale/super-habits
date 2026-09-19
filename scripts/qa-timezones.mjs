@@ -8,6 +8,7 @@ const testArgs = [
   'tests/time.test.ts',
   'tests/integration/dateKeys.test.ts',
   'tests/habitReminders.domain.test.ts',
+  'tests/weeklyReview.domain.test.ts',
 ];
 
 for (const timezone of zones) {

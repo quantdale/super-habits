@@ -16,6 +16,7 @@ import type {
   WeeklyReviewDraft,
   WeeklyReviewSummaryV1,
 } from '@/features/weekly-review/weeklyReview.types';
+import { dateKeyToLocalDate, toDateKey } from '@/lib/time';
 
 describe('getReviewWeek', () => {
   it('returns Monday–Sunday week for a midweek date', () => {
@@ -295,6 +296,93 @@ describe('listWeekDateKeys / shiftDateKeyByDays (F5 local-calendar arithmetic)',
   it('shifts backwards across month boundaries', () => {
     expect(shiftDateKeyByDays('2026-03-01', -1)).toBe('2026-02-28');
     expect(shiftDateKeyByDays('2026-08-17', -7)).toBe('2026-08-10');
+  });
+});
+
+describe('weekly-review date keys stay on the local calendar west of UTC (F5)', () => {
+  // Red/green proof (F5): `new Date("YYYY-MM-DD")` parses as UTC midnight per
+  // the ES spec, while `toDateKey()` formats in local time. West of UTC (e.g.
+  // America/New_York, Pacific/Honolulu) the UTC parse localizes to the prior
+  // calendar day — `new Date("2026-08-17").getDate() === 16` there — so a
+  // habit window / prior-week range built on it shifts a day. East of UTC
+  // (including CI's TZ=Asia/Manila) the round-trip is identity, hiding the
+  // regression. Every assertion below pins the local-calendar contract, so it
+  // passes with `dateKeyToLocalDate` in all matrix zones but FAILS west of UTC
+  // if the implementation ever regresses to `new Date(dateKey)`. This block is
+  // executed under each zone in `scripts/qa-timezones.mjs`.
+  it('round-trips date keys through local midnight in every zone', () => {
+    for (const key of ['2026-08-17', '2026-03-08', '2026-11-01', '2025-12-31']) {
+      const local = dateKeyToLocalDate(key);
+      expect(local.getHours()).toBe(0);
+      expect(local.getMinutes()).toBe(0);
+      expect(toDateKey(local)).toBe(key);
+    }
+    expect(dateKeyToLocalDate('2026-08-17').getDate()).toBe(17);
+  });
+
+  it('pins the Monday-start review week on the local calendar', () => {
+    const week = getReviewWeek('2026-08-19');
+    expect(week.startDateKey).toBe('2026-08-17');
+    expect(week.endDateKey).toBe('2026-08-23');
+    expect(week.weekKey).toBe('2026-08-17');
+    // Monday-start invariant resolved locally: a UTC-parse regression west of
+    // UTC would resolve the anchor to Sunday and break both of these.
+    expect(dateKeyToLocalDate(week.startDateKey).getDay()).toBe(1);
+    expect(dateKeyToLocalDate(week.endDateKey).getDay()).toBe(0);
+    expect(week.nextWeekStartDateKey).toBe('2026-08-24');
+    expect(week.nextWeekEndDateKey).toBe('2026-08-30');
+  });
+
+  it('pins the DST spring-forward week (US 2026-03-08) on the local calendar', () => {
+    // Week Mon 2026-03-02 – Sun 2026-03-08 contains the spring-forward Sunday.
+    const week = getReviewWeek('2026-03-08');
+    expect(week.startDateKey).toBe('2026-03-02');
+    expect(week.endDateKey).toBe('2026-03-08');
+    expect(listWeekDateKeys(week.startDateKey, 7)).toEqual([
+      '2026-03-02',
+      '2026-03-03',
+      '2026-03-04',
+      '2026-03-05',
+      '2026-03-06',
+      '2026-03-07',
+      '2026-03-08',
+    ]);
+    expect(shiftDateKeyByDays('2026-03-07', 1)).toBe('2026-03-08');
+    expect(shiftDateKeyByDays('2026-03-08', 1)).toBe('2026-03-09');
+  });
+
+  it('pins the DST fall-back week (US 2026-11-01) on the local calendar', () => {
+    // Week Mon 2026-10-26 – Sun 2026-11-01 contains the fall-back Sunday.
+    const week = getReviewWeek('2026-11-01');
+    expect(week.startDateKey).toBe('2026-10-26');
+    expect(week.endDateKey).toBe('2026-11-01');
+    expect(listWeekDateKeys(week.startDateKey, 7)).toEqual([
+      '2026-10-26',
+      '2026-10-27',
+      '2026-10-28',
+      '2026-10-29',
+      '2026-10-30',
+      '2026-10-31',
+      '2026-11-01',
+    ]);
+    expect(shiftDateKeyByDays('2026-11-01', 1)).toBe('2026-11-02');
+    expect(shiftDateKeyByDays('2026-11-02', -1)).toBe('2026-11-01');
+  });
+
+  it('pins prior-week bounds used by focus/workout comparisons', () => {
+    const week = getReviewWeek('2026-08-19');
+    expect(shiftDateKeyByDays(week.startDateKey, -7)).toBe('2026-08-10');
+    expect(shiftDateKeyByDays(week.endDateKey, -7)).toBe('2026-08-16');
+    // Prior-week window stays a contiguous local 7-day run.
+    expect(listWeekDateKeys(shiftDateKeyByDays(week.startDateKey, -7), 7)).toEqual([
+      '2026-08-10',
+      '2026-08-11',
+      '2026-08-12',
+      '2026-08-13',
+      '2026-08-14',
+      '2026-08-15',
+      '2026-08-16',
+    ]);
   });
 });
 
