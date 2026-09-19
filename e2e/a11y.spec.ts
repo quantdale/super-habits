@@ -288,6 +288,37 @@ test.describe('Accessibility conformance', () => {
     expect(result.contrast, 'settings: WCAG AA contrast').toEqual([]);
   });
 
+  // Dark appearances swap in brighter text variants and the gap-19
+  // `readableAccent` derivation resolves accent text against theme tints;
+  // the light Settings guard above cannot see that path. Audit the open
+  // Settings overlay in the dark theme so a future palette/component edit
+  // there cannot regress legibility or control naming silently.
+  test('the Settings overlay is AA-clean in the dark theme', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => localStorage.setItem('superhabits.theme.mode', 'dark'));
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(
+      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('button', { name: 'Today' }),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme')))
+      .toBe('dark');
+    await page.waitForTimeout(2500);
+    await page.getByRole('button', { name: 'Open settings' }).click();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme')))
+      .toBe('dark');
+    await page.waitForTimeout(1200);
+    const result = await page.evaluate(auditPage);
+    expect(result.contrast, 'settings dark: WCAG AA contrast').toEqual([]);
+    expect(result.nameless, 'settings dark: controls without accessible names').toEqual([]);
+    expect(result.duplicateIds, 'settings dark: duplicate element ids').toEqual([]);
+    expect(result.hiddenFocusable, 'settings dark: focusable content inside aria-hidden').toEqual(
+      [],
+    );
+  });
+
   // The Command Center is a global overlay with its own input card, mode
   // toggle, parse-result card, and draft preview — none of which the section
   // or Settings audits reach. Guard both the empty Create state and a parsed

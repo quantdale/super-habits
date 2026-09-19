@@ -1,6 +1,7 @@
 import { Text } from '@/core/ui/Text';
 import { Pressable } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { readableSurface } from '@/core/theme/contrast';
 import { Card } from '@/core/ui/Card';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { COMMAND_EXPERIMENT_ENABLED } from '@/features/command/types';
@@ -44,7 +45,11 @@ export function SettingsCommandSection({ onOpenCommandCenter }: SettingsCommandS
             accessibilityLabel="Open advanced capture from settings"
             className="mt-4 rounded-2xl px-4 py-3"
             style={{
-              backgroundColor: tokens.textMuted,
+              // textMuted is a text-role token: in dark themes it lightens past
+              // AA against fixed light label text (dark #A9A4C9 measured
+              // 2.38:1). Deepen the fill until textOnAccent clears 4.5 while
+              // keeping the hue; no-op where it already passes (light).
+              backgroundColor: readableSurface(tokens.textMuted, tokens.textOnAccent),
               shadowColor: tokens.shadowColor,
               shadowOffset: { width: 0, height: 6 },
               shadowOpacity: 0.08,
