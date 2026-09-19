@@ -106,7 +106,9 @@ documented flakes are closed:
 - **Notifications**: 5 runtime channels — General, Habit reminders,
   Todo reminders, Daily plan reminders, Weekly review reminders.
   iOS/Android permission prompts themselves are system-localized; the app
-  ships no custom permission copy that needs translation.
+  ships no custom permission copy that needs translation. Drift guard:
+  `tests/store-declaration-drift.test.ts` pins the `app.json` permission set
+  and the 5-channel inventory to these declarations.
 
 ## Remaining metadata before submission
 
