@@ -319,6 +319,44 @@ test.describe('Accessibility conformance', () => {
     );
   });
 
+  // Cyberpunk Neon replaces the whole section accent set with neon hues
+  // (sectionOverrides); the light/dark Settings guards above cannot see
+  // that override path. Audit the open Settings overlay under
+  // cyberpunk-neon so a future palette/component edit there cannot regress
+  // legibility or control naming silently.
+  test('the Settings overlay is AA-clean in the cyberpunk-neon theme', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => {
+      localStorage.setItem('superhabits.theme.mode', 'dark');
+      localStorage.setItem(
+        'superhabits.theme.slots.v2',
+        JSON.stringify({ lightThemeId: 'light', darkThemeId: 'cyberpunk-neon' }),
+      );
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(
+      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('button', { name: 'Today' }),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme-id')))
+      .toBe('cyberpunk-neon');
+    await page.waitForTimeout(2500);
+    await page.getByRole('button', { name: 'Open settings' }).click();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme-id')))
+      .toBe('cyberpunk-neon');
+    await page.waitForTimeout(1200);
+    const result = await page.evaluate(auditPage);
+    expect(result.contrast, 'settings cyberpunk: WCAG AA contrast').toEqual([]);
+    expect(result.nameless, 'settings cyberpunk: controls without accessible names').toEqual([]);
+    expect(result.duplicateIds, 'settings cyberpunk: duplicate element ids').toEqual([]);
+    expect(
+      result.hiddenFocusable,
+      'settings cyberpunk: focusable content inside aria-hidden',
+    ).toEqual([]);
+  });
+
   // The Command Center is a global overlay with its own input card, mode
   // toggle, parse-result card, and draft preview — none of which the section
   // or Settings audits reach. Guard both the empty Create state and a parsed
