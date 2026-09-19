@@ -1,7 +1,7 @@
 # ExecPlan: web-lifecycle terminateOwnedTree ENVIRONMENT assertion fix
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -56,13 +56,13 @@ release.
 
 ## Current Checkpoint
 
-- Current milestone: verify via qa:fast, then validate plan and commit.
+- Current milestone: complete — fix committed as 2447787.
 - Completed: read AGENTS.md + .agent/PLANS.md + known-gaps; reproduced the
   fail (`npx vitest run tests/web-lifecycle.test.ts --project unit` → 1
   failed / 18 passed, line 160 `expected false to be true`); proved signal
   semantics with a minimal spawn/SIGTERM probe
   (`exit event code null sig SIGTERM`); created this ExecPlan.
-- In progress: running qa:fast.
+- In progress: none.
 - Important modified files: `tests/web-lifecycle.test.ts` (assertion + comment); this plan.
 - Last successful validation: focused spec 19/19 green ×3 consecutive runs (2026-09-19).
 - Current failures: `terminateOwnedTree > cleans up after a failing probe`
@@ -71,10 +71,8 @@ release.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Run `npm run qa:fast`, then `npm run qa:affected`, then plan-validate and commit locally.
-- Remaining definition of done: focused spec green; `qa:fast` green (or
-  scoped equivalent + parity); plan validated; local conventional commit (no
-  tag/push).
+- Exact next action: None — task complete.
+- Remaining definition of done: Complete — all conditions validated (focused spec 19/19 ×3, `qa:fast` green, impact focused test 9/9, plan valid, committed locally with no tag/push).
 
 ## Progress
 
@@ -85,7 +83,7 @@ release.
 - [x] Implement the assertion fix (no weakening).
 - [x] Focused spec green.
 - [x] `qa:fast` (typecheck + lint + unit + label parity) green.
-- [ ] Validate plan, commit locally (no tag/push).
+- [x] Validate plan, commit locally (no tag/push).
 
 ## Surprises & Discoveries
 
@@ -139,7 +137,6 @@ release.
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: pending implementation and verification.
-- Follow-up: record final test evidence, commit hash, remaining gaps, and
-  `git status --short` in the user report.
+- Status: Complete (commit `2447787`, no tag, no push).
+- Summary: Fixed the `terminateOwnedTree` failing-probe oracle to accept POSIX signal death (`signalCode`) alongside `exitCode`; port-release assertion unchanged. Focused spec 19/19 ×3, `qa:fast` green (140 files / 1791 tests + parity), impact-named `agent-execplan` test 9/9, `web:hygiene` PASS. Classification: TEST_BUG/ENVIRONMENT (assertion vs POSIX semantics); no library change needed.
+- Follow-up: option (b) J8 ≤680ms/15% headroom hardening and option (c) readiness polish remain open as separate tasks; full `qa:full`/E2E battery not run (disproportionate for a unit-oracle-only change; impact map required only qa:fast → qa:full with no broad regression).
