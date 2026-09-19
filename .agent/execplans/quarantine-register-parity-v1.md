@@ -67,7 +67,7 @@ dummy-Supabase dist-sync export; standard dist/ is local-only.')`. No
   `scripts/quarantine-register-parity.mjs` (single-pass lexer after a
   the-commute `/*.supabase.co/` false-negative find); 6-case unit test;
   `qa:fast` wiring; prettier clean; guard positive (13/13) + negative checks.
-- In progress: qa:fast (typecheck + lint + full unit + both parity guards).
+- In progress: None.
 - Important modified files: `docs/testing/known-gaps.md`, `e2e/README.md`,
   `scripts/quarantine-register-parity.mjs`,
   `tests/quarantineRegisterParity.test.ts`, `package.json`.
@@ -77,17 +77,7 @@ dummy-Supabase dist-sync export; standard dist/ is local-only.')`. No
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: add known-gaps entry 20 + fix e2e/README.md, then write
-  the parity guard script + unit test + qa:fast wiring.
-- Remaining definition of done:
-  - [ ] known-gaps entry 20 landed and accurate.
-  - [ ] e2e/README.md quarantine paragraph + counts corrected.
-  - [ ] parity guard script ships, fails on unregistered gate file (negative
-        check), passes on current tree.
-  - [ ] unit test for the guard passes; `qa:fast` (or impact-mapped gates)
-        green under pinned Node 22.
-  - [ ] plan validated (`agent:plan:validate`) and marked COMPLETED; local
-        commit only, no push.
+- Remaining definition of done: None — every condition is complete (entry 20, README, guard, unit test, qa:fast, plan validation, local commit 0d4d14c, no push).
 
 ## Progress
 
@@ -95,7 +85,7 @@ dummy-Supabase dist-sync export; standard dist/ is local-only.')`. No
 - [x] Docs: known-gaps entry 20 + entries 8/9 file refs + README corrections.
 - [x] Guard script (lexer fix) + unit test + qa:fast wiring.
 - [x] Validation: qa:fast + focused plan tests + plan validate.
-- [ ] Local commit (no push).
+- [x] Local commit 0d4d14c (no push).
 
 ## Surprises & Discoveries
 
@@ -122,7 +112,7 @@ dummy-Supabase dist-sync export; standard dist/ is local-only.')`. No
 - 2026-09-19 — `node scripts/quarantine-register-parity.mjs` — PASS — 13/13
   gate files registered; negative check (redacted stem) flags correctly.
 - 2026-09-19 — `npx vitest run --project unit
-  tests/quarantineRegisterParity.test.ts` — PASS — 6/6 (incl. the-commute
+tests/quarantineRegisterParity.test.ts` — PASS — 6/6 (incl. the-commute
   route-string and template-expression lexer cases).
 - 2026-09-19 — `npm run qa:fast` — PASS — typecheck clean, lint clean
   (`--max-warnings 0`), unit 142 files / 1805 tests, journey-label-parity OK,
