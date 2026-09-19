@@ -157,7 +157,11 @@ describe('terminateOwnedTree', { timeout: 60_000 }, () => {
       waitForHttp({ url: `http://localhost:${port}/`, timeoutMs: 500, child: owned.child }),
     ).rejects.toThrow();
     await terminateOwnedTree(owned, { graceMs: 500 });
-    expect(owned.child.exitCode !== null).toBe(true);
+    // POSIX signal semantics: a child with no SIGTERM handler (like
+    // NEVER_LISTEN_SCRIPT) dies by signal, yielding exitCode null +
+    // signalCode 'SIGTERM'. Either field proves the owned process is dead;
+    // the port-release assertion below proves the bind was freed.
+    expect(owned.child.exitCode !== null || owned.child.signalCode !== null).toBe(true);
     await expect(waitForPortRelease(port, { timeoutMs: 5000 })).resolves.toBe(true);
   });
 
