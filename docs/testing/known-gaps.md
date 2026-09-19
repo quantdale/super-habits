@@ -204,6 +204,8 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 **Resolution (closed 2026-08-04, task 6.1a/Q5; real-worker boundary verified 2026-08-09):** the dummy-Supabase `dist-sync/` build (non-routable `https://dummy.supabase.co` + placeholder anon key) is served on `localhost:8082` by the dedicated `journeys-sync` Playwright project (`npm run e2e:sync`, main/nightly only, never PRs). Against it, the J5 mock backup makes the prompt appear and all restore branches **run and pass** with the production service worker active (verified: 7/7 J5 steps green, including the CG-2 tombstone branch). The worker now bypasses cross-origin API/auth traffic while preserving same-origin shell caching; the gates remain in the code only so the standard `dist/` lane can keep the same files, releasing when a boundary is present rather than weakening an assertion. J5's CG-2 branch is now released separately under CG-2.
 
+**Covered files:** `e2e/journeys/new-phone.spec.ts` (J5). The V2-era restore/account files that ride the same lane are registered under entry 20.
+
 **Host-unreachability caveat (2026-08-26):** the `journeys-sync` lane is ENVIRONMENT-sensitive on hosts that cannot resolve `dummy.supabase.co`. This campaign's local Windows host returned NXDOMAIN for `*.supabase.co` (nslookup against 8.8.8.8 and 1.1.1.1; `curl` exited `000` in ~0.12s), so the pass-through injection escapes to a dead host and the partial-failure (bad-backend P5 step 5) and recoverable-account-v1 (A step 2) journeys deterministically miss locally. A bisect at the pre-campaign SHA `7a49647` failed identically on this host, while CI run 491 (same SHA) was green on GitHub runners — proving the lane is valid on reachable DNS and the local misses are ENVIRONMENT, not product regressions. Authoritative green for this lane is the CI rerun after push, not a local run on an unreachable dummy host.
 
 ### 9. Reconnect-push boundary (standard `dist/` build) — CLOSED by the `journeys-sync` lane
@@ -211,6 +213,8 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 **Reason:** J3 (the-commute) "pushed exactly once" needs a real remote boundary. On the standard `dist/` build the outbox grows, dedupes per (entity, id), and survives a reload — but a flush with `supabase` null no-ops and would **drop** the records, which is not a push and cannot be asserted as one. The reconnect-push step is runtime-gated (`test.fixme(!remoteBoundaryDetected, …)`) and skipped there.
 
 **Resolution (closed 2026-08-04, task 6.1a/Q5):** against `dist-sync/` in the `journeys-sync` project, the counting upsert injector observes the flush at the network boundary and asserts each of the four outbox records (todos ×2, habits, calorie_entries) is delivered **exactly once** and the outbox drains — **passing** (verified). J4's backend-failure steps (503 / malformed / timeout / partial / backoff) run under the same lane and pass 6/6. The gates remain so the standard `dist/` lane skips them with an honest reason instead of failing on a no-op flush.
+
+**Covered files:** `e2e/journeys/the-commute.spec.ts` (J3) and `e2e/journeys/bad-backend.spec.ts` (J4).
 
 ### 10. Internal command evaluation suite — env-gated opt-in lane
 
@@ -422,6 +426,32 @@ runs unskipped in `e2e/a11y.spec.ts` (3 passed, no `test.fixme`).
 overlay control that paints accent text must resolve it with
 `readableAccent`/`readableSurface` from `core/theme/contrast.ts` rather than
 using a fill hue directly.
+
+### 20. V2-era restore/account/Ask boundary files ride the same `journeys-sync` lane
+
+**Reason:** these journeys postdate entries 8/9 and gate their remote steps
+with the same `test.fixme(!<boundaryDetected>, …)` protocol, so on the standard
+local-only `dist/` build they show as skipped lane attributes — not coverage
+holes — and run for real against `dist-sync/` in the `journeys-sync` lane
+(all are `@sync`-tagged):
+
+- `e2e/journeys/new-phone-v2.spec.ts` (P6 V2 restore round-trip plus the
+  post-restore linked-action replay step) and
+  `e2e/journeys/new-phone-v2-settings-failures.spec.ts` (V2 settings
+  allowlist/failure branches) — the same Supabase-backed restore boundary as
+  entry 8.
+- `e2e/journeys/portable-owner-recovery.spec.ts` (portable export/import plus
+  the account boundary) — the same dummy-Supabase boundary, gated by
+  `requireAccountBoundary()` when no Supabase request is seen.
+- `e2e/journeys/command-center-v2-ask.spec.ts` (P6 Ask V2 deterministic
+  boundary) — the Ask edge route only exists when a Supabase boundary is
+  present, so on standard `dist/` no Supabase request is ever seen and every
+  step releases as fixme with the reason naming the lane.
+
+**Closing path:** none needed; keep the runtime gates. This entry exists so
+the standing rule holds — every skipped or quarantined test is named here —
+and so the quarantine-register parity guard
+(`scripts/quarantine-register-parity.mjs`, wired into `qa:fast`) can verify it.
 
 ---
 
