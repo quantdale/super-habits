@@ -455,6 +455,29 @@ The user-simulation platform (`simulation/`) layers a model + multiple runners o
 
 **Closing path:** run `npm run supabase:schema:validate` for repository-side checks, then perform a read-only authenticated comparison of the linked project against `supabase/migrations/` and file any exact discrepancy. The disposable fixture is now a compatibility payload, not the authority. The live comparison remains `CREDENTIAL_REQUIRED` until project access is available.
 
+## Environment notes (not gaps)
+
+Dated host/toolchain findings that are neither contract nor capability gaps.
+They are recorded here so a cryptic failure is not re-investigated from
+scratch. No test is weakened or skipped on their account.
+
+### E1 — Integration suite requires the pinned Node major (2026-09-19)
+
+**Finding:** on this host, `npm run test:integration` failed with
+`ERR_IPC_CHANNEL_CLOSED` and zero tests executed — identically for a
+34-line single file — while the unit project stayed green. Root cause was
+the shell's default `node` (v20.19.2) versus the repo's pinned `22.23.2`
+(`.nvmrc`, `package.json` `engines >=22.22.1 <23`): `better-sqlite3@13`
+requires Node >= 22 and segfaults on import under Node 20 (exit 139),
+killing each tinypool worker during setup import, below any pool layer
+(`--pool` / `maxWorkers` / `fileParallelism` cannot matter). Under the
+pinned Node the full suite passes unchanged (64/64 files, 309/309 tests).
+
+**Rule:** run Vitest (and any node script) on this repo only with the
+pinned major (`fnm use` / matching PATH); an `ERR_IPC_CHANNEL_CLOSED`
+with zero tests executed means "check `node --version` first". Evidence
+in `.agent/execplans/integration-tinypool-ipc-channel-closed-v1.md`.
+
 ### P4 — No persistent staging environment
 
 **Reason:** there is no standing staging Supabase/Vercel environment. The disposable-backend lane creates-or-wipes a throwaway project per run (design D8), which is excellent isolation but means nothing persists between runs: long-lived data, RLS role changes, and cross-day cloud behaviour cannot be observed anywhere.
