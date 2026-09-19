@@ -317,4 +317,78 @@ test.describe('Accessibility conformance', () => {
       [],
     );
   });
+
+  // Dark appearances swap in brighter text variants
+  // (SECTION_TEXT_COLORS_DARK, getRewardAccents); the overlay's input card,
+  // mode toggle, parse-result card, and draft preview need the same guard as
+  // the light baseline above.
+  test('the Command Center overlay is AA-clean in the dark theme', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => localStorage.setItem('superhabits.theme.mode', 'dark'));
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(
+      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('button', { name: 'Today' }),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme')))
+      .toBe('dark');
+    await openCommandScreen(page);
+    await expect(page.getByText('Command center', { exact: true })).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme')))
+      .toBe('dark');
+    await page.waitForTimeout(1200);
+    const empty = await page.evaluate(auditPage);
+    expect(empty.contrast, 'command dark empty: WCAG AA contrast').toEqual([]);
+    expect(empty.nameless, 'command dark empty: controls without accessible names').toEqual([]);
+    expect(empty.duplicateIds, 'command dark empty: duplicate element ids').toEqual([]);
+    expect(
+      empty.hiddenFocusable,
+      'command dark empty: focusable content inside aria-hidden',
+    ).toEqual([]);
+
+    await parseCommand(page, 'Add a todo to call mom tomorrow');
+    await page.waitForTimeout(1200);
+    const parsed = await page.evaluate(auditPage);
+    expect(parsed.contrast, 'command dark parsed: WCAG AA contrast').toEqual([]);
+    expect(parsed.nameless, 'command dark parsed: controls without accessible names').toEqual([]);
+    expect(parsed.duplicateIds, 'command dark parsed: duplicate element ids').toEqual([]);
+    expect(
+      parsed.hiddenFocusable,
+      'command dark parsed: focusable content inside aria-hidden',
+    ).toEqual([]);
+  });
+
+  // Ask and Auto mount their own cards (question input, Ask/Send buttons)
+  // that the Create-mode audit never renders. Guard their empty states so a
+  // future component edit there cannot regress legibility or naming silently.
+  // Selector note: the click happens while still in Create mode, where 'Ask'
+  // names only the mode toggle; in Ask mode 'Auto' names only its toggle
+  // (the Ask card's buttons are 'Ask'/'Try again', the Auto card's is 'Send').
+  test('the Command Center Ask and Auto modes have no AA contrast, name, id, or hidden-focus defects', async ({
+    page,
+  }) => {
+    await openCommandScreen(page);
+    await expect(page.getByText('Command center', { exact: true })).toBeVisible();
+    await page.waitForTimeout(1200);
+
+    await page.getByRole('button', { name: 'Ask', exact: true }).click({ force: true });
+    await expect(page.getByText('Ask a question', { exact: true })).toBeVisible();
+    await page.waitForTimeout(1200);
+    const ask = await page.evaluate(auditPage);
+    expect(ask.contrast, 'command ask: WCAG AA contrast').toEqual([]);
+    expect(ask.nameless, 'command ask: controls without accessible names').toEqual([]);
+    expect(ask.duplicateIds, 'command ask: duplicate element ids').toEqual([]);
+    expect(ask.hiddenFocusable, 'command ask: focusable content inside aria-hidden').toEqual([]);
+
+    await page.getByRole('button', { name: 'Auto', exact: true }).click({ force: true });
+    await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeVisible();
+    await page.waitForTimeout(1200);
+    const auto = await page.evaluate(auditPage);
+    expect(auto.contrast, 'command auto: WCAG AA contrast').toEqual([]);
+    expect(auto.nameless, 'command auto: controls without accessible names').toEqual([]);
+    expect(auto.duplicateIds, 'command auto: duplicate element ids').toEqual([]);
+    expect(auto.hiddenFocusable, 'command auto: focusable content inside aria-hidden').toEqual([]);
+  });
 });
