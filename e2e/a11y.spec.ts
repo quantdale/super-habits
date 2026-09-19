@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import { goToTab } from './helpers/navigation';
+import { openCommandScreen, parseCommand } from './helpers/commandObservation';
 
 /**
  * DOM-level accessibility conformance check: real rendered colour contrast
@@ -285,5 +286,35 @@ test.describe('Accessibility conformance', () => {
     await page.waitForTimeout(1200);
     const result = await page.evaluate(auditPage);
     expect(result.contrast, 'settings: WCAG AA contrast').toEqual([]);
+  });
+
+  // The Command Center is a global overlay with its own input card, mode
+  // toggle, parse-result card, and draft preview — none of which the section
+  // or Settings audits reach. Guard both the empty Create state and a parsed
+  // todo state so a future palette/component edit here cannot regress
+  // legibility or control naming silently.
+  test('the Command Center overlay has no AA contrast, name, id, or hidden-focus defects', async ({
+    page,
+  }) => {
+    await openCommandScreen(page);
+    await expect(page.getByText('Command center', { exact: true })).toBeVisible();
+    await page.waitForTimeout(1200);
+    const empty = await page.evaluate(auditPage);
+    expect(empty.contrast, 'command empty: WCAG AA contrast').toEqual([]);
+    expect(empty.nameless, 'command empty: controls without accessible names').toEqual([]);
+    expect(empty.duplicateIds, 'command empty: duplicate element ids').toEqual([]);
+    expect(empty.hiddenFocusable, 'command empty: focusable content inside aria-hidden').toEqual(
+      [],
+    );
+
+    await parseCommand(page, 'Add a todo to call mom tomorrow');
+    await page.waitForTimeout(1200);
+    const parsed = await page.evaluate(auditPage);
+    expect(parsed.contrast, 'command parsed: WCAG AA contrast').toEqual([]);
+    expect(parsed.nameless, 'command parsed: controls without accessible names').toEqual([]);
+    expect(parsed.duplicateIds, 'command parsed: duplicate element ids').toEqual([]);
+    expect(parsed.hiddenFocusable, 'command parsed: focusable content inside aria-hidden').toEqual(
+      [],
+    );
   });
 });
