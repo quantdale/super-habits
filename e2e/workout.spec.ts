@@ -3,7 +3,11 @@ import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
 import { queryRows, returnToApp } from './helpers/dbHarness';
 import { fillRoutineName } from './helpers/forms';
-import { clickSwipeDeleteAction, swipeLeftRevealWorkoutRoutineRow } from './helpers/gestures';
+import {
+  clickSwipeDeleteAction,
+  rapidPress,
+  swipeLeftRevealWorkoutRoutineRow,
+} from './helpers/gestures';
 
 test.describe('Workout', () => {
   test.beforeEach(async ({ page }) => {
@@ -118,6 +122,45 @@ test.describe('Workout', () => {
     await expect(detail.getByText(/est\. 1RM 101/)).toBeVisible();
     await expect(page.getByText('Duration')).toBeVisible();
     await expect(page.getByText('Quick log — no exercises recorded.')).not.toBeVisible();
+  });
+
+  test('double-tapping Save and finish logs exactly one workout', async ({ page }) => {
+    // CG-3 defect class on the session finish path: two taps in the same tick
+    // must not log two workouts. The finish handler holds a synchronous
+    // re-entry guard, so the second press is dropped before any write begins.
+    await fillRoutineName(page, 'Double tap day');
+    await page.getByText('Add routine', { exact: true }).click();
+    await expect(page.getByText('Double tap day')).toBeVisible();
+    await page.getByText('Double tap day', { exact: true }).first().click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByPlaceholder(/e\.g\. Rows, Curls, Push-ups/i).fill('Bench Press');
+    await dialog.getByText('Add', { exact: true }).click({ force: true });
+    await expect(dialog.getByText('Start workout', { exact: true })).toBeVisible();
+    await dialog.getByRole('textbox', { name: 'Active (seconds)' }).fill('8');
+    await expect(dialog.getByRole('textbox', { name: 'Active (seconds)' })).toHaveValue('8', {
+      timeout: 10_000,
+    });
+
+    await dialog.getByText('Start workout', { exact: true }).click({ force: true });
+
+    await expect(page.getByText('Log this set (optional)')).toBeVisible();
+    await page.getByText('Start', { exact: true }).first().click();
+    await page.getByRole('textbox', { name: 'Weight' }).fill('80');
+    await page.getByRole('textbox', { name: 'Reps' }).fill('8');
+    await expect(page.getByText('Workout complete!')).toBeVisible({ timeout: 20_000 });
+
+    // Two complete presses in the same tick — the fastest a double-tap can land.
+    await rapidPress(page.getByText('Save and finish', { exact: true }), 2);
+
+    await expect(page.getByText('Workout saved')).toBeVisible({ timeout: 10_000 });
+    await page.getByText('Done', { exact: true }).click();
+
+    // Strict one-row contract: a double-tap is ONE workout, never two.
+    const rows = await queryRows(
+      page,
+      "SELECT COUNT(*) AS n FROM workout_logs WHERE routine_id IN (SELECT id FROM workout_routines WHERE name = 'Double tap day')",
+    );
+    expect(Number(rows[0]?.n)).toBe(1);
   });
 
   test('quick-complete logs are labeled distinctly from timed sessions', async ({ page }) => {

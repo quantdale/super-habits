@@ -45,6 +45,7 @@ import {
   saveWorkoutSessionDraft,
 } from './workout.data';
 import { cancelScheduledNotification, scheduleTimerEndNotification } from '@/lib/notifications';
+import { createSubmitGuard } from '@/lib/submitGuard';
 import { sanitizeNumericInput } from '@/lib/numericInput';
 import {
   DEFAULT_REST_SECONDS,
@@ -217,6 +218,11 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   }));
   const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  // Synchronous re-entry guard for the async finish path: React state updates
+  // are async, so two taps in the same tick would both pass an `isSaving`
+  // check and log two workouts (CG-3 defect class). tryStart() is synchronous
+  // and drops the second press before any write begins.
+  const finishGuardRef = useRef(createSubmitGuard());
   const [savedOutcome, setSavedOutcome] = useState<{ newRecords: string[] } | null>(null);
   const [previousLookup, setPreviousLookup] = useState<PreviousSetLookup | null>(null);
   const [recentSetOutcomes, setRecentSetOutcomes] = useState<
@@ -661,7 +667,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   };
 
   const handleFinish = async () => {
-    if (isSaving) return;
+    if (!finishGuardRef.current.tryStart()) return;
     setIsRunning(false);
     setIsSaving(true);
     try {
@@ -751,6 +757,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       recordAction('workout');
       setSavedOutcome({ newRecords });
     } finally {
+      finishGuardRef.current.finish();
       setIsSaving(false);
     }
   };
@@ -919,6 +926,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                   label={isSaving ? 'Saving…' : 'Save and finish'}
                   onPress={handleFinish}
                   color={WORKOUT_COLOR}
+                  loading={isSaving}
                 />
               </View>
             </View>

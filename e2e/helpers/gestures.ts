@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 type RowRect = { left: number; top: number; width: number; height: number };
 
@@ -168,6 +168,52 @@ export async function clickTodoCheckboxForTitle(page: Page, title: string): Prom
  * duplicate rows — scope from the row title to the nearest ancestor that contains both Edit and
  * Delete (`SwipeRightActions`), then force-click the Delete label.
  */
+/**
+ * Rapid-fire a full press sequence `times` times synchronously on a Pressable
+ * (same task, no awaits between presses): the degenerate "fastest possible
+ * double-tap" a fat-fingered user can land. Mirrors how RN Web Pressables are
+ * driven elsewhere in this file (pointerdown/pointerup/click). A same-tick
+ * double press is the exact case an async-state (`useState`) re-entry check
+ * misses and a synchronous guard (`lib/submitGuard.ts`) catches.
+ */
+export async function rapidPress(locator: Locator, times: number): Promise<void> {
+  await locator.evaluate((el, n) => {
+    const btn = el as HTMLElement;
+    const r = btn.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    for (let i = 0; i < n; i++) {
+      btn.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+          pointerId: i + 1,
+          pointerType: 'mouse',
+          isPrimary: true,
+          buttons: 1,
+        }),
+      );
+      btn.dispatchEvent(
+        new PointerEvent('pointerup', {
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+          pointerId: i + 1,
+          pointerType: 'mouse',
+          isPrimary: true,
+          buttons: 0,
+        }),
+      );
+      btn.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y }),
+      );
+    }
+  }, times);
+}
+
 export async function clickSwipeDeleteAction(page: Page, rowAnchorText: string): Promise<void> {
   const anchor = await rowTitleAnchor(page, rowAnchorText);
   const withActions = anchor.locator(
