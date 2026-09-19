@@ -118,4 +118,29 @@ describe('validateCalorieGoal', () => {
   it('accepts valid goal', () => {
     expect(validateCalorieGoal('2000', '150', '200', '65')).toBeNull();
   });
+  it('rejects empty macro fields instead of saving 0', () => {
+    expect(validateCalorieGoal('2000', '', '200', '65')).toBe(
+      'Enter a value for every goal field.',
+    );
+    expect(validateCalorieGoal('2000', '150', '', '65')).toBe(
+      'Enter a value for every goal field.',
+    );
+    expect(validateCalorieGoal('2000', '150', '200', '')).toBe(
+      'Enter a value for every goal field.',
+    );
+  });
+  it('rejects whitespace-only fields instead of saving 0', () => {
+    expect(validateCalorieGoal('2000', '   ', '200', '65')).toBe(
+      'Enter a value for every goal field.',
+    );
+    expect(validateCalorieGoal('   ', '150', '200', '65')).toBe(
+      'Enter a value for every goal field.',
+    );
+  });
+  it('rejects empty calories with a clear error', () => {
+    expect(validateCalorieGoal('', '150', '200', '65')).toBe('Enter a value for every goal field.');
+  });
+  it('accepts explicit zero macros', () => {
+    expect(validateCalorieGoal('2000', '0', '0', '0')).toBeNull();
+  });
 });

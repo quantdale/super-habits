@@ -67,6 +67,20 @@ export function validateCalorieGoal(
   carbs: string,
   fats: string,
 ): string | null {
+  // Empty is invalid, not zero: `Number('') === 0` would otherwise pass the
+  // range checks below and silently save a cleared field as 0 (same class
+  // as the MacroTargetsModal hole). Explicit '0' macros remain valid;
+  // calorie entry forms intentionally allow empty (treated as 0 + guarded
+  // by validateCalorieComputedKcal) and are untouched — this guard lives
+  // only on the goal path.
+  if (
+    calories.trim() === '' ||
+    protein.trim() === '' ||
+    carbs.trim() === '' ||
+    fats.trim() === ''
+  ) {
+    return 'Enter a value for every goal field.';
+  }
   const cal = Number(calories.trim());
   if (isNaN(cal) || cal < 500) return 'Daily calorie goal must be at least 500.';
   if (cal > 6000) return 'Daily calorie goal cannot exceed 6000.';
