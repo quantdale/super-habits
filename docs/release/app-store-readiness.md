@@ -3,8 +3,22 @@
 Snapshot of release state for SuperHabits 1.0.0 (schema 25). Refreshed
 2026-09-14 at source `7fa5790` (release-readiness pass at `c04cceb`, then the
 accessibility campaign `bcca6ae` and the Settings-overlay contrast closure
-`3c5a086`). Update this file when a release actually ships rather than letting
-it drift.
+`3c5a086`); privacy-artifact pass 2026-09-19 adds `privacy-policy.md` +
+`store-data-declarations.md` and corrects the item-3 conditional; hosted-policy
+pass 2026-09-19 ships `public/privacy.html` → `/privacy.html` with a drift-guard
+test; release-notes pass 2026-09-19 makes `release-notes-1.0.0.md` store-ready
+(Apple/Play What's New + version/tag checklist); age-rating/DSA pass
+2026-09-19 adds `age-rating-and-trader.md` (Apple 4+ / Play Everyone /
+trader-declaration drafts) with a guard test; store-assets pass
+2026-09-19 adds `store-assets-checklist.md` (Apple/Play dimensions, counts,
+six-surface file mapping, acceptance, owner capture boxes) with a guard test;
+icon/splash audit pass 2026-09-19 adds `icon-splash-asset-audit.md`
+(measured PNG-header sizes for every app.json/manifest icon, splash, and
+notification asset) with a header-parse guard test; version/build
+consistency pass 2026-09-19 adds `version-build-consistency.md`
+(cross-file 1.0.0 / buildNumber 1 / versionCode 1 / eas.json posture
+proof) with a consistency guard test. Update this
+file when a release actually ships rather than letting it drift.
 
 ## What ships
 
@@ -69,13 +83,21 @@ documented flakes are closed:
   (`android-icon-foreground.png` 512², `android-icon-background.png`, and
   `android-icon-monochrome.png` 432² for themed icons), web `favicon.png`
   plus PWA `public/icon-192.png`, `icon-512.png`, `icon-maskable-512.png`.
+  Measured sizes verified 2026-09-19 in
+  `docs/release/icon-splash-asset-audit.md` (guard:
+  `tests/icon-splash-asset-audit.test.ts`; read-only IHDR, no binaries
+  fabricated).
 - **Notification icon**: `assets/notification-icon.png` (96×96
   white-on-transparent, derived from the app's monochrome mark), wired through
   the `expo-notifications` plugin with colour `#6D28D9`. A prebuild emits
   `drawable-{mdpi..xxxhdpi}/notification_icon.png`, `@color/notification_icon_color`,
   and both FCM + local `default_notification_icon` manifest entries.
+  Header verified 96×96 with alpha in `icon-splash-asset-audit.md`; white
+  artwork itself stays `[OWNER ACTION]`.
 - **Splash**: `assets/splash-icon.png` (1024²), `resizeMode: contain`,
   `backgroundColor: #ffffff`, with a dark variant (`#0a0f1a`).
+  Header verified 1024² in `icon-splash-asset-audit.md`; safe-area cropping
+  stays `[OWNER ACTION]`.
 - **iOS**: bundle id `com.dale16.superhabits`, tablet support on,
   `ITSAppUsesNonExemptEncryption: false` (no non-exempt crypto in the app).
 - **Android**: package `com.dale16.superhabits`, predictive back off,
@@ -88,23 +110,48 @@ documented flakes are closed:
 
 ## Remaining metadata before submission
 
-1. **App Store screenshots**: 6.7" and 6.1" iPhone sets, plus 12.9"/13" iPad
-   (tablet support is on). Capture from a seeded device — Today dashboard,
-   Habits, Focus timer, Workout session, Calories diary, Level & Achievements.
+1. **App Store screenshots**: 6.7" (1290 × 2796) and 6.1" (1179 × 2556) iPhone sets, plus 12.9" (2048 × 2732) / 13" (2064 × 2752) iPad
+   (tablet support is on). Spec is **delivered 2026-09-19** in `docs/release/store-assets-checklist.md` (§§1/3–5: sizes, counts, six-surface file mapping, acceptance). Capture from a seeded device — Today dashboard,
+   Habits, Focus timer, Workout session, Calories diary, Level & Achievements — as `[OWNER ACTION]` (no PNGs fabricated in-repo).
 2. **Play Store assets**: feature graphic (1024×500), phone screenshots
-   (min 2), short/full description, and the Data safety form (answers below).
-3. **Privacy nutrition labels / Data safety**: this build collects nothing —
-   accounts are optional and only used for backup, data lives in local SQLite,
-   and analytics are absent. Declare "Data Not Collected" on iOS and
-   "No data collected / No data shared" on Play, with encryption in transit
-   for the optional backup path.
+   (min 2, same six surfaces preferred), short/full description, and the Data safety form (answers below). Spec is **delivered 2026-09-19** in `docs/release/store-assets-checklist.md` (§§2–5). Image capture itself stays `[OWNER ACTION]`.
+3. **Privacy nutrition labels / Data safety**: default posture collects
+   nothing — accounts are optional and only used for backup, data lives in
+   local SQLite, and analytics are absent. `docs/release/privacy-policy.md`
+   (hostable draft, owner to confirm + host; deployable rendering ships as
+   `public/privacy.html` → `/privacy.html` with a drift-guard test) and
+   `docs/release/store-data-declarations.md` (Apple label + Play Data safety
+   answers + Play listing drafts + asset checklist) are **delivered
+   2026-09-19**. Conditional, stated explicitly in the declarations file:
+   with backup unused the posture is "Data Not Collected" / "No data
+   collected"; with user-enabled backup, user content + account id
+   (+ optional recovery email) are stored in the developer's Supabase
+   backend (encrypted in transit, per-account isolated, never shared),
+   so the filed answers cover the backup-enabled path.
 4. ~~**Android notification icon**~~ — **delivered 2026-09-14**
    (`assets/notification-icon.png` + plugin config + prebuild verification).
-5. **Version tagging + release notes**: write the store release notes
-   (`docs/release/release-notes-1.0.0.md` is the draft) and confirm the EAS
-   `submit.production` profile has credentials. Tag `v1.0.0` at release time.
+5. **Version tagging + release notes**: `docs/release/release-notes-1.0.0.md`
+   is **store-ready 2026-09-19** (paste-ready Apple What's New ≤ 4000 chars
+   - Play release notes ≤ 500 chars, guarded by
+     `tests/release-notes.test.ts`, plus a version/tag checklist pinning
+     `package.json 1.0.0` / `app.json 1.0.0 + buildNumber 1 + versionCode 1`).
+     Cross-file proof is **delivered 2026-09-19** in
+     `docs/release/version-build-consistency.md` (guard:
+     `tests/version-build-consistency.test.ts`; asserts `eas.json`
+     `appVersionSource remote` + `production.autoIncrement true` + empty
+     `submit.production`, and readiness ↔ release-notes checklist agreement;
+     no tag, no version change).
+     Remaining release-time owner actions: configure the EAS
+     `submit.production` credentials (`eas.json` is `{}`) and create the
+     `v1.0.0` tag (`git tag -a v1.0.0 -m "SuperHabits 1.0.0" &&
+git push origin v1.0.0`) only with explicit release intent.
 6. **Age rating questionnaires** (iOS 4+, Play "Everyone") and the EU DSA
-   trader declaration.
+   trader declaration: `docs/release/age-rating-and-trader.md` is
+   **delivered 2026-09-19** (Apple all-None → 4+, Play Everyone / not
+   child-directed / no ads / no purchases, DSA trader-status + identity
+   fields as `[OWNER ACTION]`), guarded by
+   `tests/age-rating-dsa.test.ts`. Owner + counsel must still confirm
+   the answers and file the trader declaration at submission time.
 7. **Localization**: the UI ships English-only. Android channel names and the
    `app_name` string would need `values-<locale>/strings.xml` entries before
    claiming additional store locales.
