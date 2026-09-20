@@ -23,6 +23,7 @@ import {
   estimate1RM,
   findNewPersonalRecords,
   formatWorkoutTime,
+  groupSessionExercises,
   lookupPreviousSet,
   parseOptionalMeasurement,
   recommendProgression,
@@ -709,15 +710,16 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         newRecords = findNewPersonalRecords(sessionSets, historySets);
       }
 
+      const grouped = groupSessionExercises(summary, records);
       await logWorkoutSession({
         routineId: routine.id,
         notes: notes.trim() ? notes.trim() : undefined,
-        exercises: summary.map((s) => {
-          const exercise = routine.exercises.find((item) => item.name === s.exerciseName);
+        exercises: grouped.map((g) => {
+          const exercise = routine.exercises.find((item) => item.name === g.exerciseName);
           const isLegacyFreeText = !exercise?.catalog_exercise_id;
           return {
-            exerciseName: s.exerciseName,
-            setsCompleted: s.setsCompleted,
+            exerciseName: g.exerciseName,
+            setsCompleted: g.setsCompleted,
             ...(isLegacyFreeText
               ? {}
               : {
@@ -729,20 +731,18 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                       ? exercise?.modality === 'weighted_strength'
                       : exercise.supports_external_load === 1,
                 }),
-            sets: records
-              .filter((r) => r.exerciseName === s.exerciseName)
-              .map((r) => ({
-                setNumber: r.setNumber,
-                weight: r.weight,
-                reps: r.reps,
-                completed: r.completed,
-                weightUnit: r.weight !== null ? ('kg' as const) : null,
-                durationSeconds: r.durationSeconds,
-                distance: r.distance,
-                pace: r.pace,
-                effortValue: r.effortValue,
-                effortScale: r.effortScale,
-              })),
+            sets: g.sets.map((r) => ({
+              setNumber: r.setNumber,
+              weight: r.weight,
+              reps: r.reps,
+              completed: r.completed,
+              weightUnit: r.weight !== null ? ('kg' as const) : null,
+              durationSeconds: r.durationSeconds,
+              distance: r.distance,
+              pace: r.pace,
+              effortValue: r.effortValue,
+              effortScale: r.effortScale,
+            })),
           };
         }),
         startedAt: startedAtMs !== null ? new Date(startedAtMs).toISOString() : null,

@@ -162,6 +162,85 @@ describe('workout Gym V2 queries (real SQLite)', () => {
     expect(performance.filter((row) => row.exerciseName === 'Row')).toHaveLength(2);
   });
 
+  it('persists a fully-skipped exercise with setsCompleted 0 and completed=0 rows', async () => {
+    db = await freshDatabase();
+    const workout = await import('@/features/workout/workout.data');
+
+    await workout.addRoutine('Skip Audit', 'strength');
+    const routineId = (await db.getFirstAsync<{ id: string }>(
+      `SELECT id FROM workout_routines WHERE name = 'Skip Audit' AND deleted_at IS NULL`,
+    ))!.id;
+
+    // Mirrors the fixed handleFinish wiring: every attempted exercise is
+    // logged, including one whose sets were all skipped.
+    await workout.logWorkoutSession({
+      routineId,
+      exercises: [
+        {
+          exerciseName: 'Bench',
+          setsCompleted: 0,
+          sets: [
+            { setNumber: 1, weight: 80, reps: 8, completed: false },
+            { setNumber: 2, weight: 82.5, reps: 6, completed: false },
+          ],
+        },
+        {
+          exerciseName: 'Row',
+          setsCompleted: 2,
+          sets: [
+            { setNumber: 1, weight: 60, reps: 10, completed: true },
+            { setNumber: 2, weight: 60, reps: 10, completed: true },
+          ],
+        },
+      ],
+    });
+
+    const logId = (await db.getFirstAsync<{ id: string }>(
+      `SELECT id FROM workout_logs WHERE routine_id = ?`,
+      [routineId],
+    ))!.id;
+    const detail = await workout.getWorkoutLogDetail(logId);
+    expect(detail?.exercises.map((e) => [e.exercise_name, e.sets_completed])).toEqual([
+      ['Bench', 0],
+      ['Row', 2],
+    ]);
+    expect(detail?.sets).toHaveLength(4);
+    expect((detail?.sets ?? []).filter((s) => s.completed === 0)).toHaveLength(2);
+    expect((detail?.sets ?? []).filter((s) => s.completed === 1)).toHaveLength(2);
+    const perExercise = await db.getAllAsync<{
+      exercise_name: string;
+      set_number: number;
+      completed: number;
+    }>(
+      `SELECT e.exercise_name AS exercise_name, s.set_number AS set_number, s.completed AS completed
+       FROM workout_session_sets s
+       INNER JOIN workout_session_exercises e ON e.id = s.session_exercise_id
+       WHERE e.log_id = ?
+       ORDER BY e.created_at ASC, e.id ASC, s.set_number ASC`,
+      [logId],
+    );
+    expect(perExercise).toEqual([
+      { exercise_name: 'Bench', set_number: 1, completed: 0 },
+      { exercise_name: 'Bench', set_number: 2, completed: 0 },
+      { exercise_name: 'Row', set_number: 1, completed: 1 },
+      { exercise_name: 'Row', set_number: 2, completed: 1 },
+    ]);
+
+    // Measurable reads still exclude the skipped rows: prefill sees only Row.
+    const prefill = await workout.listRecentLoggedSets();
+    expect(prefill.filter((r) => r.exerciseName === 'Bench')).toEqual([]);
+    expect(prefill.filter((r) => r.exerciseName === 'Row')).toHaveLength(2);
+    // Outcomes keep the skips so progression holds instead of advancing.
+    const outcomes = await workout.listRecentWorkoutSetOutcomes();
+    expect(outcomes.filter((o) => o.exerciseName === 'Bench').map((o) => o.completed)).toEqual([
+      0, 0,
+    ]);
+    // Session totals count only completed work (2), not skipped rows.
+    const todayKey = toDateKey();
+    const totals = await workout.listSessionTotalsForRange(todayKey, todayKey);
+    expect(totals).toEqual([{ id: logId, completedAt: expect.any(String), totalSets: 2 }]);
+  });
+
   it('reschedule writes a rest and workout override and validates input', async () => {
     db = await freshDatabase();
     const workout = await import('@/features/workout/workout.data');

@@ -4,6 +4,7 @@ import {
   buildPreviousSetLookup,
   collectSessionSetRecords,
   formatWorkoutTime,
+  groupSessionExercises,
   lookupPreviousSet,
   summarizeCompletedSets,
   buildWorkoutActivityDays,
@@ -260,6 +261,82 @@ describe('collectSessionSetRecords', () => {
     const records = collectSessionSetRecords(seq, 0, {}, { 0: { weight: '-5', reps: '-1' } });
     expect(records[0].weight).toBeNull();
     expect(records[0].reps).toBeNull();
+  });
+});
+
+describe('groupSessionExercises', () => {
+  const exercises = [
+    {
+      name: 'Bench',
+      sets: [
+        { set_number: 1, active_seconds: 30, rest_seconds: 10 },
+        { set_number: 2, active_seconds: 30, rest_seconds: 10 },
+      ],
+    },
+    {
+      name: 'Row',
+      sets: [
+        { set_number: 1, active_seconds: 30, rest_seconds: 10 },
+        { set_number: 2, active_seconds: 30, rest_seconds: 10 },
+      ],
+    },
+  ];
+  const seq = buildTimerSequence(exercises);
+  const activeIdx = seq.map((p, i) => (p.phase === 'active' ? i : -1)).filter((i) => i >= 0);
+
+  it('keeps a fully-skipped exercise with setsCompleted 0 plus its skipped rows', () => {
+    const dispositions = {
+      [activeIdx[0]]: 'skipped' as const,
+      [activeIdx[1]]: 'skipped' as const,
+      [activeIdx[2]]: 'completed' as const,
+      [activeIdx[3]]: 'completed' as const,
+    };
+    const last = seq.length - 1;
+    const records = collectSessionSetRecords(seq, last, dispositions, {}, 'off');
+    const summary = summarizeCompletedSets(seq, last, dispositions);
+    expect(summary).toEqual([{ exerciseName: 'Row', setsCompleted: 2 }]);
+    const grouped = groupSessionExercises(summary, records);
+    expect(grouped.map((g) => [g.exerciseName, g.setsCompleted])).toEqual([
+      ['Bench', 0],
+      ['Row', 2],
+    ]);
+    expect(grouped[0].sets).toHaveLength(2);
+    expect(grouped[0].sets.every((s) => s.completed === false)).toBe(true);
+    expect(grouped[1].sets.every((s) => s.completed === true)).toBe(true);
+  });
+
+  it('keeps partial skips alongside completed sets for one exercise', () => {
+    const dispositions = {
+      [activeIdx[0]]: 'skipped' as const,
+      [activeIdx[1]]: 'completed' as const,
+      [activeIdx[2]]: 'completed' as const,
+      [activeIdx[3]]: 'completed' as const,
+    };
+    const last = seq.length - 1;
+    const records = collectSessionSetRecords(seq, last, dispositions, {}, 'off');
+    const summary = summarizeCompletedSets(seq, last, dispositions);
+    const grouped = groupSessionExercises(summary, records);
+    const bench = grouped.find((g) => g.exerciseName === 'Bench')!;
+    expect(bench.setsCompleted).toBe(1);
+    expect(bench.sets.map((s) => s.completed)).toEqual([false, true]);
+  });
+
+  it('persists an all-skipped session as skipped rows, never an empty exercise list', () => {
+    const dispositions = {
+      [activeIdx[0]]: 'skipped' as const,
+      [activeIdx[1]]: 'skipped' as const,
+      [activeIdx[2]]: 'skipped' as const,
+      [activeIdx[3]]: 'skipped' as const,
+    };
+    const last = seq.length - 1;
+    const records = collectSessionSetRecords(seq, last, dispositions, {}, 'off');
+    const summary = summarizeCompletedSets(seq, last, dispositions);
+    expect(summary).toEqual([]);
+    const grouped = groupSessionExercises(summary, records);
+    expect(grouped).toHaveLength(2);
+    expect(grouped.map((g) => g.setsCompleted)).toEqual([0, 0]);
+    expect(grouped.flatMap((g) => g.sets)).toHaveLength(4);
+    expect(grouped.flatMap((g) => g.sets).every((s) => s.completed === false)).toBe(true);
   });
 });
 

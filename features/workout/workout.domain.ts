@@ -907,6 +907,56 @@ export function collectSessionSetRecords(
   return records;
 }
 
+/** One exercise's persisted payload: truthful completed count plus its per-set rows. */
+export type SessionExerciseGroup = {
+  exerciseName: string;
+  setsCompleted: number;
+  sets: SessionSetRecord[];
+};
+
+/**
+ * Group per-set records by exercise for `logWorkoutSession`, keyed off the
+ * completed-count summary. Exercises whose every active phase was skipped
+ * have no summary entry but must still persist with `setsCompleted: 0` plus
+ * their `completed: false` rows — otherwise the skip vanishes from history
+ * and progression falls back to an older completed session instead of
+ * holding. Order follows first appearance in `records` (sequence order).
+ */
+export function groupSessionExercises(
+  summary: readonly { exerciseName: string; setsCompleted: number }[],
+  records: readonly SessionSetRecord[],
+): SessionExerciseGroup[] {
+  const completedByName = new Map<string, number>();
+  for (const entry of summary) {
+    if (!completedByName.has(entry.exerciseName)) {
+      completedByName.set(entry.exerciseName, entry.setsCompleted);
+    }
+  }
+  const groups = new Map<string, SessionExerciseGroup>();
+  for (const record of records) {
+    const existing = groups.get(record.exerciseName);
+    if (existing) {
+      existing.sets.push(record);
+    } else {
+      groups.set(record.exerciseName, {
+        exerciseName: record.exerciseName,
+        setsCompleted: completedByName.get(record.exerciseName) ?? 0,
+        sets: [record],
+      });
+    }
+  }
+  for (const entry of summary) {
+    if (!groups.has(entry.exerciseName)) {
+      groups.set(entry.exerciseName, {
+        exerciseName: entry.exerciseName,
+        setsCompleted: entry.setsCompleted,
+        sets: [],
+      });
+    }
+  }
+  return [...groups.values()];
+}
+
 // --- Previous-session set lookup (per-set entry defaults) ---
 
 /** A recorded weighted set from an earlier session (newest-first ordering). */
