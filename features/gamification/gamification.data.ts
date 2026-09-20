@@ -398,14 +398,15 @@ async function insertEvents(db: Db, result: GamificationAwardResult): Promise<vo
 /**
  * Reward one real action.
  *
- * `entityId` identifies the action when the caller has it (habit, todo, focus
- * session, workout log). Callers that only know the kind — a committed daily
- * plan, a completed weekly review — omit it, and the oldest unrewarded action
- * of that kind is awarded instead. Workout awards REQUIRE the log id on the
- * fast path: without it the award would silently land on the oldest
- * unrewarded log rather than the one just finished, so the call returns null
- * and leaves the award to reconcile backfill (which always passes explicit
- * ids).
+ * `entityId` identifies the action (habit id, todo id, focus session id,
+ * workout log id, plan id, review id, or the day key for nutrition).
+ * Entity-keyed awards REQUIRE the id on the fast path: without it the award
+ * would silently land on the oldest unrewarded row of that kind rather than
+ * the action just completed, so the call returns null and leaves the award
+ * to reconcile backfill (which always passes explicit ids). This holds for
+ * `todo`, `focus`, `workout`, `plan`, and `review`. Only `habit` (keyed
+ * per-habit-per-day) and `nutrition` (keyed per-day) keep the oldest-
+ * unrewarded fallback.
  *
  * Returns `null` when the action was already recorded — the ledger's unique
  * (kind, source key) index is the single source of truth for "already paid",
@@ -423,10 +424,23 @@ export async function awardGamificationAction(input: {
 
   let entityId = input.entityId;
   if (!entityId) {
-    // Workout fast-path awards must name the log just completed. Falling back
-    // to the oldest unrewarded row here would credit the wrong session, so a
-    // missing id is a miss (reconcile backfills it with the correct id).
-    if (input.kind === 'workout') return null;
+    // Entity-keyed fast-path awards must name the action just completed.
+    // Falling back to the oldest unrewarded row here would credit the wrong
+    // entity when several are unrewarded (todos by completed_at, focus
+    // sessions by started_at, reviews by completed_at), so a missing id is a
+    // miss (reconcile backfills it with the correct id). Plans are capped at
+    // one active row per day today, but stay under the same guard for
+    // uniformity and future-proofing — no production caller uses the
+    // fallback, and reconcile always passes explicit ids.
+    if (
+      input.kind === 'workout' ||
+      input.kind === 'todo' ||
+      input.kind === 'focus' ||
+      input.kind === 'plan' ||
+      input.kind === 'review'
+    ) {
+      return null;
+    }
     const candidate = (await loadActivityCandidates(db, todayKey)).find(
       (entry) => entry.kind === input.kind,
     );

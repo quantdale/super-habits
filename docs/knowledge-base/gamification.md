@@ -56,10 +56,14 @@ what makes the reward math unit-testable (`tests/gamification.domain.test.ts`).
 
 - `readGamificationSnapshot()` — the single read model every surface renders
   from (level, streak, week strip, quests, badges, today's facts).
-- `awardGamificationAction({ kind, entityId? })` — idempotent award. Callers with
-  an entity id pass it; callers that only know the kind (workout log, committed
-  plan, completed review) omit it and the newest unrewarded action of that kind
-  is awarded. Returns `null` when the action was already paid.
+- `awardGamificationAction({ kind, entityId? })` — idempotent award. Callers pass
+  the entity id of the action just completed. Entity-keyed kinds (`todo`,
+  `focus`, `workout`, `plan`, `review`) REQUIRE the id on the fast path: an
+  id-less call returns `null` (a miss, healed by reconcile backfill with the
+  correct id) instead of awarding the oldest unrewarded row, which would
+  mis-attribute XP when several are unrewarded. Only `habit` and day-keyed
+  `nutrition` keep the oldest-unrewarded fallback. Returns `null` when the
+  action was already paid.
 - `reconcileGamificationActivity()` — backfills today's unrewarded actions.
   This is why a screen's direct call is a latency optimization rather than the
   source of truth: habit reminder quick-actions and command-center writes earn
