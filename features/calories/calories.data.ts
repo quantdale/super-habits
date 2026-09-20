@@ -23,6 +23,22 @@ import type { CalorieGoal, DailySummary } from '@/features/calories/types';
 
 export type { CalorieGoal, DailySummary } from '@/features/calories/types';
 
+/**
+ * Past-only consumed-date contract (mirrors the command path
+ * `executeLogCalories`): entries reference today or a past local date.
+ * Future rows would be orphaned — the diary navigator caps at today and
+ * every aggregate range ends at today — so writers fail closed with a
+ * clear error instead of persisting an entry no surface can display.
+ */
+function assertConsumableDateKey(consumedOn: string): void {
+  if (!isValidDateKey(consumedOn)) {
+    throw new Error('Consumed date must be a valid calendar date (YYYY-MM-DD).');
+  }
+  if (consumedOn > toDateKey()) {
+    throw new Error('Calorie logging is limited to today or a past local date.');
+  }
+}
+
 export async function getCalorieSummaryByRange(
   startDateKey: string,
   endDateKey: string,
@@ -154,6 +170,7 @@ export async function addCalorieEntry(
   const id = createId('cal');
   const now = nowIso();
   const consumedOn = input.consumedOn ?? toDateKey();
+  assertConsumableDateKey(consumedOn);
   const db = await getDatabase();
   await runSyncedMutation({
     db,
@@ -227,8 +244,8 @@ export async function updateCalorieEntry(
     consumedOn?: string;
   },
 ): Promise<'updated' | 'not_found'> {
-  if (updates.consumedOn !== undefined && !isValidDateKey(updates.consumedOn)) {
-    throw new Error('Consumed date must be a valid calendar date (YYYY-MM-DD).');
+  if (updates.consumedOn !== undefined) {
+    assertConsumableDateKey(updates.consumedOn);
   }
   const db = await getDatabase();
   const now = nowIso();
@@ -504,6 +521,7 @@ export async function addCalorieEntryFromLinkedAction(input: {
   mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   consumedOn: string;
 }): Promise<LinkedActionEffectAdapterResult> {
+  assertConsumableDateKey(input.consumedOn);
   const db = await getDatabase();
   const existing = await db.getFirstAsync<Pick<CalorieEntry, 'id' | 'food_name'>>(
     `SELECT id, food_name FROM calorie_entries WHERE id = ? AND deleted_at IS NULL`,
