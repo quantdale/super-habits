@@ -36,7 +36,8 @@ function summarizeExerciseSets(sets: RoutineExerciseSet[]): string {
   const allSameRest = sets.every((s) => s.rest_seconds === first.rest_seconds);
   const head = `${sets.length} set${sets.length === 1 ? '' : 's'}`;
   if (allSameActive && allSameRest) {
-    return `${head} · ${formatWorkoutTime(first.active_seconds)} / ${formatWorkoutTime(first.rest_seconds)}`;
+    const restLabel = first.rest_seconds === 0 ? 'no rest' : formatWorkoutTime(first.rest_seconds);
+    return `${head} · ${formatWorkoutTime(first.active_seconds)} / ${restLabel}`;
   }
   return `${head} · mixed`;
 }
@@ -378,7 +379,7 @@ export function RoutineExerciseCard({
                 max={3600}
               />
               <NumberStepperField
-                label="Rest (seconds)"
+                label="Rest (seconds, 0 = no rest)"
                 value={String(set.rest_seconds)}
                 onChange={async (value) => {
                   const next = Math.round(Number(value.trim()));

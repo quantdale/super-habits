@@ -89,6 +89,9 @@ export function formatLastPerformedLabel(iso: string, now: Date = new Date()): s
 /**
  * Build the flat sequence of timer phases for a session.
  * Returns an ordered array that the session screen steps through.
+ * Rest policy (Option A): `rest_seconds === 0` is intentional zero rest —
+ * no rest phase is emitted, so the sets run back-to-back. Per-set values are
+ * authoritative; no default is inherited here.
  */
 export type TimerPhase = {
   exerciseName: string;
@@ -172,7 +175,8 @@ export function buildTimerSequence(
         Boolean(exercise.superset_group) &&
         nextExercise?.superset_group === exercise.superset_group;
       const isLastSet = exIndex === exercises.length - 1 && set.set_number === exercise.sets.length;
-      if (!isLastSet && !staysInsideSuperset) {
+      // Zero rest is intentional no-rest: emit no phase so sets run back-to-back.
+      if (!isLastSet && !staysInsideSuperset && set.rest_seconds > 0) {
         sequence.push({
           exerciseName: exercise.name,
           exerciseIndex: exIndex,
@@ -722,67 +726,12 @@ export function buildVolumePerWeek(
 }
 
 /**
- * Apply the user's default rest seconds to any set that has no explicit rest
- * (rest_seconds === 0), so unset sets inherit the configured default.
+ * Rest policy (Option A): `rest_seconds === 0` is intentional zero rest (no
+ * rest / skip rest). There is no inherit-default coercion: `addDefaultSet`
+ * seeds new sets from the stored preference and per-set values are
+ * authoritative thereafter. This helper was removed so a stored 0 can never
+ * silently run as the default.
  */
-export function applyRestDefault(
-  exercises: {
-    name: string;
-    modality?: WorkoutModality;
-    catalog_exercise_id?: string | null;
-    unilateral?: boolean;
-    supports_external_load?: boolean;
-    superset_group?: string | null;
-    sets: {
-      set_number: number;
-      active_seconds: number;
-      rest_seconds: number;
-      target_reps_min?: number | null;
-      target_reps_max?: number | null;
-      target_load?: number | null;
-      target_duration_seconds?: number | null;
-      target_distance?: number | null;
-      target_pace?: number | null;
-    }[];
-  }[],
-  defaultRestSeconds: number,
-): {
-  name: string;
-  modality?: WorkoutModality;
-  catalog_exercise_id?: string | null;
-  unilateral?: boolean;
-  supports_external_load?: boolean;
-  superset_group?: string | null;
-  sets: {
-    set_number: number;
-    active_seconds: number;
-    rest_seconds: number;
-    target_reps_min?: number | null;
-    target_reps_max?: number | null;
-    target_load?: number | null;
-    target_duration_seconds?: number | null;
-    target_distance?: number | null;
-    target_pace?: number | null;
-  }[];
-}[] {
-  if (!Number.isFinite(defaultRestSeconds) || defaultRestSeconds <= 0) return exercises;
-  return exercises.map((ex) => ({
-    name: ex.name,
-    ...(ex.catalog_exercise_id !== undefined
-      ? { catalog_exercise_id: ex.catalog_exercise_id }
-      : {}),
-    ...(ex.modality !== undefined ? { modality: ex.modality } : {}),
-    ...(ex.unilateral !== undefined ? { unilateral: ex.unilateral } : {}),
-    ...(ex.supports_external_load !== undefined
-      ? { supports_external_load: ex.supports_external_load }
-      : {}),
-    ...(ex.superset_group !== undefined ? { superset_group: ex.superset_group } : {}),
-    sets: ex.sets.map((set) => ({
-      ...set,
-      rest_seconds: set.rest_seconds > 0 ? set.rest_seconds : Math.round(defaultRestSeconds),
-    })),
-  }));
-}
 
 /**
  * Whether a timer phase was performed to its natural end ('completed') or

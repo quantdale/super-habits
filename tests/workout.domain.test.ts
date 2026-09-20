@@ -95,6 +95,21 @@ describe('buildTimerSequence', () => {
     ]);
     expect(sequence.map((phase) => phase.phase)).toEqual(['active', 'active', 'rest', 'active']);
   });
+
+  it('omits rest phases for zero-rest sets so they run back-to-back (0 = no rest)', () => {
+    const sequence = buildTimerSequence([
+      {
+        name: 'Press',
+        sets: [
+          { set_number: 1, active_seconds: 30, rest_seconds: 0 },
+          { set_number: 2, active_seconds: 30, rest_seconds: 30 },
+          { set_number: 3, active_seconds: 30, rest_seconds: 0 },
+        ],
+      },
+    ]);
+    expect(sequence.map((phase) => phase.phase)).toEqual(['active', 'active', 'rest', 'active']);
+    expect(sequence[2].durationSeconds).toBe(30);
+  });
 });
 
 describe('buildWorkoutActivityDays', () => {

@@ -14,7 +14,6 @@ import { NumberStepperField } from '@/core/ui/NumberStepperField';
 import { useMotionDuration } from '@/core/theme/motion';
 import { useGamification } from '@/features/gamification/gamificationContext';
 import {
-  applyRestDefault,
   buildPreviousSetLookup,
   buildTimerSequence,
   collectSessionSetRecords,
@@ -100,51 +99,49 @@ type Props = {
 export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Props) {
   const { tokens } = useAppTheme();
   const { recordAction } = useGamification();
-  // Loaded from app_meta; zero-rest sets inherit this default. Adjustments
-  // during the session stay session-local until explicitly saved (the
-  // persisted preference is only rewritten by "Save as default").
+  // Rest policy (Option A): stored `rest_seconds === 0` is intentional no
+  // rest and runs back-to-back. The preference below only seeds sets created
+  // afterwards — it never rewrites this live sequence. Mid-session tweaks stay
+  // local until explicitly saved ("Save as default").
   const [restDefault, setRestDefault] = useState<number | null>(null);
   const [persistedRestDefault, setPersistedRestDefault] = useState<number | null>(null);
   const [effortScale, setEffortScale] = useState<WorkoutEffortScale>('off');
   const sequence = useMemo(
     () =>
       buildTimerSequence(
-        applyRestDefault(
-          routine.exercises.map((ex) => {
-            const isLegacyFreeText = !ex.catalog_exercise_id;
-            return {
-              name: ex.name,
-              // Keep the old missing-catalog path modality-less so historic
-              // free-text exercises continue to offer weight/reps and PRs.
-              ...(isLegacyFreeText ? {} : { catalog_exercise_id: ex.catalog_exercise_id }),
-              ...(isLegacyFreeText ? {} : { modality: ex.modality ?? 'timed' }),
-              ...(isLegacyFreeText ? {} : { unilateral: ex.unilateral === 1 }),
-              ...(isLegacyFreeText
-                ? {}
-                : {
-                    supports_external_load:
-                      ex.supports_external_load === undefined
-                        ? ex.modality === 'weighted_strength'
-                        : ex.supports_external_load === 1,
-                  }),
-              ...(ex.superset_group !== undefined ? { superset_group: ex.superset_group } : {}),
-              sets: ex.sets.map((s) => ({
-                set_number: s.set_number,
-                active_seconds: s.active_seconds,
-                rest_seconds: s.rest_seconds,
-                target_reps_min: s.target_reps_min,
-                target_reps_max: s.target_reps_max,
-                target_load: s.target_load,
-                target_duration_seconds: s.target_duration_seconds,
-                target_distance: s.target_distance,
-                target_pace: s.target_pace,
-              })),
-            };
-          }),
-          restDefault ?? 0,
-        ),
+        routine.exercises.map((ex) => {
+          const isLegacyFreeText = !ex.catalog_exercise_id;
+          return {
+            name: ex.name,
+            // Keep the old missing-catalog path modality-less so historic
+            // free-text exercises continue to offer weight/reps and PRs.
+            ...(isLegacyFreeText ? {} : { catalog_exercise_id: ex.catalog_exercise_id }),
+            ...(isLegacyFreeText ? {} : { modality: ex.modality ?? 'timed' }),
+            ...(isLegacyFreeText ? {} : { unilateral: ex.unilateral === 1 }),
+            ...(isLegacyFreeText
+              ? {}
+              : {
+                  supports_external_load:
+                    ex.supports_external_load === undefined
+                      ? ex.modality === 'weighted_strength'
+                      : ex.supports_external_load === 1,
+                }),
+            ...(ex.superset_group !== undefined ? { superset_group: ex.superset_group } : {}),
+            sets: ex.sets.map((s) => ({
+              set_number: s.set_number,
+              active_seconds: s.active_seconds,
+              rest_seconds: s.rest_seconds,
+              target_reps_min: s.target_reps_min,
+              target_reps_max: s.target_reps_max,
+              target_load: s.target_load,
+              target_duration_seconds: s.target_duration_seconds,
+              target_distance: s.target_distance,
+              target_pace: s.target_pace,
+            })),
+          };
+        }),
       ),
-    [routine.exercises, restDefault],
+    [routine.exercises],
   );
 
   useEffect(() => {
@@ -621,8 +618,8 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     const finishedIndex = currentIndexRef.current;
     setDispositions((d) => ({ ...d, [finishedIndex]: disposition }));
     let nextIndex = finishedIndex + 1;
-    // A zero-second rest is an intentional back-to-back transition, not a
-    // phase that should force a second Start tap or an empty timer screen.
+    // Defensive: zero-duration rests are omitted at build time (0 = no rest),
+    // so this only guards legacy sequences that still contain one.
     while (nextIndex < sequence.length) {
       const phase = sequence[nextIndex];
       if (phase.phase !== 'rest' || phase.durationSeconds > 0) break;
@@ -1302,7 +1299,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
 
         <View className="mt-5 flex-row items-center justify-center gap-3">
           <Text className="text-xs" style={{ color: tokens.textMuted }}>
-            Default rest (this session): {restDefault === null ? '…' : `${restDefault}s`}
+            Default for new sets: {restDefault === null ? '…' : `${restDefault}s`}
           </Text>
           <Pressable
             onPress={() => handleAdjustRestDefault(-REST_SECONDS_STEP)}
@@ -1336,6 +1333,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
             </Text>
           </Pressable>
         ) : null}
+        <Text className="mt-2 text-center text-xs" style={{ color: tokens.textMuted }}>
+          Sets at 0s skip rest and run back-to-back.
+        </Text>
 
         {currentIndex + 1 < sequence.length ? (
           <Text className="mt-6 text-center text-xs" style={{ color: tokens.textMuted }}>

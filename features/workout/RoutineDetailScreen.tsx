@@ -54,7 +54,8 @@ function summarizeExerciseSets(sets: RoutineExerciseSet[]): string {
   const allSameRest = sets.every((s) => s.rest_seconds === first.rest_seconds);
   const head = `${sets.length} set${sets.length === 1 ? '' : 's'}`;
   if (allSameActive && allSameRest) {
-    return `${head} · ${first.active_seconds}s / ${first.rest_seconds}s`;
+    const restLabel = first.rest_seconds === 0 ? 'no rest' : `${first.rest_seconds}s`;
+    return `${head} · ${first.active_seconds}s / ${restLabel}`;
   }
   return `${head} · mixed`;
 }
@@ -779,7 +780,7 @@ export function RoutineDetailModal({
                             max={3600}
                           />
                           <NumberStepperField
-                            label="Rest (seconds)"
+                            label="Rest (seconds, 0 = no rest)"
                             value={String(set.rest_seconds)}
                             onChange={async (v) => {
                               const next = Math.round(Number(v.trim()));

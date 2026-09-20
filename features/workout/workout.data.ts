@@ -893,8 +893,8 @@ export async function addDefaultSet(exerciseId: string): Promise<void> {
     [exerciseId],
   );
   const nextNumber = (countRow?.count ?? 0) + 1;
-  // The rest preference seeds newly created sets; per-set values are
-  // authoritative thereafter (applyRestDefault only covers legacy zero rows).
+  // Rest policy (Option A): 0 means intentional no rest. The preference seeds
+  // newly created sets; stored per-set values run verbatim thereafter.
   const restSeconds = await loadRestSecondsDefault();
   await addSet({
     exerciseId,

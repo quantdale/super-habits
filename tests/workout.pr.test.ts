@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  applyRestDefault,
+  buildTimerSequence,
   buildVolumePerWeek,
   classifyPersonalRecordEvents,
   computePersonalRecords,
@@ -250,12 +250,12 @@ describe('computeSessionTotalSets', () => {
   });
 });
 
-describe('applyRestDefault', () => {
-  // Documented role after the F3 precedence change: per-set rest_seconds
-  // values are authoritative (addDefaultSet seeds them from the preference);
-  // this merge is only a legacy fallback for pre-existing 0 rows.
-  it('fills zero-rest sets with the default and keeps explicit rest', () => {
-    const input = [
+describe('rest_seconds === 0 means intentional no rest (Option A)', () => {
+  // Per-set rest_seconds values are authoritative (addDefaultSet seeds them
+  // from the preference); a stored 0 runs back-to-back with no rest phase and
+  // is never coerced to the default.
+  it('omits the rest phase for a zero-rest set and keeps explicit rest', () => {
+    const sequence = buildTimerSequence([
       {
         name: 'Press',
         sets: [
@@ -263,23 +263,23 @@ describe('applyRestDefault', () => {
           { set_number: 2, active_seconds: 40, rest_seconds: 45 },
         ],
       },
-    ];
-    expect(applyRestDefault(input, 60)).toEqual([
+    ]);
+    expect(sequence.map((phase) => phase.phase)).toEqual(['active', 'active']);
+    expect(sequence[0].durationSeconds).toBe(40);
+    expect(sequence[1].durationSeconds).toBe(40);
+  });
+
+  it('keeps an explicit rest phase between sets', () => {
+    const sequence = buildTimerSequence([
       {
         name: 'Press',
         sets: [
-          { set_number: 1, active_seconds: 40, rest_seconds: 60 },
+          { set_number: 1, active_seconds: 40, rest_seconds: 45 },
           { set_number: 2, active_seconds: 40, rest_seconds: 45 },
         ],
       },
     ]);
-  });
-
-  it('leaves input untouched for non-positive defaults', () => {
-    const input = [
-      { name: 'Press', sets: [{ set_number: 1, active_seconds: 40, rest_seconds: 0 }] },
-    ];
-    expect(applyRestDefault(input, 0)).toBe(input);
-    expect(applyRestDefault(input, Number.NaN)).toBe(input);
+    expect(sequence.map((phase) => phase.phase)).toEqual(['active', 'rest', 'active']);
+    expect(sequence[1].durationSeconds).toBe(45);
   });
 });
