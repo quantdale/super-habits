@@ -10,7 +10,6 @@ import type {
   TodoSummary,
   TodoSummaryItem,
   HabitSummary,
-  HabitAttentionItem,
   FocusSummary,
   WorkoutSummary,
   CalorieSummary,
@@ -21,6 +20,7 @@ import {
   generateInsights,
   listWeekDateKeys,
   shiftDateKeyByDays,
+  summarizeHabitWeekOccurrences,
 } from './weeklyReview.domain';
 import { listTodos } from '@/features/todos/todos.data';
 import { listHabits, getAllHabitCompletionsForRange } from '@/features/habits/habits.data';
@@ -99,48 +99,11 @@ async function summarizeHabits(week: ReviewWeek): Promise<HabitSummary> {
 
   const completions = await getAllHabitCompletionsForRange(week.startDateKey, week.endDateKey);
 
-  const completionMap = new Map<string, Map<string, number>>();
-  for (const c of completions) {
-    if (!completionMap.has(c.habit_id)) completionMap.set(c.habit_id, new Map());
-    completionMap.get(c.habit_id)!.set(c.date_key, c.count);
-  }
-
-  let totalScheduled = 0;
-  let totalCompleted = 0;
-  const attention: HabitAttentionItem[] = [];
-
-  for (const habit of habits) {
-    const daysInWeek = 7;
-    totalScheduled += daysInWeek;
-    const habitCompletions = completionMap.get(habit.id);
-    let completedDays = 0;
-    // Local-calendar day keys (F5): parsing the key as UTC midnight shifted
-    // the whole window a day off for users west of UTC.
-    for (const dateKey of listWeekDateKeys(week.startDateKey, daysInWeek)) {
-      const count = habitCompletions?.get(dateKey) ?? 0;
-      if (count >= habit.target_per_day) completedDays++;
-    }
-    totalCompleted += completedDays;
-
-    if (completedDays === 0) {
-      attention.push({
-        habitId: habit.id,
-        name: habit.name,
-        kind: 'no_completions',
-        message: 'No completions this week',
-      });
-    }
-  }
-
-  const consistencyPercent =
-    totalScheduled > 0 ? Math.round((totalCompleted / totalScheduled) * 100) : null;
-
-  return {
-    scheduledOccurrences: totalScheduled,
-    completedOccurrences: totalCompleted,
-    consistencyPercent,
-    attention,
-  };
+  // Local-calendar day keys (F5): parsing the key as UTC midnight shifted
+  // the whole window a day off for users west of UTC. Schedule-aware counts
+  // (F6): each habit contributes only its actually-scheduled days, resolved
+  // through the Habit Engine V2 authority — never a blind 7 days.
+  return summarizeHabitWeekOccurrences(habits, completions, listWeekDateKeys(week.startDateKey, 7));
 }
 
 // ── focus (pomodoro) ─────────────────────────────────────────────────────────

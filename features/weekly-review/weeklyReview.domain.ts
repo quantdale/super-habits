@@ -5,8 +5,17 @@ import type {
   WeeklyReviewDraft,
   NewTodoCommitmentDraft,
   ReviewInsight,
+  HabitSummary,
+  HabitAttentionItem,
 } from './weeklyReview.types';
 import { dateKeyToLocalDate, toDateKey, isValidDateKey } from '@/lib/time';
+import {
+  getHabitTargetForDate,
+  habitCreationDateKey,
+  isHabitLifecycleMaskedOn,
+  isHabitScheduledOn,
+  parseHabitLifecycleHistory,
+} from '@/features/habits/habits.domain';
 
 // ---------- constants ----------
 
@@ -292,6 +301,102 @@ export function listWeekDateKeys(startDateKey: string, days = 7): string[] {
     keys.push(shiftDateKeyByDays(startDateKey, i));
   }
   return keys;
+}
+
+// ---------- schedule-aware habit week summary (F6) ----------
+
+export type HabitWeekSummaryInput = {
+  id: string;
+  name: string;
+  target_per_day: number;
+  rule_history?: string | null;
+  created_at?: string;
+  lifecycle_history?: string | null;
+  status?: string;
+};
+
+export type HabitWeekCompletionInput = {
+  habit_id: string;
+  date_key: string;
+  count: number;
+};
+
+/**
+ * Schedule-aware habit occurrences for a local-calendar week (F6).
+ *
+ * Each habit contributes only its actually-scheduled days — resolved per
+ * dateKey through the Habit Engine V2 authority (`isHabitScheduledOn` +
+ * rule-resolved `getHabitTargetForDate`, with the same creation-date fallback
+ * the insights/reminder surfaces use) — instead of a blind 7 days. Dates
+ * inside a paused/archived lifecycle interval are masked so pauses never
+ * count as misses. A habit with zero scheduled days contributes nothing and
+ * gets no `no_completions` flag; consistency is null when nothing was
+ * scheduled. Pure and DB-free so the weekly-review timezone matrix covers it.
+ */
+export function summarizeHabitWeekOccurrences(
+  habits: readonly HabitWeekSummaryInput[],
+  completions: readonly HabitWeekCompletionInput[],
+  dateKeys: readonly string[],
+): HabitSummary {
+  const counts = new Map<string, Map<string, number>>();
+  for (const completion of completions) {
+    if (!counts.has(completion.habit_id)) counts.set(completion.habit_id, new Map());
+    counts.get(completion.habit_id)!.set(completion.date_key, completion.count);
+  }
+
+  let scheduledOccurrences = 0;
+  let completedOccurrences = 0;
+  const attention: HabitAttentionItem[] = [];
+
+  for (const habit of habits) {
+    const creationDateKey = habitCreationDateKey(habit.created_at);
+    // Safety net: a non-active status with no recorded lifecycle history must
+    // not generate a week of false misses (post-migration rows always carry
+    // history; this covers legacy-shaped rows that predate it).
+    const statusMasksWeek =
+      habit.status !== undefined &&
+      habit.status !== 'active' &&
+      parseHabitLifecycleHistory(habit.lifecycle_history).length === 0;
+    const habitCounts = counts.get(habit.id);
+    let scheduled = 0;
+    let completed = 0;
+    for (const dateKey of dateKeys) {
+      if (statusMasksWeek) continue;
+      if (isHabitLifecycleMaskedOn(habit.lifecycle_history, dateKey)) continue;
+      if (!isHabitScheduledOn(habit.rule_history, dateKey, habit.target_per_day, creationDateKey)) {
+        continue;
+      }
+      scheduled += 1;
+      const target = getHabitTargetForDate(
+        habit.rule_history,
+        dateKey,
+        habit.target_per_day,
+        creationDateKey,
+      );
+      if ((habitCounts?.get(dateKey) ?? 0) >= target) completed += 1;
+    }
+    scheduledOccurrences += scheduled;
+    completedOccurrences += completed;
+
+    if (scheduled > 0 && completed === 0) {
+      attention.push({
+        habitId: habit.id,
+        name: habit.name,
+        kind: 'no_completions',
+        message: 'No completions this week',
+      });
+    }
+  }
+
+  return {
+    scheduledOccurrences,
+    completedOccurrences,
+    consistencyPercent:
+      scheduledOccurrences > 0
+        ? Math.round((completedOccurrences / scheduledOccurrences) * 100)
+        : null,
+    attention,
+  };
 }
 
 // ---------- next-week plan suggestions ----------

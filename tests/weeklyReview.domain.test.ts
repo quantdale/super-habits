@@ -10,8 +10,10 @@ import {
   buildNextWeekPlanSuggestions,
   listWeekDateKeys,
   shiftDateKeyByDays,
+  summarizeHabitWeekOccurrences,
   MAX_REFLECTION_LENGTH,
 } from '@/features/weekly-review/weeklyReview.domain';
+import { createHabitRule } from '@/features/habits/habits.domain';
 import type {
   WeeklyReviewDraft,
   WeeklyReviewSummaryV1,
@@ -383,6 +385,263 @@ describe('weekly-review date keys stay on the local calendar west of UTC (F5)', 
       '2026-08-15',
       '2026-08-16',
     ]);
+  });
+});
+
+describe('summarizeHabitWeekOccurrences schedule-aware counts (F6)', () => {
+  // Week Mon 2026-08-17 – Sun 2026-08-23 (Mon=1 … Sun=7).
+  const weekKeys = listWeekDateKeys('2026-08-17', 7);
+  const mwfHistory = JSON.stringify([createHabitRule('2026-08-01', [1, 3, 5], 1)]);
+  const dailyHistory = JSON.stringify([createHabitRule('2026-08-01', [1, 2, 3, 4, 5, 6, 7], 1)]);
+  const CREATED = '2026-08-01T12:00:00.000Z';
+
+  it('counts only scheduled days for an M/W/F habit completed on all of them', () => {
+    // Red proof for F6: the old `daysInWeek = 7` logic reported 7 scheduled /
+    // 3 completed / 43% plus a false `no_completions` flag here.
+    const summary = summarizeHabitWeekOccurrences(
+      [
+        {
+          id: 'h-mwf',
+          name: 'Gym',
+          target_per_day: 1,
+          rule_history: mwfHistory,
+          created_at: CREATED,
+        },
+      ],
+      [
+        { habit_id: 'h-mwf', date_key: '2026-08-17', count: 1 },
+        { habit_id: 'h-mwf', date_key: '2026-08-19', count: 1 },
+        { habit_id: 'h-mwf', date_key: '2026-08-21', count: 1 },
+      ],
+      weekKeys,
+    );
+    expect(summary.scheduledOccurrences).toBe(3);
+    expect(summary.completedOccurrences).toBe(3);
+    expect(summary.consistencyPercent).toBe(100);
+    expect(summary.attention).toEqual([]);
+  });
+
+  it('ignores off-day completions and flags a habit with no scheduled-day completions', () => {
+    const summary = summarizeHabitWeekOccurrences(
+      [
+        {
+          id: 'h-mwf',
+          name: 'Gym',
+          target_per_day: 1,
+          rule_history: mwfHistory,
+          created_at: CREATED,
+        },
+      ],
+      [
+        // Tuesday is an off day: must move neither numerator nor denominator.
+        { habit_id: 'h-mwf', date_key: '2026-08-18', count: 5 },
+      ],
+      weekKeys,
+    );
+    expect(summary.scheduledOccurrences).toBe(3);
+    expect(summary.completedOccurrences).toBe(0);
+    expect(summary.consistencyPercent).toBe(0);
+    expect(summary.attention).toEqual([
+      expect.objectContaining({ habitId: 'h-mwf', kind: 'no_completions' }),
+    ]);
+  });
+
+  it('mixes daily and M/W/F habits into one schedule-aware denominator', () => {
+    const summary = summarizeHabitWeekOccurrences(
+      [
+        {
+          id: 'h-daily',
+          name: 'Read',
+          target_per_day: 1,
+          rule_history: dailyHistory,
+          created_at: CREATED,
+        },
+        {
+          id: 'h-mwf',
+          name: 'Gym',
+          target_per_day: 1,
+          rule_history: mwfHistory,
+          created_at: CREATED,
+        },
+      ],
+      [
+        ...weekKeys.map((date_key) => ({ habit_id: 'h-daily', date_key, count: 1 })),
+        { habit_id: 'h-mwf', date_key: '2026-08-17', count: 1 },
+        { habit_id: 'h-mwf', date_key: '2026-08-19', count: 1 },
+      ],
+      weekKeys,
+    );
+    expect(summary.scheduledOccurrences).toBe(10);
+    expect(summary.completedOccurrences).toBe(9);
+    expect(summary.consistencyPercent).toBe(90);
+    expect(summary.attention).toEqual([]);
+  });
+
+  it('gives a habit scheduled zero days this week no occurrences and no attention flag', () => {
+    const summary = summarizeHabitWeekOccurrences(
+      [
+        {
+          id: 'h-daily',
+          name: 'Read',
+          target_per_day: 1,
+          rule_history: dailyHistory,
+          created_at: CREATED,
+        },
+        {
+          id: 'h-future',
+          name: 'Future',
+          target_per_day: 1,
+          // Effective after the reviewed week: no rule covers any week date.
+          rule_history: JSON.stringify([createHabitRule('2026-08-24', [1, 2, 3, 4, 5, 6, 7], 1)]),
+          created_at: '2026-08-24T12:00:00.000Z',
+        },
+      ],
+      weekKeys.map((date_key) => ({ habit_id: 'h-daily', date_key, count: 1 })),
+      weekKeys,
+    );
+    expect(summary.scheduledOccurrences).toBe(7);
+    expect(summary.completedOccurrences).toBe(7);
+    expect(summary.consistencyPercent).toBe(100);
+    expect(summary.attention).toEqual([]);
+  });
+
+  it('returns null consistency when nothing was scheduled at all', () => {
+    const summary = summarizeHabitWeekOccurrences(
+      [
+        {
+          id: 'h-future',
+          name: 'Future',
+          target_per_day: 1,
+          rule_history: JSON.stringify([createHabitRule('2026-08-24', [1, 2, 3, 4, 5, 6, 7], 1)]),
+          created_at: '2026-08-24T12:00:00.000Z',
+        },
+      ],
+      [],
+      weekKeys,
+    );
+    expect(summary.scheduledOccurrences).toBe(0);
+    expect(summary.completedOccurrences).toBe(0);
+    expect(summary.consistencyPercent).toBeNull();
+    expect(summary.attention).toEqual([]);
+  });
+
+  it('resolves the per-date rule target when the schedule changes mid-week', () => {
+    const history = JSON.stringify([
+      createHabitRule('2026-08-01', [1, 2, 3, 4, 5, 6, 7], 1),
+      // Friday onward the target doubles.
+      createHabitRule('2026-08-21', [1, 2, 3, 4, 5, 6, 7], 2),
+    ]);
+    const summary = summarizeHabitWeekOccurrences(
+      [
+        {
+          id: 'h',
+          name: 'Pushups',
+          target_per_day: 1,
+          rule_history: history,
+          created_at: CREATED,
+        },
+      ],
+      [
+        // One rep completes Mon–Thu (target 1) but not Fri–Sun (target 2).
+        ...weekKeys.map((date_key) => ({ habit_id: 'h', date_key, count: 1 })),
+      ],
+      weekKeys,
+    );
+    expect(summary.scheduledOccurrences).toBe(7);
+    expect(summary.completedOccurrences).toBe(4);
+    expect(summary.consistencyPercent).toBe(57);
+    expect(summary.attention).toEqual([]);
+  });
+
+  it('masks paused lifecycle dates so pauses never count as misses', () => {
+    const summary = summarizeHabitWeekOccurrences(
+      [
+        {
+          id: 'h',
+          name: 'Read',
+          target_per_day: 1,
+          rule_history: dailyHistory,
+          created_at: CREATED,
+          status: 'active',
+          lifecycle_history: JSON.stringify([
+            { status: 'paused', from_date_key: '2026-08-18', to_date_key: '2026-08-19' },
+          ]),
+        },
+      ],
+      [
+        { habit_id: 'h', date_key: '2026-08-17', count: 1 },
+        { habit_id: 'h', date_key: '2026-08-20', count: 1 },
+        { habit_id: 'h', date_key: '2026-08-21', count: 1 },
+        { habit_id: 'h', date_key: '2026-08-22', count: 1 },
+        { habit_id: 'h', date_key: '2026-08-23', count: 1 },
+      ],
+      weekKeys,
+    );
+    expect(summary.scheduledOccurrences).toBe(5);
+    expect(summary.completedOccurrences).toBe(5);
+    expect(summary.consistencyPercent).toBe(100);
+    expect(summary.attention).toEqual([]);
+  });
+
+  it('masks a fully paused week with no occurrences and no attention flag', () => {
+    const summary = summarizeHabitWeekOccurrences(
+      [
+        {
+          id: 'h',
+          name: 'Read',
+          target_per_day: 1,
+          rule_history: dailyHistory,
+          created_at: CREATED,
+          status: 'paused',
+          lifecycle_history: JSON.stringify([
+            { status: 'paused', from_date_key: '2026-08-17', to_date_key: null },
+          ]),
+        },
+      ],
+      [],
+      weekKeys,
+    );
+    expect(summary.scheduledOccurrences).toBe(0);
+    expect(summary.consistencyPercent).toBeNull();
+    expect(summary.attention).toEqual([]);
+  });
+
+  it('pins M/W/F scheduled days to local Mon/Wed/Fri in every timezone matrix zone', () => {
+    // Executed under each zone in `scripts/qa-timezones.mjs`: weekday
+    // resolution must use local-midnight semantics (`dateKeyToLocalDate`), so
+    // the scheduled set stays {Mon, Wed, Fri} west of UTC too. A UTC-parse
+    // regression would shift the window a day and drop completions.
+    const week = getReviewWeek('2026-08-19');
+    const keys = listWeekDateKeys(week.startDateKey, 7);
+    expect(keys).toEqual([
+      '2026-08-17',
+      '2026-08-18',
+      '2026-08-19',
+      '2026-08-20',
+      '2026-08-21',
+      '2026-08-22',
+      '2026-08-23',
+    ]);
+    const summary = summarizeHabitWeekOccurrences(
+      [
+        {
+          id: 'h-mwf',
+          name: 'Gym',
+          target_per_day: 1,
+          rule_history: mwfHistory,
+          created_at: CREATED,
+        },
+      ],
+      [
+        { habit_id: 'h-mwf', date_key: '2026-08-17', count: 1 },
+        { habit_id: 'h-mwf', date_key: '2026-08-19', count: 1 },
+        { habit_id: 'h-mwf', date_key: '2026-08-21', count: 1 },
+      ],
+      keys,
+    );
+    expect(summary.scheduledOccurrences).toBe(3);
+    expect(summary.completedOccurrences).toBe(3);
+    expect(summary.consistencyPercent).toBe(100);
   });
 });
 
