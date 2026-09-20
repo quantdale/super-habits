@@ -9,13 +9,16 @@ import { TODO_REMINDER_SNOOZE_ACTION } from '@/lib/notificationConstants';
 import { snoozeTodoReminderAction } from '@/core/notifications/todoReminderActions';
 
 const NOW = new Date(2026, 7, 12, 12, 0, 0, 0);
-const DUE_ISO = '2026-08-12T18:00:00.000Z';
-const DUE_MS = new Date(DUE_ISO).getTime();
+// Production due_dates are local-calendar YYYY-MM-DD keys (the UI validator
+// and the data-layer write contract both reject full timestamps) — fixtures
+// use the same shape so occurrence matching runs on realistic rows.
+const DUE_KEY = '2026-08-12';
+const DUE_MS = new Date(DUE_KEY).getTime();
 
 type SnoozeAdapter = Parameters<typeof snoozeTodoReminderAction>[1];
 
 async function createDueTodo(todos: typeof import('@/features/todos/todos.data')) {
-  return todos.addTodo({ title: 'Laundry', dueDate: DUE_ISO });
+  return todos.addTodo({ title: 'Laundry', dueDate: DUE_KEY });
 }
 
 function actionInput(todoId: string) {
@@ -165,7 +168,9 @@ describe('todo reminder Snooze against real SQLite', () => {
 
   it('allows a snooze that crosses local midnight (documented divergence from habits)', async () => {
     const todos = await import('@/features/todos/todos.data');
-    const lateDue = '2026-08-12T23:50:00.000Z';
+    // The midnight crossing under test is the snoozed fire time (23:55 + 15m),
+    // not the due moment itself, so a production-shaped date key suffices.
+    const lateDue = '2026-08-12';
     const todoId = await todos.addTodo({ title: 'Late chore', dueDate: lateDue });
     const lateMs = new Date(lateDue).getTime();
     const native = adapter(db);
@@ -189,7 +194,7 @@ describe('todo reminder Snooze against real SQLite', () => {
     const todos = await import('@/features/todos/todos.data');
     const todoId = await createDueTodo(todos);
     // The todo was edited to a new due moment after the notification shipped.
-    await todos.updateTodo(todoId, { dueDate: '2026-08-14T10:00:00.000Z' });
+    await todos.updateTodo(todoId, { dueDate: '2026-08-14' });
     const native = adapter(db);
 
     const result = await snoozeTodoReminderAction({ ...actionInput(todoId), now: NOW }, native);

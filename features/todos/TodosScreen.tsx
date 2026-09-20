@@ -474,10 +474,25 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
 
   const handleQuickAdd = useCallback(
     async (quickTitle: string) => {
+      // Quick capture has no editor form: pre-validate here so an over-length
+      // title surfaces as a notice instead of throwing into TodoQuickCapture
+      // (which has no error slot and would leave an unhandled rejection).
+      const validationError = validateTodo(quickTitle, '', null);
+      if (validationError) {
+        showNotice(
+          createLinkedActionsNotice({
+            message: validationError,
+            reason: 'quick_add_validation_failed',
+            source: { feature: 'todos', entityType: 'todo' },
+            target: { feature: 'todos', entityType: 'todo' },
+          }),
+        );
+        return;
+      }
       await addTodo({ title: quickTitle });
       void refresh();
     },
-    [refresh],
+    [refresh, showNotice],
   );
 
   const todoKeyExtractor = useCallback((item: Todo) => item.id, []);

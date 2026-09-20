@@ -13,6 +13,7 @@ import type {
   SaveLinkedActionRuleForSourceInput,
 } from '@/core/linked-actions/linkedActions.types';
 import { createId } from '@/lib/id';
+import { assertHabitWrite } from '@/lib/validation';
 import { nowIso, timestampToLocalDateKey, toDateKey } from '@/lib/time';
 import { runBackupMutation, runSyncedMutation } from '@/core/sync/syncedMutation';
 import { linkedActionsEngine } from '@/core/linked-actions/linkedActions.engine';
@@ -87,6 +88,9 @@ export async function addHabit(
   projectId?: string | null,
   goalId?: string | null,
 ): Promise<string> {
+  // Data-layer hard reject (same contract as the UI validateHabit path +
+  // non-empty weekdays): non-UI writers must never land an invalid row.
+  assertHabitWrite({ name, targetPerDay, weekdays });
   const parsedReminderTime = reminderTime === null ? null : parseHabitReminderTime(reminderTime);
   if (reminderTime !== null && !parsedReminderTime) {
     throw new Error('Reminder time must use HH:MM local time.');
@@ -608,6 +612,12 @@ export async function updateHabit(
     reminderTime?: string | null;
   },
 ): Promise<void> {
+  // Data-layer hard reject on the full edited shape (same messages as UI).
+  assertHabitWrite({
+    name: updates.name,
+    targetPerDay: updates.targetPerDay,
+    weekdays: updates.weekdays,
+  });
   const now = nowIso();
   const db = await getDatabase();
   const existing = await db.getFirstAsync<{

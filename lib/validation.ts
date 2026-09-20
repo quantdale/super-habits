@@ -2,10 +2,18 @@ import { isValidDateKey, toDateKey } from './time';
 
 const YYYY_MM_DD = /^\d{4}-\d{2}-\d{2}$/;
 
-export function validateTodo(title: string, notes: string, dueDate?: string | null): string | null {
+export function validateTodoTitle(title: string): string | null {
   if (!title.trim()) return 'Task title is required.';
   if (title.trim().length > 200) return 'Title must be 200 characters or less.';
+  return null;
+}
+
+export function validateTodoNotes(notes: string): string | null {
   if (notes.length > 500) return 'Notes must be 500 characters or less.';
+  return null;
+}
+
+export function validateTodoDueDate(dueDate: string | null | undefined): string | null {
   if (dueDate != null && dueDate !== '') {
     if (!YYYY_MM_DD.test(dueDate)) return 'Due date must be a valid YYYY-MM-DD date.';
     const d = new Date(`${dueDate}T12:00:00`);
@@ -18,13 +26,75 @@ export function validateTodo(title: string, notes: string, dueDate?: string | nu
   return null;
 }
 
-export function validateHabit(name: string, targetPerDay: number): string | null {
+export function validateTodo(title: string, notes: string, dueDate?: string | null): string | null {
+  return validateTodoTitle(title) ?? validateTodoNotes(notes) ?? validateTodoDueDate(dueDate);
+}
+
+/**
+ * Data-layer hard reject for todo writes. Same contract (and same messages) as
+ * the UI `validateTodo` path, so non-UI writers (quick capture, weekly-review
+ * executor, recurrence expansion) can never land an invalid row. Throws.
+ */
+export function assertTodoWrite(input: {
+  title: string;
+  notes?: string | null;
+  dueDate?: string | null;
+}): void {
+  const err =
+    validateTodoTitle(input.title) ??
+    validateTodoNotes(input.notes ?? '') ??
+    validateTodoDueDate(input.dueDate ?? null);
+  if (err) throw new Error(err);
+}
+
+/** Partial-update variant: only defined fields are checked. */
+export function assertTodoPartialUpdate(updates: {
+  title?: string;
+  notes?: string;
+  dueDate?: string | null;
+}): void {
+  let err: string | null = null;
+  if (err === null && updates.title !== undefined) err = validateTodoTitle(updates.title);
+  if (err === null && updates.notes !== undefined) err = validateTodoNotes(updates.notes);
+  if (err === null && updates.dueDate !== undefined) err = validateTodoDueDate(updates.dueDate);
+  if (err) throw new Error(err);
+}
+
+export function validateHabitName(name: string): string | null {
   if (!name.trim()) return 'Habit name is required.';
   if (name.trim().length > 100) return 'Name must be 100 characters or less.';
+  return null;
+}
+
+export function validateHabitTarget(targetPerDay: number): string | null {
   if (!Number.isInteger(targetPerDay) || targetPerDay < 1)
     return 'Daily target must be at least 1.';
   if (targetPerDay > 99) return 'Daily target cannot exceed 99.';
   return null;
+}
+
+export function validateHabit(name: string, targetPerDay: number): string | null {
+  return validateHabitName(name) ?? validateHabitTarget(targetPerDay);
+}
+
+/**
+ * Data-layer hard reject for habit writes. Same contract (and same messages) as
+ * the UI `validateHabit` path, plus the non-empty-weekdays rule the habit
+ * editor enforces. `weekdays` is `readonly unknown[]` so this pure lib module
+ * never imports feature types. Throws.
+ */
+export function assertHabitWrite(input: {
+  name: string;
+  targetPerDay: number;
+  weekdays?: readonly unknown[];
+}): void {
+  const err =
+    validateHabitName(input.name) ??
+    validateHabitTarget(input.targetPerDay) ??
+    (input.weekdays !== undefined && input.weekdays.length === 0
+      ? 'Choose at least one day for this habit.'
+      : null);
+  if (err) throw new Error(err);
 }
 
 export function validateCalorieEntry(

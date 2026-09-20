@@ -13,6 +13,7 @@ import {
   replaceLinkedActionRulesForSourceEntity,
 } from '@/core/linked-actions/linkedActions.data';
 import { createId } from '@/lib/id';
+import { assertTodoPartialUpdate, assertTodoWrite } from '@/lib/validation';
 import { nowIso, toDateKey, dateKeyToLocalDate } from '@/lib/time';
 import { runBackupMutation, runSyncedMutation } from '@/core/sync/syncedMutation';
 import type { SyncRecord } from '@/core/sync/sync.engine';
@@ -177,6 +178,10 @@ export async function addTodo(input: {
   const dueDate =
     input.dueDate !== undefined ? input.dueDate : input.recurrence === 'daily' ? toDateKey() : null;
 
+  // Data-layer hard reject (same contract as the UI validateTodo path):
+  // non-UI writers must never land an empty/overlong/invalid row.
+  assertTodoWrite({ title: input.title, notes: input.notes, dueDate });
+
   await runSyncedMutation({
     db,
     record: { entity: 'todos', id, updatedAt: now, operation: 'create' },
@@ -235,6 +240,12 @@ export async function createRecurringInstance(input: RecurringInstanceInput): Pr
 
 export async function createRecurringInstances(inputs: RecurringInstanceInput[]): Promise<void> {
   if (inputs.length === 0) return;
+
+  // Direct INSERT path bypassing addTodo: uphold the same write contract so a
+  // corrupted template can never propagate invalid rows into the series.
+  for (const input of inputs) {
+    assertTodoWrite({ title: input.title, notes: input.notes, dueDate: input.dueDate });
+  }
 
   const db = await getDatabase();
 
@@ -446,6 +457,12 @@ export async function updateTodo(
     recurrence?: TodoRecurrence;
   },
 ): Promise<void> {
+  // Data-layer hard reject on the fields being changed (same messages as UI).
+  assertTodoPartialUpdate({
+    title: updates.title,
+    notes: updates.notes,
+    dueDate: updates.dueDate,
+  });
   const db = await getDatabase();
   const now = nowIso();
 
@@ -545,6 +562,9 @@ export async function updateRecurringSeriesTemplate(
   recurrenceId: string,
   updates: { title?: string; notes?: string | null; priority?: TodoPriority },
 ): Promise<void> {
+  // Series-template edits fan out to every live instance: uphold the same
+  // write contract (null notes = explicit clear, always valid).
+  assertTodoPartialUpdate({ title: updates.title, notes: updates.notes ?? undefined });
   const db = await getDatabase();
   const now = nowIso();
 
