@@ -103,7 +103,10 @@ export function CustomExerciseManagerModal({ visible, onClose, onChanged }: Prop
   const handleSaveEdit = useCallback(async () => {
     if (!editing) return;
     const trimmed = editing.name.trim();
-    if (!trimmed) return;
+    // No error surface in this modal (matches the silent empty guard): keep
+    // the editor open so the user can fix it; the data-layer assert is the
+    // backstop that rejects over-long names with the canonical message.
+    if (!trimmed || trimmed.length > 100) return;
     await updateCustomExercise(editing.id, {
       name: trimmed,
       primaryArea: editing.area.trim() || undefined,

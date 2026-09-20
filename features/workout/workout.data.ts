@@ -36,7 +36,7 @@ import {
 import type { WorkoutEffortScale, WorkoutWeightUnit } from '@/core/db/types';
 import type { SyncRecord } from '@/core/sync/sync.engine';
 import { requestWorkoutReminderReconciliation } from '@/core/notifications/workoutReminderSignals';
-import { validateSetTiming } from '@/lib/validation';
+import { assertExerciseWrite, assertRoutineWrite, validateSetTiming } from '@/lib/validation';
 import {
   clampRestSeconds,
   DEFAULT_REST_SECONDS,
@@ -163,6 +163,9 @@ export async function addRoutine(
   description: string,
   goalTag?: string | null,
 ): Promise<void> {
+  // Data-layer hard reject (same contract as the UI validateRoutineName
+  // path): non-UI writers must never land an empty/overlong row.
+  assertRoutineWrite({ name });
   const id = createId('wrk');
   const now = nowIso();
   const db = await getDatabase();
@@ -193,6 +196,9 @@ export type RoutineUpdate = Partial<{
 }>;
 
 export async function updateRoutine(routineId: string, updates: RoutineUpdate): Promise<void> {
+  // An explicitly passed name must satisfy the write contract (reject,
+  // never silently keep the old row like the pre-assert fallback did).
+  if (updates.name !== undefined) assertRoutineWrite({ name: updates.name });
   const db = await getDatabase();
   const current = await db.getFirstAsync<WorkoutRoutine>(
     'SELECT * FROM workout_routines WHERE id = ? AND deleted_at IS NULL',
@@ -471,6 +477,9 @@ export async function addExercise(input: {
   progressionMinReps?: number | null;
   progressionMaxReps?: number | null;
 }): Promise<string> {
+  // Data-layer hard reject (same contract as the UI validateExerciseName
+  // path): non-UI writers must never land an empty/overlong row.
+  assertExerciseWrite({ name: input.name });
   const db = await getDatabase();
   const id = createId('ex');
   const now = nowIso();
@@ -1576,7 +1585,13 @@ export async function duplicateRoutine(routineId: string): Promise<string | null
 
   const newId = createId('wrk');
   const now = nowIso();
-  const newName = `${source.name} (copy)`;
+  // The system-generated ` (copy)` suffix can push a valid long source name
+  // past the 100-char write contract; truncate the source part (keeping the
+  // marker) instead of landing an over-long row via this direct SQL path.
+  const newName =
+    `${source.name} (copy)`.length <= 100
+      ? `${source.name} (copy)`
+      : `${source.name.slice(0, 93).trimEnd()} (copy)`;
   await runSyncedMutation({
     db,
     record: { entity: 'workout_routines', id: newId, updatedAt: now, operation: 'create' },
@@ -2056,9 +2071,11 @@ export async function listCustomExercises(includeArchived = false): Promise<Cust
 }
 
 export async function createCustomExercise(input: CustomExerciseInput): Promise<string> {
+  // Same 100-char exercise-name contract as routine exercises (the empty
+  // message is identical to the previous hand-rolled check).
+  assertExerciseWrite({ name: input.name });
   const name = input.name.trim();
   const primaryArea = input.primaryArea.trim().toLowerCase();
-  if (!name) throw new Error('Exercise name is required.');
   if (!primaryArea) throw new Error('Primary body area is required.');
   assertWorkoutModality(input.modality);
   const db = await getDatabase();
@@ -2105,6 +2122,8 @@ export async function updateCustomExercise(
   id: string,
   updates: Partial<CustomExerciseInput>,
 ): Promise<void> {
+  // An explicitly passed name must satisfy the same contract as create.
+  if (updates.name !== undefined) assertExerciseWrite({ name: updates.name });
   const db = await getDatabase();
   const current = await db.getFirstAsync<CustomExercise>(
     'SELECT * FROM custom_exercises WHERE id = ? AND deleted_at IS NULL',
@@ -2216,6 +2235,9 @@ export type RoutineExerciseUpdate = Partial<{
 }>;
 
 export async function updateExercise(id: string, updates: RoutineExerciseUpdate): Promise<void> {
+  // An explicitly passed name must satisfy the write contract (reject,
+  // never silently keep the old row like the pre-assert fallback did).
+  if (updates.name !== undefined) assertExerciseWrite({ name: updates.name });
   const db = await getDatabase();
   if (updates.modality) assertWorkoutModality(updates.modality);
   const now = nowIso();

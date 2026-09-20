@@ -34,7 +34,7 @@ import {
 } from './exerciseCatalog';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { ValidationError } from '@/core/ui/ValidationError';
-import { validateExerciseName, validateSetTiming } from '@/lib/validation';
+import { validateExerciseName, validateRoutineName, validateSetTiming } from '@/lib/validation';
 import { parseNumericInput } from '@/lib/numericInput';
 import { NumberStepperField } from '@/core/ui/NumberStepperField';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
@@ -211,6 +211,15 @@ export function RoutineDetailModal({
       setRenameDraft(null);
       return;
     }
+    // Pre-validate with a notice (same contract the data layer now asserts):
+    // this handler has no try/catch, so a data-layer throw would reject
+    // into the queue unhandled. Keep the draft open so the user can fix it.
+    const err = validateRoutineName(trimmed);
+    if (err) {
+      setWorkoutError(err);
+      return;
+    }
+    setWorkoutError(null);
     await updateRoutine(routineId, { name: trimmed });
     setRenameDraft(null);
     await onRenamed?.(trimmed);

@@ -244,6 +244,26 @@ export function validateExerciseName(name: string): string | null {
   return null;
 }
 
+/**
+ * Data-layer hard reject for workout routine writes. Same contract (and same
+ * messages) as the UI `validateRoutineName` path, so non-UI writers and the
+ * unvalidated rename path can never land an invalid row. Throws.
+ */
+export function assertRoutineWrite(input: { name: string }): void {
+  const err = validateRoutineName(input.name);
+  if (err) throw new Error(err);
+}
+
+/**
+ * Data-layer hard reject for workout exercise-name writes (routine exercises
+ * and custom exercises share the 100-char contract). Same contract (and same
+ * messages) as the UI `validateExerciseName` path. Throws.
+ */
+export function assertExerciseWrite(input: { name: string }): void {
+  const err = validateExerciseName(input.name);
+  if (err) throw new Error(err);
+}
+
 export function validateSetTiming(activeSeconds: number, restSeconds: number): string | null {
   if (activeSeconds < 5) return 'Active time must be at least 5 seconds.';
   if (activeSeconds > 3600) return 'Active time cannot exceed 60 minutes.';
