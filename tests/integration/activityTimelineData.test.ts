@@ -129,11 +129,14 @@ describe('activityTimeline.data (real SQLite)', () => {
 
     expect(titles.has('Completed "Ship report"')).toBe(true);
     expect(titles.has('Completed "Ghost task"')).toBe(false);
-    expect(titles.has('Completed "Meditate"')).toBe(true);
+    // F5: habit rows are state, not completion events — they use the log
+    // operation label so decrement touches are never mislabeled Completed.
+    expect(titles.has('Logged "Meditate"')).toBe(true);
+    expect(titles.has('Completed "Meditate"')).toBe(false);
     // F3: a soft-deleted habit's completion survives with its real name;
     // a fully orphaned completion falls back to the neutral label.
-    expect(titles.has('Completed "Old ritual"')).toBe(true);
-    expect(titles.has('Completed "a deleted habit"')).toBe(true);
+    expect(titles.has('Logged "Old ritual"')).toBe(true);
+    expect(titles.has('Logged "a deleted habit"')).toBe(true);
     expect(titles.has('Focus session · 25 min')).toBe(true);
     expect(titles.has('Break · 5 min')).toBe(true);
     expect(titles.has('Workout · Timeline Legs')).toBe(true);
@@ -151,7 +154,7 @@ describe('activityTimeline.data (real SQLite)', () => {
     const calorieItem = byTitle.get('Logged 2 meals · 500 kcal');
     expect(calorieItem?.dateKey).toBe(todayKey);
     expect(calorieItem?.source).toBe('calories');
-    const habitItem = byTitle.get('Completed "Meditate"');
+    const habitItem = byTitle.get('Logged "Meditate"');
     expect(habitItem?.dateKey).toBe(todayKey);
     expect(habitItem?.subtitle).toBe(`Habit · ${todayKey}`);
   });
@@ -216,9 +219,33 @@ describe('activityTimeline.data (real SQLite)', () => {
     await habits.incrementHabit(habitId, backdatedKey);
 
     const items = await buildActivityTimeline({ days: 30, now: new Date() });
-    const item = items.find((i) => i.title === 'Completed "Journal"');
+    const item = items.find((i) => i.title === 'Logged "Journal"');
     expect(item).toBeDefined();
     expect(item!.dateKey).toBe(backdatedKey);
     expect(item!.occurredAt >= new Date(`${backdatedKey}T00:00:00`).toISOString()).toBe(true);
+  });
+
+  it('labels decrement-touched habit rows Logged, never Completed (F5)', async () => {
+    db = await freshDatabase();
+    const { toDateKey } = await import('@/lib/time');
+    const habits = await import('@/features/habits/habits.data');
+    const { buildActivityTimeline } = await import('@/features/activity/activityTimeline.data');
+
+    const todayKey = toDateKey();
+    const habitId = await habits.addHabit('Decrement probe', 3);
+    // Two increments then one decrement: the surviving row was last touched
+    // by a decrement, so a Completed label would prove the mislabel bug.
+    await habits.incrementHabit(habitId, todayKey);
+    await habits.incrementHabit(habitId, todayKey);
+    await habits.decrementHabit(habitId, todayKey);
+
+    const items = await buildActivityTimeline({ days: 30, now: new Date() });
+    const habitItems = items.filter((i) => i.source === 'habit');
+    expect(habitItems).toHaveLength(1);
+    expect(habitItems[0].title).toBe('Logged "Decrement probe"');
+    expect(habitItems[0].title.startsWith('Completed')).toBe(false);
+    expect(habitItems[0].dateKey).toBe(todayKey);
+    // Count is back to 1 after 2 increments + 1 decrement, so no × suffix.
+    expect(habitItems[0].subtitle).toBe(`Habit · ${todayKey}`);
   });
 });

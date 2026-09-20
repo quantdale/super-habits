@@ -34,6 +34,21 @@ export function categoryOf(source: ActivityTimelineSource): ActivityTimelineCate
   return SOURCE_CATEGORY[source];
 }
 
+/**
+ * Habit timeline operation label (F5).
+ *
+ * `habit_completions` is mutable state (one row per habit + date key),
+ * touched by increments, decrements, and backdated corrections — it is not
+ * a per-operation event log. Every habit row therefore uses the neutral log
+ * label `Logged "<name>"`; only stable `completed_at` sources (todos,
+ * projects, goals, plans, reviews) may claim `Completed`. In particular a
+ * decrement that leaves `count > 0` must never render as Completed.
+ */
+export function formatHabitTimelineTitle(name: string, max = 60): string {
+  const label = name.length > max ? `${name.slice(0, max - 1)}…` : name;
+  return `Logged "${label}"`;
+}
+
 /** Entity-type chips → timeline sources. Projects/goals live under planning. */
 export const SOURCE_FILTER_SOURCES: Record<
   Exclude<ActivityTimelineSourceFilter, 'all'>,

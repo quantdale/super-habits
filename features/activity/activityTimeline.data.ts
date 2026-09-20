@@ -4,7 +4,11 @@ import type {
   ActivityTimelineItem,
   ActivityTimelineSource,
 } from '@/features/activity/activityTimeline.types';
-import { categoryOf, SOURCE_ICON } from '@/features/activity/activityTimeline.domain';
+import {
+  categoryOf,
+  formatHabitTimelineTitle,
+  SOURCE_ICON,
+} from '@/features/activity/activityTimeline.domain';
 
 const DEFAULT_WINDOW_DAYS = 30;
 
@@ -80,7 +84,9 @@ export async function buildActivityTimeline(
   // Progress (progress.data.ts) counts these same rows unjoined; both surfaces
   // therefore agree that "a completion happened on date X" survives deletion.
   // F5: bucket by the row's authoritative `date_key` (not `updated_at`, which
-  // also moves on decrements/backdated corrections) and label neutrally.
+  // also moves on decrements/backdated corrections) and label neutrally with
+  // the log operation (`Logged`) — never `Completed`, which is reserved for
+  // stable `completed_at` sources. habit_completions is state, not events.
   const habitCompletions = await db.getAllAsync<{
     id: string;
     habit_id: string;
@@ -103,7 +109,7 @@ export async function buildActivityTimeline(
         'habit',
         hc.id,
         hc.updated_at,
-        `Completed "${truncate(label)}"`,
+        formatHabitTimelineTitle(label),
         `Habit · ${hc.date_key}${hc.count > 1 ? ` · ${hc.count}×` : ''}`,
         // Authoritative local day wins over updated_at so backdated edits and
         // decrement touches stay in the completion's own day bucket.

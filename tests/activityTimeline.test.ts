@@ -3,6 +3,7 @@ import {
   filterTimelineByDay,
   filterTimelineByRange,
   filterTimelineBySources,
+  formatHabitTimelineTitle,
   getTimelineDayKeys,
   groupTimelineByDay,
 } from '@/features/activity/activityTimeline.domain';
@@ -213,9 +214,12 @@ describe('buildActivityTimeline data layer', () => {
     const habitItems = items.filter((item) => item.source === 'habit');
     expect(habitItems).toHaveLength(2);
     expect(habitItems.find((item) => item.id === 'habit:hc_deleted')?.title).toBe(
-      'Completed "a deleted habit"',
+      'Logged "a deleted habit"',
     );
-    expect(habitItems.find((item) => item.id === 'habit:hc_live')?.title).toBe('Completed "Water"');
+    expect(habitItems.find((item) => item.id === 'habit:hc_live')?.title).toBe('Logged "Water"');
+    for (const habitItem of habitItems) {
+      expect(habitItem.title.startsWith('Completed')).toBe(false);
+    }
   });
 
   // F5: bucket by the row's authoritative date_key — a decrement or backdated
@@ -261,5 +265,42 @@ describe('buildActivityTimeline data layer', () => {
     const items = await buildActivityTimeline({ days: 30, now: new Date('2026-08-20T12:00:00') });
     const corrupt = items.find((item) => item.id === 'habit:hc_corrupt');
     expect(corrupt?.dateKey).toBe('2026-08-05');
+  });
+
+  // Decrement touches bump updated_at but must never render as Completed:
+  // habit rows are state, so every habit item uses the log operation label.
+  it('labels decrement-touched rows with the log operation, not Completed', async () => {
+    const db = makeDb({
+      habit_completions: [
+        habitCompletionRow({
+          id: 'hc_decremented',
+          date_key: '2026-08-10',
+          count: 1,
+          updated_at: '2026-08-20T09:00:00.000Z', // decrement touch today
+        }),
+      ],
+    });
+    getDatabase.mockResolvedValue(db);
+
+    const items = await buildActivityTimeline({ days: 30, now: new Date('2026-08-20T12:00:00') });
+    const decremented = items.find((item) => item.id === 'habit:hc_decremented');
+    expect(decremented?.title).toBe('Logged "Water"');
+    expect(decremented?.title.startsWith('Completed')).toBe(false);
+    expect(decremented?.dateKey).toBe('2026-08-10');
+  });
+});
+
+describe('formatHabitTimelineTitle', () => {
+  it('uses the log operation label, never Completed', () => {
+    expect(formatHabitTimelineTitle('Water')).toBe('Logged "Water"');
+    expect(formatHabitTimelineTitle('a deleted habit')).toBe('Logged "a deleted habit"');
+    expect(formatHabitTimelineTitle('Water').startsWith('Completed')).toBe(false);
+  });
+
+  it('truncates long habit names to 60 chars like the timeline', () => {
+    const long = `${'n'.repeat(100)}`;
+    const title = formatHabitTimelineTitle(long);
+    expect(title).toBe(`Logged "${`${'n'.repeat(59)}…"`}`);
+    expect(title.startsWith('Completed')).toBe(false);
   });
 });
