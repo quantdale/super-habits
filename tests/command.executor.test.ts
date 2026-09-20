@@ -133,7 +133,12 @@ describe('features/command/command.executor', () => {
       },
     ]);
     addCalorieEntry.mockResolvedValue(undefined);
-    completeRoutine.mockResolvedValue({ status: 'applied', reason: null, routineName: 'Push Day' });
+    completeRoutine.mockResolvedValue({
+      status: 'applied',
+      reason: null,
+      routineName: 'Push Day',
+      logId: 'wrk_log_default_1',
+    });
     listRoutines.mockResolvedValue([{ id: 'routine_1', name: 'Push Day', deleted_at: null }]);
     validateTodo.mockReturnValue(null);
     validateHabit.mockReturnValue(null);
@@ -350,11 +355,39 @@ describe('features/command/command.executor', () => {
     expect(completeRoutine).toHaveBeenCalledWith('routine_1');
   });
 
+  it('returns the workout log id (not the routine id) as the command entityId', async () => {
+    completeRoutine.mockResolvedValueOnce({
+      status: 'applied',
+      reason: null,
+      routineName: 'Push Day',
+      logId: 'wrk_log_exact_1',
+    });
+    const draft: DraftLogWorkoutRoutine = {
+      kind: 'log_workout_routine',
+      rawText: 'log Push Day workout',
+      parserKind: 'mock_rules',
+      parserVersion: 'v2',
+      confidence: 0.9,
+      status: 'ready',
+      warnings: [],
+      missingFields: [],
+      fields: { routineName: 'Push Day', completedOn: null },
+    };
+
+    const result = await executeDraftAction(draft, { resolvedEntityId: 'routine_1' });
+    expect(result).toMatchObject({ outcome: 'success', kind: 'log_workout_routine' });
+    if (result.outcome !== 'success') throw new Error('expected a successful workout command');
+    // The gamification ledger keys workout awards verbatim by this id, so it
+    // must name the log just written — never the routine that produced it.
+    expect(result.entityId).toBe('wrk_log_exact_1');
+  });
+
   it('does not create a workout log when the routine disappears after review', async () => {
     completeRoutine.mockResolvedValueOnce({
       status: 'skipped',
       reason: 'target_missing',
       routineName: null,
+      logId: null,
     });
     const draft: DraftLogWorkoutRoutine = {
       kind: 'log_workout_routine',

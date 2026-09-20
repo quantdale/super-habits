@@ -296,10 +296,14 @@ async function executeLogWorkout(
         message: 'That workout routine is no longer available.',
       };
     }
+    // Attribute the result to the log just written: the gamification ledger
+    // keys workout awards verbatim by this id, so returning the routine id
+    // would mint a foreign source key that reconcile can never match (and pay
+    // the same workout twice). A null id degrades to reconcile backfill.
     return {
       outcome: 'success',
       kind: draft.kind,
-      entityId: routineId,
+      entityId: result.logId ?? null,
       message: 'Workout logged.',
     };
   } catch (error) {
