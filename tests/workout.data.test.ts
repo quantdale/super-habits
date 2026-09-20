@@ -4,6 +4,7 @@ import {
   completeRoutine,
   logWorkoutFromLinkedAction,
   logWorkoutSession,
+  listWorkoutSessionExerciseCounts,
   updateSet,
 } from '@/features/workout/workout.data';
 
@@ -59,6 +60,28 @@ describe('features/workout/workout.data', () => {
       null,
     ]);
     expect(linkedActionsEngine.processSourceAction).not.toHaveBeenCalled();
+    // Quick-complete writes the log row only — no session-exercise rows, so
+    // history provenance reads the session as a quick log.
+    expect(db.runAsync).not.toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO workout_session_exercises'),
+      expect.anything(),
+    );
+  });
+
+  it('reads per-log session-exercise counts for history provenance', async () => {
+    const db = {
+      getAllAsync: vi.fn().mockResolvedValue([
+        { logId: 'wrk_guided', exerciseCount: 3 },
+        { logId: 'wrk_single', exerciseCount: 1 },
+      ]),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    await expect(listWorkoutSessionExerciseCounts()).resolves.toEqual([
+      { logId: 'wrk_guided', exerciseCount: 3 },
+      { logId: 'wrk_single', exerciseCount: 1 },
+    ]);
+    expect(db.getAllAsync).toHaveBeenCalledWith(expect.stringContaining('GROUP BY log_id'));
   });
 
   it('writes workout session exercise rows for session flow completion', async () => {

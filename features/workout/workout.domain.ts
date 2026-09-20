@@ -600,6 +600,16 @@ export function computeSessionTotalSets(sessionExercises: { setsCompleted: numbe
 }
 
 /**
+ * True when a logged session carries no recorded exercises — the quick-log
+ * contract: `completeRoutine` writes the log row only, while guided sessions
+ * always write session-exercise rows. Both history surfaces (list badge and
+ * detail copy) use this single predicate so they can never disagree.
+ */
+export function isQuickLoggedSession(exerciseCount: number): boolean {
+  return !(exerciseCount > 0);
+}
+
+/**
  * Σ weight×reps across completed sets. Sets without recorded weight/reps are
  * skipped — unknown contributes nothing rather than fabricating volume.
  */

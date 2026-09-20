@@ -15,6 +15,7 @@ import {
   computeBodyWeightTrend,
   computeModalityVolume,
   computeTrainingTotals,
+  isQuickLoggedSession,
   normalizeEffort,
   recommendProgression,
   resolveWorkoutSchedule,
@@ -699,5 +700,19 @@ describe('Gym V2 training domain', () => {
       { area: 'chest', sets: 5 },
       { area: 'legs', sets: 1 },
     ]);
+  });
+});
+
+describe('isQuickLoggedSession', () => {
+  it('marks zero recorded exercises as a quick log', () => {
+    expect(isQuickLoggedSession(0)).toBe(true);
+  });
+  it('marks sessions with recorded exercises as fully tracked', () => {
+    expect(isQuickLoggedSession(1)).toBe(false);
+    expect(isQuickLoggedSession(5)).toBe(false);
+  });
+  it('treats non-positive counts as quick logs (absence of evidence)', () => {
+    expect(isQuickLoggedSession(-1)).toBe(true);
+    expect(isQuickLoggedSession(Number.NaN)).toBe(true);
   });
 });

@@ -294,6 +294,25 @@ export async function listWorkoutLogsForRange(
   );
 }
 
+export type WorkoutSessionExerciseCount = {
+  logId: string;
+  exerciseCount: number;
+};
+
+/**
+ * Per-log session-exercise counts for history provenance. A log absent from
+ * the result has no recorded exercises — the quick-log contract
+ * (`completeRoutine` writes the log row only). Read-only; no sync enqueue.
+ */
+export async function listWorkoutSessionExerciseCounts(): Promise<WorkoutSessionExerciseCount[]> {
+  const db = await getDatabase();
+  return db.getAllAsync<WorkoutSessionExerciseCount>(
+    `SELECT log_id AS logId, COUNT(*) AS exerciseCount
+     FROM workout_session_exercises
+     GROUP BY log_id`,
+  );
+}
+
 export async function deleteRoutine(routineId: string): Promise<void> {
   const now = nowIso();
   const db = await getDatabase();

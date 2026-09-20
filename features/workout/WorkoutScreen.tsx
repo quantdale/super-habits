@@ -42,6 +42,7 @@ import {
   deleteBodyWeightEntry,
   listCustomExercises,
   listWorkoutPerformanceRows,
+  listWorkoutSessionExerciseCounts,
   getWorkoutPreferences,
   saveWorkoutPreferences,
   type WorkoutPerformanceRow,
@@ -57,6 +58,7 @@ import {
   computePersonalRecords,
   computeTrainingTotals,
   computeBodyAreaDistribution,
+  isQuickLoggedSession,
   type EnteredSetValues,
   type PhaseDisposition,
   type ScheduleResolution,
@@ -76,6 +78,7 @@ import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { RoutineDetailModal } from './RoutineDetailScreen';
 import { WorkoutSessionScreen, type SessionResume } from './WorkoutSessionScreen';
 import { WorkoutHistoryDetailModal } from './WorkoutHistoryDetail';
+import { QuickLogBadge } from './QuickLogBadge';
 import { WeeklyVolumeChart } from './WeeklyVolumeChart';
 
 import { SECTION_COLORS } from '@/constants/sectionColors';
@@ -187,6 +190,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const [todayRoutine, setTodayRoutine] = useState<RoutineWithExercises | null>(null);
   const [bodyWeightEntries, setBodyWeightEntries] = useState<BodyWeightEntry[]>([]);
   const [performanceRows, setPerformanceRows] = useState<WorkoutPerformanceRow[]>([]);
+  const [sessionExerciseCounts, setSessionExerciseCounts] = useState<
+    { logId: string; exerciseCount: number }[]
+  >([]);
   const [customExercises, setCustomExercises] = useState<CustomExercise[]>([]);
   const [selectedProgressExercise, setSelectedProgressExercise] = useState<string | null>(null);
   const [weekEditorVisible, setWeekEditorVisible] = useState(false);
@@ -229,6 +235,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       plan,
       weightEntries,
       performanceRowsLoaded,
+      sessionExerciseCountsLoaded,
       customExercisesLoaded,
       preferences,
     ] = await Promise.all([
@@ -241,6 +248,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       listWeeklyPlan(),
       listBodyWeightEntries(),
       listWorkoutPerformanceRows(),
+      listWorkoutSessionExerciseCounts(),
       listCustomExercises(),
       getWorkoutPreferences(),
     ]);
@@ -258,6 +266,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     setWeeklyPlan(plan);
     setBodyWeightEntries(weightEntries);
     setPerformanceRows(performanceRowsLoaded);
+    setSessionExerciseCounts(sessionExerciseCountsLoaded);
     setCustomExercises(customExercisesLoaded);
     setWorkoutPreferences(preferences);
     setBodyWeightGoalValue(preferences.goalWeight ? String(preferences.goalWeight.value) : '');
@@ -481,6 +490,11 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   // History/analytics sections, composed into a two-column grid at content-max
   // widths (isWide) and stacked on phones. One responsive tree — only one
   // branch renders, so there are no duplicated SQLite reads or chart mounts.
+  // A log missing from the exercise-count map has no recorded exercises: the
+  // quick-log contract (shared `isQuickLoggedSession` predicate).
+  const exerciseCountByLog = new Map(
+    sessionExerciseCounts.map((row) => [row.logId, row.exerciseCount]),
+  );
   const recentSessionsSection =
     recentLogs.length > 0 ? (
       <ScreenSection>
@@ -494,6 +508,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         </View>
         {recentLogs.map((log) => {
           const routine = routines.find((r) => r.id === log.routine_id);
+          const isQuickLog = isQuickLoggedSession(exerciseCountByLog.get(log.id) ?? 0);
           return (
             <Card key={log.id} accentColor={COLOR} style={{ marginBottom: 12 }}>
               <RectButton
@@ -502,9 +517,12 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                 accessibilityLabel={`Open session from ${log.completed_at}`}
                 style={{ backgroundColor: 'transparent' }}
               >
-                <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-                  {routine?.name ?? 'Workout'}
-                </Text>
+                <View className="flex-row items-center gap-2">
+                  <Text className="flex-1 text-base font-semibold" style={{ color: tokens.text }}>
+                    {routine?.name ?? 'Workout'}
+                  </Text>
+                  {isQuickLog ? <QuickLogBadge /> : null}
+                </View>
                 <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
                   {new Date(log.completed_at).toLocaleString('en', {
                     month: 'short',

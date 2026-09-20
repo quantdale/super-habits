@@ -13,8 +13,10 @@ import {
   computeSessionTotalSets,
   computeSessionTotalVolume,
   formatWorkoutTime,
+  isQuickLoggedSession,
   type LoggedSet,
 } from './workout.domain';
+import { QuickLogBadge } from './QuickLogBadge';
 import { deleteWorkoutLog, getWorkoutLogDetail, type WorkoutLogDetail } from './workout.data';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import type { WorkoutModality, WorkoutSessionSet } from '@/core/db/types';
@@ -145,6 +147,7 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose, onDeleted }
       ];
     });
   const prs = computePersonalRecords(loggedSets);
+  const isQuickLog = detail ? isQuickLoggedSession(detail.exercises.length) : false;
   const totalVolume = computeSessionTotalVolume(
     (detail?.sets ?? []).map((set) => ({
       weight: set.weight,
@@ -194,12 +197,17 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose, onDeleted }
             <Text className="mt-0.5 text-sm" style={{ color: tokens.textMuted }}>
               {formatSessionDate(detail.log.completed_at)}
             </Text>
+            {isQuickLog ? (
+              <View className="mt-2">
+                <QuickLogBadge />
+              </View>
+            ) : null}
             {detail.log.notes ? (
               <Text className="mt-2 text-sm italic" style={{ color: tokens.textMuted }}>
                 “{detail.log.notes}”
               </Text>
             ) : null}
-            {detail.exercises.length === 0 ? (
+            {isQuickLog ? (
               <Text className="mt-2 text-sm italic" style={{ color: tokens.textMuted }}>
                 Quick log — no exercises recorded.
               </Text>
