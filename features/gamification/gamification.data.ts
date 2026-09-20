@@ -399,9 +399,13 @@ async function insertEvents(db: Db, result: GamificationAwardResult): Promise<vo
  * Reward one real action.
  *
  * `entityId` identifies the action when the caller has it (habit, todo, focus
- * session). Callers that only know the kind — a workout log whose insert
- * returns no id, a committed daily plan, a completed weekly review — omit it,
- * and the newest unrewarded action of that kind is awarded instead.
+ * session, workout log). Callers that only know the kind — a committed daily
+ * plan, a completed weekly review — omit it, and the oldest unrewarded action
+ * of that kind is awarded instead. Workout awards REQUIRE the log id on the
+ * fast path: without it the award would silently land on the oldest
+ * unrewarded log rather than the one just finished, so the call returns null
+ * and leaves the award to reconcile backfill (which always passes explicit
+ * ids).
  *
  * Returns `null` when the action was already recorded — the ledger's unique
  * (kind, source key) index is the single source of truth for "already paid",
@@ -419,6 +423,10 @@ export async function awardGamificationAction(input: {
 
   let entityId = input.entityId;
   if (!entityId) {
+    // Workout fast-path awards must name the log just completed. Falling back
+    // to the oldest unrewarded row here would credit the wrong session, so a
+    // missing id is a miss (reconcile backfills it with the correct id).
+    if (input.kind === 'workout') return null;
     const candidate = (await loadActivityCandidates(db, todayKey)).find(
       (entry) => entry.kind === input.kind,
     );

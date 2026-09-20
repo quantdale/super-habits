@@ -711,7 +711,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       }
 
       const grouped = groupSessionExercises(summary, records);
-      await logWorkoutSession({
+      const logResult = await logWorkoutSession({
         routineId: routine.id,
         notes: notes.trim() ? notes.trim() : undefined,
         exercises: grouped.map((g) => {
@@ -752,9 +752,11 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         ...(resume ? { activeDurationSeconds: Math.max(0, elapsedSecondsRef.current) } : {}),
       });
       clearDraft();
-      // Reward after the log is durable: the workout is worth XP whether it was
-      // a quick complete or a fully logged session.
-      recordAction('workout');
+      // Reward after the log is durable, attributed to THIS log id: without
+      // it the award would fall back to the oldest unrewarded log instead.
+      if (logResult.status === 'applied' && logResult.logId) {
+        recordAction('workout', logResult.logId);
+      }
       setSavedOutcome({ newRecords });
     } finally {
       finishGuardRef.current.finish();

@@ -224,6 +224,8 @@ export type CompleteRoutineResult = {
   status: 'applied' | 'skipped';
   reason: string | null;
   routineName: string | null;
+  /** The workout_logs row id when applied; null when skipped (no row written). */
+  logId: string | null;
 };
 
 export async function completeRoutine(
@@ -251,7 +253,16 @@ export async function completeRoutine(
         requireActiveRoutine: true,
         enqueue,
       });
-      return { changed: record.status === 'applied', value: record };
+      const applied = record.status === 'applied';
+      return {
+        changed: applied,
+        value: {
+          status: record.status,
+          reason: record.reason,
+          routineName: record.routineName,
+          logId: applied ? logId : null,
+        } satisfies CompleteRoutineResult,
+      };
     },
   });
   return outcome.value;
@@ -947,6 +958,12 @@ export type LoggedSessionSetInput = {
   effortScale?: Exclude<WorkoutEffortScale, 'off'> | null;
 };
 
+export type LogWorkoutSessionResult = {
+  status: 'applied' | 'skipped';
+  /** The workout_logs row id when applied; null when skipped (no row written). */
+  logId: string | null;
+};
+
 export async function logWorkoutSession(input: {
   routineId: string;
   notes?: string;
@@ -969,7 +986,7 @@ export async function logWorkoutSession(input: {
    *  wall-clock includes time the app was closed. Invalid values fall back to
    *  the derived duration. */
   activeDurationSeconds?: number | null;
-}): Promise<void> {
+}): Promise<LogWorkoutSessionResult> {
   const db = await getDatabase();
   const logId = createId('wrk');
   const now = nowIso();
@@ -979,7 +996,7 @@ export async function logWorkoutSession(input: {
       ? Math.round(override)
       : deriveDurationSeconds(input.startedAt ?? null, input.endedAt ?? null);
 
-  await runBackupMutation({
+  const outcome = await runBackupMutation<LogWorkoutSessionResult>({
     db,
     mutate: async (transactionDb, enqueue) => {
       const record = await insertWorkoutLogRecord({
@@ -996,7 +1013,11 @@ export async function logWorkoutSession(input: {
         enqueue,
       });
 
-      if (record.status !== 'applied') return { changed: false, value: undefined };
+      if (record.status !== 'applied')
+        return {
+          changed: false,
+          value: { status: record.status, logId: null } satisfies LogWorkoutSessionResult,
+        };
 
       for (const ex of input.exercises) {
         const exId = createId('wsex');
@@ -1090,9 +1111,13 @@ export async function logWorkoutSession(input: {
           });
         }
       }
-      return { changed: true, value: undefined };
+      return {
+        changed: true,
+        value: { status: 'applied', logId } satisfies LogWorkoutSessionResult,
+      };
     },
   });
+  return outcome.value;
 }
 
 export async function logWorkoutFromLinkedAction(input: {
@@ -1119,7 +1144,16 @@ export async function logWorkoutFromLinkedAction(input: {
         requireActiveRoutine: true,
         enqueue,
       });
-      return { changed: record.status === 'applied', value: record };
+      const applied = record.status === 'applied';
+      return {
+        changed: applied,
+        value: {
+          status: record.status,
+          reason: record.reason,
+          routineName: record.routineName,
+          logId: applied ? input.id : null,
+        } satisfies CompleteRoutineResult,
+      };
     },
   });
 

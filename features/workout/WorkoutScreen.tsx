@@ -1098,8 +1098,12 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                   if (!quickCompleteGuardRef.current.tryStart()) return;
                   void (async () => {
                     try {
-                      await completeRoutine(routine.id);
-                      recordAction('workout');
+                      const result = await completeRoutine(routine.id);
+                      // Attribute the award to the log just written; a skipped
+                      // write (missing routine) earns no XP.
+                      if (result.status === 'applied' && result.logId) {
+                        recordAction('workout', result.logId);
+                      }
                       void refresh();
                     } finally {
                       quickCompleteGuardRef.current.finish();
