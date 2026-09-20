@@ -58,7 +58,11 @@ import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
 import { isValidDateKey, toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
-import { validateCalorieComputedKcal, validateCalorieEntry } from '@/lib/validation';
+import {
+  validateCalorieComputedKcal,
+  validateCalorieEntry,
+  validateConsumedDateKey,
+} from '@/lib/validation';
 import { CalorieGoalModal } from './CalorieGoalModal';
 import { loadMacroTargets, saveMacroTargets } from './caloriesTargets';
 import { CaloriesDiaryView } from './CaloriesDiaryView';
@@ -330,6 +334,20 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       ),
     [protein, carbs, fats, fiber],
   );
+  /**
+   * Pre-submit consumed-date validation for the edit modal (mirrors
+   * `assertConsumableDateKey`): the error surfaces as soon as the date
+   * becomes invalid/future, and Save stays disabled until it is saveable.
+   * Null on the create path (no free date field there).
+   */
+  const entryDateError = useMemo(
+    () => (editingEntryId ? validateConsumedDateKey(entryDateKey) : null),
+    [editingEntryId, entryDateKey],
+  );
+  // End of today (local) capping the native date picker. Computed per
+  // render (cheap) so a midnight rollover can never leave a stale cap.
+  const entryDateMax = new Date();
+  entryDateMax.setHours(23, 59, 59, 999);
   const macroDonut = useMemo(
     () => (
       <MacroDonutChart
@@ -467,7 +485,9 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     setEntryDateKey(entry.consumed_on);
     setShowEntryDatePicker(false);
     setEditingEntryId(entry.id);
-    setCalorieError(null);
+    // Surface a legacy future date immediately (Save is also disabled
+    // via entryDateError); today/past entries clear any stale error.
+    setCalorieError(validateConsumedDateKey(entry.consumed_on));
     setEntryModalVisible(true);
   };
 
@@ -581,6 +601,17 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       return;
     }
 
+    // Pre-submit consumed-date check (edit path only): refuse before the
+    // submit guard with the exact data-layer message, so the user gets
+    // feedback before — not after — the throw in `updateCalorieEntry`.
+    if (editingEntryId) {
+      const dateError = validateConsumedDateKey(entryDateKey);
+      if (dateError) {
+        setCalorieError(dateError);
+        return;
+      }
+    }
+
     setCalorieError(null);
     // Double-submit guard: rapid re-taps must not create duplicate entries.
     if (!entrySubmitGuard.current.tryStart()) return;
@@ -593,10 +624,6 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         const fiberN = parseNumericInput(fiber) ?? 0;
 
         if (editingEntryId) {
-          if (!isValidDateKey(entryDateKey)) {
-            setCalorieError('Consumed date must be a valid calendar date (YYYY-MM-DD).');
-            return;
-          }
           await updateCalorieEntry(editingEntryId, {
             foodName: food.trim(),
             protein: proteinN,
@@ -655,6 +682,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           onPress={handleSubmit}
           color={COLOR}
           loading={isSavingEntry}
+          disabled={entryDateError !== null}
         />
       </View>
     </View>
@@ -934,8 +962,9 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
                 accessibilityLabel="Consumed date"
                 value={entryDateKey}
                 onChangeText={(t) => {
-                  setCalorieError(null);
-                  setEntryDateKey(t.trim());
+                  const next = t.trim();
+                  setEntryDateKey(next);
+                  setCalorieError(validateConsumedDateKey(next));
                 }}
               />
             ) : (
@@ -959,11 +988,13 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
                     }
                     mode="date"
                     display="default"
+                    maximumDate={entryDateMax}
                     onChange={(event, selectedDate) => {
                       setShowEntryDatePicker(false);
                       if (event.type === 'set' && selectedDate) {
-                        setCalorieError(null);
-                        setEntryDateKey(toDateKey(selectedDate));
+                        const next = toDateKey(selectedDate);
+                        setEntryDateKey(next);
+                        setCalorieError(validateConsumedDateKey(next));
                       }
                     }}
                   />

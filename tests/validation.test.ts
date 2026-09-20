@@ -5,11 +5,13 @@ import {
   validateCalorieEntry,
   validateCalorieComputedKcal,
   validateCalorieGoal,
+  validateConsumedDateKey,
   validateRoutineName,
   validateExerciseName,
   validateSetTiming,
   validatePomodoroSettings,
 } from '@/lib/validation';
+import { toDateKey } from '@/lib/time';
 
 describe('validateTodo', () => {
   it('rejects empty title', () => {
@@ -54,6 +56,45 @@ describe('validateCalorieComputedKcal', () => {
   });
   it('rejects over 9999', () => {
     expect(validateCalorieComputedKcal(10000)).not.toBeNull();
+  });
+});
+
+describe('validateConsumedDateKey', () => {
+  function shiftKey(days: number): string {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return toDateKey(d);
+  }
+
+  it('rejects a future date with the data-layer message', () => {
+    expect(validateConsumedDateKey(shiftKey(1))).toBe(
+      'Calorie logging is limited to today or a past local date.',
+    );
+  });
+
+  it('rejects malformed dates with the format message', () => {
+    expect(validateConsumedDateKey('2026-13-40')).toBe(
+      'Consumed date must be a valid calendar date (YYYY-MM-DD).',
+    );
+    expect(validateConsumedDateKey('tomorrow')).toBe(
+      'Consumed date must be a valid calendar date (YYYY-MM-DD).',
+    );
+    expect(validateConsumedDateKey('')).toBe(
+      'Consumed date must be a valid calendar date (YYYY-MM-DD).',
+    );
+  });
+
+  it('accepts today and past dates', () => {
+    expect(validateConsumedDateKey(shiftKey(0))).toBeNull();
+    expect(validateConsumedDateKey(shiftKey(-1))).toBeNull();
+    expect(validateConsumedDateKey(shiftKey(-365))).toBeNull();
+  });
+
+  it('compares against an explicit today override', () => {
+    expect(validateConsumedDateKey('2026-09-21', '2026-09-20')).toBe(
+      'Calorie logging is limited to today or a past local date.',
+    );
+    expect(validateConsumedDateKey('2026-09-20', '2026-09-20')).toBeNull();
   });
 });
 

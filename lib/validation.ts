@@ -1,3 +1,5 @@
+import { isValidDateKey, toDateKey } from './time';
+
 const YYYY_MM_DD = /^\d{4}-\d{2}-\d{2}$/;
 
 export function validateTodo(title: string, notes: string, dueDate?: string | null): string | null {
@@ -49,6 +51,25 @@ export function validateCalorieEntry(
   if (f > 999) return 'Fats value seems too high (max 999g).';
   if (fi > 999) return 'Fiber value seems too high (max 999g).';
 
+  return null;
+}
+
+/**
+ * Past-only consumed-date contract for the calorie edit modal. Mirrors
+ * `assertConsumableDateKey` in `features/calories/calories.data.ts` with the
+ * exact same messages so pre-submit feedback matches the submit refusal:
+ * entries reference today or a past local date. Returns null when saveable.
+ */
+export function validateConsumedDateKey(
+  consumedOn: string,
+  todayKey: string = toDateKey(),
+): string | null {
+  if (!isValidDateKey(consumedOn)) {
+    return 'Consumed date must be a valid calendar date (YYYY-MM-DD).';
+  }
+  if (consumedOn > todayKey) {
+    return 'Calorie logging is limited to today or a past local date.';
+  }
   return null;
 }
 
