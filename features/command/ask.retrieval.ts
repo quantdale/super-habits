@@ -12,8 +12,10 @@ import {
   calculateCurrentStreak,
   calculateLongestStreak,
   getHabitTargetForDate,
+  habitCreationDateKey,
   isHabitScheduledOn,
   parseHabitRuleHistory,
+  type HabitLifecycleHistoryInput,
 } from '@/features/habits/habits.domain';
 import { calculateHabitProgressInsights } from '@/features/habits/habitInsights.domain';
 import { listPomodoroSessionsForDateRange } from '@/features/pomodoro/pomodoro.data';
@@ -148,9 +150,26 @@ export async function retrieveCalorieSummary(
   };
 }
 
-async function computeHabitStreaks(habitId: string, targetPerDay: number, ruleHistory?: string) {
+async function computeHabitStreaks(
+  habitId: string,
+  targetPerDay: number,
+  ruleHistory?: string,
+  // Paused intervals must mask the same dates here as on every other streak
+  // surface (Habits tab, insights, momentum, gamification); otherwise Ask
+  // reports a broken streak across a pause the rest of the app bridges.
+  lifecycleHistory?: HabitLifecycleHistoryInput,
+  fallbackEffectiveFromDate?: string,
+) {
   const completions = await getCompletionHistory(habitId);
-  const dayCompletions = buildDayCompletions(completions, targetPerDay, undefined, ruleHistory);
+  const dayCompletions = buildDayCompletions(
+    completions,
+    targetPerDay,
+    undefined,
+    ruleHistory,
+    fallbackEffectiveFromDate,
+    undefined,
+    lifecycleHistory,
+  );
   return {
     currentStreak: calculateCurrentStreak(dayCompletions),
     longestStreak: calculateLongestStreak(dayCompletions),
@@ -170,6 +189,8 @@ export async function retrieveHabitStreak(habitName: string | null): Promise<Hab
           habit.id,
           habit.target_per_day,
           habit.rule_history,
+          habit.lifecycle_history,
+          habitCreationDateKey(habit.created_at),
         );
         return {
           habitName: habit.name,
@@ -196,7 +217,13 @@ export async function retrieveHabitStreak(habitName: string | null): Promise<Hab
     throw new AskRetrievalError('habit_not_found', `No Habit named "${habitName}" was found.`);
   }
 
-  const streaks = await computeHabitStreaks(habit.id, habit.target_per_day, habit.rule_history);
+  const streaks = await computeHabitStreaks(
+    habit.id,
+    habit.target_per_day,
+    habit.rule_history,
+    habit.lifecycle_history,
+    habitCreationDateKey(habit.created_at),
+  );
   return {
     scope: 'single',
     habitName: habit.name,

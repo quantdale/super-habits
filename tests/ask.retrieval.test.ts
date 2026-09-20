@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { toDateKey } from '@/lib/time';
+
 import {
   AskRetrievalError,
   retrieveCalorieSummary,
@@ -183,6 +185,48 @@ describe('features/command/ask.retrieval', () => {
         reasonCode: 'habit_not_found',
       });
       await expect(retrieveHabitStreak('run 5k')).rejects.toBeInstanceOf(AskRetrievalError);
+    });
+
+    it('bridges a paused interval instead of breaking the streak', async () => {
+      const daysAgo = (n: number): string => {
+        const date = new Date();
+        date.setDate(date.getDate() - n);
+        return toDateKey(date);
+      };
+      const pausedFrom = daysAgo(3);
+      const pausedTo = daysAgo(1);
+      listHabits.mockResolvedValue([
+        {
+          id: 'habit_pause',
+          name: 'Run',
+          target_per_day: 1,
+          status: 'active',
+          rule_history: null,
+          created_at: '2020-01-01T00:00:00.000Z',
+          lifecycle_history: JSON.stringify([
+            { status: 'paused', from_date_key: pausedFrom, to_date_key: pausedTo },
+          ]),
+        },
+      ]);
+      // Seven completed days, a three-day pause, then today complete.
+      getCompletionHistory.mockResolvedValue([
+        ...[10, 9, 8, 7, 6, 5, 4].map((n) => ({
+          habit_id: 'habit_pause',
+          date_key: daysAgo(n),
+          count: 1,
+        })),
+        { habit_id: 'habit_pause', date_key: daysAgo(0), count: 1 },
+      ]);
+
+      const facts = await retrieveHabitStreak('run');
+
+      // The Habits tab bridges the pause (7 + today = 8); Ask must agree.
+      expect(facts).toEqual({
+        scope: 'single',
+        habitName: 'Run',
+        currentStreak: 8,
+        longestStreak: 8,
+      });
     });
 
     it('returns an overall summary across all habits when no name is given', async () => {
