@@ -7,6 +7,7 @@ import {
   filterTodos,
   groupTodosByDueWindow,
   searchTodos,
+  shouldAwardTodoFastPath,
   sortTodos,
 } from '@/features/todos/todos.domain';
 import { createSubmitGuard } from '@/lib/submitGuard';
@@ -206,5 +207,17 @@ describe('todos list query (search/filter/sort/group)', () => {
     expect(groups.today.map((t) => t.title)).toEqual(['Write report']);
     expect(groups.upcoming.map((t) => t.title)).toEqual(['Read book']);
     expect(groups.noDue.map((t) => t.title)).toEqual(['No date task']);
+  });
+});
+
+describe('shouldAwardTodoFastPath (confirmed-completion gate)', () => {
+  it('awards confirmed completions', () => {
+    expect(shouldAwardTodoFastPath(1)).toBe(true);
+  });
+
+  it('refuses failed or non-completed toggles (no phantom XP)', () => {
+    // toggleTodo returns completed 0 (not a throw) for missing/deleted rows
+    // and lost races, and for the un-complete direction.
+    expect(shouldAwardTodoFastPath(0)).toBe(false);
   });
 });

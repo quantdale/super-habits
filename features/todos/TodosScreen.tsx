@@ -51,6 +51,7 @@ import {
   findMissingRecurrenceIds,
   getTodayDateKey,
   groupTodosByDueWindow,
+  shouldAwardTodoFastPath,
   type TodoListFilters,
   type TodoSortMode,
 } from './todos.domain';
@@ -413,8 +414,12 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
       for (const notice of result.linkedActions.notices) {
         showNotice(notice);
       }
-      // Only the completion direction earns XP; un-completing never removes it.
-      if (todo.completed === 0) recordAction('todo', todo.id);
+      // Fast path only for confirmed completions (idempotent per todo id,
+      // so a replay can never double-award). Failed toggles (missing/deleted
+      // row or lost race yield completed 0) and the un-complete direction
+      // degrade to reconcile backfill or silence — a stale-prop award for
+      // either would mint phantom XP, mirroring shouldAwardHabitFastPath.
+      if (shouldAwardTodoFastPath(result.completed)) recordAction('todo', todo.id);
       if (todo.completed === 0 && !reducedMotion) {
         // Hold the just-completed row in the list while the settle animation
         // plays, then let the normal refresh remove it.

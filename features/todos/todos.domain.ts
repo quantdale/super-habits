@@ -222,3 +222,17 @@ export function groupTodosByDueWindow<T extends { due_date: string | null }>(
   }
   return groups;
 }
+
+/**
+ * True when a todo toggle may take the gamification fast path.
+ *
+ * Mirror of shouldAwardHabitFastPath: only a confirmed completion
+ * (result.completed equals 1 from toggleTodo, completeTodo, or
+ * setTodoCompletionState) may award. A failed toggle (missing or deleted row
+ * or lost race yields completed 0) must not mint XP for an action that never
+ * happened. The un-complete direction (completed 0) never awards. A real
+ * completion that misses the fast path degrades to reconcile backfill.
+ */
+export function shouldAwardTodoFastPath(completed: 0 | 1): boolean {
+  return completed === 1;
+}
