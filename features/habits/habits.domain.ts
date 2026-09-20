@@ -317,6 +317,30 @@ export function isHabitActionableOn(
   );
 }
 
+/**
+ * True when a habit check-in may take the gamification fast path
+ * (`recordAction('habit', habitId)` → `awardGamificationAction` with the
+ * current day as `todayKey`).
+ *
+ * Two refusals, both correctness — not latency:
+ * - a refused write (`count < 1`: missing/paused/unscheduled habit) must not
+ *   mint XP for an action that never happened;
+ * - a backdated write (`dateKey !== todayKey`: the day-strip backfill flow)
+ *   must not be awarded under today's key. Habit source keys are
+ *   per-habit-per-day (`${dateKey}:${habitId}`), so a today-keyed award for a
+ *   past-day increment double-pays once reconcile awards the action-day key —
+ *   and marks today active with no today action. Backdated increments degrade
+ *   to reconcile backfill (exact + silent), the same miss+reconcile policy as
+ *   the id-less fast-path guards.
+ */
+export function shouldAwardHabitFastPath(
+  dateKey: string,
+  count: number,
+  todayKey: string,
+): boolean {
+  return count > 0 && dateKey === todayKey;
+}
+
 export function getHabitSchedulePreset(weekdays: readonly number[]): HabitSchedulePreset {
   const normalized = normalizeHabitWeekdays(weekdays);
   if (normalized.join(',') === ALL_HABIT_WEEKDAYS.join(',')) return 'every_day';

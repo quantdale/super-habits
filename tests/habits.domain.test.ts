@@ -22,6 +22,7 @@ import {
   parseHabitLifecycleHistory,
   parseHabitRuleHistory,
   serializeHabitLifecycleHistory,
+  shouldAwardHabitFastPath,
   sortHabits,
   summarizeHabitLifecycle,
   type DayCompletion,
@@ -730,5 +731,34 @@ describe('isHabitActionableOn (lifecycle write gate)', () => {
     expect(isHabitActionableOn(everyDay, '2026-04-14', 1, '2026-04-01', lifecycle)).toBe(false);
     // The day before the pause starts stays actionable (inclusive bounds).
     expect(isHabitActionableOn(everyDay, '2026-04-09', 1, '2026-04-01', lifecycle)).toBe(true);
+  });
+});
+
+describe('shouldAwardHabitFastPath (today-only confirmed-write gate)', () => {
+  const today = toDateKey();
+  const yesterday = toDateKey(
+    (() => {
+      const date = new Date();
+      date.setDate(date.getDate() - 1);
+      return date;
+    })(),
+  );
+
+  it('awards confirmed today writes', () => {
+    expect(shouldAwardHabitFastPath(today, 1, today)).toBe(true);
+    expect(shouldAwardHabitFastPath(today, 3, today)).toBe(true);
+  });
+
+  it('refuses backdated writes even when confirmed (reconcile owns the action-day key)', () => {
+    expect(yesterday).not.toBe(today);
+    // A today-keyed award for a past-day increment would double-pay once
+    // reconcile awards the action-day key — so the fast path stays silent.
+    expect(shouldAwardHabitFastPath(yesterday, 1, today)).toBe(false);
+  });
+
+  it('refuses unconfirmed writes even for today (no phantom XP)', () => {
+    // incrementHabit returns count 0 (not a throw) for missing, paused,
+    // archived, or unscheduled writes.
+    expect(shouldAwardHabitFastPath(today, 0, today)).toBe(false);
   });
 });

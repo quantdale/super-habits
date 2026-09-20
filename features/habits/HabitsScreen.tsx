@@ -67,6 +67,7 @@ import {
   isHabitActionableOn,
   isHabitScheduledOn,
   normalizeHabitWeekdays,
+  shouldAwardHabitFastPath,
   sortHabits,
   type HabitSchedulePreset,
   type HabitSortMode,
@@ -618,9 +619,13 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
       for (const notice of result.linkedActions.notices) {
         showNotice(notice);
       }
-      // Fast path only: the reward is idempotent per (day, habit), so a replay
-      // of this handler can never double-award.
-      recordAction('habit', habitId);
+      // Fast path only for confirmed TODAY writes (idempotent per day+habit,
+      // so a replay can never double-award). Backdated day-strip check-ins
+      // and refused writes (count 0) degrade to reconcile backfill with the
+      // action-day key — a today-keyed award for either would mis-attribute.
+      if (shouldAwardHabitFastPath(dateKey, result.count, toDateKey())) {
+        recordAction('habit', habitId);
+      }
       void refresh();
     },
     [recordAction, refresh, showNotice],
