@@ -418,6 +418,70 @@ describe('Command Center V2 canonical SQLite execution', () => {
       await closeDatabase(db);
     }
   });
+
+  it('blocks Habit logging review for paused/archived habits without writing progress', async () => {
+    const db = await freshDatabase();
+
+    try {
+      const commandDomain = await import('@/features/command/command.domain');
+      const commandReview = await import('@/features/command/command.review');
+      const habits = await import('@/features/habits/habits.data');
+
+      const { toDateKey } = await import('@/lib/time');
+      const todayKey = toDateKey();
+      const pausedId = await habits.addHabit('Morning pages', 1);
+      const archivedId = await habits.addHabit('Evening pages', 1);
+      const activeId = await habits.addHabit('Midday pages', 1);
+      const now = new Date();
+      expect(await habits.pauseHabit(pausedId, todayKey)).toBe(true);
+      expect(await habits.archiveHabit(archivedId, todayKey)).toBe(true);
+
+      // Paused/archived habits are not actionable (Area 1 F3): the review
+      // must agree with the executor and refuse readiness instead of
+      // promising `ready` and failing at confirm time.
+      for (const name of ['Morning pages', 'Evening pages']) {
+        const parsed = commandDomain.parseCommandDraft({
+          rawText: `add one to ${name}`,
+          now,
+          locale: 'en-US',
+          timeZone: 'Asia/Manila',
+          todayDateKey: todayKey,
+          tomorrowDateKey: todayKey,
+        });
+        expect(parsed.outcome).toBe('draft');
+        if (parsed.outcome !== 'draft' || parsed.draft.kind !== 'log_habit') return;
+
+        const review = await commandReview.prepareCommandReview(parsed.draft, { now });
+        expect(review.status).toBe('needs_input');
+        expect(review.missingFields).toContainEqual(
+          expect.objectContaining({ field: 'lifecycle' }),
+        );
+      }
+
+      // Active control: still ready.
+      const activeParsed = commandDomain.parseCommandDraft({
+        rawText: 'add one to Midday pages',
+        now,
+        locale: 'en-US',
+        timeZone: 'Asia/Manila',
+        todayDateKey: todayKey,
+        tomorrowDateKey: todayKey,
+      });
+      expect(activeParsed.outcome).toBe('draft');
+      if (activeParsed.outcome !== 'draft' || activeParsed.draft.kind !== 'log_habit') return;
+      const activeReview = await commandReview.prepareCommandReview(activeParsed.draft, { now });
+      expect(activeReview.status).toBe('ready');
+      expect(activeReview.resolvedEntityId).toBe(activeId);
+
+      expect(
+        await db.getFirstAsync<{ count: number }>(
+          'SELECT COUNT(*) AS count FROM habit_completions',
+        ),
+      ).toEqual({ count: 0 });
+    } finally {
+      await closeDatabase(db);
+    }
+  });
 });
 
 async function closeDatabase(db: TestDatabase): Promise<void> {

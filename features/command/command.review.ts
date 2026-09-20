@@ -8,6 +8,7 @@ import {
 import { listRoutines } from '@/features/workout/workout.data';
 import { listGoals } from '@/features/goals/goals.data';
 import { listTodos } from '@/features/todos/todos.data';
+import { isActiveHabit } from '@/features/overview/overview.domain';
 import { createId } from '@/lib/id';
 import { timestampToLocalDateKey, toDateKey } from '@/lib/time';
 import { isValidCommandDateKey, validateCommandDraftFields } from './command.validation';
@@ -527,6 +528,17 @@ export async function prepareCommandReview(
     if (!scheduled) {
       warnings.push({ code: 'off_day', message: 'This Habit is not scheduled for today.' });
     }
+    // Paused/archived habits are not actionable (Area 1 F3): the executor
+    // refuses them at confirm time, so the review must refuse readiness here
+    // with the same resume-first message instead of promising `ready`.
+    const lifecycleMissing = !isActiveHabit(habit)
+      ? [
+          fieldMissing(
+            'lifecycle',
+            `"${habit.name}" is ${habit.status === 'archived' ? 'archived' : 'paused'} — resume it before logging.`,
+          ),
+        ]
+      : [];
     const missingFields = [
       ...(dateMissing ? [dateMissing] : []),
       ...(!scheduled
@@ -537,8 +549,9 @@ export async function prepareCommandReview(
             ),
           ]
         : []),
+      ...lifecycleMissing,
     ];
-    const blocked = !scheduled || dateMissing !== null;
+    const blocked = !scheduled || dateMissing !== null || lifecycleMissing.length > 0;
     return makeReview(draft, {
       status: blocked ? 'needs_input' : 'ready',
       missingFields,
