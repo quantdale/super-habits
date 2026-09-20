@@ -17,12 +17,12 @@ import {
   parseTopTodoTitles,
   toggleTopTodoId,
   normalizeEnergyScore,
+  selectScheduledHabitNamesForPlan,
 } from '@/features/daily-plan/dailyPlan.domain';
 import { MAX_TOP_PRIORITIES } from '@/features/daily-plan/dailyPlan.types';
 import { DailyPlanHistoryView } from '@/features/daily-plan/DailyPlanHistoryView';
 import { listPendingTodos } from '@/features/todos/todos.data';
 import { listHabits } from '@/features/habits/habits.data';
-import { isHabitScheduledOn } from '@/features/habits/habits.domain';
 import { toDateKey } from '@/lib/time';
 import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { createEditableFieldOwner } from '@/lib/editableDraft';
@@ -101,11 +101,7 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
         draft.applyIfPristine('topTodoIds', () => setTopTodoIds([]));
       }
       setPendingTodos(todos.map((t) => ({ id: t.id, title: t.title })));
-      setScheduledHabits(
-        habits
-          .filter((h) => isHabitScheduledOn(h.rule_history, today, h.target_per_day))
-          .map((h) => h.name),
-      );
+      setScheduledHabits(selectScheduledHabitNamesForPlan(habits, today));
       if (adherenceSummary) {
         setAdherence({
           committedStreak: adherenceSummary.committedStreak,

@@ -1,4 +1,9 @@
-import type { DailyPlanStatus } from '@/core/db/types';
+import type { DailyPlanStatus, HabitLifecycleStatus } from '@/core/db/types';
+import { isHabitActionableOn } from '@/features/habits/habits.domain';
+import type {
+  HabitLifecycleHistoryInput,
+  HabitRuleHistoryInput,
+} from '@/features/habits/habits.domain';
 import { dateKeyToLocalDate } from '@/lib/time';
 import {
   ENERGY_SCORE_MAX,
@@ -35,6 +40,43 @@ export function computeCarryForwardIds(input: {
     result.push(todoId);
   }
   return result;
+}
+
+// ---------- scheduled habits for the plan ----------
+
+export type ScheduledPlanHabit = {
+  name: string;
+  target_per_day: number;
+  rule_history?: HabitRuleHistoryInput;
+  status?: HabitLifecycleStatus;
+  lifecycle_history?: HabitLifecycleHistoryInput;
+};
+
+/**
+ * Names of habits to list under "Scheduled habits today" in the daily plan.
+ *
+ * Today-obligation contract (durable lifecycle, migration 20): only active,
+ * actionable habits are listed — paused/archived habits owe nothing until
+ * resumed, matching the Habits tab denominators, Overview rings, reminders,
+ * and notification/command guards.
+ */
+export function selectScheduledHabitNamesForPlan(
+  habits: ScheduledPlanHabit[],
+  dateKey: string,
+): string[] {
+  return habits
+    .filter(
+      (habit) =>
+        (habit.status ?? 'active') === 'active' &&
+        isHabitActionableOn(
+          habit.rule_history,
+          dateKey,
+          habit.target_per_day,
+          undefined,
+          habit.lifecycle_history,
+        ),
+    )
+    .map((habit) => habit.name);
 }
 
 // ---------- adherence streaks ----------
