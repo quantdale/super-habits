@@ -97,6 +97,27 @@ export function assertHabitWrite(input: {
   if (err) throw new Error(err);
 }
 
+export function validateCalorieFoodName(foodName: string): string | null {
+  if (!foodName.trim()) return 'Food name is required.';
+  if (foodName.trim().length > 100) return 'Food name must be 100 characters or less.';
+  return null;
+}
+
+export type CalorieMacroLabel = 'Protein' | 'Carbs' | 'Fats' | 'Fiber';
+
+/**
+ * Numeric macro check with the exact UI messages. Non-finite, NaN, and
+ * negative values all report `must be 0 or greater` (matching the string
+ * form below, where `Number('') === 0` passes and unparseable text is NaN);
+ * values above the per-macro cap report the `too high` message.
+ */
+export function validateCalorieMacroValue(value: number, label: CalorieMacroLabel): string | null {
+  if (typeof value !== 'number' || Number.isNaN(value) || value < 0)
+    return `${label} must be 0 or greater.`;
+  if (value > 999) return `${label} value seems too high (max 999g).`;
+  return null;
+}
+
 export function validateCalorieEntry(
   foodName: string,
   protein: string,
@@ -104,24 +125,51 @@ export function validateCalorieEntry(
   fats: string,
   fiber: string,
 ): string | null {
-  if (!foodName.trim()) return 'Food name is required.';
-  if (foodName.trim().length > 100) return 'Food name must be 100 characters or less.';
+  const foodError = validateCalorieFoodName(foodName);
+  if (foodError) return foodError;
 
-  const p = Number(protein.trim());
-  const c = Number(carbs.trim());
-  const f = Number(fats.trim());
-  const fi = Number(fiber.trim());
-
-  if (isNaN(p) || p < 0) return 'Protein must be 0 or greater.';
-  if (isNaN(c) || c < 0) return 'Carbs must be 0 or greater.';
-  if (isNaN(f) || f < 0) return 'Fats must be 0 or greater.';
-  if (isNaN(fi) || fi < 0) return 'Fiber must be 0 or greater.';
-  if (p > 999) return 'Protein value seems too high (max 999g).';
-  if (c > 999) return 'Carbs value seems too high (max 999g).';
-  if (f > 999) return 'Fats value seems too high (max 999g).';
-  if (fi > 999) return 'Fiber value seems too high (max 999g).';
+  const macros: [string, CalorieMacroLabel][] = [
+    [protein, 'Protein'],
+    [carbs, 'Carbs'],
+    [fats, 'Fats'],
+    [fiber, 'Fiber'],
+  ];
+  for (const [raw, label] of macros) {
+    const macroError = validateCalorieMacroValue(Number(raw.trim()), label);
+    if (macroError) return macroError;
+  }
 
   return null;
+}
+
+const SUPPORTED_MEAL_TYPES: readonly string[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+/**
+ * Data-layer hard reject for calorie-ledger writes. Same contract (and same
+ * messages) as the UI `validateCalorieEntry` +
+ * `validateCalorieComputedKcal` path, so non-UI writers (quick capture,
+ * command executor, linked-action effects) can never land an invalid row.
+ * Callers pass *resolved* values (macros defaulted, kcal computed) — the
+ * same precedent as the todo resolved-dueDate assert. Throws.
+ */
+export function assertCalorieEntryWrite(input: {
+  foodName: string;
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
+  calories: number;
+  mealType: string;
+}): void {
+  const err =
+    validateCalorieFoodName(input.foodName) ??
+    validateCalorieMacroValue(input.protein, 'Protein') ??
+    validateCalorieMacroValue(input.carbs, 'Carbs') ??
+    validateCalorieMacroValue(input.fats, 'Fats') ??
+    validateCalorieMacroValue(input.fiber, 'Fiber') ??
+    validateCalorieComputedKcal(input.calories) ??
+    (SUPPORTED_MEAL_TYPES.includes(input.mealType) ? null : 'Choose a supported meal type.');
+  if (err) throw new Error(err);
 }
 
 /**

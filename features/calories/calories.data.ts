@@ -5,6 +5,7 @@ import type { LinkedActionEffectAdapterResult } from '@/core/linked-actions/link
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createId } from '@/lib/id';
 import { isValidDateKey, nowIso, toDateKey } from '@/lib/time';
+import { assertCalorieEntryWrite } from '@/lib/validation';
 import {
   runBackupMutation,
   runSyncedMutation,
@@ -171,6 +172,17 @@ export async function addCalorieEntry(
   const now = nowIso();
   const consumedOn = input.consumedOn ?? toDateKey();
   assertConsumableDateKey(consumedOn);
+  // Data-layer hard reject (same contract as the UI validateCalorieEntry +
+  // computed-kcal path): non-UI writers must never land an invalid ledger row.
+  assertCalorieEntryWrite({
+    foodName: input.foodName,
+    protein: input.protein ?? 0,
+    carbs: input.carbs ?? 0,
+    fats: input.fats ?? 0,
+    fiber: input.fiber ?? 0,
+    calories: input.calories,
+    mealType: input.mealType,
+  });
   const db = await getDatabase();
   await runSyncedMutation({
     db,
@@ -247,9 +259,19 @@ export async function updateCalorieEntry(
   if (updates.consumedOn !== undefined) {
     assertConsumableDateKey(updates.consumedOn);
   }
+  const calories = kcalFromMacros(updates.protein, updates.carbs, updates.fats, updates.fiber);
+  // Same write contract as the add path (kcal is recomputed from macros here).
+  assertCalorieEntryWrite({
+    foodName: updates.foodName,
+    protein: updates.protein,
+    carbs: updates.carbs,
+    fats: updates.fats,
+    fiber: updates.fiber,
+    calories,
+    mealType: updates.mealType,
+  });
   const db = await getDatabase();
   const now = nowIso();
-  const calories = kcalFromMacros(updates.protein, updates.carbs, updates.fats, updates.fiber);
   const dayMove = updates.consumedOn !== undefined ? ', consumed_on = ?' : '';
   const result = await runSyncedMutation<'updated' | 'not_found'>({
     db,
@@ -522,6 +544,17 @@ export async function addCalorieEntryFromLinkedAction(input: {
   consumedOn: string;
 }): Promise<LinkedActionEffectAdapterResult> {
   assertConsumableDateKey(input.consumedOn);
+  // Fail closed with the exact UI messages (the engine records the throw as a
+  // failed execution) instead of persisting an invalid automated log.
+  assertCalorieEntryWrite({
+    foodName: input.foodName,
+    protein: input.protein,
+    carbs: input.carbs,
+    fats: input.fats,
+    fiber: input.fiber,
+    calories: input.calories,
+    mealType: input.mealType,
+  });
   const db = await getDatabase();
   const existing = await db.getFirstAsync<Pick<CalorieEntry, 'id' | 'food_name'>>(
     `SELECT id, food_name FROM calorie_entries WHERE id = ? AND deleted_at IS NULL`,
