@@ -290,16 +290,18 @@ describe('calories.data', () => {
     ]);
   });
 
-  it('upsertSavedMeal returns early for blank names', async () => {
-    await upsertSavedMeal({
-      foodName: '   ',
-      calories: 100,
-      protein: 0,
-      carbs: 0,
-      fats: 0,
-      fiber: 0,
-      mealType: 'snack',
-    });
+  it('upsertSavedMeal hard-rejects blank names with the exact UI message', async () => {
+    await expect(
+      upsertSavedMeal({
+        foodName: '   ',
+        calories: 100,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+        fiber: 0,
+        mealType: 'snack',
+      }),
+    ).rejects.toThrow('Food name is required.');
 
     expect(getDatabase).not.toHaveBeenCalled();
     expect(db.getFirstAsync).not.toHaveBeenCalled();

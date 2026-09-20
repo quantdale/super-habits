@@ -320,7 +320,20 @@ export async function upsertSavedMeal(input: {
   fiber: number;
   mealType: string;
 }): Promise<void> {
-  if (!input.foodName?.trim()) return;
+  // Data-layer hard reject (same contract as the ledger UI
+  // validateCalorieEntry + computed-kcal path): direct callers must never
+  // land an invalid catalog row, and invalid payloads must throw with the
+  // exact UI messages instead of being silently dropped. Reuses the shared
+  // ledger assert — the catalog columns mirror the ledger 1:1.
+  assertCalorieEntryWrite({
+    foodName: input.foodName,
+    protein: input.protein,
+    carbs: input.carbs,
+    fats: input.fats,
+    fiber: input.fiber,
+    calories: input.calories,
+    mealType: input.mealType,
+  });
 
   const db = await getDatabase();
   const now = nowIso();
