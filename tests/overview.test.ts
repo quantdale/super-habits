@@ -405,22 +405,25 @@ describe('shapeCaloriesSummary', () => {
 });
 
 describe('shapeProjectsSummary / shapeGoalsSummary', () => {
-  it('keeps active projects only, bounded preview', () => {
+  it('keeps live projects (active + paused), bounded preview', () => {
     const projects = [
       { id: 'p1', name: 'A', color: '#111', status: 'active' },
       { id: 'p2', name: 'B', color: '#222', status: 'paused' },
       { id: 'p3', name: 'C', color: '#333', status: 'active' },
+      { id: 'p4', name: 'D', color: '#444', status: 'completed' },
+      { id: 'p5', name: 'E', color: '#555', status: 'archived' },
     ] as never[];
     const summary = shapeProjectsSummary(projects);
-    expect(summary.activeCount).toBe(2);
-    expect(summary.preview.map((p) => p.id)).toEqual(['p1', 'p3']);
+    expect(summary.activeCount).toBe(3);
+    expect(summary.preview.map((p) => p.id)).toEqual(['p1', 'p2', 'p3']);
   });
 
-  it('averages goal progress over active goals', () => {
+  it('averages goal progress over live goals (active + paused)', () => {
     const goals = [
       { id: 'g1', title: 'G1', status: 'active', progress_percent: 40 },
-      { id: 'g2', title: 'G2', status: 'active', progress_percent: 80 },
+      { id: 'g2', title: 'G2', status: 'paused', progress_percent: 80 },
       { id: 'g3', title: 'Done', status: 'completed', progress_percent: 100 },
+      { id: 'g4', title: 'Old', status: 'archived', progress_percent: 100 },
     ] as never[];
     const summary = shapeGoalsSummary(goals);
     expect(summary.activeCount).toBe(2);

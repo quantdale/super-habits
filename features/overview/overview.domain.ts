@@ -6,6 +6,8 @@
 import type { DailyPlan, HabitLifecycleStatus } from '@/core/db/types';
 import { parseTopTodoIds } from '@/features/daily-plan/dailyPlan.domain';
 import { isHabitScheduledOn } from '@/features/habits/habits.domain';
+import { ACTIVE_PROJECT_STATUSES } from '@/features/projects/projects.domain';
+import { ACTIVE_GOAL_STATUSES } from '@/features/goals/goals.domain';
 import type { Goal } from '@/features/goals/goals.types';
 import type { Project } from '@/features/projects/projects.types';
 import type { Todo } from '@/features/todos/types';
@@ -390,7 +392,10 @@ export type ProjectsSummary = {
 };
 
 export function shapeProjectsSummary(projects: readonly Project[]): ProjectsSummary {
-  const active = projects.filter((p) => p.status === 'active');
+  // Live-portfolio contract (ACTIVE_PROJECT_STATUSES): paused projects are
+  // still live work, matching countActiveProjects, progress rollups, and the
+  // Planning Hub briefing. Only completed/archived are retired.
+  const active = projects.filter((p) => ACTIVE_PROJECT_STATUSES.includes(p.status));
   return {
     activeCount: active.length,
     preview: active.slice(0, 3).map((p) => ({ id: p.id, name: p.name, color: p.color })),
@@ -404,7 +409,9 @@ export type GoalsSummary = {
 };
 
 export function shapeGoalsSummary(goals: readonly Goal[]): GoalsSummary {
-  const active = goals.filter((g) => g.status === 'active');
+  // Live-portfolio contract (ACTIVE_GOAL_STATUSES): paused goals still count
+  // toward the dashboard average, matching countActiveGoals and progress.
+  const active = goals.filter((g) => ACTIVE_GOAL_STATUSES.includes(g.status));
   return {
     activeCount: active.length,
     averageProgress:
