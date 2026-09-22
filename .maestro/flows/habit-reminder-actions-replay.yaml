@@ -42,7 +42,8 @@ tags:
 - tapOn: 'Create habit'
 - scrollUntilVisible:
     element: 'Native replay action: 0 of 1 today.*'
-    direction: DOWN
+    direction: UP
+    centerElement: true
 - extendedWaitUntil:
     visible: 'Native replay action: 0 of 1 today.*'
     timeout: 5000
@@ -68,7 +69,8 @@ tags:
 - tapOn: 'Exit habit edit mode'
 - scrollUntilVisible:
     element: 'Native replay action: 1 of 1 today.*'
-    direction: DOWN
+    direction: UP
+    centerElement: true
 - killApp
 - launchApp
 - extendedWaitUntil:
@@ -86,7 +88,8 @@ tags:
     timeout: 15000
 - scrollUntilVisible:
     element: 'Native replay action: 1 of 1 today.*'
-    direction: DOWN
+    direction: UP
+    centerElement: true
     visibilityPercentage: 50
 - assertVisible: 'Native replay action: 1 of 1 today.*'
 - scrollUntilVisible:

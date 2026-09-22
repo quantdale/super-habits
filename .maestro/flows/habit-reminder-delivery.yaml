@@ -44,6 +44,12 @@ tags:
     element: 'Create habit'
     direction: DOWN
 - tapOn: 'Create habit'
+# The Habits list retains its prior scroll position; reveal the new tile before
+# opening its edit controls.
+- scrollUntilVisible:
+    element: 'Native delivery habit'
+    direction: UP
+    centerElement: true
 - extendedWaitUntil:
     visible: 'Native delivery habit'
     timeout: 5000

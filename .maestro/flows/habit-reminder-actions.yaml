@@ -40,6 +40,12 @@ tags:
     element: 'Create habit'
     direction: DOWN
 - tapOn: 'Create habit'
+# The Habits list retains its prior scroll position; reveal the new tile before
+# the progress assertion.
+- scrollUntilVisible:
+    element: 'Native Gym action: 0 of 1 today.*'
+    direction: UP
+    centerElement: true
 - extendedWaitUntil:
     visible: 'Native Gym action: 0 of 1 today.*'
     timeout: 5000
