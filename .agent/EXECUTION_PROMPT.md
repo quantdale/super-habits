@@ -1,197 +1,1138 @@
-# Super Habits Functional Completion V1
+# SuperHabits — Production Closure, Exact-HEAD Certification, Platform Closure, and Release Readiness Campaign
 
-**Status:** COMPLETED
-**Exact next action:** None — terminal condition A closed 2026-09-05; full evidence in the final report below.
-**Planned-From:** `76f79d90a499f3ab0e2213edd965d23393a7840c`
+**Status:** ACTIVE
+**Exact next action:** Phase 1 — reconcile `.agent/execplans/workout-history-quick-log-badge.md` (tick the landed `Single commit` task), run `npm run agent:plan:validate:all` to PASS, run the cheap gates, commit the CI/governance repair, push, and verify the exact pushed-SHA GitHub Actions run progresses past `Validate versioned ExecPlans`.
+**Planned-From:** `691d2a2ef488c45d936f736d29ba81d7cea96150`
 **Target branch:** `main`
-**Campaign:** Super Habits Functional Completion V1
-**Subtitle:** Correction Flows → Orphaned Capability Activation → Weekly-Review Surfacing → Planning-Surface Test Floor
+**Campaign:** Production Closure, Exact-HEAD Certification, Platform Closure, and Release Readiness
+**Subtitle:** Restore CI truth → reconcile stale plans → exact-HEAD certification → Android/Supabase/iOS/store/dependency closure → release verdict → v2 direction audit
+
+> Reconciled 2026-09-22 against Git at planner handoff: `HEAD == origin/main == 691d2a2`, tree clean; Phase-0 verification confirmed the CI defect hypothesis (see `.agent/execplans/production-closure-exact-head-cert-v1.md`). The predecessor prompt (Super Habits Functional Completion V1, COMPLETED) survives in Git history.
 
 ---
 
-## 0. Planner baseline (authoritative, verified 2026-09-05)
+You are the primary autonomous engineering agent responsible for taking the **SuperHabits** repository from its current state through the remaining production-readiness work.
 
-- `HEAD == origin/main == 76f79d90a499f3ab0e2213edd965d23393a7840c` (`76f79d9`), branch `main`, tree clean, single worktree, no other local/remote branches.
-- Predecessor `.agent/EXECUTION_PROMPT.md` was `Status: COMPLETED` (Certification Infrastructure V2, closed `bb376bd`, final report appended in `76f79d9`). `npm run agent:plans` shows all 48 discovered plans `COMPLETED`; `agent:plan:validate:all` 48/48 PASS; `openspec:validate` 50/50 PASS. Production Hardening V1 (`harden-production-persistence-recovery-v1`) and Certification Infrastructure V2 (`certification-infrastructure-v2`) are genuinely closed with full evidence — do not reopen them. This prompt replaces the completed prompt; the V2 final report survives in Git history and `.agent/execplans/certification-infrastructure-v2.md`.
-- Certification infrastructure is mature and must be **reused, not rebuilt**: `qa:repeat`, multi-AVD orchestration (`scripts/qa-native*.mjs`), auth-mock lifecycle automation, deterministic MATURE corpus (`tests/integration/fixtures/seeders.ts` `seedMature()`), J8 ceilings (`e2e/journeys/three-months-in.spec.ts`), corpus performance tripwires (`corpusPerformance.test.ts`), `web:verify` / `web:hygiene`.
-- The last two campaigns were intentionally reliability/certification work and landed almost no product features (`1e1f4d0..bb376bd` touched product source only once, `app/index.tsx` FAB fix). A fresh repository-wide completion audit at this baseline found the strongest remaining evidence is **functional depth**: the data/domain layer broadly shipped full CRUD, but the UI exposes only create/read in multiple mature sections, and one flagship loop is unreachable in-app.
-- Known external blockers (evaluate, never gate): iOS (no macOS/Xcode on this Windows host), disposable Supabase backend (no `SUPABASE_ACCESS_TOKEN`), internal command-parser lanes (env-gated opt-in), real-corpus migration fixtures (no anonymized real-world DB; synthetic corpus already covers the code paths).
+Repository:
 
-## 1. Objective
+```text
+quantdale/super-habits
+```
 
-Close the product's largest evidence-backed depth gap: users cannot **correct, edit, reorganize, or manage** substantial classes of their own data, several fully-implemented backend capabilities are unreachable from the UI, and the shipped Weekly Review loop has no in-app entry point. Deliver real correction/editing flows across Todos, Calories, Workout, and Pomodoro, surface Weekly Review per the existing disposition decision, reconcile the Linked Actions policy/engine contradiction, and raise the Planning-surface test floor so every shipped flow is proven with data oracles.
+This is a **long-running autonomous campaign**. Work methodically, use subagents aggressively for parallel read-only investigation and isolated implementation where safe, and continue until every repository-executable task described below has either been completed and validated or has been proven to require an external owner/device/credential action.
 
-## 2. Audit evidence (planner-verified at `76f79d9`; re-verify each line in Wave 0 before implementing)
+Do **not** stop after producing a report.
 
-### E1 — Recurring Todo series has no management UI
+Do **not** merely audit.
 
-- `updateTodo` accepts no recurrence fields (`features/todos/todos.data.ts:434-443`); the "Repeat daily" toggle renders only on create (`features/todos/TodosScreen.tsx:1025-1057`). Editing a recurring instance silently edits one instance; there is no stop-repeat, no edit-series-template, and delete is the only de-facto stop control (`todos.data.ts:683-703` re-spawns the next copy on completion).
-- Linked Actions blocked for recurring sources with dead-end copy (`TodosScreen.tsx:1114-1117`).
+Do **not** stop after finding problems.
 
-### E2 — Orphaned CRUD: fully implemented data-layer functions with zero UI callers (planner grep-verified: callers are only tests)
-
-- `savePomodoroPresets` (`features/pomodoro/pomodoro.presets.store.ts:88`) — no custom-preset authoring; the preset selector is read-only.
-- `updateRoutine` (`features/workout/workout.data.ts:195`) — routines un-editable after creation; rename requires delete/recreate.
-- `updateCustomExercise` (`workout.data.ts:1988`), `archiveCustomExercise` (`:2051`), archived listing (`:1934`) — custom exercises are create-only.
-- `deleteWeeklyReview` (`features/weekly-review/weeklyReview.data.ts:120`, "future use" comment) — review history append-only.
-- `reorderProjects` (`features/projects/projects.data.ts:214`) — no project ordering UI.
-- `setPomodoroSessionMeta` supports note **and** `linkedTodoId` (`features/pomodoro/pomodoro.data.ts:230`); the UI edits notes only, at completion time (`SessionNotePrompt.tsx:27`) — past sessions can never be relabeled or relinked.
-- `updateCalorieEntry` has no `consumedOn` field (`features/calories/calories.data.ts:212-221`) and the edit modal omits a date control — wrong-day entries must be deleted and retyped.
-- Audit lead (confirm in Wave 0): `workout_logs` has no update/delete path at all — accidental quick-completes are permanent (per fresh audit; grep the workout data layer for the absence).
-
-### E3 — Weekly Review loop shipped but undiscoverable
-
-- `openWeeklyReview` has exactly one behavioral call-site: the notification-response path (`app/_layout.tsx:160-162` ← `core/notifications/notificationResponseDispatcher.ts:216`). No Overview, Planning Hub, or Settings button opens it.
-- The disposition ledger (`docs/ui-ux/2026-09-01-feature-disposition-ledger.md:28`) already decided: **keep the modal; expose from Plan/Progress rather than competing with Today actions**. This is unexecuted, already-authorized product work.
-- No E2E spec ever drives the Weekly Review guided flow (only the reminder-preference toggle in `settings-ripple`).
-
-### E4 — Planning surfaces are an untested product area
-
-- `features/planning-hub/PlanningHubScreen.tsx` mounts five views (Plan / Projects / Goals / Activity / Progress) with zero dedicated E2E specs and no journey visit.
-- `features/progress/progress.data.ts` and `features/activity/activityTimeline.data.ts` SQL never executes against real SQLite (unit tests `vi.mock` the DB).
-- Audit lead (confirm in Wave 0): vacuous assertions in feature specs (e.g. Workout "completes a workout" asserting text that is also present in the empty state; Habits increment asserting only name visibility while sibling tests use `habit_completions` oracles).
-
-### E5 — Linked Actions policy contradicts the shipped engine
-
-- Engine effects for `calorie.log` / `pomodoro.log` are implemented (`core/linked-actions/linkedActions.effects.ts:68,100`) with exactly-once integration proof (`tests/integration/linkedActionEffectsExactlyOnce.test.ts`), yet policy marks those target features/entities `engineSupport: 'deferred', authoringSupport: 'hidden'` (`core/linked-actions/linkedActions.policy.ts:108-110,119-121`), so the editor can never create rules that are already executable. Related triggers (`workout.completed`, `pomodoro.focus_completed`, `calorie.entry_logged`) are similarly deferred (`policy.ts:79-99`). Cross-feature automation is capped at todo/habit triggers by a label that misdescribes shipped capability.
-- Latent transitive module cycle: `features/habits/habits.data.ts:23` → `linkedActions.engine.ts:14-17` → `linkedActions.effects.ts:11-18` → feature data layers. It resolves at call time and has caused no runtime defect — do **not** launch a cycle-elimination campaign; only avoid deepening it, and if Wave 2–5 work naturally decouples a path, do so.
-
-### E6 — Documentation truth drift (fix opportunistically in the changed areas; not a campaign of its own)
-
-- `README.md:142,148` claims draft kinds are "limited to `create_todo` and `create_habit`" and Ask is false by default; the code is `AI_ASK_EXPERIMENT_ENABLED = true` with 10 draft kinds (`features/command/types.ts:9-23`). Reconcile docs to code, or file an explicit product decision — do not silently change AI flags in this campaign.
-- `AGENTS.md` / `docs/PROJECT_STRUCTURE_MAP.md` omit shipped areas now mounted by the shell (Quick Capture, Planning Hub, Weekly Review, `features/{goals,progress,activity,momentum,projects,weekly-review,daily-plan}`); stale "14 spec files" count; three conditional skips missing from the known-gaps register (`e2e/command.spec.ts:178`, `e2e/journeys/command-center-v2.spec.ts:209`, `e2e/calories-day-navigation.spec.ts:104`).
-
-## 3. Scope (executor implements autonomously; planner did no implementation)
-
-- **Wave 0 — Re-baseline.** Record Git/plan truth, hygiene, `qa:fast` + static gates; re-verify every E1–E6 citation above against the current tree and mark each CONFIRMED/CORRECTED in the ExecPlan. Confirm no new PRODUCT_BUG evidence contradicts the trusted hardening baseline.
-- **Wave 1 — Contracts first (OpenSpec).** Author the change(s) at `openspec/changes/<slug>/` defining the correction contracts before UI work: series-edit semantics (this-instance vs future-instances vs whole-series), delete-then-undo posture, pomodoro session correction schema decision (soft-delete via a new append-only migration `if (version < 25)` **only if** required; otherwise an explicitly documented immutability contract with edit-metadata-only scope), workout-log correction cascade semantics, weekly-review management, filter wiring. Open one ExecPlan per substantial workstream per `.agent/PLANS.md`; a master orchestration plan is the proven shape.
-- **Wave 2 — Todos correction depth.** Recurring-series management UI (stop-repeat, edit-series template for future instances, clear copy distinguishing instance vs series), decide+implement the project/goal filter dead branches (`todos.domain.ts:128-131` wired into the toolbar or removed with rationale), evaluate delete undo (Quick Capture already has undo precedent — extend or explicitly reject with recorded reasoning). Regression coverage for every semantics branch.
-- **Wave 3 — Calories day-correction.** Add `consumedOn` to the update path + date control in the edit modal with correct day-total refresh, diary/form consistency, outbox and backup correctness. Cover wrong-day move including month boundaries and pre-cutover date-key rows (never rewrite legacy keys).
-- **Wave 4 — Workout correction.** Routine rename/edit UI, custom-exercise edit/archive/restore UI (with `archiveCustomExercise` + archived listing activation), and — subject to Wave 1 contract — workout-log edit/delete with nested-set cascade, sync-enqueue correctness, and restore inertness. This touches the largest data file (`workout.data.ts` ≈2.6k lines): extend it in place; no greenfield rewrite.
-- **Wave 5 — Pomodoro correction depth.** Custom-preset authoring wired to the existing store (`savePomodoroPresets`), post-hoc session note/relink via the existing `setPomodoroSessionMeta` contract, and the Wave-1 session-correction decision implemented with schema- and backup-validated migrations if needed.
-- **Wave 6 — Weekly Review surfacing + policy honesty.** Add the in-app entry per the existing disposition (Plan/Progress surfaces, not Today competition — `docs/ui-ux/2026-09-01-feature-disposition-ledger.md:28`), wire `deleteWeeklyReview` for draft/erroneous reviews or formally retire it, and reconcile Linked Actions policy with the engine: either mark the shipped `calorie.log`/`pomodoro.log` paths authorable (with editor rows + validation + E2E proof) or record the concrete product reason they stay hidden while fixing the misleading `engineSupport` label. Recurring-source Linked Actions (E1 dead-end) closes only if the Wave-1 semantics make it safe; otherwise update the copy honestly.
-- **Wave 7 — Planning-surface test floor.** E2E coverage for Planning Hub (all five views) and the Weekly Review guided flow with data oracles (no visibility-only assertions); real-SQLite contract tests for `progress.data` and `activityTimeline.data`; repair the E4 vacuous-assertion leads found in Wave 0 by aligning them to existing oracle helpers — strengthen, never weaken.
-- **Wave 8 — Regression ladder.** `qa:affected` per change; unit + integration full runs; P0; Chromium; affected journeys (recurring-todo, fat-fingers, settings-ripple, workout-gym-v2, calories); corpus-backed performance for any touched hot path (Todos activation, diary read path); `web:verify`; native smoke + persistence on the existing multi-AVD automation (product UI changes make native validation mandatory); `qa:repeat` only for historically flaky changed surfaces — risk-driven, not blanket ×5.
-- **Wave 9 — Adversarial verification.** Independent verifier instruction: assume the completion report is overstated; try to disprove it. Check implementation vs E-references, plan truth vs Git, artifact freshness, product invariants, E2E oracle strength, and remaining P0/P1. Fix actionable failures and re-verify.
-- **Wave 10 — Residual P0/P1 sweep + docs truth.** Re-grep orphaned exported data functions (the E2 pattern may recur), reconcile E6 docs in touched areas, register any new skips in known-gaps, and confirm externals stay `EXTERNAL BLOCKER`/`NOT RUN`, never success.
-
-## 4. Non-goals
-
-- No Production Hardening V3, Certification Infrastructure V3, generic performance, repetition-framework, or test-count campaigns — those programs are closed with strong evidence.
-- No two-way sync / pull adapter, no persistence-stack rewrite, no state-management framework swap, no new top-level section, no second Gym state.
-- No editing of past migration blocks; schema growth is append-only (`if (version < 25) { ... }`); `schema.sql` stays a reference snapshot.
-- No cycle-elimination campaign (E5 rationale), no workout.data.ts split by size alone, no AI/Ask product-flag changes (docs reconcile or explicit decision only).
-- No weakened assertions, blind retries, sleeps, added skips, or `data-testid` injections to satisfy tests.
-- No production Supabase use, no real personal data in fixtures, no destructive user-data resets.
-- Do not rewrite historical campaign logs; reconcile current-facing docs only.
-
-## 5. Invariants (non-negotiable, unchanged)
-
-Soft-delete only for main entities (documented `habit_completions` / `saved_meals` exceptions stay); every applicable write through `runSyncedMutation`/`runBackupMutation` + durable outbox enqueue from `*.data.ts` only; `getDatabase()` singleton; IDs via `createId(prefix)`; date keys via `toDateKey()`; no `getDatabase` in screens/domain; no feature import of `linkedActions.effects`/`linkedActionsTargetProviders`; single-page shell (`app/index.tsx` + `NavigationContext.activeSection`, Settings modal, Command overlay) — Weekly Review surfaces as a modal entered from Plan/Progress, never a seventh tab; Today-first hierarchy and one global Add entry; COOP/COEP preserved. New flows must preserve backup-scope membership for edited entities (all touched entities are already in the 21-table recoverable scope).
-
-## 6. Product guardrails (verified current before encoding)
-
-Today-first information hierarchy; six direct top-level sections; one global Add (Quick Capture) with advanced capture behind `Describe it`; no duplicate global FAB; SQLite/local-first source of truth; safe owner binding; mature Gym semantics; current input/modal determinism contracts; FINITE-vs-SERVICE server-lifecycle safety. Corrective flows add secondary affordances within existing surfaces — they never restructure the information hierarchy.
-
-## 7. Operating rules
-
-1. **Root-cause-first:** DISCOVER → DIAGNOSE → IMPLEMENT → TEST → VERIFY. No symptom patches.
-2. **No retry-as-fix**, no weakened assertions, no sleep-injection.
-3. **Process safety:** persistent services need ownership, readiness, bounded purpose, cleanup; never broadly kill processes; end with `web:hygiene` PASS and no owned emulator/mock left booted.
-4. **Durable state:** update each ExecPlan `Current Checkpoint` at every milestone/decision/failure; after compaction run `npm run agent:resume -- --plan <path>`, inspect Git, reconcile, resume from `Exact next action`. Chat history is never task state.
-5. **Commit/push loop:** coherent commits per scope (`feat(...)`, `fix(...)`, `test(...)`, `docs(agent): ...`), normal push, no force-push, never one giant end-of-campaign commit; final tree clean and `HEAD == origin/main`.
-6. **Priority preemption:** proven P0/P1 (data loss/corruption, crash, owner breach) preempts the wave sequence.
-7. **Native:** product-UI changes require the native lane on existing multi-AVD automation with canonical provenance; unavailable targets are `ENVIRONMENT`, never pass.
-
-## 8. Validation battery (risk-adjusted)
-
-`git diff --check`, typecheck, lint, unit, integration, OpenSpec, `agent:plan:validate:all`, `qa:impact:validate`, themes, Supabase schema validation, `qa:timezones` (date-key semantics in Waves 3/5), fresh `build:web`, `web:verify`, `web:hygiene`, Chromium, P0, affected journeys, full journeys before close, deterministic simulation (add scenarios for new correction flows), sync lane where remote-visible writes change, corpus performance where hot paths are touched, native smoke + persistence (product UI changed), adversarial verification.
-
-## 9. Terminal conditions (stop only when)
-
-- **A:** Waves 1–7 landed with contract specs, implementations, and oracle-grade tests; correction flows for E1/E2/E3 exist end-to-end with proof; Wave 8 ladder green on final tree; adversarial verification PASS; E6 docs reconciled in touched areas; OR
-- **B:** remaining meaningful work is externally blocked and all worthwhile local work is exhausted; OR
-- **C:** further changes would be speculative with no demonstrated defect.
-
-Invalid stops: one green suite, implementation without its E2E/journey oracle, native skipped though product UI changed, orphaned function "activated" without UI proof, or elapsed hours.
-
-## 10. Final report structure (append as `## Final report (campaign COMPLETED <date>)`)
-
-Baseline SHA → closure commits by scope; per-wave evidence table (E-reference → flow shipped → tests → proof); contract decisions (series semantics, pomodoro session decision, log-correction decision, policy reconciliation outcome); validation battery table (command/outcome/date); native certification table (device/APK/tag/count/artifacts); failure classifications with artifacts; plan/OpenSpec lifecycle states; docs reconciled; residual blockers; exact next action.
+Where an issue is clearly fixable from the repository and current machine, fix it, test it, integrate it, and continue.
 
 ---
 
-## Final report (campaign COMPLETED 2026-09-05)
+# 1. PRIMARY OBJECTIVE
 
-### Baseline → closure commits
+Complete the following program **in sequence**:
 
-Baseline `76f79d9` → closure chain on `main` (each pushed): `192e496` (plan), `3e05490` (Wave 0 truth/gates), `62356b5` (Wave 1 OpenSpec contracts), `0065ae9` (Wave 2 Todos series), `de9632e` (Wave 3 Calories day move), `29aacba` (Wave 4 Workout correction), `14ca4ad` (Wave 5 Pomodoro correction), `21b20e4` (Wave 6 Weekly Review + Linked Actions), `73c26cd` (Wave 7 planning test floor), `bf6fd8d` (Wave 8 ladder evidence), `6b596f2` (Wave 9 adversarial repairs), `c949458` (Wave 10 docs truth + projects reorder), plus this closure commit. `HEAD == origin/main` at close.
+1. Restore trustworthy GitHub CI.
+2. Reconcile stale repository governance/planning state.
+3. Certify the exact current release candidate SHA.
+4. Close every safely executable platform/release gap.
+5. Deeply validate Supabase/cloud behavior where infrastructure permits.
+6. Deeply validate Android/native behavior where infrastructure permits.
+7. Validate iOS-related repository readiness and execute actual iOS validation if the environment supports it.
+8. Finish every repository-side App Store / Play Store release artifact.
+9. Audit dependency/security posture without unsafe blind upgrades.
+10. Produce a final release-readiness verdict grounded in actual evidence.
+11. Only after the release line is trustworthy, identify the strongest post-1.0 / v2 engineering direction, with preference toward:
 
-### Per-wave evidence (E-reference → flow → tests → proof)
+- real multi-device synchronization; or
+- productionizing the AI Command Center.
 
-| E   | Flow shipped                                                                            | Tests                                                                   | Proof                                                         |
-| --- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------- |
-| E1  | Recurring-series edit/complete-future/pause (Todos editor)                              | 6 unit + 3 integration + E2E                                            | todos spec 9/9; series row/intent oracles                     |
-| E2  | Last orphan `reorderProjects` activated (Projects manual order) + all prior activations | domain unit + real-SQL integration + hub journey                        | `projects-manual-reorder` spec; row/intent/restart oracles    |
-| E3  | Weekly Review entry on Progress + durable history delete                                | executor +3 tests + `weekly-review.spec.ts`                             | guided flow → oracle → delete coalesced-intent oracle         |
-| E4  | Planning surfaces proven with real SQL                                                  | `progressData` 3 + `activityTimelineData` 3 + `planning-hub` 3 journeys | exact window matrices, row + outbox + restart oracles         |
-| E5  | Linked Actions policy ↔ engine parity; log targets authorable                           | policy 4 + `linkedActionLogTargets` 3 + 2 E2E                           | author→fire→effect for pomodoro/calorie paths                 |
-| E6  | README/AGENTS/known-gaps/structure docs truth                                           | —                                                                       | draft-kind list, Ask gating, dynamic inventories, skips 12–14 |
-| —   | Calories day correction                                                                 | 3 integration + 5 E2E                                                   | post-reload row oracle (W9-3)                                 |
-| —   | Workout rename / custom-exercise manager / log delete                                   | 4 integration + 3 E2E                                                   | cascade = one durable delete intent per removed row           |
-| —   | Pomodoro preset manager + session meta correction                                       | 3 integration + 2 E2E                                                   | app_meta + single coalesced update-intent oracles             |
+12. Do not begin speculative v2 implementation unless all 1.0 repository-executable closure work is genuinely finished and the evidence strongly supports proceeding.
 
-### Contract decisions
+The campaign must prefer **production closure over feature churn**.
 
-- Series semantics: editing a recurring todo edits the template; "complete/adjust future" re-materializes instances forward; two-phase save surfaces template-update failure with a retry message (W9-1).
-- Pomodoro session decision: metadata-only correction (`setPomodoroSessionMeta`, undefined=keep/null=clear), no migration, no duration rewrite.
-- Log-correction decision: completed workout-log tables have no `deleted_at` — corrections use the documented hard-delete exception with one durable delete intent per removed row (design D3 amendment); delete of an already-absent row is a no-op (W9-2).
-- Policy reconciliation: `LINKED_ACTION_SUPPORTED_RULE_PATHS` is the single execution gate (D6 premise corrected by audit); only emitted triggers are authorable; drift guarded by `tests/linkedActionsPolicy.test.ts`.
+---
 
-### Validation battery (final tree `c949458`, 2026-09-05)
+# 2. IMPORTANT CURRENT BASELINE — VERIFY, DO NOT BLINDLY TRUST
 
-| Command                                                           | Outcome                                                                                                                                                                                                                                                                                                                                                         |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run typecheck` / `npm run lint -- --max-warnings 0`          | PASS 0/0                                                                                                                                                                                                                                                                                                                                                        |
-| `npx vitest run`                                                  | PASS 1977/1977 (185 files, both projects)                                                                                                                                                                                                                                                                                                                       |
-| `npm run openspec:validate`                                       | PASS (all specs incl. `projects-manual-reorder`)                                                                                                                                                                                                                                                                                                                |
-| `npm run agent:plan:validate:all`                                 | PASS                                                                                                                                                                                                                                                                                                                                                            |
-| `npx playwright test --project=chromium e2e/planning-hub.spec.ts` | PASS 3/3                                                                                                                                                                                                                                                                                                                                                        |
-| Full `npm run e2e` battery (chromium+journeys+simulation+pwa) ×2  | 206 passed / 43 skipped / 1 documented flake / 0 product failures — J8 15%-headroom floor at 692/697 ms under battery load (known-gaps 15); the 800 ms ceiling never breached; same test passes standalone on the final tree at 646 ms (19.3% headroom, 7/7 incl. the 4 aborted successors); product diff vs last green battery touches no mounted section code |
-| `sim:run --mode deterministic` (owned :8081 server)               | PASS 23/23                                                                                                                                                                                                                                                                                                                                                      |
-| `npm run web:verify` / `npm run web:hygiene`                      | PASS / 8081+8082 FREE                                                                                                                                                                                                                                                                                                                                           |
-| `qa:repeat --suite p0 --times 3`                                  | PASS 3/3 (Wave 8)                                                                                                                                                                                                                                                                                                                                               |
+The following information is supplied only as an initial lead.
 
-### Native certification (owned Nitro_API_36, credential-free canonical APK)
+You MUST verify it against the actual repository, Git history, GitHub state, workflows, files, and executable behavior before relying on it.
 
-| Source                        | Tag                       | Result      | Artifact                                                             |
-| ----------------------------- | ------------------------- | ----------- | -------------------------------------------------------------------- |
-| `73c26cd` (SHA 3C03C258…7908) | smoke / persistence 11/11 | PASS / PASS | `…064222041Z` / `…065339570Z`                                        |
-| `c949458` (rebuilt final)     | smoke                     | PASS        | `native-android-smoke-Nitro_API_36-2026-09-05T072915791Z.json`       |
-| `c949458` (rebuilt final)     | persistence               | PASS        | `native-android-persistence-Nitro_API_36-2026-09-05T074043358Z.json` |
+Expected recent repository state:
 
-Emulators owned, stopped, no leaks; no production credentials used.
+```text
+main ≈ 691d2a2
+```
 
-### Failure classifications (all preserved, none weakened)
+Recent tip observed previously:
 
-- PRODUCT_BUG ×2: modal-layer stacking made Progress→Weekly Review unclickable (fixed in `openWeeklyReview`, Wave 6); recurring-template save failure was swallowed (fixed Wave 9 repair W9-1).
-- TEST_BUG ×6 fixed in-flight: Playwright strict-mode collisions (`.first()`/`exact`), habit creation-date write gate, `rule_history` NOT NULL, orphan-vs-soft-deleted label semantics, weekend-dependent gym-v2 selector (scoped, assertion preserved).
-- ENVIRONMENT: raw `sim:run` without an owned static server (by design — helper added); bare native run without `--avd` correctly refuses.
-- Expected skips: 43 pre-existing @sync/internal-parser/capability gates, now all registered in `docs/testing/known-gaps.md` (entries 12–14 added).
-- FLAKY_TEST ×1 (documented, artifacts preserved in `.cursor/playwright-output/e2e-failures/three-months-in-P2-…`): J8 headroom floor 692/697 ms in-battery vs 646 ms standalone on the identical final tree; zero mounted-section perf diff vs the last green battery; registered as known-gap 15 with a re-verify-before-touching-product rule. Assertion unchanged.
+```text
+691d2a2 docs(execplan): autonomous campaign thinning survey — declare stop (Run 2)
+```
 
-### Plan / OpenSpec lifecycle
+The recent campaign appears to have concluded that arbitrary micro-hardening should stop and that remaining work is primarily CI, certification, native/cloud/platform, and release closure.
 
-`.agent/EXECUTION_PROMPT.md` ACTIVE → COMPLETED; `.agent/execplans/functional-completion-v1.md` ACTIVE → COMPLETED (validator PASS). OpenSpec change `complete-product-correction-flows-v1` — 7 specs (6 correction-flow + `projects-manual-reorder`), tasks fully checked, validate green; archive follows the repo's normal openspec workflow.
+Potential current CI defect:
 
-### Docs reconciled
+```text
+.agent/execplans/workout-history-quick-log-badge.md
+```
 
-`README.md` (draft kinds, Ask gating), `AGENTS.md` (dynamic E2E inventory, `ppre` prefix), `docs/testing/known-gaps.md` (12–14), design D3/D6 amendments, integration-helper comment fix.
+appears to be marked:
 
-### Residual blockers (externals, evaluated never gating)
+```text
+Status: COMPLETED
+```
 
-iOS device lane (no macOS host), disposable Supabase backend (`SUPABASE_ACCESS_TOKEN`), internal-parser live lanes, real-corpus fixtures; `e2e:sync` remains the opt-in CI main/nightly remote-boundary lane.
+while still containing:
 
-### Exact next action
+```text
+- [ ] Single commit.
+```
 
-None — campaign closed. `HEAD == origin/main`, tree clean, ports free, no owned processes.
+despite the implementation apparently already existing as commit:
+
+```text
+ac60e78 feat(workout): badge quick-logged sessions in history list and detail
+```
+
+This reportedly causes:
+
+```text
+npm run agent:plan:validate:all
+```
+
+to fail before Vitest and E2E execute.
+
+Treat all of this as a hypothesis until verified.
+
+---
+
+# 3. NON-NEGOTIABLE ENGINEERING RULES
+
+## 3.1 Repository truth beats documentation
+
+Do not blindly trust:
+
+- README
+- ExecPlans
+- OpenSpec status
+- release documents
+- known-gap registers
+- previous completion claims
+- old certification reports
+- stale CI summaries
+
+Cross-check claims against:
+
+- current Git tree;
+- Git history;
+- actual source;
+- actual test files;
+- GitHub Actions state;
+- release/config files;
+- generated artifacts;
+- runtime behavior where feasible.
+
+If documentation conflicts with code or actual behavior, the code/runtime evidence wins and documentation must be corrected.
+
+---
+
+## 3.2 Preserve strict tests
+
+Never make a failing test pass by:
+
+- deleting it;
+- weakening the assertion without evidence;
+- increasing limits merely because a threshold failed;
+- skipping/quarantining it without justified classification;
+- converting meaningful failures into advisory checks.
+
+Use the repository's existing failure taxonomy where applicable:
+
+```text
+PRODUCT_BUG
+TEST_BUG
+FLAKY_TEST
+ENVIRONMENT
+EXPECTED_KNOWN_GAP
+SPEC_AMBIGUITY
+```
+
+Fix root causes.
+
+---
+
+## 3.3 Git safety
+
+Before any mutation:
+
+```bash
+git status --short
+git branch --show-current
+git rev-parse HEAD
+git rev-parse origin/main
+git log --oneline -20
+git worktree list
+git stash list
+```
+
+Fetch remote state.
+
+Never:
+
+- reset away unknown work;
+- force push;
+- delete another session's work;
+- overwrite concurrent changes;
+- assume an unclean tree is yours.
+
+If concurrent work exists, preserve it.
+
+Use separate worktrees/branches where appropriate.
+
+Prefer small coherent commits with clear messages.
+
+Before claiming final completion:
+
+```bash
+git status --short
+git diff --check
+git rev-parse HEAD
+git rev-parse origin/main
+```
+
+The final repository state must be explicitly reported.
+
+---
+
+# 4. USE SUBAGENTS AGGRESSIVELY
+
+Use multiple subagents in parallel for independent **read-only** investigations.
+
+Suggested initial decomposition:
+
+### Agent A — Git / governance / ExecPlan state
+
+Inspect:
+
+- Git topology;
+- recent history;
+- active/BLOCKED/COMPLETED ExecPlans;
+- stale completion state;
+- OpenSpec state;
+- branch/worktree hygiene.
+
+### Agent B — GitHub Actions / CI
+
+Inspect:
+
+- current workflow configuration;
+- recent failed runs;
+- exact failing steps;
+- scheduled/nightly behavior;
+- skipped downstream gates;
+- native EAS workflow state.
+
+### Agent C — release/store readiness
+
+Inspect:
+
+```text
+docs/release/
+app.json
+eas.json
+public/privacy.html
+```
+
+Identify:
+
+- repository-executable work;
+- owner-only actions;
+- stale release claims.
+
+### Agent D — test/certification landscape
+
+Inspect:
+
+```text
+docs/testing/
+qa/
+e2e/
+simulation/
+.maestro/
+```
+
+Build the exact certification matrix required for current HEAD.
+
+### Agent E — Supabase / backup / auth
+
+Inspect:
+
+```text
+supabase/
+core/sync/
+core/backup/
+core/auth/
+```
+
+Map:
+
+- actual remote behavior;
+- stubs;
+- migrations;
+- RLS;
+- disposable backend capability;
+- remaining real-boundary gaps.
+
+### Agent F — native Android/iOS
+
+Inspect:
+
+```text
+.eas/
+.maestro/
+scripts/qa-native*
+app.json
+plugins/
+```
+
+Determine which native validations can run on this environment.
+
+### Agent G — dependencies/security
+
+Inspect:
+
+- package.json;
+- lockfile;
+- npm audit;
+- Expo compatibility;
+- overrides;
+- transitive vulnerabilities.
+
+Subagents must return evidence and proposed actions.
+
+The primary agent decides integration and owns all mutations.
+
+---
+
+# 5. PHASE 0 — RECONSTRUCT REAL CURRENT STATE
+
+Before changing anything:
+
+1. Read completely:
+
+```text
+AGENTS.md
+.agent/PLANS.md
+.agent/EXECUTION_PROMPT.md
+README.md
+docs/testing/autonomous-qa.md
+docs/testing/known-gaps.md
+docs/release/app-store-readiness.md
+qa/impact-map.json
+```
+
+2. Inspect all version-2 ExecPlans and determine their real lifecycle state.
+
+Run:
+
+```bash
+npm run agent:plans
+npm run agent:plan:validate:all
+```
+
+3. Inspect OpenSpec:
+
+```bash
+openspec list
+openspec validate --all
+```
+
+or repository equivalents.
+
+4. Inspect GitHub:
+
+- current `main`;
+- open PRs;
+- open issues;
+- recent workflows;
+- latest push run;
+- scheduled/nightly runs;
+- exact-head status checks.
+
+5. Record a fresh campaign ExecPlan.
+
+Do not reuse a stale global progress document if the repository's conventions say to create a task-specific ExecPlan.
+
+---
+
+# 6. PHASE 1 — RESTORE CI TRUTH
+
+This is the highest-priority action.
+
+Investigate the current CI failure rather than assuming the supplied diagnosis is correct.
+
+If the failure is indeed caused by:
+
+```text
+.agent/execplans/workout-history-quick-log-badge.md
+```
+
+with a completed implementation but an unchecked historical commit task:
+
+- verify the commit exists;
+- verify the feature exists;
+- verify the plan's validation evidence;
+- reconcile the checkbox/status honestly;
+- do not falsify completion.
+
+Then run:
+
+```bash
+npm run agent:plan:validate:all
+```
+
+It must pass.
+
+Afterward run at least the repository's cheap gates:
+
+```bash
+npm run typecheck
+npm run lint
+npm run validate:themes
+npm run openspec:validate
+npm test
+```
+
+Repair any genuine failures discovered.
+
+Commit the CI/governance repair.
+
+Push only when safe and permitted.
+
+Then inspect the exact GitHub Actions run created from that pushed SHA.
+
+Do not treat CI as restored until the pipeline progresses past the previously blocked step.
+
+If later jobs fail, investigate and fix them.
+
+---
+
+# 7. PHASE 2 — RECONCILE STALE PLANS AND REPOSITORY TRUTH
+
+Audit all lifecycle documents for contradictions such as:
+
+- BLOCKED plans whose blocker is gone;
+- COMPLETED plans with unchecked mandatory work;
+- old references to GitHub billing being blocked;
+- stale SHA references;
+- release documents claiming certification against superseded commits;
+- unresolved "next action" fields on supposedly complete plans.
+
+Especially inspect:
+
+```text
+.agent/execplans/repository-completion-and-truth-v1.md
+.agent/execplans/release-readiness-refresh-v1.md
+.agent/execplans/autonomous-campaign-thinning-stop-v1.md
+```
+
+Do not rewrite history unnecessarily.
+
+Correct only material stale truth that currently misrepresents repository state or blocks tooling.
+
+Validate every changed ExecPlan.
+
+---
+
+# 8. PHASE 3 — EXACT-HEAD RELEASE CERTIFICATION
+
+The application has received substantial changes since earlier release certification.
+
+Do not reuse old evidence as proof for the current exact SHA.
+
+Create a certification plan tied to one explicit candidate SHA.
+
+The candidate must remain stable during certification.
+
+If source changes during certification, invalidate affected evidence and rerun the relevant lanes.
+
+At minimum execute, when supported:
+
+## Static / contracts
+
+```bash
+npm run typecheck
+npm run lint
+npm run validate:themes
+npm run openspec:validate
+npm run agent:plan:validate:all
+npm run qa:impact:validate
+```
+
+## Unit + integration
+
+```bash
+npm test
+```
+
+Confirm actual test counts and failures from output.
+
+Do not hard-code historical counts.
+
+## Fast QA
+
+```bash
+npm run qa:fast
+```
+
+## Timezone behavior
+
+```bash
+npm run qa:timezones
+```
+
+if applicable.
+
+## Web build
+
+```bash
+npm run build:web
+```
+
+## Web lifecycle/hygiene
+
+```bash
+npm run web:verify
+npm run web:hygiene
+```
+
+where applicable.
+
+## Browser E2E
+
+Execute the repository's appropriate complete web suite.
+
+Likely:
+
+```bash
+npm run e2e
+```
+
+or the exact lane matrix currently defined.
+
+## Deterministic simulations
+
+```bash
+npm run sim:validate
+npm run sim:run -- --mode deterministic
+```
+
+If the campaign's release criteria require repetition/soak, execute it.
+
+## Remote-boundary dummy lane
+
+```bash
+npm run build:sync
+npm run e2e:sync
+```
+
+where supported.
+
+## PWA/service worker
+
+Run the PWA lane independently where appropriate.
+
+Document:
+
+- pass;
+- skip;
+- environment;
+- genuine known gap.
+
+Every skip must have a reason.
+
+---
+
+# 9. PHASE 4 — ANDROID EXACT-BUILD CERTIFICATION
+
+Inspect the actual native QA guidance first.
+
+Determine:
+
+- installed AVDs;
+- adb state;
+- Android API;
+- ABI;
+- Maestro version;
+- whether provisioning is current.
+
+Use the repository's existing scripts instead of inventing ad hoc commands where possible.
+
+Likely lanes include:
+
+```bash
+npm run qa:native:provision
+npm run qa:native:android
+npm run qa:native:targeted
+npm run qa:native:lifecycle
+```
+
+Execute applicable Android validation against an APK built from the exact certified candidate SHA.
+
+Record:
+
+- source SHA;
+- APK path;
+- APK SHA-256;
+- package name;
+- emulator/device;
+- API level;
+- ABI;
+- smoke results;
+- persistence results;
+- lifecycle results.
+
+If source changes afterward, native certification must be reconsidered.
+
+Investigate remaining native known gaps that are feasible on this workstation:
+
+- notification behavior;
+- app process death;
+- persistence;
+- long-horizon recurrence where practical;
+- offline transitions where practical;
+- native performance profiling where practical.
+
+Do not pretend Windows can run Xcode/iOS simulator.
+
+---
+
+# 10. PHASE 5 — SUPABASE / CLOUD / ACCOUNT CLOSURE
+
+Deeply inspect:
+
+```text
+supabase/migrations/
+supabase/functions/
+core/sync/
+core/backup/
+core/auth/
+```
+
+Verify what is truly implemented versus documented.
+
+Important distinction:
+
+SuperHabits currently appears to implement:
+
+```text
+local SQLite source of truth
++
+one-way cloud backup
++
+Restore V2
++
+portable backup/import
+```
+
+rather than true two-way sync.
+
+Do not accidentally turn backup into sync during a release-closure task.
+
+### Required work
+
+1. Validate schema/migration coherence.
+2. Validate RLS definitions statically.
+3. Validate all remote tables match the local recoverable scope.
+4. Validate owner stamping.
+5. Validate backup manifests/checksums.
+6. Validate Restore V2 empty-device guarantees.
+7. Validate account recovery boundary.
+8. Validate portable-import owner recovery.
+9. Validate edge functions.
+10. Run the disposable/live backend lane if:
+
+    - credentials/environment exist;
+    - the repository already supports it;
+    - it can be done safely.
+
+If no authorized Supabase environment exists, classify real round-trip validation as an environment/capability gap and provide the exact command/runbook needed to close it.
+
+Never use production infrastructure destructively.
+
+---
+
+# 11. PHASE 6 — IOS READINESS
+
+Determine what can be validated from the current environment.
+
+On Windows/Linux:
+
+- statically verify iOS configuration;
+- verify Expo config;
+- verify bundle identifier;
+- verify required plist values;
+- verify asset completeness;
+- verify EAS workflow;
+- verify build profile;
+- verify release metadata;
+- run Expo/doctor/prebuild checks where safe and appropriate.
+
+If EAS can remotely produce an iOS simulator/device build using existing authorized credentials, do so only when this repository's workflow already supports it and credentials are available.
+
+Otherwise document:
+
+```text
+REQUIRES EAS/macOS/Apple credentials
+```
+
+with exact next action.
+
+Do not claim iOS runtime certification without an actual iOS runtime.
+
+---
+
+# 12. PHASE 7 — STORE RELEASE CLOSURE
+
+Inspect and reconcile:
+
+```text
+docs/release/app-store-readiness.md
+docs/release/privacy-policy.md
+docs/release/store-data-declarations.md
+docs/release/release-notes-1.0.0.md
+docs/release/age-rating-and-trader.md
+docs/release/store-assets-checklist.md
+docs/release/version-build-consistency.md
+docs/release/icon-splash-asset-audit.md
+public/privacy.html
+app.json
+eas.json
+```
+
+Repository-side tasks should be completed where possible.
+
+Validate:
+
+- app name;
+- package/bundle identifiers;
+- version;
+- versionCode;
+- buildNumber;
+- icon sizes;
+- adaptive icon;
+- monochrome icon;
+- splash;
+- notification icon;
+- privacy text;
+- public privacy URL path;
+- release notes length limits;
+- store descriptions;
+- age-rating drafts;
+- Data Safety declarations;
+- App Privacy declarations;
+- permissions versus declaration documents;
+- EAS production profile;
+- submit profile.
+
+Clearly separate:
+
+## Repository-executable
+
+Examples:
+
+- metadata corrections;
+- drift guards;
+- release notes;
+- copy;
+- manifests;
+- asset dimension validation;
+- store checklist corrections.
+
+## Owner/external actions
+
+Examples:
+
+- App Store Connect access;
+- Play Console access;
+- legal/trader confirmation;
+- privacy-policy public hosting confirmation;
+- production credentials;
+- signing;
+- screenshot capture requiring final store devices;
+- actual submission;
+- final release/tag authorization.
+
+Do not fabricate screenshots.
+
+Do not submit to stores without explicit authorization.
+
+Do not create the final production Git tag unless release intent is explicitly authorized by the repository/user instructions.
+
+---
+
+# 13. PHASE 8 — DEPENDENCY AND SECURITY AUDIT
+
+Run:
+
+```bash
+npm audit
+npm audit --omit=dev
+npx expo-doctor
+```
+
+or repository-approved equivalents.
+
+Investigate every high/critical advisory.
+
+Classify advisories into:
+
+- direct runtime dependency;
+- direct dev dependency;
+- transitive framework dependency;
+- unreachable tooling;
+- patched through override;
+- upgrade available safely;
+- upgrade requires Expo/RN stack migration.
+
+Do not run:
+
+```bash
+npm audit fix --force
+```
+
+blindly.
+
+Do not destabilize Expo 55 / React Native 0.83 simply to reduce an advisory number.
+
+Where safe patch/minor upgrades are available and compatible:
+
+- apply them coherently;
+- update lockfile;
+- run full affected QA.
+
+Where framework-owned:
+
+- record the exact dependency chain;
+- document remediation availability;
+- leave it advisory if no safe supported fix exists.
+
+---
+
+# 14. PHASE 9 — PERFORMANCE / RESILIENCE FOLLOW-UPS
+
+Review remaining meaningful known gaps.
+
+Prioritize evidence-backed gaps such as:
+
+- sustained memory growth;
+- native performance;
+- real historical migration corpus;
+- remote backend behavior;
+- long-lived runtime behavior.
+
+Do not manufacture work merely because the known-gap register contains capability boundaries.
+
+For the J8 section-switch headroom issue:
+
+- retain existing ceilings/floors;
+- do not weaken them;
+- reproduce before changing code;
+- only implement a performance fix if profiling identifies a concrete product bottleneck.
+
+---
+
+# 15. PHASE 10 — CURRENT RELEASE VERDICT
+
+After all executable closure work is complete, produce a release certification report tied to the exact final SHA.
+
+The report must contain:
+
+```text
+Final branch
+Final local HEAD
+Final origin/main
+Working-tree cleanliness
+Commits created during campaign
+Open PRs/issues
+CI run IDs
+CI status
+Unit/integration results
+Web E2E results
+Simulation results
+PWA results
+Remote-boundary results
+Android source SHA
+Android APK SHA-256
+Native smoke results
+Native persistence results
+Native lifecycle results
+Supabase validation status
+iOS validation status
+Dependency/security status
+Store artifact status
+Remaining external owner actions
+Known deliberate limitations
+```
+
+Use explicit classifications such as:
+
+```text
+PASS
+FAIL
+BLOCKED_EXTERNAL
+ENVIRONMENT
+NOT_APPLICABLE
+DELIBERATE_PRODUCT_BOUNDARY
+```
+
+Do not hide skipped lanes.
+
+---
+
+# 16. PHASE 11 — V2 DIRECTION AUDIT
+
+Only after release closure is stable, investigate what should be developed next.
+
+Do not choose based on novelty.
+
+Compare at least these two directions.
+
+---
+
+## Candidate A — True multi-device synchronization
+
+Current architecture reportedly has:
+
+```text
+SupabaseSyncAdapter.pull() -> []
+```
+
+and cloud behavior is backup-first rather than bidirectional sync.
+
+Investigate what production-quality true sync would require:
+
+- remote pull;
+- revision/version model;
+- tombstones;
+- conflict rules;
+- idempotency;
+- causal ordering;
+- concurrent edits;
+- deleted-row semantics;
+- per-entity merge behavior;
+- account recovery interactions;
+- portable backup interactions;
+- offline mutation replay;
+- remote schema changes;
+- sync health UX;
+- migration path from backup-only users;
+- test infrastructure.
+
+Do not implement this as a small patch.
+
+If selected, create a formal v2 OpenSpec/architecture campaign first.
+
+---
+
+## Candidate B — Production AI Command Center
+
+Current behavior reportedly defaults to:
+
+```text
+mock
+```
+
+with model parsing behind internal rollout flags.
+
+Investigate productionization requirements:
+
+- model/provider strategy;
+- server-side key isolation;
+- latency;
+- fallback behavior;
+- structured output validation;
+- hallucination containment;
+- user confirmation boundaries;
+- evaluator suite;
+- cost controls;
+- rate limiting;
+- telemetry/privacy;
+- offline degradation;
+- supported-intent expansion;
+- account/backend dependencies.
+
+Again, create a proper design/spec before implementation.
+
+---
+
+# 17. DECISION RULE FOR V2
+
+Recommend the next v2 initiative based on:
+
+- user value;
+- technical leverage;
+- architectural fit;
+- amount of foundational work;
+- risk;
+- release stability;
+- testability.
+
+Do not begin implementation if 1.0 still has unresolved repository-executable release blockers.
+
+If only external owner/store actions remain, producing the v2 architecture/spec is acceptable.
+
+---
+
+# 18. AUTONOMOUS EXECUTION LOOP
+
+For every phase:
+
+1. Investigate.
+2. Record evidence.
+3. Identify actual gap.
+4. Create/update ExecPlan.
+5. Implement the smallest coherent fix.
+6. Run affected QA.
+7. Fix failures.
+8. Run broader QA where required.
+9. Commit coherently.
+10. Reconcile docs.
+11. Continue.
+
+Do not repeatedly stop to ask what to do next.
+
+Make reasonable engineering decisions autonomously.
+
+Ask only when an operation truly requires:
+
+- unavailable credentials;
+- destructive production access;
+- store submission authority;
+- legal declaration;
+- irreversible release/tag decision.
+
+Otherwise continue.
+
+---
+
+# 19. ANTI-PREMATURE-COMPLETION RULES
+
+You are NOT finished because:
+
+- one test passed;
+- `typecheck` passed;
+- the app builds;
+- one platform is green;
+- old docs say "complete";
+- OpenSpec has no active changes;
+- a previous agent declared STOP;
+- there are no GitHub issues;
+- one CI job is green.
+
+Completion requires reconciliation of the whole campaign.
+
+Before stopping, perform an adversarial final sweep:
+
+### Product
+
+Is there any clear regression or unfinished path exposed by the work?
+
+### Data
+
+Can user data be corrupted, silently lost, duplicated, misattributed, or unrecoverable?
+
+### Backup
+
+Can backup/restore misrepresent completeness?
+
+### Native
+
+Does Android behave on the certified exact build?
+
+### Web
+
+Does the exact build pass full browser/runtime validation?
+
+### CI
+
+Is the exact final SHA actually green?
+
+### Release
+
+Do repository artifacts reflect what will really be submitted?
+
+### Security
+
+Are meaningful dependency/security issues either fixed or explicitly justified?
+
+### Docs
+
+Do current docs describe reality rather than historical state?
+
+Only then close.
+
+---
+
+# 20. REQUIRED FINAL REPORT
+
+Return a concise but evidence-rich terminal report with these sections:
+
+```text
+1. Executive verdict
+2. Starting state
+3. Final repository state
+4. CI repairs
+5. Bugs/fixes implemented
+6. Certification results
+7. Android results
+8. Supabase/cloud results
+9. iOS status
+10. Store-release status
+11. Dependency/security status
+12. Remaining external-only actions
+13. Known deliberate limitations
+14. V2 recommendation
+15. Commits created
+16. Exact final SHA
+```
+
+For every incomplete item state exactly:
+
+```text
+WHY it remains
+WHO/WHAT is required
+EXACT next action
+```
+
+Do not end with vague statements such as:
+
+```text
+more testing may be needed
+```
+
+Specify the missing proof precisely.
+
+---
+
+# FINAL OPERATING PRINCIPLE
+
+SuperHabits appears to have reached the point where **shipping discipline matters more than continuing to manufacture feature work**.
+
+Act accordingly.
+
+First restore the integrity of CI.
+
+Then prove the exact candidate.
+
+Then close real platform and release boundaries.
+
+Then determine the next product generation.
+
+Do not confuse more commits with more progress.
