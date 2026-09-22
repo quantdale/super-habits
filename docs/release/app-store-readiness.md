@@ -17,7 +17,12 @@ icon/splash audit pass 2026-09-19 adds `icon-splash-asset-audit.md`
 notification asset) with a header-parse guard test; version/build
 consistency pass 2026-09-19 adds `version-build-consistency.md`
 (cross-file 1.0.0 / buildNumber 1 / versionCode 1 / eas.json posture
-proof) with a consistency guard test. Update this
+proof) with a consistency guard test; gate-table vs E2E-narrative provenance
+reconciled 2026-09-22 (production-closure Phase 2 — the table carries the
+latest 2026-09-14 per-gate re-runs through the a11y closure, the E2E-result
+narrative quotes the original release-readiness battery); exact-HEAD
+recertification supersedes all 2026-09-14 numbers at that campaign's release
+verdict. Update this
 file when a release actually ships rather than letting it drift.
 
 ## What ships
@@ -32,7 +37,13 @@ file when a release actually ships rather than letting it drift.
 | Design system | **Pop**: Nunito type via `core/ui/Text`, bottom tab bar / wide-screen side rail shell, per-section hues, tactile motion (`docs/ui-ux/12-pop-design-system.md`) |
 | Targets       | Web PWA (Vercel), iOS, Android                                                                                                                                 |
 
-## Verification run for this release (2026-09-14)
+## Verification runs for this release (2026-09-14)
+
+Gate rows show the latest measured result per gate as that day's passes
+accumulated (release-readiness `f753769` → a11y closure `3c5a086`/`ccb1474`);
+the E2E-result narrative below quotes the original release-readiness battery,
+so its chromium/journey totals intentionally differ from the re-run rows here.
+Provenance reconciled 2026-09-22 (production-closure Phase 2).
 
 | Gate                    | Command                                                   | Result                                                                                                                                                                 |
 | ----------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -41,7 +52,7 @@ file when a release actually ships rather than letting it drift.
 | Unit + integration      | `npm test`                                                | 2055 passed / 196 files                                                                                                                                                |
 | Accessibility audit     | `npx playwright test --project=chromium e2e/a11y.spec.ts` | 5 passed: six sections in light + dark + an override theme (cyberpunk-neon), Settings semantics + contrast, all zero-defect                                            |
 | Chromium E2E            | `npx playwright test --project=chromium`                  | 140 passed / 7 skipped / 0 failed                                                                                                                                      |
-| Journey E2E             | `npx playwright test --project=journeys`                  | 98 passed / 6 skipped in the colour-change battery; 2 load-induced failures pass standalone (gap 15 class)                                                             |
+| Journey E2E             | `npx playwright test --project=journeys`                  | 98 passed / 6 skipped; 2 load-induced failures pass standalone (known-gap 15 class, colour-change battery)                                                             |
 | Simulation E2E          | `npx playwright test --project=simulation`                | 3 passed (repro replay, deterministic reproducibility, run-report schema)                                                                                              |
 | Web bundle              | `npm run build:web`                                       | exported to `dist/`, 4 bundles + static routes                                                                                                                         |
 | Live web probe          | `npm run web:verify`                                      | PASS in 64.7s (fresh export, HTTP 200, COOP/COEP, shell probe, port released)                                                                                          |
@@ -57,7 +68,9 @@ file when a release actually ships rather than letting it drift.
 ### E2E result
 
 Chromium **136 passed / 7 skipped / 0 failed**, journeys **104 / 6 / 0**, and
-the simulation lane **3 passed** on the shipped `dist/`. The previously
+the simulation lane **3 passed** in the original release-readiness battery on
+the shipped `dist/` (the gate table above records the later 2026-09-14 re-runs
+through the a11y closure). The previously
 documented flakes are closed:
 
 - `habits.spec.ts` “target edits keep a prior completed date complete” was a

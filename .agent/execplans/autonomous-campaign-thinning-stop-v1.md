@@ -119,7 +119,7 @@ Test-infrastructure / release lanes closed along the way:
 
 None of these is box-executable agent work. Each names its owner lane:
 
-1. **Push / remote sync of the ~43 local commits** — owner decision + network/credential lane. Agent must not push.
+1. **Push / remote sync of the ~43 local commits** — owner decision + network/credential lane. Agent must not push. (Reconciled 2026-09-22: this later happened — the stack reached `origin/main` as `691d2a2` on 2026-09-20/21, and HEAD == origin/main again; the constraint applied only to this survey's mission.)
 2. **CI execution and green confirmation** (quality + e2e + nightly lanes) — CI infrastructure lane; cannot be proven from this box.
 3. **Supabase-backed lanes** (disposable-backend exploratory lane, any RLS/ownership verification needing a live project) — Supabase project + secrets lane.
 4. **Native device lanes** (Maestro smoke / targeted / lifecycle on Android/iOS targets, EAS `e2e-test` builds) — physical device or EAS credential lane.
@@ -129,6 +129,7 @@ None of these is box-executable agent work. Each names its owner lane:
 ## Validation Ledger
 
 - 2026-09-20 — `git rev-parse HEAD` + `git log --oneline -60` + `git status --short` — PASS (HEAD `9e0a79e`, tree clean, citations verified, no invention).
+- 2026-09-22 — production-closure Phase-2 reconciliation — blocker 1 annotated (push later landed as `691d2a2`); plan remains a truthful historical survey, Status unchanged (COMPLETED).
 - 2026-09-20 — `npm run agent:plan:validate -- --plan .agent/execplans/autonomous-campaign-thinning-stop-v1.md` — PASS.
 - 2026-09-20 — `git status --short` post-commit — PASS (only the survey doc committed; no product churn).
 

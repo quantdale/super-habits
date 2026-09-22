@@ -66,13 +66,16 @@ committed and pushed.
 
 ## Current Checkpoint
 
-- Current milestone: COMPLETE — icon delivered and prebuild-verified, release
-  doc refreshed with measured results, release-notes draft added, gates green;
-  closure commit/push pending.
+- Current milestone: COMPLETE and CLOSED — icon delivered and prebuild-verified,
+  release doc refreshed with measured results, release-notes draft added, gates
+  green; closure commit/push landed (this plan's files are in `origin/main` as
+  of the 2026-09-22 production-closure campaign start at `691d2a2`).
 - Completed: icon generation + verification; plugin wiring + prebuild evidence;
   `expo-doctor`; `web:verify`; release doc rewrite; release-notes draft;
-  typecheck/lint clean; plan validated.
-- In progress: closure commit/push.
+  typecheck/lint clean; plan validated; closure commit/push (landed 2026-09-14
+  lineage; verified present at `691d2a2` during Phase-2 reconciliation
+  2026-09-22).
+- In progress: None.
 - Important modified files: `app.json`, `assets/notification-icon.png`, the two
   `docs/release/` files, this plan.
 - Last successful validation: see the Validation Ledger.
@@ -89,13 +92,19 @@ committed and pushed.
 - [x] WS1 — notification icon generated
 - [x] WS2 — plugin wired and prebuild-verified
 - [x] WS3 — release doc refreshed; release notes drafted
-- [x] WS4 — gates green (typecheck/lint clean); closure commit/push next
+- [x] WS4 — gates green (typecheck/lint clean); closure commit/push landed
 
 ## Surprises & Discoveries
 
 - 2026-09-14 — the release doc still told readers the native lane was 2/11 and
   that two suites were failing, so its "release state" was materially wrong;
   the drift came from campaign fixes that never updated the contract.
+- 2026-09-22 (production-closure Phase 2) — this plan's checkpoint still said
+  "closure commit/push pending" although Status was COMPLETED and the files had
+  long shipped; corrected the checkpoint/WS4 to record the landed closure. The
+  doc's internal E2E-number contradiction (table vs narrative) and any remaining
+  drift are handled by the production-closure campaign (Phase 2 fix + Phase 3/7
+  exact-HEAD refresh), not reopened here.
 - 2026-09-14 — the notification icon can be derived losslessly from the app's
   monochrome adaptive mark with `pngjs` (already present), so no new dependency
   or hand-drawn art was needed.
