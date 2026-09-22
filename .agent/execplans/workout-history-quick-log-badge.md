@@ -49,7 +49,7 @@ so the two surfaces never disagree.
   zero-exercises rule; Vitest coverage in `tests/workout.domain.test.ts`.
 - Data (`workout.data.ts`): new read-only
   `listWorkoutSessionExerciseCounts(): Promise<{ logId: string;
-  exerciseCount: number }[]>` (`GROUP BY log_id`, no sync enqueue — pure
+exerciseCount: number }[]>` (`GROUP BY log_id`, no sync enqueue — pure
   read). Wired into the existing concurrent `refresh()` batch in
   `WorkoutScreen.tsx`; missing key ⇒ 0 ⇒ quick log.
 - UI: new feature-local `features/workout/QuickLogBadge.tsx` (Pop pill:
@@ -76,7 +76,7 @@ so the two surfaces never disagree.
 
 ## Current Checkpoint
 
-- Current milestone: complete — badge implemented, verified, ready to commit.
+- Current milestone: complete — badge implemented, verified, committed as `ac60e78`.
 - Completed: path mapping; zero-exercises rule decision; ExecPlan (this
   file); domain predicate; data counts query + refresh() wiring;
   `QuickLogBadge` + list/detail call sites; predicate + data-contract tests;
@@ -85,7 +85,7 @@ so the two surfaces never disagree.
 - Important modified files: `features/workout/workout.domain.ts`,
   `features/workout/workout.data.ts`, `features/workout/QuickLogBadge.tsx`
   (new), `features/workout/WorkoutScreen.tsx`, `features/workout/
-  WorkoutHistoryDetail.tsx`, `tests/workout.domain.test.ts`,
+WorkoutHistoryDetail.tsx`, `tests/workout.domain.test.ts`,
   `tests/workout.data.test.ts`, this plan.
 - Last successful validation: `npm test` 215 files / 2186 tests PASS;
   `npm run typecheck` PASS; `npm run lint` PASS (after one prettier
@@ -97,7 +97,7 @@ so the two surfaces never disagree.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
 - Exact next action: None — task complete.
-- Remaining definition of done: none (single commit to follow in the same change).
+- Remaining definition of done: none (single commit landed as `ac60e78`).
 
 ## Progress
 
@@ -109,7 +109,7 @@ so the two surfaces never disagree.
 - [x] UI: `QuickLogBadge` + list/detail call sites.
 - [x] Tests: predicate tests + data-contract test.
 - [x] Verify: typecheck, lint, vitest, plan validate.
-- [ ] Single commit.
+- [x] Single commit (`ac60e78`).
 
 ## Surprises & Discoveries
 
@@ -132,14 +132,17 @@ so the two surfaces never disagree.
   tree, head `e52c34f`.
 - 2026-09-20 — `npm run typecheck` — PASS — 0 errors.
 - 2026-09-20 — `npx vitest run tests/workout.domain.test.ts
-  tests/workout.data.test.ts` — PASS — 2 files, 55 tests passed.
+tests/workout.data.test.ts` — PASS — 2 files, 55 tests passed.
 - 2026-09-20 — `npm run lint` — FAIL then PASS — one prettier formatting
   error in `WorkoutScreen.tsx` (multi-line Text props), fixed via
   `eslint --fix`; re-run 0 errors, 0 warnings.
 - 2026-09-20 — `npm test` — PASS — 215 files, 2186 tests, 0 failures
   (baseline 2182 + 4 new).
 - 2026-09-20 — `npm run agent:plan:validate -- --plan
-  .agent/execplans/workout-history-quick-log-badge.md` — PASS — Status COMPLETED.
+.agent/execplans/workout-history-quick-log-badge.md` — PASS — Status COMPLETED.
+- 2026-09-22 — `git show --stat ac60e78` + checkbox reconciliation — PASS —
+  the single-commit task is ticked to match the landed commit; `validate --all`
+  now passes this plan (was the sole CI quality-lane failure).
 
 ## Changed Files / Areas
 
@@ -161,7 +164,7 @@ so the two surfaces never disagree.
 4. Run `npm run qa:affected` when applicable; then cheapest sufficient gates
    (`typecheck`, `lint`, targeted Vitest) before broad `npm test`.
 5. Run `npm run agent:plan:validate -- --plan
-   .agent/execplans/workout-history-quick-log-badge.md` before completion.
+.agent/execplans/workout-history-quick-log-badge.md` before completion.
 
 ## Outcomes & Retrospective
 
@@ -170,6 +173,8 @@ so the two surfaces never disagree.
   the Recent sessions list and the session detail header, driven by one
   shared zero-exercises predicate over a single read-only counts query — no
   schema change. Verified: typecheck/lint clean, 2186 Vitest tests green on
-  Node 22.
+  Node 22. Landed as commit `ac60e78`; the Progress commit task was
+  reconciled on 2026-09-22 after it was found unchecked despite the commit
+  being on main (restored `agent:plan:validate:all` / CI quality lane).
 - Follow-up: none. A `source`-column model remains a possible future
   direction but needs migration 26 + contract churn; not pursued here.
