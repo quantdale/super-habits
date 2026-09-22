@@ -316,7 +316,7 @@ test.describe('Workout Gym V2', () => {
       await builder.getByText(exerciseName, { exact: true }).click();
       await builder.getByRole('textbox', { name: `${exerciseName} superset group` }).fill('tour');
       await builder.getByRole('textbox', { name: 'Active (seconds)' }).fill('5');
-      await builder.getByRole('textbox', { name: 'Rest (seconds)' }).fill('0');
+      await builder.getByRole('textbox', { name: 'Rest (seconds, 0 = no rest)' }).fill('0');
       if (exerciseName === 'Push-up') {
         await builder.getByRole('textbox', { name: 'Target reps min' }).fill('8');
         await builder.getByRole('textbox', { name: 'Target reps max' }).fill('12');
