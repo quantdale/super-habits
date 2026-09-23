@@ -32,6 +32,7 @@ import {
   selectAndroidDevice,
 } from './native-qa-utils.mjs';
 import { readGitProvenance } from './native-provenance.mjs';
+import { replayForAvd } from './qa-native-replay.mjs';
 import {
   assertMockProof,
   interpretDeviceProbe,
@@ -1009,7 +1010,7 @@ function pushTargetRecord(
       status: report.status,
       classification: report.classification ?? (report.status === 'BLOCKED' ? 'ENVIRONMENT' : null),
       artifactPath: outcome.reportPath,
-      replayCommand: `${options.replayCommand} --avd ${avdName}`,
+      replayCommand: replayForAvd(options.replayCommand, avdName),
       attempt,
     }),
   );
@@ -1020,7 +1021,7 @@ function pushTargetRecord(
 }
 
 function blockedTargetOutcome(avdName, options, resolution, message, remediation) {
-  return blocked('android', options.tag, `${options.replayCommand} --avd ${avdName}`, message, {
+  return blocked('android', options.tag, replayForAvd(options.replayCommand, avdName), message, {
     flow: options.flow ?? '.maestro',
     avd: avdName,
     serial: resolution?.serial ?? null,
@@ -1052,7 +1053,7 @@ function runLaneAttempt(
       ...options,
       serial: resolution.serial,
       avdContext: { avd: avdName, owned: resolution.owned },
-      replayCommand: `${options.replayCommand} --avd ${avdName}`,
+      replayCommand: replayForAvd(options.replayCommand, avdName),
       authSlice: authSession
         ? { logPath: authSession.logPath, startOffset: mockLogOffset(authSession.logPath) }
         : null,
@@ -1434,19 +1435,24 @@ try {
     process.exit(1);
   }
   const platforms = options.platform === 'all' ? ['android', 'ios'] : [options.platform];
-  const command = ['npm run qa:native', `-- --platform ${options.platform}`];
-  if (options.tag) command.push(`--tag ${options.tag}`);
-  if (options.flow) command.push(`--flow ${options.flow}`);
-  if (options.serial) command.push(`--serial ${options.serial}`);
-  if (!options.provision) command.push('--no-provision');
-  for (const avd of options.avds) command.push(`--avd ${avd}`);
-  if (options.reset) command.push('--reset');
-  if (options.noStop) command.push('--no-stop');
-  if (options.authMock) {
-    command.push('--auth-mock');
-    if (options.authMockPort !== 4545) command.push(`--auth-mock-port ${options.authMockPort}`);
-  }
-  if (options.buildMetadata) command.push(`--build-metadata ${options.buildMetadata}`);
+  // Replay commands must be paste-runnable: direct `node scripts/qa-native.mjs`
+  // form (the old `npm run qa:native` referenced a nonexistent script).
+  // Per-target `--avd` appends go through replayForAvd() so flags never duplicate.
+  const command = [
+    'node scripts/qa-native.mjs',
+    `--platform ${options.platform}`,
+    ...(options.tag ? [`--tag ${options.tag}`] : []),
+    ...(options.flow ? [`--flow ${options.flow}`] : []),
+    ...(options.serial ? [`--serial ${options.serial}`] : []),
+    ...(!options.provision ? ['--no-provision'] : []),
+    ...options.avds.map((avd) => `--avd ${avd}`),
+    ...(options.reset ? ['--reset'] : []),
+    ...(options.noStop ? ['--no-stop'] : []),
+    ...(options.authMock
+      ? ['--auth-mock', ...(options.authMockPort !== 4545 ? [`--auth-mock-port ${options.authMockPort}`] : [])]
+      : []),
+    ...(options.buildMetadata ? [`--build-metadata ${options.buildMetadata}`] : []),
+  ];
   options.replayCommand = command.join(' ');
   if (options.avds.length > 0) process.exit(runMultiAvd(options));
   if (options.authMock) process.exit(runSingleWithAuthMock(options, platforms));

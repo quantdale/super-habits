@@ -138,7 +138,7 @@ E2E tests run against a static web export served on `localhost:8081`. Each spec 
 
 Use `getByText` for `Button`/`Pressable` labels (RN Web doesn't always expose `role=button` + accessible name). Playwright workers stay at 1 locally (OPFS lock per origin).
 
-The suite spans **four Playwright projects**: `chromium` (root `e2e/*.spec.ts`), `journeys` (`e2e/journeys/`, continuity journeys), `simulation` (`simulation/runner/specs/`, the simulation platform's own specs), and `journeys-sync` (the `@sync`-tagged remote-boundary steps, opt-in via `npm run e2e:sync` against `dist-sync/` on :8082, main/nightly CI only). Counts are point-in-time — currently **2,248 Vitest tests** (unit + integration) and **323 Playwright tests in 32 spec files**; verify with `npx vitest list` / `npx playwright test --list` before relying on them. Read `simulation/README.md` before touching the simulation platform.
+The suite spans **four Playwright projects**: `chromium` (root `e2e/*.spec.ts`), `journeys` (`e2e/journeys/`, continuity journeys), `simulation` (`simulation/runner/specs/`, the simulation platform's own specs), and `journeys-sync` (the `@sync`-tagged remote-boundary steps, opt-in via `npm run e2e:sync` against `dist-sync/` on :8082, main/nightly CI only). Test counts are point-in-time and intentionally **not hard-coded here** — always measure live with `npx vitest list` / `npx playwright test --list` before relying on them. Read `simulation/README.md` before touching the simulation platform.
 
 ---
 
