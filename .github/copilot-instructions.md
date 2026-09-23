@@ -1,6 +1,6 @@
 # SuperHabits — Copilot Instructions
 
-Offline-first productivity app (To Do, Habits, Focus/Pomodoro, Workout, Calories) targeting web (PWA), iOS, and Android. Stack: React Native 0.83.4 · Expo 55 · React 19 · TypeScript 5.9 · Expo Router · NativeWind 4 · expo-sqlite (WAL; OPFS on web).
+Offline-first productivity app (To Do, Habits, Focus/Pomodoro, Workout, Calories) targeting web (PWA), iOS, and Android. Stack: React Native 0.83.10 · Expo 55 · React 19 · TypeScript 5.9 · Expo Router · NativeWind 4 · expo-sqlite (WAL; OPFS on web).
 
 ---
 
@@ -23,7 +23,7 @@ npm run e2e:debug        # Playwright inspector
 # Single E2E spec
 npx playwright test e2e/todos.spec.ts
 
-# E2E projects: chromium (root specs), journeys (e2e/journeys), simulation (simulation/runner/specs)
+# E2E projects: chromium (root specs), journeys (e2e/journeys), simulation (simulation/runner/specs), pwa
 npm run e2e:sync          # journeys-sync project: @sync journeys vs dist-sync/ on :8082 (opt-in, main/nightly CI only)
 npm run sim:run           # simulation-platform scenario runner
 npm run sim:validate      # validate simulation lane matrix / scenarios
@@ -79,11 +79,11 @@ app/index.tsx → section mounted behind NavigationContext.activeSection (no per
 
 ### Soft delete
 
-Never `DELETE FROM` main entity tables. Use `deleted_at` timestamp + filter `WHERE deleted_at IS NULL`. Documented exceptions: `habit_completions` (hard-delete at count 0), `saved_meals` (hard delete by design).
+Never `DELETE FROM` main entity tables. Use `deleted_at` timestamp + filter `WHERE deleted_at IS NULL`. Documented exceptions: `habit_completions` (hard-delete at count 0), `saved_meals` (hard delete by design), and the workout session-log triple (`workout_logs`, `workout_session_exercises`, `workout_session_sets` — no `deleted_at` column in the DDL; `deleteWorkoutLog` hard-deletes locally and records a durable remote delete intent per row, codified in `BACKUP_HARD_DELETE_ENTITIES`).
 
 ### Sync enqueue
 
-After **every** mutating write on synced entities, call `syncEngine.enqueue` immediately — only from `*.data.ts`. Synced entities: `todos`, `habits`, `calorie_entries`, `workout_routines` (+ routine bump after nested edits). Not synced: `pomodoro_sessions`, `habit_completions`, `saved_meals`, `workout_logs`, `linked_action_rules`, `linked_action_events`, `linked_action_executions`, nested workout tables.
+After **every** mutating write on synced entities, call `syncEngine.enqueue` immediately — only from `*.data.ts`. Synced entities = the full 21-entity `BACKUP_ENTITIES` scope in `core/backup/backup.types.ts` (todos, habits, habit_completions, calorie_entries, saved_meals, workout_routines + routine_exercises/routine_exercise_sets, workout_logs, workout_session_exercises, workout_session_sets, workout_weekly_plan, workout_schedule_overrides, body_weight_entries, custom_exercises, pomodoro_sessions, linked_action_rules, projects, goals, daily_plans, weekly_reviews), plus synthetic `user_backup_settings`/`backup_manifest` records. Only local operational state stays unsynced: `linked_action_events`, `linked_action_executions`, `processed_notification_actions` (see AGENTS.md for the authoritative invariant).
 
 ### IDs and date keys
 
@@ -112,7 +112,7 @@ import { toDateKey } from '@/lib/time'; // toDateKey() → "YYYY-MM-DD" (local c
 
 ### Schema migrations
 
-All migrations live in `core/db/client.ts` (`runMigrations`). They are **append-only** — never edit past `if (version < N)` blocks. Current schema: **v12**; next migration uses `if (version < 13)`. `core/db/schema.sql` is a reference, not runtime.
+All migrations live in `core/db/client.ts` (`runMigrations`). They are **append-only** — never edit past `if (version < N)` blocks. Current schema: **v25**; next migration uses `if (version < 26)`. `core/db/schema.sql` is a reference, not runtime.
 
 ### Styling
 
@@ -138,7 +138,7 @@ E2E tests run against a static web export served on `localhost:8081`. Each spec 
 
 Use `getByText` for `Button`/`Pressable` labels (RN Web doesn't always expose `role=button` + accessible name). Playwright workers stay at 1 locally (OPFS lock per origin).
 
-The suite spans **four Playwright projects**: `chromium` (root `e2e/*.spec.ts`), `journeys` (`e2e/journeys/`, continuity journeys), `simulation` (`simulation/runner/specs/`, the simulation platform's own specs), and `journeys-sync` (the `@sync`-tagged remote-boundary steps, opt-in via `npm run e2e:sync` against `dist-sync/` on :8082, main/nightly CI only). Counts are point-in-time — currently **664 Vitest tests** (613 unit + 51 integration) and **181 Playwright tests in 19 spec files**; verify with `npx vitest list` / `npx playwright test --list` before relying on them. Read `simulation/README.md` before touching the simulation platform.
+The suite spans **four Playwright projects**: `chromium` (root `e2e/*.spec.ts`), `journeys` (`e2e/journeys/`, continuity journeys), `simulation` (`simulation/runner/specs/`, the simulation platform's own specs), and `journeys-sync` (the `@sync`-tagged remote-boundary steps, opt-in via `npm run e2e:sync` against `dist-sync/` on :8082, main/nightly CI only). Counts are point-in-time — currently **2,248 Vitest tests** (unit + integration) and **323 Playwright tests in 32 spec files**; verify with `npx vitest list` / `npx playwright test --list` before relying on them. Read `simulation/README.md` before touching the simulation platform.
 
 ---
 

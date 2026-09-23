@@ -90,11 +90,11 @@ Key product facts:
 
 ## Technology Stack
 
-- **Runtime:** Expo SDK `~55.0.28`, React Native `0.83.10`, React `19.2.0`
+- **Runtime:** Expo SDK `~55.0.31`, React Native `0.83.10`, React `19.2.0`
 - **Language:** TypeScript `~5.9.2` (strict mode)
-- **Routing:** Expo Router `~55.0.17` (file-based routing in `app/`)
+- **Routing:** Expo Router `~55.0.18` (file-based routing in `app/`)
 - **Styling:** NativeWind `^4.2.3` + Tailwind CSS `^3.4.19`
-- **Database:** `expo-sqlite` (`~55.0.18`); WAL mode on native, SQLite WASM + OPFS on web
+- **Database:** `expo-sqlite` (`~55.0.20`); WAL mode on native, SQLite WASM + OPFS on web
 - **State:** Local `useState` only; section switching via `NavigationContext.activeSection` (`core/providers/NavigationProvider.tsx`).
 - **Backup/Auth:** Supabase (`@supabase/supabase-js`) with anonymous sign-in, email-change protection, and no-create existing-account OTP recovery
 - **Networking:** `@react-native-community/netinfo`
@@ -222,7 +222,7 @@ Violating these can cause silent data corruption or break the app on cold start.
 5. **Date keys via `toDateKey()` from `lib/time.ts`.** Returns local-calendar `YYYY-MM-DD`. Migration 5 records `app_meta.date_key_format` and `date_key_cutover`; old rows are not backfilled.
 6. **Migrations are append-only.** Never edit existing migration blocks. Add a new `if (version < N+1) { ... }` block in `runMigrations()` in `core/db/client.ts`.
 7. **`schema.sql` is a reference-only partial snapshot** (not runtime authority) — the runtime truth is the bootstrap DDL + append-only migration blocks in `core/db/client.ts`; the snapshot records the v15 owner-bound outbox addition but may omit runtime-only details.
-8. **Hard-delete exceptions.** `habit_completions` uses `SELECT → INSERT` (new row) or `UPDATE` (count ±1). Hard `DELETE` is allowed only when decrementing from count 1 to 0; the corresponding durable outbox delete intent is still synced. `saved_meals` also hard-deletes by design (`DELETE FROM saved_meals WHERE id = ?` in `features/calories/calories.data.ts`) and its remote delete intent is synced. These are local hard-delete exceptions, not unsynced entities.
+8. **Hard-delete exceptions.** `habit_completions` uses `SELECT → INSERT` (new row) or `UPDATE` (count ±1). Hard `DELETE` is allowed only when decrementing from count 1 to 0; the corresponding durable outbox delete intent is still synced. `saved_meals` also hard-deletes by design (`DELETE FROM saved_meals WHERE id = ?` in `features/calories/calories.data.ts`) and its remote delete intent is synced. The workout session-log triple (`workout_logs`, `workout_session_exercises`, `workout_session_sets`) hard-deletes by design because those tables carry no `deleted_at` column: `deleteWorkoutLog` removes the local rows and enqueues a durable remote delete intent per row in the same transaction (`BACKUP_HARD_DELETE_ENTITIES` makes the adapter physically delete remote rows). These are local hard-delete exceptions, not unsynced entities.
 
 ## Feature Module Pattern
 
@@ -274,6 +274,7 @@ Current exceptions:
 | `weekly_reviews`                                           | `wrev`                    |
 | `linked_action_rules`                                      | `link`                    |
 | linked-action chains/events/executions (local operational) | `lchain`, `levt`, `lexec` |
+| gamification ledger event (`gamification_events`)          | `gxp`                     |
 | command history/drafts (`app_meta` local)                  | `cmd`                     |
 
 ## Build, Run, and Test Commands

@@ -86,4 +86,4 @@ Supabase: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`. Command p
 
 ## Web / PWA gotcha
 
-SQLite WASM requires `crossOriginIsolated`, enforced by COOP/COEP headers in `metro.config.js` (dev), `app.json`, and `vercel.json` (prod: `require-corp` / `same-origin` + SPA rewrite `/(.*)` → `/index.html`). Service worker `public/sw.js` cache is `superhabits-shell-v3`; localhost requests are network-first (no stale Metro cache). Deploy: `npm run build:web` → `dist/` on Vercel. Native APK: `eas build -p android --profile preview` (package `com.dale16.superhabits`).
+SQLite WASM requires `crossOriginIsolated`, enforced by COOP/COEP headers in `metro.config.js` (dev), `app.json`, and `vercel.json` (prod: `require-corp` / `same-origin` + SPA rewrite `/(.*)` → `/index.html`). Service worker `public/sw.js` cache is `superhabits-shell-v7` (derived from the built asset manifest — check `CACHE_VERSION` in `public/sw.js` for the current value); localhost requests are network-first (no stale Metro cache). Deploy: `npm run build:web` → `dist/` on Vercel. Native APK: `eas build -p android --profile preview` (package `com.dale16.superhabits`).
