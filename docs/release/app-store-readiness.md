@@ -37,6 +37,21 @@ file when a release actually ships rather than letting it drift.
 | Design system | **Pop**: Nunito type via `core/ui/Text`, bottom tab bar / wide-screen side rail shell, per-section hues, tactile motion (`docs/ui-ux/12-pop-design-system.md`) |
 | Targets       | Web PWA (Vercel), iOS, Android                                                                                                                                 |
 
+## Exact-HEAD recertification (2026-09-23 — production-closure campaign)
+
+The 2026-09-14 gate table below is **historical** and is superseded for the
+campaign verdict by this block; every number here comes from a fresh
+execution (commands re-run, not copied), with CI results cited per run/SHA:
+
+- Static/contracts: typecheck · lint (`--max-warnings 0`) · theme tokens (140 checks) · OpenSpec 59/59 · versioned ExecPlans all-valid · impact rules 13 — PASS
+- Unit + integration: **223 files / 2,252 passed / 2,252 total** (`npm test`, local fresh); CI quality at certified SHAs: 223 files / 2,247 passed / 1 skipped (run `35814424527` @ `63ff09c`, step log)
+- `qa:fast` fresh: 146 files / 1,879 passed · timezones: 94 tests × 5 zones · release guards: 35/35 (7 files)
+- Web: `build:web` PASS · `web:verify` PASS (HTTP 200, COOP/COEP, `crossOriginIsolated=true` probe) · `web:hygiene` PASS
+- Full browser E2E + deterministic 23/23 + `build:sync` + `e2e:sync` 40/6/0: PASS on CI run `35815411915` @ `cbe9f77` (push runs re-certify each pushed SHA)
+- Android: exact-source provision + smoke 2/2 + persistence (10/11 battery + isolated replay) + lifecycle 6/6 + delivery probe VERIFIED — see campaign ExecPlan Phase 4
+- Expo Doctor **20/20** · `npm audit` **0 critical / 0 high / 16 moderate** (prod 14; all force-only, framework-owned) · `sim:validate` 23 scenarios
+- Application candidate of record: `cc6889a` (CI run `35749583938`); certified head at campaign time: `cbe9f77`; final verdict SHA recorded in `.agent/execplans/production-closure-exact-head-cert-v1.md`
+
 ## Verification runs for this release (2026-09-14)
 
 Gate rows show the latest measured result per gate as that day's passes
