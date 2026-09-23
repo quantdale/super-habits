@@ -74,8 +74,7 @@ intact; privacy disclosure updated truthfully before default-on.
   sample-trace evidence — CPU-saturated host refresh-storm delay, semantics
   unchanged).
 - In progress: nothing credential-free — remaining phases gated as below.
-- Important modified files: none yet (file lands from gitignored staging after
-  the predecessor campaign's frozen native-suite chain completes).
+- Important modified files (phase 1, landed): `e2e/helpers/commandEvalCorpus.ts` (corpus), `e2e/command.eval.internal.spec.ts` (loader wiring), `tests/commandEvalCorpus.test.ts` (shape/contract).
 - Last successful validation: n/a.
 - Current failures: None.
 - Relevant quarantines: None.
