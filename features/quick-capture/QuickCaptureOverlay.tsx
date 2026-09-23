@@ -24,6 +24,7 @@ import { createSubmitGuard } from '@/lib/submitGuard';
 import {
   loadLastCaptureMode,
   loadPersistedRecentCaptures,
+  nextCalorieCaptureKey,
   persistLastCaptureMode,
   persistRecentCaptures,
   pushRecentCapture,
@@ -266,7 +267,7 @@ export function QuickCaptureOverlay() {
         const capturedFood = title.trim();
         await addCalorieEntry({ foodName: capturedFood, calories: cal, mealType });
         pushRecent({
-          key: `calorie:${Date.now()}`,
+          key: nextCalorieCaptureKey(),
           label: `${capturedFood} · ${cal} kcal`,
           calorieRef: { foodName: capturedFood, calories: cal, mealType },
           undo: async () => {

@@ -125,10 +125,16 @@ function buildServingSupabase(
     malformedRow?: { entity: string; row: Record<string, unknown> } | null;
     dropParent?: { entity: string; id: string } | null;
     duplicateCompletion?: boolean;
-    failEntity?: string | null;
+    failEntity?: string | string[] | null;
+    failEntityMessage?: string;
     failSettingsFetch?: boolean;
   } = {},
 ) {
+  const failEntities = Array.isArray(options.failEntity)
+    ? options.failEntity
+    : options.failEntity
+      ? [options.failEntity]
+      : [];
   const from = vi.fn((entity: string) => {
     if (transactionOpen.value) {
       throw new Error('network call issued inside an open SQLite transaction');
@@ -166,10 +172,10 @@ function buildServingSupabase(
           is: vi.fn(() => query),
           order: vi.fn(() => query),
           limit: vi.fn(() => {
-            if (options.failEntity === entity) {
+            if (failEntities.includes(entity)) {
               return Promise.resolve({
                 data: null,
-                error: { message: 'simulated network failure' },
+                error: { message: options.failEntityMessage ?? 'simulated network failure' },
               });
             }
             if (entity === 'user_backup_settings' && options.failSettingsFetch) {
@@ -190,10 +196,10 @@ function buildServingSupabase(
             return Promise.resolve({ data: rowsForQuery().slice(0, 1), error: null });
           }),
           range: vi.fn((from: number, to: number) => {
-            if (options.failEntity === entity) {
+            if (failEntities.includes(entity)) {
               return Promise.resolve({
                 data: null,
-                error: { message: 'simulated network failure' },
+                error: { message: options.failEntityMessage ?? 'simulated network failure' },
               });
             }
             return Promise.resolve({ data: rowsForQuery().slice(from, to + 1), error: null });
@@ -1192,6 +1198,44 @@ describe('backup completeness v2 restore', () => {
     const remote = await publishSourceBackup();
     remote.delete('backup_manifest');
     const serving = buildServingSupabase(remote);
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result).toMatchObject({ status: 'legacy' });
+    await expectZeroImportedRows(targetDb);
+    await targetDb.closeAsync();
+  });
+
+  it('does not downgrade to legacy when a transient 404-style manifest error hits a V2 server', async () => {
+    // §32 finding D: the broad missing-table matcher must not turn a flaky
+    // proxy 404 into a 3-entity legacy restore reported as success while the
+    // backup_manifest/user_backup_settings tables demonstrably exist.
+    const remote = await publishSourceBackup();
+    const serving = buildServingSupabase(remote, {
+      failEntity: 'backup_manifest',
+      failEntityMessage: 'HTTP 404 Not Found',
+    });
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+
+    // Dynamic import is the file's documented convention: the restore module
+    // must (re)bind getDatabase per freshDatabase generation — a static
+    // top-level import freezes the first registry generation (see file header).
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const result = await restoreFromRemoteBackupV2();
+    expect(result).toMatchObject({ status: 'invalid', reason: 'fetch_failed' });
+    await expectZeroImportedRows(targetDb);
+    await targetDb.closeAsync();
+  });
+
+  it('falls back to legacy only when both V2 probes report missing tables', async () => {
+    const remote = await publishSourceBackup();
+    const serving = buildServingSupabase(remote, {
+      failEntity: ['backup_manifest', 'user_backup_settings'],
+      failEntityMessage: 'relation "public.backup_manifest" does not exist',
+    });
     installSupabaseMock(serving.supabase);
     const targetDb = await freshDatabase();
 

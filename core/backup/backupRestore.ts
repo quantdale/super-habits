@@ -289,6 +289,28 @@ export function isMissingV2RemoteTableError(error: unknown): boolean {
   );
 }
 
+/**
+ * Second-opinion probe behind the broad missing-V2-table classifier: query a
+ * DIFFERENT V2-only table before declaring a legacy server.
+ *
+ * - probe succeeds           -> the server has V2 tables (original error was transient)
+ * - probe fails missing-style -> genuinely pre-migration (empty-message stubs included)
+ * - probe fails any other way -> cannot confirm -> NOT legacy (fail closed to invalid)
+ */
+async function probeV2TablesPresent(ownerUserId: string): Promise<boolean> {
+  try {
+    await fetchRemoteRecoverableSettings(ownerUserId);
+    return true;
+  } catch (probeError) {
+    const probeMessage = probeError instanceof Error ? probeError.message : String(probeError);
+    if (/Failed to fetch user_backup_settings: undefined/.test(probeMessage)) {
+      // Empty-message stub pattern mirrored from the manifest matcher.
+      return false;
+    }
+    return !isMissingV2RemoteTableError(probeError);
+  }
+}
+
 async function fetchRemoteRows(
   entity: BackupEntity,
   ownerUserId: string,
@@ -386,7 +408,23 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     // endpoint: treat that as a legacy-only backup instead of failing the
     // whole restore. Genuine network errors stay invalid.
     if (isMissingV2RemoteTableError(error)) {
-      return { status: 'legacy' };
+      // The matcher is broad on purpose (proxies/stubs phrase 404s many
+      // ways), so confirm with a second V2-only probe before downgrading:
+      // a transient error that merely LOOKS like a missing table must not
+      // send a V2 backup down the 3-entity legacy path that reports success
+      // with most of the dataset silently missing.
+      const v2Present = await probeV2TablesPresent(ownerUserId);
+      if (!v2Present) {
+        return { status: 'legacy' };
+      }
+      return {
+        status: 'invalid',
+        reason: 'fetch_failed',
+        message: error instanceof Error ? error.message : String(error),
+        diagnostics: [
+          'manifest fetch looked like a missing V2 table, but the user_backup_settings probe found V2 tables — treated as a transient failure, not a legacy server',
+        ],
+      };
     }
     return {
       status: 'invalid',

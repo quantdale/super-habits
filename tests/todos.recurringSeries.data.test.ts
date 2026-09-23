@@ -178,8 +178,13 @@ describe('recurring series correction (features/todos/todos.data)', () => {
       expect(enqueued).toContainEqual(
         expect.objectContaining({ entity: 'todos', id: 'todo_done', operation: 'update' }),
       );
-      // Already-deleted members keep their existing remote delete intent.
-      expect(enqueued.some((r: Record<string, unknown>) => r.id === 'todo_deleted')).toBe(false);
+      // Already-deleted members must re-push too: the canonical `recurrence`
+      // column changed on the tombstone, and an unpushed canonical mutation
+      // makes the next manifest checksum unsatisfiable by the remote row
+      // (§32 finding A; the old expectation pinned that defect).
+      expect(enqueued).toContainEqual(
+        expect.objectContaining({ entity: 'todos', id: 'todo_deleted', operation: 'update' }),
+      );
     });
 
     it('is a no-op for an unknown series', async () => {

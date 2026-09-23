@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { parseQuickCapture } from '@/features/quick-capture/quickCapture.domain';
 import {
   MAX_RECENT_CAPTURES,
+  nextCalorieCaptureKey,
   pushRecentCapture,
   removeRecentCapture,
   undoRecentCapture,
@@ -163,6 +164,20 @@ describe('recent captures undo list', () => {
   it('removes an undone entry by key and leaves others intact', () => {
     const list = [entry('a'), entry('b'), entry('c')];
     expect(removeRecentCapture(list, 'b').map((e) => e.key)).toEqual(['a', 'c']);
+  });
+
+  it('generates distinct keys for same-millisecond calorie captures', () => {
+    // A bare Date.now() key collided when two captures landed in the same
+    // millisecond: removeRecentCapture dropped BOTH entries and stranded one
+    // undo (§32 finding K). The monotonic suffix must keep keys unique even
+    // when the clock does not advance.
+    expect(nextCalorieCaptureKey()).not.toBe(nextCalorieCaptureKey());
+  });
+
+  it('calorie keys never match the persisted legacy bare-timestamp format', () => {
+    // Persisted legacy `calorie:<ms>` keys must remain distinct forever, so
+    // an old entry can never absorb a new entry's remove/undo-by-key call.
+    expect(nextCalorieCaptureKey()).toMatch(/^calorie:\d+_\d+$/);
   });
 
   it('runs the undo for a known key and reports it as removed', async () => {

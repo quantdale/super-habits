@@ -649,11 +649,15 @@ export async function stopRecurringSeries(recurrenceId: string): Promise<void> {
       }
       for (const member of members) {
         if (member.deleted_at !== null) {
-          // Already deleted locally and remotely; clear the marker without
-          // re-enqueueing the existing delete intent.
-          await transactionDb.runAsync(`UPDATE todos SET recurrence = NULL WHERE id = ?`, [
-            member.id,
-          ]);
+          // Already deleted locally and remotely; the recurrence marker is a
+          // canonical backup column, so clearing it MUST bump updated_at and
+          // re-push — otherwise the next manifest certifies a tombstone the
+          // remote can never match (V2 restore fails integrity_mismatch).
+          await transactionDb.runAsync(
+            `UPDATE todos SET recurrence = NULL, updated_at = ? WHERE id = ?`,
+            [now, member.id],
+          );
+          enqueue({ entity: 'todos', id: member.id, updatedAt: now, operation: 'update' });
           continue;
         }
         const endsFuture =

@@ -96,6 +96,21 @@ export function persistLastCaptureMode(mode: string): void {
   });
 }
 
+/**
+ * Unique key for an id-less calorie capture: `addCalorieEntry` does not
+ * return the row id, so keys were bare `Date.now()` — two captures in the
+ * same millisecond collided and `removeRecentCapture` dropped both list
+ * entries (one undo became unreachable). The monotonic suffix makes keys
+ * unique within a session and never equal to persisted legacy `calorie:<ms>`
+ * keys.
+ */
+export function nextCalorieCaptureKey(): string {
+  calorieCaptureSequence += 1;
+  return `calorie:${Date.now()}_${calorieCaptureSequence}`;
+}
+
+let calorieCaptureSequence = 0;
+
 /** Restore the last-used destination mode; null when unset or unreadable. */
 export async function loadLastCaptureMode(): Promise<string | null> {
   try {
