@@ -32,7 +32,7 @@ import {
   selectAndroidDevice,
 } from './native-qa-utils.mjs';
 import { readGitProvenance } from './native-provenance.mjs';
-import { replayForAvd } from './qa-native-replay.mjs';
+import { baseReplayCommand, replayForAvd } from './qa-native-replay.mjs';
 import {
   assertMockProof,
   interpretDeviceProbe,
@@ -1435,25 +1435,22 @@ try {
     process.exit(1);
   }
   const platforms = options.platform === 'all' ? ['android', 'ios'] : [options.platform];
-  // Replay commands must be paste-runnable: direct `node scripts/qa-native.mjs`
-  // form (the old `npm run qa:native` referenced a nonexistent script).
-  // Per-target `--avd` appends go through replayForAvd() so flags never duplicate.
-  const command = [
-    'node scripts/qa-native.mjs',
-    `--platform ${options.platform}`,
-    ...(options.tag ? [`--tag ${options.tag}`] : []),
-    ...(options.flow ? [`--flow ${options.flow}`] : []),
-    ...(options.serial ? [`--serial ${options.serial}`] : []),
-    ...(!options.provision ? ['--no-provision'] : []),
-    ...options.avds.map((avd) => `--avd ${avd}`),
-    ...(options.reset ? ['--reset'] : []),
-    ...(options.noStop ? ['--no-stop'] : []),
-    ...(options.authMock
-      ? ['--auth-mock', ...(options.authMockPort !== 4545 ? [`--auth-mock-port ${options.authMockPort}`] : [])]
-      : []),
-    ...(options.buildMetadata ? [`--build-metadata ${options.buildMetadata}`] : []),
-  ];
-  options.replayCommand = command.join(' ');
+  // Replay commands must be paste-runnable: built by the same pure helper the
+  // regression tests pin (scripts/qa-native-replay.mjs), so production output
+  // and the tested contract cannot drift — the old inline builder referenced a
+  // nonexistent `npm run qa:native` script and duplicated `--avd` flags.
+  options.replayCommand = baseReplayCommand(options.platform, {
+    tag: options.tag,
+    flow: options.flow,
+    serial: options.serial,
+    noProvision: !options.provision,
+    avds: options.avds,
+    reset: options.reset,
+    noStop: options.noStop,
+    authMock: options.authMock,
+    authMockPort: options.authMockPort,
+    buildMetadata: options.buildMetadata,
+  });
   if (options.avds.length > 0) process.exit(runMultiAvd(options));
   if (options.authMock) process.exit(runSingleWithAuthMock(options, platforms));
   let exitCode = 0;
