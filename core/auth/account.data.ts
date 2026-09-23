@@ -1,6 +1,7 @@
 import type * as SQLite from 'expo-sqlite';
 import { appMetaKeys, getAppMetaText, setAppMetaText } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
+import { withSQLiteTransaction } from '@/core/db/transactions';
 import {
   ACCOUNT_USER_TABLES,
   type AccountUserTable,
@@ -144,10 +145,13 @@ export async function bindLocalDatasetOwner(
   options: { adoptUnownedOutbox?: boolean } = {},
 ): Promise<void> {
   try {
-    await db.withTransactionAsync(async () => {
-      await setLocalDatasetOwner(db, userId);
+    // OTP sign-in also triggers account reconciliation. Serialize this bind so
+    // the auth-state refresh and the explicit recovery action cannot start two
+    // transactions on the same SQLite connection for the same verified owner.
+    await withSQLiteTransaction(db, async (transactionDb) => {
+      await setLocalDatasetOwner(transactionDb, userId);
       if (options.adoptUnownedOutbox) {
-        await adoptUnownedOutboxRows(db, userId);
+        await adoptUnownedOutboxRows(transactionDb, userId);
       }
     });
   } catch (error) {

@@ -66,19 +66,38 @@
     {
       "id": "sync-and-restore",
       "patterns": [
+        "core/auth/**",
         "core/sync/**",
         "lib/supabase.ts",
+        "core/providers/AppProviders.tsx",
+        "features/settings/SettingsBackupSection.tsx",
         "tests/*sync*",
         "tests/*restore*",
-        "e2e/helpers/failure.ts"
+        "tests/account*.test.ts",
+        "tests/portableAccountGating.test.ts",
+        "tests/integration/account*.test.ts",
+        "tests/integration/portableOwnerRecovery.test.ts",
+        "e2e/helpers/failure.ts",
+        "e2e/journeys/recoverable-account-v1.spec.ts",
+        "e2e/journeys/portable-owner-recovery.spec.ts"
       ],
       "gates": ["qa:fast", "qa:integration", "e2e:journeys", "e2e:sync"],
       "tests": [
         "tests/sync.engine.test.ts",
         "tests/restore.coordinator.test.ts",
-        "tests/integration/restore.test.ts"
+        "tests/integration/restore.test.ts",
+        "tests/account*.test.ts",
+        "tests/portableAccountGating.test.ts",
+        "tests/integration/account*.test.ts",
+        "tests/integration/portableOwnerRecovery.test.ts"
       ],
-      "journeys": ["@sync", "offline/reconnect", "restore"],
+      "journeys": [
+        "@sync",
+        "@portable-owner",
+        "recoverable-account-v1",
+        "offline/reconnect",
+        "restore"
+      ],
       "broadRegression": true
     },
     {

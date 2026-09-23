@@ -173,13 +173,13 @@ git push origin v1.0.0`) only with explicit release intent.
 
 ## Known constraints (deliberate, not blockers)
 
-- **Expo SDK patch drift**: `expo-doctor` reports 10 packages behind the
-  SDK-recommended _patch_ versions. Upgrading is blocked by the pinned
-  `patches/*.patch` files (e.g. `expo-sqlite+55.0.18.patch`,
-  `expo-modules-core+55.0.25.patch`): those patches apply to exact versions,
-  so an SDK patch bump must land together with regenerated patches in the
-  same change. `expo-audio`, `expo-asset`, and `expo-haptics` were added for
-  reward feedback and are on their SDK-matched versions.
+- **Expo SDK patch alignment**: the 2026-09-23 release-closure update aligned
+  the ten SDK 55 packages reported by Expo Doctor with their recommended patch
+  versions; `npm run doctor` now passes 20/20. The exact-version patches were
+  refreshed with the update: `expo-modules-core@55.0.26`,
+  `expo-sqlite@55.0.20`, and `metro-file-map@0.83.8`. Regenerate these patches
+  in the same change as any future SDK patch bump. `expo-audio`, `expo-asset`,
+  and `expo-haptics` remain on their SDK-matched versions.
 - **Sync wording**: remote backup stays "one-way push backup", never "full
   two-way sync".
 - **Gamification is local-only**: no reward state is synced or backed up, so a

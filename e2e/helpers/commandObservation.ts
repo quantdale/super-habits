@@ -18,7 +18,7 @@ export async function openCommandScreen(page: Page) {
   await expect(page.getByText('Add something', { exact: true })).toBeVisible({
     timeout: 15_000,
   });
-  await page.getByText('Describe it', { exact: true }).locator('..').click({ force: true });
+  await page.getByRole('button', { name: 'Describe it', exact: true }).click();
 
   // "Describe it" closes the quick-capture sheet and opens the command modal
   // in the same tick; the sheet's fade-out keeps both modals mounted for a few
