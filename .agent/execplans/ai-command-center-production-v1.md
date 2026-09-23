@@ -58,13 +58,22 @@ intact; privacy disclosure updated truthfully before default-on.
 
 ## Current Checkpoint
 
-- Current milestone: Successor campaign defined, validated-in-progress; phase 1 (eval corpus) is the first executable milestone; certification predecessor = production-closure campaign at final SHA `59bb353` with full CI success (run `35824126015`).
-- Current checkpoint: Campaign not started — this plan is the Master Successor
-  Rule deliverable of the production-closure campaign.
-- Completed: none (plan is ACTIVE because scope item 1, the eval corpus, is
-  executable today without credentials; credential dependencies gate phases 2-6
-  only, recorded as external conditions below).
-- In progress: nothing yet — Exact next action below is the first task.
+- Current milestone: Phase 1 (eval corpus) COMPLETE — corpus landed, wired, and
+  battery-green; phases 2-6 external-gated on credentials.
+- Current checkpoint: 2026-09-23 — phase 1 executed and validated inside the
+  parent production-closure campaign (single-campaign rule): corpus module
+  `e2e/helpers/commandEvalCorpus.ts` (10 command ground-truth rows: ready ×
+  needs_input × unsupported × unavailable incl. forced-failure, + 4 Ask safety
+  negatives), wired into `e2e/command.eval.internal.spec.ts` via
+  `[...INTERNAL_EVAL_CASES, ...COMMAND_EVAL_CORPUS]` (gate semantics unchanged),
+  shape/contract tests `tests/commandEvalCorpus.test.ts` 5/5.
+- Completed: **Eval corpus (phase 1 scope item 1)** — affected battery all green:
+  qa:fast 1,893/1,893 + parity, full `npm test` 2,266/2,266, journeys @p0 25/25,
+  recurring/linked 6/6, deterministic simulation aggregate **23/23** (22+1
+  slices after a sanctioned `switchSection` 5s→30s identity-wait fix with
+  sample-trace evidence — CPU-saturated host refresh-storm delay, semantics
+  unchanged).
+- In progress: nothing credential-free — remaining phases gated as below.
 - Important modified files: none yet (file lands from gitignored staging after
   the predecessor campaign's frozen native-suite chain completes).
 - Last successful validation: n/a.
@@ -81,17 +90,20 @@ intact; privacy disclosure updated truthfully before default-on.
 run --with-parser --no-teardown` (or the nightly lane once the token exists),
   then run the eval/observation describes against the real provider and record
   the measured gates in this plan's Validation Ledger.
-- Exact next action: Build the eval corpus fixtures (scope item 1) — executable
-  today without credentials — and wire them into the existing eval describe's
-  fixture loader; run `npm run qa:affected` gates; commit.
-- Remaining definition of done: corpus landed; authenticated lanes green on
+- Exact next action: parent campaign: checkpoint-commit the corpus + sanctioned
+  oracle wait (campaign files), force-provision Android from that exact SHA,
+  run the chunked smoke/persistence/lifecycle suites, then pre-push → push → CI
+  terminal watch. Successor plan itself: nothing credential-free remains —
+  resume phase 2 (authenticated nightly lane) when the owner provisions the
+  provider secret / Supabase project per the External conditions below.
+- Remaining definition of done: (phases 2-6, external-gated) authenticated lanes green on
   nightly; measured gates documented with numbers; red-team items passed;
   privacy delta shipped through guards; owner default-on executed with monitoring
   evidence; every certification lane green at the resulting SHAs.
 
 ## Progress
 
-- [ ] Eval corpus fixtures + loader wiring
+- [x] Eval corpus fixtures + loader wiring
 - [ ] Authenticated nightly lane (token-guarded)
 - [ ] Measured gate report (accuracy/latency/fallback/cost)
 - [ ] Red-team pass through the five layers

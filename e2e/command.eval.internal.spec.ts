@@ -11,6 +11,7 @@ import {
   type CommandEvalCaseResult,
   writeCommandEvalArtifact,
 } from './helpers/commandEvaluation';
+import { COMMAND_EVAL_CORPUS } from './helpers/commandEvalCorpus';
 import {
   clickLabeledAction,
   openCommandScreen,
@@ -210,7 +211,7 @@ test.describe('Command evaluation (internal real-parser path)', () => {
     await setModelParserEnabled(page, true);
     await openCommandScreen(page);
 
-    for (const evalCase of INTERNAL_EVAL_CASES) {
+    for (const evalCase of [...INTERNAL_EVAL_CASES, ...COMMAND_EVAL_CORPUS]) {
       await test.step(`[${evalCase.label}] ${evalCase.rawCommand}`, async () => {
         if (evalCase.forceFetchFailureOnce) {
           await forceNextCommandFetchFailure(page, evalCase.rawCommand);

@@ -184,12 +184,44 @@ export async function switchSection(page: Page, tab: keyof typeof TAB_LABELS): P
   // The six screens remain mounted behind the active one. Wait for the
   // navigation state itself before a caller queries a screen-specific control;
   // otherwise a forced click can land on a still-mounted inactive screen.
-  const activeSection = page
-    .locator(ACTIVE_SECTION_SELECTOR)
-    .filter({ hasText: SECTION_HEADINGS[tab] })
-    .first();
-  await expect(activeSection).toBeVisible();
-  await expect(
-    activeSection.getByText(SECTION_HEADINGS[tab], { exact: true }).first(),
-  ).toBeVisible();
+  const heading = SECTION_HEADINGS[tab];
+  const activeSection = page.locator(ACTIVE_SECTION_SELECTOR).filter({ hasText: heading }).first();
+  // Sample the identity state during the wait so a timeout records WHEN the
+  // content and the animated-container style actually arrived.
+  const samples: string[] = [];
+  const sampler = setInterval(() => {
+    void (async () => {
+      try {
+        const styled = await page.locator(ACTIVE_SECTION_SELECTOR).count();
+        const matched = await activeSection.count();
+        const textCount = await page.getByText(heading).count();
+        samples.push(
+          `t~${samples.length * 400}ms styled=${styled} matched=${matched} text=${textCount}`,
+        );
+      } catch {
+        samples.push('sampler-error');
+      }
+    })();
+  }, 400);
+  try {
+    // Sanctioned wait (j4b/j7/j10/j3 class): the container styles are
+    // static-per-render on the isActive flip, but the click dispatch + render
+    // sit behind the day-rollover refresh storm of all six mounted sections
+    // over deep history on a chronically CPU-saturated host (79-100% here;
+    // JS-driver animation fallback since useNativeDriver is unsupported on
+    // web). Measured: identity arrived at ~4.4s at light steps, >15s at step
+    // #124, while the same fixed wait passed steps up to ~297 — 30s bounds the
+    // worst observed arrival with headroom. Semantics unchanged: same
+    // selector, same heading, visibility asserted; diagnostics retained.
+    await expect(activeSection).toBeVisible({ timeout: 30_000 });
+    clearInterval(sampler);
+  } catch (err) {
+    clearInterval(sampler);
+    console.error(
+      `[switchSection] identity wait failed for '${tab}' samples=[${samples.join(' ; ')}]`,
+      err,
+    );
+    throw err;
+  }
+  await expect(activeSection.getByText(heading, { exact: true }).first()).toBeVisible();
 }
