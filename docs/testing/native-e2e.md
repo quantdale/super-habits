@@ -162,8 +162,12 @@ current-source validation for this change.
 
 iOS native execution remains cloud-only on Nitro. `npm run qa:native:ios`
 correctly reports `ENVIRONMENT` because Windows has no Xcode `xcrun/simctl`.
-The EAS workflow remains the executable iOS path and was not claimed as a
-local pass.
+The EAS workflow is currently `BLOCKED_EXTERNAL` for project `@dale16/superhabits`.
+On 2026-09-23, an exact-SHA dispatch failed because EAS found no GitHub
+repository linked to the app ID; workflow validation also reported that
+Maestro jobs require a paid plan. The project owner must link
+`quantdale/super-habits` in EAS and enable a plan that permits Maestro before
+the cloud iOS lane can run. No subscription or billing change was made.
 
 ### Remaining unproven
 
@@ -287,6 +291,11 @@ both platforms and runs the focused flows through EAS Maestro. It is triggered
 manually or by the explicit `native-e2e` pull-request label, so ordinary web PRs
 remain practical. The workflow does not submit or publish an app.
 
+The workflow definition is checked in, but account prerequisites currently
+block execution: EAS needs a linked GitHub repository for `--ref`, and the
+account plan must permit Maestro jobs. See the dated result above; retry only
+after both conditions are met.
+
 ## Lifecycle and notification boundaries
 
 The Pomodoro lifecycle flow verifies the running native UI through a real
@@ -318,7 +327,8 @@ belong with the corresponding workflow run.
 
 - Android smoke and targeted lifecycle flows are the practical local gate when
   an emulator/device and E2E APK are available.
-- iOS uses a macOS simulator locally or the EAS workflow; Windows development
-  does not claim iOS execution.
+- iOS uses a macOS simulator locally or the EAS workflow after its repository
+  link and Maestro-plan prerequisites are met; Windows development does not
+  claim iOS execution.
 - Cross-platform native success is reported only when both platform runs have
   actually executed. An unavailable platform is `EXTERNAL BLOCKER` or `NOT RUN`.

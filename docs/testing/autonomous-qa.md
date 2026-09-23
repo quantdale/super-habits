@@ -65,9 +65,11 @@ API-36 x86_64 target is missing the package or has stale provenance; use
 `npm run qa:native:provision -- --serial <serial>` for an explicit build/install
 step. Local commands perform preflight and write focused reports under
 `simulation-output/native/` (gitignored). A missing toolchain, target, or build
-is an `ENVIRONMENT` blocker, never a native pass. The cost-conscious cloud path
-is `.eas/workflows/native-e2e.yml`; it runs only by manual dispatch or the
-explicit `native-e2e` pull-request label.
+is an `ENVIRONMENT` blocker, never a native pass. The cloud path is
+`.eas/workflows/native-e2e.yml`; it runs only by manual dispatch or the explicit
+`native-e2e` pull-request label. EAS must have this GitHub repository linked,
+and the account plan must permit Maestro jobs; see
+`docs/testing/native-e2e.md` for the current account-side status.
 
 The standard feature project blocks service workers so they cannot bypass the
 Playwright-routed OPFS harness between tests. `e2e/infrastructure.spec.ts`

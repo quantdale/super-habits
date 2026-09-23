@@ -106,13 +106,17 @@ notification-shade action selection on the current-source APK. The remaining
 capability gaps are long-horizon recurrence, long-running background
 execution, focused `Alert.alert` confirmations, system offline toggling, and
 platform-specific performance. iOS remains dependent on EAS/macOS because
-Windows has no Xcode `xcrun/simctl`.
+Windows has no Xcode `xcrun/simctl`. The 2026-09-23 cloud attempt found no EAS
+GitHub repository link for the project and the account plan blocks Maestro
+jobs, so the cloud iOS lane is also `BLOCKED_EXTERNAL` until the project owner
+links the repository and enables an eligible plan.
 
 **Closing path:** keep `npm run qa:native:android`, the targeted persistence
 lane, lifecycle lane, and the test-only delivery probe as the local Android
-gates. Run the `.eas/workflows/native-e2e.yml` jobs for iOS/cross-platform
-coverage. Add stable visual notification-shade and system-network assertions
-only after selecting a supported device-lab mechanism. (Supplemented by the
+gates. Run `.eas/workflows/native-e2e.yml` only after the EAS project is linked
+to the GitHub repository and the account plan permits Maestro jobs. Add stable
+visual notification-shade and system-network assertions only after selecting
+a supported device-lab mechanism. (Supplemented by the
 manual exploratory missions in `docs/testing/exploratory-missions.md` — M1,
 M2.)
 
