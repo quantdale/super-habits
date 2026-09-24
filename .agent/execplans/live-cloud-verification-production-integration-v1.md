@@ -42,13 +42,25 @@ directive 11 until directive 12's exhaustion condition holds.
 
 ## Current Checkpoint
 
-- Current milestone: **J8 RESOLVED without touching a single threshold** —
-  root-caused (mid-animation measurement backlog) + fixed (settle-before-
-  measured-round) + the E2E remote-leak incident closed (hermetic
-  `build:e2e`); persona **7/7 green**, `maxSwitch=622/800 (22.3% hd)`;
-  the14-file wave is staged; CI `35969211668` e2e failure root-caused (same
-  floor on ubuntu 725/745 + registered fixme skips) and fixed pending the
-  next push's CI cycle.
+- Current milestone: **J8 wave landed, pushed, CI-GREEN; Campaign 4 Android
+  COMPLETE** — commits `8d9db26` (fix) + `8f8c79e` (docs); CI `35987777309`
+  quality+e2e SUCCESS at certified SHA `8f8c79e` (weeks-long gap-15 straddle
+  closed on ubuntu too); Android exact-build cert at `8f8c79e`: **19/19
+  flows** (smoke 2/2, persistence 11/11, lifecycle 6/6), APK
+  `A95C9BC81B537BEAFDB73C5F21EE27146444089681FA98AE47F1B3D67262FB93`,
+  provenance `simulation-output/native/native-android-build.json`, owned
+  emulators stopped each lane.
+- Completed: Directives 1-3 (true state; CI trustworthy; governance landed
+  `3858cb9`); Directive 4 = certified at `8f8c79e` (full local ladder incl.
+  qa:full exit 0 + CI green at that SHA) — final doc-wave SHA still needs its
+  own CI per DoD; Directive 6 waves 1+2 (`3858cb9`, `ea2e36d`, `8d9db26`);
+  Campaign 4 (above); gap-15/W8-1 root-caused + resolved without threshold
+  changes; hermetic `build:e2e` (leak guard verified 0 hosts); 6-scout
+  swarm integrated; ladder evidence at `ea2e36d`/`8f8c79e`: qa:fast 1,897 |
+  integration 373 | journeys @p0 25 | qa:full exit 0 (incl. e2e:full +
+  deterministic 23/23) | plans 93/0 | themes 140 | openspec 59 | timezones
+  5/5 | web:verify+hygiene PASS | audit 0C/0H/14M | expo-doctor 20/20 |
+  e2e:sync 40/6.
 - Completed: Directives 1-3 (true state; CI trustworthy at `2f742fe`;
   governance landed `3858cb9`); Directive 6 wave 1 (`3858cb9` + `ea2e36d`,
   pushed); battery at `ea2e36d` under engines Node 22.23.2 (PATH must be
@@ -60,11 +72,13 @@ directive 11 until directive 12's exhaustion condition holds.
   e2e:sync 40/6 skip exit 0, web:verify PASS, web:hygiene PASS,
   audit 0C/0H/14M, expo-doctor 20/20, e2e:full 259 pass/1 fail (J8)/13 skip
   registered; 6-scout swarm integrated; `nul` removed; stash preserved.
-- In progress: impact-mapped ladder at the new tree (`qa:fast → qa:full →
-qa:integration → qa:journeys → qa:simulation` + focused
-  `tests/{simulation.*,repeat,agent-execplan}.*` + @p0 + full deterministic +
-  broad regression), then commit → push → CI watch → Campaign 4 (Android
-  certification at the resulting SHA).
+- In progress: **documentation-reconciliation wave** — store-readiness
+  recert block refresh (guard counts + candidate/HEAD cites), ci.yml advisory
+  snapshot refresh + Campaign-8 override-rejection rationale, then commit →
+  push → CI watch at the new SHA; then §32 adversarial final review →
+  Directive-9 successor selection (leading executable candidate:
+  ai-command-center phase-5 privacy delta — credential-free guard/docs work;
+  candidates A/B otherwise externally gated or spec-only per §25).
 - Important modified files: (landed) `.agent/EXECUTION_PROMPT.md`, mission
   plan, `ai-command-center-production-v1.md` (`3858cb9`);
   `simulation/backend/provision.ts` + `tests/simulation.provisionHosts.test.ts`
@@ -116,14 +130,12 @@ provision.ts run --with-parser --no-teardown --reuse=slvctfwphtpeymzghyoc
 --org-id mnqrbiambekxvrtuufcn --production-hosts
 kruubbynsmxzxfdunaal.supabase.co`; (d) re-probe parse/ask → successor
   phase 2.
-- Exact next action: run the impact-mapped ladder at this tree (qa:fast →
-  qa:full → qa:integration → qa:journeys → qa:simulation + focused tests +
-  @p0 + full deterministic + broad), lint/format/typecheck/plans-validate,
-  delete-check `git status` clean of transients, commit the wave coherently,
-  push, watch CI to terminal; then Campaign 4 (Android exact-build
-  certification: `qa:native:provision` → boot `Nitro_API_36` → APK from the
-  certified SHA → smoke/persistence/lifecycle); then store-doc SHA refresh +
-  Campaign 8 override decision (decode-uri-component 0.5.0).
+- Exact next action: land the doc-reconciliation edits (store recert block,
+  ci.yml snapshot + override rationale), prettier+plans-validate, commit,
+  push, CI watch to terminal; then §32 adversarial review (delegate
+  read-only reviewers on the final tree); then Directive 9 → 10 (execute the
+  chosen successor or record exhaustion), §33 final matrix at the final SHA,
+  §35 hygiene, §36 report, Outcomes.
 - Remaining definition of done: 12 directives evidenced; J8 classified/
   resolved without threshold changes; CI green at final SHA; Campaigns
   4-10 executed or runbook-classified; doc reconciliations (KB:1010,

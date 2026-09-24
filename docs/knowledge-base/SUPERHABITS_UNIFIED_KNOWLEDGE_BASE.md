@@ -1007,7 +1007,7 @@ export interface SyncAdapter {
 
 #### `SupabaseSyncAdapter` (`core/sync/supabase.adapter.ts`)
 
-- `push(records)` — groups by `entity`, loads current SQLite rows for queued ids, **`upsert`**s into Supabase (`onConflict: "id"`) for the complete current Scope-7 `BACKUP_ENTITIES` set (including Gym V2 structure/history, planning, custom exercise metadata, weekly plans, overrides, and body weight) plus the synthetic `user_backup_settings` and `backup_manifest` records (settings-before-manifest push ordering; hard-delete entities issue owner-scoped remote DELETEs). No-ops if `records` empty, **`supabase` client is null** (missing env), or entity unknown.
+- `push(records)` — groups by `entity`, loads current SQLite rows for queued ids, **`upsert`**s into Supabase (`onConflict: "id"`) for the complete current Scope-7 `BACKUP_ENTITIES` set (including Gym V2 structure/history, planning, custom exercise metadata, weekly plans, overrides, and body weight) plus the synthetic `user_backup_settings` and `backup_manifest` records (settings-before-manifest push ordering; hard-delete entities issue owner-scoped remote DELETEs). No-ops only when `records` is empty; a null **`supabase` client** (missing env) or an unknown entity **throws** (the outbox is kept intact and the failure surfaces as `SyncPushPartialFailureError`), never a silent no-op.
 - `pull` — returns `[]` (restore / multi-device pull not implemented; empty-device recovery goes through Restore V2 / the legacy V1 coordinator).
 
 #### `SyncEngine`

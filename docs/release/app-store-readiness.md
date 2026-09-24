@@ -39,8 +39,21 @@ file when a release actually ships rather than letting it drift.
 
 ## Exact-HEAD recertification (2026-09-23 — production-closure campaign)
 
+The 2026-09-24 overnight recertification block below is the CURRENT verdict
+source (fresh executions; CI cited per run/SHA); everything under it is
+historical until the next recertification:
+
+- Static/contracts: typecheck · lint (`--max-warnings 0`) · theme tokens (140) · OpenSpec 59/59 · versioned ExecPlans 93/93 · impact rules 13 — PASS
+- Unit + integration: **227 files / 2,270 passed** (`npm test`, Node v22.23.2 engines-conformant, local fresh)
+- `qa:fast` fresh: 149 files / 1,897 passed · timezones: 94 tests × 5 zones · release guards: **34/34 (7 files)** — age-rating-dsa · icon-splash-asset-audit · privacy-hosting · release-notes · store-assets-checklist · store-declaration-drift · version-build-consistency
+- Web: `build:web` PASS · `build:e2e` **hermetic PASS** (`EXPO_NO_DOTENV` + `supabase.co` leak guard, 0 hosts in `dist/`) · `web:verify` PASS · `web:hygiene` PASS
+- Full browser E2E + deterministic 23/23 + J8 persona 7/7 (measurement-start root cause; ceiling/floor/guard unchanged): local `qa:full` exit 0 · **CI run `35987777309` @ `8f8c79e` quality+e2e SUCCESS** · `build:sync` + `e2e:sync` 40/6/0 PASS
+- Android: exact-source `8f8c79e` → APK SHA-256 `A95C9BC81B537BEAFDB73C5F21EE27146444089681FA98AE47F1B3D67262FB93` · smoke 2/2 + persistence 11/11 + lifecycle 6/6 (**19/19 flows**) · provenance `simulation-output/native/native-android-build.json`
+- Expo Doctor **20/20** · `npm audit` **0 critical / 0 high / 14 moderate** (all production; two leaf advisories — override-rejection rationale recorded in the ci.yml advisory comment) · `sim:validate` 23 scenarios
+- Application candidate of record: `8f8c79e` (CI run `35987777309`); docs-only successor commits re-certify via their push runs (recorded in `.agent/execplans/live-cloud-verification-production-integration-v1.md`)
+
 The 2026-09-14 gate table below is **historical** and is superseded for the
-campaign verdict by this block; every number here comes from a fresh
+campaign verdict by the blocks above; every number here comes from a fresh
 execution (commands re-run, not copied), with CI results cited per run/SHA:
 
 - Static/contracts: typecheck · lint (`--max-warnings 0`) · theme tokens (140 checks) · OpenSpec 59/59 · versioned ExecPlans all-valid · impact rules 13 — PASS

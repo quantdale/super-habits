@@ -95,18 +95,21 @@ jobs:
         env:
           TZ: Asia/Manila
 
-      # Advisory policy (production-closure Phase 8; snapshot dated 2026-09-23,
+      # Advisory policy (production-closure Phase 8; snapshot dated 2026-09-24,
       # verify live with `npm audit --omit=dev`): non-force fixes are applied
       # as soon as they exist; fixes requiring an incompatible framework change
       # (e.g. vitest@5 / router@5.1.11 / Expo-major proposals) are NEVER forced
       # and wait for an upstream coordinated release. Severity policy:
       # critical/high must be zero (the gate below enforces that); moderate
       # findings are framework-owned and report-only. Dated snapshot: 0
-      # critical / 0 high / 16 moderate (14 production) — the shipped-reachable
-      # node is expo-router's query-string decode chain; the uuid/xcode and
-      # vitest chains are build-time/dev only. This step stays
-      # continue-on-error: moderates must not gate, while any NEW high or
-      # critical still fails the command and surfaces here visibly.
+      # critical / 0 high / 14 moderate (all production; two leaf advisories:
+      # decode-uri-component via expo-router's query-string chain — an override
+      # to 0.5.0 was REJECTED 2026-09-24 as a semver-major swap under a
+      # pinned ^0.2 dependency with untested URL-decode behavior (policy:
+      # framework-owned, wait for upstream); uuid via @expo/config-plugins →
+      # xcode is build-time only. The vitest chain is dev-only. This step
+      # stays continue-on-error: moderates must not gate, while any NEW high
+      # or critical still fails the command and surfaces here visibly.
       - name: Audit runtime dependencies (advisory)
         continue-on-error: true
         run: npm audit --omit=dev --audit-level=high
