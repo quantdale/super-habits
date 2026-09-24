@@ -1,7 +1,7 @@
 # ExecPlan: live-cloud-verification-production-integration-v1
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -156,19 +156,14 @@ provision.ts run --with-parser --no-teardown --reuse=slvctfwphtpeymzghyoc
 --org-id mnqrbiambekxvrtuufcn --production-hosts
 kruubbynsmxzxfdunaal.supabase.co`; (d) re-probe parse/ask → successor
   phase 2.
-- Exact next action: finish the ladder (qa:integration → qa:journeys →
-  qa:simulation → qa:full), prettier+eslint+tsc+plans-validate clean, commit
-  the successor-fix wave coherently, push, CI watch to terminal; then §33
-  final matrix at the final SHA, §35 hygiene (ports/processes/temp), §36
-  evidence-heavy report, fill Outcomes. After that: ai-command-center
-  phase-5 privacy delta only if material capacity remains (else queued as
-  next campaign with credential-free scope noted).
-- Remaining definition of done: 12 directives evidenced; J8 classified/
-  resolved without threshold changes; CI green at final SHA; Campaigns
-  4-10 executed or runbook-classified; doc reconciliations (KB:1010,
-  AGENTS `user-ai-ask`, "anonymous only", store SHA cites) landed;
-  successor chosen + executed; final matrix + adversarial review + report;
-  Outcomes filled.
+- Exact next action: None — campaign complete; terminal proof recorded in
+  Outcomes & Retrospective (code-final SHA `5625987`, CI `36017723458`
+  quality+e2e SUCCESS; Android 19/19 at the same source).
+- Remaining definition of done: COMPLETE — all 12 directives evidenced or
+  runbook-classified; J8 resolved without threshold changes; CI green at
+  every pushed SHA incl. final; Campaigns 1-10 executed; doc reconciliations
+  landed; successor (§32 fix wave) chosen AND executed; final matrix +
+  adversarial review + report done; Outcomes filled.
 
 ## Progress
 
@@ -347,6 +342,46 @@ kruubbynsmxzxfdunaal.supabase.co`; (d) re-probe parse/ask → successor
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: Pending.
-- Follow-up: Pending.
+- Status: Complete.
+- Summary: Overnight campaign (2026-09-24) executed all 12 directives and
+  Campaigns 1-10. Six commits (`3858cb9`, `ea2e36d`, `8d9db26`, `8f8c79e`,
+  `180dc4a`, `5625987`), each pushed, every CI run terminal-SUCCESS
+  (`35969211668` classified+fixed → `35987777309` → `35997911294` →
+  `36017723458` quality+e2e green at code-final `5625987`). Headlines:
+  (1) **gap-15/W8-1 closed** — weeks-long J8 floor straddle root-caused to
+  measurement-start inheriting the warm-up animation backlog (in-test
+  per-switch `[761,403,635,481,657,425]` vs settled `223-348ms`, CDP no app
+  hotspot) and fixed with settle-before-measure — guard/ceiling/floor all
+  untouched; (2) **production-drain incident closed** — local `build:web`
+  inlined live Supabase creds, restored project drained `sync_outbox`
+  mid-journey (J8 oracle `0≠24`) and pushed test rows under throwaway anon
+  sessions; hermetic `build:e2e` (EXPO_NO_DOTENV + strip-all + byte-level
+  leak guard) + serve-e2e runtime backstop +9-file doc sweep now enforce
+  CI-parity everywhere; (3) **Campaign 4 Android exact-source 19/19 twice**
+  (`8f8c79e` APK `A95C9BC8…`, final `5625987` APK `5ABF7B8C…`), owned
+  emulators stopped per lane; (4) **§32 adversarial review (3 reviewers)
+  → successor fix wave**: P0 backfill OFFSET page-skip → keyset cursor
+  paging + deterministic regression (integration 374), KB truth fixes +
+  schema pins, provision SAFE_ARG enforcement, recert corrections;
+  (5) Campaign 8 closed: override REJECTED with pinned rationale; (6)
+  gap-21 (P1 manifest-window) consciously accepted + spec-deferred with
+  closing path; (7) store recert block is the current verdict source.
+  Final matrix at `5625987`: CI quality+e2e SUCCESS · Android 19/19 ·
+  qa:fast1,897/integration374/journeys25/simulation23/qa:full PASS (one
+  ENVIRONMENT ceiling excursion884ms classified with lineage, next run
+  green) · web:verify+hygiene · plans93/themes140/openspec59 ·
+  timezones5/5 · e2e:sync40/6 · audit0C/0H/14M · expo-doctor20/20 ·
+  supabase:schema:validate PASS · stash untouched · §35 hygiene clean.
+- Follow-up (external-only + queued, all with runbooks in Checkpoint):
+  (a) owner: export `SUPABASE_ACCESS_TOKEN` (or IPv6 network) → disposable
+  schema resume command; (b) owner: provider secrets (`OPENAI_API_KEY`+
+  `AI_COMMAND_MODEL` / `DEEPSEEK_API_KEY`) → ai-command-center phase 2
+  probes; (c) owner: paid Expo plan → EAS Maestro validation; (d) owner:
+  production-residue cleanup SQL (test rows/anon sessions from the drain
+  window — see gap/incident notes); (e) owner/legal: 58 store placeholders
+  across9 files (inventory in adversarial review); (f) spec: gap-21
+  manifest generations + degraded-restore modes; (g) queued next campaign:
+  ai-command-center **phase-5 privacy delta** (credential-free engineering
+  scope; provider names need owner/legal confirmation per §25); (h) MINOR
+  optional: leak-guard custom-domain pattern. No v1.0.0 tag, no store
+  submission, no billing change were made — all remain owner-authorized.
