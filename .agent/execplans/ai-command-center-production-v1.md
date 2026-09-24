@@ -21,8 +21,14 @@ intact; privacy disclosure updated truthfully before default-on.
   CI `deno check` green); dual-mode client with `remote_with_fallback`; confirm
   boundary; env-gated eval (2 tests) / observation (4 tests) / rollout describes;
   mock-parser twins green in standard lanes; specs `command-center-v2` + `ai-ask`.
-- External prerequisites absent at handoff: provider model credential (Functions
-  secret), `SUPABASE_ACCESS_TOKEN` (project INACTIVE), default-on authorization.
+- External prerequisites at handoff: provider model credential (Functions
+  secret) — STILL ABSENT after restoration (live probes 2026-09-24: parse
+  502 / ask 500 on the restored project; local `OPENAI_API_KEY` answers 401
+  `Incorrect API key provided` — placeholder/revoked, never printed),
+  `SUPABASE_ACCESS_TOKEN` for token-gated CI lanes (UNSET; local CLI is
+  authenticated by another mechanism), owner default-on authorization.
+  Supabase project itself is NO LONGER a prerequisite: ref
+  `kruubbynsmxzxfdunaal` is `ACTIVE_HEALTHY`, `linked: true`.
 
 ## Scope
 
@@ -76,9 +82,16 @@ intact; privacy disclosure updated truthfully before default-on.
 - In progress: nothing credential-free — remaining phases gated as below.
 - Important modified files: (phase 1, landed) `e2e/helpers/commandEvalCorpus.ts` (corpus), `e2e/command.eval.internal.spec.ts` (loader wiring), `tests/commandEvalCorpus.test.ts` (shape/contract).
 - Last successful validation: n/a.
-- Current failures: None.
+- Current failures: None (repo-side). Live-lane probes failing externally:
+  PARSE 502 `Command parsing is temporarily unavailable.`; ASK 500
+  `The ask service could not classify your question.` — both traced to the
+  absent provider secret, not project state.
 - Relevant quarantines: None.
-- Blockers: Phase 1 (eval corpus) has no blocker — executable today. Phases 2-6 are gated on external credentials: provider model credential (Edge Functions secret); restored Supabase project + `SUPABASE_ACCESS_TOKEN`; owner default-on authorization.
+- Blockers: Phases 2-6 blocked ONLY on the provider secret (Edge Functions:
+  `OPENAI_API_KEY` + `AI_COMMAND_MODEL` for parse, `DEEPSEEK_API_KEY` for
+  ask) + `SUPABASE_ACCESS_TOKEN` for token-gated CI lanes + owner default-on
+  authorization. Project/CLI/function-reachability blockers from the prior
+  campaign are RESOLVED (evidence in Validation Ledger).
 - External conditions gating phases 2-6: provider model credential; restored
   Supabase project + `SUPABASE_ACCESS_TOKEN`; owner default-on authorization.
 - Condition required to unblock phases 2-6: Owner provisions the provider secret
@@ -89,12 +102,14 @@ intact; privacy disclosure updated truthfully before default-on.
 run --with-parser --no-teardown` (or the nightly lane once the token exists),
   then run the eval/observation describes against the real provider and record
   the measured gates in this plan's Validation Ledger.
-- Exact next action: parent campaign: checkpoint-commit the corpus + sanctioned
-  oracle wait (campaign files), force-provision Android from that exact SHA,
-  run the chunked smoke/persistence/lifecycle suites, then pre-push → push → CI
-  terminal watch. Successor plan itself: nothing credential-free remains —
-  resume phase 2 (authenticated nightly lane) when the owner provisions the
-  provider secret / Supabase project per the External conditions below.
+- Exact next action: (parent-campaign items above all COMPLETED at
+  `7bc8a64`/`2f742fe` — corpus committed, Android certified, CI green.) Live
+  campaign `.agent/execplans/live-cloud-verification-production-integration-v1.md`
+  owns current execution; this plan resumes phase 2 the moment the owner
+  sets the provider secrets: re-probe parse/ask (probes recorded in the
+  mission plan's Ledger), then `npx tsx simulation/backend/provision.ts run
+--with-parser --no-teardown --org-id <org> --production-hosts
+<prod-host>` or the nightly lane once `SUPABASE_ACCESS_TOKEN` exists.
 - Remaining definition of done: (phases 2-6, external-gated) authenticated lanes green on
   nightly; measured gates documented with numbers; red-team items passed;
   privacy delta shipped through guards; owner default-on executed with monitoring
@@ -112,7 +127,16 @@ run --with-parser --no-teardown` (or the nightly lane once the token exists),
 
 ## Surprises & Discoveries
 
-- None yet.
+- 2026-09-24 — Restoration reclassified the gates: project ACTIVE_HEALTHY,
+  CLI authenticated (`supabase projects list` exit 0 without
+  `SUPABASE_ACCESS_TOKEN`), functions reachable + auth-enforcing. The ONLY
+  surviving external for phases 2-3 is the provider secret; local
+  `OPENAI_API_KEY` (len 67, `sk-…`) is rejected 401 by OpenAI — do not
+  mistake presence for validity.
+- 2026-09-24 — `parse-ai-command` gateway order verified live:
+  no-header → 401 `UNAUTHORIZED_NO_AUTH_HEADER`; anon-bearer → function-level
+  401; authenticated anon session → normalize (400 on missing fields, 502 on
+  provider absence). Auth-before-parse holds on the restored deployment.
 
 ## Decision Log
 
@@ -122,7 +146,17 @@ run --with-parser --no-teardown` (or the nightly lane once the token exists),
 
 ## Validation Ledger
 
-- (none yet)
+- 2026-09-24 — REST probes against restored project (anon, presence-only) —
+  PASS(gateway) / FAIL(external provider) — GoTrue health 200 v2.197.0;
+  anonymous signup 200 (`external.anonymous_users: true`); `/rest/v1/todos`
+  42501 anon-denied (RLS intact); PARSE 502 / ASK 500 = missing secret.
+- 2026-09-24 — local `OPENAI_API_KEY` validity probe (value never printed) —
+  FAIL(external) — OpenAI 401 `Incorrect API key provided` → key present but
+  placeholder/revoked; owner must provision real credentials as Edge
+  Function secrets.
+- 2026-09-23 — corpus battery (phase 1) — PASS — qa:fast 1,893/1,893 +
+  parity; full `npm test` 2,266/2,266; journeys @p0 25/25; deterministic sim
+  23/23; `tests/commandEvalCorpus.test.ts` 5/5.
 
 ## Changed Files / Areas
 

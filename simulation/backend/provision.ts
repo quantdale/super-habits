@@ -94,6 +94,12 @@ async function supabase(
     cwd: options.cwd,
     timeout: options.timeoutMs ?? 3 * 60_000,
     maxBuffer: 10 * 1024 * 1024,
+    // Windows: npm global CLIs are `.cmd` shims, which Node refuses to spawn
+    // via execFile without a shell (ENOENT) — that false-negatived the
+    // "CLI present" precondition on win32. `args` are repo-controlled,
+    // fixed-charset strings (flags, marker prefixes, generated ids), so the
+    // shell concatenation is safe here.
+    shell: process.platform === 'win32',
   });
   return stdout.trim();
 }
