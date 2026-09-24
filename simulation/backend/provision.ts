@@ -13,11 +13,13 @@
  * the disposable marker. The `dist-live/` build is produced only inside the
  * guarded job (see build-dist-live.sh).
  *
- * EXECUTION BLOCKED IN THIS ENVIRONMENT: it requires the Supabase CLI and a
- * login, neither of which is present here, and live execution is externally
- * blocked. The script therefore fails fast and clearly when the preconditions
- * (CLI, login, disposable marker, production-host config) are absent — it
- * never fabricates or fakes a run.
+ * PRECONDITIONS: the Supabase CLI must be installed and authenticated
+ * (`supabase login`). Schema application prefers the Management API when
+ * SUPABASE_ACCESS_TOKEN is set (CI path); locally, without the token, it
+ * falls back to psql over the throwaway project's direct connection using
+ * the db password persisted at creation time (state/, gitignored). It
+ * fails fast and clearly when neither path is available — it never
+ * fabricates or fakes a run.
  *
  * RUNNER: no `tsx`/`ts-node` dependency is added to this repo by design
  * (constraint: no package.json changes). Invoke with `npx tsx` (one-off, not
@@ -26,6 +28,8 @@
  */
 
 import { execFile } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -90,17 +94,28 @@ async function supabase(
   args: string[],
   options: { cwd?: string; timeoutMs?: number } = {},
 ): Promise<string> {
-  const { stdout } = await execFileAsync('supabase', args, {
-    cwd: options.cwd,
-    timeout: options.timeoutMs ?? 3 * 60_000,
-    maxBuffer: 10 * 1024 * 1024,
-    // Windows: npm global CLIs are `.cmd` shims, which Node refuses to spawn
-    // via execFile without a shell (ENOENT) — that false-negatived the
-    // "CLI present" precondition on win32. `args` are repo-controlled,
-    // fixed-charset strings (flags, marker prefixes, generated ids), so the
-    // shell concatenation is safe here.
-    shell: process.platform === 'win32',
-  });
+  const { stdout } = await (async () => {
+    try {
+      return await execFileAsync('supabase', args, {
+        cwd: options.cwd,
+        timeout: options.timeoutMs ?? 3 * 60_000,
+        maxBuffer: 10 * 1024 * 1024,
+        // Windows: npm global CLIs are `.cmd` shims, which Node refuses to spawn
+        // via execFile without a shell (ENOENT) — that false-negatived the
+        // "CLI present" precondition on win32. `args` are repo-controlled,
+        // fixed-charset strings (flags, marker prefixes, generated ids), so the
+        // shell concatenation is safe here.
+        shell: process.platform === 'win32',
+      });
+    } catch (error) {
+      // execFile errors embed the full command line — scrub credential-valued
+      // flags before the message can reach logs or CI output.
+      if (error instanceof Error) {
+        error.message = error.message.replace(/(--db-password|--token|-p)\s+\S+/g, '$1 [REDACTED]');
+      }
+      throw error;
+    }
+  })();
   return stdout.trim();
 }
 
@@ -118,7 +133,11 @@ function projectHostFromRef(ref: string): string {
 }
 
 function parseProductionHosts(env: NodeJS.ProcessEnv): string[] {
-  const raw = env.SIMULATION_PRODUCTION_SUPABASE_HOSTS ?? '';
+  return parseHostList(env.SIMULATION_PRODUCTION_SUPABASE_HOSTS ?? '');
+}
+
+/** Split a comma-separated host list (flag value or env var) into hosts. */
+export function parseHostList(raw: string): string[] {
   return raw
     .split(',')
     .map((s) => s.trim())
@@ -195,12 +214,7 @@ function guardFor(
 /* Management API (raw SQL + readiness) - Cloud disposable lane         */
 /* ------------------------------------------------------------------ */
 
-async function managementApi(
-  ref: string,
-  method: string,
-  pathname: string,
-  body?: unknown,
-): Promise<unknown> {
+async function managementApi(method: string, pathname: string, body?: unknown): Promise<unknown> {
   const token = process.env.SUPABASE_ACCESS_TOKEN;
   if (!token) {
     failFast('SUPABASE_ACCESS_TOKEN is required for the Management API path.');
@@ -226,9 +240,63 @@ async function managementApi(
 async function applySchemaToProject(ref: string, wipe: boolean): Promise<void> {
   const sql = await readFile(SCHEMA_FILE, 'utf8');
   const wipeSql = wipe ? `DROP TABLE IF EXISTS ${DATA_TABLES.join(', ')};\n` : '';
-  await managementApi(ref, 'POST', `/projects/${ref}/database/query`, {
-    query: `${wipeSql}${sql}`,
-  });
+  const query = `${wipeSql}${sql}`;
+  if (process.env.SUPABASE_ACCESS_TOKEN) {
+    await managementApi('POST', `/projects/${ref}/database/query`, { query });
+    return;
+  }
+  await applySchemaViaPsql(ref, query);
+}
+
+/** Read the throwaway db password persisted by createProject (state/, gitignored). */
+function readPersistedDbPassword(ref: string): string | null {
+  try {
+    const raw = readFileSync(path.join(STATE_DIR, 'disposable-db-password.txt'), 'utf8');
+    const [fileRef, password] = raw.trim().split('\n');
+    return fileRef === ref && password ? password : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * No-token schema path: psql over the project's direct connection. The
+ * password only ever exists in the gitignored state/ file or the
+ * SUPABASE_DISPOSE_DB_PASSWORD env var, and is scrubbed from any error.
+ */
+async function applySchemaViaPsql(ref: string, query: string): Promise<void> {
+  const password = readPersistedDbPassword(ref) ?? process.env.SUPABASE_DISPOSE_DB_PASSWORD ?? null;
+  if (!password) {
+    failFast(
+      `SUPABASE_ACCESS_TOKEN is not set and no persisted db password matches ${ref}; ` +
+        `cannot apply schema. Export SUPABASE_ACCESS_TOKEN (Management API path) or ` +
+        `SUPABASE_DISPOSE_DB_PASSWORD, or re-create the disposable project so its ` +
+        `password is persisted under ${STATE_DIR}. Missing precondition: schema channel.`,
+    );
+  }
+  const conn =
+    `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres` +
+    `?sslmode=require`;
+  const scrub = (text: string): string =>
+    text.replace(/postgres:[^@\s]+@/g, 'postgres:[REDACTED]@');
+  await mkdir(STATE_DIR, { recursive: true });
+  const sqlFile = path.join(STATE_DIR, 'apply-schema.sql');
+  await writeFile(sqlFile, query, 'utf8');
+  try {
+    await execFileAsync('psql', [conn, '-v', 'ON_ERROR_STOP=1', '-q', '-f', sqlFile], {
+      timeout: 5 * 60_000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      error.message = scrub(error.message);
+    }
+    failFast(
+      `psql schema application for ${ref} failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
 }
 
 /** Poll until the project's PostgREST endpoint is reachable (any HTTP status proves the host is up). */
@@ -260,7 +328,18 @@ interface ProjectInfo {
 /** Find a project in the account by ref, or null. */
 async function lookupProject(ref: string): Promise<ProjectInfo | null> {
   const list = await supabase(['projects', 'list']);
-  // CLI prints lines like: <ref> <region> <name> ... (or a table). Be tolerant.
+  // Piped (non-TTY) CLI output is JSON; interactive output is a table.
+  // The lane historically only ever ran non-interactively, so the table
+  // branch never matched and lookup always returned null — parse JSON first.
+  try {
+    const parsed = JSON.parse(list) as {
+      projects?: { ref?: string; name?: string }[];
+    };
+    const hit = parsed.projects?.find((p) => p.ref === ref);
+    if (hit) return { ref, name: hit.name ?? ref };
+  } catch {
+    // not JSON — fall through to tolerant table parsing
+  }
   const lines = list.split('\n');
   for (const line of lines) {
     const tokens = line.trim().split(/\s+/);
@@ -276,16 +355,30 @@ async function createProject(opts: {
   orgId: string;
   name: string;
   region: string;
+  size?: string;
 }): Promise<ProjectInfo> {
+  // Current CLI versions make --db-password required even non-interactively.
+  // This is a throwaway disposable project: generate a high-entropy password,
+  // never log it, and keep it only for the project's lifetime.
+  const dbPassword = randomBytes(24).toString('base64url');
+  const sizeArgs = opts.size ? ['--size', opts.size] : [];
   const out = await supabase([
     'projects',
     'create',
+    // Positional name: current CLI usage is `create [flags] [<name>]` —
+    // `--name` is not a recognized flag and aborts into help output, and
+    // `db-password` is required. `--size` is only valid on paid-plan orgs
+    // (free-plan orgs reject it: "Instance size cannot be specified for
+    // free plan organizations"), so it is passed only when configured.
+    opts.name,
     '--org-id',
     opts.orgId,
-    '--name',
-    opts.name,
     '--region',
     opts.region,
+    ...sizeArgs,
+    '--db-password',
+    dbPassword,
+    '--yes',
   ]);
   // The CLI prints the new project ref somewhere in the output; extract the
   // 20-char ref token, then confirm via the projects list.
@@ -298,6 +391,14 @@ async function createProject(opts: {
   if (!info) {
     failFast(`Created project ${ref} but could not find it in the projects list.`);
   }
+  // Persist the throwaway password (state/ is gitignored) so the no-token
+  // psql schema path — and later reuse of this ref — stay possible after the
+  // process exits. Never echoed, never committed.
+  await mkdir(STATE_DIR, { recursive: true });
+  await writeFile(path.join(STATE_DIR, 'disposable-db-password.txt'), `${ref}\n${dbPassword}\n`, {
+    encoding: 'utf8',
+    mode: 0o600,
+  });
   return info;
 }
 
@@ -383,7 +484,12 @@ function parseCommonOpts(argv: string[]): CommonOpts {
       DEFAULT_MARKER_PREFIX,
     orgId: get('--org-id') ?? process.env.SUPABASE_ORG_ID ?? null,
     region: get('--region') ?? process.env.SUPABASE_REGION ?? DEFAULT_REGION,
-    productionHosts: parseProductionHosts(process.env),
+    // `--production-hosts` must win over the env var; the precondition
+    // error message documents the flag, so a flag-only invocation has to
+    // work (it previously fell through to the env-only parser).
+    productionHosts: get('--production-hosts')
+      ? parseHostList(get('--production-hosts') ?? '')
+      : parseProductionHosts(process.env),
     ambientEnv: process.env,
   };
 }
@@ -537,10 +643,11 @@ export async function main(argv: string[]): Promise<number> {
           '  --marker-prefix <p> disposable marker prefix (default: superhabits-disposable)',
           '  --region <r>        creation region (default: us-east-1)',
           '  --reuse=<ref>       reuse an existing project by ref instead of creating',
+          '  --production-hosts <hosts>  comma-separated production hosts the guard must refuse (or SIMULATION_PRODUCTION_SUPABASE_HOSTS)',
           '  --with-parser       deploy the parse-ai-command edge function',
           '  --no-teardown       keep the project after the run',
           '',
-          'env: SUPABASE_ACCESS_TOKEN, SUPABASE_ORG_ID, SIMULATION_PRODUCTION_SUPABASE_HOSTS, SUPABASE_DISPOSABLE_MARKER_PREFIX',
+          'env: SUPABASE_ACCESS_TOKEN, SUPABASE_ORG_ID, SIMULATION_PRODUCTION_SUPABASE_HOSTS, SUPABASE_DISPOSABLE_MARKER_PREFIX, SUPABASE_DISPOSE_DB_PASSWORD (schema fallback when reusing without the persisted password)',
         ].join('\n'),
       );
       return 0;
