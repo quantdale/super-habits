@@ -42,65 +42,127 @@ directive 11 until directive 12's exhaustion condition holds.
 
 ## Current Checkpoint
 
-- Current milestone: Directive 3 (governance reconciliation) landing — mission
-  plan created, successor plan reconciled, execution prompt committed.
-- Completed: Directive 1 (true state: HEAD == origin/main == `2f742fe`, tree
-  clean but for the new execution prompt; single worktree; stash preserved);
-  Directive 2 (CI trustworthy: push `35871287036` success + nightly
-  `35912837207` success at HEAD; jobs quality/e2e/nightly all green);
-  attempt-first evidence sweep across all three external blockers (see
-  Validation Ledger); first hardened defect (directive 6 candidate):
-  `simulation/backend/provision.ts` win32 ENOENT false-negative fixed.
-- In progress: directive 3 landing commit; then directive 4 exact-SHA battery.
-- Important modified files: `.agent/EXECUTION_PROMPT.md` (new directive,
-  uncommitted→landing), `simulation/backend/provision.ts` (win32 shell fix),
-  this plan, `.agent/execplans/ai-command-center-production-v1.md`
-  (checkpoint reconciliation).
-- Last successful validation: `npm run agent:plan:validate:all` — 92 PASS /
-  0 FAIL (pre-landing); `npm run qa:affected` for the prompt change resolves
-  `qa:fast` + `tests/agent-execplan.test.ts`.
-- Current failures: None.
-- Relevant quarantines: None.
-- Blockers: None for directives 1-4, 6, 7. External-gated items re-attempted
-  with fresh evidence: provider credentials for AI lanes (parse 502 / ask 500
-  on the restored project); EAS Maestro jobs require a paid plan (verbatim
-  from `eas workflow:validate`); `SUPABASE_ACCESS_TOKEN` still UNSET (CI-only
-  lanes).
-- Condition required to unblock: owner provisions provider secrets
-  (`OPENAI_API_KEY`/`AI_COMMAND_MODEL` for parse, `DEEPSEEK_API_KEY` for ask)
-  on the restored project and/or supplies `SUPABASE_ACCESS_TOKEN` for
-  token-gated CI lanes; paid Expo plan for Maestro workflow jobs.
-- Exact resume action after unblock: re-run the recorded probes in the
-  Validation Ledger below, then the successor plan's phase-2 resume command.
-- Exact next action: commit the governance landing (prompt + three plan
-  files), then run the directive-4 certification battery at that exact SHA
-  (qa:affected-driven: `qa:fast` → integration → journeys → simulation →
-  `qa:full`, typecheck, lint, format:check, build:web, web:verify), then
-  attempt the disposable-backend lane (`provision.ts run --with-parser
---no-teardown --org-id mnqrbiambekxvrtuufcn --production-hosts
-kruubbynsmxzxfdunaal.supabase.co`), then push + CI terminal watch.
-- Remaining definition of done: all 12 directives evidenced or classified
-  with exact runbooks; certification green at the final pushed SHA; successor
-  campaign chosen (directive 9) and executed or exhaustively run-ruled
-  (directives 10-12); plans validated; web hygiene clean; Outcomes filled.
+- Current milestone: **J8 RESOLVED without touching a single threshold** —
+  root-caused (mid-animation measurement backlog) + fixed (settle-before-
+  measured-round) + the E2E remote-leak incident closed (hermetic
+  `build:e2e`); persona **7/7 green**, `maxSwitch=622/800 (22.3% hd)`;
+  the14-file wave is staged; CI `35969211668` e2e failure root-caused (same
+  floor on ubuntu 725/745 + registered fixme skips) and fixed pending the
+  next push's CI cycle.
+- Completed: Directives 1-3 (true state; CI trustworthy at `2f742fe`;
+  governance landed `3858cb9`); Directive 6 wave 1 (`3858cb9` + `ea2e36d`,
+  pushed); battery at `ea2e36d` under engines Node 22.23.2 (PATH must be
+  `/c/Users/palac/AppData/Local/tools/node-v22.23.2-win-x64` — backslash form
+  silently falls to node24): typecheck/lint PASS 0/0, themes 140, openspec
+  59, plans 93, impact 13 rules, qa:fast 1,897, npm test 2,270 (227 files),
+  timezones 5/5 (94), integration 373 (node24 run), journeys @p0 25,
+  simulation deterministic 23 + sim:validate 23, build:web, build:sync,
+  e2e:sync 40/6 skip exit 0, web:verify PASS, web:hygiene PASS,
+  audit 0C/0H/14M, expo-doctor 20/20, e2e:full 259 pass/1 fail (J8)/13 skip
+  registered; 6-scout swarm integrated; `nul` removed; stash preserved.
+- In progress: impact-mapped ladder at the new tree (`qa:fast → qa:full →
+qa:integration → qa:journeys → qa:simulation` + focused
+  `tests/{simulation.*,repeat,agent-execplan}.*` + @p0 + full deterministic +
+  broad regression), then commit → push → CI watch → Campaign 4 (Android
+  certification at the resulting SHA).
+- Important modified files: (landed) `.agent/EXECUTION_PROMPT.md`, mission
+  plan, `ai-command-center-production-v1.md` (`3858cb9`);
+  `simulation/backend/provision.ts` + `tests/simulation.provisionHosts.test.ts`
+  (`ea2e36d`, pushed). (staged, this wave) `e2e/journeys/three-months-in.spec.ts`
+  (settle + label), `scripts/build-dist-e2e.mjs` (new hermetic export + leak
+  guard), `package.json` (`build:e2e` + 2 rewires), `ci.yml` (2 E2E build
+  steps), `scripts/{qa-simulation,web-verify,qa-repeat,web-lifecycle,serve-e2e}`,
+  `e2e/{README.md,helpers/dbHarness.ts,infrastructure.spec.ts,journeys/bad-backend.spec.ts}`,
+  `AGENTS.md`, `docs/testing/known-gaps.md` (gap-15 root-cause entry), this plan.
+- Last successful validation: full battery rows above at `ea2e36d` /
+  Node 22.23.2, 2026-09-24.
+- Current failures: **None open.** (1) J8 step3 floor — RESOLVED: in-test
+  per-switch `[761,403,635,481,657,425]`ms isolated switch1 as the
+  warm-up-animation backlog (standalone settled 223-348 vs no-settle
+  704-917, ≥3× both directions, idle host; CDP: no app hotspot —
+  corroborates prior harness31/browser53/app16 attribution); fixed with
+  `waitForSectionTransitionsSettled` (ceiling/floor/guard UNCHANGED), label
+  corrected `overview→todos`→`calories→todos`; post-fix 7/7 with
+  `calories→todos=619 … max 622`. Isolated single-step reruns were an
+  INVALID METHOD (steps1/2 own the navigation) — recorded, not product.
+  (2) J8 step7 oracle `0≠24` — RESOLVED: local `build:web` inlined real
+  `.env` Supabase creds; restored project let the app drain `sync_outbox`
+  mid-journey (CI hermetic only by accident of no `.env`); fixed by hermetic
+  `build:e2e` (EXPO_NO_DOTENV + ambient strip + `supabase.co` leak guard,
+  0 hosts verified in dist/). (3) step6 `diarySearch=533ms` single blip,
+  green next two runs (396 final) — host variance recorded, ceiling kept.
+  (4) CI e2e failure — root-caused as (1) on ubuntu (725/745) + registered
+  fixme skips + workout:297 flaky-but-passed (green locally); fixed by this
+  wave pending CI rerun.
+- Relevant quarantines: None added; 13 registered gate files unchanged
+  (parity guard green).
+- Blockers: (b) disposable-lane schema —
+  BLOCKED_EXTERNAL: `db.<ref>` IPv6-only (DoH AAAA yes/A no), no IPv6 route
+  (ENETUNREACH), `*.pooler.supabase.co` NXDOMAIN all refs, no
+  `SUPABASE_ACCESS_TOKEN`; resume: token → managementApi path (code-ready);
+  (b2) E2E-drain residue cleanup — BLOCKED_EXTERNAL: local runs between
+  restoration and the hermetic fix pushed UI-created test rows + synthetic
+  settings/manifest under throwaway anonymous users on the LIVE project;
+  owner must run SQL/Management-console cleanup (identify `auth.users`
+  created 2026-09-24 by test sessions + their owned rows); (c) EAS Maestro
+  jobs — paid plan (verbatim); (d) AI provider secrets — parse 502 / ask 500
+  live probes. (J8 floor blocker RESOLVED this wave.)
+- Condition required to unblock: (b) owner exports `SUPABASE_ACCESS_TOKEN`
+  or IPv6-capable network; (b2) owner SQL/Management access; (c) paid Expo
+  plan; (d) owner sets `OPENAI_API_KEY`+`AI_COMMAND_MODEL` /
+  `DEEPSEEK_API_KEY`.
+- Exact resume action after unblock: (b) `npx tsx simulation/backend/
+provision.ts run --with-parser --no-teardown --reuse=slvctfwphtpeymzghyoc
+--org-id mnqrbiambekxvrtuufcn --production-hosts
+kruubbynsmxzxfdunaal.supabase.co`; (d) re-probe parse/ask → successor
+  phase 2.
+- Exact next action: run the impact-mapped ladder at this tree (qa:fast →
+  qa:full → qa:integration → qa:journeys → qa:simulation + focused tests +
+  @p0 + full deterministic + broad), lint/format/typecheck/plans-validate,
+  delete-check `git status` clean of transients, commit the wave coherently,
+  push, watch CI to terminal; then Campaign 4 (Android exact-build
+  certification: `qa:native:provision` → boot `Nitro_API_36` → APK from the
+  certified SHA → smoke/persistence/lifecycle); then store-doc SHA refresh +
+  Campaign 8 override decision (decode-uri-component 0.5.0).
+- Remaining definition of done: 12 directives evidenced; J8 classified/
+  resolved without threshold changes; CI green at final SHA; Campaigns
+  4-10 executed or runbook-classified; doc reconciliations (KB:1010,
+  AGENTS `user-ai-ask`, "anonymous only", store SHA cites) landed;
+  successor chosen + executed; final matrix + adversarial review + report;
+  Outcomes filled.
 
 ## Progress
 
 - [x] Directive 1 — true repository state established
 - [x] Directive 2 — CI verified trustworthy at HEAD
-- [ ] Directive 3 — governance reconciliation landed (commit pending)
-- [ ] Directive 4 — exact-SHA certification battery + push + CI watch
-- [ ] Directive 5 — release/platform gaps closed or classified (disposable
-      lane, provider-secret probe, EAS workflow retry with correct args)
-- [ ] Directive 6 — evidence-backed defects hardened (provision.ts win32 fix
-      already staged)
-- [ ] Directive 7 — repository-side release preparation completed
-- [ ] Directive 8 — production-risk investigation reported
+- [x] Directive 3 — governance reconciliation landed (`3858cb9`)
+- [~] Directive 4 — exact-SHA battery at `ea2e36d` green except J8; pushed;
+  CI `35969211668` watch open
+- [~] Directive 5 — platform gaps: disposable lane progressed to schema
+  (blocked: IPv6-only db host / no token — runbook recorded); AI parse/ask
+  live-probed (provider-secret external); EAS paid-plan external
+- [x] Directive 6 — first defect wave landed (`3858cb9` + `ea2e36d`)
+- [~] Directive 7 — store artifacts classified (scout): doc SHA-refresh +
+  guard-count line pending
+- [~] Directive 8 — risks probed: 2 leaf advisories identified
+  (decode-uri-component override candidate; uuid FRAMEWORK_OWNED)
 - [ ] Directive 9 — successor campaign chosen with evidence
 - [ ] Directive 10 — successor campaign executed
 - [ ] Directive 11-12 — loop until exhaustion; no speculative residue
 
 ## Surprises & Discoveries
+
+- 2026-09-24 — `npx expo export` inlines whatever `.env*` exists locally;
+  the repo's own `bad-backend.spec.ts` comment asserted the opposite (true
+  only in CI). With the project RESTORED, local test exports became live
+  clients: anon bootstrap → outbox drain → J8 oracle `0≠24` AND test-row
+  pollution of production under throwaway anonymous users. `build:sync`'s
+  EXPO_NO_DOTENV precedent was the template for `build:e2e`.
+- 2026-09-24 — the J8 floor straddle (documented across Windows + CI
+  runners for weeks) reduced to ONE switch: measured round start inherits
+  the warm-up's RN-Web animation backlog; settled product cost is
+  223-348ms standalone. Measurement-start correction resolved it with all
+  thresholds intact.
 
 - 2026-09-24 — Supabase CLI is installed (2.111.0) AND authenticated
   (`supabase projects list` exit 0) despite `SUPABASE_ACCESS_TOKEN` being
@@ -139,35 +201,39 @@ kruubbynsmxzxfdunaal.supabase.co`), then push + CI terminal watch.
 ## Validation Ledger
 
 - 2026-09-24 — `git status/fetch/rev-parse` — PASS — HEAD == origin/main ==
-  `2f742fe`, one modified file (the new directive), single worktree,
-  `stash@{0}` intact.
-- 2026-09-24 — `gh run list` (HEAD) — PASS — push `35871287036` success
-  (quality+e2e), nightly `35912837207` success (quality+nightly).
-- 2026-09-24 — `npm run agent:plan:validate:all` — PASS — 92/0.
-- 2026-09-24 — Supabase REST probes (anon key, presence-only) — PASS —
-  GoTrue health 200 (v2.197.0); `/rest/v1/todos` 42501 permission-denied for
-  anon (RLS working as intended); `parse-ai-command` 401
-  `UNAUTHORIZED_NO_AUTH_HEADER` without header.
-- 2026-09-24 — anonymous signup probe — PASS — 200 session issued
-  (`external.anonymous_users: true`); gateway `verify_jwt` enforced.
-- 2026-09-24 — authenticated parse/ask probes (correct payload shapes) —
-  FAIL(external) — PARSE 502 `{"error":"Command parsing is temporarily
-unavailable."}`; ASK 500 `{"error":"The ask service could not classify your
-question."}` → classified `BLOCKED_EXTERNAL`: provider secrets
-  (`OPENAI_API_KEY`+`AI_COMMAND_MODEL` / `DEEPSEEK_API_KEY`) absent on the
-  deployed functions; local `OPENAI_API_KEY` SET but len 14 (suspect
-  placeholder — validity probe pending, value never printed).
-- 2026-09-24 — `supabase projects list` — PASS — authenticated; superhabits
-  project ACTIVE_HEALTHY; org id `mnqrbiambekxvrtuufcn` discovered.
-- 2026-09-24 — `provision.ts run` precondition advance — PASS(after fix) —
-  now stops at `Missing precondition: org id` (was: false CLI-absent);
-  production-host config precondition next; both values now known.
+  `2f742fe` at start; single worktree; `stash@{0}` intact throughout.
+- 2026-09-24 — governance landing commit `3858cb9` — PASS — prompt + 2 plans +
+  win32 provision fix; lint-staged green.
+
+- 2026-09-24 — five-defect lane fix commit `ea2e36d` — PASS — provisionHosts
+  test 4/4, eslint 0, tsc 0; pushed → CI `35969211668` in_progress.
+- 2026-09-24 — Supabase live probes — PASS(gateway)/FAIL(external) — GoTrue
+  200 v2.197.0; anon signup 200; RLS anon-denied 42501; function auth order
+  verified (401 no-header → 401 anon-bearer → 400 normalize → 502/500 =
+  missing provider secret); project `kruubbynsmxzxfdunaal` ACTIVE_HEALTHY.
+- 2026-09-24 — `supabase projects list` — PASS — CLI authenticated without
+  `SUPABASE_ACCESS_TOKEN`; org `mnqrbiambekxvrtuufcn` discovered.
+- 2026-09-24 — disposable-lane run series — PARTIAL — create/lookup/waitReady/
+  guard green after 5 fixes; schema step BLOCKED (AAAA-only db host + no IPv6
+  route + pooler NXDOMAIN + no token); project `slvctfwphtpeymzghyoc` left
+  marker-named with password persisted in gitignored `state/`.
 - 2026-09-24 — `eas workflow:validate .eas/workflows/native-e2e.yml` —
-  FAIL(external) — verbatim: "Running maestro_test jobs requires a paid
-  plan."; `eas whoami` = dale16; project `@dale16/superhabits` resolves.
-- 2026-09-24 — `npm audit --omit=dev --audit-level=high` — PASS — 0
-  critical / 0 high / 14 moderate (advisory step semantics unchanged).
-- NOT RUN — directive-4 battery (next action after landing commit).
+  FAIL(external) — "Running maestro_test jobs requires a paid plan";
+  `eas whoami` dale16; project `@dale16/superhabits` resolves; `workflow:run
+--ref main` → "No repository found for appId 2cfd0e33…".
+- 2026-09-24 — certification battery at `ea2e36d` (Node 22.23.2) — PASS
+  except J8 — see Current failures for the single red; every other row green
+  (counts recorded in Current milestone).
+- 2026-09-24 — J8 isolated reruns ×3 (plus 1 inside qa:full) — FAIL —
+  deterministic 120s timeout; classification pending trace evidence.
+- 2026-09-24 — `npm audit --omit=dev` / full — PASS — 0 critical / 0 high /
+  14 moderate prod (2 leaf: decode-uri-component override candidate,
+  uuid FRAMEWORK_OWNED); expo-doctor 20/20.
+- 2026-09-24 — scout swarm (6 read-only) — PASS — integrated findings:
+  workout-history plan verified consistent (lead disproven); store docs
+  consistent (SHA-citation staleness only); cloud claims supported except
+  KB:1010 adapter-throw + AGENTS supabase-dir + "anonymous only" wording;
+  patches 8/8 applied; cert matrix enumerated.
 
 ## Changed Files / Areas
 

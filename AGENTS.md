@@ -303,7 +303,8 @@ npm test             # vitest run
 # Web build / deploy
 npm run build:web    # npx expo export -p web → dist/ (one-shot, finite)
 
-# E2E (requires dist/ to be up to date)
+# E2E (requires dist/ to be up to date — build with `npm run build:e2e`, the
+# hermetic export; plain `build:web` inlines local `.env` Supabase creds)
 npm run e2e          # playwright test (chromium + journeys + simulation + pwa projects)
 npm run e2e:sync     # remote-boundary journeys against dist-sync/ (:8082) — opt-in, main/nightly only
 npm run e2e:report   # open HTML report

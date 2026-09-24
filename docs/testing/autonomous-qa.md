@@ -46,7 +46,9 @@ For local E2E, build the static export first. The standard Playwright projects
 serve it on `http://localhost:8081` by default. If another development server
 already owns that port, use an isolated port; reuse is opt-in. Never await the
 persistent `npm run web` (Metro) as a validation gate — it does not exit; use
-`npm run build:web`, Playwright, or the finite `npm run web:verify` (which
+`npm run build:e2e` (hermetic test export — EXPO_NO_DOTENV + a `supabase.co`
+leak guard; plain `build:web` inlines local `.env` Supabase credentials and
+must never feed test lanes), Playwright, or the finite `npm run web:verify` (which
 builds, serves, probes, and terminates its own server), and run
 `npm run web:hygiene` before finishing a campaign:
 
