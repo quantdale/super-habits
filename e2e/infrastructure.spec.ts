@@ -66,7 +66,7 @@ test.describe('Infrastructure', () => {
     const publicVersion = cacheVersionOf(publicSource);
     expect(
       servedVersion,
-      `dist/sw.js (CACHE_VERSION=${servedVersion}) is stale vs public/sw.js (${publicVersion}) — run \`npm run build:web\`.`,
+      `dist/sw.js (CACHE_VERSION=${servedVersion}) is stale vs public/sw.js (${publicVersion}) — run \`npm run build:e2e\`.`,
     ).toEqual(publicVersion);
   });
 

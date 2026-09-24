@@ -86,7 +86,7 @@ export function discoverWasmName(): string {
   const name = fs.readdirSync(WA_SQLITE_ASSET_DIR).find((f) => f.endsWith('.wasm'));
   if (!name) {
     throw new Error(
-      `expo-sqlite wasm not found under ${DIST_DIR}/assets — run \`npm run build:web\` (or the dist-sync build) before journeys.`,
+      `expo-sqlite wasm not found under ${DIST_DIR}/assets — run \`npm run build:e2e\` (or the dist-sync build) before journeys.`,
     );
   }
   return name;

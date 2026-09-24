@@ -4,7 +4,7 @@
  *
  * This command is the repository-owned alternative to awaiting the persistent
  * Metro server (`npm run web` / `npm run web:dev`). It:
- *   1. builds the static export (`npm run build:web`) unless --skip-build;
+ *   1. builds the hermetic test export (`npm run build:e2e`) unless --skip-build;
  *   2. spawns `scripts/serve-e2e.js` on a controlled port as an OWNED child;
  *   3. polls HTTP readiness with a bounded deadline;
  *   4. asserts COOP/COEP isolation headers and (by default) runs a bounded
@@ -45,7 +45,7 @@ Usage:
 
 Options:
   --skip-build          Reuse the existing static export (dist/) instead of
-                        running \`npm run build:web\`. Fails if dist/ is absent.
+                        running \`npm run build:e2e\`. Fails if dist/ is absent.
   --port <port>         Explicit port (must be free). Default: 8081 when free,
                         otherwise the next free port in 8081..8099. The
                         E2E_PORT environment variable is honored when --port
@@ -81,9 +81,11 @@ function runNpm(args, stdio = 'inherit') {
 }
 
 function buildWebExport() {
-  const result = runNpm(['run', 'build:web']);
+  // Hermetic: the verification export must not inline local `.env` Supabase
+  // credentials (build:e2e sets EXPO_NO_DOTENV + runs a leak guard).
+  const result = runNpm(['run', 'build:e2e']);
   if (result.status !== 0) {
-    throw new WebLifecycleError(`npm run build:web failed (exit ${result.status})`);
+    throw new WebLifecycleError(`npm run build:e2e failed (exit ${result.status})`);
   }
 }
 

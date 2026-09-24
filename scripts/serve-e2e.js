@@ -62,13 +62,13 @@ async function readPatchedSwSource() {
     source = await fs.readFile(path.join(DIST, 'sw.js'), 'utf8');
   } catch {
     throw new Error(
-      `serve-e2e: ${path.join(DIST, 'sw.js')} not found — run \`npm run build:web\` first.`,
+      `serve-e2e: ${path.join(DIST, 'sw.js')} not found — run \`npm run build:e2e\` first.`,
     );
   }
   if (!source.includes(SW_BYPASS_MARKER)) {
     throw new Error(
       'serve-e2e: served sw.js is missing the E2E_DISABLE_DEV_BYPASS marker — ' +
-        'the export is stale relative to public/sw.js. Run `npm run build:web`.',
+        'the export is stale relative to public/sw.js. Run `npm run build:e2e`.',
     );
   }
   const patched = source.replace(SW_BYPASS_MARKER, SW_BYPASS_PATCHED);

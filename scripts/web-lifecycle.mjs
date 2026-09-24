@@ -5,7 +5,7 @@
  * - Persistent (human HMR): `npm run web` / `npm run web:dev` — long-lived
  *   Metro servers that intentionally never exit. Autonomous agents MUST NOT
  *   await them as validation gates.
- * - One-shot build: `npm run build:web` — finite.
+ * - One-shot build: `npm run build:e2e` — finite.
  * - Automated verification: `npm run web:verify` — finite; backed by this
  *   module plus `scripts/web-verify.mjs`.
  *
@@ -284,14 +284,14 @@ export async function runWebVerify({
       if (!build) {
         throw new WebLifecycleError('runWebVerify: build is required unless skipBuild is set');
       }
-      log('step 1/5: building static export (npm run build:web)…');
+      log('step 1/5: building hermetic static export (npm run build:e2e)…');
       await build();
       log('step 1/5: build complete');
     } else {
       const indexPath = path.join(distDir, 'index.html');
       if (!existsSync(indexPath)) {
         throw new WebLifecycleError(
-          `--skip-build but ${indexPath} does not exist; run \`npm run build:web\` first`,
+          `--skip-build but ${indexPath} does not exist; run \`npm run build:e2e\` first`,
         );
       }
       log(`step 1/5: reusing existing static export (${distDir}/)`);

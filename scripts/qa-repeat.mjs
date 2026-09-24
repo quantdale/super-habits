@@ -86,10 +86,10 @@ function main() {
     const buildStart = new Date().toISOString();
     const buildMs0 = Date.now();
     console.log('Building a fresh web export for the repeated lane (once up front)...');
-    const built = runNpm(['run', 'build:web']);
+    const built = runNpm(['run', 'build:e2e']);
     if (built.status !== 0) {
       console.error(
-        `Repeat battery blocked [ENVIRONMENT]: build:web failed (exit ${built.status}).`,
+        `Repeat battery blocked [ENVIRONMENT]: build:e2e failed (exit ${built.status}).`,
       );
       process.exit(2);
     }

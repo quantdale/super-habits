@@ -64,7 +64,7 @@ function waitForServer(url, timeoutMs = 30_000) {
 }
 
 async function main() {
-  run(npmCommand, ['run', 'build:web']);
+  run(npmCommand, ['run', 'build:e2e']);
   const server = spawn(process.execPath, ['scripts/serve-e2e.js', '--port', port], {
     stdio: 'inherit',
     env: process.env,

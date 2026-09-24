@@ -154,7 +154,7 @@ jobs:
       # Web export must exist before the E2E/server steps (Playwright
       # webServer only starts the static server; sim:run needs it too).
       - name: Build web export for E2E
-        run: npm run build:web
+        run: npm run build:e2e
 
       # ---- PR lane: fast, fake-backed, deterministic ----
       - name: Run feature E2E suite (lane journeys@pr — chromium project)
@@ -317,7 +317,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Build web export for E2E
-        run: npm run build:web
+        run: npm run build:e2e
 
       - name: Run full suite incl. full journeys (lane journeys@nightly)
         run: npm run e2e

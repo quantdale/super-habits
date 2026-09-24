@@ -39,7 +39,8 @@ import { fulfillDummySupabaseAuth } from '../helpers/supabaseAuth';
 const SUPABASE_ROUTE = '**/*.supabase.co/**';
 
 // Runtime detection of a Supabase boundary in the served build. The standard
-// `npm run build:web` export bakes no EXPO_PUBLIC_SUPABASE_* (local-only), so
+// `npm run build:e2e` export bakes no EXPO_PUBLIC_SUPABASE_* (hermetic:
+// EXPO_NO_DOTENV + leak guard — a plain `build:web` DOES inline local `.env`), so
 // the app issues NO supabase request and every flush no-ops and DRAINS the
 // outbox — the failure-scenario assertions would be meaningless there. The
 // failure injectors only take effect when the build carries a supabase origin

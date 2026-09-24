@@ -4,7 +4,7 @@ Playwright E2E tests for the SuperHabits web app.
 
 ## Prerequisites
 
-Build static web output first with `npm run build:web`.
+Build static web output first with `npm run build:e2e`.
 `npm run e2e` starts `node scripts/serve-e2e.js` automatically (serves `dist/` on localhost:8081).
 Only one tab of localhost:8081 should be open (OPFS lock).
 
@@ -20,7 +20,7 @@ npm run e2e:sync — run the remote-boundary journeys against `dist-sync/` (see 
 
 Journey caveats:
 
-- Journeys run against a `dist/` built with `npm run build:web`. Playwright does not build.
+- Journeys run against a `dist/` built with `npm run build:e2e`. Playwright does not build.
 - Journeys are **session-scoped**: state is seeded once per journey and carried across steps — do not run the suite in random order.
 - Sync/restore journeys additionally need the `dist-sync/` build described under [Dummy-Supabase build](#dummy-supabase-build).
 
