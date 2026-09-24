@@ -3,7 +3,7 @@
 Run the full SuperHabits test suite — unit tests (Vitest) and
 E2E tests (Playwright) — in one pass. Reports results for both.
 
-**E2E prerequisites:** Run `npm run build:web` whenever React components or the web bundle change (Playwright does **not** build automatically). Playwright starts `node scripts/serve-e2e.js`, which serves `dist/` on `localhost:8081` with strict `require-corp` COEP for OPFS. Metro is **not** used for E2E. With `reuseExistingServer: true` locally, you may leave a static server running on 8081 instead of relying on `webServer` startup.
+**E2E prerequisites:** Run `npm run build:e2e` whenever React components or the web bundle change (Playwright does **not** build automatically). Playwright starts `node scripts/serve-e2e.js`, which serves `dist/` on `localhost:8081` with strict `require-corp` COEP for OPFS. Metro is **not** used for E2E. With `reuseExistingServer: true` locally, you may leave a static server running on 8081 instead of relying on `webServer` startup.
 
 ---
 
@@ -99,7 +99,7 @@ If any failures:
 
 ## Prerequisites
 
-- Fresh `dist/`: `npm run build:web` before E2E when app code changed
+- Fresh `dist/`: `npm run build:e2e` before E2E when app code changed
 - `localhost:8081`: Playwright `webServer` runs `node scripts/serve-e2e.js` (or reuse existing server on that port)
 - Only one browser context / tab hitting the app origin for DB-heavy flows (OPFS lock)
 - Playwright MCP not required for this command (uses CLI directly)

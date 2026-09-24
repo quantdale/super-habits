@@ -83,7 +83,14 @@ async function enqueueRowsForEntity(
     hasUpdatedAt ? 'updated_at' : 'created_at',
     ...(hasSoftDelete ? ['deleted_at'] : []),
   ].join(', ');
-  let offset = 0;
+  // Keyset cursor paging (id > cursor), NOT OFFSET: a concurrent hard
+  // delete between pages used to shift the table left, so the row at the
+  // page boundary was never read — the entity was still marked done and the
+  // next checkpoint certified a row the remote would never receive, failing
+  // restore with integrity_mismatch forever (32 adversarial review,
+  // 2026-09-24, backupBackfill OFFSET page-skip). Rows before the cursor
+  // cannot affect which rows come next, so deletions mid-run are safe.
+  let lastId = '';
   while (true) {
     const rows = await db.getAllAsync<{
       id: string;
@@ -93,9 +100,10 @@ async function enqueueRowsForEntity(
     }>(
       `SELECT ${selectColumns}
        FROM ${entity}
+       WHERE id > ?
        ORDER BY id ASC
-       LIMIT ? OFFSET ?`,
-      [BACKFILL_BATCH_SIZE, offset],
+       LIMIT ?`,
+      [lastId, BACKFILL_BATCH_SIZE],
     );
     if (rows.length === 0) break;
 
@@ -125,7 +133,7 @@ async function enqueueRowsForEntity(
       syncEngine.enqueuePrepared(prepared, { durablyPersisted: true });
     }
 
-    offset += rows.length;
+    lastId = rows[rows.length - 1].id;
     // Yield so the main thread can serve UI work (switches, input) between
     // bounded batches instead of stalling for the whole entity.
     await new Promise((resolve) => setTimeout(resolve, 0));

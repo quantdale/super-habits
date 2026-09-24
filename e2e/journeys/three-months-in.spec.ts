@@ -208,8 +208,8 @@ defineJourney({
         // the warm-up's last switch completes at opacity > 0.5 while its
         // RN-Web Animated transition (and the five before it) still runs, so
         // switch 1 of the measured round used to inherit the residual
-        // animation backlog and read ~760ms in-runner / 823-917ms standalone
-        // no-settle, while the same settled switch measures 223-348ms
+        // animation backlog and read ~760ms in-runner / 704-917ms standalone
+        // no-settle (trace variants included), while the same settled switch measures 223-348ms
         // (CDP profile: no product hot spot — actionability + idle only).
         // Wait for every mounted section's transition to FINISH before
         // measuring so each switch is measured from the steady state the D14

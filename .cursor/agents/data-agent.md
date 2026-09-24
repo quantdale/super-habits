@@ -54,7 +54,7 @@ NON-NEGOTIABLES
 - 0 failing tests is the gate: run `npm test` and compare the inventory against `npx vitest list` — never maintain a magic total count
 
 E2E TESTS
-E2E uses the **static** web bundle (`dist/`) served by `node scripts/serve-e2e.js` (see `playwright.config.ts` `webServer`). Run `npm run build:web` before `npm run e2e` when data-layer changes affect the web build. **Keep `workers: 1` locally** — OPFS SQLite does not tolerate parallel Playwright workers on the same origin.
+E2E uses the **static** web bundle (`dist/`) served by `node scripts/serve-e2e.js` (see `playwright.config.ts` `webServer`). Run `npm run build:e2e` before `npm run e2e` when data-layer changes affect the web build. **Keep `workers: 1` locally** — OPFS SQLite does not tolerate parallel Playwright workers on the same origin.
 
 When fixing data layer issues, run the relevant E2E spec after:
 npx playwright test e2e/{feature}.spec.ts

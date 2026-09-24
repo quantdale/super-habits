@@ -108,7 +108,7 @@ Do not wire these up without an explicit decision to do so.
 
 ## E2E Tests (Playwright)
 
-E2E tests live in `e2e/` at the project root. They run against the **static web export** in `dist/`, served by `node scripts/serve-e2e.js` on `http://localhost:8081` with `Cross-Origin-Embedder-Policy: require-corp` (OPFS + SQLite WASM). **Playwright does not build the app:** run `npm run build:web` yourself whenever React components or web bundle output change, then run E2E. Metro (`npm run web`) is for local dev with HMR — **not** used by the E2E pipeline. For a finite automated live-web check, use `npm run web:verify` (builds, serves, probes, and terminates its own server); never await the persistent `npm run web` as a validation gate (see AGENTS.md → Server Lifecycle Rule).
+E2E tests live in `e2e/` at the project root. They run against the **static web export** in `dist/`, served by `node scripts/serve-e2e.js` on `http://localhost:8081` with `Cross-Origin-Embedder-Policy: require-corp` (OPFS + SQLite WASM). **Playwright does not build the app:** run `npm run build:e2e` yourself whenever React components or web bundle output change, then run E2E. Metro (`npm run web`) is for local dev with HMR — **not** used by the E2E pipeline. For a finite automated live-web check, use `npm run web:verify` (builds, serves, probes, and terminates its own server); never await the persistent `npm run web` as a validation gate (see AGENTS.md → Server Lifecycle Rule).
 
 **Test files:** feature specs live in `e2e/*.spec.ts` and journeys in `e2e/journeys/*.spec.ts` — the inventory drifts, so verify it with `npx playwright test --list` instead of relying on a hard-coded list. Representative feature specs: `todos`, `habits`, `pomodoro`, `workout`, `workout-gym-v2`, `calories`, `calories-day-navigation`, `calendar`, `settings`, `overview`, `planning-hub`, `weekly-review`, `linked-actions-log`, `momentum-garden`, `command*`, `boundary`, `infrastructure`, `theming`.
 
@@ -117,7 +117,7 @@ E2E tests live in `e2e/` at the project root. They run against the **static web 
 - `headless: true` always
 - Chromium only
 - `workers: 1` locally (do not increase — OPFS + expo-sqlite hold one lock per origin; extra workers cause flaky navigation/reload). `fullyParallel: false` — tests in a file stay serial; `clearDatabase()` in `beforeEach` must not race.
-- `webServer.command`: `node scripts/serve-e2e.js` (serves `dist/`; ensure `npm run build:web` has been run)
+- `webServer.command`: `node scripts/serve-e2e.js` (serves `dist/`; ensure `npm run build:e2e` has been run)
 - `retries: 2` on CI, `0` locally
 - HTML report: `.cursor/playwright-output/e2e-report/`
 - Failure screenshots / traces: `.cursor/playwright-output/e2e-failures/` (`outputDir`)
@@ -142,7 +142,7 @@ E2E tests live in `e2e/` at the project root. They run against the **static web 
 - Do not add `data-testid` to app components
 - Do not change assertions to make tests pass artificially
 - If a test reveals a genuine bug, fix the app not the test
-- E2E tests are NOT unit tests — they require the static server (or CI’s `build:web` + `npm run e2e`)
+- E2E tests are NOT unit tests — they require the static server (or CI’s `build:e2e` + `npm run e2e`)
 
 ## CI (GitHub Actions)
 

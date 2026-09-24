@@ -16,7 +16,7 @@ npx vitest run tests/todos.domain.test.ts
 # Single unit test by name
 npx vitest run -t "test name substring"
 
-npm run e2e              # Playwright headless (requires prior: npm run build:web)
+npm run e2e              # Playwright headless (requires prior: npm run build:e2e)
 npm run e2e:headed       # Playwright with visible browser
 npm run e2e:debug        # Playwright inspector
 
@@ -28,7 +28,7 @@ npm run e2e:sync          # journeys-sync project: @sync journeys vs dist-sync/ 
 npm run sim:run           # simulation-platform scenario runner
 npm run sim:validate      # validate simulation lane matrix / scenarios
 
-npm run build:web        # Expo web export (needed before e2e in CI)
+npm run build:e2e        # Expo web export (needed before e2e in CI)
 ```
 
 ---
@@ -151,7 +151,7 @@ The suite spans **four Playwright projects**: `chromium` (root `e2e/*.spec.ts`),
 | **fetch**          | Fetch external URLs, docs, or APIs and return them as markdown/JSON                                                                       |
 | **lighthouse-mcp** | Run PWA / performance / accessibility audits against `localhost:8081` (`npx -y lighthouse-mcp`)                                           |
 
-E2E work: run `npm run build:web` before Playwright; `npm run e2e` serves `dist/` via `node scripts/serve-e2e.js`.
+E2E work: run `npm run build:e2e` before Playwright; `npm run e2e` serves `dist/` via `node scripts/serve-e2e.js`.
 
 ---
 

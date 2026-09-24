@@ -39,6 +39,57 @@ if (!Number.isInteger(args.port) || args.port <= 0 || !args.dist) {
 const PORT = args.port;
 const DIST = path.resolve(__dirname, '..', args.dist);
 
+// Runtime hermeticity backstop (J8 incident, 2026-09-24): no test export
+// may carry a LIVE Supabase host. `build:e2e` strips env + pre-scans, but
+// this server is also started manually and by Playwright `webServer`, so it
+// refuses any dist/ whose bundles embed a real *.supabase.co host. The
+// dummy-Supabase dist-sync export (journeys-sync lane) is the only allowed
+// exception. Fails closed BEFORE serving a single byte.
+(async function assertHermeticDist() {
+  const needle = Buffer.from('supabase.co', 'utf8');
+  const offenders = [];
+  const walk = async (dir) => {
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return; // missing dist — the existing sw.js check below reports it
+    }
+    for (const entry of entries) {
+      const p = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(p);
+      } else {
+        try {
+          const buf = await fs.readFile(p);
+          if (!buf.includes(needle)) continue;
+          const hosts = [...buf.toString('utf8').matchAll(/[a-z0-9-]+\.supabase\.co/g)].map(
+            (m) => m[0],
+          );
+          if (hosts.some((h) => h !== 'dummy.supabase.co')) {
+            offenders.push(`${path.relative(DIST, p)} (${[...new Set(hosts)].join(', ')})`);
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+  };
+  await walk(DIST);
+  if (offenders.length > 0) {
+    console.error(
+      `serve-e2e: REFUSING to serve ${args.dist}/ — live Supabase host(s) baked into the test export:\n` +
+        offenders
+          .slice(0, 5)
+          .map((o) => `  - ${o}`)
+          .join('\n') +
+        `\nRebuild hermetically: npm run build:e2e (EXPO_NO_DOTENV + leak guard). ` +
+        `Only dist-sync/ may carry dummy.supabase.co.`,
+    );
+    process.exit(1);
+  }
+})();
+
 // Audit AREA 9 F5: product sw.js bypasses localhost in its fetch handler
 // (never cache Metro/dev responses), which also makes the cache-serving path
 // untestable against this E2E server. The worker ships a marked constant; we

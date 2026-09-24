@@ -59,7 +59,7 @@
 
 ## 1. Executive Summary
 
-**SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`, and the six sections — **Overview**, **todos**, **habits** (daily completion counts per local date key), **Pomodoro** (focus timer with session log), **Workout/Gym V2** (exercise identity, typed routines, weekly planning, guided training, progression, analytics, and body weight), and **calories** (macro-derived kcal) — render inside `app/index.tsx` behind a `NavigationContext.activeSection` state with a section switcher of plain `Pressable` items. **Settings** is a six-bucket full-screen modal (appearance, backup/sync/restore, AI/command, focus defaults, nutrition defaults, and developer/internal controls); the **Command Center** is a global overlay only. There are no `/settings`, `/command`, or `/(tabs)/*` routes.
+**SuperHabits** is an **offline-first** **React Native** app (**Expo 55**, **TypeScript 5.9**, **expo-router**) targeting **web (PWA)**, **iOS**, and **Android**. The app is a single-page experience: `app/` contains only `_layout.tsx` and `index.tsx`, and the six sections — **Today** (overview), **To Do** (todos), **Habits** (habits; daily completion counts per local date key), **Focus** (pomodoro; focus timer with session log), **Workout/Gym V2** (workout; exercise identity, typed routines, weekly planning, guided training, progression, analytics, and body weight), and **Calories** (calories; macro-derived kcal) — render inside `app/index.tsx` behind a `NavigationContext.activeSection` state with a section switcher of plain `Pressable` items. **Settings** is a six-bucket full-screen modal (appearance, backup/sync/restore, AI/command, focus defaults, nutrition defaults, and developer/internal controls); the **Command Center** is a global overlay only. There are no `/settings`, `/command`, or `/(tabs)/*` routes.
 
 **Persistence:** SQLite via `expo-sqlite` (`superhabits.db`), singleton `getDatabase()`. DDL from `bootstrapStatements` in `core/db/client.ts` plus versioned migrations. Schema stored version: **25**. Next migration: `if (version < 26)`. Migration 13 adds durable `processed_notification_actions` state, migration 14 adds the durable `sync_outbox` table, and migration 15 adds its enqueue-time owner binding; migrations 16–19 add the planning entities and habit schedule history, migration 20 is the hardening-wave-v2 durable-state promotion (habit lifecycle columns, Pomodoro session metadata columns, `workout_session_sets`, workout timing columns), migration 21 adds `daily_plans.top_todo_titles`, migration 22 adds Gym V2 routine/session columns plus custom exercises, weekly plan, date overrides, and body-weight tables, migration 23 adds deep Gym V2 semantic metadata (aliases, instructions, unilateral and external-load snapshots), migration 24 adds hot-path range indexes for the unbounded history tables (`pomodoro_sessions.started_at`, `workout_logs.completed_at`, `habit_completions.date_key`) plus the partial pending-todos index `idx_todos_pending_sort`, and migration 25 adds the local-only reward ledger (`gamification_events`, `gamification_streak_freezes`, `gamification_quests`, `gamification_badges`). Habit schedule and target history are effective-dated JSON in `habits.rule_history`.
 
@@ -101,15 +101,15 @@
 
 ### Repository identity
 
-| Attribute               | Value                                                                                                                                               |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Name                    | `superhabits` (npm package, private)                                                                                                                |
-| Purpose                 | Offline-first Expo + React Native client; single-page experience with Overview + five core sections, settings modal + command overlay               |
-| Entry                   | `package.json` → `"main": "expo-router/entry"`                                                                                                      |
-| Schema version (stored) | **24** (`app_meta.db_schema_version`)                                                                                                               |
-| Next migration          | `26` (new `if (version < 26)` block in `runMigrations`)                                                                                             |
-| Unit/integration tests  | **740** passing (Vitest; verify with `npm test` and `npx vitest list`)                                                                              |
-| E2E tests               | **95** Chromium tests in **14** spec files; **`workers: 1` locally and in CI** (shared OPFS origin); static `dist/` via `node scripts/serve-e2e.js` |
+| Attribute               | Value                                                                                                                                                                                                                                                 |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Name                    | `superhabits` (npm package, private)                                                                                                                                                                                                                  |
+| Purpose                 | Offline-first Expo + React Native client; single-page experience with Today (overview) + five core sections, settings modal + command overlay                                                                                                         |
+| Entry                   | `package.json` → `"main": "expo-router/entry"`                                                                                                                                                                                                        |
+| Schema version (stored) | **25** (`app_meta.db_schema_version`)                                                                                                                                                                                                                 |
+| Next migration          | `26` (new `if (version < 26)` block in `runMigrations`)                                                                                                                                                                                               |
+| Unit/integration tests  | **2,270** passing (Vitest; 227 files as of 2026-09-24 — verify with `npm test` and `npx vitest list`)                                                                                                                                                 |
+| E2E tests               | **159** Chromium-project tests in **25** spec files (**323** total across all Playwright projects; verify with `npx playwright test --list`); **`workers: 1` locally and in CI** (shared OPFS origin); static `dist/` via `node scripts/serve-e2e.js` |
 
 ### Top-level directory map
 
@@ -471,7 +471,7 @@ Shared foreground trigger used by feature screens:
 
 #### Layout model
 
-- The six sections render behind a `NavigationContext.activeSection` state; the section switcher is a row of plain `Pressable` items (Overview, Todos, Habits, Pomodoro, Workout, Calories).
+- The six sections render behind a `NavigationContext.activeSection` state; the section switcher is a row of plain `Pressable` items (Today, To Do, Habits, Focus, Workout, Calories).
 - The tab rail colors come from `useAppTheme()` tokens (`tokens.tabRail`, `tokens.tabRailBorder`, `tokens.background`) instead of hard-coded shell constants.
 - `overview` uses a muted slate accent that shifts with theme; the other five sections use their section colors from `SECTION_COLORS` / `SECTION_TEXT_COLORS`.
 - `TopTabItem` keeps the row-style icon + label layout, active rounded top corners, and inset inactive tabs, but the actual surface colors are theme-driven.
@@ -514,7 +514,7 @@ There are no distinct URL routes. The app is a single page: all six sections are
 
 ### Schema version
 
-Current `app_meta.db_schema_version`: **24**. Migration 14 added the durable
+Current `app_meta.db_schema_version`: **25**. Migration 14 added the durable
 SQLite sync outbox and migration 15 added its enqueue-time owner binding;
 migrations 16–21 added planning/hardening state, migration 22 added the
 Gym V2 workout/catalog/planning/body-weight contract, and migration 23 added

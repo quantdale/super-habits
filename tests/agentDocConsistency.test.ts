@@ -47,6 +47,12 @@ describe('agent documentation vs source truth', () => {
     const knowledgeBase = read('docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md');
     expect(knowledgeBase).toContain(`Schema stored version: **${schema}**`);
     expect(knowledgeBase).toContain(`if (version < ${nextSchema})`);
+    // 2026-09-24 adversarial review: two more KB phrasings of the schema
+    // number were stale ("24") while the line above passed — pin them all.
+    expect(knowledgeBase).toContain(`Schema version (stored) | **${schema}**`);
+    expect(knowledgeBase).toContain(`Current \`app_meta.db_schema_version\`: **${schema}**`);
+    // Stale-count detector (was "740 passing").
+    expect(knowledgeBase).not.toContain('**740** passing');
 
     const structureMap = read('docs/PROJECT_STRUCTURE_MAP.md');
     expect(structureMap).toContain(`Schema v${schema}`);

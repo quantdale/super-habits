@@ -102,9 +102,10 @@ async function supabase(
         maxBuffer: 10 * 1024 * 1024,
         // Windows: npm global CLIs are `.cmd` shims, which Node refuses to spawn
         // via execFile without a shell (ENOENT) — that false-negatived the
-        // "CLI present" precondition on win32. `args` are repo-controlled,
-        // fixed-charset strings (flags, marker prefixes, generated ids), so the
-        // shell concatenation is safe here.
+        // "CLI present" precondition on win32. Spawn-bound values
+        // (marker-prefix / org-id / region) are charset-validated in
+        // parseCommonOpts (SAFE_ARG) and generated ids are fixed-charset, so
+        // the shell concatenation is safe by enforcement, not assumption.
         shell: process.platform === 'win32',
       });
     } catch (error) {
@@ -477,13 +478,30 @@ function parseCommonOpts(argv: string[]): CommonOpts {
     const i = argv.indexOf(flag);
     return i >= 0 && i + 1 < argv.length ? argv[i + 1] : undefined;
   };
+  // Spawn-bound values (they reach the win32 shell:true path in supabase())
+  // are validated to a fixed charset so the "args are fixed-charset" invariant
+  // behind that shell choice is enforced, not merely asserted in a comment
+  // (adversarial-review finding, 2026-09-24).
+  const SAFE_ARG = /^[A-Za-z0-9_-]+$/;
+  const markerPrefix =
+    get('--marker-prefix') ??
+    process.env.SUPABASE_DISPOSABLE_MARKER_PREFIX ??
+    DEFAULT_MARKER_PREFIX;
+  const orgId = get('--org-id') ?? process.env.SUPABASE_ORG_ID ?? null;
+  const region = get('--region') ?? process.env.SUPABASE_REGION ?? DEFAULT_REGION;
+  if (!SAFE_ARG.test(markerPrefix)) {
+    failFast(`--marker-prefix must match ${SAFE_ARG} (got a value with shell metacharacters).`);
+  }
+  if (orgId !== null && !SAFE_ARG.test(orgId)) {
+    failFast(`--org-id must match ${SAFE_ARG} (got a value with shell metacharacters).`);
+  }
+  if (!SAFE_ARG.test(region)) {
+    failFast(`--region must match ${SAFE_ARG} (got a value with shell metacharacters).`);
+  }
   return {
-    markerPrefix:
-      get('--marker-prefix') ??
-      process.env.SUPABASE_DISPOSABLE_MARKER_PREFIX ??
-      DEFAULT_MARKER_PREFIX,
-    orgId: get('--org-id') ?? process.env.SUPABASE_ORG_ID ?? null,
-    region: get('--region') ?? process.env.SUPABASE_REGION ?? DEFAULT_REGION,
+    markerPrefix,
+    orgId,
+    region,
     // `--production-hosts` must win over the env var; the precondition
     // error message documents the flag, so a flag-only invocation has to
     // work (it previously fell through to the env-only parser).

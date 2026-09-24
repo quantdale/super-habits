@@ -5,7 +5,7 @@ MCP, identify every failure, and fix each one autonomously.
 Plan-first for any code changes — wait for approval before
 modifying application source files.
 
-Requires: `npm run build:web` when app code changed (Playwright does not build). Playwright starts `node scripts/serve-e2e.js` on `localhost:8081` (serves `dist/` with `require-corp` COEP). Metro is not used for E2E.
+Requires: `npm run build:e2e` when app code changed (Playwright does not build). Playwright starts `node scripts/serve-e2e.js` on `localhost:8081` (serves `dist/` with `require-corp` COEP). Metro is not used for E2E.
 Requires: Playwright MCP connected in Cursor Settings → MCP.
 
 ---
@@ -94,7 +94,7 @@ For each failed test, classify the failure type:
 **Type E — Environment issue**
   Symptom: "ERR_CONNECTION_REFUSED" or "net::ERR_FAILED"
   Cause: Static E2E server not running, `dist/` missing, or wrong port.
-  Fix: Stop — remind user to run `npm run build:web`, then ensure `node scripts/serve-e2e.js` is up (or let Playwright `webServer` start it) on `localhost:8081`.
+  Fix: Stop — remind user to run `npm run build:e2e`, then ensure `node scripts/serve-e2e.js` is up (or let Playwright `webServer` start it) on `localhost:8081`.
 
 ---
 

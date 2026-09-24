@@ -42,14 +42,36 @@ directive 11 until directive 12's exhaustion condition holds.
 
 ## Current Checkpoint
 
-- Current milestone: **J8 wave landed, pushed, CI-GREEN; Campaign 4 Android
-  COMPLETE** — commits `8d9db26` (fix) + `8f8c79e` (docs); CI `35987777309`
-  quality+e2e SUCCESS at certified SHA `8f8c79e` (weeks-long gap-15 straddle
-  closed on ubuntu too); Android exact-build cert at `8f8c79e`: **19/19
-  flows** (smoke 2/2, persistence 11/11, lifecycle 6/6), APK
-  `A95C9BC81B537BEAFDB73C5F21EE27146444089681FA98AE47F1B3D67262FB93`,
-  provenance `simulation-output/native/native-android-build.json`, owned
-  emulators stopped each lane.
+- Current milestone: **§32 adversarial review executed → successor fix
+  campaign code-complete, focused gates green** — three read-only reviewers
+  returned BLOCK/BLOCK/OK-with-notes; merged findings fixed: P0 backfill
+  OFFSET page-skip → keyset cursor paging + deterministic regression test
+  (5/5), recurrence-lane closure (hermetic runtime backstop in serve-e2e +
+  `build:e2e` sweep across 9 stale doc files/12 sites + strip-all-
+  EXPO_PUBLIC_ + scan-all + dist pre-clean), KB truth fixes (schema 24→25 ×2,
+  labels, counts) + agentDocConsistency pins (4/4), recert corrections
+  (150 files, heading), no-settle range reconcile, provision charset
+  enforcement (SAFE_ARG) + honest comment, known-gaps #21 registered
+  (P1 manifest-window: consciously accepted, spec-deferred). Prior evidence:
+  doc wave `180dc4a` pushed with CI `35997911294` SUCCESS (quality+e2e);
+  Campaign 4 Android 19/19 at `8f8c79e` (APK A95C9BC8…); gap-15 resolved
+  without threshold changes; hermetic `build:e2e` leak-guard verified.
+- Completed: Directives 1-3 (true state; CI trustworthy; governance
+  `3858cb9`); Directive 4 certified at `8f8c79e` (full local ladder + CI
+  green; this wave's push re-certifies the final docs SHA); Directive 6
+  waves 1-2 (`3858cb9`, `ea2e36d`, `8d9db26`) + successor wave (this);
+  Directive 7 store recert block landed; Directive 8 override decision
+  landed (ci.yml rationale: decode-uri-component 0.5.0 REJECTED,
+  framework-owned); Directive 9 successor CHOSEN from §32 evidence
+  (adversarial-fix campaign; ai-command-center phase-5 privacy delta queued
+  as next credential-free item); gap-15/W8-1 root-caused+resolved;
+  `build:e2e` hermetic; 6-scout swarm + 3 adversarial reviewers integrated;
+  ladder evidence through `180dc4a`: qa:fast 1,897 | integration 373 |
+  journeys @p0 25 | qa:full exit 0 (e2e:full + deterministic 23/23) | plans
+  93/0 | themes 140 | openspec 59 | timezones 5/5 | web:verify+hygiene
+  PASS | audit 0C/0H/14M | expo-doctor 20/20 | e2e:sync 40/6 | supabase
+  schema:validate PASS (14 migrations) | focused: backfill 5/5, doc pins
+  4/4, tsc 0.
 - Completed: Directives 1-3 (true state; CI trustworthy; governance landed
   `3858cb9`); Directive 4 = certified at `8f8c79e` (full local ladder incl.
   qa:full exit 0 + CI green at that SHA) — final doc-wave SHA still needs its
@@ -61,24 +83,22 @@ directive 11 until directive 12's exhaustion condition holds.
   deterministic 23/23) | plans 93/0 | themes 140 | openspec 59 | timezones
   5/5 | web:verify+hygiene PASS | audit 0C/0H/14M | expo-doctor 20/20 |
   e2e:sync 40/6.
-- Completed: Directives 1-3 (true state; CI trustworthy at `2f742fe`;
-  governance landed `3858cb9`); Directive 6 wave 1 (`3858cb9` + `ea2e36d`,
-  pushed); battery at `ea2e36d` under engines Node 22.23.2 (PATH must be
+- Completed (campaign history): Directives 1-3 (true state; CI trustworthy;
+  governance `3858cb9`); wave 1-2 (`3858cb9`, `ea2e36d`); battery at
+  `ea2e36d` under engines Node 22.23.2 (PATH must be
   `/c/Users/palac/AppData/Local/tools/node-v22.23.2-win-x64` — backslash form
-  silently falls to node24): typecheck/lint PASS 0/0, themes 140, openspec
-  59, plans 93, impact 13 rules, qa:fast 1,897, npm test 2,270 (227 files),
-  timezones 5/5 (94), integration 373 (node24 run), journeys @p0 25,
-  simulation deterministic 23 + sim:validate 23, build:web, build:sync,
-  e2e:sync 40/6 skip exit 0, web:verify PASS, web:hygiene PASS,
-  audit 0C/0H/14M, expo-doctor 20/20, e2e:full 259 pass/1 fail (J8)/13 skip
-  registered; 6-scout swarm integrated; `nul` removed; stash preserved.
-- In progress: **documentation-reconciliation wave** — store-readiness
-  recert block refresh (guard counts + candidate/HEAD cites), ci.yml advisory
-  snapshot refresh + Campaign-8 override-rejection rationale, then commit →
-  push → CI watch at the new SHA; then §32 adversarial final review →
-  Directive-9 successor selection (leading executable candidate:
-  ai-command-center phase-5 privacy delta — credential-free guard/docs work;
-  candidates A/B otherwise externally gated or spec-only per §25).
+  silently falls to node24); J8 wave (`8d9db26` fix + `8f8c79e` docs, CI
+  green); Android exact-build 19/19 at `8f8c79e` (APK
+  `A95C9BC81B537BEAFDB73C5F21EE27146444089681FA98AE47F1B3D67262FB93`,
+  provenance `simulation-output/native/native-android-build.json`); doc
+  recert wave `180dc4a` (CI `35997911294` SUCCESS); successor fix campaign
+  (current tree, this milestone row).
+- In progress: impact-mapped ladder at the successor-fix tree (qa:fast ✓
+  1,897 + parity; integration → journeys @p0 → simulation → qa:full/broad
+  pending), then prettier/lint/tsc, commit, push, CI watch; then §33 final
+  matrix at the final SHA, §35 hygiene, §36 report, Outcomes. Decision Log
+  to append: P1 manifest-window consciously accepted (gap-21 spec-deferred),
+  override rejection, adversarial-successor selection.
 - Important modified files: (landed) `.agent/EXECUTION_PROMPT.md`, mission
   plan, `ai-command-center-production-v1.md` (`3858cb9`);
   `simulation/backend/provision.ts` + `tests/simulation.provisionHosts.test.ts`
@@ -106,8 +126,14 @@ directive 11 until directive 12's exhaustion condition holds.
   0 hosts verified in dist/). (3) step6 `diarySearch=533ms` single blip,
   green next two runs (396 final) — host variance recorded, ceiling kept.
   (4) CI e2e failure — root-caused as (1) on ubuntu (725/745) + registered
-  fixme skips + workout:297 flaky-but-passed (green locally); fixed by this
-  wave pending CI rerun.
+  fixme skips + workout:297 flaky-but-passed (green locally); FIXED — CI
+  rerun `35997911294` quality+e2e SUCCESS at `180dc4a`.
+  (5) ENVIRONMENT (classified, NOT open) — post-settle battery ceiling
+  excursion `calories→todos 884ms > 800ms` in one `qa:full` run, followed
+  by a fully green `qa:full` (234 e2e + deterministic 23/23); documented
+  lineage (Wave-8 910ms breach, CPU-loaded 861/1006ms replays), product
+  unchanged + CDP no hotspot, guard/ceiling/floor preserved; recorded in the
+  known-gaps gap-15 dated addendum.
 - Relevant quarantines: None added; 13 registered gate files unchanged
   (parity guard green).
 - Blockers: (b) disposable-lane schema —
@@ -130,12 +156,13 @@ provision.ts run --with-parser --no-teardown --reuse=slvctfwphtpeymzghyoc
 --org-id mnqrbiambekxvrtuufcn --production-hosts
 kruubbynsmxzxfdunaal.supabase.co`; (d) re-probe parse/ask → successor
   phase 2.
-- Exact next action: land the doc-reconciliation edits (store recert block,
-  ci.yml snapshot + override rationale), prettier+plans-validate, commit,
-  push, CI watch to terminal; then §32 adversarial review (delegate
-  read-only reviewers on the final tree); then Directive 9 → 10 (execute the
-  chosen successor or record exhaustion), §33 final matrix at the final SHA,
-  §35 hygiene, §36 report, Outcomes.
+- Exact next action: finish the ladder (qa:integration → qa:journeys →
+  qa:simulation → qa:full), prettier+eslint+tsc+plans-validate clean, commit
+  the successor-fix wave coherently, push, CI watch to terminal; then §33
+  final matrix at the final SHA, §35 hygiene (ports/processes/temp), §36
+  evidence-heavy report, fill Outcomes. After that: ai-command-center
+  phase-5 privacy delta only if material capacity remains (else queued as
+  next campaign with credential-free scope noted).
 - Remaining definition of done: 12 directives evidenced; J8 classified/
   resolved without threshold changes; CI green at final SHA; Campaigns
   4-10 executed or runbook-classified; doc reconciliations (KB:1010,
@@ -148,19 +175,25 @@ kruubbynsmxzxfdunaal.supabase.co`; (d) re-probe parse/ask → successor
 - [x] Directive 1 — true repository state established
 - [x] Directive 2 — CI verified trustworthy at HEAD
 - [x] Directive 3 — governance reconciliation landed (`3858cb9`)
-- [~] Directive 4 — exact-SHA battery at `ea2e36d` green except J8; pushed;
-  CI `35969211668` watch open
-- [~] Directive 5 — platform gaps: disposable lane progressed to schema
-  (blocked: IPv6-only db host / no token — runbook recorded); AI parse/ask
-  live-probed (provider-secret external); EAS paid-plan external
-- [x] Directive 6 — first defect wave landed (`3858cb9` + `ea2e36d`)
-- [~] Directive 7 — store artifacts classified (scout): doc SHA-refresh +
-  guard-count line pending
-- [~] Directive 8 — risks probed: 2 leaf advisories identified
-  (decode-uri-component override candidate; uuid FRAMEWORK_OWNED)
-- [ ] Directive 9 — successor campaign chosen with evidence
-- [ ] Directive 10 — successor campaign executed
-- [ ] Directive 11-12 — loop until exhaustion; no speculative residue
+- [x] Directive 4 — exact-SHA certification executed: `ea2e36d` battery,
+      certified at `8f8c79e` (CI `35987777309` success), recert docs at
+      `180dc4a` (CI `35997911294` success); each push re-certifies its SHA
+- [x] Directive 5 — platform gaps closed-or-classified: disposable lane →
+      schema blocked (IPv6-only/no token, runbook); AI parse/ask live-probed
+      (provider-secret external); EAS paid-plan external (verbatim)
+- [x] Directive 6 — defect waves 1-2 landed (`3858cb9`, `ea2e36d`,
+      `8d9db26`) + successor hardening wave (current tree)
+- [x] Directive 7 — store recert block landed (guard counts, HEAD/CI cites,
+      candidate-of-record `8f8c79e`)
+- [x] Directive 8 — dependency posture closed: leaf advisories documented,
+      override REJECTED with rationale in ci.yml advisory comment
+- [x] Directive 9 — successor CHOSEN from §32 adversarial evidence
+      (evidence-defined fix campaign; ai-command-center phase-5 privacy delta
+      queued as next credential-free campaign)
+- [~] Directive 10 — successor executing: fix wave code-complete, ladder
+  green, commit/push/CI pending
+- [~] Directive 11-12 — loop continues: after push+CI → §33 matrix → §35
+  hygiene → §36 report → reassess exhaustion
 
 ## Surprises & Discoveries
 
@@ -209,6 +242,18 @@ kruubbynsmxzxfdunaal.supabase.co`; (d) re-probe parse/ask → successor
 - 2026-09-24 — Governance landing commits before certification so directive 4
   certifies one stable SHA; cloud lanes run before the long battery to avoid
   CPU-contention flakiness (prior campaign recorded CPU-saturation artifacts).
+- 2026-09-24 — §32 adversarial review (3 read-only reviewers: data/release/
+  diff) → successor campaign DEFINED BY FINDINGS (Master Successor Rule):
+  P0 backfill keyset fix + recurrence-lane closure + KB truth + hardening —
+  not an invented campaign.
+- 2026-09-24 — gap-21 P1 manifest-window CONSCIOUSLY ACCEPTED and
+  spec-deferred: fail-closed, narrow, self-healing; degraded-restore
+  semantics are a product decision (§25: specify, don't guess); recorded as
+  known-gaps `### 21` with closing path.
+- 2026-09-24 — decode-uri-component 0.5.0 override REJECTED: semver-major
+  under expo-router's pinned ^0.2, untested URL-decode behavior change;
+  framework-owned moderate per severity policy — rationale pinned in the
+  ci.yml advisory comment.
 
 ## Validation Ledger
 
@@ -246,16 +291,48 @@ kruubbynsmxzxfdunaal.supabase.co`; (d) re-probe parse/ask → successor
   consistent (SHA-citation staleness only); cloud claims supported except
   KB:1010 adapter-throw + AGENTS supabase-dir + "anonymous only" wording;
   patches 8/8 applied; cert matrix enumerated.
+- 2026-09-24 — adversarial reviewers ×3 (§32) — BLOCK/BLOCK/OK-with-notes —
+  merged findings all fixed: P0 keyset paging + regression test (5/5),
+  recurrence-lane sweep (9 files/12 sites → `build:e2e`) + serve-e2e runtime
+  backstop, KB truth ×7 blocks + agentDocConsistency pins (4/4), recert
+  corrections (150 files/heading), no-settle range reconcile, provision
+  SAFE_ARG enforcement, gap-21 registered. All confirm-by-diff commands
+  closed (spec diff = settle+label only; ci.yml = 2 build lines; -w sweep
+  clean; stash intact; CI `35987777309` headSha `8f8c79e` success).
+- 2026-09-24 — `npm run supabase:schema:validate` — PASS — 14 migrations,
+  owner-scoped contract (closes adv-data MINOR repo-side; live comparison
+  stays CREDENTIAL_REQUIRED).
+- 2026-09-24 — successor-fix ladder — PASS — qa:fast 1,897 + parity |
+  integration **374** (incl. keyset page-skip regression) | journeys @p0 25 |
+  simulation ✓ | focused backfill 5/5 + doc pins 4/4 + tsc 0 | qa:full
+  run-A = ENVIRONMENT ceiling excursion 884ms (classified) → run-B **PASS**
+  (234 e2e + deterministic 23/23, chain exit 0).
 
 ## Changed Files / Areas
 
-- `.agent/EXECUTION_PROMPT.md` — the new campaign directive (landing).
+- `.agent/EXECUTION_PROMPT.md` — campaign directive (landed `3858cb9`).
 - `.agent/execplans/live-cloud-verification-production-integration-v1.md` —
-  this mission plan (new).
-- `.agent/execplans/ai-command-center-production-v1.md` — stale checkpoint
-  claims reconciled (project state, CLI state, live-probe results).
-- `simulation/backend/provision.ts` — win32 `execFile` shell fix so the
-  CLI-present precondition stops false-negativing.
+  this mission plan.
+- `.agent/execplans/ai-command-center-production-v1.md` — checkpoint
+  reconciliation (project/CLI/probe truth).
+- `simulation/backend/provision.ts` + `tests/simulation.provisionHosts.test.ts`
+  — win32 CLI probe, JSON lookup, create-contract drift, psql fallback,
+  credential scrubbing, SAFE_ARG charset enforcement (`ea2e36d`).
+- `e2e/journeys/three-months-in.spec.ts` — settle-before-measure + label +
+  range reconcile (`8d9db26`).
+- `scripts/build-dist-e2e.mjs` (new), `scripts/serve-e2e.js`,
+  `package.json`, `.github/workflows/ci.yml` — hermetic `build:e2e` + runtime
+  backstop + wiring (`8d9db26`, hardened this wave).
+- `core/backup/backupBackfill.ts` + `tests/integration/backupBackfill.test.ts`
+  — P0 keyset cursor paging + deterministic page-skip regression.
+- `docs/testing/known-gaps.md` — gap-15 root-cause + post-settle addendum,
+  gap-21 (P1 manifest-window accepted/spec-deferred).
+- `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md` +
+  `tests/agentDocConsistency.test.ts` — schema 25 ×2, labels, counts + pins.
+- `docs/release/app-store-readiness.md` — 2026-09-24 recert block.
+- `AGENTS.md`, `docs/testing/autonomous-qa.md`, `README.md`, `.cursor/**`,
+  `.agents/agents/*`, `.github/copilot-instructions.md` — hermetic-build
+  policy + contradiction sweep.
 
 ## Recovery / Resume Instructions
 

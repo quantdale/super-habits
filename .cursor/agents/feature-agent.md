@@ -63,7 +63,7 @@ NON-NEGOTIABLES
 - 0 failing tests is the gate: run `npm test` and compare the inventory against `npx vitest list` — never maintain a magic total count
 
 E2E TESTS
-E2E uses the **static** web bundle: run `npm run build:web` when you change screens or components, then `npm run e2e` (Playwright serves `dist/` via `node scripts/serve-e2e.js`). Metro is not used for E2E. **Keep `workers: 1` locally** for OPFS SQLite.
+E2E uses the **static** web bundle: run `npm run build:e2e` when you change screens or components, then `npm run e2e` (Playwright serves `dist/` via `node scripts/serve-e2e.js`). Metro is not used for E2E. **Keep `workers: 1` locally** for OPFS SQLite.
 
 When fixing UI or domain issues, run the relevant E2E spec after:
 npx playwright test e2e/{feature}.spec.ts

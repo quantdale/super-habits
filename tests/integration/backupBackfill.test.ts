@@ -238,4 +238,65 @@ describe('backup completeness v2 backfill', () => {
       }
     }
   });
+
+  it('keyset paging: a hard delete between pages cannot skip the boundary row (32-review regression)', async () => {
+    const db = await freshDatabase();
+    await seedExistingState(db); // smeal_1 + every other entity
+    const now = '2026-01-01T00:00:00.000Z';
+    // 24 more saved_meals (a BACKUP_HARD_DELETE entity): 'smeal_pNN' sorts
+    // AFTER 'smeal_1' ('1' < 'p'), giving 25 rows → pages of 10 are
+    // [smeal_1, p01..p09], [p10..p19], [p20..p24].
+    for (let i = 1; i <= 24; i++) {
+      const id = `smeal_p${String(i).padStart(2, '0')}`;
+      await db.runAsync(
+        `INSERT INTO saved_meals (id, food_name, calories, meal_type, use_count, last_used_at, created_at)
+         VALUES (?, ?, 100, 'lunch', 1, ?, ?)`,
+        [id, `Meal ${i}`, now, now],
+      );
+    }
+    const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
+    await setLocalDatasetOwner(db as never, 'user_a');
+
+    // Deterministic interleave at the exact hazard seam: hard-delete a
+    // page-1 row immediately AFTER backfill reads page 1. OFFSET paging
+    // would resume at the shifted index and silently skip smeal_p10 (the
+    // entity still marked done → manifest certifies a row the remote never
+    // receives → restore integrity_mismatch). Keyset (id > cursor) cannot
+    // skip: rows before the cursor do not affect which rows come next.
+    const original = db.getAllAsync.bind(db);
+    let savedMealsPages = 0;
+    const patched = async (sql: string, params?: readonly unknown[]): Promise<unknown> => {
+      const rows = await original(sql, params);
+      if (/FROM saved_meals/.test(sql)) {
+        savedMealsPages += 1;
+        if (savedMealsPages === 1) {
+          expect((rows as { id: string }[]).length).toBe(10);
+          db.raw.prepare(`DELETE FROM saved_meals WHERE id = 'smeal_p05'`).run();
+        }
+      }
+      return rows;
+    };
+    (db as unknown as { getAllAsync: typeof patched }).getAllAsync = patched;
+
+    const { ensureBackupBackfill } = await import('@/core/backup/backupBackfill');
+    expect(await ensureBackupBackfill()).toBe('running');
+    // The interleave really fired (otherwise this test would pass vacuously):
+    expect(savedMealsPages).toBeGreaterThan(1);
+    const remaining = await db.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM saved_meals',
+    );
+    expect(Number(remaining?.count)).toBe(24); // page-1 delete really happened
+
+    const outbox = await readOutbox(db);
+    const ids = outbox.filter((r) => r.entity === 'saved_meals').map((r) => r.id);
+    const expected = [
+      'smeal_1',
+      ...Array.from({ length: 24 }, (_, i) => `smeal_p${String(i + 1).padStart(2, '0')}`),
+    ].sort();
+    // All25 originally-read rows enqueued (page 1 was read pre-delete) and —
+    // the regression itself — page 2 still starts at p10, which OFFSET paging
+    // skipped after the shift.
+    expect([...ids].sort()).toEqual(expected);
+    expect(ids).toContain('smeal_p10');
+  });
 });

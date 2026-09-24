@@ -266,6 +266,8 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 **2026-09-24 gap-15 ROOT CAUSE + RESOLUTION (floor misses and the J8 step-7 oracle, same campaign):** the floor misses were a MEASUREMENT-START defect, not host noise: the measured round began while the warm-up's six back-to-back RN-Web `Animated` transitions (200/240 ms) were still settling, so switch 1 inherited the animation backlog. Evidence: in-test per-switch `[761, 403, 635, 481, 657, 425]` ms (only switch 1 above the 680 ms floor); the identical switch standalone measures `223–348 ms` settled vs `704–917 ms` no-settle (both directions reproduced ≥3×, idle host); fresh CDP profile shows no app hotspot (Playwright actionability + idle + <5 % app bundle), corroborating the 2026-09-23 harness-31/browser-53/app-16 attribution. Fix: `waitForSectionTransitionsSettled(page)` before the measured round in `e2e/journeys/three-months-in.spec.ts` — a measurement-accuracy correction; the 800 ms ceiling, the 15 % floor, and every assertion are UNCHANGED. The round label was also corrected `overview→todos` → `calories→todos` (the warm-up ends on calories; historical notes keep their original wording). Post-fix evidence: persona **7/7 green**, `maxSwitch=622/800 (22.3 % headroom)`, per-switch `619/407/395/500/622/457`, `diarySearch=396/500`, `pickerSearch=186/500`. In the same campaign the step-7 outbox oracle failed `0 ≠ 24` because local `npm run build:web` inlined real `EXPO_PUBLIC_SUPABASE_*` from the developer `.env`: with the Supabase project restored the app bootstrapped an anonymous session mid-journey and drained `sync_outbox` to the LIVE project (CI is hermetic only by accident — runners have no `.env`). Fix: new hermetic `npm run build:e2e` (`scripts/build-dist-e2e.mjs`: `EXPO_NO_DOTENV=1` + ambient `EXPO_PUBLIC_SUPABASE_*` strip + post-build `supabase.co` leak guard) wired into `e2e:full`, `qa:journeys`, `qa-simulation`, `web-verify`, `qa-repeat`, `web-lifecycle`, and both CI E2E export steps. Residue: local runs between restoration and this fix pushed UI-created test rows + synthetic settings/manifest under throwaway anonymous users — owner cleanup is `BLOCKED_EXTERNAL` (needs SQL/Management access); runbook in `.agent/execplans/live-cloud-verification-production-integration-v1.md`. A single `diarySearch=533 ms` ceiling blip occurred once pre-fix and was green in the next two runs (396 ms final) — recorded as host variance, ceiling kept.
 
+**2026-09-24 post-settle battery addendum (second documented hard-ceiling excursion):** with the settle fix in place, standalone J8 measures `calories→todos=619` and CI runs `35987777309` + `35997911294` both pass the full persona on ubuntu — but a local full `qa:full` battery still recorded `calories→todos 884ms > 800ms` ceiling (fail) followed immediately by a green `qa:full` (234 e2e passed + deterministic 23/23, idle host between runs). This is the same documented host-load inflation that produced Wave-8's 910ms breach and the 861/1006ms CPU-loaded replays, now isolated to its residual component after the animation-backlog component was removed: the assertion correctly caught a real excursion; product code was unchanged all day and CDP shows no app hotspot. Classified `ENVIRONMENT` (intermittent, battery-load-dependent); guard, ceiling, floor all unchanged; re-run guidance stays "timing checks when host CPU < 60%".
+
 ### 16. Habit target-edit rule-history commit race under full-battery load — CLOSED (TEST_BUG)
 
 **Reason:** during the 2026-09-10 full `npm run e2e` battery, `e2e/habits.spec.ts`
@@ -464,6 +466,18 @@ holes — and run for real against `dist-sync/` in the `journeys-sync` lane
 the standing rule holds — every skipped or quarantined test is named here —
 and so the quarantine-register parity guard
 (`scripts/quarantine-register-parity.mjs`, wired into `qa:fast`) can verify it.
+
+---
+
+### 21. Remote data/settings can outrun the singleton manifest (OPEN — consciously accepted, spec-deferred)
+
+**Source:** §32 adversarial data-safety review (2026-09-24, HEAD `180dc4a`).
+
+**Mechanism:** every flush pushes data first (`AppProviders.tsx:374`) and only afterwards captures + pushes the manifest (`:389` → `backupCheckpoint.ts:232-246/320`); settings saves push the singleton `user_backup_settings` row ahead of the next capture; the manifest is one row per owner (`user_id UUID PRIMARY KEY`, upsert) with **no generation history**. If the device dies permanently inside any such window (loss/wipe — the exact scenario backups exist for), remote is a strict superset of the published manifest and restore fails closed at `backupRestore.ts:530` (row counts) or `:642` (settings checksum) with `status:'invalid'`; the legacy coordinator does not fall back (only on `legacy`). This contradicts the `backupCheckpoint` comment implying the previous manifest stays restorable.
+
+**Why accepted tonight, not fixed:** fail-closed (never imports wrong data), narrow (self-heals within one maintenance cycle while the device lives), and the fix is a PRODUCT decision — manifest generation history and/or defined degraded-restore semantics change the restore contract (§25: specify, don't guess). Reordering alone (republish manifest before every flush returns) trades the window for write amplification without removing it.
+
+**Closing path:** OpenSpec change for manifest generations + degraded-restore modes (strict vs best-effort-with-report), then ordering/verification implementation; regression = device-death-in-window integration test.
 
 ---
 

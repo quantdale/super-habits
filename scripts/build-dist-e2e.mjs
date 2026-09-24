@@ -27,10 +27,18 @@ function fail(message) {
   process.exit(1);
 }
 
-// 1. Hermetic export: block dotenv files AND strip any ambient Supabase env.
+// 1. Hermetic export: block dotenv files AND strip ALL ambient EXPO_PUBLIC_*
+// (exact CI parity: runners export none of them; public-by-design flags
+// still change app behavior between local and CI builds).
 const env = { ...process.env, EXPO_NO_DOTENV: '1' };
-delete env.EXPO_PUBLIC_SUPABASE_URL;
-delete env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+for (const key of Object.keys(env)) {
+  if (key.startsWith('EXPO_PUBLIC_')) delete env[key];
+}
+
+// Pre-clean: a stale file from a prior plain `build:web` export must never
+// survive into the guarded scan window (fails-closed either way, but a clean
+// tree makes the leak verdict exact).
+fs.rmSync(distDir, { recursive: true, force: true });
 
 console.log(
   '[build:e2e] exporting dist/ with EXPO_NO_DOTENV=1 (no .env, no ambient Supabase env)…',
@@ -45,19 +53,26 @@ try {
   fail('expo export failed (exit non-zero).');
 }
 
-// 2. Leak guard: no Supabase host may survive into the test export.
+// 2. Leak guard: no Supabase host may survive into the test export — scan
+// EVERY file (any extension, buffers; the previous js/html/json/css filter
+// missed .map/.wasm/extensionless carriers).
 if (!fs.existsSync(path.join(distDir, 'index.html'))) {
   fail('dist/index.html missing after export.');
 }
 const leakFiles = [];
+const needle = Buffer.from('supabase.co', 'utf8');
 const scan = (dir) => {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       scan(p);
-    } else if (/\.(js|html|json|css)$/.test(entry.name)) {
-      const text = fs.readFileSync(p, 'utf8');
-      if (/supabase\.co/.test(text)) leakFiles.push(path.relative(root, p));
+    } else {
+      try {
+        if (fs.readFileSync(p).includes(needle)) leakFiles.push(path.relative(root, p));
+      } catch {
+        // unreadable/binary stream — rethrow anything that is not a plain read miss
+        continue;
+      }
     }
   }
 };

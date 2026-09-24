@@ -208,7 +208,7 @@ If unset, the app runs local-only and remote backup/restore operations stay unav
 
 - Type checking: `npm run typecheck`
 - Unit tests: `npm test`
-- E2E tests: `npm run e2e` (run `npm run build:web` first when web bundle changes; Playwright serves static `dist/` through `node scripts/serve-e2e.js`)
+- E2E tests: `npm run e2e` (run `npm run build:e2e` first when web bundle changes; Playwright serves static `dist/` through `node scripts/serve-e2e.js`)
 
 Test inventories are intentionally not hard-coded here because they change as
 coverage evolves. Re-verify them with `npx vitest list` and
