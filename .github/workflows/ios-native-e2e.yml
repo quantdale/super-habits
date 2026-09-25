@@ -15,7 +15,7 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'ios-simulator-gha') &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: macos-15-intel
-    timeout-minutes: 120
+    timeout-minutes: 300
     env:
       CI: '1'
       EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}

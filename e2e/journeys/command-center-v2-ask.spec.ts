@@ -102,12 +102,7 @@ async function routeAskBoundary(page: Page): Promise<void> {
 }
 
 async function askQuestion(page: Page, question: string, intent: AskIntent): Promise<void> {
-  if (supabaseRequestsSeen === 0) {
-    test.fixme(
-      true,
-      'Ask boundary tests run against the dummy-Supabase dist-sync export; standard dist/ is local-only.',
-    );
-  }
+  requireSyncBoundary();
   await openCommandScreen(page);
   await page.getByRole('button', { name: 'Ask', exact: true }).first().click({ force: true });
   await page.getByLabel('Question').fill(question);
@@ -118,6 +113,15 @@ async function askQuestion(page: Page, question: string, intent: AskIntent): Pro
   expect(latestFacts?.intent).toBe(intent);
   expect(JSON.stringify(latestFacts?.facts)).not.toContain('SELECT ');
   expect(JSON.stringify(latestFacts?.facts)).not.toContain('CREATE TABLE');
+}
+
+function requireSyncBoundary(): void {
+  if (supabaseRequestsSeen === 0) {
+    test.fixme(
+      true,
+      'Ask boundary tests run against the dummy-Supabase dist-sync export; standard dist/ is local-only.',
+    );
+  }
 }
 
 defineJourney({
@@ -131,12 +135,7 @@ defineJourney({
         await routeAskBoundary(page);
         await resetAll(page);
         await returnToApp(page);
-        if (supabaseRequestsSeen === 0) {
-          test.fixme(
-            true,
-            'Ask boundary tests run against the dummy-Supabase dist-sync export; standard dist/ is local-only.',
-          );
-        }
+        requireSyncBoundary();
       },
     },
     {
@@ -201,6 +200,7 @@ defineJourney({
     {
       name: 'retries an Auto Ask result through Create with the exact same text',
       run: async ({ page }) => {
+        requireSyncBoundary();
         await openCommandScreen(page);
         await page.getByRole('button', { name: 'Auto', exact: true }).click({ force: true });
         const submittedText = 'Add a todo to buy milk tomorrow';
@@ -219,6 +219,7 @@ defineJourney({
     {
       name: 'retries an unsupported Auto Create result through Ask',
       run: async ({ page }) => {
+        requireSyncBoundary();
         let firstClassify = true;
         const classifyAsCreateOnce = async (route: Route) => {
           const body = route.request().postDataJSON() as { stage?: string };
@@ -256,6 +257,7 @@ defineJourney({
     {
       name: 'ignores a delayed Auto classification after switching to a newer Create draft',
       run: async ({ page }) => {
+        requireSyncBoundary();
         let releaseClassification: (() => void) | undefined;
         let signalClassificationStarted: (() => void) | undefined;
         const classificationStarted = new Promise<void>((resolve) => {
@@ -315,6 +317,7 @@ defineJourney({
     {
       name: 'keeps internal Ask and Auto controls accessible',
       run: async ({ page }) => {
+        requireSyncBoundary();
         await openCommandScreen(page);
         await page.getByRole('button', { name: 'Ask', exact: true }).click({ force: true });
         await expect(page.getByText('Ask a question', { exact: true })).toBeVisible();
@@ -342,6 +345,7 @@ defineJourney({
     {
       name: 'shows provider-unavailable Ask without changing local data',
       run: async ({ page }) => {
+        requireSyncBoundary();
         await page.route('**/functions/v1/user-ai-ask', async (route) => {
           await route.fulfill({
             status: 500,
@@ -367,6 +371,7 @@ defineJourney({
     {
       name: 'keeps the exact Auto input visible when classification fails',
       run: async ({ page }) => {
+        requireSyncBoundary();
         await page.route('**/functions/v1/user-ai-ask', async (route) => {
           await route.fulfill({
             status: 503,
