@@ -13,6 +13,18 @@ function runtimeEnv(name) {
   return '';
 }
 
+/** An authenticated owner must be explicitly allowed before any AI quota or provider work. */
+export function isInternalAiUserAllowed(userId, rolloutFlag, options = {}) {
+  const enabled = options.enabled ?? runtimeEnv(rolloutFlag);
+  const allowedUserIds = options.allowedUserIds ?? runtimeEnv('AI_INTERNAL_USER_IDS');
+  if (enabled !== 'true' || typeof userId !== 'string') return false;
+  return allowedUserIds
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean)
+    .includes(userId);
+}
+
 function timeoutSignal(milliseconds) {
   if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
     return AbortSignal.timeout(milliseconds);

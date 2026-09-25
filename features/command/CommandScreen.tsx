@@ -248,6 +248,9 @@ export function CommandScreen({
     { outcome: 'success' }
   > | null>(null);
   const [mode, setMode] = useState<CommandMode>('create');
+  const modeRef = useRef<CommandMode>('create');
+  const modeTransitionId = useRef(0);
+  const [autoCreatePreview, setAutoCreatePreview] = useState(false);
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
 
   useEffect(() => {
@@ -264,8 +267,10 @@ export function CommandScreen({
     if (!AI_ASK_EXPERIMENT_ENABLED) return;
 
     let cancelled = false;
+    const initialTransitionId = modeTransitionId.current;
     void getLastUsedCommandMode().then((storedMode) => {
-      if (!cancelled) {
+      if (!cancelled && initialTransitionId === modeTransitionId.current) {
+        modeRef.current = storedMode;
         setMode(storedMode);
       }
     });
@@ -275,7 +280,11 @@ export function CommandScreen({
     };
   }, []);
 
-  const handleModeChange = (nextMode: CommandMode) => {
+  const handleModeChange = (nextMode: CommandMode, draftText?: string) => {
+    modeTransitionId.current += 1;
+    modeRef.current = nextMode;
+    if (nextMode === 'create' && draftText !== undefined) handleRawTextChange(draftText);
+    if (nextMode !== 'auto') setAutoCreatePreview(false);
     setMode(nextMode);
     void setLastUsedCommandMode(nextMode).catch(() => {
       // The runtime cache is already updated before the await; a persistence
@@ -350,12 +359,20 @@ export function CommandScreen({
     setSuccessResult(null);
   };
 
-  const handleParseCommand = async () => {
+  const parseCommandText = async (
+    inputText: string,
+    fromAuto = false,
+  ): Promise<ParseCommandResult | null> => {
     setExecutionError(null);
     setSuccessResult(null);
+    setParseResult(null);
+    setEditableDraft(null);
+    setCommandReview(null);
+    setSelectedEntityId(null);
+    setParseObservation(null);
     setIsParsing(true);
-    if (rawText.trim().length > 0) {
-      void recordCommandInvocation(rawText).then(() =>
+    if (inputText.trim().length > 0) {
+      void recordCommandInvocation(inputText).then(() =>
         getCommandHistory().then((entries) =>
           setCommandHistory(entries.map((entry) => entry.rawText)),
         ),
@@ -365,21 +382,26 @@ export function CommandScreen({
     const parserContext = getParserContext();
     const now = new Date();
     const requestId = ++reviewRequestId.current;
+    const initialModeTransitionId = modeTransitionId.current;
+    const isCurrentRequest = () =>
+      requestId === reviewRequestId.current &&
+      (!fromAuto ||
+        (modeRef.current === 'auto' && initialModeTransitionId === modeTransitionId.current));
     try {
       const execution = await commandParser.parseWithObservation({
-        rawText,
+        rawText: inputText,
         now,
         locale: parserContext.locale,
         timeZone: parserContext.timeZone,
         todayDateKey: toDateKey(now),
         tomorrowDateKey: getTomorrowDateKey(now),
       });
-      if (requestId !== reviewRequestId.current) return;
+      if (!isCurrentRequest()) return null;
       setParseResult(execution.result);
       setParseObservation(execution.observation);
       if (execution.result.outcome === 'draft') {
         const review = await prepareCommandReview(cloneDraft(execution.result.draft), { now });
-        if (requestId !== reviewRequestId.current) return;
+        if (!isCurrentRequest()) return null;
         setCommandReview(review);
         setEditableDraft(review.draft);
         setSelectedEntityId(null);
@@ -394,24 +416,31 @@ export function CommandScreen({
         // eslint-disable-next-line no-console
         console.debug('[command][internal-rollout]', execution.observation);
       }
+      return execution.result;
     } catch {
-      if (requestId !== reviewRequestId.current) return;
-      setParseResult({
+      if (!isCurrentRequest()) return null;
+      const failure: ParseCommandResult = {
         outcome: 'unavailable',
-        rawText,
-        message: 'The command could not be prepared. Nothing was saved.',
+        rawText: inputText,
+        message: 'The command could not be prepared. No app action ran.',
         reasonCode: 'request_failed',
-      });
+      };
+      setParseResult(failure);
       setParseObservation(null);
       setCommandReview(null);
       setEditableDraft(null);
       setSelectedEntityId(null);
       setExecutionError(null);
+      return failure;
     } finally {
       if (requestId === reviewRequestId.current) {
         setIsParsing(false);
       }
     }
+  };
+
+  const handleParseCommand = () => {
+    void parseCommandText(rawText);
   };
 
   const handleConfirm = async () => {
@@ -459,6 +488,18 @@ export function CommandScreen({
     setExecutionError(null);
     setIsParsing(false);
     setSuccessResult(null);
+  };
+
+  const handleAutoRouteToCreate = async (submittedText: string, originTransitionId: number) => {
+    if (modeRef.current !== 'auto' || originTransitionId !== modeTransitionId.current) return null;
+    handleRawTextChange(submittedText);
+    setAutoCreatePreview(true);
+    return parseCommandText(submittedText, true);
+  };
+
+  const handleAutoInputChange = () => {
+    setAutoCreatePreview(false);
+    handleRawTextChange('');
   };
 
   const refreshDraftReview = (nextDraft: DraftAiAction, nextSelectedEntityId: string | null) => {
@@ -687,13 +728,22 @@ export function CommandScreen({
     return <View className="gap-4 pb-1 pt-1">{commandContent}</View>;
   }
 
+  const autoModeTransitionId = modeTransitionId.current;
   return (
     <View className="gap-4 pb-1 pt-1">
       <ModeToggle mode={mode} onChange={handleModeChange} />
       {mode === 'create' ? commandContent : null}
       {mode === 'ask' ? <AskConversationView placeholder={commandPlaceholder} /> : null}
       {mode === 'auto' ? (
-        <AutoModeView placeholder={commandPlaceholder} onSwitchToMode={handleModeChange} />
+        <>
+          <AutoModeView
+            placeholder={commandPlaceholder}
+            onSwitchToMode={handleModeChange}
+            onRouteToCreate={(text) => handleAutoRouteToCreate(text, autoModeTransitionId)}
+            onInputChange={handleAutoInputChange}
+          />
+          {autoCreatePreview ? commandContent : null}
+        </>
       ) : null}
     </View>
   );

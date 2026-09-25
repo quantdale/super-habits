@@ -99,6 +99,52 @@ const deepGymMigration = deepGymMigrationName
   ? read(`supabase/migrations/${deepGymMigrationName}`)
   : '';
 const fixture = read('simulation/backend/schema.sql');
+
+// A local SQLite REAL stores an eight-byte JavaScript number, while remote
+// PostgreSQL REAL stores only four bytes. Restore V2 hashes canonical numbers,
+// so the remote schema and disposable fixture must preserve every backed-up
+// measurement without four-byte rounding.
+const precisionMigrationName = '20260925125655_backup_numeric_precision.sql';
+if (!migrationNames.includes(precisionMigrationName)) {
+  failures.push(`missing migration ${precisionMigrationName}`);
+}
+if (
+  migrationNames.includes(precisionMigrationName) &&
+  (migrationNames.indexOf(precisionMigrationName) <= migrationNames.indexOf(gymMigrationName) ||
+    migrationNames.indexOf(precisionMigrationName) <= migrationNames.indexOf(deepGymMigrationName))
+) {
+  failures.push('backup numeric precision migration must follow both Gym V2 migrations');
+}
+const precisionMigration = read(`supabase/migrations/${precisionMigrationName}`);
+const precisionColumns = {
+  calorie_entries: ['protein', 'carbs', 'fats', 'fiber'],
+  saved_meals: ['protein', 'carbs', 'fats', 'fiber'],
+  routine_exercises: ['progression_increment'],
+  routine_exercise_sets: ['target_load', 'target_distance', 'target_pace'],
+  workout_session_sets: ['weight', 'distance', 'pace', 'effort_value'],
+  body_weight_entries: ['weight'],
+};
+for (const [table, columns] of Object.entries(precisionColumns)) {
+  const migrationBlock =
+    precisionMigration.match(new RegExp(`ALTER TABLE public\\.${table}\\b([^;]*);`, 'i'))?.[1] ??
+    '';
+  const fixtureBlock =
+    fixture.match(
+      new RegExp(`CREATE TABLE IF NOT EXISTS public\\.${table}\\s*\\(([^;]*?)\\n\\);`, 'i'),
+    )?.[1] ?? '';
+  for (const column of columns) {
+    requireText(
+      `precision migration ${table}.${column}`,
+      migrationBlock,
+      new RegExp(`ALTER COLUMN ${column} TYPE NUMERIC USING \\(${column}::text\\)::numeric`, 'i'),
+    );
+    requireText(
+      `disposable fixture ${table}.${column} precision`,
+      fixtureBlock,
+      new RegExp(`\\b${column}\\s+NUMERIC\\b`, 'i'),
+    );
+  }
+}
 const config = read('supabase/config.toml');
 const clientSource = [
   read('lib/supabase.ts'),

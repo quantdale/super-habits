@@ -1,0 +1,113 @@
+name: iOS simulator E2E (GitHub Actions)
+
+# A standard macOS runner is free for this public repository. Keep this label
+# distinct from EAS's `native-e2e` label, which requires a paid Maestro plan.
+on:
+  pull_request:
+    types: [labeled, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  ios-simulator:
+    if: >-
+      contains(github.event.pull_request.labels.*.name, 'ios-simulator-gha') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: macos-15-intel
+    timeout-minutes: 120
+    env:
+      CI: '1'
+      EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      # Expo SDK 55 needs Xcode 26.2+; the runner image defaults to 16.4.
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+      CODE_SIGNING_ALLOWED: 'NO'
+      EXPO_NO_DOTENV: '1'
+      EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST: 'true'
+      EXPO_PUBLIC_SUPABASE_URL: ''
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ''
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Verify exact source and native toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node --version)" = 'v22.23.2'
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          test "$(xcodebuild -version | head -n 1)" = 'Xcode 26.2'
+          xcrun simctl list runtimes
+          echo "Source SHA: $EXPECTED_SOURCE_SHA"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install pinned Maestro CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          export MAESTRO_VERSION=2.2.0
+          curl -fsSL 'https://get.maestro.mobile.dev' | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" --version
+
+      - name: Boot iOS 26.2 Simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          simulator_id="$(xcrun simctl list devices available -j | node -e '
+            let input = "";
+            process.stdin.on("data", chunk => input += chunk);
+            process.stdin.on("end", () => {
+              const devices = JSON.parse(input).devices;
+              const matches = Object.entries(devices)
+                .filter(([runtime]) => runtime.endsWith(".iOS-26-2"))
+                .flatMap(([, entries]) => entries)
+                .filter(device => device.name === "iPhone 17 Pro");
+              if (matches.length !== 1) process.exit(1);
+              process.stdout.write(matches[0].udid);
+            });
+          ')"
+          test -n "$simulator_id"
+          xcrun simctl boot "$simulator_id"
+          xcrun simctl bootstatus "$simulator_id" -b
+          echo "IOS_SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
+          echo "Simulator UDID: $simulator_id"
+
+      - name: Build and install unsigned release app for iOS Simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx expo run:ios --configuration Release --device "$IOS_SIMULATOR_ID" --no-bundler
+          app_path="$(xcrun simctl get_app_container "$IOS_SIMULATOR_ID" com.dale16.superhabits app)"
+          test -d "$app_path"
+          echo "IOS_APP_PATH=$app_path" >> "$GITHUB_ENV"
+
+      - name: Run iOS flows and print source/build provenance
+        run: node scripts/qa-ios-github-actions.mjs "$IOS_APP_PATH"
+
+      - name: Preserve iOS simulator reports and debug evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            simulation-output/native/*.json
+            simulation-output/native/debug-ios-*/
+          if-no-files-found: warn
+          retention-days: 14

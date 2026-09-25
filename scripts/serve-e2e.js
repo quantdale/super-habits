@@ -45,15 +45,14 @@ const DIST = path.resolve(__dirname, '..', args.dist);
 // refuses any dist/ whose bundles embed a real *.supabase.co host. The
 // dummy-Supabase dist-sync export (journeys-sync lane) is the only allowed
 // exception. Fails closed BEFORE serving a single byte.
-(async function assertHermeticDist() {
-  const needle = Buffer.from('supabase.co', 'utf8');
+async function assertHermeticDist() {
   const offenders = [];
   const walk = async (dir) => {
     let entries;
     try {
       entries = await fs.readdir(dir, { withFileTypes: true });
-    } catch {
-      return; // missing dist — the existing sw.js check below reports it
+    } catch (error) {
+      throw new Error(`cannot scan ${path.relative(DIST, dir) || args.dist}: ${error.message}`);
     }
     for (const entry of entries) {
       const p = path.join(dir, entry.name);
@@ -61,16 +60,17 @@ const DIST = path.resolve(__dirname, '..', args.dist);
         await walk(p);
       } else {
         try {
-          const buf = await fs.readFile(p);
-          if (!buf.includes(needle)) continue;
-          const hosts = [...buf.toString('utf8').matchAll(/[a-z0-9-]+\.supabase\.co/g)].map(
-            (m) => m[0],
+          const source = (await fs.readFile(p)).toString('utf8');
+          if (!/supabase\.co/i.test(source)) continue;
+          const hosts = [...source.matchAll(/[a-z0-9-]+\.supabase\.co/gi)].map((m) =>
+            m[0].toLowerCase(),
           );
-          if (hosts.some((h) => h !== 'dummy.supabase.co')) {
+          const allowDummy = DIST === path.resolve(__dirname, '..', 'dist-sync');
+          if (hosts.length === 0 || hosts.some((h) => !allowDummy || h !== 'dummy.supabase.co')) {
             offenders.push(`${path.relative(DIST, p)} (${[...new Set(hosts)].join(', ')})`);
           }
-        } catch {
-          continue;
+        } catch (error) {
+          throw new Error(`cannot scan ${path.relative(DIST, p)}: ${error.message}`);
         }
       }
     }
@@ -88,7 +88,7 @@ const DIST = path.resolve(__dirname, '..', args.dist);
     );
     process.exit(1);
   }
-})();
+}
 
 // Audit AREA 9 F5: product sw.js bypasses localhost in its fetch handler
 // (never cache Metro/dev responses), which also makes the cache-serving path
@@ -230,6 +230,13 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`E2E static server: http://localhost:${PORT} (root: ${DIST})`);
-});
+assertHermeticDist()
+  .then(() => {
+    server.listen(PORT, () => {
+      console.log(`E2E static server: http://localhost:${PORT} (root: ${DIST})`);
+    });
+  })
+  .catch((error) => {
+    console.error(`serve-e2e: hermeticity scan failed: ${error.message}`);
+    process.exitCode = 1;
+  });

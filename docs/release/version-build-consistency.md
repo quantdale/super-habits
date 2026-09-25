@@ -4,7 +4,8 @@ Companion to `app-store-readiness.md` (item 5) and
 `release-notes-1.0.0.md` ("Version + tag checklist"). Version truth for
 SuperHabits 1.0.0 is spread across five sources — `package.json`,
 `app.json`, `eas.json`, the readiness doc, and the release notes — and a
-drift between any two of them would ship mismatched store metadata. This
+drift between any two of their source baselines could make the release
+metadata misleading. This
 file is **measured evidence only**: every value below was read from the
 existing files on 2026-09-19. No version was bumped, no build number was
 incremented, no tag was created, and no submit credentials were touched in
@@ -28,9 +29,11 @@ this pass.
 | `eas.json`          | `submit.production`              | `{}`     | PASS — empty; credentials stay `[OWNER ACTION]`           |
 | `git tag -l v1.0.0` | (no output)                      | —        | PASS — no tag exists; tagging stays `[OWNER ACTION]` (§4) |
 
-No missing keys, no mismatched values at audit time. If any row above
-ever reads differently, fix the source file (or the doc quoting it) back
-into agreement before tagging — never tag a drifted tree.
+No missing keys or mismatched source baselines at audit time. EAS uses
+remote version state and `autoIncrement: true`, so this table does not
+prove the resolved build number of a later production binary. If a row
+reads differently, reconcile the source files and actual artifact before
+any release decision.
 
 ## 2. Consistency rules (what the guard proves)
 
@@ -43,10 +46,9 @@ Proves:
   integer `1` — the first-release baseline both stores expect; the guard
   asserts the JSON types too, so `"1"` vs `1` mix-ups fail loudly.
 - `eas.json` production posture is exactly `autoIncrement: true` with an
-  empty `submit.production` — no submit credentials are committed, and
-  post-release build increments stay automatic per the existing readiness
-  statement ("EAS `production` profile has `autoIncrement: true`, so CI
-  increments these").
+  empty `submit.production` — no submit credentials are committed. The
+  resolved build identifiers must be read from the actual EAS artifacts;
+  `app.json` values alone are not that proof.
 - `eas.json` `cli.appVersionSource` is `"remote"` — recorded literally as
   configured; the owner confirms the intended version source at
   submission time (§3).
@@ -90,14 +92,17 @@ No tags, submits, or credential writes ship in this pass. Confirm each
 box at release time with explicit intent:
 
 - [ ] `[OWNER ACTION]` EAS submit credentials: `submit.production` is
-      currently `{}` — configure App Store Connect / Play Console submit
-      credentials before `eas submit -p ios` / `eas submit -p android`.
+      currently `{}` — prepare App Store Connect / Play Console credentials
+      in owner-controlled accounts or a secure environment, leaving this
+      repository profile empty before any authorized submission.
 - [ ] `[OWNER ACTION]` Tag only with explicit release intent:
       `git tag -a v1.0.0 -m "SuperHabits 1.0.0" && git push origin v1.0.0`.
       Do not create the tag in a routine readiness pass.
-- [ ] `[OWNER ACTION]` Confirm the EAS production build resolves version
-      `1.0.0` with iOS build `1` / Android version code `1` before filing
-      the stores.
+- [ ] `[OWNER ACTION]` Confirm the actual EAS production binaries resolve
+      version `1.0.0`, record their iOS build number and Android version
+      code, and match those values to the store records. The source
+      baselines are iOS `1` / Android `1`; remote auto-increment may assign
+      later identifiers.
 - [ ] `[OWNER ACTION]` Hosted privacy URL: deploy `/privacy.html` with the
       production web build and paste that URL in both store listings
       (see `release-notes-1.0.0.md` checklist).

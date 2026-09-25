@@ -1,7 +1,8 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { defineJourney } from '../helpers/journey';
 import { openCommandScreen } from '../helpers/commandObservation';
-import { returnToApp } from '../helpers/dbHarness';
+import { auditPage } from '../helpers/a11yAudit';
+import { queryRows, returnToApp } from '../helpers/dbHarness';
 import { resetAll } from '../helpers/reset';
 import { fulfillDummySupabaseAuth } from '../helpers/supabaseAuth';
 
@@ -195,6 +196,203 @@ defineJourney({
           focus: expect.any(Object),
           workout: expect.any(Object),
         });
+      },
+    },
+    {
+      name: 'retries an Auto Ask result through Create with the exact same text',
+      run: async ({ page }) => {
+        await openCommandScreen(page);
+        await page.getByRole('button', { name: 'Auto', exact: true }).click({ force: true });
+        const submittedText = 'Add a todo to buy milk tomorrow';
+        await page.getByLabel('Auto mode question').fill(submittedText);
+        await page.getByRole('button', { name: 'Send', exact: true }).click({ force: true });
+        await expect(page.getByText('Auto → Ask', { exact: true })).toBeVisible();
+        await page.getByRole('button', { name: 'Try as Create instead' }).click({ force: true });
+        await expect(page.getByText('Auto → Create', { exact: true })).toBeVisible();
+        await expect(page.locator('#command-input')).toHaveValue(submittedText);
+        await expect(page.locator('#command-edit-todo-title')).toHaveValue(/buy milk/i);
+        expect(await queryRows(page, 'SELECT COUNT(*) AS count FROM todos')).toEqual([
+          { count: 0 },
+        ]);
+      },
+    },
+    {
+      name: 'retries an unsupported Auto Create result through Ask',
+      run: async ({ page }) => {
+        let firstClassify = true;
+        const classifyAsCreateOnce = async (route: Route) => {
+          const body = route.request().postDataJSON() as { stage?: string };
+          if (firstClassify && body.stage === 'classify') {
+            firstClassify = false;
+            await route.fulfill({
+              status: 200,
+              headers: { 'access-control-allow-origin': '*' },
+              contentType: 'application/json',
+              body: JSON.stringify({ outcome: 'unsupported', reason: 'Try Create first.' }),
+            });
+            return;
+          }
+          await route.fallback();
+        };
+        await page.route('**/functions/v1/user-ai-ask', classifyAsCreateOnce);
+        try {
+          await openCommandScreen(page);
+          await page.getByRole('button', { name: 'Auto', exact: true }).click({ force: true });
+          const submittedText = 'How many calories did I eat today?';
+          await page.getByLabel('Auto mode question').fill(submittedText);
+          await page.getByRole('button', { name: 'Send', exact: true }).click({ force: true });
+          await expect(page.getByText('Auto → Create', { exact: true })).toBeVisible();
+          await page.getByRole('button', { name: 'Try as Ask instead' }).click({ force: true });
+          await expect(page.getByText(phraseForIntent('calorie_summary'))).toBeVisible();
+          await expect(page.getByLabel('Auto mode question')).toHaveValue(submittedText);
+          expect(await queryRows(page, 'SELECT COUNT(*) AS count FROM todos')).toEqual([
+            { count: 0 },
+          ]);
+        } finally {
+          await page.unroute('**/functions/v1/user-ai-ask', classifyAsCreateOnce);
+        }
+      },
+    },
+    {
+      name: 'ignores a delayed Auto classification after switching to a newer Create draft',
+      run: async ({ page }) => {
+        let releaseClassification: (() => void) | undefined;
+        let signalClassificationStarted: (() => void) | undefined;
+        const classificationStarted = new Promise<void>((resolve) => {
+          signalClassificationStarted = resolve;
+        });
+        const classificationGate = new Promise<void>((resolve) => {
+          releaseClassification = resolve;
+        });
+        const delayClassification = async (route: Route) => {
+          const body = route.request().postDataJSON() as { stage?: string };
+          if (body.stage !== 'classify') {
+            await route.fallback();
+            return;
+          }
+          signalClassificationStarted?.();
+          await classificationGate;
+          await route.fulfill({
+            status: 200,
+            headers: { 'access-control-allow-origin': '*' },
+            contentType: 'application/json',
+            body: JSON.stringify({ outcome: 'unsupported', reason: 'Try Create first.' }),
+          });
+        };
+        await page.route('**/functions/v1/user-ai-ask', delayClassification);
+        try {
+          await openCommandScreen(page);
+          await page.getByRole('button', { name: 'Auto', exact: true }).click({ force: true });
+          await page.getByLabel('Auto mode question').fill('Add a todo to call mom tomorrow');
+          await page.getByRole('button', { name: 'Send', exact: true }).click({ force: true });
+          await classificationStarted;
+
+          await page.getByRole('button', { name: 'Create', exact: true }).click({ force: true });
+          const newerText = 'Add a todo to buy bread tomorrow';
+          await page.locator('#command-input').fill(newerText);
+          await page.getByRole('button', { name: 'Parse command' }).click({ force: true });
+          await expect(page.locator('#command-edit-todo-title')).toHaveValue(/buy bread/i);
+
+          const delayedResponse = page.waitForResponse(
+            (response) =>
+              response.url().includes('/functions/v1/user-ai-ask') &&
+              response.request().postDataJSON()?.stage === 'classify',
+          );
+          releaseClassification?.();
+          await delayedResponse;
+          await page.waitForTimeout(200);
+          await expect(page.locator('#command-input')).toHaveValue(newerText);
+          await expect(page.locator('#command-edit-todo-title')).toHaveValue(/buy bread/i);
+          expect(await queryRows(page, 'SELECT COUNT(*) AS count FROM todos')).toEqual([
+            { count: 0 },
+          ]);
+        } finally {
+          releaseClassification?.();
+          await page.unroute('**/functions/v1/user-ai-ask', delayClassification);
+        }
+      },
+    },
+    {
+      name: 'keeps internal Ask and Auto controls accessible',
+      run: async ({ page }) => {
+        await openCommandScreen(page);
+        await page.getByRole('button', { name: 'Ask', exact: true }).click({ force: true });
+        await expect(page.getByText('Ask a question', { exact: true })).toBeVisible();
+        await page.waitForTimeout(1200);
+        const ask = await page.evaluate(auditPage);
+        expect(ask.contrast, 'command ask: WCAG AA contrast').toEqual([]);
+        expect(ask.nameless, 'command ask: controls without accessible names').toEqual([]);
+        expect(ask.duplicateIds, 'command ask: duplicate element ids').toEqual([]);
+        expect(ask.hiddenFocusable, 'command ask: focusable content inside aria-hidden').toEqual(
+          [],
+        );
+
+        await page.getByRole('button', { name: 'Auto', exact: true }).click({ force: true });
+        await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeVisible();
+        await page.waitForTimeout(1200);
+        const auto = await page.evaluate(auditPage);
+        expect(auto.contrast, 'command auto: WCAG AA contrast').toEqual([]);
+        expect(auto.nameless, 'command auto: controls without accessible names').toEqual([]);
+        expect(auto.duplicateIds, 'command auto: duplicate element ids').toEqual([]);
+        expect(auto.hiddenFocusable, 'command auto: focusable content inside aria-hidden').toEqual(
+          [],
+        );
+      },
+    },
+    {
+      name: 'shows provider-unavailable Ask without changing local data',
+      run: async ({ page }) => {
+        await page.route('**/functions/v1/user-ai-ask', async (route) => {
+          await route.fulfill({
+            status: 500,
+            headers: { 'access-control-allow-origin': '*' },
+            contentType: 'application/json',
+            body: JSON.stringify({ error: 'Provider unavailable.' }),
+          });
+        });
+        await openCommandScreen(page);
+        await page.getByRole('button', { name: 'Ask', exact: true }).first().click({ force: true });
+        await page.getByLabel('Question').fill('How many pending todos do I have?');
+        await page.getByRole('button', { name: 'Ask', exact: true }).last().click({ force: true });
+        await expect(
+          page.getByText('Ask is temporarily unavailable', { exact: true }),
+        ).toBeVisible();
+        await expect(
+          page.getByText('Nothing was saved or changed.', { exact: true }),
+        ).toBeVisible();
+        const rows = await queryRows(page, 'SELECT COUNT(*) AS count FROM todos');
+        expect(rows).toEqual([{ count: 0 }]);
+      },
+    },
+    {
+      name: 'keeps the exact Auto input visible when classification fails',
+      run: async ({ page }) => {
+        await page.route('**/functions/v1/user-ai-ask', async (route) => {
+          await route.fulfill({
+            status: 503,
+            headers: { 'access-control-allow-origin': '*' },
+            contentType: 'application/json',
+            body: JSON.stringify({ error: 'Ask is unavailable.' }),
+          });
+        });
+        await openCommandScreen(page);
+        await page.getByRole('button', { name: 'Create', exact: true }).click({ force: true });
+        await page.locator('#command-input').fill('Add a todo to buy bananas tomorrow');
+        await page.getByRole('button', { name: 'Parse command' }).click({ force: true });
+        await expect(page.locator('#command-edit-todo-title')).toHaveValue(/buy bananas/i);
+        await page.getByRole('button', { name: 'Auto', exact: true }).click({ force: true });
+        const submittedText = 'Add a todo to call mom tomorrow';
+        await page.getByLabel('Auto mode question').fill(submittedText);
+        await page.getByRole('button', { name: 'Send', exact: true }).click({ force: true });
+        await expect(page.getByText('Auto → Create', { exact: true })).toBeVisible();
+        await expect(page.getByText(/Classification unavailable/)).toBeVisible();
+        await expect(page.locator('#command-edit-todo-title')).toHaveValue(/call mom/i);
+        await page.getByRole('button', { name: 'Switch to Create' }).click({ force: true });
+        await expect(page.locator('#command-input')).toHaveValue(submittedText);
+        await expect(page.locator('#command-edit-todo-title')).toHaveValue(/call mom/i);
+        expect(await queryRows(page, 'SELECT COUNT(*) AS count FROM todos')).toEqual([
+          { count: 0 },
+        ]);
       },
     },
   ],

@@ -8,6 +8,7 @@ import {
 import {
   authenticateSupabaseUser,
   consumeAiQuota,
+  isInternalAiUserAllowed,
   readBoundedJson,
 } from "../_shared/aiSecurity.js";
 
@@ -245,14 +246,12 @@ async function invokeOpenAiParse(input) {
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    // Log the provider detail server-side but do not echo it to the caller —
-    // upstream request/schema details can contain sensitive data.
+    // Provider error bodies can echo prompt text or credentials. Keep only
+    // the status needed to diagnose upstream failures.
     console.log(
       JSON.stringify({
         event: "parse_ai_command_upstream_error",
         status: response.status,
-        errorBody: String(errorText).slice(0, 500),
       }),
     );
     throw new Error(`OpenAI request failed with status ${response.status}.`);
@@ -334,6 +333,17 @@ Deno.serve(async (request) => {
       httpStatus: auth.status,
     });
     return jsonResponse(auth.status, auth.body);
+  }
+
+  if (!isInternalAiUserAllowed(auth.userId, "AI_COMMAND_INTERNAL_ROLLOUT")) {
+    logParseEvent({
+      requestId,
+      rawTextLength: null,
+      latencyMs: Date.now() - startedAt,
+      outcome: "rollout_rejected",
+      httpStatus: 403,
+    });
+    return jsonResponse(403, { error: "Command parsing is unavailable." });
   }
 
   try {

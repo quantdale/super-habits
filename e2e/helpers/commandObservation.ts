@@ -27,11 +27,13 @@ export async function openCommandScreen(page: Page) {
   // this window prevents the command modal from re-rendering mid-interaction.
   await expect(page.getByText('Add something', { exact: true })).toHaveCount(0);
 
-  // The command center remembers the last-used mode and defaults to Auto on a
-  // fresh origin. Parser-oriented tests pin Create before using #command-input.
+  // Internal Ask builds remember the last-used mode and may open in Auto.
+  // Ordinary builds hide the mode toggle and show Create content directly.
   const createMode = page.getByRole('button', { name: 'Create', exact: true });
-  await expect(createMode).toBeVisible({ timeout: 15_000 });
-  await createMode.click({ force: true });
+  if (await createMode.count()) {
+    await expect(createMode).toBeVisible({ timeout: 15_000 });
+    await createMode.click({ force: true });
+  }
   await expect(page.locator('#command-input')).toBeVisible({ timeout: 15_000 });
 }
 

@@ -1,51 +1,50 @@
-# Store assets checklist — dimensions/spec (for owner capture)
+# Store assets checklist — current capture requirements (for owner capture)
 
 Companion to `store-data-declarations.md` §4 and `app-store-readiness.md`
 items 1–2. This file is the **verifiable spec only** — no screenshot or
 feature-graphic image binaries ship in this pass. Capture itself is
 device-bound and stays `[OWNER ACTION]`.
 
-> Store specs drift. Re-verify every size, count, and format in
-> App Store Connect / Play Console at submission time before capture.
+> Rechecked against the [Apple screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications)
+> and [Google Play preview-asset requirements](https://support.google.com/googleplay/android-developer/answer/9866151)
+> on 2026-09-25. Re-verify the available device classes and upload fields in
+> the actual consoles at submission time before capture.
 > Spec version at this draft: 1.0.0 (`package.json`, `app.json`
 > `expo.version`), iOS `buildNumber 1`, Android `versionCode 1`.
 
-## 1. Apple App Store — required sets
+## 1. Apple App Store — required display classes
 
-Tablet support is on (`app.json` iOS tablet support), so iPad sets are
-required alongside iPhone. Provide portrait captures; add landscape only
-if the submission uses landscape frames. Export at the device-native
-pixel size (no upscaling, no alpha-channel tricks, JPEG or PNG as
-Connect accepts).
+Tablet support is on (`app.json` iOS tablet support), so an iPad set is
+required alongside an iPhone set. Apple accepts **one to 10** JPEG/PNG
+screenshots per supplied set, without transparency. Capture from a genuine
+release build at the device's native pixel size; do not resize an older image
+to fit a new class. App Store Connect can scale the highest-resolution
+required set to smaller devices, so extra sets are optional.
 
-| Set (this submission)                      | Portrait (px) | Landscape (px) | Count                       |
-| ------------------------------------------ | ------------- | -------------- | --------------------------- |
-| 6.7" iPhone (required)                     | 1290 × 2796   | 2796 × 1290    | 1–10 per size; fill the set |
-| 6.1" iPhone (required)                     | 1179 × 2556   | 2556 × 1179    | 1–10 per size; fill the set |
-| 12.9" iPad (required)                      | 2048 × 2732   | 2732 × 2048    | 1–10 per size; fill the set |
-| 13" iPad (required where Connect shows it) | 2064 × 2752   | 2752 × 2064    | 1–10 per size; fill the set |
+| Display class / status                               | Accepted portrait examples (px)       | Capture decision                                                                 |
+| ---------------------------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------- |
+| 6.9" iPhone — primary iPhone set                     | 1290 × 2796; 1260 × 2736; 1320 × 2868 | Capture one native size from the matching genuine build.                         |
+| 6.5" iPhone — fallback if no 6.9" set                | 1284 × 2778; 1242 × 2688              | Apple lists this as required only when a 6.9" set is absent.                     |
+| 6.3" iPhone — optional additional set                | 1179 × 2556; 1206 × 2622              | The old checklist mislabeled 1179 × 2556 as a required 6.1" set.                 |
+| 6.1" iPhone — optional additional set                | 1170 × 2532; 1125 × 2436; 1080 × 2340 | Capture only if useful for the listing.                                          |
+| 13" iPad — required because `supportsTablet` is true | 2064 × 2752 or 2048 × 2732            | Use the exact native size of the matching iPad build; one accepted set suffices. |
+| 12.9" iPad — optional legacy set                     | 2048 × 2732                           | Apple scales from the 13" set if this set is omitted.                            |
 
 Notes:
 
-- 6.7" covers the iPhone 14 Pro Max / 15 Pro Max class
-  (1290 × 2796). Do not substitute the older 1242 × 2688 class unless
-  Connect explicitly accepts it for the submission.
-- 6.1" covers the iPhone 15 / 15 Pro class (1179 × 2556). The older
-  6.1" class (1170 × 2532) is accepted only where Connect says so —
-  capture at the real device's native size and verify.
-- 12.9" iPad Pro class is 2048 × 2732. The 13" iPad Pro (M4) class
-  is 2064 × 2752. Where Connect merges them, one exact-native set
-  plus verification is enough — never stretch one size into the other.
-- Use the same six surfaces (§3) in every set so iPhone and iPad tell
-  the same story.
+- Apple's current table lists 1290 × 2796 under 6.9", 1179 × 2556 under
+  6.3", and both 2048 × 2732 and 2064 × 2752 under the required 13"
+  iPad class. These are accepted pixel dimensions, not a request to upscale.
+- Use the same six surfaces (§3) in the required iPhone and iPad sets so
+  the two listings tell the same story. Extra sets may use the same sequence.
 
 ## 2. Google Play — feature graphic + screenshots
 
-| Asset                                                           | Spec                                                                                                              | Count / rules                                    |
-| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| Feature graphic                                                 | 1024 × 500 px, JPEG or PNG (no transparency), no essential text or logo near the edges (keep a clear safe margin) | 1, required for the listing                      |
-| Phone screenshots                                               | 320–3840 px per side, 16:9 or 9:16 aspect, JPEG or PNG (no transparency)                                          | Min 2, max 8; same six surfaces preferred        |
-| 7" / 10" tablet screenshots (recommended, tablet support is on) | Same pixel rules as phone (native tablet frame, 16:9 or 9:16 where the Console accepts it)                        | Optional but recommended; reuse the six surfaces |
+| Asset                       | Spec                                                                                                        | Count / rules                                                                                                                                                                                          |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Feature graphic             | 1024 × 500 px, JPEG or 24-bit PNG (no transparency); keep essential content away from edges                 | One required for the listing.                                                                                                                                                                          |
+| Phone screenshots           | JPEG or 24-bit PNG, no alpha; each dimension 320–3840 px and the longer side no more than twice the shorter | Min 2 across supported device types, max 8 per type; use at least two real phone captures for this listing. Four phone captures at 1080 px or more in 9:16/16:9 are recommended for broader placement. |
+| 7" / 10" tablet screenshots | Native tablet captures; follow the live large-screen upload requirements                                    | Optional for this listing, but recommended with tablet support; Play recommends at least four when supplied.                                                                                           |
 
 Notes:
 
@@ -80,8 +79,11 @@ overlay — neither is one of the six store surfaces.
 
 Every frame in every set must meet all of these:
 
-- Current `1.0.0` build (`package.json 1.0.0`, `app.json 1.0.0` +
-  `buildNumber 1` + `versionCode 1`).
+- Genuine native `1.0.0` build for that platform, with its source SHA,
+  artifact ID/hash, and resolved iOS build number or Android version code
+  recorded. `app.json` starts at `buildNumber 1` / `versionCode 1`, while
+  the EAS production profile uses remote version state and auto-increment;
+  the actual binary's values must be checked before capture.
 - English UI (the app ships English-only; see readiness item 7).
 - Seeded demo content only — the same neutral demo dataset in every
   frame, no real user data.
@@ -101,17 +103,16 @@ Every frame in every set must meet all of these:
 No image binaries ship in this pass. Capture each box on a real seeded
 device or emulator and verify pixel sizes before upload.
 
-- [ ] `[OWNER ACTION]` App Store 6.7" iPhone set (1290 × 2796) — six surfaces, acceptance §4 met.
-- [ ] `[OWNER ACTION]` App Store 6.1" iPhone set (1179 × 2556) — six surfaces, acceptance §4 met.
-- [ ] `[OWNER ACTION]` App Store 12.9" iPad set (2048 × 2732) — six surfaces, acceptance §4 met.
-- [ ] `[OWNER ACTION]` App Store 13" iPad set (2064 × 2752) where Connect shows it — six surfaces, acceptance §4 met.
+- [ ] `[OWNER ACTION]` App Store 6.9" iPhone native set (for example, 1290 × 2796) or the accepted 6.5" fallback — six genuine-build surfaces, acceptance §4 met.
+- [ ] `[OWNER ACTION]` App Store required 13" iPad native set (2048 × 2732 or 2064 × 2752 from its matching device) — six genuine-build surfaces, acceptance §4 met.
+- [ ] `[OWNER ACTION]` Additional iPhone/iPad sets only where the actual console asks for them or the owner elects to supply them; capture each from the matching build, never stretch another set.
 - [ ] `[OWNER ACTION]` Play feature graphic 1024 × 500 — safe margins kept, no transparency.
-- [ ] `[OWNER ACTION]` Play phone screenshots (≥ 2, same six surfaces preferred) — pixel/aspect rules §2 met, acceptance §4 met.
+- [ ] `[OWNER ACTION]` Play phone screenshots (≥ 2 real captures, same six surfaces preferred) — pixel rules §2 met, acceptance §4 met.
 
 ## 6. Framing don'ts
 
 - Do not fabricate, upscale, stretch, or mock up frames — capture real
-  pixels from the `1.0.0` build only.
+  pixels from the identified `1.0.0` native build only.
 - Do not pass simulator bezels, browser chrome, or dev tools as store
   screenshots.
 - Do not put essential feature-graphic text or logos near the

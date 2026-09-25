@@ -116,8 +116,9 @@ after prebuild and Gradle. `git status --porcelain` omits intentionally ignored
 generated output, but tracked or relevant untracked source changes block the
 build with a remediation message. Missing Maestro, `adb`, Xcode/simctl, a
 booted target, or a supported API-36 x86_64 target returns `ENVIRONMENT` with a
-replay command and focused JSON report; it is not reported as a pass. EAS
-remains the cloud build/install path for iOS.
+replay command and focused JSON report; it is not reported as a pass. iOS can
+run through EAS or the opt-in public GitHub Actions simulator lane described
+below; each route needs its own exact-SHA runtime result.
 
 ## Nitro validation evidence (2026-08-10)
 
@@ -296,6 +297,17 @@ block execution: EAS needs a linked GitHub repository for `--ref`, and the
 account plan must permit Maestro jobs. See the dated result above; retry only
 after both conditions are met.
 
+The separate `.github/workflows/ios-native-e2e.yml` uses a standard macOS
+runner for this public repository, builds an unsigned Expo Release app for the
+iOS Simulator, and runs the same 13 EAS iOS flows. It is opt-in through the
+`ios-simulator-gha` pull-request label and reruns on later commits while that
+label remains. The runner records the PR-head source SHA, executable hash,
+simulator/Xcode/Maestro versions, per-flow reports, and debug artifacts. It
+uses no EAS job, production Supabase credentials, signing, or store submission.
+The workflow is a prepared non-billable route, **not** an iOS pass until its
+job succeeds on the exact source SHA being certified. A new SHA needs a new
+successful run.
+
 ## Lifecycle and notification boundaries
 
 The Pomodoro lifecycle flow verifies the running native UI through a real
@@ -327,8 +339,8 @@ belong with the corresponding workflow run.
 
 - Android smoke and targeted lifecycle flows are the practical local gate when
   an emulator/device and E2E APK are available.
-- iOS uses a macOS simulator locally or the EAS workflow after its repository
-  link and Maestro-plan prerequisites are met; Windows development does not
-  claim iOS execution.
+- iOS uses a macOS simulator locally, the opt-in GitHub Actions simulator
+  workflow, or EAS after its repository link and Maestro-plan prerequisites
+  are met; Windows development does not claim iOS execution.
 - Cross-platform native success is reported only when both platform runs have
   actually executed. An unavailable platform is `EXTERNAL BLOCKER` or `NOT RUN`.

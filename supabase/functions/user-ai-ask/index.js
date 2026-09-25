@@ -3,6 +3,7 @@ import { normalizeAskRequestBody } from "./normalize.js";
 import {
   authenticateSupabaseUser,
   consumeAiQuota,
+  isInternalAiUserAllowed,
   readBoundedJson,
 } from "../_shared/aiSecurity.js";
 
@@ -223,7 +224,7 @@ function tryParseClassifyPayload(text, input) {
 
   const intent = raw.intent ?? raw.category;
   if (typeof intent !== "string" || !VALID_INTENTS.includes(intent)) {
-    throw new Error(`Invalid classify intent: ${JSON.stringify(intent)}`);
+    throw new Error("Invalid classify intent.");
   }
 
   const params = normalizeClassifyParams(intent, raw.params, input);
@@ -315,13 +316,13 @@ async function invokeDeepSeek({ messages, responseFormat, maxTokens }) {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
+        // Upstream bodies can echo the question, retrieved facts, or a key.
+        // Status and attempt are sufficient for operational diagnostics.
         console.log(
           JSON.stringify({
             event: "user_ai_ask_upstream_error",
             attempt: attempt + 1,
             status: response.status,
-            errorBody: String(errorText).slice(0, 500),
           }),
         );
         // Retryable statuses: 429 (rate limit), 5xx (transient upstream).
@@ -383,6 +384,17 @@ Deno.serve(async (request) => {
     return jsonResponse(auth.status, auth.body);
   }
 
+  if (!isInternalAiUserAllowed(auth.userId, "AI_ASK_INTERNAL_ROLLOUT")) {
+    logAskEvent({
+      requestId,
+      questionLength: null,
+      latencyMs: Date.now() - startedAt,
+      outcome: "rollout_rejected",
+      httpStatus: 403,
+    });
+    return jsonResponse(403, { error: "Ask is unavailable." });
+  }
+
   try {
     requestBody = normalizeAskRequestBody(await readBoundedJson(request));
   } catch (error) {
@@ -421,16 +433,13 @@ Deno.serve(async (request) => {
       return await handleClassify(requestBody, requestId, startedAt);
     }
     return await handlePhrase(requestBody, requestId, startedAt);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown error during invocation.";
+  } catch {
     logAskEvent({
       requestId,
       questionLength: requestBody.question.length,
       stage: requestBody.stage,
       latencyMs: Date.now() - startedAt,
       outcome: "error",
-      error: message,
       httpStatus: 500,
     });
     return jsonResponse(500, { error: "Failed to process the ask request." });
@@ -464,15 +473,13 @@ async function handleClassify(requestBody, requestId, startedAt) {
       maxTokens: 1200,
     });
     classifyResult = tryParseClassifyPayload(raw, input);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Classification failed.";
+  } catch {
     logAskEvent({
       requestId,
       questionLength: requestBody.question.length,
       stage: "classify",
       latencyMs: Date.now() - classifyStartedAt,
       outcome: "classify_error",
-      error: message,
       httpStatus: 500,
     });
     return jsonResponse(500, { error: "The ask service could not classify your question." });
@@ -513,15 +520,13 @@ async function handlePhrase(requestBody, requestId, startedAt) {
       maxTokens: 1500,
     });
     answer = tryParsePhrasePayload(raw);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Phrasing failed.";
+  } catch {
     logAskEvent({
       requestId,
       questionLength: requestBody.question.length,
       stage: "phrase",
       latencyMs: Date.now() - phraseStartedAt,
       outcome: "phrase_error",
-      error: message,
       httpStatus: 500,
     });
     return jsonResponse(500, { error: "The ask service could not phrase the answer." });

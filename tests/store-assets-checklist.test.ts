@@ -23,15 +23,22 @@ describe('store assets checklist', () => {
     expect(checklist).not.toMatch(/!\[[^\]]*\]\(.*\.png\)/i);
   });
 
-  it('cites the required Apple and Play dimensions', () => {
+  it('cites the current required Apple display classes and Play dimensions', () => {
     const checklist = readChecklist();
+    expect(checklist).toContain('Apple screenshot specifications');
+    expect(checklist).toContain('6.9" iPhone — primary iPhone set');
+    expect(checklist).toContain('6.5" iPhone — fallback if no 6.9" set');
+    expect(checklist).toContain('13" iPad — required');
+    expect(checklist).toContain('6.3" iPhone — optional additional set');
     expect(checklist).toContain('1290 × 2796');
     expect(checklist).toContain('1179 × 2556');
     expect(checklist).toContain('2048 × 2732');
     expect(checklist).toContain('2064 × 2752');
     expect(checklist).toContain('1024 × 500');
-    expect(checklist).toContain('1–10 per size');
+    expect(checklist).toContain('one to 10');
     expect(checklist).toContain('Min 2');
+    expect(checklist).not.toContain('6.7" iPhone (required)');
+    expect(checklist).not.toContain('6.1" iPhone (required)');
   });
 
   it('maps the six preferred surfaces to real screens', () => {
@@ -55,6 +62,8 @@ describe('store assets checklist', () => {
     expect(checklist).toContain('No real PII');
     expect(checklist).toContain('Status bar neutral');
     expect(checklist).toContain('Default or clearly-shown theme');
+    expect(checklist).toContain('source SHA');
+    expect(checklist).toContain('genuine build');
     expect(checklist).toContain('[OWNER ACTION]');
     const declarations = readFileSync(declarationsPath, 'utf8');
     expect(declarations).toContain('store-assets-checklist.md');

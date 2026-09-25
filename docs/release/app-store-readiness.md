@@ -1,5 +1,11 @@
 # App Store / Play Store readiness
 
+Release preparation is tracked in [submission-package.md](submission-package.md).
+It contains the current deduplicated owner-action inventory, copy/asset
+handoff, and submission gates. This repository has no store submission or
+`v1.0.0` tag authorized by this readiness pass. The historical results below
+retain their original SHA context and do not certify a future binary.
+
 Snapshot of release state for SuperHabits 1.0.0 (schema 25). Refreshed
 2026-09-14 at source `7fa5790` (release-readiness pass at `c04cceb`, then the
 accessibility campaign `bcca6ae` and the Settings-overlay contrast closure
@@ -37,13 +43,13 @@ file when a release actually ships rather than letting it drift.
 | Design system | **Pop**: Nunito type via `core/ui/Text`, bottom tab bar / wide-screen side rail shell, per-section hues, tactile motion (`docs/ui-ux/12-pop-design-system.md`) |
 | Targets       | Web PWA (Vercel), iOS, Android                                                                                                                                 |
 
-## Exact-HEAD recertification (2026-09-23 — production-closure campaign)
+## Historical exact-SHA recertification (2026-09-24 overnight live-cloud campaign)
 
-## Exact-HEAD recertification (current: 2026-09-24 overnight live-cloud campaign; prior: 2026-09-23 production-closure)
-
-The 2026-09-24 overnight recertification block below is the CURRENT verdict
-source (fresh executions; CI cited per run/SHA); everything under it is
-historical until the next recertification:
+The 2026-09-24 overnight block below is a previous campaign's evidence.
+The completed live-cloud ExecPlan records its later code-final Android
+ancestor `56259876418674f85e1ca42c87f248fcf12c7d75` separately from
+the docs-close HEAD `23ded6e7676f94d6ddf9337ad02d526d85973fcb`.
+Neither that battery nor this page certifies an unbuilt store artifact:
 
 - Static/contracts: typecheck · lint (`--max-warnings 0`) · theme tokens (140) · OpenSpec 59/59 · versioned ExecPlans 93/93 · impact rules 13 — PASS
 - Unit + integration: **227 files / 2,270 passed** (`npm test`, Node v22.23.2 engines-conformant, local fresh)
@@ -52,7 +58,7 @@ historical until the next recertification:
 - Full browser E2E + deterministic 23/23 + J8 persona 7/7 (measurement-start root cause; ceiling/floor/guard unchanged): local `qa:full` exit 0 · **CI run `35987777309` @ `8f8c79e` quality+e2e SUCCESS** · `build:sync` + `e2e:sync` 40/6/0 PASS
 - Android: exact-source `8f8c79e` → APK SHA-256 `A95C9BC81B537BEAFDB73C5F21EE27146444089681FA98AE47F1B3D67262FB93` · smoke 2/2 + persistence 11/11 + lifecycle 6/6 (**19/19 flows**) · provenance `simulation-output/native/native-android-build.json`
 - Expo Doctor **20/20** · `npm audit` **0 critical / 0 high / 14 moderate** (all production; two leaf advisories — override-rejection rationale recorded in the ci.yml advisory comment) · `sim:validate` 23 scenarios
-- Application candidate of record: `8f8c79e` (CI run `35987777309`); docs-only successor commits re-certify via their push runs (recorded in `.agent/execplans/live-cloud-verification-production-integration-v1.md`)
+- Intermediate application candidate at this historical checkpoint: `8f8c79e` (CI run `35987777309`); later evidence and the final Android source are recorded in `.agent/execplans/live-cloud-verification-production-integration-v1.md`.
 
 The 2026-09-14 gate table below is **historical** and is superseded for the
 campaign verdict by the blocks above; every number here comes from a fresh
@@ -121,7 +127,9 @@ documented flakes are closed:
 
 - **Display name**: `SuperHabits`; slug `superhabits`; scheme `superhabits`.
 - **Version**: `1.0.0`; iOS `buildNumber: 1`; Android `versionCode: 1`.
-  EAS `production` profile has `autoIncrement: true`, so CI increments these.
+  EAS `production` profile has `autoIncrement: true` with remote version
+  state, so these are source baselines; verify resolved values on each
+  production artifact before the console handoff.
 - **Icons**: `assets/icon.png` (1024×1024), Android adaptive set
   (`android-icon-foreground.png` 512², `android-icon-background.png`, and
   `android-icon-monochrome.png` 432² for themed icons), web `favicon.png`
@@ -155,24 +163,32 @@ documented flakes are closed:
 
 ## Remaining metadata before submission
 
-1. **App Store screenshots**: 6.7" (1290 × 2796) and 6.1" (1179 × 2556) iPhone sets, plus 12.9" (2048 × 2732) / 13" (2064 × 2752) iPad
-   (tablet support is on). Spec is **delivered 2026-09-19** in `docs/release/store-assets-checklist.md` (§§1/3–5: sizes, counts, six-surface file mapping, acceptance). Capture from a seeded device — Today dashboard,
-   Habits, Focus timer, Workout session, Calories diary, Level & Achievements — as `[OWNER ACTION]` (no PNGs fabricated in-repo).
+1. **App Store screenshots**: provide a genuine-build 6.9" iPhone set
+   (a 6.5" set is Apple's fallback) and a required 13" iPad set because
+   `supportsTablet` is true. The old 6.1" and 12.9" labels were not the
+   required current classes; 1179 × 2556 is a 6.3" class. The original
+   mapping was **delivered 2026-09-19**; its current source-checked
+   requirements are in `docs/release/store-assets-checklist.md` §§1/3–5.
+   Capture Today, Habits, Focus, Workout session, Calories diary, and
+   Level & Achievements from the matching native build as `[OWNER ACTION]`.
 2. **Play Store assets**: feature graphic (1024×500), phone screenshots
-   (min 2, same six surfaces preferred), short/full description, and the Data safety form (answers below). Spec is **delivered 2026-09-19** in `docs/release/store-assets-checklist.md` (§§2–5). Image capture itself stays `[OWNER ACTION]`.
-3. **Privacy nutrition labels / Data safety**: default posture collects
-   nothing — accounts are optional and only used for backup, data lives in
-   local SQLite, and analytics are absent. `docs/release/privacy-policy.md`
+   (min 2, same six surfaces preferred), short/full description, and the
+   Data safety form. The original spec was **delivered 2026-09-19**; the
+   current Play dimensions and capture checks are in
+   `docs/release/store-assets-checklist.md` §§2–5. Capture and graphic
+   approval stay `[OWNER ACTION]`.
+3. **Privacy nutrition labels / Data safety**: configured builds can
+   establish anonymous Auth at startup and automatically push eligible
+   data to Supabase; enabled AI requests can reach model providers.
+   Do not use the historical "Data Not Collected" default claim for a
+   configured release. `docs/release/privacy-policy.md`
    (hostable draft, owner to confirm + host; deployable rendering ships as
    `public/privacy.html` → `/privacy.html` with a drift-guard test) and
    `docs/release/store-data-declarations.md` (Apple label + Play Data safety
    answers + Play listing drafts + asset checklist) are **delivered
-   2026-09-19**. Conditional, stated explicitly in the declarations file:
-   with backup unused the posture is "Data Not Collected" / "No data
-   collected"; with user-enabled backup, user content + account id
-   (+ optional recovery email) are stored in the developer's Supabase
-   backend (encrypted in transit, per-account isolated, never shared),
-   so the filed answers cover the backup-enabled path.
+   2026-09-19** and corrected 2026-09-25. The owner must verify the final
+   build and provider terms, select the exact form answers, and publish the
+   matching policy; no console declaration is certified by this draft.
 4. ~~**Android notification icon**~~ — **delivered 2026-09-14**
    (`assets/notification-icon.png` + plugin config + prebuild verification).
 5. **Version tagging + release notes**: `docs/release/release-notes-1.0.0.md`
@@ -186,8 +202,9 @@ documented flakes are closed:
      `appVersionSource remote` + `production.autoIncrement true` + empty
      `submit.production`, and readiness ↔ release-notes checklist agreement;
      no tag, no version change).
-     Remaining release-time owner actions: configure the EAS
-     `submit.production` credentials (`eas.json` is `{}`) and create the
+     Remaining release-time owner actions: configure EAS/store credentials
+     in the owner-controlled accounts or secure environment while keeping
+     `eas.json` `submit.production` `{}`, and create the
      `v1.0.0` tag (`git tag -a v1.0.0 -m "SuperHabits 1.0.0" &&
 git push origin v1.0.0`) only with explicit release intent.
 6. **Age rating questionnaires** (iOS 4+, Play "Everyone") and the EU DSA
@@ -196,7 +213,8 @@ git push origin v1.0.0`) only with explicit release intent.
    child-directed / no ads / no purchases, DSA trader-status + identity
    fields as `[OWNER ACTION]`), guarded by
    `tests/age-rating-dsa.test.ts`. Owner + counsel must still confirm
-   the answers and file the trader declaration at submission time.
+   the answers against the final AI/provider posture and file the trader
+   declaration at submission time.
 7. **Localization**: the UI ships English-only. Android channel names and the
    `app_name` string would need `values-<locale>/strings.xml` entries before
    claiming additional store locales.

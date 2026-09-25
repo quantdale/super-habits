@@ -24,16 +24,22 @@ describe('privacy hosting artifact', () => {
     expect(html).toContain('<a href="/">');
   });
 
-  it('carries the effective date and key disclosures', () => {
+  it('carries the draft publication gate and current remote-data disclosures', () => {
     const html = readHtml();
-    expect(html).toContain('2026-09-19');
+    expect(html).toContain('[OWNER ACTION: publication date]');
+    expect(html).toMatch(/draft\s+revised 2026-09-25/);
     expect(html).toContain('on your device');
-    expect(html).toContain('optional backup');
+    expect(html).toContain('Configured backup');
+    expect(html).toContain('no in-app backup opt-in switch');
     expect(html).toContain('one-way push plus restore');
-    expect(html).toContain('Anonymous account');
+    expect(html).toContain('anonymous session during startup');
+    expect(html).toContain('AI-assisted requests (when enabled)');
+    expect(html).toContain('third-party model service');
+    expect(html).toContain('provider retention');
     expect(html).toContain('never uploaded');
-    expect(html).toContain('No analytics');
     expect(html).toContain('no remote push-messaging service');
+    expect(html).not.toContain('no personal data ever leaves your device');
+    expect(html).not.toContain('We collect nothing by default');
   });
 
   it('preserves owner-action placeholders instead of inventing contact details', () => {
@@ -56,6 +62,17 @@ describe('privacy hosting artifact', () => {
     expect(headings.length).toBeGreaterThanOrEqual(12);
     for (const heading of headings) {
       expect(html, `missing heading in privacy.html: ${heading}`).toContain(heading);
+    }
+    const flatMarkdown = markdown.replace(/\s+/g, ' ');
+    const flatHtml = html.replace(/\s+/g, ' ');
+    for (const disclosure of [
+      'anonymous session during startup',
+      'no in-app backup opt-in switch',
+      'selected conversation turns',
+      'provider retention',
+    ]) {
+      expect(flatMarkdown).toContain(disclosure);
+      expect(flatHtml).toContain(disclosure);
     }
     expect(html).toContain('docs/release/privacy-policy.md');
   });
