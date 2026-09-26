@@ -1,7 +1,7 @@
 # ExecPlan: ai-command-center-production-v1
 
 Plan-Version: 2
-Status: ACTIVE
+Status: BLOCKED
 
 ## Purpose / User Outcome
 
@@ -63,8 +63,10 @@ intact; privacy disclosure updated truthfully before default-on.
 
 ## Current Checkpoint
 
-- Current milestone: Phase 1 corpus complete; 2026-09-25 external-blocker-closure
-  AI readiness (tasks 4.1–4.4) is in progress before provider-backed phases.
+- Current milestone: Phase 1 corpus and 2026-09-26 external-blocker-closure
+  local AI readiness (tasks 4.1–4.4) are complete. Provider-backed phases and
+  rollout are blocked on owner-controlled credentials, budget, disclosures,
+  and authorization.
 - Completed: Phase 1 corpus and its 2026-09-23 battery (see ledger). Fresh source
   review found content-bearing upstream/error logs and default-visible Ask/Auto.
   Scoped source fixes now remove provider bodies/model-derived errors from logs,
@@ -73,13 +75,16 @@ intact; privacy disclosure updated truthfully before default-on.
   could bypass that UI flag; both functions now require a server-side flag
   and exact authenticated UID allowlist before body/quota/provider work.
   Log and direct-call regressions pass; the prior `npx tsc --noEmit` passed.
-- In progress: broad affected QA, authenticated provider and deployed-state
-  gates, and owner review of the completed phase-5 privacy/rollout draft.
+- In progress: none locally. Authenticated provider and deployed-state gates
+  resume after owner provisioning and approval. The phase-5 privacy/rollout
+  draft awaits owner and counsel review.
 - Important modified files: the two Edge `index.js` files, `features/command/types.ts`,
   `scripts/build-dist-sync.mjs`, focused unit/E2E tests and shared A11y helper.
 - Last successful validation: pinned Node v22.23.2, AI-focused Vitest 685/685,
-  direct Edge log/rollout/security tests 15/15, exact dummy-host Ask journey
-  9/9, and hermetic web build. Broad affected QA still pending.
+  direct Edge log/rollout/security tests 15/15, hermetic default-off web build,
+  dedicated dummy-host Ask/Auto journeys 13/13, and full affected QA: 2,290
+  Vitest tests, 60 OpenSpec items, browser 233 passed/49 skipped, deterministic
+  simulation 23/23. Exact-SHA CI quality and browser E2E at `c809976` passed.
 - Current failures: None after source fixes. The three red log tests were
   expected reproductions of a product privacy defect.
 - Relevant quarantines: None.
@@ -88,19 +93,19 @@ intact; privacy disclosure updated truthfully before default-on.
   present but unverified. No authorization for billable provider evaluation or
   default-on rollout; `SUPABASE_ACCESS_TOKEN` absent locally. Provider presence
   is neither validity nor authenticated-evaluation proof.
-- Condition required to unblock provider phases: owner supplies valid parse
+- Condition required to unblock: owner supplies valid parse
   credentials and authorizes bounded provider spend/evaluation; supplies CI
   Management API token for the guarded disposable lane; approves disclosure
   and default-on only after measured gates pass.
-- Exact resume action after external unblock: rerun the read-only secret presence
+- Exact resume action after unblock: rerun the read-only secret presence
   check, then execute the existing authenticated eval and observation lanes on
   a proven disposable target under the approved budget; record separate parse
   and Ask metrics before any flag change.
-- Exact next action: run pinned-Node affected broad QA, verify ordinary-build
-  Ask/Auto absence in the standard browser lane, and record final local
-  security review; retain separate provider/deployment authorization gates.
-- Remaining definition of done: local QA and draft proof; authenticated parse
-  and Ask gates with quality, latency, failure, isolation, and cost numbers;
+- Exact next action: none locally while blocked; after owner provides the
+  conditions above, verify the disposable target and run the bounded,
+  authenticated parse and Ask evaluation lanes with separate metrics.
+- Remaining definition of done: authenticated parse and Ask gates with quality,
+  latency, failure, isolation, and cost numbers;
   owner-approved disclosure/default-on, monitored window, and rollback proof.
 
 ## Progress
@@ -179,6 +184,10 @@ kruubbynsmxzxfdunaal --output json` parsed locally to name-presence booleans
   `npx vitest run tests/aiEdgeLogPrivacy.test.ts tests/aiSecurity.test.ts
 --project unit` — PASS 15/15 including four direct-call gate cases;
   `journeys-sync` Ask spec with explicit `E2E_DIST_DIR=dist-sync` — PASS 9/9.
+- 2026-09-26 — pinned `npm run qa:full` — PASS: 2,290 Vitest tests, 60
+  OpenSpec items, ordinary browser 233 passed/49 skipped, deterministic
+  simulation 23/23. Ordinary Ask/Auto journeys intentionally skipped 13/13;
+  dedicated `dist-sync` Ask/Auto journeys PASS 13/13. No provider was called.
 
 ## Changed Files / Areas
 
@@ -197,7 +206,8 @@ kruubbynsmxzxfdunaal --output json` parsed locally to name-presence booleans
 
 ## Outcomes & Retrospective
 
-- Status: Active (corpus scope executable now; phases 2-6 gated on external
-  credentials).
-- Summary: Pending.
-- Follow-up: Pending.
+- Status: Blocked on owner-controlled provider, privacy, and rollout gates.
+- Summary: Local corpus, fail-closed client/server gates, privacy-log fix,
+  draft disclosure, and full regression are complete without provider calls.
+- Follow-up: Resume the authenticated evaluation from the checkpoint after
+  credentials, bounded budget, and owner authorization are supplied.

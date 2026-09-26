@@ -119,12 +119,14 @@ function ThemedRoot() {
 
   return (
     <>
-      <Head>
-        <title>SuperHabits</title>
-        <meta name="description" content="Master your day with offline-first habit tracking." />
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content={tokens.webThemeColor} />
-      </Head>
+      {Platform.OS === 'web' ? (
+        <Head>
+          <title>SuperHabits</title>
+          <meta name="description" content="Master your day with offline-first habit tracking." />
+          <link rel="manifest" href="/manifest.json" />
+          <meta name="theme-color" content={tokens.webThemeColor} />
+        </Head>
+      ) : null}
       <StatusBar style={tokens.statusBarStyle} />
       <Stack screenOptions={{ headerShown: false }} />
       <GlobalCommandCenterHost />
