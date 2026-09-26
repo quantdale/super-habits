@@ -68,9 +68,7 @@ tags:
     element: 'Inject Mark complete response'
     direction: DOWN
 - tapOn: 'Inject Mark complete response'
-- scrollUntilVisible:
-    element: 'Cancel'
-    direction: DOWN
+- assertVisible: 'Cancel'
 - tapOn: 'Cancel'
 - scrollUntilVisible:
     element: 'Exit habit edit mode'
@@ -113,9 +111,7 @@ tags:
     element: 'Inject Mark complete response'
     direction: DOWN
 - tapOn: 'Inject Mark complete response'
-- scrollUntilVisible:
-    element: 'Cancel'
-    direction: DOWN
+- assertVisible: 'Cancel'
 - tapOn: 'Cancel'
 - scrollUntilVisible:
     element: 'Exit habit edit mode'

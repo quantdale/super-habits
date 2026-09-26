@@ -62,10 +62,7 @@ tags:
 - tapOn: 'Open Native strength routine routine'
 - tapOn: 'Exercise name'
 - inputText: 'Native rows'
-- scrollUntilVisible:
-    element: 'Add'
-    direction: DOWN
-    centerElement: true
+- assertVisible: 'Add'
 - tapOn: 'Add'
 - scrollUntilVisible:
     element: 'Configure Native rows exercise'

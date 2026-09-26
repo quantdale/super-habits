@@ -53,6 +53,9 @@ tags:
 - waitForAnimationToEnd:
     timeout: 3000
 - tapOn: 'Open Native Gym V2 resume routine routine'
+- waitForAnimationToEnd:
+    timeout: 8000
+- assertVisible: 'Choose from exercise library'
 - tapOn: 'Choose from exercise library'
 - extendedWaitUntil:
     visible: 'Exercise library'

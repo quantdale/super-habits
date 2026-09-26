@@ -79,7 +79,7 @@ tags:
     childOf:
       text: 'Section tabs'
 - extendedWaitUntil:
-    visible: 'Switch between manual entry and a diary grouped by meal.'
+    visible: '2000 kcal left'
     timeout: 10000
 - waitForAnimationToEnd:
     timeout: 8000

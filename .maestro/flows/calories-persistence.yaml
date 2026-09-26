@@ -51,6 +51,9 @@ tags:
     direction: DOWN
 # This pre-submit oracle catches a missed input focus before Save; the form's
 # computed value must equal 20×4 + 50×4 + 10×9.
+- scrollUntilVisible:
+    element: '370'
+    direction: UP
 - extendedWaitUntil:
     visible: '370'
     timeout: 5000

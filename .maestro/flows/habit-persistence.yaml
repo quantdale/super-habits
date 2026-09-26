@@ -29,8 +29,17 @@ tags:
     index: 1
 - inputText: 'Native daily habit'
 - hideKeyboard
-# The modal button is fully visible here; Maestro's center-scroll matcher can
-# time out on the nested modal even when the screenshot shows the button.
+# The footer starts below the iOS viewport after dismissing the keyboard.
+# Bounded gestures inside the modal reveal it without scrolling the page.
+- repeat:
+    times: 8
+    while:
+      notVisible: 'Create habit'
+    commands:
+      - swipe:
+          start: '85%, 80%'
+          end: '85%, 25%'
+          duration: 400
 - assertVisible: 'Create habit'
 - tapOn: 'Create habit'
 # The list keeps its scroll position; bring the new tile into view before

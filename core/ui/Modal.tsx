@@ -21,6 +21,8 @@ export type ModalLayout = 'dialog' | 'drawer' | 'bottom-sheet';
 export type ModalProps = {
   visible: boolean;
   onClose: () => void;
+  /** Fired after the native sheet is fully dismissed (iOS only). */
+  onDismiss?: () => void;
   /** When omitted, only the close control is shown (e.g. when an inner `Card variant="header"` supplies the label). */
   title?: string;
   children: ReactNode;
@@ -50,6 +52,7 @@ const MODAL_FOOTER_HEIGHT_RESERVE = 88;
 export function Modal({
   visible,
   onClose,
+  onDismiss,
   title,
   children,
   scroll = false,
@@ -100,7 +103,13 @@ export function Modal({
   const sheetRadius = { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl };
 
   return (
-    <RNModal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+    <RNModal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+      onDismiss={onDismiss}
+    >
       <View style={styles.root} accessibilityViewIsModal>
         <Animated.View
           style={[

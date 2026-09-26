@@ -28,9 +28,16 @@ tags:
     index: 1
 - inputText: 'Native insights habit'
 - hideKeyboard
-- scrollUntilVisible:
-    element: 'Create habit'
-    direction: DOWN
+- repeat:
+    times: 8
+    while:
+      notVisible: 'Create habit'
+    commands:
+      - swipe:
+          start: '85%, 80%'
+          end: '85%, 25%'
+          duration: 400
+- assertVisible: 'Create habit'
 - tapOn: 'Create habit'
 - extendedWaitUntil:
     visible: 'Native insights habit: 0 of 1 today.*'
