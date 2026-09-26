@@ -62,6 +62,11 @@ tags:
 - tapOn: 'Open Native strength routine routine'
 - tapOn: 'Exercise name'
 - inputText: 'Native rows'
+# On iOS the still-focused field receives a stray character when Maestro taps
+# the adjacent Add button during keyboard dismissal. Blur before submitting.
+- pressKey: enter
+- waitForAnimationToEnd:
+    timeout: 3000
 - assertVisible: 'Add'
 - tapOn: 'Add'
 - scrollUntilVisible:

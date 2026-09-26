@@ -71,8 +71,9 @@ tags:
     direction: DOWN
 - tapOn: 'Inject habit reminder tap'
 - assertVisible: 'Edit Habit'
-- assertVisible: 'Cancel'
-- tapOn: 'Cancel'
+# The edit-sheet footer is below the fold after the injection controls. Its
+# header Close button calls the same reset handler as Cancel.
+- tapOn: 'Close'
 - scrollUntilVisible:
     element: 'Exit habit edit mode'
     direction: UP
@@ -93,8 +94,7 @@ tags:
     element: 'Inject Mark complete response'
     direction: DOWN
 - tapOn: 'Inject Mark complete response'
-- assertVisible: 'Cancel'
-- tapOn: 'Cancel'
+- tapOn: 'Close'
 - scrollUntilVisible:
     element: 'Exit habit edit mode'
     direction: UP
@@ -114,8 +114,7 @@ tags:
     element: 'Inject Snooze response'
     direction: DOWN
 - tapOn: 'Inject Snooze response'
-- assertVisible: 'Cancel'
-- tapOn: 'Cancel'
+- tapOn: 'Close'
 - scrollUntilVisible:
     element: 'Exit habit edit mode'
     direction: UP

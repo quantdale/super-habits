@@ -67,6 +67,9 @@ tags:
 - pressKey: enter
 # Explicit proof the filter applied: with zero matches the list collapses
 # to the empty state and the create form sits near the top.
+- scrollUntilVisible:
+    element: 'No matching exercises'
+    direction: DOWN
 - extendedWaitUntil:
     visible: 'No matching exercises'
     timeout: 10000

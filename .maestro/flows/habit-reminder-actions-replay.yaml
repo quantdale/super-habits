@@ -68,8 +68,9 @@ tags:
     element: 'Inject Mark complete response'
     direction: DOWN
 - tapOn: 'Inject Mark complete response'
-- assertVisible: 'Cancel'
-- tapOn: 'Cancel'
+# Header Close and footer Cancel both reset this edit sheet; Close remains
+# visible after scrolling to the injection controls.
+- tapOn: 'Close'
 - scrollUntilVisible:
     element: 'Exit habit edit mode'
     direction: UP
@@ -111,8 +112,7 @@ tags:
     element: 'Inject Mark complete response'
     direction: DOWN
 - tapOn: 'Inject Mark complete response'
-- assertVisible: 'Cancel'
-- tapOn: 'Cancel'
+- tapOn: 'Close'
 - scrollUntilVisible:
     element: 'Exit habit edit mode'
     direction: UP

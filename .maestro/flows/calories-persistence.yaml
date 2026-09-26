@@ -22,38 +22,43 @@ tags:
     direction: DOWN
 - tapOn: 'Calories entry food'
 - inputText: 'Native breakfast'
-# On iOS the software keyboard covers the macro row. Maestro's subsequent
-# taps reported success while numeric keystrokes stayed in the food field.
-- hideKeyboard
+# On iOS hideKeyboard swipes the middle of this scrollable form. Blur with
+# Enter, then let layout settle before targeting each numeric field.
+- pressKey: enter
+- waitForAnimationToEnd:
+    timeout: 3000
 - scrollUntilVisible:
     element: 'Calories entry protein'
     direction: DOWN
     centerElement: true
+- waitForAnimationToEnd:
+    timeout: 3000
 - tapOn: 'Calories entry protein'
 - inputText: '20'
-- hideKeyboard
+- pressKey: enter
 - scrollUntilVisible:
     element: 'Calories entry carbs'
     direction: DOWN
     centerElement: true
+- waitForAnimationToEnd:
+    timeout: 3000
 - tapOn: 'Calories entry carbs'
 - inputText: '50'
-- hideKeyboard
+- pressKey: enter
 - scrollUntilVisible:
     element: 'Calories entry fat'
     direction: DOWN
     centerElement: true
+- waitForAnimationToEnd:
+    timeout: 3000
 - tapOn: 'Calories entry fat'
 - inputText: '10'
-- hideKeyboard
-- scrollUntilVisible:
-    element: 'Meal'
-    direction: DOWN
+- pressKey: enter
 # This pre-submit oracle catches a missed input focus before Save; the form's
 # computed value must equal 20×4 + 50×4 + 10×9.
 - scrollUntilVisible:
     element: '370'
-    direction: UP
+    direction: DOWN
 - extendedWaitUntil:
     visible: '370'
     timeout: 5000
