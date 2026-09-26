@@ -95,6 +95,36 @@ function writeSummary(report, reportPath) {
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
 }
 
+function captureFailureDiagnostics(nativeReport, simulator) {
+  if (!nativeReport?.debugOutputDir) return null;
+  const debugDir = join(REPORT_DIR, basename(nativeReport.debugOutputDir));
+  mkdirSync(debugDir, { recursive: true });
+  const logPath = join(debugDir, 'simulator-app.log');
+  const log = spawnSync(
+    'xcrun',
+    [
+      'simctl',
+      'spawn',
+      simulator.udid,
+      'log',
+      'show',
+      '--last',
+      '8m',
+      '--style',
+      'compact',
+      '--predicate',
+      'process == "SuperHabits" OR eventMessage CONTAINS[c] "com.dale16.superhabits"',
+    ],
+    { cwd: ROOT, encoding: 'utf8', timeout: 30000, maxBuffer: 16 * 1024 * 1024 },
+  );
+  const output = `${log.stdout ?? ''}\n${log.stderr ?? ''}`;
+  writeFileSync(
+    logPath,
+    `simctl log show exit=${log.status ?? 'unknown'} error=${log.error?.message ?? 'none'}\n${output.slice(-2_000_000)}`,
+  );
+  return `${basename(debugDir)}/simulator-app.log`;
+}
+
 async function main() {
   assert(process.env.GITHUB_ACTIONS === 'true', 'This lane runs only on GitHub Actions.');
   assert(process.env.RUNNER_OS === 'macOS', 'This lane requires a macOS runner.');
@@ -192,12 +222,23 @@ async function main() {
         : null;
     const passed =
       run.status === 0 && nativeReport?.status === 'PASS' && nativeReport.gitSha === sourceSha;
+    let diagnosticLog = null;
+    if (!passed) {
+      try {
+        diagnosticLog = captureFailureDiagnostics(nativeReport, simulators[0]);
+      } catch (error) {
+        console.warn(
+          `Simulator log capture failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
     report.flows.push({
       path: flow,
       status: passed ? 'PASS' : (nativeReport?.status ?? 'NOT_REPORTED'),
       exitCode: run.status,
       nativeReport: newReports.length === 1 ? newReports[0] : null,
       error: run.error?.message ?? null,
+      diagnosticLog,
     });
     writeReport(report, reportPath);
     if (nativeReport?.classification === 'ENVIRONMENT') break;

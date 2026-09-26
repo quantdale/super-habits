@@ -20,10 +20,20 @@ tags:
     # "Workout" and an unscoped index-0 match can land on inert content.
     childOf:
       text: 'Section tabs'
-- scrollUntilVisible:
-    element: 'New routine name'
-    direction: DOWN
-    visibilityPercentage: 50
+- repeat:
+    times: 8
+    while:
+      notVisible: 'Routine name'
+    commands:
+      - swipe:
+          start: '5%, 80%'
+          end: '5%, 25%'
+          duration: 400
+- assertVisible: 'Routine name'
+- swipe:
+    start: '5%, 70%'
+    end: '5%, 45%'
+    duration: 350
 - tapOn: 'New routine name'
 - inputText: 'Native Gym V2 resume routine'
 # Blur the focused field before revealing the bottom-edge submit control.

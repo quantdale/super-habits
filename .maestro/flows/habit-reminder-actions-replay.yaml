@@ -36,9 +36,7 @@ tags:
     element: 'Enable habit reminder'
     direction: DOWN
 - tapOn: 'Enable habit reminder'
-- scrollUntilVisible:
-    element: 'Create habit'
-    direction: DOWN
+- assertVisible: 'Create habit'
 - tapOn: 'Create habit'
 - scrollUntilVisible:
     element: 'Native replay action: 0 of 1 today.*'

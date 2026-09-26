@@ -36,9 +36,7 @@ tags:
     element: 'Enable habit reminder'
     direction: DOWN
 - tapOn: 'Enable habit reminder'
-- scrollUntilVisible:
-    element: 'Create habit'
-    direction: DOWN
+- assertVisible: 'Create habit'
 - tapOn: 'Create habit'
 # The Habits list retains its prior scroll position; reveal the new tile before
 # the progress assertion.

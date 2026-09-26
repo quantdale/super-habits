@@ -8,11 +8,13 @@ tags:
     clearState: true
 - extendedWaitUntil:
     visible: 'Today'
-    timeout: 10000
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Habits'
+    childOf:
+      text: 'Section tabs'
 - scrollUntilVisible:
     element: 'Add anytime habit'
     direction: DOWN

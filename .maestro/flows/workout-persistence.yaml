@@ -17,9 +17,20 @@ tags:
     # "Workout" and an unscoped index-0 match can land on inert content.
     childOf:
       text: 'Section tabs'
-- scrollUntilVisible:
-    element: 'New routine name'
-    direction: DOWN
+- repeat:
+    times: 8
+    while:
+      notVisible: 'Routine name'
+    commands:
+      - swipe:
+          start: '5%, 80%'
+          end: '5%, 25%'
+          duration: 400
+- assertVisible: 'Routine name'
+- swipe:
+    start: '5%, 70%'
+    end: '5%, 45%'
+    duration: 350
 - tapOn: 'New routine name'
 - inputText: 'Native strength routine'
 # Blur before the next field so no scroll/focus animation can shift the layout
@@ -27,11 +38,8 @@ tags:
 - pressKey: enter
 - waitForAnimationToEnd:
     timeout: 2000
-# Plain scroll (a no-op when already visible): the description sits directly
-# below the name, but the focused-field scroll can leave it just off-screen.
-- scrollUntilVisible:
-    element: 'New routine description'
-    direction: DOWN
+# The description sits below the name after the focused-field scroll settles.
+- assertVisible: 'Description'
 - tapOn: 'New routine description'
 - inputText: 'Native routine'
 - pressKey: enter
