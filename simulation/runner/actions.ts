@@ -192,6 +192,13 @@ export async function actionAskQuestion(
   step: Extract<SemanticStep, { kind: 'askQuestion' }>,
 ): Promise<string> {
   await openCommandScreen(page);
+  if (step.expectedOutcome === 'disabled') {
+    await expect(page.locator('#command-input')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Ask', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Auto', exact: true })).toHaveCount(0);
+    await expect(page.locator('#ask-input')).toHaveCount(0);
+    return `askQuestion outcome=disabled question=${JSON.stringify(step.question)}`;
+  }
   await page.getByRole('button', { name: 'Ask', exact: true }).last().click({ force: true });
   await page.locator('#ask-input').fill(step.question);
   await page.getByRole('button', { name: 'Ask', exact: true }).last().click({ force: true });

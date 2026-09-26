@@ -962,7 +962,7 @@ export async function replaySteps(
  * | openCommand          | runner-owned (Quick capture → "Describe it" → `#command-input`) |
  * | commandPreview       | `commandObservation.openCommandScreen` + parse + preview       |
  * | commandConfirm       | `commandObservation.openCommandScreen` + parse + confirm       |
- * | askQuestion          | `commandObservation.openCommandScreen` + AskConversationView  |
+ * | askQuestion          | `commandObservation.openCommandScreen` + optional AskConversationView |
  * | createTodo           | `navigation.openNewTodoModal` + `navigation.submitTodoModal`     |
  * | toggleTodo           | `gestures.clickTodoCheckboxForTitle`                             |
  * | createHabit          | runner-owned (Habits "Add" tile + "Habit name" form)             |

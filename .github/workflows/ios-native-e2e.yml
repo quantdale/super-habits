@@ -109,5 +109,6 @@ jobs:
           path: |
             simulation-output/native/*.json
             simulation-output/native/debug-ios-*/
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14
