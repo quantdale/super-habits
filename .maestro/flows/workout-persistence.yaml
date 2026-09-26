@@ -27,10 +27,8 @@ tags:
           end: '5%, 25%'
           duration: 400
 - assertVisible: 'Routine name'
-- swipe:
-    start: '5%, 70%'
-    end: '5%, 45%'
-    duration: 350
+# The field is visible after the bounded search. An extra swipe moves the
+# form offscreen into Workout history on the iOS simulator.
 - tapOn: 'New routine name'
 - inputText: 'Native strength routine'
 # Blur before the next field so no scroll/focus animation can shift the layout

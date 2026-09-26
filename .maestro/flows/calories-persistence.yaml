@@ -22,24 +22,38 @@ tags:
     direction: DOWN
 - tapOn: 'Calories entry food'
 - inputText: 'Native breakfast'
+# On iOS the software keyboard covers the macro row. Maestro's subsequent
+# taps reported success while numeric keystrokes stayed in the food field.
+- hideKeyboard
 - scrollUntilVisible:
     element: 'Calories entry protein'
     direction: DOWN
+    centerElement: true
 - tapOn: 'Calories entry protein'
 - inputText: '20'
+- hideKeyboard
 - scrollUntilVisible:
     element: 'Calories entry carbs'
     direction: DOWN
+    centerElement: true
 - tapOn: 'Calories entry carbs'
 - inputText: '50'
+- hideKeyboard
 - scrollUntilVisible:
     element: 'Calories entry fat'
     direction: DOWN
+    centerElement: true
 - tapOn: 'Calories entry fat'
 - inputText: '10'
+- hideKeyboard
 - scrollUntilVisible:
     element: 'Meal'
     direction: DOWN
+# This pre-submit oracle catches a missed input focus before Save; the form's
+# computed value must equal 20×4 + 50×4 + 10×9.
+- extendedWaitUntil:
+    visible: '370'
+    timeout: 5000
 - scrollUntilVisible:
     element: 'Save calorie entry'
     direction: DOWN

@@ -30,10 +30,7 @@ tags:
           end: '5%, 25%'
           duration: 400
 - assertVisible: 'Routine name'
-- swipe:
-    start: '5%, 70%'
-    end: '5%, 45%'
-    duration: 350
+# The field is visible after the bounded search; an extra swipe hides it.
 - tapOn: 'New routine name'
 - inputText: 'Native Gym V2 resume routine'
 # Blur the focused field before revealing the bottom-edge submit control.

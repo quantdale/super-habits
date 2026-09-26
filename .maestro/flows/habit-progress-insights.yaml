@@ -35,6 +35,12 @@ tags:
 - extendedWaitUntil:
     visible: 'Native insights habit: 0 of 1 today.*'
     timeout: 5000
+# Maestro reported this tile as visible with negative Y bounds after the
+# modal closed; center it before tapping so the press reaches the control.
+- scrollUntilVisible:
+    element: 'Native insights habit: 0 of 1 today.*'
+    direction: UP
+    centerElement: true
 - tapOn: 'Native insights habit: 0 of 1 today.*'
 - extendedWaitUntil:
     visible: 'Native insights habit: 1 of 1 today.*'

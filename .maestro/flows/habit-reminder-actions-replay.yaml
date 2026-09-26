@@ -36,6 +36,17 @@ tags:
     element: 'Enable habit reminder'
     direction: DOWN
 - tapOn: 'Enable habit reminder'
+# Enabling the reminder rebuilds the modal near its top. Reveal the submit
+# footer with bounded gestures inside the modal before asserting it.
+- repeat:
+    times: 8
+    while:
+      notVisible: 'Create habit'
+    commands:
+      - swipe:
+          start: '85%, 80%'
+          end: '85%, 25%'
+          duration: 400
 - assertVisible: 'Create habit'
 - tapOn: 'Create habit'
 - scrollUntilVisible:
