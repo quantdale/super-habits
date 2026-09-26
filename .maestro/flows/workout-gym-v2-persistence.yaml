@@ -22,10 +22,17 @@ tags:
       text: 'Section tabs'
 - swipe:
     direction: UP
-- scrollUntilVisible:
-    element: 'New routine name'
-    direction: DOWN
-    visibilityPercentage: 50
+- repeat:
+    times: 8
+    while:
+      notVisible: 'Routine name'
+    commands:
+      - swipe:
+          start: '5%, 80%'
+          end: '5%, 25%'
+          duration: 400
+- assertVisible: 'Routine name'
+# The field is visible after the bounded search; an extra swipe hides it.
 - tapOn: 'New routine name'
 - inputText: 'Native Gym V2 typed routine'
 - pressKey: enter
@@ -48,6 +55,9 @@ tags:
 - waitForAnimationToEnd:
     timeout: 3000
 - tapOn: 'Open Native Gym V2 typed routine routine'
+- waitForAnimationToEnd:
+    timeout: 8000
+- assertVisible: 'Choose from exercise library'
 - tapOn: 'Choose from exercise library'
 - extendedWaitUntil:
     visible: 'Exercise library'

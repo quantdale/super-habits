@@ -14,8 +14,8 @@ Welcome to SuperHabits 1.0.0 — your calm, offline-first companion for habits, 
 
 • Today dashboard, To Do with projects and recurring tasks, Habits with streaks and 52-week heatmap
 • Focus timer with presets, Gym workout workspace with guided sessions, Calories with Form/Diary views
-• Private by design: on-device database, works offline, no account, no analytics, no ads
-• Optional one-way backup + portable export; local-only rewards (XP, badges)
+• Local database and offline use without signup; no ads or cross-app tracking
+• One-way backup when configured + portable export; local-only rewards (XP, badges)
 
 First public release. English UI.
 ```
@@ -23,15 +23,16 @@ First public release. English UI.
 ### Google Play — Release notes (≤ 500 chars)
 
 ```text
-SuperHabits 1.0.0 — first release. Offline-first habits, tasks, focus timer, gym workouts & calories. Private by design: on-device, no account, no analytics. Optional backup + export. English UI.
+SuperHabits 1.0.0 — first release. Offline-first habits, tasks, focus timer, gym workouts & calories. Local database, no signup, no ads. One-way backup when configured and portable export. English UI.
 ```
 
 ## What it is
 
 SuperHabits is a calm, offline-first companion for daily habits, tasks, focus
 sessions, workouts, and nutrition. It runs as a Progressive Web App and as a
-native Android/iOS app from one codebase. There is no account to create, no
-feed, and no advertising.
+native Android/iOS app from one codebase. Local use needs no signup; a
+configured build can establish anonymous backup Auth automatically. There
+is no feed or advertising.
 
 ## Highlights in 1.0.0
 
@@ -61,13 +62,14 @@ feed, and no advertising.
 
 - Everything is stored in a local SQLite database on your device; the app is
   fully usable offline.
-- **Backup is optional and one-way.** If you choose to protect a backup with
-  an email address, your data is pushed to a private per-account store in
-  Supabase and can be restored on an empty device. It is not a two-way sync.
+- **Backup is configured per build and one-way.** A build connected to
+  Supabase can establish anonymous Auth and push recoverable local writes to
+  a private per-account store automatically. A verified email can protect
+  that backup for recovery on an empty device. It is not a two-way sync.
 - **Portable data** lets you export a complete file and import it on another
   device.
-- No analytics, no tracking, and no data collection. See the store privacy
-  declarations.
+- No advertising or cross-app tracking. Configured backup and enabled AI
+  requests can transmit data as described in the store privacy declarations.
 
 ## Known limitations in this release
 
@@ -91,14 +93,16 @@ Confirm these before tagging `v1.0.0` (all values current at this draft):
 - [ ] `package.json` `version` is `1.0.0`.
 - [ ] `app.json` `expo.version` is `1.0.0`, `ios.buildNumber` is `1`,
       `android.versionCode` is `1` (`eas.json` `production.autoIncrement`
-      stays `true`, so CI increments builds after this release).
+      stays `true`; confirm the resolved identifiers on the actual
+      production binaries because EAS remote version state can differ).
 - [ ] `docs/release/app-store-readiness.md` item 5 references this file.
 - [ ] Pre-tag gates pass: `npm run typecheck`, `npm run lint`,
       `npm test`, `npm run build:web`, `npm run web:hygiene`.
 - [ ] `[OWNER ACTION]` EAS submit credentials: `eas.json`
-      `submit.production` is currently `{}` — configure App Store Connect /
-      Play Console submit credentials before `eas submit -p ios` /
-      `eas submit -p android`.
+      `submit.production` is currently `{}` — prepare App Store Connect /
+      Play Console credentials in owner-controlled accounts or a secure
+      environment while leaving the repository profile empty. Submit only
+      after explicit release authorization.
 - [ ] `[OWNER ACTION]` hosted privacy URL: deploy `/privacy.html` with the
       production web build and paste that URL in both store listings.
 - [ ] Tag only with explicit release intent:

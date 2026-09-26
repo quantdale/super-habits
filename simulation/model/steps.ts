@@ -140,9 +140,9 @@ export const SEMANTIC_STEP_CATALOG: Record<SemanticStepName, StepDefinition> = {
   askQuestion: {
     kind: 'askQuestion',
     category: 'verification',
-    description: 'Submit one bounded read-only question to the Command Center Ask surface.',
+    description: 'Check the default-off Ask boundary or submit one bounded read-only question.',
     mutating: false,
-    parentHelper: 'commandObservation.openCommandScreen + AskConversationView',
+    parentHelper: 'commandObservation.openCommandScreen + optional AskConversationView',
   },
 
   // ---- entity actions ----

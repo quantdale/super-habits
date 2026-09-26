@@ -60,7 +60,6 @@ if (!fs.existsSync(path.join(distDir, 'index.html'))) {
   fail('dist/index.html missing after export.');
 }
 const leakFiles = [];
-const needle = Buffer.from('supabase.co', 'utf8');
 const scan = (dir) => {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, entry.name);
@@ -68,10 +67,11 @@ const scan = (dir) => {
       scan(p);
     } else {
       try {
-        if (fs.readFileSync(p).includes(needle)) leakFiles.push(path.relative(root, p));
-      } catch {
-        // unreadable/binary stream — rethrow anything that is not a plain read miss
-        continue;
+        if (fs.readFileSync(p).toString('utf8').toLowerCase().includes('supabase.co')) {
+          leakFiles.push(path.relative(root, p));
+        }
+      } catch (error) {
+        fail(`cannot scan ${path.relative(root, p)}: ${error.message}`);
       }
     }
   }

@@ -109,6 +109,8 @@ export function RoutineDetailModal({
   const [workoutError, setWorkoutError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerPending, setPickerPending] = useState(false);
+  const [pickerClosing, setPickerClosing] = useState(false);
   const [pickerQuery, setPickerQuery] = useState('');
   const [pickerArea, setPickerArea] = useState<string | null>(null);
   const [pickerEquipment, setPickerEquipment] = useState<string | null>(null);
@@ -125,6 +127,8 @@ export function RoutineDetailModal({
   const [isStarting, setIsStarting] = useState(false);
   const [renameDraft, setRenameDraft] = useState<string | null>(null);
   const [managerVisible, setManagerVisible] = useState(false);
+  const [managerPending, setManagerPending] = useState(false);
+  const [managerClosing, setManagerClosing] = useState(false);
   const pendingBuilderMutationsRef = useRef<Promise<void>>(Promise.resolve());
 
   const refresh = useCallback(async () => {
@@ -251,6 +255,11 @@ export function RoutineDetailModal({
     setExpandedId(exId);
   };
 
+  const closePicker = () => {
+    if (Platform.OS === 'ios') setPickerClosing(true);
+    setPickerVisible(false);
+  };
+
   const handleAddCatalogExercise = async (item: ExerciseCatalogItem) => {
     const exId = await addExercise({
       routineId,
@@ -262,7 +271,7 @@ export function RoutineDetailModal({
       sortOrder: exercises.length + 1,
     });
     await queuedAddDefaultSet(exId);
-    setPickerVisible(false);
+    closePicker();
     await refresh();
     setExpandedId(exId);
   };
@@ -395,8 +404,26 @@ export function RoutineDetailModal({
   return (
     <>
       <Modal
-        visible={visible}
+        visible={
+          visible &&
+          (Platform.OS !== 'ios' ||
+            (!pickerPending &&
+              !pickerVisible &&
+              !pickerClosing &&
+              !managerPending &&
+              !managerVisible &&
+              !managerClosing))
+        }
         onClose={onClose}
+        onDismiss={() => {
+          if (pickerPending) {
+            setPickerPending(false);
+            setPickerVisible(true);
+          } else if (managerPending) {
+            setManagerPending(false);
+            setManagerVisible(true);
+          }
+        }}
         title={routineName}
         scroll
         footer={
@@ -453,7 +480,10 @@ export function RoutineDetailModal({
             label="Manage custom exercises"
             accessibilityLabel="Manage custom exercises"
             variant="ghost"
-            onPress={() => setManagerVisible(true)}
+            onPress={() => {
+              if (Platform.OS === 'ios') setManagerPending(true);
+              else setManagerVisible(true);
+            }}
           />
         </View>
 
@@ -1018,7 +1048,11 @@ export function RoutineDetailModal({
             variant="ghost"
             onPress={() => {
               setWorkoutError(null);
-              setPickerVisible(true);
+              // iOS cannot present a second RN Modal until the first has
+              // finished dismissing. Keep the routine sheet hidden until the
+              // library closes, then bring it back for prescription editing.
+              if (Platform.OS === 'ios') setPickerPending(true);
+              else setPickerVisible(true);
             }}
           />
           <Text className="my-3 text-center text-xs" style={{ color: tokens.textMuted }}>
@@ -1062,7 +1096,8 @@ export function RoutineDetailModal({
       </Modal>
       <Modal
         visible={pickerVisible}
-        onClose={() => setPickerVisible(false)}
+        onClose={closePicker}
+        onDismiss={() => setPickerClosing(false)}
         title="Exercise library"
         scroll
       >
@@ -1270,7 +1305,11 @@ export function RoutineDetailModal({
       </Modal>
       <CustomExerciseManagerModal
         visible={managerVisible}
-        onClose={() => setManagerVisible(false)}
+        onClose={() => {
+          if (Platform.OS === 'ios') setManagerClosing(true);
+          setManagerVisible(false);
+        }}
+        onDismiss={() => setManagerClosing(false)}
         onChanged={() => {
           void listCustomExercises()
             .then(setCustomExercises)

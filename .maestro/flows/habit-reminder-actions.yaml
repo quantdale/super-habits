@@ -36,9 +36,18 @@ tags:
     element: 'Enable habit reminder'
     direction: DOWN
 - tapOn: 'Enable habit reminder'
-- scrollUntilVisible:
-    element: 'Create habit'
-    direction: DOWN
+# Enabling the reminder rebuilds the modal near its top. Reveal the submit
+# footer with bounded gestures inside the modal before asserting it.
+- repeat:
+    times: 8
+    while:
+      notVisible: 'Create habit'
+    commands:
+      - swipe:
+          start: '85%, 80%'
+          end: '85%, 25%'
+          duration: 400
+- assertVisible: 'Create habit'
 - tapOn: 'Create habit'
 # The Habits list retains its prior scroll position; reveal the new tile before
 # the progress assertion.
@@ -62,9 +71,7 @@ tags:
     direction: DOWN
 - tapOn: 'Inject habit reminder tap'
 - assertVisible: 'Edit Habit'
-- scrollUntilVisible:
-    element: 'Cancel'
-    direction: DOWN
+- assertVisible: 'Cancel'
 - tapOn: 'Cancel'
 - scrollUntilVisible:
     element: 'Exit habit edit mode'
@@ -86,9 +93,7 @@ tags:
     element: 'Inject Mark complete response'
     direction: DOWN
 - tapOn: 'Inject Mark complete response'
-- scrollUntilVisible:
-    element: 'Cancel'
-    direction: DOWN
+- assertVisible: 'Cancel'
 - tapOn: 'Cancel'
 - scrollUntilVisible:
     element: 'Exit habit edit mode'
@@ -109,9 +114,7 @@ tags:
     element: 'Inject Snooze response'
     direction: DOWN
 - tapOn: 'Inject Snooze response'
-- scrollUntilVisible:
-    element: 'Cancel'
-    direction: DOWN
+- assertVisible: 'Cancel'
 - tapOn: 'Cancel'
 - scrollUntilVisible:
     element: 'Exit habit edit mode'

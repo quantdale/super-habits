@@ -27,6 +27,19 @@ const EXPORT_DIR = join(ROOT, 'dist-sync');
 const DUMMY_URL = 'https://dummy.supabase.co';
 const DUMMY_KEY = 'dummy-anon-key';
 
+// Explicit test-only Ask opt-in. Strip ambient public flags first so this
+// dummy-host build cannot inherit a real backend or rollout setting.
+const exportEnv = { ...process.env };
+for (const key of Object.keys(exportEnv)) {
+  if (key.startsWith('EXPO_PUBLIC_')) delete exportEnv[key];
+}
+Object.assign(exportEnv, {
+  EXPO_NO_DOTENV: '1',
+  EXPO_PUBLIC_SUPABASE_URL: DUMMY_URL,
+  EXPO_PUBLIC_SUPABASE_ANON_KEY: DUMMY_KEY,
+  EXPO_PUBLIC_AI_ASK_INTERNAL_ROLLOUT: 'true',
+});
+
 function collectTextFiles(dir, out = []) {
   for (const entry of readdirSync(dir)) {
     const p = join(dir, entry);
@@ -70,12 +83,7 @@ const child = spawn(
     : ['expo', 'export', '-p', 'web', '--clear', '--output-dir', 'dist-sync'],
   {
     stdio: 'inherit',
-    env: {
-      ...process.env,
-      EXPO_NO_DOTENV: '1',
-      EXPO_PUBLIC_SUPABASE_URL: DUMMY_URL,
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: DUMMY_KEY,
-    },
+    env: exportEnv,
   },
 );
 

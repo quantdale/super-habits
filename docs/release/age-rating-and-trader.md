@@ -19,11 +19,16 @@ trader declaration. All answers describe the app **as implemented**
 - **Storage:** everything the user creates lives in a local SQLite
   database on the device (OPFS on web, WAL on native; schema 25). The app
   is fully usable offline.
-- **Backup (optional, user-initiated):** one-way push plus restore to the
-  developer's Supabase project, never continuous two-way sync; restore
-  runs only onto an empty device. Requires a lightweight anonymous
-  account id; a verified email is optional and used only for ownership
-  protection and one-time recovery codes. See `privacy-policy.md` §§2–3.
+- **Configured backup:** one-way push plus restore to the developer's
+  Supabase project, never continuous two-way sync; restore runs only onto
+  an empty device. A configured build can create an anonymous Auth session
+  at startup and push eligible writes automatically. A verified email is
+  optional and used for ownership protection and recovery codes. See
+  `privacy-policy.md` §§2–3.
+- **AI paths:** a separately enabled command parser or Ask request can
+  send submitted text and selected context through an Edge Function to a
+  model provider. Provider-backed rollout and privacy terms remain subject
+  to owner review; see `privacy-policy.md` "AI-assisted requests".
 - **Rewards are local-only:** XP/levels, streaks + freezes, rotating daily
   quests, 36 badge tiers, celebration overlay, haptics + synthesized
   tones. Reward state is never uploaded, backed up, or tied to an
@@ -31,9 +36,9 @@ trader declaration. All answers describe the app **as implemented**
   real-money play.
 - **No user-to-user surface:** no social feed, chat, comments, follows,
   shared profiles, or shared user content in `features/` product code.
-  User-entered content (tasks, habits, notes, workouts, meals) stays on
-  the device unless that same user enables backup; it is never shown to
-  other users, so there is no shared-UGC moderation path to declare.
+  User-entered content can leave the device for configured backup and
+  enabled AI requests, but is not shown to other app users; there is no
+  shared-UGC moderation path to declare.
 - **No unrestricted web:** no `WebView`, `expo-web-browser`, or
   `Linking.openURL` in product code; no in-app browser and no
   user-reachable general web search.
@@ -75,11 +80,12 @@ expected outcome is **4+** (no objectionable content).
 | Messaging / user-to-user communication                   | None         | No chat, no accounts directory, no message exchange.                                                                                                                                                                                                               |
 | Shared user-generated content                            | None         | No shared feed or public profiles; user content is private to the device/backup owner.                                                                                                                                                                             |
 | Unrestricted web access / user-reachable web search      | None         | No WebView or in-app browser.                                                                                                                                                                                                                                      |
-| Location, contacts, or sensors shared with third parties | None         | No tracking SDKs; backup payload contains only the recoverable entities listed in `privacy-policy.md` §2.                                                                                                                                                          |
+| Location, contacts, or sensors shared with third parties | None claimed | No product access to contacts or precise location; AI date/time context may include locale and time zone. Owner to confirm the current questionnaire and final build.                                                                                              |
 
 Filing note: keep the "Made for Kids" / kids-category answer as **No**
-(the app has no age gate and no child-directed content set; default
-posture is on-device-only — see `privacy-policy.md` §7). The privacy
+(the app has no age gate and no child-directed content set; configured
+Auth/backup and any enabled AI path must still be disclosed — see
+`privacy-policy.md` §7). The privacy
 policy URL for the listing is `[OWNER ACTION]` — deploy
 `public/privacy.html` (`/privacy.html`) and paste that URL.
 
@@ -97,19 +103,20 @@ Answer to an **Everyone** outcome on current product facts:
   randomized purchases (see basis above).
 - Social / communication features: none — no chat, no friend/follow
   graph, no shared UGC, no location sharing.
-- User interaction / data sharing: user content is stored on-device and,
-  only when that same user enables backup, in a private per-account
-  store — never shared with other users or third parties (no SDK,
-  advertiser, or broker access).
+- User interaction / data sharing: user content is stored on-device and
+  may enter a private per-account backup store in a configured build;
+  enabled AI requests can reach model providers. It is not shared with
+  other app users. The owner must review the exact Play prompts and
+  provider terms before filing.
 
 ### Families / target audience
 
 - **Designed for children:** No. General-audience productivity app with
   no child-directed content set.
-- Where the optional backup or recovery email is used, a parent or
-  guardian should supervise as with any account-backed feature (same
-  posture as `privacy-policy.md` §7). Default use needs no account and
-  collects nothing.
+- A parent or guardian should supervise use of account-backed and AI
+  features (same posture as `privacy-policy.md` §7). Configured builds can
+  start anonymous Auth and backup automatically, without a registration
+  step.
 
 ### Ads, purchases, and health prompts
 

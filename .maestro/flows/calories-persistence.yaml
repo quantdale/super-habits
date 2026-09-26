@@ -22,24 +22,41 @@ tags:
     direction: DOWN
 - tapOn: 'Calories entry food'
 - inputText: 'Native breakfast'
+# On iOS the software keyboard covers the macro row. Maestro's subsequent
+# taps reported success while numeric keystrokes stayed in the food field.
+- hideKeyboard
 - scrollUntilVisible:
     element: 'Calories entry protein'
     direction: DOWN
+    centerElement: true
 - tapOn: 'Calories entry protein'
 - inputText: '20'
+- hideKeyboard
 - scrollUntilVisible:
     element: 'Calories entry carbs'
     direction: DOWN
+    centerElement: true
 - tapOn: 'Calories entry carbs'
 - inputText: '50'
+- hideKeyboard
 - scrollUntilVisible:
     element: 'Calories entry fat'
     direction: DOWN
+    centerElement: true
 - tapOn: 'Calories entry fat'
 - inputText: '10'
+- hideKeyboard
 - scrollUntilVisible:
     element: 'Meal'
     direction: DOWN
+# This pre-submit oracle catches a missed input focus before Save; the form's
+# computed value must equal 20×4 + 50×4 + 10×9.
+- scrollUntilVisible:
+    element: '370'
+    direction: UP
+- extendedWaitUntil:
+    visible: '370'
+    timeout: 5000
 - scrollUntilVisible:
     element: 'Save calorie entry'
     direction: DOWN
@@ -49,23 +66,29 @@ tags:
 - waitForAnimationToEnd:
     timeout: 3000
 - tapOn: 'Save calorie entry'
+# The header total is the first post-save oracle. If it stays at 2000, the
+# submission failed; a later deep-scroll miss must not masquerade as success.
+- extendedWaitUntil:
+    visible: '1630 kcal left'
+    timeout: 15000
 # Let the post-save rebuild settle: scrolling while the form/list is still
 # re-rendering starves the matcher and times out even though the row renders
 # (same class as the diary-transition note below).
 - waitForAnimationToEnd:
     timeout: 8000
-# The post-save rebuild leaves the saved section below the fold. In this
-# state Maestro's center-anchored scroll swipes start in the upper half and
-# do not move the list (reproduced: two center swipes changed nothing while a
-# swipe starting at 80% height revealed the section immediately). Pre-scroll
-# from a low anchor, then finish with the scoped scroll.
-- swipe:
-    start: '50%, 80%'
-    end: '50%, 30%'
-    duration: 400
-- scrollUntilVisible:
-    element: 'Logged today'
-    direction: DOWN
+# The post-save rebuild leaves the saved section below the fold. Maestro's
+# center swipes can hit a chart instead of the outer screen scroller, so use
+# bounded left-margin swipes and retain the saved-row assertion.
+- repeat:
+    times: 10
+    while:
+      notVisible: 'Logged today'
+    commands:
+      - swipe:
+          start: '5%, 80%'
+          end: '5%, 25%'
+          duration: 400
+- assertVisible: 'Logged today'
 - swipe:
     direction: DOWN
 - scrollUntilVisible:
@@ -115,13 +138,16 @@ tags:
 - waitForAnimationToEnd:
     timeout: 8000
 - tapOn: 'Form view'
-- swipe:
-    start: '50%, 80%'
-    end: '50%, 30%'
-    duration: 400
-- scrollUntilVisible:
-    element: 'Logged today'
-    direction: DOWN
+- repeat:
+    times: 10
+    while:
+      notVisible: 'Logged today'
+    commands:
+      - swipe:
+          start: '5%, 80%'
+          end: '5%, 25%'
+          duration: 400
+- assertVisible: 'Logged today'
 - extendedWaitUntil:
     visible: 'Logged today'
     timeout: 15000

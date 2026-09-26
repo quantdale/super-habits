@@ -8,11 +8,13 @@ tags:
     clearState: true
 - extendedWaitUntil:
     visible: 'Today'
-    timeout: 10000
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Habits'
+    childOf:
+      text: 'Section tabs'
 - scrollUntilVisible:
     element: 'Add anytime habit'
     direction: DOWN
@@ -26,13 +28,26 @@ tags:
     index: 1
 - inputText: 'Native insights habit'
 - hideKeyboard
-- scrollUntilVisible:
-    element: 'Create habit'
-    direction: DOWN
+- repeat:
+    times: 8
+    while:
+      notVisible: 'Create habit'
+    commands:
+      - swipe:
+          start: '85%, 80%'
+          end: '85%, 25%'
+          duration: 400
+- assertVisible: 'Create habit'
 - tapOn: 'Create habit'
 - extendedWaitUntil:
     visible: 'Native insights habit: 0 of 1 today.*'
     timeout: 5000
+# Maestro reported this tile as visible with negative Y bounds after the
+# modal closed; center it before tapping so the press reaches the control.
+- scrollUntilVisible:
+    element: 'Native insights habit: 0 of 1 today.*'
+    direction: UP
+    centerElement: true
 - tapOn: 'Native insights habit: 0 of 1 today.*'
 - extendedWaitUntil:
     visible: 'Native insights habit: 1 of 1 today.*'

@@ -70,6 +70,7 @@ function toEditState(exercise: CustomExercise): EditState {
 type Props = {
   visible: boolean;
   onClose: () => void;
+  onDismiss?: () => void;
   onChanged?: () => void;
 };
 
@@ -78,7 +79,7 @@ type Props = {
  * restore. Archiving only hides the exercise from new routine editing —
  * historical session snapshots keep their recorded identity.
  */
-export function CustomExerciseManagerModal({ visible, onClose, onChanged }: Props) {
+export function CustomExerciseManagerModal({ visible, onClose, onDismiss, onChanged }: Props) {
   const { tokens } = useAppTheme();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [exercises, setExercises] = useState<CustomExercise[]>([]);
@@ -151,7 +152,13 @@ export function CustomExerciseManagerModal({ visible, onClose, onChanged }: Prop
   const visibleExercises = showArchived ? exercises : exercises.filter((e) => !e.deleted_at);
 
   return (
-    <Modal visible={visible} onClose={onClose} title="Custom exercises" scroll>
+    <Modal
+      visible={visible}
+      onClose={onClose}
+      onDismiss={onDismiss}
+      title="Custom exercises"
+      scroll
+    >
       <Text className="mb-3 text-xs" style={{ color: tokens.textMuted }}>
         Renames and metadata changes apply to future routine editing only — completed sessions keep
         the exercise snapshot recorded at completion.

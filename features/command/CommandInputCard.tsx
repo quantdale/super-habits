@@ -37,7 +37,7 @@ export function CommandInputCard({
       variant="header"
       accentColor={tokens.textMuted}
       headerTitle="Command input"
-      headerSubtitle="Experimental draft parsing only. Nothing is saved until you confirm."
+      headerSubtitle="Parsing saves text in recent commands on this device. App actions require confirmation."
       className="mb-0"
     >
       <View className="gap-3">

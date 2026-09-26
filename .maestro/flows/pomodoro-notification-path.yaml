@@ -11,13 +11,13 @@ tags:
       notifications: allow
 - extendedWaitUntil:
     visible: 'Today'
-    timeout: 10000
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
-- swipe:
-    direction: LEFT
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    text: 'Focus'
+    childOf:
+      text: 'Section tabs'
 - tapOn: 'Start focus'
 - assertVisible: 'Pause'
 - pressKey: home

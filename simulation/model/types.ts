@@ -234,7 +234,7 @@ export interface CommandPreviewCheck {
 export type CommandPreviewOutcome = 'ready' | 'needs_input' | 'unsupported';
 
 /** Outcomes the read-only Ask surface can expose. */
-export type AskStepOutcome = 'answer' | 'unsupported' | 'unavailable';
+export type AskStepOutcome = 'answer' | 'unsupported' | 'unavailable' | 'disabled';
 
 /**
  * A single semantic step. This is a discriminated union keyed on `kind`; the

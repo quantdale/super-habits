@@ -205,16 +205,10 @@ test.describe('Command Center V2 journeys', () => {
     expect(rows).toEqual([{ completed: 1 }]);
   });
 
-  test('shows provider-unavailable Ask state without changing local data', async ({ page }) => {
-    test.skip(
-      Boolean(process.env.EXPO_PUBLIC_SUPABASE_URL),
-      'Remote Ask builds use the mock edge route.',
-    );
+  test('keeps Ask and Auto hidden without the internal rollout flag', async ({ page }) => {
     await openCommandScreen(page);
-    await page.getByRole('button', { name: 'Ask', exact: true }).last().click({ force: true });
-    await page.locator('#ask-input').fill('How many pending todos do I have?');
-    await page.getByRole('button', { name: 'Ask', exact: true }).last().click({ force: true });
-    await expect(page.getByText('Ask is temporarily unavailable', { exact: true })).toBeVisible();
-    await expect(page.getByText('Nothing was saved or changed.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Ask', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Auto', exact: true })).toHaveCount(0);
+    await expect(page.locator('#command-input')).toBeVisible();
   });
 });

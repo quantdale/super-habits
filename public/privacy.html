@@ -6,7 +6,7 @@
     <title>SuperHabits — Privacy Policy</title>
     <meta
       name="description"
-      content="SuperHabits privacy policy: local-first storage, optional one-way backup, no analytics or ads."
+      content="SuperHabits privacy policy: local storage, configured backup and AI requests, no ads or cross-app tracking."
     />
     <style>
       :root {
@@ -89,16 +89,18 @@
       <p><a href="/">← Back to SuperHabits</a></p>
       <h1>SuperHabits — Privacy Policy</h1>
       <p class="meta">
-        <strong>Effective date:</strong> 2026-09-19 (draft — owner to confirm at release time)<br />
+        <strong>Effective date:</strong> <code>[OWNER ACTION: publication date]</code> (draft
+        revised 2026-09-25)<br />
         <strong>Applies to:</strong> SuperHabits 1.0.0 — web (PWA), Android, and iOS builds from
         this repository.
       </p>
       <div class="card" role="note" aria-label="Draft status">
         <strong>Status: release draft.</strong> It describes the app&#8217;s actual behavior as
-        implemented in this repository (local-first SQLite, optional one-way backup, no analytics).
-        Before submission, the app owner must fill the <code>[OWNER ACTION]</code> placeholders
-        below, host this text at a public URL, and link that URL in the App Store and Play Store
-        listings.
+        implemented in this repository (local-first SQLite, configured one-way backup, no ad
+        analytics). Before submission, the app owner must fill the
+        <code>[OWNER ACTION]</code> placeholders below, host this text at a public URL, and link
+        that URL in the App Store and Play Store listings. The owner must confirm the exact release
+        build's remote configuration and provider terms before publication.
       </div>
 
       <h2>The short version</h2>
@@ -108,16 +110,13 @@
           a database <strong>on your device</strong>.
         </li>
         <li>
-          We collect nothing by default:
-          <strong
-            >no account, no analytics, no tracking, no advertising, no third-party SDKs receiving
-            your data.</strong
-          >
+          No registration step is needed, and there are
+          <strong>no ads or cross-app tracking</strong>. A build configured with Supabase may
+          automatically create an anonymous account and back up eligible data. See §§2–3.
         </li>
         <li>
-          An <strong>optional backup</strong> (off by default in the sense that nothing leaves the
-          device until you use it) pushes an encrypted-in-transit copy of your data to a private
-          per-account store so you can restore it on an empty device.
+          When remote AI is enabled, submitting a question or command can send its text and selected
+          app context to a model provider. See "AI-assisted requests" below.
         </li>
         <li>An <strong>optional email</strong> is used only to protect and recover that backup.</li>
         <li>Rewards (XP, streaks, badges) never leave your device and are never backed up.</li>
@@ -128,14 +127,19 @@
         Everything you create in the app — todos, projects, goals, habits and their completions,
         focus sessions, workout routines and history, body-weight entries, calorie entries, saved
         meals, plans, reviews, linked-action rules, and settings — is stored in a local SQLite
-        database on your device. The app is fully usable without a network connection, and with
-        backup features unused, <strong>no personal data ever leaves your device</strong>.
+        database on your device. The app is fully usable without a network connection. Whether data
+        also leaves your device depends on the build's remote configuration and the actions you
+        take. A Supabase-configured build can create an anonymous session and push eligible records
+        automatically; an enabled AI request can transmit text and selected local facts. See the
+        sections below.
       </p>
 
-      <h2>2. Optional backup (one-way push, not sync)</h2>
+      <h2>2. Configured backup (one-way push, not sync)</h2>
       <p>
-        If you choose to back up, the app pushes a copy of your recoverable data to a private
-        per-account store hosted on Supabase infrastructure:
+        If the build has Supabase configured and remote mode is enabled, the app may automatically
+        push recoverable data to an account-isolated store hosted by Supabase after local writes.
+        There is currently no in-app backup opt-in switch. If the service is not configured or is
+        unavailable, local use continues.
       </p>
       <ul>
         <li>
@@ -157,23 +161,24 @@
         </li>
         <li>
           <strong>Protection in transit:</strong> backup traffic uses encrypted HTTPS connections.
-          <strong>At rest:</strong> your backup store is isolated per account and is not shared
-          with, sold to, or processed by any third party for any purpose.
+          <strong>At rest:</strong> the backup is separated by account owner in the developer's
+          Supabase project. Supabase operates the hosted service; the owner must confirm its
+          processing and retention terms for the release.
         </li>
       </ul>
       <p>
-        Using backup requires a lightweight anonymous account created on-device (see §3). If you
-        never use backup, restore, or portable import, none of §2 applies to you.
+        Backup uses an anonymous account identifier (see §3). The account and its associated network
+        requests may exist before the first user-created item is backed up.
       </p>
 
       <h2>3. Account and recovery email (optional)</h2>
       <ul>
         <li>
-          <strong>Anonymous account:</strong> when backup is used, the app creates an anonymous
-          account identifier so your backup has a private owner. A local owner binding on your
-          device prevents a lost or mismatched sign-in session from silently attaching your data to
-          the wrong account; in that case local use continues and remote backup/restore simply
-          pauses.
+          <strong>Anonymous account:</strong> when Supabase is configured, the app may create an
+          anonymous session during startup so your backup has a private owner; no registration step
+          or email is required. A local owner binding on your device prevents a lost or mismatched
+          sign-in session from silently attaching your data to the wrong account; in that case local
+          use continues and remote backup/restore simply pauses.
         </li>
         <li>
           <strong>Email (optional):</strong> you may attach a verified email address to protect an
@@ -184,6 +189,24 @@
         </li>
         <li>We send no marketing email. There is no newsletter and no mailing list.</li>
       </ul>
+
+      <h2>AI-assisted requests (when enabled)</h2>
+      <p>
+        The Ask feature can submit a question to the app's Supabase Edge Function. If its provider
+        is configured, the function can send the question, selected conversation turns, local
+        date/time context, and bounded facts retrieved from your data to a third-party model service
+        to form an answer. The remote command parser, when separately enabled for internal rollout,
+        can send the command text and date/time context to a model service. These calls happen when
+        a user submits a request; they are not required to use the other app features. Model-backed
+        results are not a replacement for confirming a mutation before it is executed.
+      </p>
+      <p>
+        The function source sets <code>store: false</code> on model requests, but that setting alone
+        does not establish provider retention. The owner must verify which AI paths and providers
+        are enabled in the release build, the provider/subprocessor terms, logging, retention, and
+        the applicable store disclosures before publishing this policy. Do not put information in an
+        AI request that you do not wish to send to its provider.
+      </p>
 
       <h2>4. Portable data (your file, your control)</h2>
       <p>
@@ -201,22 +224,25 @@
 
       <h2>6. What we do not do</h2>
       <ul>
-        <li>No analytics or usage tracking of any kind.</li>
-        <li>No advertising, no ad SDKs, no cross-app tracking.</li>
-        <li>No sale, rental, or sharing of personal data with third parties.</li>
-        <li>No data brokers, no profiling, no automated decision-making.</li>
         <li>
-          The interface ships in English only; using the app does not depend on your locale or any
-          locale data leaving the device.
+          No advertising, ad SDKs, or cross-app tracking. Remote authentication, backup, and AI
+          services can generate operational, quota, and error records.
+        </li>
+        <li>
+          No sale of personal data or data-broker use. Supabase hosts account and backup services,
+          and enabled AI requests can reach model providers as described above.
+        </li>
+        <li>
+          The interface ships in English only. AI requests may include locale, time zone, and local
+          date context when that path is enabled and used.
         </li>
       </ul>
 
       <h2>7. Children</h2>
       <p>
         SuperHabits is a general-purpose productivity app with no age gate and no content aimed
-        specifically at children. Because the default posture is on-device-only with no collection,
-        there is nothing distinct to declare for younger users; where the optional backup or email
-        is used, a parent or guardian should supervise as with any account-backed feature.
+        specifically at children. A parent or guardian should supervise use of its account-backed
+        and AI-assisted features.
       </p>
 
       <h2>8. Retention and deletion</h2>
@@ -227,16 +253,26 @@
           to your OS&#8217;s app-data policies.
         </li>
         <li>
-          <strong>Backup data:</strong> deletions made in the app propagate to your backup store
-          (including hard-delete propagation for the small set of entities the app deletes outright,
-          such as saved meals). To request complete erasure of your remote backup store, contact
-          <code>[OWNER ACTION: support email]</code> from the address associated with the backup;
-          requests are honored within 30 days.
+          <strong>Backup data:</strong> most item removals mark a record deleted and hide it from
+          the app while retaining its content in the remote backup record. A small set, such as
+          saved meals, is deleted outright from the backup. To request complete erasure of your
+          remote backup store, contact <code>[OWNER ACTION: support email]</code>. Backups can be
+          anonymous, so an email address alone cannot identify every account.
+          <code
+            >[OWNER ACTION: publish an ownership-verification and deletion procedure for anonymous
+            and email-protected backups, including a response timeline]</code
+          >.
         </li>
         <li>
-          <strong>Recovery email:</strong> removing the email from your backup settings stops future
-          use of that address; contact the same address above to request deletion of the stored
-          address.
+          <strong>Recovery email:</strong> the app currently has no in-app control to remove an
+          attached recovery email. Contact the support address above to request deletion of the
+          address or associated account; the owner must verify the request and the available
+          deletion procedure before promising an outcome.
+        </li>
+        <li>
+          <strong>AI requests:</strong> provider-side retention and deletion depend on the verified
+          terms of the providers enabled in the release build; contact the support address above for
+          a request about a submitted prompt.
         </li>
       </ul>
 
@@ -272,6 +308,11 @@
           2026-09-19 — v1.0.0 draft: initial policy for the first public release (local-first
           SQLite; optional one-way backup + restore; optional recovery email; local-only rewards; no
           analytics/ads/sharing).
+        </li>
+        <li>
+          2026-09-25 — draft correction: configured automatic backup, possible anonymous Auth
+          bootstrap, and enabled AI-provider requests disclosed; effective date and provider terms
+          remain owner review items.
         </li>
       </ul>
 

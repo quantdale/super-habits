@@ -1,12 +1,7 @@
 export const COMMAND_EXPERIMENT_ENABLED = true;
 
-/**
- * Ask mode (and Auto mode) — enabled 2026-08-05 after the user-ai-ask edge
- * function was deployed with the DeepSeek v4 Flash backend and the bounded
- * intent set + phrase stage were verified live against
- * project kruubbynsmxzxfdunaal.
- */
-export const AI_ASK_EXPERIMENT_ENABLED = true;
+/** Ask and Auto remain hidden in ordinary builds until owner-approved rollout. */
+export const AI_ASK_EXPERIMENT_ENABLED = process.env.EXPO_PUBLIC_AI_ASK_INTERNAL_ROLLOUT === 'true';
 
 export type DraftStatus = 'ready' | 'needs_input' | 'unsupported';
 export type DraftParserKind = 'mock_rules' | 'model_proxy' | 'model_proxy_fallback';

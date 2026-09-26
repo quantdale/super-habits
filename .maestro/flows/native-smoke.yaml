@@ -18,6 +18,8 @@ tags:
 - extendedWaitUntil:
     visible: 'Plan today'
     timeout: 10000
+- assertNotVisible:
+    text: '.*Expo Head: Add the handoff origin.*'
 # Tab taps are scoped to the section switcher's "Section tabs" landmark:
 # the bottom tab bar sits after section content in the native hierarchy, so an
 # unscoped text match (e.g. "Today" in the Calories summary card header) can
@@ -77,7 +79,7 @@ tags:
     childOf:
       text: 'Section tabs'
 - extendedWaitUntil:
-    visible: 'Switch between manual entry and a diary grouped by meal.'
+    visible: '2000 kcal left'
     timeout: 10000
 - waitForAnimationToEnd:
     timeout: 8000

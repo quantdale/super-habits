@@ -91,7 +91,7 @@ export function AskConversationView({ placeholder }: { placeholder: string }) {
           variant="header"
           accentColor={tokens.textMuted}
           headerTitle="Ask a question"
-          headerSubtitle="Answers come only from your own local data. Nothing is saved."
+          headerSubtitle="Your question, recent chat, and relevant app facts may be sent to an AI provider. Nothing is changed in your app."
           className="mb-0"
         >
           <View className="gap-3">

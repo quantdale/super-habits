@@ -15,14 +15,15 @@ export const commandBusyWorker = defineScenario({
   personaId: 'daily-driver',
   goal: 'Use Command Center for a morning focus block and a later Todo completion',
   description:
-    'A busy worker checks the read-only Ask surface, starts a confirmed focus session, and later completes one uniquely named Todo. No Command mutation is available before its preview confirmation.',
+    'A busy worker sees that internal Ask is disabled in the ordinary build, starts a confirmed focus session, and later completes one uniquely named Todo. No Command mutation is available before its preview confirmation.',
   risks: ['R4', 'R6', 'R8'],
   tags: ['command-v2', 'persona-a', 'journey'],
   steps: [
     {
       kind: 'askQuestion',
       question: 'What do I need to do today?',
-      expectedOutcome: 'unavailable',
+      expectedOutcome: 'disabled',
+      oracles: [{ kind: 'unchanged', sql: 'SELECT COUNT(*) AS n FROM todos' }],
     },
     {
       kind: 'apiLeg',
@@ -210,13 +211,13 @@ export const commandHabitEdgeCases = defineScenario({
   ],
 });
 
-/** Persona D — returning user: a cross-feature overview remains read-only. */
+/** Persona D — returning user: internal Ask remains hidden without changing history. */
 export const commandReturningUser = defineScenario({
   id: 'command-v2-returning-user',
   personaId: 'weekend-returner',
-  goal: 'Ask for a daily overview without changing accumulated local history',
+  goal: 'Keep internal Ask hidden without changing accumulated local history',
   description:
-    'A returning user asks for a bounded daily overview after accumulated history. In the deterministic local lane the provider-unavailable state is expected and must explicitly state that nothing changed.',
+    'A returning user opens Command Center after accumulating history. The ordinary deterministic build keeps internal Ask hidden, and local history remains unchanged.',
   risks: ['R6', 'R8'],
   fixture: 'TYPICAL',
   tags: ['command-v2', 'persona-d', 'journey'],
@@ -224,7 +225,8 @@ export const commandReturningUser = defineScenario({
     {
       kind: 'askQuestion',
       question: 'How am I doing today?',
-      expectedOutcome: 'unavailable',
+      expectedOutcome: 'disabled',
+      oracles: [{ kind: 'unchanged', sql: 'SELECT COUNT(*) AS n FROM todos' }],
     },
   ],
 });
