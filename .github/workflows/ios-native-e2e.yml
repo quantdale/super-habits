@@ -94,8 +94,12 @@ jobs:
         run: |
           set -euo pipefail
           npx expo prebuild --platform ios --no-install
-          test -f ios/SuperHabits.xcworkspace/contents.xcworkspacedata
           (cd ios && pod install)
+          workspace_path="$(find ios -maxdepth 2 -type d -name '*.xcworkspace' -print -quit)"
+          test -n "$workspace_path"
+          test -f "$workspace_path/contents.xcworkspacedata"
+          echo "IOS_WORKSPACE=$GITHUB_WORKSPACE/$workspace_path" >> "$GITHUB_ENV"
+          echo "Generated iOS workspace: $workspace_path"
 
       - name: Build unsigned Release app for iOS Simulator
         shell: bash
@@ -107,7 +111,7 @@ jobs:
           build_log="$GITHUB_WORKSPACE/simulation-output/native/ios-xcodebuild-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.log"
           export RCT_NO_LAUNCH_PACKAGER=true
           xcodebuild \
-            -workspace ios/SuperHabits.xcworkspace \
+            -workspace "$IOS_WORKSPACE" \
             -scheme SuperHabits \
             -configuration Release \
             -destination "id=$IOS_SIMULATOR_ID" \
