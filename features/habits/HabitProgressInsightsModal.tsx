@@ -265,10 +265,7 @@ export function HabitProgressInsightsModal({
             Scheduled rows use the target active on that date. Off-day activity is shown but stays
             neutral.
           </Text>
-          <View
-            accessible
-            accessibilityLabel={`${insights.recentDays.length} recent habit history rows`}
-          >
+          <View>
             {insights.recentDays.map((day) => (
               <HistoryRow key={day.dateKey} day={day} tokens={tokens} />
             ))}

@@ -86,6 +86,6 @@ tags:
     childOf:
       text: 'Section tabs'
 - scrollUntilVisible:
-    element: 'Native strength routine'
+    element: 'Open Native strength routine routine'
     direction: DOWN
-- assertVisible: 'Native strength routine'
+- assertVisible: 'Open Native strength routine routine'

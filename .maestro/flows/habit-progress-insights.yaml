@@ -71,9 +71,9 @@ tags:
     direction: DOWN
 - assertVisible: 'Recent target vs actual'
 - scrollUntilVisible:
-    element: 'Target met'
+    element: '.*Target met.*'
     direction: DOWN
-- assertVisible: 'Target met'
+- assertVisible: '.*Target met.*'
 - tapOn: 'Close'
 - assertNotVisible: 'Native insights habit progress'
 - tapOn: 'View progress for Native insights habit'

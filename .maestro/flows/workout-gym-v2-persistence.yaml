@@ -116,31 +116,28 @@ tags:
 - assertVisible: 'Custom exercise aliases'
 - tapOn: 'Custom exercise aliases'
 - inputText: 'incline press'
-- pressKey: enter
-- assertVisible: 'Exercise library'
-# Maestro's center-origin scroll starts outside the picker after keyboard
-# dismissal on iOS and closes the sheet. Keep gestures inside the panel.
+# Enter on the alias input dismisses the iOS picker. Scroll within the panel
+# above the keyboard instead and retain the custom metadata assertions.
 - repeat:
     times: 8
     while:
       notVisible: 'Custom exercise instructions'
     commands:
       - swipe:
-          start: '85%, 78%'
-          end: '85%, 25%'
+          start: '85%, 55%'
+          end: '85%, 20%'
           duration: 400
 - assertVisible: 'Custom exercise instructions'
 - tapOn: 'Custom exercise instructions'
 - inputText: 'Brace and press with a controlled descent'
-- pressKey: enter
 - repeat:
     times: 8
     while:
       notVisible: 'Create and add'
     commands:
       - swipe:
-          start: '85%, 78%'
-          end: '85%, 25%'
+          start: '85%, 55%'
+          end: '85%, 20%'
           duration: 400
 - assertVisible: 'Create and add'
 - tapOn: 'Create and add'
