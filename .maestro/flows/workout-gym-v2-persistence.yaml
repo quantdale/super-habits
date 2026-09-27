@@ -117,15 +117,32 @@ tags:
 - tapOn: 'Custom exercise aliases'
 - inputText: 'incline press'
 - pressKey: enter
-- scrollUntilVisible:
-    element: 'Custom exercise instructions'
-    direction: DOWN
+- assertVisible: 'Exercise library'
+# Maestro's center-origin scroll starts outside the picker after keyboard
+# dismissal on iOS and closes the sheet. Keep gestures inside the panel.
+- repeat:
+    times: 8
+    while:
+      notVisible: 'Custom exercise instructions'
+    commands:
+      - swipe:
+          start: '85%, 78%'
+          end: '85%, 25%'
+          duration: 400
+- assertVisible: 'Custom exercise instructions'
 - tapOn: 'Custom exercise instructions'
 - inputText: 'Brace and press with a controlled descent'
 - pressKey: enter
-- scrollUntilVisible:
-    element: 'Create and add'
-    direction: DOWN
+- repeat:
+    times: 8
+    while:
+      notVisible: 'Create and add'
+    commands:
+      - swipe:
+          start: '85%, 78%'
+          end: '85%, 25%'
+          duration: 400
+- assertVisible: 'Create and add'
 - tapOn: 'Create and add'
 - scrollUntilVisible:
     element: 'Configure Native custom press exercise'

@@ -60,7 +60,8 @@ tags:
     visible: 'Current streak: 1 scheduled occurrence.*'
     timeout: 5000
 - extendedWaitUntil:
-    visible: 'Longest streak: 1 scheduled occurrence'
+    # The summary card exposes both streaks as one accessibility element.
+    visible: 'Current streak: 1 scheduled occurrence.*Longest streak: 1 scheduled occurrence.*'
     timeout: 5000
 - assertVisible: 'Scheduled completion rate'
 # The recent-history section sits below the rate cards; scroll to it rather

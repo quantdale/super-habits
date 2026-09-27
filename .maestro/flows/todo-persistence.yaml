@@ -23,6 +23,11 @@ tags:
 - tapOn: 'Quick add task title'
 - inputText: 'Native persistence todo'
 - pressKey: enter
+# The new row can be below the first viewport even when the pending count has
+# already incremented. Reveal the row before asserting it and again on restart.
+- scrollUntilVisible:
+    element: 'Native persistence todo'
+    direction: DOWN
 - extendedWaitUntil:
     visible: 'Native persistence todo'
     timeout: 10000
@@ -38,6 +43,9 @@ tags:
     # Scope to the section switcher (unscoped index-0 can hit inert content).
     childOf:
       text: 'Section tabs'
+- scrollUntilVisible:
+    element: 'Native persistence todo'
+    direction: DOWN
 - extendedWaitUntil:
     visible: 'Native persistence todo'
     timeout: 15000

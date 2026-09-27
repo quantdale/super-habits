@@ -62,13 +62,12 @@ tags:
 - tapOn: 'Open Native strength routine routine'
 - tapOn: 'Exercise name'
 - inputText: 'Native rows'
-# On iOS the still-focused field receives a stray character when Maestro taps
-# the adjacent Add button during keyboard dismissal. Blur before submitting.
+# The free-text field submits through onSubmitEditing. Tapping the adjacent
+# Add after Enter targets an already reset form on iOS; the created exercise
+# card is the submission oracle on both platforms.
 - pressKey: enter
 - waitForAnimationToEnd:
     timeout: 3000
-- assertVisible: 'Add'
-- tapOn: 'Add'
 - scrollUntilVisible:
     element: 'Configure Native rows exercise'
     direction: UP
