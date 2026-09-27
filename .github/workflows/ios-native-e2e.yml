@@ -89,14 +89,45 @@ jobs:
           echo "IOS_SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
           echo "Simulator UDID: $simulator_id"
 
-      - name: Build and install unsigned release app for iOS Simulator
+      - name: Prepare generated iOS workspace and CocoaPods
         shell: bash
         run: |
           set -euo pipefail
-          npx expo run:ios --configuration Release --device "$IOS_SIMULATOR_ID" --no-bundler
-          app_path="$(xcrun simctl get_app_container "$IOS_SIMULATOR_ID" com.dale16.superhabits app)"
+          npx expo prebuild --platform ios --no-install
+          test -f ios/SuperHabits.xcworkspace/contents.xcworkspacedata
+          (cd ios && pod install)
+
+      - name: Build unsigned Release app for iOS Simulator
+        shell: bash
+        timeout-minutes: 190
+        run: |
+          set -euo pipefail
+          mkdir -p simulation-output/native
+          derived_data="$RUNNER_TEMP/superhabits-ios-derived-data"
+          build_log="$GITHUB_WORKSPACE/simulation-output/native/ios-xcodebuild-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.log"
+          export RCT_NO_LAUNCH_PACKAGER=true
+          xcodebuild \
+            -workspace ios/SuperHabits.xcworkspace \
+            -scheme SuperHabits \
+            -configuration Release \
+            -destination "id=$IOS_SIMULATOR_ID" \
+            -derivedDataPath "$derived_data" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY= \
+            build 2>&1 | tee "$build_log"
+          app_path="$derived_data/Build/Products/Release-iphonesimulator/SuperHabits.app"
           test -d "$app_path"
           echo "IOS_APP_PATH=$app_path" >> "$GITHUB_ENV"
+
+      - name: Install and launch Release app with simctl
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          test -d "$IOS_APP_PATH"
+          xcrun simctl install "$IOS_SIMULATOR_ID" "$IOS_APP_PATH"
+          xcrun simctl launch "$IOS_SIMULATOR_ID" com.dale16.superhabits
 
       - name: Run iOS flows and print source/build provenance
         run: node scripts/qa-ios-github-actions.mjs "$IOS_APP_PATH"
@@ -108,6 +139,7 @@ jobs:
           name: ios-simulator-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             simulation-output/native/*.json
+            simulation-output/native/*.log
             simulation-output/native/debug-ios-*/
           include-hidden-files: true
           if-no-files-found: warn
