@@ -96,23 +96,20 @@ tags:
 - tapOn: 'Custom exercise primary area'
 - inputText: 'chest'
 - pressKey: enter
+# Scroll past equipment to the aliases label — the lifecycle flow's proven
+# stop. Stopping at equipment leaves instructions too low for the bounded
+# swipes to reveal it (exact-SHA run: seq47 swipes exhausted, seq56 assert).
 - scrollUntilVisible:
-    element: 'Custom exercise equipment'
+    element: 'Search aliases (comma separated)'
     direction: DOWN
 - tapOn: 'Custom exercise equipment'
 - inputText: 'barbell'
 - pressKey: enter
-# The picker was dismissed after the prior 5%-edge swipe on iOS. Reveal the
-# aliases field with bounded gestures inside the panel, then assert it.
-- repeat:
-    times: 8
-    while:
-      notVisible: 'Custom exercise aliases'
-    commands:
-      - swipe:
-          start: '85%, 78%'
-          end: '85%, 25%'
-          duration: 400
+# Reveal the aliases field with the scoped scroll the lifecycle flow uses
+# (the 85%-edge repeat left instructions below the swipe budget), then assert.
+- scrollUntilVisible:
+    element: 'Custom exercise aliases'
+    direction: DOWN
 - assertVisible: 'Custom exercise aliases'
 - tapOn: 'Custom exercise aliases'
 - inputText: 'incline press'
@@ -139,6 +136,13 @@ tags:
           start: '85%, 55%'
           end: '85%, 20%'
           duration: 400
+# Lift the button above the keyboard: instructions is still focused and its
+# keyboard occludes the control (exact-SHA run: tap bounds sat at y692, the
+# tap hit the keyboard, and the create never happened).
+- scrollUntilVisible:
+    element: 'Create and add'
+    direction: DOWN
+    centerElement: true
 - assertVisible: 'Create and add'
 - tapOn: 'Create and add'
 - scrollUntilVisible:

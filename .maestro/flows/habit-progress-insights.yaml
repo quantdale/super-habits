@@ -39,15 +39,17 @@ tags:
           duration: 400
 - assertVisible: 'Create habit'
 - tapOn: 'Create habit'
-- extendedWaitUntil:
-    visible: 'Native insights habit: 0 of 1 today.*'
-    timeout: 5000
-# Maestro reported this tile as visible with negative Y bounds after the
-# modal closed; center it before tapping so the press reaches the control.
+# The form-reveal swipes leave the section scrolled past the new card, so it
+# renders above the fold (exact-SHA run: the bare 5s assert timed out with the
+# card off-screen). Walk back up first; Maestro also reported negative Y
+# bounds for this tile after the modal closed, so center it before tapping.
 - scrollUntilVisible:
     element: 'Native insights habit: 0 of 1 today.*'
     direction: UP
     centerElement: true
+- extendedWaitUntil:
+    visible: 'Native insights habit: 0 of 1 today.*'
+    timeout: 5000
 - tapOn: 'Native insights habit: 0 of 1 today.*'
 - extendedWaitUntil:
     visible: 'Native insights habit: 1 of 1 today.*'

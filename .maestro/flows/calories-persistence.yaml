@@ -56,9 +56,10 @@ tags:
 - pressKey: enter
 # The computed value sits directly below the macro fields. Target its own
 # label so the search stops at the form rather than passing it and landing on
-# the history chart.
+# the history chart. The trailing .* is required: textRegex is a full match,
+# so 'Calories.*kcal' cannot match the label 'Calories (kcal)'.
 - scrollUntilVisible:
-    element: 'Calories.*kcal'
+    element: 'Calories.*kcal.*'
     direction: DOWN
     centerElement: true
 # This pre-submit oracle catches a missed input focus before Save; the form's
