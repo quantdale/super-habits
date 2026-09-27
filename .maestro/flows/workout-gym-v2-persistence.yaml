@@ -136,13 +136,8 @@ tags:
           start: '85%, 55%'
           end: '85%, 20%'
           duration: 400
-# Lift the button above the keyboard: instructions is still focused and its
-# keyboard occludes the control (exact-SHA run: tap bounds sat at y692, the
-# tap hit the keyboard, and the create never happened).
-- scrollUntilVisible:
-    element: 'Create and add'
-    direction: DOWN
-    centerElement: true
+# The bounded repeat above already leaves this fully visible on iOS; an extra
+# scrollUntilVisible fails when it is already on screen.
 - assertVisible: 'Create and add'
 - tapOn: 'Create and add'
 - scrollUntilVisible:
