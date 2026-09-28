@@ -164,6 +164,8 @@ Read-only inspection on 2026-09-28 found production `ACTIVE_HEALTHY`, with 12 mi
 | 2026-09-28 | Pinned `npm run qa:fast` after report/checkpoint refresh                         | PASS: Node v22.23.2, TypeScript, ESLint, 1,919 unit tests across 155 files, journey-label parity, and quarantine-register parity.                                                                                                                             |
 | 2026-09-28 | Host RAM recheck before `qa:full`                                                | 2.55 GiB free of 31.73 GiB at 02:22:39 UTC; still insufficient for a meaningful HEAVY timing rerun. Preserve J8/D14 and keep the gate deferred.                                                                                                               |
 
+| 2026-09-28 | PR CI and E2E run `36370750894` on documentation checkpoint `a78edf5` | PASS: quality checks and PR E2E (19m20s), including Chromium feature journeys, `@p0`/J1/J2a/J2b, and the `scenarios-pr` deterministic subset. Full/main and dist-sync lanes were skipped by the PR matrix; native iOS run `36368093388` remains separate on f93dddc. |
+
 ## Terminal disposition
 
 `NOT CERTIFIED` is the only supported terminal state while the production Scope-7 schema and historical backup-integrity gate remains unresolved. This does not erase the scoped disposable pass or any local/CI result. It prevents those results from being presented as production restore readiness. Reassess this terminal state only after the owner-gated production rollout and historical manifest recovery audit have completed with direct evidence.
