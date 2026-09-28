@@ -68,6 +68,11 @@ tags:
 # (same class as the diary-transition note below).
 - waitForAnimationToEnd:
     timeout: 8000
+# Manual add preserves the current Diary mode. The saved entries heading is
+# part of Form mode, so switch modes explicitly before checking that read path.
+- tapOn: 'Form view'
+- waitForAnimationToEnd:
+    timeout: 3000
 # The post-save rebuild leaves the saved section below the fold. Maestro's
 # center swipes can hit a chart instead of the outer screen scroller, so use
 # bounded left-margin swipes and retain the saved-row assertion.

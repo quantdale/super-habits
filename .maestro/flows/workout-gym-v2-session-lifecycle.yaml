@@ -114,6 +114,10 @@ tags:
 - assertVisible: 'Custom exercise instructions'
 - tapOn: 'Custom exercise instructions'
 - inputText: 'Brace and press with a controlled descent'
+# Blur the final text field so the submit tap is not competing with the iOS keyboard.
+- pressKey: enter
+- waitForAnimationToEnd:
+    timeout: 2000
 - repeat:
     times: 8
     while:
@@ -127,6 +131,9 @@ tags:
 # scrollUntilVisible fails when it is already on screen.
 - assertVisible: 'Create and add'
 - tapOn: 'Create and add'
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: gym-v2-session-custom-exercise-submit
 - scrollUntilVisible:
     element: 'Configure Native resume press exercise'
     direction: UP
