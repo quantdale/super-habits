@@ -24,16 +24,16 @@ No unapproved production deletion, paid project or EAS run, provider spend, sign
 
 ## Current Checkpoint
 
-- Milestone: 25/27 OpenSpec tasks are checked. Tasks 5.3 (exact-SHA iOS runtime qualification) and 8.3 (final report) remain open. Production/disposable investigations, local AI readiness, release package preparation, gap-21 decision record, and adversarial reviews are documented; production changes, provider traffic, paid actions, signing, and store submission remain owner-gated.
-- Completed: Exact-SHA iOS run 36394813653 tested source 27c2a10a3e60529ec7346e2534945dc484761533. Source/toolchain, dependencies, simulator, CocoaPods, unsigned Release build, provenance, install, and launch passed; 10/13 flows passed and three failed without timeouts. Artifact 10967729073 preserves the 4,796,068-byte result, executable SHA-256 ef22674b03518115bd465ac7a1293a7ad9e5439238a5af1ac9a6ac6085be9010, and ZIP SHA-256 79be4566448a202e6e4dc45fddfb8fa9608526ac191e8521f17ed4d37ccb8ae5. Candidate fix commit 1131d58628fbef2103d66d539c8baa7500bdbb71 is pushed.
-- In progress: Exact-SHA iOS run 36423379932 targets source e9b42a3f31984f86dd50e0b337300df74898f422, containing candidate source commit 1131d586. The job started at 12:40:52 UTC; exact-source/toolchain verification passed at 12:41:31 UTC; npm ci and Maestro setup passed by 12:43:41 UTC; iOS 26.2 simulator boot passed at 12:47:03 UTC; workspace/CocoaPods preparation passed at 12:56:57 UTC; unsigned Release build passed at 14:41:58 UTC; executable provenance passed at 14:42:01 UTC; simctl install passed at 14:42:59 UTC; simctl launch passed at 14:43:11 UTC; simulator diagnostics were correctly skipped because install and launch succeeded. The Maestro flow/provenance step is active. The opt-in label was removed after the job started. All flow results and artifact upload remain pending. Post-source report/ExecPlan changes are documentation-only; app and Maestro flow files remain unchanged.
-- Current failures: Preserve run 36394813653's completed non-timeout failures: native-smoke showed 2000 kcal left in the screenshot but not the captured accessibility tree; Gym V2 persistence could not find the progression increment and showed the underlying Workout screen; session lifecycle resumed with Reps 6 and blank Weight because the prior Weight selector was ambiguous. No JS exception was seen in reviewed logs. No result is yet available for run 36423379932.
-- Important modified files: candidate source commit 1131d58 changes three Maestro flows and features/workout/WorkoutSessionScreen.tsx. The report and this plan track the previous result and active exact-head retry. No app/ or .maestro/ changes follow source 1131d586.
-- Last successful validation: pinned Node v22.23.2 typecheck, targeted ESLint, Prettier, multi-document Maestro YAML parsing, git diff --check, focused Vitest 88/88, and tests/agent-execplan.test.ts 9/9 pass. GitHub exact-source/toolchain verification, simulator boot, workspace/CocoaPods preparation, unsigned Release build, executable provenance, simctl install, and simctl launch passed for run 36423379932; Maestro flows are running. Current documentation-only qa:affected map requires qa:fast; its latest aggregate run timed out in restore.coordinator.test.ts setup (1,905 passed, 18 skipped), while isolated retry passed 18/18. Broad qa:fast and qa:full remain deferred under low memory; preserve prior HEAVY J8 miss (878 ms vs 800 ms), D14, and recorded failures.
+- Milestone: 27/27 OpenSpec tasks are checked. Run 36423379932 supplied the exact-SHA iOS result, and the final report records terminal state NOT CERTIFIED. The change stays unarchived. Production changes, provider traffic, paid actions, signing, and store submission remain owner-gated.
+- Completed: Exact-SHA iOS run 36423379932 on source e9b42a3f31984f86dd50e0b337300df74898f422 finished failure. Setup through simctl launch passed. Maestro ran 14:43:11–15:54:35 UTC. Artifact 10980993163 (4,748,248 bytes, ZIP SHA-256 f9e9b1d67454dc8563678fa7bb8b256937cd24004cfb8754de920e6411a48856) records NOT_CERTIFIED, executable SHA-256 ef22674b03518115bd465ac7a1293a7ad9e5439238a5af1ac9a6ac6085be9010, 10 PASS, and three FAILED_NEEDS_TRIAGE flows. The final report file SHA-256 is d7a07952c6501c00d7f10ac395e8fd10e379486c472393df73880716b8b7e256.
+- In progress: No iOS job is being waited on. Residuals P1–P9 stay open. Archive is intentionally not started.
+- Current failures: Run 36423379932 native-smoke failed because the Focus sequence sentence was not visible. Gym V2 persistence still could not show "Native custom press progression increment". Session lifecycle reached Weight input and failed in hideKeyboard. P2 production Scope-7 schema and historical backup integrity remain red. Android is ENVIRONMENT. qa:full stays deferred.
+- Important modified files: candidate source commit 1131d58 changes three Maestro flows and features/workout/WorkoutSessionScreen.tsx. This documentation revision updates the final report, this plan, and tasks 5.3 and 8.3. No app/ or .maestro/ changes follow source 1131d586.
+- Last successful validation: pinned Node v22.23.2 typecheck, targeted ESLint, Prettier, multi-document Maestro YAML parsing, git diff --check, focused Vitest 88/88, and tests/agent-execplan.test.ts 9/9 pass for the candidate source. Run 36423379932 then finished NOT_CERTIFIED at 10/13. Current documentation-only qa:affected map requires qa:fast; its latest aggregate run timed out in restore.coordinator.test.ts setup (1,905 passed, 18 skipped), while isolated retry passed 18/18. Broad qa:fast and qa:full remain deferred under low memory; preserve prior HEAVY J8 miss (878 ms vs 800 ms), D14, and recorded failures.
 - Relevant quarantines: gap 21 remains owner-deferred; J8/D14 ceilings remain unchanged.
 - Blockers: production cleanup/schema rollout require exact-target owner approval and recovery-point proof; damaged historical manifests require owner-scoped audit/source-device recapture. AI provider evaluation requires credentials, budget, privacy/legal review, and authorization. Store signing, console inputs, and submission require owner actions. Production anonymous bootstrap remains untested because anonymous sign-in is disabled. The production backup schema/historical integrity gate keeps the terminal state NOT CERTIFIED.
-- Exact next action: monitor active Maestro flows in run 36423379932 on source e9b42a3f31984f86dd50e0b337300df74898f422 until the flow/provenance step and evidence upload finish. Verify the full source SHA, executable hash, and all 13 reports/screenshots/logs; classify every failure. Keep tasks 5.3 and 8.3 open until one exact source passes all flows and the final report records the actual final SHA. Preserve J8/D14.
-- Remaining definition of done: resolve and record exact-SHA iOS evidence, publish the final-SHA report with WHY, CLASSIFICATION, WHAT IS REQUIRED, and EXACT RESUME ACTION for every residual, update task markers only from evidence, run impact-based final validation, and validate the plan. External production, AI, Android, release, and gap-21 decisions may keep the campaign terminal state NOT CERTIFIED.
+- Exact next action: Leave `openspec/changes/external-blocker-closure` unarchived. Resume a residual only from its EXACT RESUME ACTION in the final report. Do not record P2, the 10/13 iOS result, or any missing owner authorization as PASS. Preserve J8/D14.
+- Remaining definition of done: OpenSpec tasks 1.1–8.3 are recorded. The published report names terminal state NOT CERTIFIED, keeps residuals P1–P9, and stores this report file SHA-256. Archive remains a separate owner choice and is not part of the remaining task list.
 
 ## Progress
 
@@ -41,10 +41,10 @@ No unapproved production deletion, paid project or EAS run, provider spend, sign
 - [x] Production incident residue (tasks 2.1–2.4; execution requires separate owner approval).
 - [x] Disposable Supabase certification (tasks 3.1–3.3; anonymous bootstrap and provider work remain distinct external gates).
 - [x] AI Command Center local readiness (tasks 4.1–4.4; provider-backed evaluation remains blocked without credentials/budget/authorization).
-- [ ] iOS/EAS runtime evidence (tasks 5.1–5.2 static complete; task 5.3 exact-SHA runtime pending).
+- [x] iOS/EAS runtime evidence (tasks 5.1–5.3; exact-SHA run 36423379932 is NOT CERTIFIED at 10/13).
 - [x] Store-release preparation (tasks 6.1–6.3; owner-supplied release inputs remain open).
 - [x] Deferred architecture and dependency risk (tasks 7.1–7.3; gap-21 choice remains owner deferred).
-- [ ] Adversarial review and terminal report (tasks 8.1–8.2 complete; task 8.3 final-SHA report pending).
+- [x] Adversarial review and terminal report (tasks 8.1–8.3; terminal state NOT CERTIFIED; change not archived).
 
 ## Surprises & Discoveries
 
@@ -81,6 +81,8 @@ No unapproved production deletion, paid project or EAS run, provider spend, sign
 - Prepare production migration review and exact rollback/validation evidence before any deployment action; no production schema mutation is authorized by the incident read-only task.
 - Close demonstrated E2E server recurrence bypasses with a narrowly scoped regression and leave custom-domain detection as a separate unproven hypothesis.
 - Render `<Head>` only on web because its four tags are web metadata and the app has no Apple Handoff/associated-domain implementation. This removes the demonstrated native Release alert without adding an unused hosted origin or changing relative fetch behavior.
+- Do not archive `external-blocker-closure`. The change remains the active change under `openspec/changes/`.
+- Close tasks 5.3 and 8.3 from run 36423379932's uploaded artifact. A 10/13 result is not an iOS pass, and it does not clear P2.
 
 ## Adversarial Review and Dispositions
 
@@ -246,13 +248,14 @@ No unapproved production deletion, paid project or EAS run, provider spend, sign
 | 2026-09-28 | Candidate commit 1131d586; focused validation | Cold Calories wait, bounded Gym side swipes, and explicit Weight input selector/assertion updated. Typecheck, targeted ESLint, Prettier, multi-document YAML parse, git diff --check, and focused Vitest 88/88 and focused ExecPlan suite 9/9 PASS. Current documentation impact requires qa:fast; aggregate qa:fast and qa:full remain deferred with prior timeout/J8 evidence preserved. |
 | 2026-09-28 | Exact-SHA iOS run 36423379932 install/launch milestone | Source e9b42a3f31984f86dd50e0b337300df74898f422; unsigned Release build and executable provenance passed at 14:41:58/14:42:01 UTC; simctl install and launch passed at 14:42:59/14:43:11 UTC. Diagnostics were skipped because install and launch succeeded; Maestro flow step is active. |
 | 2026-09-28 | Final-report residual-field audit | All nine residuals P1–P9 contain WHY, CLASSIFICATION, WHAT IS REQUIRED, and EXACT RESUME ACTION. |
+| 2026-09-28 | Exact-SHA iOS run 36423379932 completed | `NOT_CERTIFIED`. Source `e9b42a3f31984f86dd50e0b337300df74898f422`; executable SHA-256 `ef22674b03518115bd465ac7a1293a7ad9e5439238a5af1ac9a6ac6085be9010`; 10/13 PASS. Artifact 10980993163 ZIP SHA-256 `f9e9b1d67454dc8563678fa7bb8b256937cd24004cfb8754de920e6411a48856`. Report file SHA-256 `d7a07952c6501c00d7f10ac395e8fd10e379486c472393df73880716b8b7e256`. Archive not run. |
 
 ## Changed Files / Areas
 
 - Candidate implementation commit 1131d58628fbef2103d66d539c8baa7500bdbb71 updates .maestro/flows/native-smoke.yaml, .maestro/flows/workout-gym-v2-persistence.yaml, .maestro/flows/workout-gym-v2-session-lifecycle.yaml, and features/workout/WorkoutSessionScreen.tsx.
 - Run 36394813653 on source 27c2a10a3e60529ec7346e2534945dc484761533 completed 10/13 flows; artifact 10967729073 preserves its exact provenance, reports, screenshots, and logs.
-- Active run 36423379932 checks out exact source e9b42a3f31984f86dd50e0b337300df74898f422, which includes the candidate code commit. Source/toolchain, dependency installation, Maestro setup, and iOS 26.2 simulator boot and workspace/CocoaPods preparation passed; unsigned Release build is in progress.
-- docs/analysis/external-blocker-closure-final-report.md and this ExecPlan record the completed failure evidence and active retry; later documentation commits do not change app or Maestro files.
+- Completed run 36423379932 checked out exact source e9b42a3f31984f86dd50e0b337300df74898f422, which includes candidate commit 1131d586. Its artifact records 10/13 flows and does not certify iOS.
+- docs/analysis/external-blocker-closure-final-report.md and this ExecPlan record that completed result. The change is not archived. Later documentation commits do not change app or Maestro files.
 - Historical implementation and workflow changes remain committed in branch history. Git status and diffs remain authoritative for pending paths.
 
 ## Recovery / Resume Instructions
@@ -261,4 +264,4 @@ Read `AGENTS.md`, `.agent/PLANS.md`, this plan, and the OpenSpec apply context. 
 
 ## Outcomes & Retrospective
 
-Pending final validation and terminal report.
+The report is published at docs/analysis/external-blocker-closure-final-report.md with file SHA-256 d7a07952c6501c00d7f10ac395e8fd10e379486c472393df73880716b8b7e256. Terminal state is NOT CERTIFIED because P2 remains red and iOS run 36423379932 passed 10 of 13 flows. Residuals P1–P9 stay in the report. The change stays unarchived in openspec/changes/external-blocker-closure. qa:full remains deferred under low free RAM and is not a pass.

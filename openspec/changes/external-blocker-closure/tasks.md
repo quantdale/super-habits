@@ -29,7 +29,7 @@
 
 - [x] 5.1 Recheck EAS project linkage, `.eas/workflows/native-e2e.yml`, and `eas.json` without starting a billable job or changing signing
 - [x] 5.2 Run the repository's non-billable workflow validation and static native checks, and record them as static evidence
-- [ ] 5.3 If an authorized non-billable iOS simulator or macOS path exists, certify that source SHA there; otherwise record the paid-plan or missing-macOS owner action and leave iOS runtime `NOT RUN`
+- [x] 5.3 If an authorized non-billable iOS simulator or macOS path exists, certify that source SHA there; otherwise record the paid-plan or missing-macOS owner action and leave iOS runtime `NOT RUN`
 
 ## 6. Store-release preparation
 
@@ -47,4 +47,4 @@
 
 - [x] 8.1 Review production integrity, disposable isolation, restore safety, RLS, AI confirmation and provider failure, and release claims that exceed evidence
 - [x] 8.2 Fix each safely executable defect with regression coverage and run a second adversarial review
-- [ ] 8.3 Publish the final report at the actual final SHA, separating it from the Android binary SHA, using only `COMPLETE`, `LOCALLY COMPLETE — EXTERNAL ACTIONS REQUIRED`, `BLOCKED`, or `NOT CERTIFIED`, with the four blocker fields on every residual
+- [x] 8.3 Publish the final report at the actual final SHA, separating it from the Android binary SHA, using only `COMPLETE`, `LOCALLY COMPLETE — EXTERNAL ACTIONS REQUIRED`, `BLOCKED`, or `NOT CERTIFIED`, with the four blocker fields on every residual
