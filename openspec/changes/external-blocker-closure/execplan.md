@@ -245,6 +245,7 @@ No unapproved production deletion, paid project or EAS run, provider spend, sign
 | 2026-09-28 | Exact-SHA iOS run 36394813653 completed | Source 27c2a10a3e60529ec7346e2534945dc484761533; setup/build/provenance/install/launch PASS, 13 flows completed with 10 PASS and three non-timeout failures. Artifact 10967729073: 4,796,068 bytes, ZIP SHA-256 79be4566448a202e6e4dc45fddfb8fa9608526ac191e8521f17ed4d37ccb8ae5; executable SHA-256 ef22674b03518115bd465ac7a1293a7ad9e5439238a5af1ac9a6ac6085be9010. |
 | 2026-09-28 | Candidate commit 1131d586; focused validation | Cold Calories wait, bounded Gym side swipes, and explicit Weight input selector/assertion updated. Typecheck, targeted ESLint, Prettier, multi-document YAML parse, git diff --check, and focused Vitest 88/88 and focused ExecPlan suite 9/9 PASS. Current documentation impact requires qa:fast; aggregate qa:fast and qa:full remain deferred with prior timeout/J8 evidence preserved. |
 | 2026-09-28 | Exact-SHA iOS run 36423379932 started | Source e9b42a3f31984f86dd50e0b337300df74898f422; source/toolchain verification PASS at 12:41:31 UTC; npm ci and Maestro setup PASS by 12:43:41 UTC; iOS 26.2 simulator boot PASS at 12:47:03 UTC; workspace/CocoaPods PASS at 12:56:57 UTC; unsigned Release build in progress. Label removed; flow results pending. |
+| 2026-09-28 | Final-report residual-field audit | All nine residuals P1–P9 contain WHY, CLASSIFICATION, WHAT IS REQUIRED, and EXACT RESUME ACTION. |
 
 ## Changed Files / Areas
 
