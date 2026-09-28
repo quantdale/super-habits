@@ -124,14 +124,72 @@ jobs:
           test -d "$app_path"
           echo "IOS_APP_PATH=$app_path" >> "$GITHUB_ENV"
 
-      - name: Install and launch Release app with simctl
+      - name: Record built iOS app provenance
         shell: bash
-        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          source_sha="$(git rev-parse HEAD)"
+          test "$source_sha" = "$EXPECTED_SOURCE_SHA"
+          plist="$IOS_APP_PATH/Info.plist"
+          bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")"
+          executable_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$plist")"
+          bundle_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")"
+          short_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")"
+          test "$bundle_id" = 'com.dale16.superhabits'
+          test -f "$IOS_APP_PATH/$executable_name"
+          executable_sha256="$(shasum -a 256 "$IOS_APP_PATH/$executable_name" | awk '{print $1}')"
+          [[ "$executable_sha256" =~ ^[[:xdigit:]]{64}$ ]]
+          export IOS_SOURCE_SHA="$source_sha"
+          export IOS_BUNDLE_ID="$bundle_id"
+          export IOS_BUNDLE_VERSION="$bundle_version"
+          export IOS_SHORT_VERSION="$short_version"
+          export IOS_EXECUTABLE_NAME="$executable_name"
+          export IOS_EXECUTABLE_SHA256="$executable_sha256"
+          node --input-type=module <<'NODE'
+          import { mkdirSync, writeFileSync } from 'node:fs';
+          import path from 'node:path';
+
+          const directory = path.resolve('simulation-output/native');
+          mkdirSync(directory, { recursive: true });
+          const report = {
+            schemaVersion: 1,
+            sourceSha: process.env.IOS_SOURCE_SHA,
+            runId: process.env.GITHUB_RUN_ID,
+            runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+            appPath: process.env.IOS_APP_PATH,
+            bundleIdentifier: process.env.IOS_BUNDLE_ID,
+            bundleVersion: process.env.IOS_BUNDLE_VERSION,
+            shortVersion: process.env.IOS_SHORT_VERSION,
+            executableName: process.env.IOS_EXECUTABLE_NAME,
+            executableSha256: process.env.IOS_EXECUTABLE_SHA256,
+            capturedAt: new Date().toISOString(),
+          };
+          const filename = `ios-provenance-${report.runId}-${report.runAttempt}.json`;
+          writeFileSync(path.join(directory, filename), `${JSON.stringify(report, null, 2)}\n`);
+          console.log(JSON.stringify(report, null, 2));
+          NODE
+
+      - name: Install Release app with simctl
+        id: simctl_install
+        shell: bash
+        timeout-minutes: 3
         run: |
           set -euo pipefail
           test -d "$IOS_APP_PATH"
-          xcrun simctl install "$IOS_SIMULATOR_ID" "$IOS_APP_PATH"
-          xcrun simctl launch "$IOS_SIMULATOR_ID" com.dale16.superhabits
+          node scripts/qa-ios-simctl.mjs install
+
+      - name: Launch Release app with simctl
+        id: simctl_launch
+        shell: bash
+        timeout-minutes: 3
+        run: node scripts/qa-ios-simctl.mjs launch
+
+      - name: Capture bounded iOS simulator diagnostics
+        if: always() && (steps.simctl_install.outcome == 'failure' || steps.simctl_launch.outcome == 'failure')
+        shell: bash
+        timeout-minutes: 3
+        continue-on-error: true
+        run: node scripts/qa-ios-simctl.mjs diagnostics
 
       - name: Run iOS flows and print source/build provenance
         run: node scripts/qa-ios-github-actions.mjs "$IOS_APP_PATH"

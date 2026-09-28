@@ -1,20 +1,20 @@
 # External blocker closure — final report
 
-**Draft state:** The prior exact-source run 36346516389 timed out after one failed flow. The bounded-timeout fix and regression tests are committed. New run 36368093388 targets exact SHA f93dddc5f67b7ff48061b652fe476feefa89ccc8; source/toolchain verification, npm ci, Maestro CLI installation, iOS 26.2 simulator boot, workspace/CocoaPods preparation, and unsigned Release simulator build passed. The build completed at 03:45:20 UTC after 1h28m24s; simctl install/launch is now in progress. The opt-in label has been removed, and no app-launch or flow result is inferred yet.
+**Draft state:** The prior exact-source run 36346516389 timed out after one failed flow. The bounded-timeout fix and regression tests are committed. Exact-SHA run 36368093388 on f93dddc5f67b7ff48061b652fe476feefa89ccc8 passed its unsigned Release build, then its combined simctl install/launch action timed out at five minutes before Maestro; artifact 10950916331 preserves only the Xcode log. The follow-up branch patch now isolates install and launch with 150-second deadlines, records each command output/timing, hashes the app executable before simctl, and captures bounded diagnostics on failure. Four focused helper tests and pinned qa:fast pass. Android smoke/lifecycle remain ENVIRONMENT without a booted target, and qa:full remains deferred with 2.63 GiB free of 31.73 GiB. No new iOS run or flow result exists yet; the opt-in label is removed.
 
 **Provisional terminal state:** `NOT CERTIFIED`. The production backup schema and historical integrity gate is substantively red; a passing local, disposable, Android, or iOS check cannot clear that production gate.
 
 ## Workstream summary
 
-| Workstream                                       | Current status                                                                                                                                    |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Production incident residue and backup integrity | `NOT CERTIFIED`; cleanup and schema rollout remain owner-gated.                                                                                   |
-| Disposable Supabase                              | Scoped authenticated-owner backup/restore battery passed; anonymous bootstrap is untested.                                                        |
-| AI Command Center                                | Local deterministic/security work passed; provider evaluation and rollout are blocked on credentials and owner authorization.                     |
-| iOS/EAS and Android                              | Prior iOS run 36346516389 timed out; exact-SHA retry 36368093388 is in progress on f93dddc. Android runtime remains ENVIRONMENT-blocked.          |
-| Store release                                    | Submission package is prepared; owner inputs, signed builds, real screenshots, and release approval remain.                                       |
-| Deferred architecture/dependencies               | Gap 21 remains fail-closed pending owner choice; the resource-constrained HEAVY rerun is unresolved; no breaking dependency override was applied. |
-| Adversarial certification                        | Two reviews completed and executable fixes landed; the production integrity gate remains red.                                                     |
+| Workstream                                       | Current status                                                                                                                                                                                                                                     |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Production incident residue and backup integrity | `NOT CERTIFIED`; cleanup and schema rollout remain owner-gated.                                                                                                                                                                                    |
+| Disposable Supabase                              | Scoped authenticated-owner backup/restore battery passed; anonymous bootstrap is untested.                                                                                                                                                         |
+| AI Command Center                                | Local deterministic/security work passed; provider evaluation and rollout are blocked on credentials and owner authorization.                                                                                                                      |
+| iOS/EAS and Android                              | Exact-SHA run 36368093388 built on f93dddc, then timed out during combined install/launch before Maestro. The isolated retry patch and local fast checks pass; a fresh exact-head iOS run is pending. Android runtime remains ENVIRONMENT-blocked. |
+| Store release                                    | Submission package is prepared; owner inputs, signed builds, real screenshots, and release approval remain.                                                                                                                                        |
+| Deferred architecture/dependencies               | Gap 21 remains fail-closed pending owner choice; the resource-constrained HEAVY rerun is unresolved; no breaking dependency override was applied.                                                                                                  |
+| Adversarial certification                        | Two reviews completed and executable fixes landed; the production integrity gate remains red.                                                                                                                                                      |
 
 ## Source and artifact identities
 
@@ -30,6 +30,8 @@
 | Final report document SHA-256        | To be recorded in the ExecPlan after this report is finalized      | Hash of this report file; distinct from app source and native binary hashes.                                                                                                         |
 
 The completed live-cloud ExecPlan and stash `pre-recovery-local-changes` remain preserved as historical evidence.
+
+**Latest iOS run artifact:** [Artifact 10950916331](https://github.com/quantdale/super-habits/actions/runs/36368093388/artifacts/10950916331) (`ios-simulator-evidence-36368093388-1`, 864,035 bytes, zip SHA-256 `cdcdbf76aab51b2464a9f8052e8e58eb1200148257f1d459e59d76cfbe3dab3c`) contains only `ios-xcodebuild-36368093388-1.log`. That log ends with `BUILD SUCCEEDED`; the artifact has no `.app`, per-command simctl report, simulator diagnostics, or executable hash.
 
 ## 1. Production incident residue and backup integrity
 
@@ -89,16 +91,18 @@ Read-only inspection on 2026-09-28 found production `ACTIVE_HEALTHY`, with 12 mi
 
 **Prior exact-source iOS run:** Run `36346516389` is for source SHA `30b5619ec79d6efdfa30271cd999b5ee803131a1`. Source/toolchain verification, dependency installation, Maestro setup, iOS 26.2 simulator boot, CocoaPods/workspace preparation, unsigned Release build, and simctl install/launch passed. Its uploaded provenance records executable SHA-256 `ef22674b03518115bd465ac7a1293a7ad9e5439238a5af1ac9a6ac6085be9010`. The first `native-smoke` flow failed when Maestro's `simctl launch` timed out; XCTest driver status checks also failed to connect and cleanup later timed out while uninstalling the driver. The screenshot is black, and captured simulator diagnostics contain no app crash entry, though the `simctl log show` capture itself timed out. The native report had no automatic classification. The preceding run `36335066339` reported `native-smoke` PASS with this identical executable SHA-256, although its source SHA differs; this supports a runner/simulator failure rather than an app-code regression. No second per-flow invocation/report appears in the job log; the subsequent iOS target preflight used unbounded `simctl` commands, so the preflight stall is the leading harness/environment explanation. The workflow job was canceled at 300 minutes; 12 flows have no result and no iOS runtime pass is claimed. The preceding run `36335066339` finished 10/13; three `TEST_BUG` failures were fixed in `30b5619`.
 
-**Exact-SHA retry in progress:** Run 36368093388 checks out f93dddc5f67b7ff48061b652fe476feefa89ccc8. Source/toolchain verification, npm ci, Maestro CLI installation, iOS 26.2 simulator boot, workspace/CocoaPods preparation, and the unsigned Release simulator build passed. The build completed at 03:45:20 UTC; simctl install/launch is in progress, while flows and provenance remain pending. The opt-in label has been removed after kickoff. No app-launch or flow result is inferred.
+**Latest exact-SHA iOS attempt:** Run 36368093388 checked out f93dddc5f67b7ff48061b652fe476feefa89ccc8. Source/toolchain, dependencies, Maestro CLI, iOS 26.2 simulator boot, workspace/CocoaPods, and the unsigned Release simulator build passed. The combined `simctl install`/`simctl launch` action timed out after five minutes at 03:50:33 UTC; its log shows both commands were invoked but no command completion. Maestro was skipped. The preserved artifact is ID 10950916331 and contains only the Xcode build log. No app executable hash, install/launch result, or flow verdict is available.
 
 **Current Android state:** No Android device or booted emulator was attached. Native smoke, targeted persistence, and lifecycle preflights returned `ENVIRONMENT` before executing flows. A local API-36 AVD boot attempt stalled under memory pressure. Do not infer Android readiness from iOS results or the historical APK.
 
+**Retry patch status:** The working branch now separates install and launch, saves independent timing/stdout/stderr JSON, records the pre-simctl executable SHA, and captures four bounded diagnostics after either command fails. Four focused tests and pinned qa:fast pass. The Android smoke/lifecycle gates report ENVIRONMENT because no device is booted. qa:full is deferred at 2.63 GiB free of 31.73 GiB; J8/D14 remain unchanged.
+
 **Residual blocker P5. Current-source iOS simulator result**
 
-- **WHY:** The prior exact-source attempt built and installed the Release app, but its first Maestro flow could not launch it; simulator/XCUITest operations timed out, and the job cap canceled that run before the remaining 12 flows. The timeout-bounded exact-SHA retry now builds successfully on f93dddc; simctl install/launch is in progress, with no flow result yet.
-- **CLASSIFICATION:** `ENVIRONMENT` at campaign level based on the simulator and XCTest command timeouts and the same executable passing `native-smoke` in run `36335066339`; the current native flow report itself left `classification` null.
-- **WHAT IS REQUIRED:** The fix and three timeout/readiness regression tests pass locally. Run 36368093388 must complete all 13 Maestro flows with exact source/toolchain provenance and executable hash.
-- **EXACT RESUME ACTION:** Inspect run 36368093388 on source SHA f93dddc5f67b7ff48061b652fe476feefa89ccc8 and preserve its per-flow/provenance artifact. Mark task 5.3 complete only if all 13 flows pass; otherwise classify the exact failure and continue with the smallest bounded correction and another exact-SHA run.
+- **WHY:** The prior exact-source attempt's first Maestro flow could not launch and simulator/XCUITest operations timed out. The f93dddc retry built successfully, but its combined `simctl install`/`simctl launch` step timed out at five minutes, before Maestro began; the step emitted no per-command completion output, so the stalled command is unknown.
+- **CLASSIFICATION:** `ENVIRONMENT` suspected at the simulator/runner boundary; the five-minute action timeout cannot distinguish an install stall from a launch/CoreSimulator/app-startup stall. The Maestro report and executable hash were not produced, and no product-flow failure is established.
+- **WHAT IS REQUIRED:** Complete final local validation and push the retry workflow patch. Then complete all 13 Maestro flows on the exact PR-head SHA with source/toolchain and executable provenance; retain the prior failure evidence and the new command reports distinctly.
+- **EXACT RESUME ACTION:** Run final impact-map, plan, style, syntax, and diff checks; commit and push the patch; then add the authorized ios-simulator-gha label to PR #56 for its exact new head and remove the label once the run starts. Inspect install/launch results, executable hash, diagnostics, and all 13 flows. Mark task 5.3 complete only if all 13 pass.
 
 **Residual blocker P6. Current-source Android runtime result**
 
@@ -165,6 +169,9 @@ Read-only inspection on 2026-09-28 found production `ACTIVE_HEALTHY`, with 12 mi
 | 2026-09-28 | Host RAM recheck before `qa:full`                                                | 2.55 GiB free of 31.73 GiB at 02:22:39 UTC; still insufficient for a meaningful HEAVY timing rerun. Preserve J8/D14 and keep the gate deferred.                                                                                                               |
 
 | 2026-09-28 | PR CI and E2E run `36370750894` on documentation checkpoint `a78edf5` | PASS: quality checks and PR E2E (19m20s), including Chromium feature journeys, `@p0`/J1/J2a/J2b, and the `scenarios-pr` deterministic subset. Full/main and dist-sync lanes were skipped by the PR matrix; native iOS run `36368093388` remains separate on f93dddc. |
+
+| 2026-09-28 | Exact-SHA iOS run `36368093388` completed | `NOT CERTIFIED`: Xcode Release build PASS at 03:45:20 UTC (1h28m24s); combined simctl install/launch action timed out at 03:50:33 UTC after five minutes; Maestro skipped. Artifact 10950916331 contains only the Xcode log; no executable hash or flow report. |
+| 2026-09-28 | iOS simctl retry instrumentation and mapped local validation | Four focused helper tests and pinned qa:fast PASS (1,923 tests / 156 files); qa:affected resolves qa:fast, native smoke, native lifecycle, and qa:full. Native smoke/lifecycle return ENVIRONMENT without a booted device. qa:full deferred at 2.63 GiB free of 31.73 GiB; existing J8/D14 miss remains unresolved. |
 
 ## Terminal disposition
 
