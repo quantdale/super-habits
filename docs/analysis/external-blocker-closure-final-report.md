@@ -18,14 +18,15 @@
 
 ## Source and artifact identities
 
-| Identity                               | SHA / reference                                                    | Meaning                                                                                                                                                              |
-| -------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Starting source SHA                    | `23ded6e7676f94d6ddf9337ad02d526d85973fcb`                         | Preserved campaign starting HEAD.                                                                                                                                    |
-| Final product source SHA under test    | `30b5619ec79d6efdfa30271cd999b5ee803131a1`                         | Current app/test source candidate; exact-SHA iOS run `36346516389` targets this SHA. If a further code fix is needed, replace this with the final tested source SHA. |
-| Historical Android source SHA          | `56259876418674f85e1ca42c87f248fcf12c7d75`                         | Prior Android candidate; it is not the current product source.                                                                                                       |
-| Historical Android APK SHA-256         | `5ABF7B8CA34350C00ECE6D925C12CCBE15F519C0258D497B7654758CEDFA7A78` | Binary identity for that historical Android source only; it does not certify `30b5619`.                                                                              |
-| Current iOS Release executable SHA-256 | `ef22674b03518115bd465ac7a1293a7ad9e5439238a5af1ac9a6ac6085be9010` | Exact provenance from run `36346516389`; it is the same executable hash recorded for the previous source run. The run did not certify all 13 flows.                  |
-| Final report document SHA-256          | To be recorded in the ExecPlan after this report is finalized      | Hash of this report file; distinct from app source and native binary hashes.                                                                                         |
+| Identity                               | SHA / reference                                                    | Meaning                                                                                                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Starting source SHA                    | `23ded6e7676f94d6ddf9337ad02d526d85973fcb`                         | Preserved campaign starting HEAD.                                                                                                                             |
+| Prior iOS run source SHA               | 30b5619ec79d6efdfa30271cd999b5ee803131a1                           | Source tested by run 36346516389 before the timeout fix; this run did not certify the candidate.                                                              |
+| Historical Android source SHA          | `56259876418674f85e1ca42c87f248fcf12c7d75`                         | Prior Android candidate; it is not the current product source.                                                                                                |
+| Historical Android APK SHA-256         | `5ABF7B8CA34350C00ECE6D925C12CCBE15F519C0258D497B7654758CEDFA7A78` | Binary identity for that historical Android source only; it does not certify `30b5619`.                                                                       |
+| Timeout-fix source commit SHA          | fb5c9d1d51271ba671b6651ad35549b454ea67a0                           | Bounded simulator probes and per-flow Maestro timeout with regression coverage; the exact iOS rerun will use the pushed PR head after this checkpoint update. |
+| Current iOS Release executable SHA-256 | `ef22674b03518115bd465ac7a1293a7ad9e5439238a5af1ac9a6ac6085be9010` | Exact provenance from run `36346516389`; it is the same executable hash recorded for the previous source run. The run did not certify all 13 flows.           |
+| Final report document SHA-256          | To be recorded in the ExecPlan after this report is finalized      | Hash of this report file; distinct from app source and native binary hashes.                                                                                  |
 
 The completed live-cloud ExecPlan and stash `pre-recovery-local-changes` remain preserved as historical evidence.
 
@@ -94,7 +95,7 @@ Read-only inspection on 2026-09-28 found production `ACTIVE_HEALTHY`, with 12 mi
 - **WHY:** The exact-source job built and installed the Release app but the first Maestro flow could not launch it; simulator/XCUITest operations timed out, and the job cap canceled the run before the remaining 12 flows.
 - **CLASSIFICATION:** `ENVIRONMENT` at campaign level based on the simulator and XCTest command timeouts and the same executable passing `native-smoke` in run `36335066339`; the current native flow report itself left `classification` null.
 - **WHAT IS REQUIRED:** The bounded-probe/per-flow-timeout fix and its three regression tests pass locally; the gate still requires all 13 flows to pass with exact source/toolchain provenance and executable hash.
-- **EXACT RESUME ACTION:** Commit and push the bounded-timeout fix, trigger the authorized non-billable iOS simulator workflow on the resulting exact SHA, and inspect every flow and provenance artifact. Mark task 5.3 complete only if all 13 flows pass with matching source/toolchain evidence.
+- **EXACT RESUME ACTION:** Push timeout-fix commit fb5c9d1 together with the checkpoint update, trigger the authorized non-billable iOS simulator workflow on the resulting exact PR-head SHA, and inspect every flow and provenance artifact. Mark task 5.3 complete only if all 13 flows pass with matching source/toolchain evidence.
 
 **Residual blocker P6. Current-source Android runtime result**
 
