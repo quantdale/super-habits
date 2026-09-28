@@ -33,6 +33,7 @@ import {
 } from './native-qa-utils.mjs';
 import { readGitProvenance } from './native-provenance.mjs';
 import { baseReplayCommand, replayForAvd } from './qa-native-replay.mjs';
+import { checkIosSimulatorReadiness, runNativeCommand } from './qa-native-process.mjs';
 import {
   assertMockProof,
   interpretDeviceProbe,
@@ -52,6 +53,8 @@ import {
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const APP_ID = 'com.dale16.superhabits';
+const IOS_SIMCTL_TIMEOUT_MS = 30_000;
+const IOS_MAESTRO_FLOW_TIMEOUT_MS = 25 * 60_000;
 const REPORT_DIR = resolve(ROOT, 'simulation-output', 'native');
 const BUILD_METADATA_PATH = resolve(REPORT_DIR, 'native-android-build.json');
 const MOCK_METADATA_PATH = resolve(REPORT_DIR, 'native-android-build-mock.json');
@@ -199,23 +202,11 @@ function quoteWindowsShellArg(value) {
 }
 
 function run(command, args, options = {}) {
-  const useWindowsBatchShell = process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(command);
-  const spawnCommand = useWindowsBatchShell
-    ? [command, ...args].map(quoteWindowsShellArg).join(' ')
-    : command;
-  const spawnArgs = useWindowsBatchShell ? [] : args;
-  const result = spawnSync(spawnCommand, spawnArgs, {
+  return runNativeCommand(command, args, {
     cwd: ROOT,
     encoding: 'utf8',
-    shell: useWindowsBatchShell,
     ...options,
   });
-  return {
-    status: result.status ?? 1,
-    stdout: result.stdout ?? '',
-    stderr: result.stderr ?? '',
-    error: result.error?.message ?? null,
-  };
 }
 
 function gitSha() {
@@ -493,20 +484,8 @@ function checkTarget(platform, options) {
       remediation: 'Run on macOS with Xcode or use the EAS native-e2e workflow for iOS.',
     };
   }
-  const devices = run(xcrun, ['simctl', 'list', 'devices', 'booted']);
-  if (!/Booted/.test(devices.stdout)) {
-    return {
-      blocked: 'No booted iOS simulator is available.',
-      remediation: 'Boot an iOS simulator or use the EAS native-e2e workflow.',
-    };
-  }
-  const installed = run(xcrun, ['simctl', 'get_app_container', 'booted', APP_ID]);
-  if (installed.status !== 0) {
-    return {
-      blocked: `${APP_ID} is not installed on the booted iOS simulator.`,
-      remediation: 'Build/install the e2e-test simulator app, then rerun the same command.',
-    };
-  }
+  const simulatorReadiness = checkIosSimulatorReadiness(run, xcrun, APP_ID, IOS_SIMCTL_TIMEOUT_MS);
+  if (simulatorReadiness) return simulatorReadiness;
   return { command: maestro, target: 'iOS simulator' };
 }
 
@@ -579,6 +558,7 @@ function runPlatform(platform, options) {
   console.log(`Running native ${platform} QA on ${target.target}: maestro ${args.join(' ')}`);
   const result = run(target.command, args, {
     stdio: 'inherit',
+    timeoutMs: platform === 'ios' ? IOS_MAESTRO_FLOW_TIMEOUT_MS : undefined,
     env: target.serial
       ? {
           ...process.env,
@@ -612,6 +592,8 @@ function runPlatform(platform, options) {
     gitSha: gitSha(),
     replayCommand: options.replayCommand,
     exitCode: result.status,
+    timedOut: result.timedOut,
+    error: result.error,
     stdout: result.stdout,
     stderr: result.stderr,
     capturedAt: new Date().toISOString(),

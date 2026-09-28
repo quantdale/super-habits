@@ -241,7 +241,7 @@ async function main() {
       diagnosticLog,
     });
     writeReport(report, reportPath);
-    if (nativeReport?.classification === 'ENVIRONMENT') break;
+    if (nativeReport?.classification === 'ENVIRONMENT' || nativeReport?.timedOut === true) break;
   }
 
   report.status =
