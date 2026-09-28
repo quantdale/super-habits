@@ -158,9 +158,21 @@ tags:
     element: 'Linear'
     direction: DOWN
 - tapOn: 'Linear'
-- scrollUntilVisible:
-    element: 'Native custom press progression increment'
-    direction: DOWN
+- waitForAnimationToEnd:
+    timeout: 3000
+# Keep the scroll gesture within the expanded exercise card. The default
+# centered scroll failed to find the field and the failure screenshot showed
+# the underlying Workout screen on the exact-SHA run.
+- repeat:
+    times: 8
+    while:
+      notVisible: 'Native custom press progression increment'
+    commands:
+      - swipe:
+          start: '85%, 72%'
+          end: '85%, 25%'
+          duration: 300
+- assertVisible: 'Native custom press progression increment'
 - tapOn: 'Native custom press progression increment'
 - inputText: '2.5'
 - pressKey: enter

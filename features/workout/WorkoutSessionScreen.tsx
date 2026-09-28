@@ -1130,7 +1130,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                         {isBodyweight ? 'Additional load' : 'Weight'}
                       </Text>
                       <TextInput
-                        accessibilityLabel={isBodyweight ? 'Additional load' : 'Weight'}
+                        accessibilityLabel={isBodyweight ? 'Additional load input' : 'Weight input'}
                         className="rounded-xl border px-3 py-2 text-center text-base"
                         style={{
                           height: 48,

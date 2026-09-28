@@ -78,9 +78,14 @@ tags:
     text: 'Calories'
     childOf:
       text: 'Section tabs'
+- waitForAnimationToEnd:
+    timeout: 8000
+# The cold Calories mount can paint before the accessibility tree exposes its
+# summary. The previous exact-SHA run passed this same assertion slowly; keep a
+# longer bounded wait for the initial render.
 - extendedWaitUntil:
     visible: '2000 kcal left'
-    timeout: 10000
+    timeout: 30000
 - waitForAnimationToEnd:
     timeout: 8000
 - tapOn:

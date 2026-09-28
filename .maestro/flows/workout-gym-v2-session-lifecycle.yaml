@@ -148,8 +148,9 @@ tags:
 - extendedWaitUntil:
     visible: 'Complete set'
     timeout: 5000
-- tapOn: 'Weight'
+- tapOn: 'Weight input'
 - inputText: '42'
+- assertVisible: '42'
 - hideKeyboard
 - tapOn: 'Reps input'
 - inputText: '6'
