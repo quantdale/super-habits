@@ -26,14 +26,21 @@ A substantive unresolved product/recovery gate keeps this state red. Production 
 
 ## 2. CI
 
-**Current head — `16cb41a25cced14ba1f3c20b1815dc17c8506bc6` (main == origin/main).**
+**Green run — `36518073584` on `c1dc252` (push): completed SUCCESS.**
 
-| Run                 | Event               | Status    | Result                                                  |
-| ------------------- | ------------------- | --------- | ------------------------------------------------------- |
-| `36515963710` (CI)  | push                | in flight | exact-head evidence for task 6.2                        |
-| `36516000163` (iOS) | `workflow_dispatch` | in flight | the task 3.3 recertification run at this exact main SHA |
+| Job       | Status    | Conclusion  | Verdict                                         |
+| --------- | --------- | ----------- | ----------------------------------------------- |
+| `quality` | completed | **success** | pass                                            |
+| `e2e`     | completed | **success** | pass                                            |
+| `nightly` | completed | skipped     | not a pass, not a failure — expected for a push |
 
-**Superseded head — `4fa769e`: run `36515101194` completed CANCELLED, not green.**
+`c1dc252` is the tip that carries every product change in this change: the three iOS flow fixes, the regression test, and the `workflow_dispatch` lane. This run is **not** the exact-head record for whatever tip exists after this report is committed, because `ci.yml` declares `concurrency: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}` with `cancel-in-progress: true`, so the push that lands these documents starts a new run. Task 6.2 therefore stays **open**: it requires exact-head CI to complete on the final candidate SHA.
+
+**In flight — `36516000163`, iOS simulator E2E, `workflow_dispatch` on `16cb41a`.** This run is the task 3.3 recertification attempt. It was still `in_progress` when active monitoring was stopped at the operator's request, so **no iOS result exists and iOS is not certified**. `ios-native-e2e.yml` declares no concurrency group, so this run was never affected by later pushes and will still complete on its own; its result is simply not being awaited.
+
+**Superseded — `36515963710` on `16cb41a`: completed CANCELLED, not green.** `quality` had completed success; `e2e` finished cancelled. Cancelled by the same `cancel-in-progress` rule when a later push landed. Recorded as cancelled, not as evidence.
+
+**Superseded — `36515101194` on `4fa769e`: completed CANCELLED, not green.**
 
 | Job       | Result                       |
 | --------- | ---------------------------- |
@@ -41,7 +48,7 @@ A substantive unresolved product/recovery gate keeps this state red. Production 
 | `e2e`     | **cancelled** — not a pass   |
 | `nightly` | skipped, expected for a push |
 
-`4fa769e` carried the three iOS flow fixes. Pushing `16cb41a` (the `workflow_dispatch` change) while `36515101194` was still running caused GitHub to cancel its in-progress `e2e` job, so that run is not usable as exact-head evidence and is recorded as cancelled. The lesson is operational: a follow-up commit on the same branch supersedes the earlier run, so the final candidate SHA has to be fixed before its CI is treated as the record.
+`4fa769e` carried the three iOS flow fixes. It was cancelled when `16cb41a` landed. The lesson is operational: a follow-up commit on the same branch supersedes the earlier run, so the final candidate SHA has to be fixed before its CI is treated as the record.
 
 **Prior head — `575c403`: run `36449656365` completed success.**
 
