@@ -58,8 +58,13 @@ tags:
     text: 'Focus'
     childOf:
       text: 'Section tabs'
+# Focus marker: 'Start focus', a single-occurrence element that
+# pomodoro-lifecycle matched and passed on in the same run. The long
+# two-line subtitle it replaces was present, on screen, and still reported
+# not visible by Maestro in run 36423379932. Full evidence and the withdrawn
+# first attempt: openspec/changes/final-certification-closure/ios-flow-classification.md
 - extendedWaitUntil:
-    visible: 'Classic sequence: focus → short breaks → long break — durations saved on device.'
+    visible: 'Start focus'
     timeout: 10000
 - waitForAnimationToEnd:
     timeout: 8000

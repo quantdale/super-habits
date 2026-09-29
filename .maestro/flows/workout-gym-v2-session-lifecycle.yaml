@@ -151,7 +151,12 @@ tags:
 - tapOn: 'Weight input'
 - inputText: '42'
 - assertVisible: '42'
-- hideKeyboard
+# Enter-to-blur, not hideKeyboard: run 36423379932 failed at this exact step
+# with "Couldn't hide the keyboard." for this session's custom numeric inputs.
+# Weight-survival proof is unchanged: '42' here, and '42' + '6' again after
+# killApp/launchApp at 'Resume workout'. Evidence:
+# openspec/changes/final-certification-closure/ios-flow-classification.md
+- pressKey: enter
 - tapOn: 'Reps input'
 - inputText: '6'
 - waitForAnimationToEnd:

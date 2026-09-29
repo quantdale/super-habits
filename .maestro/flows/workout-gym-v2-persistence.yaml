@@ -160,18 +160,20 @@ tags:
 - tapOn: 'Linear'
 - waitForAnimationToEnd:
     timeout: 3000
-# Keep the scroll gesture within the expanded exercise card. The default
-# centered scroll failed to find the field and the failure screenshot showed
-# the underlying Workout screen on the exact-SHA run.
-- repeat:
-    times: 8
-    while:
-      notVisible: 'Native custom press progression increment'
-    commands:
-      - swipe:
-          start: '85%, 72%'
-          end: '85%, 25%'
-          duration: 300
+# UNPROVEN REPLACEMENT, pending task 3.3. Run 36423379932 (seq64-seq72)
+# reported all eight swipes COMPLETED and still failed: the failure hierarchy
+# held none of the exercise-card nodes, only the Workout landing cards. So the
+# old construct left the routine detail, but the artifact does not show which
+# gesture did it, nor that this scroll stays on the card. centerElement is
+# omitted on purpose: the comment this block replaced recorded that a centered
+# scroll already escaped to the Workout screen, and Maestro's default swipe is
+# still centred. Treat this as a hypothesis for the next exact-SHA run.
+# Evidence: openspec/changes/final-certification-closure/ios-flow-classification.md
+- scrollUntilVisible:
+    element: 'Native custom press progression increment'
+    direction: DOWN
+    visibilityPercentage: 50
+    timeout: 30000
 - assertVisible: 'Native custom press progression increment'
 - tapOn: 'Native custom press progression increment'
 - inputText: '2.5'
