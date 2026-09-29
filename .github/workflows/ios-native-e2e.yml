@@ -5,6 +5,12 @@ name: iOS simulator E2E (GitHub Actions)
 on:
   pull_request:
     types: [labeled, synchronize]
+  # Manual lane for main-only certification. The label-gated pull_request
+  # trigger above still works, but it needs a head branch, so a run started
+  # that way certifies a branch SHA rather than the main tip. This change's
+  # operator rule is main only, so the dispatch path pins github.sha and the
+  # existing exact-source assertions below verify it.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,13 +18,14 @@ permissions:
 jobs:
   ios-simulator:
     if: >-
-      contains(github.event.pull_request.labels.*.name, 'ios-simulator-gha') &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event_name == 'workflow_dispatch' ||
+      (contains(github.event.pull_request.labels.*.name, 'ios-simulator-gha') &&
+      github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: macos-15-intel
     timeout-minutes: 300
     env:
       CI: '1'
-      EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       # Expo SDK 55 needs Xcode 26.2+; the runner image defaults to 16.4.
       DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
       CODE_SIGNING_ALLOWED: 'NO'
@@ -30,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - uses: actions/setup-node@v4

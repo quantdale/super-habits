@@ -2,7 +2,7 @@
 
 Change: `final-certification-closure` · Prepared: 2026-09-29 · Schema: `spec-driven`
 
-> **Task 6.4 is not checked.** This draft is incomplete on its own terms: it cannot name the final candidate SHA, because task 6.2 (commit, fast-forward push, exact-head CI) has not run, and the spec's required identities include that SHA. It also cannot carry the full recovery / checksums / owner-isolation / migration-order / incident-separation / store-claims review that task 6.1 requires, which this change's own ordering places behind the production read-only verification (2.1, 2.2). Both must be closed before this is the published report. The residual blocks below are complete and are the part that does not depend on the missing evidence.
+> **Task 6.4 is not checked.** The final candidate SHA now exists — `4fa769e` — but this draft is still not the final published report for two reasons: exact-head CI run `36515101194` has not completed, and the spec's required review (task 6.1) is still gated behind the production read-only verification (2.1, 2.2) that this change's own ordering places first. Both must close before this is the published report. The residual blocks below are complete and are the part that does not depend on the missing evidence.
 
 ## Terminal state
 
@@ -12,20 +12,30 @@ A substantive unresolved product/recovery gate keeps this state red. Production 
 
 ## 1. Identities
 
-| Item                        | Value                                                                                                                                       |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Final candidate SHA         | **not established** — task 6.2 is open; this change is uncommitted, so no candidate exists yet                                              |
-| `HEAD` at apply time        | `575c4035e7b48e9d84df47f7a5f28dfcb14d7e27`                                                                                                  |
-| `origin/main` at apply time | `575c4035e7b48e9d84df47f7a5f28dfcb14d7e27` (identical, fast-forward clean)                                                                  |
-| Branch                      | `main` only; one worktree; no branch, tag, stash, or history rewrite was created                                                            |
-| Foreign stash               | `stash@{0}` `pre-recovery-local-changes` — preserved, never applied or dropped                                                              |
-| Tree state                  | 3 modified `.maestro/flows/*.yaml`, 1 new `tests/maestroIosFlowGuards.test.ts`, 1 new untracked change directory, 1 untracked local extract |
-| `.tmp-ios36423379932/`      | untracked, not committed, not deleted                                                                                                       |
-| Integration Node            | pinned `v22.23.2` used for every gate; ambient `v24.3.0` never ran a gate                                                                   |
+| Item                        | Value                                                                                                 |
+| --------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Final candidate SHA         | `4fa769e4c12b78a47f42f2137be1204b1725e705` — committed and pushed; exact-head CI in flight            |
+| `main` == `origin/main`     | `4fa769e` (fast-forward `575c403..4fa769e`, 0 ahead / 0 behind)                                       |
+| Base this change applied on | `575c4035e7b48e9d84df47f7a5f28dfcb14d7e27`                                                            |
+| Branch                      | `main` only; one worktree; no branch, tag, stash, or history rewrite was created                      |
+| Foreign stash               | `stash@{0}` `pre-recovery-local-changes` — preserved, never applied or dropped                        |
+| Tree state                  | clean at `4fa769e`; only `.tmp-ios36423379932/` is untracked, and it is gitignored at `.gitignore:81` |
+| `.tmp-ios36423379932/`      | untracked, never staged, never committed, never deleted                                               |
+| Integration Node            | pinned `v22.23.2` used for every gate; ambient `v24.3.0` never ran a gate                             |
 
 ## 2. CI
 
-GitHub run `36449656365` on `575c403` (push, "docs: record closing validation for external-blocker-closure"): **completed success**.
+**Exact head — run `36515101194` on `4fa769e` (push): IN PROGRESS at the time of writing.**
+
+| Job       | Result                       |
+| --------- | ---------------------------- |
+| `quality` | success                      |
+| `e2e`     | in progress                  |
+| `nightly` | skipped, expected for a push |
+
+Task 6.2 closes when this run completes and each job result is recorded here. Until then it is not closed.
+
+**Prior head — run `36449656365` on `575c403` (push): completed success.**
 
 | Job       | Result                                                     |
 | --------- | ---------------------------------------------------------- |
@@ -33,7 +43,7 @@ GitHub run `36449656365` on `575c403` (push, "docs: record closing validation fo
 | `e2e`     | success, including deterministic scenarios and `dist-sync` |
 | `nightly` | skipped, expected for a push                               |
 
-This is a documentation-only tip. It contains **no** production-schema, iOS, Android, or J8 result and certifies none of them. No exact-head CI exists for this change, because this change is not committed or pushed.
+`575c403` was a documentation-only tip. It contains **no** production-schema, iOS, Android, or J8 result and certifies none of them. The iOS workflow did not run on either head: `ios-native-e2e.yml` triggers only on `pull_request` with the `ios-simulator-gha` label, so a push to `main` cannot start it. See R1.
 
 ## 3. Production schema and historical manifests — RED, and the stated posture is unconfirmed
 
@@ -109,9 +119,9 @@ Every residual below carries `WHY`, `CLASSIFICATION`, `WHAT IS REQUIRED`, and `E
 ### R1 — iOS recertification
 
 - **WHY:** The three classified fixes are unproven, and no current-source iOS run exists.
-- **CLASSIFICATION:** EXECUTABLE, AWAITING OWNER PUSH AUTHORIZATION (task 3.2 also remains open on the persistence fix)
-- **WHAT IS REQUIRED:** Commit the three `.maestro/flows` edits, the new regression test, and this change's artifacts; fast-forward push to `main`; run the iOS workflow at that exact SHA; require build, executable hash, install, launch, and 13/13 flow passes.
-- **EXACT RESUME ACTION:** `git add .maestro/flows tests/maestroIosFlowGuards.test.ts openspec/changes/final-certification-closure && git commit`, then `git push origin main` (fast-forward only), then `gh workflow run <ios-workflow> --ref main` and `gh run watch <id>`. Compare the new artifact's flow statuses against the three classified flows. A first attempt may still fail; if it does, re-read the new artifact before changing anything.
+- **CLASSIFICATION:** BLOCKED — THE WORKFLOW CANNOT BE TRIGGERED FROM `main` (task 3.2 also remains open on the persistence fix)
+- **WHAT IS REQUIRED:** The commit and push are DONE: 16 files as `4fa769e`, fast-forwarded, `main` == `origin/main`. What is still required is a runnable path. `.github/workflows/ios-native-e2e.yml` declares only `on: pull_request: types: [labeled, synchronize]`, its job is gated on the `ios-simulator-gha` label, and it has no `workflow_dispatch`; run `36423379932` was likewise a `pull_request` run from `codex/external-blocker-closure`. A push to `main` therefore cannot start it. Either a labelled PR is opened (needs a head branch, and would certify a SHA that is not the `main` tip) or a `workflow_dispatch` trigger is added and the job gate plus `EXPECTED_SOURCE_SHA` are adapted for dispatch events, which changes a release-gate workflow and needs an owner decision. Then require build, executable hash, install, launch, and 13/13 flow passes.
+- **EXACT RESUME ACTION:** Take the owner's chosen route, then re-read the new artifact and compare its flow statuses against the three classified flows before changing anything — do not assume a fix held. A first attempt may still fail, especially for the persistence scroll, which is an untested hypothesis.
 
 ### R2 — Production read-only verification
 
@@ -123,9 +133,9 @@ Every residual below carries `WHY`, `CLASSIFICATION`, `WHAT IS REQUIRED`, and `E
 ### R3 — Production DDL rollout
 
 - **WHY:** The three missing migrations leave production backup scope behind local.
-- **CLASSIFICATION:** OWNER_APPROVAL_REQUIRED
-- **WHAT IS REQUIRED:** One explicit approval naming the project `kruubbynsmxzxfdunaal`, the exact three migrations `20260824010000`, `20260824020000`, `20260925125655` in that order, a named proven-restorable `public` + `auth` recovery point, and acceptance of the verification procedure in `production-approval-packet.md` §6.
-- **EXACT RESUME ACTION:** Prove the recovery point first. Then dry-run and confirm the only three migrations appear, in order; any drift or surprise stops the write and updates the packet. Apply, then verify schema, RLS, grants, indexes, advisors, and a cleaned-up synthetic decimal Restore V2 with checksums **enabled and unmodified**. Audit each historical manifest cohort without rewriting manifests or weakening checksums.
+- **CLASSIFICATION:** OWNER_APPROVAL_GRANTED_BUT_NOT_EXECUTABLE
+- **WHAT IS REQUIRED:** Authorization is no longer the blocker — the owner granted the project `superhabits` / `kruubbynsmxzxfdunaal` and the exact three migrations `20260824010000`, `20260824020000`, `20260925125655` in that order. The binding blockers are a production credential (absent) and a named proven-restorable `public` + `auth` recovery point, which does not exist and cannot be proven without the credential. The grant also omits acceptance of the verification procedure in `production-approval-packet.md` §6, which this change's own terms require alongside the project and migrations. The owner's own precondition — that the live catalog and a proven recovery point exist first — is unmet. Task 2.2's stop condition (missing recovery point) is therefore active.
+- **EXACT RESUME ACTION:** Supply the credential, then **prove the recovery point first** — do not apply DDL on the way in. Re-verify the live catalog read-only and compare it against `production-approval-packet.md` §3; if it has drifted from the 2026-09-28 hypothesis, stop and update the packet. Then dry-run and confirm the only three migrations appear, in order. Apply, then verify schema, RLS, grants, indexes, advisors, and a cleaned-up synthetic decimal Restore V2 with checksums **enabled and unmodified**. Audit each historical manifest cohort without rewriting manifests or weakening checksums.
 
 ### R4 — Historical numeric precision
 

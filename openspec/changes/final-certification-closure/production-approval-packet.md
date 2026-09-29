@@ -1,8 +1,20 @@
 # Production schema rollout — owner approval packet
 
-**Classification: `OWNER_APPROVAL_REQUIRED`. Nothing in this packet has been executed.**
+**Classification: `OWNER_APPROVAL_GRANTED_BUT_NOT_EXECUTABLE`. Nothing in this packet has been executed.**
 
 Produced by OpenSpec change `final-certification-closure`, task 2.3, which requires that, absent explicit approval, the approval packet is written and the write is marked `OWNER_APPROVAL_REQUIRED` **without mutating production**. No production SQL was run. No production object was created, altered, or dropped.
+
+## 0. Approval status as of 2026-09-29
+
+The owner granted DDL approval, naming the project and the three migrations. The grant is **recorded and is not executed**, for three independent reasons:
+
+1. **No production credential exists in this environment.** The same questionnaire answer that carried the grant also chose to leave production blocked for read-only access. `psql` returns `fe_sendauth: no password supplied`, the Supabase CLI SQL paths require an interactive password, and no Supabase MCP server is configured. Without a connection there is no way to apply a migration, take a recovery point, or even confirm the live catalog.
+2. **The grant is incomplete against this change's own terms.** Section 8 of this packet requires an approval to name four things: the project, the three migrations, **a named proven-restorable recovery point**, and acceptance of the verification procedure. The grant names the first two. The recovery point does not exist yet and cannot be proven without the credential, and acceptance of section 6 was not given.
+3. **The owner's own stated precondition is unmet.** Alongside the grant, the owner recorded that DDL approval for 2.4 "waits until that live catalog and a proven `public` plus `auth` recovery point exist," and that "the 2026-09-28 hypothesis is not enough." Neither precondition is satisfied, and this change's design (Decision 4) says the same.
+
+Task 2.2 independently mandates the stop: prove a restorable `public` and `auth` recovery point and **stop DDL** on drift, a missing recovery point, or any dry-run migration other than the exact three files in order. The recovery point is unproven, so the stop condition is active.
+
+**What this means practically:** the grant removes authorization as the blocker for 2.4. The credential and the recovery point remain blockers, and they are the binding ones. To execute, supply a production credential; the first action after connecting is to prove the recovery point, not to apply DDL. If the live catalog has drifted from section 3's hypothesis, or if a dry run shows anything other than these three files in this order, stop and update this packet before any write.
 
 ## 1. Why this packet exists
 
