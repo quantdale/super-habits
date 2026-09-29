@@ -12,30 +12,38 @@ A substantive unresolved product/recovery gate keeps this state red. Production 
 
 ## 1. Identities
 
-| Item                        | Value                                                                                                 |
-| --------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Final candidate SHA         | `4fa769e4c12b78a47f42f2137be1204b1725e705` — committed and pushed; exact-head CI in flight            |
-| `main` == `origin/main`     | `4fa769e` (fast-forward `575c403..4fa769e`, 0 ahead / 0 behind)                                       |
-| Base this change applied on | `575c4035e7b48e9d84df47f7a5f28dfcb14d7e27`                                                            |
-| Branch                      | `main` only; one worktree; no branch, tag, stash, or history rewrite was created                      |
-| Foreign stash               | `stash@{0}` `pre-recovery-local-changes` — preserved, never applied or dropped                        |
-| Tree state                  | clean at `4fa769e`; only `.tmp-ios36423379932/` is untracked, and it is gitignored at `.gitignore:81` |
-| `.tmp-ios36423379932/`      | untracked, never staged, never committed, never deleted                                               |
-| Integration Node            | pinned `v22.23.2` used for every gate; ambient `v24.3.0` never ran a gate                             |
+| Item                        | Value                                                                                                                                   |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Final candidate SHA         | `16cb41a25cced14ba1f3c20b1815dc17c8506bc6` — committed, pushed, and pinned as the head both open runs certify                           |
+| `main` == `origin/main`     | `16cb41a` (fast-forward `575c403..4fa769e..16cb41a`, 0 ahead / 0 behind)                                                                |
+| Superseded head             | `4fa769e4c12b78a47f42f2137be1204b1725e705` — carried the three iOS flow fixes; its CI `36515101194` was cancelled by the follow-up push |
+| Base this change applied on | `575c4035e7b48e9d84df47f7a5f28dfcb14d7e27`                                                                                              |
+| Branch                      | `main` only; one worktree; no branch, tag, stash, or history rewrite was created                                                        |
+| Foreign stash               | `stash@{0}` `pre-recovery-local-changes` — preserved, never applied or dropped                                                          |
+| Tree state                  | clean at `16cb41a`; only `.tmp-ios36423379932/` is untracked, and it is gitignored at `.gitignore:81`                                   |
+| `.tmp-ios36423379932/`      | untracked, never staged, never committed, never deleted                                                                                 |
+| Integration Node            | pinned `v22.23.2` used for every gate; ambient `v24.3.0` never ran a gate                                                               |
 
 ## 2. CI
 
-**Exact head — run `36515101194` on `4fa769e` (push): IN PROGRESS at the time of writing.**
+**Current head — `16cb41a25cced14ba1f3c20b1815dc17c8506bc6` (main == origin/main).**
+
+| Run                 | Event               | Status    | Result                                                  |
+| ------------------- | ------------------- | --------- | ------------------------------------------------------- |
+| `36515963710` (CI)  | push                | in flight | exact-head evidence for task 6.2                        |
+| `36516000163` (iOS) | `workflow_dispatch` | in flight | the task 3.3 recertification run at this exact main SHA |
+
+**Superseded head — `4fa769e`: run `36515101194` completed CANCELLED, not green.**
 
 | Job       | Result                       |
 | --------- | ---------------------------- |
 | `quality` | success                      |
-| `e2e`     | in progress                  |
+| `e2e`     | **cancelled** — not a pass   |
 | `nightly` | skipped, expected for a push |
 
-Task 6.2 closes when this run completes and each job result is recorded here. Until then it is not closed.
+`4fa769e` carried the three iOS flow fixes. Pushing `16cb41a` (the `workflow_dispatch` change) while `36515101194` was still running caused GitHub to cancel its in-progress `e2e` job, so that run is not usable as exact-head evidence and is recorded as cancelled. The lesson is operational: a follow-up commit on the same branch supersedes the earlier run, so the final candidate SHA has to be fixed before its CI is treated as the record.
 
-**Prior head — run `36449656365` on `575c403` (push): completed success.**
+**Prior head — `575c403`: run `36449656365` completed success.**
 
 | Job       | Result                                                     |
 | --------- | ---------------------------------------------------------- |
@@ -43,7 +51,7 @@ Task 6.2 closes when this run completes and each job result is recorded here. Un
 | `e2e`     | success, including deterministic scenarios and `dist-sync` |
 | `nightly` | skipped, expected for a push                               |
 
-`575c403` was a documentation-only tip. It contains **no** production-schema, iOS, Android, or J8 result and certifies none of them. The iOS workflow did not run on either head: `ios-native-e2e.yml` triggers only on `pull_request` with the `ios-simulator-gha` label, so a push to `main` cannot start it. See R1.
+`575c403` was a documentation-only tip and certifies no production, iOS, Android, or J8 result. The iOS workflow did not run on `575c403` or `4fa769e`: `ios-native-e2e.yml` triggered only on `pull_request` with the `ios-simulator-gha` label, so a push to `main` could not start it. It now also accepts `workflow_dispatch`, which is how `36516000163` was started against the main tip.
 
 ## 3. Production schema and historical manifests — RED, and the stated posture is unconfirmed
 
