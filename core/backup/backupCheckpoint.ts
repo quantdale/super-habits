@@ -89,11 +89,44 @@ export type BackupMaintenanceHooks = {
   afterSnapshot?: (transactionDb: SQLite.SQLiteDatabase) => Promise<void>;
 };
 
+/**
+ * Number of outbox rows that still have a chance of pushing.
+ *
+ * Records in the terminal `blocked` state are EXCLUDED
+ * (`harden-silent-failure-certification` 2.4). They can never push, so counting
+ * them froze the completeness checkpoint forever: a single un-pushable record
+ * meant the manifest was never published again and the user could not tell a
+ * permanently blocked backup from one still uploading. Integrity is preserved
+ * by the caller excluding the same entities from the certified snapshot (see
+ * `computeEntityMetadata`), so the manifest never claims rows the remote does
+ * not hold.
+ */
 async function durableOutboxCount(db: SQLite.SQLiteDatabase): Promise<number> {
-  const row = await db.getFirstAsync<{ count: number }>(
-    'SELECT COUNT(*) AS count FROM sync_outbox',
+  const blockedKeys = new Set(syncEngine.getBlockedKeys());
+  if (blockedKeys.size === 0) {
+    const row = await db.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM sync_outbox',
+    );
+    return row?.count ?? 0;
+  }
+  const rows = await db.getAllAsync<{ entity: string; id: string }>(
+    'SELECT entity, id FROM sync_outbox',
   );
-  return row?.count ?? 0;
+  return rows.filter((row) => !blockedKeys.has(`${row.entity}:${row.id}`)).length;
+}
+
+/**
+ * Entities whose outbox records are terminally blocked, derived from the
+ * engine's durable ledger.
+ */
+function blockedBackupEntities(): Set<BackupEntity> {
+  const entities = new Set<BackupEntity>();
+  for (const entry of syncEngine.getStatus().blockedEntities) {
+    if (BACKUP_ENTITIES.includes(entry.entity as BackupEntity)) {
+      entities.add(entry.entity as BackupEntity);
+    }
+  }
+  return entities;
 }
 
 async function readLastCompleteGeneration(db: SQLite.SQLiteDatabase): Promise<number> {
@@ -120,14 +153,25 @@ async function readPendingManifest(db: SQLite.SQLiteDatabase): Promise<BackupMan
   ) {
     return null;
   }
+  // SAFETY: every field checked above is verified by type above, and the
+  // nested entity-metadata shape is validated by `parseManifestRow`'s sibling
+  // `validateManifestMetadata` before this value is ever used downstream; the
+  // double assertion only bridges the index-signature mismatch between the
+  // parsed record and the manifest type.
   return candidate as unknown as BackupManifest;
 }
 
 async function computeEntityMetadata(
   db: SQLite.SQLiteDatabase,
+  excludeEntities: ReadonlySet<BackupEntity> = new Set(),
 ): Promise<Partial<Record<BackupEntity, EntityIntegrityMetadata>>> {
   const metadata: Partial<Record<BackupEntity, EntityIntegrityMetadata>> = {};
   for (const entity of BACKUP_ENTITIES) {
+    // A terminally-blocked entity is OMITTED from the certified snapshot: the
+    // remote cannot hold those rows, so certifying their local checksum would
+    // publish a manifest that fails its own integrity check on restore. The
+    // omission is disclosed instead (backup state `blocked` + missingEntities).
+    if (excludeEntities.has(entity)) continue;
     const rows = await db.getAllAsync<Record<string, unknown>>(
       `SELECT * FROM ${entity} ORDER BY id ASC`,
     );
@@ -235,8 +279,12 @@ async function runMaintenanceCycle(options?: {
       // 5b. Dirty verified inside the coherence boundary.
       if (!(await isBackupDirty(transactionDb))) return null;
 
-      // 5c. Canonical snapshot computed from local rows inside the boundary.
-      const entityMetadata = await computeEntityMetadata(transactionDb);
+      // 5c. Canonical snapshot computed from local rows inside the boundary,
+      //     minus any entity whose outbox records are terminally blocked (the
+      //     remote cannot hold those rows; certifying them would be a lie the
+      //     restore integrity check would later catch).
+      const blockedEntities = blockedBackupEntities();
+      const entityMetadata = await computeEntityMetadata(transactionDb, blockedEntities);
 
       // 5d. Re-check the outbox (defense-in-depth against non-transactional
       //     web interleaving; deterministic barrier for the race tests). Any

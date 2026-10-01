@@ -1,6 +1,17 @@
 import { SupabaseSyncAdapter } from '@/core/sync/supabase.adapter';
 import { SqliteSyncPersistence } from '@/core/sync/syncPersistence';
 import { SyncPushPartialFailureError } from '@/core/sync/syncErrors';
+import {
+  applyOutboxFailure,
+  blockedOutboxKeys,
+  clearOutboxAttempt,
+  classifyOutboxFailure as classifyFailure,
+  describeBlockedOutbox,
+  outboxAttemptKey,
+  type OutboxAttemptLedger,
+  type OutboxFailureClass,
+  type OutboxPersistentFailureClass,
+} from '@/core/sync/outboxAttempts';
 
 export type SyncRecord = {
   entity: string;
@@ -37,6 +48,16 @@ export type SyncStatus = {
   consecutiveFailures: number;
   lastErrorMessage: string | null;
   nextRetryAt: string | null;
+  /** Entities whose outbox records can never push, with the reason. */
+  blockedEntities: BlockedOutboxSummary[];
+};
+
+export type BlockedOutboxSummary = {
+  entity: string;
+  id: string;
+  class: OutboxPersistentFailureClass;
+  reason: string;
+  at: string;
 };
 
 export const INITIAL_SYNC_STATUS: SyncStatus = {
@@ -44,6 +65,7 @@ export const INITIAL_SYNC_STATUS: SyncStatus = {
   consecutiveFailures: 0,
   lastErrorMessage: null,
   nextRetryAt: null,
+  blockedEntities: [],
 };
 
 /** Durable storage for the outbox/status so a killed process doesn't lose pending records. */
@@ -57,6 +79,14 @@ export interface SyncPersistence {
   removeOutbox?(records: SyncRecord[]): Promise<void>;
   loadStatus(): Promise<SyncStatus | null>;
   saveStatus(status: SyncStatus): Promise<void>;
+  /**
+   * Durable per-record attempt ledger for the terminal outbox classification
+   * (`core/sync/outboxAttempts.ts`). Optional so simple test adapters and
+   * `NoopSyncPersistence` need not implement it: without these the engine
+   * retries every record forever, which is the pre-change behavior.
+   */
+  loadAttemptLedger?(): Promise<OutboxAttemptLedger>;
+  saveAttemptLedger?(ledger: OutboxAttemptLedger): Promise<void>;
 }
 
 export class NoopSyncPersistence implements SyncPersistence {
@@ -86,6 +116,22 @@ function dedupeKey(record: SyncRecord): string {
   return `${record.entity}:${record.id}`;
 }
 
+/** True when the record is in the terminal state in the given ledger. */
+function isBlockedIn(
+  ledger: OutboxAttemptLedger,
+  record: Pick<SyncRecord, 'entity' | 'id'>,
+): boolean {
+  return ledger[`${record.entity}:${record.id}`]?.blocked != null;
+}
+
+/**
+ * Classify a push failure for the terminal outbox state. Split out so the
+ * engine's flush path stays a readable requeue decision.
+ */
+function classifyOutboxFailure(error: unknown): OutboxFailureClass {
+  return classifyFailure(error);
+}
+
 export class SyncEngine {
   constructor(
     private readonly adapter: SyncAdapter = new NoopSyncAdapter(),
@@ -96,21 +142,44 @@ export class SyncEngine {
   private readonly revisions = new Map<string, number>();
   private nextRevision = 0;
   private status: SyncStatus = { ...INITIAL_SYNC_STATUS };
+  private attemptLedger: OutboxAttemptLedger = {};
   private flushing: Promise<void> | null = null;
   private persistenceTail: Promise<void> = Promise.resolve();
 
+  /**
+   * Durable per-record attempt ledger, loaded with the outbox so a terminal
+   * verdict survives a restart. A record that was blocked before the process
+   * died stays blocked instead of retrying from zero forever.
+   */
+  getAttemptLedger(): OutboxAttemptLedger {
+    return { ...this.attemptLedger };
+  }
+
+  /** Outbox keys currently in the terminal state (can never push). */
+  getBlockedKeys(): string[] {
+    return blockedOutboxKeys(this.attemptLedger);
+  }
+
+  /** True when this record reached the terminal state and is not retried. */
+  isBlocked(record: Pick<SyncRecord, 'entity' | 'id'>): boolean {
+    return this.attemptLedger[outboxAttemptKey(record)]?.blocked != null;
+  }
+
   /** Loads the persisted outbox/status. Call once during app bootstrap, before the first flush. */
   async hydrate(): Promise<void> {
-    const [outbox, status] = await Promise.all([
+    const [outbox, status, ledger] = await Promise.all([
       this.persistence.loadOutbox(),
       this.persistence.loadStatus(),
+      this.persistence.loadAttemptLedger?.() ?? Promise.resolve<OutboxAttemptLedger>({}),
     ]);
     for (const record of outbox) {
       const revision = record.revision ?? ++this.nextRevision;
       this.nextRevision = Math.max(this.nextRevision, revision);
       this.replaceOrAppend(record, revision);
     }
-    if (status) this.status = status;
+    if (status) this.status = { ...status, blockedEntities: status.blockedEntities ?? [] };
+    if (ledger) this.attemptLedger = ledger;
+    this.refreshBlockedEntities();
   }
 
   getStatus(): SyncStatus {
@@ -255,6 +324,12 @@ export class SyncEngine {
     try {
       await this.adapter.push(snapshot);
       await this.persistRemoval(snapshotWithRevisions);
+      // A record that pushed clears its attempt streak, so a future failure
+      // must earn its own bound instead of inheriting old attempts.
+      let ledger = this.attemptLedger;
+      for (const record of snapshot) ledger = clearOutboxAttempt(ledger, record);
+      this.attemptLedger = ledger;
+      this.persistAttemptLedger();
       this.recordSuccess();
     } catch (error) {
       const failedRecords =
@@ -276,9 +351,26 @@ export class SyncEngine {
       }
       // Anything not reported as failed succeeded and should stay dropped;
       // only the actually-failed records go back, ahead of anything enqueued
-      // while this flush was in flight.
+      // while this flush was in flight. Records that reached the TERMINAL state
+      // (a persistent failure past the attempt bound) are NOT requeued: they
+      // can never push, and requeueing them is what froze the completeness
+      // checkpoint forever.
+      const failureClass = classifyOutboxFailure(error);
+      const nowIso = new Date().toISOString();
+      let ledger = this.attemptLedger;
+      const newlyBlocked: string[] = [];
+      for (const failed of failedRecords) {
+        const applied = applyOutboxFailure(ledger, failed, failureClass, nowIso);
+        ledger = applied.ledger;
+        if (applied.blockedNow) newlyBlocked.push(outboxAttemptKey(failed));
+      }
       const currentKeys = new Set(this.queue.map(dedupeKey));
-      const retryRecords = failedRecords.filter((record) => !currentKeys.has(dedupeKey(record)));
+      const retryRecords = failedRecords.filter(
+        (record) => !currentKeys.has(dedupeKey(record)) && !isBlockedIn(ledger, record),
+      );
+      const terminal = failedRecords.filter(
+        (record) => !currentKeys.has(dedupeKey(record)) && isBlockedIn(ledger, record),
+      );
       this.queue = [...retryRecords, ...this.queue];
       for (const failed of retryRecords) {
         const original = snapshotWithRevisions.find(
@@ -286,14 +378,47 @@ export class SyncEngine {
         );
         if (original) this.revisions.set(dedupeKey(failed), original.revision ?? 0);
       }
+      this.attemptLedger = ledger;
+      this.persistAttemptLedger();
+      this.refreshBlockedEntities();
+      if (terminal.length > 0 || newlyBlocked.length > 0) {
+        console.warn(
+          `[sync] ${newlyBlocked.length} outbox record(s) can never push and are now blocked (${failureClass}): ${[...new Set([...newlyBlocked, ...terminal.map(dedupeKey)])].join(', ')}. They stay out of the retry queue and are reported in backup status.`,
+        );
+      }
       this.recordFailure(error);
       throw error;
     }
     await this.persistenceTail;
   }
 
+  /** True when `record` is blocked in the GIVEN ledger (not yet the field). */
+  private isBlockedIn(
+    ledger: OutboxAttemptLedger,
+    record: Pick<SyncRecord, 'entity' | 'id'>,
+  ): boolean {
+    return ledger[outboxAttemptKey(record)]?.blocked != null;
+  }
+
+  private persistAttemptLedger(): void {
+    const saveAttemptLedger = this.persistence.saveAttemptLedger?.bind(this.persistence);
+    if (!saveAttemptLedger) return;
+    const snapshot = { ...this.attemptLedger };
+    // `schedulePersistence` is the existing fire-and-forget convention: a
+    // ledger write must never fail a flush, but a lost write only costs the
+    // terminal verdict (the record simply retries).
+    this.schedulePersistence(() => saveAttemptLedger(snapshot));
+  }
+
+  /** Recompute the user-facing blocked summary from the ledger. */
+  private refreshBlockedEntities(): void {
+    const blocked = describeBlockedOutbox(this.attemptLedger);
+    this.status = { ...this.status, blockedEntities: blocked };
+  }
+
   private recordSuccess(): void {
     this.status = {
+      ...this.status,
       lastSuccessAt: new Date().toISOString(),
       consecutiveFailures: 0,
       lastErrorMessage: null,

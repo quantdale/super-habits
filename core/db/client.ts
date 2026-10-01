@@ -5,6 +5,15 @@ import { timestampToLocalDateKey, toDateKey } from '@/lib/time';
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
+/**
+ * The schema version the migration chain must land on. Declared once and
+ * asserted after `runMigrations` completes, so a block that silently fails to
+ * apply cannot leave the database reporting an older version forever (which
+ * would re-enter that block on the next launch, including the destructive
+ * block-6 ordering backfill). Bump this with every appended migration block.
+ */
+const EXPECTED_SCHEMA_VERSION = 25;
+
 const bootstrapStatements = [
   ...(Platform.OS === 'web' ? [] : ['PRAGMA journal_mode = WAL;']),
   `CREATE TABLE IF NOT EXISTS todos (
@@ -136,9 +145,19 @@ async function applyMigration(
 async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   const schemaVersion = await getAppMetaText(db, appMetaKeys.dbSchemaVersion);
   // A corrupted/non-numeric stored version must not silently skip every
-  // migration block: every block is idempotent, so re-running from 0 is the
-  // safe recovery instead of a cold start that crashes on missing columns.
-  const parsedVersion = schemaVersion ? parseInt(schemaVersion, 10) : 0;
+  // migration block. Re-running from 0 was the old "safe recovery", but block
+  // 6 REWRITES user-authored todo ordering, so a re-run is destructive and the
+  // recovery has to be earned, not asserted: a populated database with an
+  // unreadable version is a loud failure, and only a genuinely empty one may be
+  // treated as a fresh install.
+  const parsedVersion = schemaVersion === null ? 0 : parseInt(schemaVersion, 10);
+  if (schemaVersion !== null && !Number.isFinite(parsedVersion) && (await hasUserData(db))) {
+    throw new Error(
+      `Refusing to migrate: app_meta.db_schema_version is '${schemaVersion}', which is not a number, and this database holds user data. ` +
+        `Re-running the migration chain would rewrite todo ordering (block 6). ` +
+        `Restore a backup, or delete the database to start fresh — do not hand-edit the stored version.`,
+    );
+  }
   const version = Number.isFinite(parsedVersion) ? parsedVersion : 0;
   if (version < 2) {
     await applyMigration(db, 2, async () => {
@@ -168,17 +187,28 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     });
   }
   if (version < 6) {
+    // The backfill REWRITES user-authored todo ordering, so it must run only
+    // when the ordering column is actually being added. Without this guard a
+    // re-run of the chain would collapse a user's manual sort back to creation
+    // order. This mirrors the `addedSortOrder` guard migration 24 already uses.
+    const addedSortOrder = await addColumnIfMissing(
+      db,
+      'todos',
+      'sort_order',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
     await applyMigration(db, 6, async () => {
       await addColumnIfMissing(db, 'todos', 'due_date', 'TEXT');
       await addColumnIfMissing(db, 'todos', 'priority', "TEXT NOT NULL DEFAULT 'normal'");
-      await addColumnIfMissing(db, 'todos', 'sort_order', 'INTEGER NOT NULL DEFAULT 0');
-      await db.runAsync(
-        `UPDATE todos SET sort_order = (
-           SELECT COUNT(*) FROM todos t2
-           WHERE t2.created_at <= todos.created_at
-             AND t2.deleted_at IS NULL
-         ) WHERE deleted_at IS NULL`,
-      );
+      if (addedSortOrder) {
+        await db.runAsync(
+          `UPDATE todos SET sort_order = (
+             SELECT COUNT(*) FROM todos t2
+             WHERE t2.created_at <= todos.created_at
+               AND t2.deleted_at IS NULL
+           ) WHERE deleted_at IS NULL`,
+        );
+      }
     });
   }
   if (version < 7) {
@@ -995,6 +1025,26 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
       `);
     });
   }
+
+  // The chain must have LANDED on the expected head. A block that silently did
+  // not apply (a swallowed error, a renamed key) would leave a database that
+  // reports an old version forever, and the next run would re-enter that block
+  // — including the destructive one. Assert the head instead of assuming it.
+  const headVersion = await getAppMetaText(db, appMetaKeys.dbSchemaVersion);
+  if (parseInt(headVersion ?? '0', 10) !== EXPECTED_SCHEMA_VERSION) {
+    throw new Error(
+      `Migration chain did not reach the expected schema version ${EXPECTED_SCHEMA_VERSION} (found ${headVersion ?? 'none'}).`,
+    );
+  }
+}
+
+/** True when the database holds anything a re-run of the chain could rewrite. */
+async function hasUserData(db: SQLite.SQLiteDatabase): Promise<boolean> {
+  for (const table of ['todos', 'habits', 'calorie_entries']) {
+    const row = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table}`);
+    if ((row?.count ?? 0) > 0) return true;
+  }
+  return false;
 }
 
 async function openAndBootstrap(): Promise<SQLite.SQLiteDatabase> {

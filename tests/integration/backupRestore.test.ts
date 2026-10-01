@@ -98,6 +98,8 @@ type UpsertCall = { entity: string; rows: Record<string, unknown>[] };
 
 function buildRecordingSupabase() {
   const upserted: UpsertCall[] = [];
+  /** Rows this fake remote stores, so the push read-back can verify them. */
+  const stored = new Map<string, Map<string, Record<string, unknown>>>();
   const from = vi.fn((entity: string) => {
     if (transactionOpen.value) {
       throw new Error('network call issued inside an open SQLite transaction');
@@ -106,8 +108,26 @@ function buildRecordingSupabase() {
       upsert: vi.fn(async (rows: Record<string, unknown>[]) => {
         const rowList = Array.isArray(rows) ? rows : [rows];
         upserted.push({ entity, rows: rowList });
+        const table = stored.get(entity) ?? new Map<string, Record<string, unknown>>();
+        for (const row of rowList) table.set(String(row.id), row);
+        stored.set(entity, table);
         return { error: null };
       }),
+      // Push verification read-back (harden-silent-failure-certification 3.1):
+      // a read that is issued inside the import transaction must still throw
+      // above, which is exactly what the guarded-restore test asserts.
+      select: vi.fn((_columns: string) => ({
+        in: vi.fn((_column: string, ids: string[]) => ({
+          eq: vi.fn(async (_eqColumn: string, value: string) => ({
+            data: ids
+              .map((id) => stored.get(entity)?.get(id))
+              .filter((row): row is Record<string, unknown> => row !== undefined)
+              .filter((row) => row.user_id === value || row.user_id === undefined)
+              .map((row) => ({ id: row.id })),
+            error: null,
+          })),
+        })),
+      })),
       delete: vi.fn(() => ({
         in: vi.fn(() => ({
           eq: vi.fn(async () => ({ error: null })),
@@ -1244,6 +1264,87 @@ describe('backup completeness v2 restore', () => {
     expect(result).toMatchObject({ status: 'legacy' });
     await expectZeroImportedRows(targetDb);
     await targetDb.closeAsync();
+  });
+
+  it('never classifies an EMPTY error message as legacy (task 1.2)', async () => {
+    // The proxy that started this whole change: it swallows the body, so both
+    // the manifest fetch and the capability probe fail with an EMPTY message.
+    // The previous code called that "missing tables" and downgraded a complete
+    // V2 backup to a three-entity restore reported as success.
+    const remote = await publishSourceBackup();
+    const serving = buildServingSupabase(remote, {
+      failEntity: ['backup_manifest', 'user_backup_settings'],
+      failEntityMessage: '',
+    });
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+
+    const { restoreFromRemoteBackupV2, isMissingV2RemoteTableError } =
+      await import('@/core/backup/backupRestore');
+    // The classifier itself refuses an empty message outright.
+    expect(isMissingV2RemoteTableError(new Error(''))).toBe(false);
+    expect(isMissingV2RemoteTableError('   ')).toBe(false);
+
+    const result = await restoreFromRemoteBackupV2();
+    // Not legacy, and not a fabricated success either: a classified failure
+    // whose diagnostics say the remote's answer was not usable evidence.
+    expect(result.status).not.toBe('legacy');
+    expect(result).toMatchObject({ status: 'invalid', reason: 'fetch_failed' });
+    if (result.status === 'invalid') {
+      expect(result.diagnostics.join(' ')).toMatch(/UNKNOWN|unknown|empty/i);
+    }
+    await expectZeroImportedRows(targetDb);
+    await targetDb.closeAsync();
+  });
+
+  it('reports backup state as UNKNOWN, not v1_legacy, when the manifest fetch fails (task 1.3)', async () => {
+    // The Settings screen used to say "Only the legacy V1 backup exists" during
+    // an outage, which is a false statement about a complete V2 backup.
+    const remote = await publishSourceBackup();
+    const serving = buildServingSupabase(remote, {
+      failEntity: 'backup_manifest',
+      failEntityMessage: 'Failed to fetch',
+    });
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+
+    const { getBackupStateSummary } = await import('@/core/backup/backupRestore');
+    const summary = await getBackupStateSummary('user_a');
+    expect(summary.state).not.toBe('v1_legacy');
+    expect(summary.state).toBe('unknown');
+    await targetDb.closeAsync();
+  });
+
+  it('still reports v1_legacy when the remote genuinely lacks the V2 tables', async () => {
+    // The non-vacuity control for the two cases above: when the remote really
+    // answers "these tables do not exist", legacy remains the correct state.
+    const remote = await publishSourceBackup();
+    remote.delete('backup_manifest');
+    const serving = buildServingSupabase(remote, {
+      failEntity: ['backup_manifest', 'user_backup_settings'],
+      failEntityMessage: 'relation "public.backup_manifest" does not exist',
+    });
+    installSupabaseMock(serving.supabase);
+    const targetDb = await freshDatabase();
+
+    const { getBackupStateSummary } = await import('@/core/backup/backupRestore');
+    const summary = await getBackupStateSummary('user_a');
+    expect(summary.state).toBe('v1_legacy');
+    await targetDb.closeAsync();
+  });
+
+  it('describes per-entity restored counts for the success report (task 1.6)', async () => {
+    const { describeRestoredCounts, totalRestoredCount } =
+      await import('@/core/backup/backupRestore');
+    const rows = describeRestoredCounts({ todos: 3, habits: 0, projects: 2, settings: 5 });
+    // Zero-count and non-entity keys are dropped; real counts are labeled.
+    expect(rows).toEqual([
+      { entity: 'todos', label: 'Todos', count: 3 },
+      { entity: 'projects', label: 'Projects', count: 2 },
+    ]);
+    expect(totalRestoredCount({ todos: 3, projects: 2 })).toBe(5);
+    expect(describeRestoredCounts(null)).toEqual([]);
+    expect(totalRestoredCount(null)).toBe(0);
   });
 });
 

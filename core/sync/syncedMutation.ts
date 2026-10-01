@@ -28,6 +28,15 @@ export type SyncedMutationOutcome<T> = {
  * pristine. A missing/expired session must never block a SQLite write, so
  * `null` is a valid result (the outbox row stays unowned until the owner is
  * established, mirroring `runSyncedMutation`).
+ *
+ * SAFETY: an UNPRIMED cache (`undefined` — the process has not read the owner
+ * yet) is treated exactly like a known-empty one, so the pristine-dataset check
+ * runs on every path that does not already have a confirmed owner. The old
+ * check only ran for the explicit `null` case, so a device holding real user
+ * data with an unprimed cache skipped the check entirely and stamped its new
+ * intents with whichever account happened to be current — silently rebinding
+ * local data to a wrong account, which is the exact outcome this check exists
+ * to prevent.
  */
 export async function resolveSyncOwnerUserId(db: SQLite.SQLiteDatabase): Promise<string | null> {
   let sessionUserId: string | null = null;
@@ -38,18 +47,18 @@ export async function resolveSyncOwnerUserId(db: SQLite.SQLiteDatabase): Promise
   }
 
   const existingOwnerUserId = getCachedLocalDatasetOwner();
-  if (existingOwnerUserId !== undefined && existingOwnerUserId !== null) {
+  if (typeof existingOwnerUserId === 'string' && existingOwnerUserId.length > 0) {
     return existingOwnerUserId;
   }
-  if (existingOwnerUserId === null) {
-    try {
-      const local = await inspectLocalAccountDataState(db);
-      if (local.hasUserData || local.pendingOutboxCount > 0) {
-        return null;
-      }
-    } catch {
+  // Either explicitly empty (`null`) or never primed (`undefined`): the dataset
+  // may not be pristine, so it must be proven before a session owner is adopted.
+  try {
+    const local = await inspectLocalAccountDataState(db);
+    if (local.hasUserData || local.pendingOutboxCount > 0) {
       return null;
     }
+  } catch {
+    return null;
   }
   return sessionUserId;
 }

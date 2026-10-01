@@ -405,6 +405,9 @@ async function buildRestorePreview(ownerUserId: string | null): Promise<RestoreP
     disclosures: buildDisclosures(),
     backupState: backupSummary.state,
     lastCompleteBackupAt: backupSummary.lastCompleteAt,
+    // Disclosed, not hidden: a partial-scope manifest must not read as a
+    // verified complete backup.
+    missingEntities: backupSummary.missingEntities,
     recoverableAreas: buildRecoverableAreas(),
     pendingChangeCount: backupSummary.pendingChangeCount,
     backfillInProgress: backupSummary.backfillInProgress,

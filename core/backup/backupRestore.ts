@@ -9,6 +9,7 @@ import { withSQLiteTransaction } from '@/core/db/transactions';
 import { requestHabitReminderReconciliation } from '@/core/notifications/habitReminderSignals';
 import { requestWorkoutReminderReconciliation } from '@/core/notifications/workoutReminderSignals';
 import { getSupabaseAuthUserId, isRemoteEnabled, supabase } from '@/lib/supabase';
+import { syncEngine, type BlockedOutboxSummary } from '@/core/sync/sync.engine';
 import { nowIso } from '@/lib/time';
 import { checksumRows } from '@/lib/checksum';
 import {
@@ -168,12 +169,27 @@ export type RestoreV2Result =
     };
 
 export type BackupStateSummary = {
-  state: 'v2_complete' | 'v1_legacy' | 'in_progress' | 'invalid' | 'unavailable';
+  state:
+    | 'v2_complete'
+    | 'v1_legacy'
+    /** We could not establish which backup generation this remote has. */
+    | 'unknown'
+    /**
+     * At least one outbox record can never push, so this backup is permanently
+     * incomplete until the cause is fixed. Distinct from `in_progress`, which
+     * means the work is still moving.
+     */
+    | 'blocked'
+    | 'in_progress'
+    | 'invalid'
+    | 'unavailable';
   lastCompleteAt: string | null;
   lastCompleteGeneration: number | null;
   pendingChangeCount: number;
   backfillInProgress: boolean;
   missingEntities: BackupEntity[];
+  /** Entity-level diagnosis for the `blocked` state. */
+  blockedEntities: BlockedOutboxSummary[];
 };
 
 const PAGE_SIZE = 1_000;
@@ -273,41 +289,69 @@ async function fetchRemoteRecoverableSettings(
  * True when the manifest fetch failed because the remote does not have the V2
  * tables yet (pre-migration server or a non-Supabase stub). In that case the
  * backup can only be legacy V1 — restore must fall back instead of failing.
+ *
+ * An EMPTY or unrecognized message is deliberately NOT a match: a proxy that
+ * swallows the body and an empty PostgREST error are indistinguishable from a
+ * transient outage, and classifying either as "legacy" silently downgrades a
+ * complete V2 backup to a three-entity restore that then reports success with
+ * most of the dataset missing (harden-silent-failure-certification 1.2).
  */
 export function isMissingV2RemoteTableError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
+  if (message.trim().length === 0) return false;
   return (
     /PGRST205/i.test(message) ||
     /relation .*backup_manifest.* does not exist/i.test(message) ||
     /does not exist/i.test(message) ||
     /404/i.test(message) ||
-    /not found/i.test(message) ||
-    // Some stubs/proxies surface the PostgREST body with an empty message;
-    // an empty error is far more likely a missing resource than a network
-    // outage (those carry real messages), so fall back to legacy.
-    /backup manifest: undefined/i.test(message)
+    /not found/i.test(message)
   );
 }
 
 /**
- * Second-opinion probe behind the broad missing-V2-table classifier: query a
- * DIFFERENT V2-only table before declaring a legacy server.
+ * Three-valued result of the V2 capability probe.
  *
- * - probe succeeds           -> the server has V2 tables (original error was transient)
- * - probe fails missing-style -> genuinely pre-migration (empty-message stubs included)
- * - probe fails any other way -> cannot confirm -> NOT legacy (fail closed to invalid)
+ * The discriminating property is whether the TRANSPORT succeeded, not which URL
+ * was used: two endpoints can both fail through the same proxy with the same
+ * empty message, so a second identical probe cannot establish absence.
  */
-async function probeV2TablesPresent(ownerUserId: string): Promise<boolean> {
+export type V2CapabilityProbe =
+  /** The remote answered, and the V2 tables are present. */
+  | { kind: 'present' }
+  /** The remote answered, and reported the V2-only table absent. */
+  | { kind: 'absent'; evidence: string }
+  /** The transport itself failed; nothing about V2 presence was established. */
+  | { kind: 'indeterminate'; reason: string };
+
+/**
+ * Capability probe behind the legacy classification: query a V2-only table
+ * BEFORE downgrading, and separate "the remote answered and says the table is
+ * absent" from "the request never got an answer".
+ *
+ * - answered + readable -> `present` (the original error was transient)
+ * - answered + missing-style -> `absent` (genuinely pre-migration)
+ * - transport failure (network, timeout, 5xx, empty body, CORS) -> `indeterminate`
+ */
+export async function probeV2TablesPresent(ownerUserId: string): Promise<V2CapabilityProbe> {
   try {
     await fetchRemoteRecoverableSettings(ownerUserId);
-    return true;
+    return { kind: 'present' };
   } catch (probeError) {
     const probeMessage = probeError instanceof Error ? probeError.message : String(probeError);
-    if (/Failed to fetch user_backup_settings: undefined/.test(probeMessage)) {
-      // Empty-message stub pattern mirrored from the manifest matcher.
-      return false;
+    if (probeMessage.trim().length === 0) {
+      return {
+        kind: 'indeterminate',
+        reason:
+          'the V2 capability probe failed with an empty error message, so absence cannot be established',
+      };
     }
-    return !isMissingV2RemoteTableError(probeError);
+    if (isMissingV2RemoteTableError(probeError)) {
+      return { kind: 'absent', evidence: probeMessage };
+    }
+    return {
+      kind: 'indeterminate',
+      reason: `the V2 capability probe failed without a missing-table answer: ${probeMessage}`,
+    };
   }
 }
 
@@ -413,24 +457,49 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
       // a transient error that merely LOOKS like a missing table must not
       // send a V2 backup down the 3-entity legacy path that reports success
       // with most of the dataset silently missing.
-      const v2Present = await probeV2TablesPresent(ownerUserId);
-      if (!v2Present) {
+      const probe = await probeV2TablesPresent(ownerUserId);
+      if (probe.kind === 'absent') {
         return { status: 'legacy' };
       }
+      if (probe.kind === 'present') {
+        return {
+          status: 'invalid',
+          reason: 'fetch_failed',
+          message: error instanceof Error ? error.message : String(error),
+          diagnostics: [
+            'manifest fetch looked like a missing V2 table, but the user_backup_settings probe found V2 tables — treated as a transient failure, not a legacy server',
+          ],
+        };
+      }
+      // No evidence either way: refuse to claim legacy, because a legacy
+      // classification is a promise that most of the dataset is absent.
       return {
         status: 'invalid',
         reason: 'fetch_failed',
         message: error instanceof Error ? error.message : String(error),
         diagnostics: [
-          'manifest fetch looked like a missing V2 table, but the user_backup_settings probe found V2 tables — treated as a transient failure, not a legacy server',
+          `manifest fetch looked like a missing V2 table, but V2 presence is UNKNOWN: ${probe.reason}`,
         ],
       };
+    }
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    // An empty or unrecognized message is NOT evidence that the V2 tables are
+    // missing, so it can never become a legacy classification. Say so in the
+    // record: "invalid" with no stated reason is the same unverified outcome one
+    // level up.
+    let notDowngraded: string;
+    if (rawMessage.trim().length === 0) {
+      notDowngraded =
+        'The manifest fetch failed with an EMPTY error message, so V2 capability is UNKNOWN. An empty message is not evidence of a pre-migration remote, and this backup was NOT downgraded to the legacy 3-entity path.';
+    } else {
+      notDowngraded =
+        'The manifest fetch failed without a missing-table answer, so V2 capability is UNKNOWN. This backup was NOT downgraded to the legacy 3-entity path.';
     }
     return {
       status: 'invalid',
       reason: 'fetch_failed',
-      message: error instanceof Error ? error.message : String(error),
-      diagnostics: [],
+      message: rawMessage,
+      diagnostics: [notDowngraded],
     };
   }
   if (!manifestRow) {
@@ -751,18 +820,91 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
 }
 
 /**
+ * Per-entity labels for the restore success report. The restore surface cares
+ * about the whole backup scope, so every recoverable entity is named; an
+ * unfamiliar key falls back to itself rather than being dropped.
+ */
+const RESTORED_ENTITY_LABELS: Partial<Record<BackupEntity, string>> = {
+  todos: 'Todos',
+  habits: 'Habits',
+  habit_completions: 'Habit history',
+  calorie_entries: 'Calorie entries',
+  saved_meals: 'Saved meals',
+  pomodoro_sessions: 'Pomodoro sessions',
+  workout_routines: 'Workout routines',
+  routine_exercises: 'Routine exercises',
+  routine_exercise_sets: 'Routine sets',
+  workout_session_exercises: 'Session exercises',
+  workout_session_sets: 'Session sets',
+  body_weight_entries: 'Body weight',
+  custom_exercises: 'Custom exercises',
+  workout_weekly_plan: 'Weekly plan',
+  workout_schedule_overrides: 'Schedule overrides',
+  projects: 'Projects',
+  goals: 'Goals',
+  daily_plans: 'Daily plans',
+  weekly_reviews: 'Weekly reviews',
+  linked_action_rules: 'Linked action rules',
+};
+
+/**
+ * Per-entity restored counts, for the success report a restore shows.
+ *
+ * A restore that reports "done" without saying WHAT came back is the same class
+ * of unverified success this change exists to remove: a user cannot tell a
+ * complete dataset from a three-entity one. Mirrors
+ * `describePortableCounts` so both import surfaces speak the same shape, and is
+ * pure so the copy is unit-testable.
+ *
+ * @param counts per-entity counts from the restore result
+ * @returns rows for entities that actually restored anything, plus the total
+ */
+export function describeRestoredCounts(
+  counts: Partial<Record<BackupEntity, number>> | Record<string, number> | null | undefined,
+): { entity: BackupEntity; label: string; count: number }[] {
+  if (!counts) return [];
+  return BACKUP_ENTITIES.filter((entity) => (counts[entity] ?? 0) > 0).map((entity) => ({
+    entity,
+    label: RESTORED_ENTITY_LABELS[entity] ?? entity,
+    count: counts[entity] ?? 0,
+  }));
+}
+
+/** Total records restored across every entity, for the summary line. */
+export function totalRestoredCount(
+  counts: Partial<Record<BackupEntity, number>> | Record<string, number> | null | undefined,
+): number {
+  if (!counts) return 0;
+  return Object.values(counts).reduce<number>((sum, count) => sum + (Number(count) || 0), 0);
+}
+
+/**
  * UI-facing backup completeness state. Reads the owner's manifest (if any)
  * and local backfill/queue signals. Precedence: valid complete manifest →
  * `v2_complete` (with pending change count); manifest present but broken →
  * `invalid`; no manifest with V1 data or backfill in progress →
- * `in_progress`/`v1_legacy`; no remote → `unavailable`.
+ * `in_progress`/`v1_legacy`; manifest unreachable with no capability evidence →
+ * `unknown`; no remote → `unavailable`.
  */
 export async function getBackupStateSummary(
   ownerUserId: string | null,
 ): Promise<BackupStateSummary> {
   const db = await getDatabase();
   const [outboxCount, backfill, dirty] = await Promise.all([
-    db.getFirstAsync<{ count: number }>('SELECT COUNT(*) AS count FROM sync_outbox'),
+    // Scope the count to rows THIS owner can push. Counting every row inflated
+    // the number with intents belonging to another account (a record stamped
+    // before the owner binding, or a leftover from a different session), so a
+    // user could see "N changes pending" that could never leave their device.
+    // An unowned row is still counted: it has not been refused, and refusing to
+    // count it would hide a stuck intent.
+    ownerUserId
+      ? db.getFirstAsync<{ count: number }>(
+          'SELECT COUNT(*) AS count FROM sync_outbox WHERE owner_user_id IS NULL OR owner_user_id = ?',
+          [ownerUserId],
+        )
+      : db.getFirstAsync<{ count: number }>(
+          'SELECT COUNT(*) AS count FROM sync_outbox WHERE owner_user_id IS NULL',
+        ),
     getBackfillStatusForSummary(db),
     db.getFirstAsync<{ value: string }>('SELECT value FROM app_meta WHERE key = ?', [
       appMetaKeys.backupDirty.key,
@@ -770,6 +912,26 @@ export async function getBackupStateSummary(
   ]);
 
   const pendingChangeCount = (outboxCount?.count ?? 0) + (dirty?.value === '1' ? 1 : 0);
+  // A terminally-blocked outbox record is a permanent condition, not progress.
+  // It must be visible as its own state: `in_progress` promises the work is
+  // still moving, and a frozen checkpoint is exactly what the user cannot
+  // diagnose.
+  const blockedEntities = syncEngine.getStatus().blockedEntities;
+  const blockedBackupEntities = new Set<BackupEntity>();
+  for (const entry of blockedEntities) {
+    if (BACKUP_ENTITIES.includes(entry.entity as BackupEntity)) {
+      blockedBackupEntities.add(entry.entity as BackupEntity);
+    }
+  }
+  const blockedDiagnosis = (missing: BackupEntity[]): BackupStateSummary => ({
+    state: 'blocked',
+    lastCompleteAt: null,
+    lastCompleteGeneration: null,
+    pendingChangeCount,
+    backfillInProgress: backfill === 'running',
+    missingEntities: missing,
+    blockedEntities,
+  });
 
   if (!ownerUserId || !supabase || !isRemoteEnabled()) {
     return {
@@ -779,6 +941,7 @@ export async function getBackupStateSummary(
       pendingChangeCount,
       backfillInProgress: backfill === 'running',
       missingEntities: [...BACKUP_ENTITIES],
+      blockedEntities,
     };
   }
 
@@ -791,15 +954,31 @@ export async function getBackupStateSummary(
   }
 
   if (manifestError) {
-    // Missing V2 tables on the server are a legacy-only backup situation,
-    // not a corrupt manifest.
+    // A failed manifest fetch is NOT evidence that this remote is legacy-only.
+    // Under a transient outage the previous code answered `v1_legacy`, which
+    // told the user their backup had three entities when a complete V2 backup
+    // was unreachable. Ask the capability probe instead: only a remote that
+    // ANSWERS and reports the V2 tables absent may be called legacy.
+    const probe = ownerUserId ? await probeV2TablesPresent(ownerUserId) : null;
+    if (probe?.kind === 'absent') {
+      return {
+        state: 'v1_legacy',
+        lastCompleteAt: null,
+        lastCompleteGeneration: null,
+        pendingChangeCount,
+        backfillInProgress: backfill === 'running',
+        missingEntities: [...BACKUP_ENTITIES],
+        blockedEntities,
+      };
+    }
     return {
-      state: 'v1_legacy',
+      state: 'unknown',
       lastCompleteAt: null,
       lastCompleteGeneration: null,
       pendingChangeCount,
       backfillInProgress: backfill === 'running',
       missingEntities: [...BACKUP_ENTITIES],
+      blockedEntities,
     };
   }
 
@@ -812,6 +991,7 @@ export async function getBackupStateSummary(
         pendingChangeCount,
         backfillInProgress: backfill === 'running',
         missingEntities: [...BACKUP_ENTITIES],
+        blockedEntities,
       };
     }
     return {
@@ -821,6 +1001,7 @@ export async function getBackupStateSummary(
       pendingChangeCount,
       backfillInProgress: false,
       missingEntities: [...BACKUP_ENTITIES],
+      blockedEntities,
     };
   }
 
@@ -839,6 +1020,7 @@ export async function getBackupStateSummary(
       pendingChangeCount,
       backfillInProgress: false,
       missingEntities: [],
+      blockedEntities,
     };
   }
   // Recognize both the current hardened scope and known historical scope
@@ -857,6 +1039,7 @@ export async function getBackupStateSummary(
       pendingChangeCount,
       backfillInProgress: false,
       missingEntities: [...BACKUP_ENTITIES],
+      blockedEntities,
     };
   }
   const missingInScope = resolvedScope.entitySet.filter(
@@ -870,6 +1053,7 @@ export async function getBackupStateSummary(
       pendingChangeCount,
       backfillInProgress: false,
       missingEntities: [...BACKUP_ENTITIES],
+      blockedEntities,
     };
   }
 
@@ -878,6 +1062,14 @@ export async function getBackupStateSummary(
   // flipping a complete historical backup to "invalid".
   const missingEntities = BACKUP_ENTITIES.filter((entity) => !manifest.entityMetadata[entity]);
 
+  // A manifest can be internally valid and still not be a COMPLETE backup: a
+  // terminally-blocked record is omitted from the certified scope, so
+  // `missingEntities` is non-empty. Reporting `v2_complete` here is the exact
+  // unverified-success claim this change removes, so blocked wins.
+  if (blockedBackupEntities.size > 0) {
+    return blockedDiagnosis([...new Set([...missingEntities, ...blockedBackupEntities])]);
+  }
+
   return {
     state: 'v2_complete',
     lastCompleteAt: manifest.completedAt,
@@ -885,6 +1077,7 @@ export async function getBackupStateSummary(
     pendingChangeCount,
     backfillInProgress: backfill === 'running',
     missingEntities,
+    blockedEntities,
   };
 }
 

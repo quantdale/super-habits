@@ -7,6 +7,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { getRestorePreview, restoreFromRemoteBackup } from '@/core/sync/restore.coordinator';
 import type { RestorePreview } from '@/core/sync/restore.types';
 import { syncEngine } from '@/core/sync/sync.engine';
+import { describeRestoredCounts } from '@/core/backup/backupRestore';
 import { Screen } from '@/core/ui/Screen';
 import { spacing, radius, size } from '@/core/theme/designTokens';
 import { DEFAULT_GOAL, getCalorieGoal, setCalorieGoal } from '@/features/calories/calories.data';
@@ -72,6 +73,12 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
   const [restoreLoading, setRestoreLoading] = useState(true);
   const [restoreRunning, setRestoreRunning] = useState(false);
   const [restoreError, setRestoreError] = useState<string | null>(null);
+  // A restore that says only "done" cannot be distinguished from one that
+  // restored three entities, so the per-entity counts ride the success message
+  // (harden-silent-failure-certification 1.6).
+  const [restoredCounts, setRestoredCounts] = useState<{ entity: string; count: number }[] | null>(
+    null,
+  );
   const [commandRolloutEnabledOnDevice, setCommandRolloutEnabledOnDevice] = useState(false);
   const [commandRolloutLoading, setCommandRolloutLoading] = useState(
     commandInternalRolloutAvailable,
@@ -204,6 +211,7 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
   const handleRestore = async () => {
     setRestoreRunning(true);
     setRestoreError(null);
+    setRestoredCounts(null);
     try {
       const result = await restoreFromRemoteBackup();
       if (result.status === 'blocked') {
@@ -213,6 +221,13 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
           `${result.message}${
             result.diagnostics.length > 0 ? ` (${result.diagnostics.slice(0, 3).join('; ')})` : ''
           }`,
+        );
+      } else {
+        setRestoredCounts(
+          describeRestoredCounts(result.importedCounts).map(({ entity, count }) => ({
+            entity,
+            count,
+          })),
         );
       }
       await loadRestorePreview({ preserveError: true });
@@ -366,6 +381,7 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
         restoreLoading={restoreLoading}
         restoreRunning={restoreRunning}
         restoreError={restoreError}
+        restoredCounts={restoredCounts}
         onRestore={handleRestore}
         accountState={accountState}
         onProtectAccount={protectAccount}

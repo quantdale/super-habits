@@ -35,10 +35,57 @@ const RESTORE_ENTITY_LABELS: Record<SyncBackedEntity, string> = {
 const BACKUP_STATE_LABELS: Record<RestorePreview['backupState'], string> = {
   v2_complete: 'Complete (V2)',
   v1_legacy: 'Legacy (V1)',
+  unknown: 'Unknown',
+  blocked: 'Blocked',
   in_progress: 'In progress',
   invalid: 'Invalid',
   unavailable: 'Unavailable',
 };
+
+/**
+ * User-facing names for the entity groups a manifest can omit.
+ *
+ * `RESTORE_ENTITY_LABELS` covers only the four entities the restore surface
+ * lists; the coverage disclosure speaks about the whole backup scope, so it
+ * names the groups a user would recognize and falls back to the entity key
+ * rather than dropping an unfamiliar one.
+ */
+const BACKUP_SCOPE_LABELS: Record<string, string> = {
+  todos: 'todos',
+  habits: 'habits',
+  habit_completions: 'habit history',
+  calorie_entries: 'calorie entries',
+  saved_meals: 'saved meals',
+  pomodoro_sessions: 'pomodoro sessions',
+  workout_routines: 'workout routines',
+  routine_exercises: 'routine exercises',
+  routine_exercise_sets: 'routine sets',
+  workout_session_exercises: 'session exercises',
+  workout_session_sets: 'session sets',
+  body_weight_entries: 'body weight',
+  custom_exercises: 'custom exercises',
+  workout_weekly_plan: 'weekly plan',
+  workout_schedule_overrides: 'schedule overrides',
+  projects: 'projects',
+  goals: 'goals',
+  daily_plans: 'daily plans',
+  linked_action_rules: 'linked action rules',
+  settings: 'settings',
+};
+
+/**
+ * Name the entity groups a manifest did NOT cover.
+ *
+ * A partial-scope manifest used to be reported as a verified complete backup
+ * with its omitted groups invisible; the disclosure belongs next to the
+ * completeness claim, not in a diagnostics panel.
+ */
+function describeMissingEntities(entities: readonly string[] | undefined): string {
+  if (!entities || entities.length === 0) return '';
+  const names = entities.map((entity) => BACKUP_SCOPE_LABELS[entity] ?? entity);
+  if (names.length === 1) return ` Not included in this manifest: ${names[0]}.`;
+  return ` Not included in this manifest (${names.length} entity groups): ${names.join(', ')}.`;
+}
 
 function describeBackupCoverage(preview: RestorePreview | null): string {
   if (!preview) return 'Backup status is not available yet.';
@@ -51,10 +98,19 @@ function describeBackupCoverage(preview: RestorePreview | null): string {
         preview.pendingChangeCount > 0
           ? ` ${preview.pendingChangeCount} change(s) pending since the checkpoint.`
           : '';
-      return `A verified complete V2 backup exists.${lastComplete}${pending}`;
+      // A complete-scope manifest may still be missing entity groups; say so
+      // rather than letting "verified complete" cover the omission.
+      const missing = describeMissingEntities(preview.missingEntities);
+      return `A verified complete V2 backup exists.${lastComplete}${pending}${missing}`;
     }
     case 'v1_legacy':
       return 'Only the legacy V1 backup exists (todos, habits, calorie entries). History and settings are not yet backed up.';
+    case 'unknown':
+      return 'Backup coverage could not be verified: the remote backup did not answer, so this is not known to be complete, legacy, or absent. Nothing has been changed.';
+    case 'blocked':
+      // A terminal state, not progress: name the entity and the reason so the
+      // user can act instead of watching a backup that will never finish.
+      return 'Backup is blocked: some data can never be uploaded, so this backup is permanently incomplete until the cause is fixed. The affected data is listed below and is NOT in the remote backup.';
     case 'in_progress':
       return preview.backfillInProgress
         ? 'Backup upgrade in progress: existing history is being added to the remote backup.'
@@ -72,7 +128,9 @@ function backupCoverageTone(state: RestorePreview['backupState'] | null): Settin
       return 'accent';
     case 'in_progress':
     case 'v1_legacy':
+    case 'unknown':
       return 'warning';
+    case 'blocked':
     case 'invalid':
       return 'danger';
     default:
@@ -117,6 +175,8 @@ type SettingsBackupSectionProps = {
   restoreLoading: boolean;
   restoreRunning: boolean;
   restoreError: string | null;
+  /** Per-entity counts from the last successful restore, or null. */
+  restoredCounts: { entity: string; count: number }[] | null;
   onRestore: () => void;
   accountState: AccountState;
   onProtectAccount: (email: string) => Promise<AccountActionResult>;
@@ -133,6 +193,7 @@ export function SettingsBackupSection({
   restoreLoading,
   restoreRunning,
   restoreError,
+  restoredCounts,
   onRestore,
   accountState,
   onProtectAccount,
@@ -265,6 +326,24 @@ export function SettingsBackupSection({
           />
 
           <ValidationError message={restoreError} />
+          {/* A successful restore reports WHAT came back, not just "done": a
+              three-entity restore and a complete one must not look alike. */}
+          {restoredCounts && restoredCounts.length > 0 ? (
+            <View className="mt-2 gap-1">
+              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+                Restore complete. Records restored:
+              </Text>
+              {restoredCounts.map(({ entity, count }) => (
+                <Text
+                  key={entity}
+                  className="text-sm leading-6"
+                  style={{ color: tokens.textMuted }}
+                >
+                  {BACKUP_SCOPE_LABELS[entity] ?? entity}: {count.toLocaleString()}
+                </Text>
+              ))}
+            </View>
+          ) : null}
           <Button
             label={restoreButtonLabel}
             onPress={onRestore}
@@ -434,6 +513,7 @@ function SettingsAccountCard({
   | 'restoreLoading'
   | 'restoreRunning'
   | 'restoreError'
+  | 'restoredCounts'
   | 'onRestore'
 >) {
   const { tokens } = useAppTheme();

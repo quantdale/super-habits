@@ -70,6 +70,9 @@ const gymMigrationName = migrationNames.find((name) =>
 const deepGymMigrationName = migrationNames.find((name) =>
   /_add_gym_workout_deep_expansion\.sql$/.test(name),
 );
+const ownerScopedRemediationName = migrationNames.find((name) =>
+  /_habit_completions_owner_scoped_uniqueness\.sql$/.test(name),
+);
 if (!ownershipMigrationName) {
   failures.push('missing secure sync ownership migration');
 }
@@ -81,6 +84,9 @@ if (!remediationMigrationName) {
 }
 if (!gymMigrationName) failures.push('missing Gym V2 backup scope migration');
 if (!deepGymMigrationName) failures.push('missing Gym Workout V2 deep expansion migration');
+if (!ownerScopedRemediationName) {
+  failures.push('missing habit_completions owner-scoped uniqueness remediation migration');
+}
 if (migrationNames.join('\n') !== [...migrationNames].sort().join('\n')) {
   failures.push('migration filenames are not lexically ordered');
 }
@@ -97,6 +103,9 @@ const remediationMigration = remediationMigrationName
 const gymMigration = gymMigrationName ? read(`supabase/migrations/${gymMigrationName}`) : '';
 const deepGymMigration = deepGymMigrationName
   ? read(`supabase/migrations/${deepGymMigrationName}`)
+  : '';
+const ownerScopedRemediation = ownerScopedRemediationName
+  ? read(`supabase/migrations/${ownerScopedRemediationName}`)
   : '';
 const fixture = read('simulation/backend/schema.sql');
 
@@ -279,35 +288,108 @@ for (const table of backupOwnerIndexTables) {
   requireText(`backup migration ${table} owner index`, tableMigration, new RegExp(`idx_${table}`));
 }
 
+// ---- Owner-scoped uniqueness guard (tasks 4.1-4.2) -------------------
+//
+// WHY THIS TABLE: three backup entities once declared a GLOBAL unique
+// constraint whose scope was narrower than the owner, so two accounts could
+// collide on a key that is only unique per account (and an upsert could
+// silently affect zero rows). The `saved_meals` case was fixed by a
+// remediation migration and guarded individually; `habit_completions` still
+// carries `UNIQUE (habit_id, date_key)` in BOTH the migration SQL and the
+// simulation fixture, so the guard has to name it explicitly.
+//
+// The table is explicit rather than a regex sweep for `UNIQUE` without
+// `user_id`: a sweep false-positives on legitimate single-column indexes that
+// are not backup entities, and it cannot tell an owner-scoped index from an
+// unrelated one. Naming the tables keeps the scope honest — which is the
+// property the guard exists to protect.
+const OWNER_SCOPED_UNIQUENESS = [
+  {
+    table: 'saved_meals',
+    ownerColumns: ['user_id'],
+    globalConstraint: 'saved_meals_food_name_unique',
+    remediation:
+      'uq_saved_meals_owner_food_name (user_id, lower(food_name)) — see the V2 closure remediation migration',
+  },
+  {
+    table: 'habit_completions',
+    ownerColumns: ['user_id'],
+    globalConstraint: 'habit_completions_habit_date_unique',
+    remediation:
+      'uq_habit_completions_owner_habit_date (user_id, habit_id, date_key) — must be declared by an owner-scoped migration and mirrored in the fixture',
+  },
+];
+
+for (const entry of OWNER_SCOPED_UNIQUENESS) {
+  // The global constraint must be ABSENT from the fixture.
+  requireText(
+    `fixture ${entry.table} has no global ${entry.globalConstraint} constraint`,
+    fixture,
+    new RegExp(
+      `^(?![\\s\\S]*CONSTRAINT\\s+${entry.globalConstraint}\\s+UNIQUE\\s*\\((?![^)]*user_id)[^)]*\\))`,
+      'i',
+    ),
+  );
+  // ...and the owner-scoped index must be declared for it.
+  const ownerScopedColumns = entry.ownerColumns.join('\\s*,\\s*');
+  // Tolerate a wrapped definition (`CREATE UNIQUE INDEX ...\n  ON table (...)`)
+  // while staying bounded so the match cannot run into an unrelated statement.
+  const scopedIndexPattern = new RegExp(
+    `CREATE UNIQUE INDEX[\\s\\S]{0,120}?ON\\s+(?:public\\.)?${entry.table}\\s*\\([^)]*${ownerScopedColumns}[^)]*\\)`,
+    'i',
+  );
+  if (entry.table === 'saved_meals') {
+    // The historical case: the remediation migration replaces the constraint.
+    requireText(
+      'remediation drops global saved_meals food-name constraint',
+      remediationMigration,
+      /ALTER TABLE public\.saved_meals[\s\S]*DROP CONSTRAINT saved_meals_food_name_unique/i,
+    );
+    requireText(
+      'remediation creates owner-scoped saved_meals unique index',
+      remediationMigration,
+      /CREATE UNIQUE INDEX IF NOT EXISTS uq_saved_meals_owner_food_name\s+ON public\.saved_meals\s*\(\s*user_id\s*,\s*lower\(\s*food_name\s*\)\s*\)/i,
+    );
+    requireText(
+      'fixture saved_meals has owner-scoped unique index',
+      fixture,
+      /CREATE UNIQUE INDEX IF NOT EXISTS uq_saved_meals_owner_food_name\s+ON public\.saved_meals\s*\(\s*user_id\s*,\s*lower\(\s*food_name\s*\)\s*\)/i,
+    );
+  } else {
+    // A table whose global constraint is still present must be REMEDIATED, not
+    // silently accepted: this is the guard's whole job. The remediation is an
+    // ADDITIVE migration (the applied one is historical input), and the fixture
+    // must carry the owner-scoped index the migration creates.
+    requireText(
+      `remediation drops global ${entry.globalConstraint} constraint`,
+      ownerScopedRemediation,
+      new RegExp(
+        `ALTER TABLE (?:public\\.)?${entry.table}[\\s\\S]*DROP CONSTRAINT ${entry.globalConstraint}`,
+        'i',
+      ),
+    );
+    requireText(
+      `remediation creates an owner-scoped ${entry.table} unique index`,
+      ownerScopedRemediation,
+      scopedIndexPattern,
+    );
+    requireText(
+      `fixture ${entry.table} declares an owner-scoped unique index`,
+      fixture,
+      scopedIndexPattern,
+    );
+  }
+}
+
 // ---- Backup V2 closure remediation contract ----
 // The global saved_meals food-name uniqueness from the V2 migration must be
 // removed and replaced by an owner-scoped, case-insensitive index; the
 // manifest must gain settings integrity metadata; and no migration may
 // reintroduce global food-name uniqueness afterwards.
 requireText(
-  'remediation drops global saved_meals food-name constraint',
-  remediationMigration,
-  /ALTER TABLE public\.saved_meals[\s\S]*DROP CONSTRAINT saved_meals_food_name_unique/i,
-);
-requireText(
-  'remediation creates owner-scoped saved_meals unique index',
-  remediationMigration,
-  /CREATE UNIQUE INDEX IF NOT EXISTS uq_saved_meals_owner_food_name\s+ON public\.saved_meals\s*\(\s*user_id\s*,\s*lower\(\s*food_name\s*\)\s*\)/i,
-);
-requireText(
   'remediation adds manifest settings metadata column',
   remediationMigration,
   /ALTER TABLE public\.backup_manifest[\s\S]*ADD COLUMN IF NOT EXISTS settings_metadata JSONB/i,
-);
-requireText(
-  'fixture saved_meals has owner-scoped unique index',
-  fixture,
-  /CREATE UNIQUE INDEX IF NOT EXISTS uq_saved_meals_owner_food_name\s+ON public\.saved_meals\s*\(\s*user_id\s*,\s*lower\(\s*food_name\s*\)\s*\)/i,
-);
-requireText(
-  'fixture saved_meals has no global food_name constraint',
-  fixture,
-  /^(?![\s\S]*CONSTRAINT saved_meals_food_name_unique\s+UNIQUE\s*\(\s*food_name\s*\))/i,
 );
 requireText(
   'fixture manifest has settings_metadata column',

@@ -2,6 +2,7 @@ import { appMetaKeys, getAppMetaJsonOrDefault, setAppMetaJson } from '@/core/db/
 import { getDatabase } from '@/core/db/client';
 import { withSQLiteTransaction } from '@/core/db/transactions';
 import type { SyncPersistence, SyncRecord, SyncStatus } from '@/core/sync/sync.engine';
+import type { OutboxAttemptEntry, OutboxAttemptLedger } from '@/core/sync/outboxAttempts';
 
 function isSyncRecord(value: unknown): value is SyncRecord {
   if (!value || typeof value !== 'object') return false;
@@ -34,6 +35,27 @@ function isSyncStatus(value: unknown): value is SyncStatus {
     isNullableString(candidate.lastErrorMessage) &&
     isNullableString(candidate.nextRetryAt)
   );
+}
+
+/** Reject a ledger value that is not a well-formed attempt map, so a corrupt row cannot block pushes. */
+function isOutboxAttemptLedger(value: unknown): value is OutboxAttemptLedger {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.values(value as Record<string, unknown>).every((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+    const candidate = entry as Record<string, unknown>;
+    if (!Number.isInteger(candidate.attempts) || Number(candidate.attempts) < 0) return false;
+    if (typeof candidate.firstFailureAt !== 'string') return false;
+    if (typeof candidate.lastFailureAt !== 'string') return false;
+    if (typeof candidate.lastClass !== 'string') return false;
+    if (candidate.blocked === null || candidate.blocked === undefined) return true;
+    if (typeof candidate.blocked !== 'object') return false;
+    const blocked = candidate.blocked as Record<string, unknown>;
+    return (
+      typeof blocked.class === 'string' &&
+      typeof blocked.reason === 'string' &&
+      typeof blocked.at === 'string'
+    );
+  });
 }
 
 /** Persists the durable SQLite outbox and sync status so a killed process doesn't silently lose pending records. */
@@ -114,7 +136,27 @@ export class SqliteSyncPersistence implements SyncPersistence {
     const db = await getDatabase();
     await setAppMetaJson(db, appMetaKeys.syncStatus, status);
   }
+
+  /**
+   * Durable per-record attempt ledger for the terminal outbox classification
+   * (`core/sync/outboxAttempts.ts`). Stored in app_meta rather than a new
+   * table or column: it is local operational state that is never backed up, and
+   * this change earns no schema migration. A corrupt or absent value reads as
+   * an empty ledger, so a bad row can never wedge the outbox.
+   */
+  async loadAttemptLedger(): Promise<OutboxAttemptLedger> {
+    const db = await getDatabase();
+    const stored = await getAppMetaJsonOrDefault<unknown>(db, appMetaKeys.syncOutboxAttempts, {});
+    return isOutboxAttemptLedger(stored) ? stored : {};
+  }
+
+  async saveAttemptLedger(ledger: OutboxAttemptLedger): Promise<void> {
+    const db = await getDatabase();
+    await setAppMetaJson(db, appMetaKeys.syncOutboxAttempts, ledger);
+  }
 }
+
+export type { OutboxAttemptEntry };
 
 export async function upsertSyncOutboxRecord(
   db: Parameters<typeof withSQLiteTransaction>[0],

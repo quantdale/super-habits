@@ -298,6 +298,65 @@ describe('AccountCoordinator', () => {
     expect(database.meta.get('account.owner_user_id')).toBe('user_a');
   });
 
+  it('pauses remote backup and records a protection failure when a foreign remote owner appears (4.4)', async () => {
+    // The protection re-checks remote ownership after the email conversion. The
+    // old `ownerIds` derivation could only ever return the current user, so this
+    // branch was unreachable; the distinct-owner probe makes it real.
+    const database = fakeDatabase({ ownerBinding: 'user_a', activeRows: { todos: 1 } });
+    const currentAuth = { value: auth({ verifiedUserId: 'user_a', verifiedIsAnonymous: true }) };
+    const coordinator = coordinatorFor(database, currentAuth, {
+      requestEmailProtection: vi.fn(),
+      verifyEmailChangeOtp: vi.fn(async () => {
+        currentAuth.value = auth({
+          verifiedUserId: 'user_a',
+          verifiedIsAnonymous: false,
+          verifiedEmail: 'recover@example.com',
+          sessionUserId: 'user_a',
+        });
+      }),
+      getRemoteFingerprint: async () =>
+        fingerprint({ counts: {}, ownerIds: ['someone_else', 'user_a'] }),
+    });
+
+    await coordinator.protect('recover@example.com');
+    const result = await coordinator.verifyProtection('123456');
+
+    expect(result).toMatchObject({ ok: false, status: 'error' });
+    expect(result.message).toMatch(/paused for safety|ownership changed/i);
+    // The diagnosis is recorded, not just logged: a later reader can see WHY.
+    const failure = database.meta.get('account.protection_last_failure');
+    expect(failure).toBeTruthy();
+    expect(String(failure)).toContain('remote_foreign_owner');
+    // The pending protection is terminated so it cannot loop after a restart:
+    // the cleared record is the JSON literal 'null', not a live request.
+    const pending = database.meta.get('account.protection_pending');
+    expect(pending === undefined || pending === 'null' || pending === null).toBe(true);
+  });
+
+  it('prefers the verified user over a diverging cached session (4.6)', async () => {
+    // Every existing test mocked session and verified to the same value, so the
+    // divergence was untested: a cached session naming one account while the
+    // verified identity names another must never be adopted as the owner.
+    const database = fakeDatabase({ ownerBinding: 'user_a', activeRows: { todos: 1 } });
+    const currentAuth = {
+      value: auth({
+        // Session still reports a DIFFERENT (stale) account while verification
+        // says otherwise — the exact split-brain case.
+        sessionUserId: 'stale_session_user',
+        sessionIsAnonymous: true,
+        verifiedUserId: 'user_a',
+        verifiedIsAnonymous: true,
+      }),
+    };
+    const coordinator = coordinatorFor(database, currentAuth);
+
+    const state = await coordinator.refresh();
+    // The dataset owner is the VERIFIED identity, never the cached session.
+    expect(state.hasOwnerBinding).toBe(true);
+    expect(database.meta.get('account.owner_user_id')).toBe('user_a');
+    expect(database.meta.get('account.owner_user_id')).not.toBe('stale_session_user');
+  });
+
   it('recovers an existing account only on an empty device', async () => {
     const database = fakeDatabase();
     const currentAuth = { value: auth() };

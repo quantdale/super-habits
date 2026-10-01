@@ -25,7 +25,23 @@ export type LocalSyncBackedCounts = Record<SyncBackedEntity, number>;
 
 /** Backup completeness state shown in Settings and the startup prompt. */
 export type BackupCoverageState =
-  'v2_complete' | 'v1_legacy' | 'in_progress' | 'invalid' | 'unavailable';
+  | 'v2_complete'
+  | 'v1_legacy'
+  /**
+   * The remote did not answer, so its backup generation is unestablished. This
+   * is NOT the same as legacy: claiming legacy promises that most of the
+   * dataset is absent, which is a claim we could not make.
+   */
+  | 'unknown'
+  /**
+   * At least one outbox record can never push, so this backup is permanently
+   * incomplete. Distinct from `in_progress`, which promises the work is still
+   * moving.
+   */
+  | 'blocked'
+  | 'in_progress'
+  | 'invalid'
+  | 'unavailable';
 
 export type RestoreEligibility =
   | {
@@ -54,6 +70,8 @@ export type RestorePreview = {
   /** Backup Completeness V2 state. */
   backupState: BackupCoverageState;
   lastCompleteBackupAt: string | null;
+  /** Entity groups the manifest did not cover, disclosed rather than hidden. */
+  missingEntities: string[];
   recoverableAreas: string[];
   pendingChangeCount: number;
   backfillInProgress: boolean;

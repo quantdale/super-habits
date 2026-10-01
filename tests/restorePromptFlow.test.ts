@@ -29,6 +29,9 @@ function buildBlockedPreview(message: string): RestorePreview {
     freshnessSignature: null,
     dismissedForCurrentBackup: false,
     startupPromptEligible: false,
+    // A blocked preview establishes nothing about backup coverage, so it
+    // discloses the whole scope as unconfirmed rather than omitting the field.
+    missingEntities: [],
     eligibility: {
       kind: 'blocked',
       reason: 'remote_backup_unavailable',

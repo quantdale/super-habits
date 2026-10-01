@@ -37,6 +37,11 @@ export const appMetaKeys = {
   lastRestoreSignature: defineTextKey('last_restore_signature', 'sync'),
   lastRestoreAt: defineTextKey('last_restore_at', 'sync'),
   syncOutbox: defineJsonKey('sync_outbox', 'sync'),
+  /** Durable per-record attempt ledger for the terminal outbox classification
+   *  (harden-silent-failure-certification wave 2). Local operational state —
+   *  never backed up, never synced: it records WHY a record cannot push, so a
+   *  permanently blocked backup is distinguishable from one still uploading. */
+  syncOutboxAttempts: defineJsonKey('sync.outbox_attempts', 'sync'),
   syncStatus: defineJsonKey('sync_status', 'sync'),
   calorieGoal: defineJsonKey('calorie_goal', 'calories'),
   /** Daily macro targets (hardening wave v2; recoverable-settings V3 source). */

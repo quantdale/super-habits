@@ -606,8 +606,8 @@ function RestorePrompt({
         >
           <View className="gap-3">
             <Text style={{ color: tokens.text, fontSize: 14, lineHeight: 20 }}>
-              Restoring now imports your backed-up todos, habits, calorie history, focus history,
-              workouts, saved meals, linked-action rules, and settings.
+              Restoring now imports your backed-up todos, habits, and calorie entries. The
+              disclosure below names everything this restore path does NOT import.
             </Text>
             {preview.latestRestorableBackupAt ? (
               <Text style={{ color: tokens.textMuted, fontSize: 13 }}>

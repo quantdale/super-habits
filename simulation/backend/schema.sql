@@ -160,9 +160,16 @@ CREATE TABLE IF NOT EXISTS public.habit_completions (
   date_key   TEXT NOT NULL,
   count      INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  CONSTRAINT habit_completions_habit_date_unique UNIQUE (habit_id, date_key)
+  updated_at TEXT NOT NULL
 );
+
+-- Owner-scoped uniqueness. This was a GLOBAL UNIQUE (habit_id, date_key), whose
+-- scope was narrower than the owner: two accounts sharing a habit id could not
+-- both record a completion for the same date, and the losing upsert silently
+-- affected zero rows while reporting success. Mirrors
+-- supabase/migrations/20260930000000_habit_completions_owner_scoped_uniqueness.sql.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_habit_completions_owner_habit_date
+  ON public.habit_completions (user_id, habit_id, date_key);
 
 CREATE TABLE IF NOT EXISTS public.pomodoro_sessions (
   id                TEXT PRIMARY KEY NOT NULL,

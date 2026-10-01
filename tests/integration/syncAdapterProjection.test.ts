@@ -14,14 +14,34 @@ type DeleteCall = { entity: string; ids: string[]; userId: string };
 
 const upserted: UpsertCall[] = [];
 const deleted: DeleteCall[] = [];
+/** Rows the fake remote actually stored, per entity, so the read-back can be honest. */
+const stored = new Map<string, Map<string, Record<string, unknown>>>();
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: vi.fn((entity: string) => ({
       upsert: vi.fn(async (rows: Record<string, unknown>[]) => {
-        upserted.push({ entity, rows: Array.isArray(rows) ? rows : [rows] });
+        const rowList = Array.isArray(rows) ? rows : [rows];
+        upserted.push({ entity, rows: rowList });
+        stored.set(entity, new Map(rowList.map((row) => [String(row.id), row])));
         return { error: null };
       }),
+      // Push verification read-back (harden-silent-failure-certification 3.1):
+      // the adapter re-reads the ids it just wrote, scoped to the owner.
+      select: vi.fn((_columns: string) => ({
+        in: vi.fn((_column: string, ids: string[]) => ({
+          eq: vi.fn(async (_column: string, value: string) => {
+            const rows = ids
+              .map((id) => stored.get(entity)?.get(id))
+              .filter(
+                (row): row is Record<string, unknown> =>
+                  row !== undefined && (row.user_id === undefined || row.user_id === value),
+              )
+              .map((row) => ({ id: row.id }));
+            return { data: rows, error: null };
+          }),
+        })),
+      })),
       delete: vi.fn(() => ({
         in: vi.fn((_column: string, ids: string[]) => ({
           eq: vi.fn(async (column: string, value: string) => {

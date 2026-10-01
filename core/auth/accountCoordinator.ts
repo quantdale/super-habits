@@ -85,6 +85,48 @@ function isMissingRemoteTableError(error: unknown): boolean {
   );
 }
 
+/**
+ * Distinct remote owner ids, bounded, with NO `user_id` filter.
+ *
+ * WHY: the previous derivation produced `ownerIds` from a count that was
+ * already filtered to `userId`, so the set could only ever be `[userId]` or
+ * `[]` — which made the `remote_foreign_owner` protection branch UNREACHABLE
+ * by construction. A check whose evidence is filtered by the same predicate as
+ * the hypothesis it is meant to disprove cannot disprove anything.
+ *
+ * The query is deliberately unbounded by owner and bounded by ROW COUNT: it
+ * asks "which owners actually have rows here", not "how many rows do I have".
+ * RLS still scopes what the caller can see — the point is that the evidence is
+ * no longer derived from the assumption.
+ */
+const DISTINCT_OWNER_PROBE_LIMIT = 20;
+
+/** Entities sampled for the distinct-owner probe (bounded cost, not exhaustive). */
+const OWNER_PROBE_ENTITIES = ['todos', 'habits', 'calorie_entries'] as const;
+
+async function fetchDistinctRemoteOwners(client: NonNullable<typeof supabase>): Promise<string[]> {
+  const owners = new Set<string>();
+  for (const entity of OWNER_PROBE_ENTITIES) {
+    const { data, error } = await client
+      .from(entity)
+      .select('user_id')
+      .limit(DISTINCT_OWNER_PROBE_LIMIT);
+    if (error) {
+      // A pre-migration remote may not have the table; that is not evidence of
+      // a foreign owner, so keep probing the remaining entities.
+      if (isMissingRemoteTableError(error)) continue;
+      throw error;
+    }
+    for (const row of data ?? []) {
+      const ownerUserId = (row as { user_id?: unknown } | null)?.user_id;
+      if (typeof ownerUserId === 'string' && ownerUserId.length > 0) {
+        owners.add(ownerUserId);
+      }
+    }
+  }
+  return [...owners].sort();
+}
+
 /** Exported for diagnostics/tests: owner-scoped remote row counts per entity. */
 export async function getRemoteFingerprint(userId: string): Promise<AccountRemoteFingerprint> {
   const client = supabase;
@@ -118,7 +160,10 @@ export async function getRemoteFingerprint(userId: string): Promise<AccountRemot
 
   return {
     counts: Object.fromEntries(results.map(({ entity, count }) => [entity, count])),
-    ownerIds: results.some((r) => r.count > 0) ? [userId] : [],
+    // Independent evidence, not a restatement of the counts above: the owners
+    // actually present on the remote, so the `remote_foreign_owner` branch
+    // downstream is reachable by construction.
+    ownerIds: await fetchDistinctRemoteOwners(client),
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
   };
 }

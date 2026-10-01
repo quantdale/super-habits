@@ -220,6 +220,39 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     if (error) {
       throw new Error(`Supabase upsert failed for ${entity}: ${error.message}`);
     }
+
+    // VERIFY THE WRITE BEFORE CALLING IT A PUSH (task 3.1).
+    //
+    // `upsert(..., { onConflict: 'id' })` can succeed with HTTP 200 while
+    // affecting ZERO rows: if a row with the same `id` already exists and
+    // belongs to a DIFFERENT owner, the owner's RLS policy makes the statement
+    // a no-op instead of an error. The push then looked successful, the record
+    // was dropped from the outbox, and the manifest went on to certify counts
+    // and checksums for a row the remote never stored. A single read-back of the
+    // ids just written, scoped to the pushing owner, turns that silent skip into
+    // a visible, classifiable push failure.
+    const readBack = await client
+      .from(entity)
+      .select('id')
+      .in('id', ids)
+      .eq('user_id', currentUserId);
+    if (readBack.error) {
+      throw new Error(
+        `Supabase read-back failed for ${entity} (${ids.length} rows): ${readBack.error.message}`,
+      );
+    }
+    const confirmed = new Set(
+      (readBack.data ?? [])
+        .map((row) => (row as { id?: unknown } | null)?.id)
+        .filter((id): id is string => typeof id === 'string'),
+    );
+    if (confirmed.size !== ids.length) {
+      const missing = ids.filter((id) => !confirmed.has(id));
+      throw new Error(
+        `Supabase push verification failed for ${entity}: ${missing.length} of ${ids.length} row(s) were not stored for this owner (${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ', …' : ''}). ` +
+          `The remote accepted the statement without storing them (a row with the same id owned by another account makes the upsert a no-op), so this push is reported as a failure rather than a success.`,
+      );
+    }
   }
 
   private async pushSettingsSnapshot(

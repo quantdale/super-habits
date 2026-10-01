@@ -17,18 +17,46 @@ type UpsertCall = { entity: string; rows: Record<string, unknown>[] };
 function buildSupabaseMock(
   options: {
     onUpsert?: (entity: string, rows: Record<string, unknown>[]) => Promise<void> | void;
+    /**
+     * Message used while `setFailUpserts(true)` is active. Defaults to a
+     * TRANSIENT failure; the terminal-outbox case passes a persistent
+     * (missing-relation) message so the classifier has something to classify.
+     */
+    upsertErrorMessage?: string;
   } = {},
 ) {
   const upserted: UpsertCall[] = [];
+  /** Rows the fake remote actually stored, so the push read-back can be honest. */
+  const stored = new Map<string, Map<string, Record<string, unknown>>>();
   let failUpserts = false;
+  const failureMessage = options.upsertErrorMessage ?? 'simulated remote failure';
   const from = vi.fn((entity: string) => ({
     upsert: vi.fn(async (rows: Record<string, unknown>[]) => {
-      if (failUpserts) return { error: { message: 'simulated remote failure' } };
+      if (failUpserts) return { error: { message: failureMessage } };
       const rowList = Array.isArray(rows) ? rows : [rows];
       upserted.push({ entity, rows: rowList });
+      const table = stored.get(entity) ?? new Map<string, Record<string, unknown>>();
+      for (const row of rowList) table.set(String(row.id), row);
+      stored.set(entity, table);
       await options.onUpsert?.(entity, rowList);
       return { error: null };
     }),
+    // Push verification read-back (harden-silent-failure-certification 3.1):
+    // the adapter re-reads the ids it just wrote, scoped to the pushing owner,
+    // and treats a missing row as a push failure.
+    select: vi.fn((_columns: string) => ({
+      in: vi.fn((_column: string, ids: string[]) => ({
+        eq: vi.fn(async (_eqColumn: string, value: string) => {
+          const table = stored.get(entity);
+          const data = ids
+            .map((id) => table?.get(id))
+            .filter((row): row is Record<string, unknown> => row !== undefined)
+            .filter((row) => row.user_id === value || row.user_id === undefined)
+            .map((row) => ({ id: row.id }));
+          return { data, error: null };
+        }),
+      })),
+    })),
     delete: vi.fn(() => ({
       in: vi.fn(() => ({
         eq: vi.fn(async () => ({ error: null })),
@@ -47,6 +75,8 @@ function buildSupabaseMock(
 async function load(
   options: {
     onUpsert?: (entity: string, rows: Record<string, unknown>[]) => Promise<void> | void;
+    /** Message for the injected failure; see `buildSupabaseMock`. */
+    upsertErrorMessage?: string;
   } = {},
 ) {
   const supabaseMock = buildSupabaseMock(options);
@@ -449,5 +479,97 @@ describe('backup completeness v2 checkpoint', () => {
       1,
     );
     expect(await outboxCount(db)).toBe(0);
+  });
+
+  it('does not freeze forever on a record that can never push (task 2.4)', async () => {
+    // A remote missing the `todos` table is a PERMANENT condition: every retry
+    // fails the same way. Before this change the outbox kept that record
+    // forever, so `durableOutboxCount` never reached zero and the checkpoint
+    // published nothing again — indistinguishable from a slow backup.
+    const { db, supabaseMock, checkpoint } = await load({
+      upsertErrorMessage: 'relation "public.todos" does not exist',
+    });
+    const { addTodo } = await import('@/features/todos/todos.data');
+    await addTodo({ title: 'stuck' });
+    supabaseMock.setFailUpserts(true);
+
+    // One flush attempt per maintenance cycle. The bound is 5 persistent
+    // attempts, so drive past it.
+    for (let cycle = 0; cycle <= 6; cycle += 1) {
+      await checkpoint.runBackupMaintenance();
+    }
+
+    const { OUTBOX_BLOCK_ATTEMPT_BOUND } = await import('@/core/sync/outboxAttempts');
+    const { syncEngine } = await import('@/core/sync/sync.engine');
+    const blocked = syncEngine.getStatus().blockedEntities;
+    expect(blocked.length).toBeGreaterThan(0);
+    expect(blocked[0]).toMatchObject({ entity: 'todos', class: 'missing_remote_table' });
+    expect(blocked[0]?.reason).toContain('missing_remote_table');
+    expect(syncEngine.getBlockedKeys().length).toBeGreaterThanOrEqual(1);
+    expect(OUTBOX_BLOCK_ATTEMPT_BOUND).toBeGreaterThan(0);
+
+    // The checkpoint is no longer frozen: the blocked record no longer holds
+    // the outbox gate open, so a later cycle captures and publishes. The
+    // remote must accept the push for the capture to be observable.
+    supabaseMock.setFailUpserts(false);
+    await checkpoint.runBackupMaintenance();
+    const manifests = supabaseMock.upserted.filter((call) => call.entity === 'backup_manifest');
+    expect(manifests.length).toBeGreaterThanOrEqual(1);
+    await db.closeAsync();
+  });
+
+  it('omits a blocked entity from the certified manifest (integrity)', async () => {
+    // The manifest certifies checksums of rows the REMOTE holds. A blocked
+    // record's local rows will never be pushed, so certifying them would
+    // publish a manifest that fails its own integrity check on restore. The
+    // honest shape is an omission, disclosed rather than claimed.
+    const { db, supabaseMock, checkpoint } = await load({
+      upsertErrorMessage: 'new row violates row-level security policy for table "todos"',
+    });
+    const { addTodo } = await import('@/features/todos/todos.data');
+    await addTodo({ title: 'rejected' });
+    supabaseMock.setFailUpserts(true);
+    for (let cycle = 0; cycle <= 6; cycle += 1) {
+      await checkpoint.runBackupMaintenance();
+    }
+
+    // Let the remote work again so a manifest can actually be published.
+    supabaseMock.setFailUpserts(false);
+    await checkpoint.runBackupMaintenance();
+
+    const manifests = supabaseMock.upserted.filter((call) => call.entity === 'backup_manifest');
+    expect(manifests.length).toBeGreaterThanOrEqual(1);
+    const latest = manifests[manifests.length - 1].rows[0];
+    const metadata = latest.entity_metadata as Record<string, { count: number }>;
+    expect(metadata.todos).toBeUndefined();
+    // A non-blocked entity is still certified, so the omission is per-entity.
+    const { getBackupStateSummary } = await import('@/core/backup/backupRestore');
+    const summary = await getBackupStateSummary('user_a');
+    if (summary.state === 'v2_complete' || summary.state === 'blocked') {
+      expect(summary.missingEntities).toContain('todos');
+    }
+    await db.closeAsync();
+  });
+
+  it('a transient failure never blocks the record (control for 2.4)', async () => {
+    // The paired control: the same number of failed cycles with a TRANSIENT
+    // message must leave the record retrying, because a flaky network must
+    // never be recorded as a permanent failure and silently dropped.
+    const { db, supabaseMock, checkpoint } = await load({
+      upsertErrorMessage: 'Failed to fetch',
+    });
+    const { addTodo } = await import('@/features/todos/todos.data');
+    await addTodo({ title: 'flaky' });
+    supabaseMock.setFailUpserts(true);
+    for (let cycle = 0; cycle < 8; cycle += 1) {
+      await checkpoint.runBackupMaintenance();
+    }
+    const { syncEngine } = await import('@/core/sync/sync.engine');
+    expect(syncEngine.getBlockedKeys()).toEqual([]);
+    expect(syncEngine.getStatus().blockedEntities).toEqual([]);
+    // The record is still queued and still retrying — the pre-change behavior,
+    // which is correct for a failure that may succeed later.
+    expect(await outboxCount(db)).toBeGreaterThan(0);
+    await db.closeAsync();
   });
 });

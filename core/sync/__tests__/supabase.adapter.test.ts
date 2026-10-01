@@ -9,6 +9,39 @@ type AdapterSetupOptions = {
   localOwnerUserId?: string | null;
 };
 
+/**
+ * A fake remote table surface that stores what it is upserted AND can answer the
+ * push read-back the adapter performs (harden-silent-failure-certification 3.1).
+ * Without the read chain, every push in these tests would fail for a reason that
+ * has nothing to do with what they assert.
+ */
+function storingFrom(
+  upsertImpl?: (
+    rows: Record<string, unknown> | Record<string, unknown>[],
+    options?: { onConflict?: string },
+  ) => Promise<unknown>,
+) {
+  const stored = new Set<string>();
+  const upsert = vi.fn(
+    async (
+      rows: Record<string, unknown> | Record<string, unknown>[],
+      options?: { onConflict?: string },
+    ) => {
+      for (const row of Array.isArray(rows) ? rows : [rows]) stored.add(String(row.id));
+      return upsertImpl ? await upsertImpl(rows, options) : { error: null };
+    },
+  );
+  const select = vi.fn(() => ({
+    in: vi.fn((_column: string, ids: string[]) => ({
+      eq: vi.fn(async () => ({
+        data: ids.filter((id) => stored.has(id)).map((id) => ({ id })),
+        error: null,
+      })),
+    })),
+  }));
+  return { upsert, select };
+}
+
 async function setupAdapter(options: AdapterSetupOptions) {
   vi.resetModules();
 
@@ -21,8 +54,25 @@ async function setupAdapter(options: AdapterSetupOptions) {
       ),
   };
   const getDatabase = vi.fn().mockResolvedValue(db);
-  const upsert = vi.fn().mockResolvedValue({ error: null });
-  const from = vi.fn().mockReturnValue({ upsert });
+  // The adapter verifies each push by reading the ids it just wrote back,
+  // scoped to the pushing owner (harden-silent-failure-certification 3.1), so
+  // the fake remote must be able to ANSWER that read. Rows the upsert received
+  // are recorded and served back, which is the honest default: this fake remote
+  // stores what it is given.
+  const storedRows = new Set<string>();
+  const upsert = vi.fn(async (rows: Record<string, unknown> | Record<string, unknown>[]) => {
+    for (const row of Array.isArray(rows) ? rows : [rows]) storedRows.add(String(row.id));
+    return { error: null };
+  });
+  const select = vi.fn(() => ({
+    in: vi.fn((_column: string, ids: string[]) => ({
+      eq: vi.fn(async () => ({
+        data: ids.filter((id) => storedRows.has(id)).map((id) => ({ id })),
+        error: null,
+      })),
+    })),
+  }));
+  const from = vi.fn().mockReturnValue({ upsert, select });
 
   vi.doMock('@/core/db/client', () => ({
     getDatabase,
@@ -76,6 +126,13 @@ async function expectPartialFailure(
   expect(partialFailure.message).toContain(expected.messageContains);
   expect(partialFailure.failedRecords).toEqual(expected.failedRecords);
 }
+
+// The adapter module (and its Supabase/sync-engine imports) is loaded once at
+// COLLECTION time: `setupAdapter` calls `vi.resetModules()` per test, so without
+// this the FIRST test of the file pays the whole cold-load cost inside its 5s
+// budget — tight when the unit project runs in parallel. The warm-up only
+// populates the transform cache; each test still gets its own module instance.
+await import('@/core/sync/supabase.adapter');
 
 describe('SupabaseSyncAdapter', () => {
   beforeEach(() => {
@@ -272,9 +329,18 @@ describe('SupabaseSyncAdapter', () => {
   });
 
   it('processes each known entity in the same batch separately', async () => {
-    const supabase = {
-      from: vi.fn().mockReturnValue({ upsert: vi.fn().mockResolvedValue({ error: null }) }),
-    };
+    // ONE shared storing surface for the whole test: the read-back re-enters
+    // `from()` for the same entity, and each entity's rows must be visible to
+    // its own verification.
+    const store = storingFrom();
+    // The shared store is returned for every entity, and its upsert spy is
+    // cleared per entity so call-order assertions stay meaningful across the
+    // read-back's re-entry into `from()`.
+    const entities = vi.fn((_entity: string) => {
+      store.upsert.mockClear();
+      return store;
+    });
+    const supabase = { from: entities };
     const { adapter, db } = await setupAdapter({ supabase });
     db.getAllAsync
       .mockResolvedValueOnce([{ id: 'todo_1' }])
@@ -283,15 +349,26 @@ describe('SupabaseSyncAdapter', () => {
     await adapter.push([record('todos', 'todo_1'), record('calorie_entries', 'cal_1')]);
 
     expect(db.getAllAsync).toHaveBeenCalledTimes(2);
-    expect(supabase.from).toHaveBeenNthCalledWith(1, 'todos');
-    expect(supabase.from).toHaveBeenNthCalledWith(2, 'calorie_entries');
+    // The read-back re-enters `from()` for each entity, so the distinct
+    // entities pushed are asserted in first-seen order rather than by call index.
+    const pushedEntities = entities.mock.calls.map(([entity]) => entity);
+    expect([...new Set(pushedEntities)]).toEqual(['todos', 'calorie_entries']);
   });
 
   it('a poisoned entity does not block other entities in the same batch from pushing', async () => {
-    const habitsUpsert = vi.fn().mockResolvedValue({ error: null });
+    const habitsUpsert = vi.fn(
+      async (
+        _rows: Record<string, unknown> | Record<string, unknown>[],
+        _options?: { onConflict?: string },
+      ) => ({ error: null }),
+    );
     const todosUpsert = vi.fn().mockResolvedValue({ error: new Error('schema drift') });
+    // The healthy entity's store is shared across its upsert AND its read-back
+    // (so the healthy push still verifies), while its upsert stays the spy this
+    // test asserts on.
+    const healthyStore = storingFrom(habitsUpsert);
     const from = vi.fn((entity: string) =>
-      entity === 'todos' ? { upsert: todosUpsert } : { upsert: habitsUpsert },
+      entity === 'todos' ? { upsert: todosUpsert } : healthyStore,
     );
     const supabase = { from };
     const { adapter, db, SyncPushPartialFailureError } = await setupAdapter({ supabase });
@@ -352,7 +429,8 @@ describe('SupabaseSyncAdapter', () => {
 
   it('upserts surviving rows when a batch mixes hard deletes and updates', async () => {
     const deleteIntents: string[][] = [];
-    const upsert = vi.fn().mockResolvedValue({ error: null });
+    const store = storingFrom();
+    const upsert = store.upsert;
     const from = vi.fn((entity: string) =>
       entity === 'saved_meals'
         ? {
@@ -364,9 +442,9 @@ describe('SupabaseSyncAdapter', () => {
                 }),
               })),
             })),
-            upsert,
+            ...store,
           }
-        : { upsert },
+        : store,
     );
     const { adapter, db } = await setupAdapter({ supabase: { from } });
     db.getAllAsync.mockResolvedValue([{ id: 'smeal_2', food_name: 'Keep' }]);
