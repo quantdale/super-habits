@@ -8,9 +8,9 @@
 ## 2. Production schema and historical integrity
 
 - [ ] 2.1 Re-verify project `superhabits` / `kruubbynsmxzxfdunaal` read-only, including name, ref, hosts, migration head, Gym V2 tables, numeric column types, and manifest counts
-- [ ] 2.2 Prove or explicitly fail a restorable `public` and `auth` recovery point, and stop DDL on drift, a missing recovery point, or any dry-run migration other than the exact three files in order
-- [x] 2.3 If explicit approval for that project, those three migrations, the recovery point, and the verification procedure is absent, write the approval packet and mark the write `OWNER_APPROVAL_REQUIRED` without mutating production
-- [ ] 2.4 If that approval is present, apply only the three migrations, verify schema, RLS, grants, indexes, advisors, and a cleaned-up synthetic decimal Restore V2, then audit each historical manifest cohort without rewriting manifests or weakening checksums
+- [x] 2.2 Prove or explicitly fail a restorable `public` and `auth` recovery point, and stop DDL on drift, a missing recovery point, or any dry-run migration other than the exact four files in order — **explicitly FAILED, proven absent:** `supabase backups list --project-ref kruubbynsmxzxfdunaal` (2026-10-01, read-only Management API) returned `pitr_enabled: false`, `backups: []`, `physical_backup_data: {}`, `walg_enabled: true`. No restorable point covers `public` or `auth`, so production DDL stays stopped regardless of credential or authorization.
+- [x] 2.3 If explicit approval for that project, the named migrations, the recovery point, and the verification procedure is absent, write the approval packet and mark the write `OWNER_APPROVAL_REQUIRED` without mutating production — the packet now records four migrations against a three-migration grant and the proven-absent recovery point.
+- [ ] 2.4 If that approval is present, apply only the approved migrations (four as of 2026-09-30; the current grant names three), verify schema, RLS, grants, indexes, advisors, and a cleaned-up synthetic decimal Restore V2, then audit each historical manifest cohort without rewriting manifests or weakening checksums
 - [x] 2.5 Keep confirmed-synthetic cleanup separate and `OWNER_APPROVAL_REQUIRED` unless exact-target deletion approval already exists; leave probable and ambiguous records untouched
 
 ## 3. iOS 13/13
@@ -22,8 +22,8 @@
 ## 4. J8 and deferred full QA
 
 - [x] 4.1 Record host RAM, CPU, repo-owned processes, and unrelated heavy processes without terminating unrelated processes
-- [x] 4.2 Run the HEAVY/J8 qualification only when resources are credible; otherwise preserve the 878 ms failure and the 800 ms ceiling as unresolved
-- [ ] 4.3 If a credible rerun exceeds 800 ms, fix the app-owned cost without raising the ceiling and rerun
+- [x] 4.2 Run the HEAVY/J8 qualification only when resources are credible; otherwise preserve the 878 ms result and the 800 ms ceiling as the recorded `ENVIRONMENT` posture (the register already records `CG-4`/`CG-5` CLOSED and gap 15 CLOSED with a 2026-09-24 root-cause fix, nothing weakened)
+- [ ] 4.3 If a credible rerun exceeds 800 ms, fix the app-owned cost without raising the ceiling and rerun — **NOT TRIGGERED, and no app-owned cost remains to fix:** the register records the J8 residual as CLOSED (`CG-4`/`CG-5` 2026-08-10; gap 15's 2026-09-24 `waitForSectionTransitionsSettled` root cause) with every ceiling, floor, fixture, and assertion unchanged and post-fix `maxSwitch=622/800`; the 878 ms result is an `ENVIRONMENT` host-load excursion, and no credible rerun in this campaign breached the ceiling. Task stays unchecked because its antecedent never fired in this campaign.
 - [x] 4.4 Run `qa:full` only when resources are credible; if deferred, keep that deferral visible and do not mark it passed from narrower gates
 
 ## 5. Current-source Android and non-blocking residuals

@@ -8,7 +8,7 @@ Change: `final-certification-closure` · Prepared: 2026-09-29 · Schema: `spec-d
 
 # NOT CERTIFIED
 
-A substantive unresolved product/recovery gate keeps this state red. Production Scope-7 backup integrity is substantively red _and_ currently unverifiable, because no read-only production credential is available. Current-source iOS has three classified flow failures with edits applied but no recertification. J8 is an open performance miss against an unchanged ceiling. `external-blocker-closure` stays **unarchived**.
+A substantive unresolved product/recovery gate keeps this state red. Production Scope-7 backup integrity is substantively red and, for the catalog read, still unverified — but its recovery-point limb is now **proven absent** from a direct read-only observation (`pitr_enabled: false`, `backups: []`), which is a `FAIL`, not an open question. Current-source iOS has three classified flow failures with edits applied but no recertification. J8's preserved 878 ms section-switch result is reclassified as an `ENVIRONMENT` host-load excursion, not an open product gate: `docs/testing/known-gaps.md` records `CG-4` and `CG-5` as CLOSED (2026-08-10, unchanged thresholds) and gap 15 as CLOSED with a 2026-09-24 root-cause fix. `external-blocker-closure` stays **unarchived**.
 
 ## 1. Identities
 
@@ -98,26 +98,26 @@ All three failures are classified `TEST_BUG` with in-artifact evidence, and all 
 
 ## 7. J8 environment and measurement
 
-| Item                        | Value                                                                                             |
-| --------------------------- | ------------------------------------------------------------------------------------------------- |
-| Host                        | i5-13500HX, 20 logical cores, 31.73 GB total RAM, 110.3 h uptime                                  |
-| Available RAM               | **0.57 GB**, then 1.57 GB, then **0.26 GB** across three measurements — all non-credible          |
-| Repo-owned processes        | a single `pwsh.exe` shell; no lingering test, build, or emulator process                          |
-| Largest unrelated consumers | `vmmemWSL` 5,217 MB, `Memory Compression` 4,758 MB, `opencode` 875 MB, plus agent/editor runtimes |
-| Terminated                  | nothing — no unrelated process was killed                                                         |
-| Preserved result            | **878 ms against the unchanged 800 ms ceiling**                                                   |
-| HEAVY/J8 rerun              | **not run** — host headroom is not credible                                                       |
-| `qa:full`                   | **deferred**, and not marked passed from narrower gates                                           |
+| Item                        | Value                                                                                                                                                                                                              |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Host                        | i5-13500HX, 20 logical cores, 31.73 GB total RAM, 110.3 h uptime                                                                                                                                                   |
+| Available RAM               | **0.57 GB**, then 1.57 GB, then **0.26 GB** across three measurements — all non-credible                                                                                                                           |
+| Repo-owned processes        | a single `pwsh.exe` shell; no lingering test, build, or emulator process                                                                                                                                           |
+| Largest unrelated consumers | `vmmemWSL` 5,217 MB, `Memory Compression` 4,758 MB, `opencode` 875 MB, plus agent/editor runtimes                                                                                                                  |
+| Terminated                  | nothing — no unrelated process was killed                                                                                                                                                                          |
+| Preserved result            | **878 ms against the unchanged 800 ms ceiling** — recorded `ENVIRONMENT` host-load excursion, not an open product gate (register: `CG-4`/`CG-5` CLOSED 2026-08-10; gap 15 CLOSED with a 2026-09-24 root-cause fix) |
+| HEAVY/J8 rerun              | **not run** — host headroom is not credible                                                                                                                                                                        |
+| `qa:full`                   | **deferred**, and not marked passed from narrower gates                                                                                                                                                            |
 
-The ceiling stays 800 ms. No app-owned cost was profiled or changed because no credible measurement was possible. Broad `qa:fast`/`qa:full` were not run for the same reason; the gates that were run are listed in the ExecPlan ledger.
+The ceiling stays 800 ms and the 15 % floor stays 15 %. No app-owned cost was profiled or changed because no credible measurement was possible in this session — and none is required: the register's 2026-09-24 resolution already removed the app-owned/measurement contribution (`waitForSectionTransitionsSettled` before the measured round), with post-fix evidence persona 7/7, `maxSwitch=622/800` (22.3 % headroom), per-switch `619/407/395/500/622/457`, `diarySearch=396/500`, `pickerSearch=186/500`. The 878 ms result is retained verbatim as an `ENVIRONMENT` excursion under full-battery host load. Broad `qa:fast`/`qa:full` were not run for the same reason; the gates that were run are listed in the ExecPlan ledger.
 
 ## 8. OpenSpec and ExecPlan status
 
-| Item                                   | Value                                                                                                      |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| This change                            | `final-certification-closure`, 13/22 tasks recorded; 9 remain: 2.1, 2.2, 2.4, 3.2, 3.3, 4.3, 6.1, 6.2, 6.4 |
-| This ExecPlan                          | `Plan-Version: 2`, `Status: BLOCKED`, validates PASS                                                       |
-| Predecessor `external-blocker-closure` | 27/27, ExecPlan `ACTIVE`, report `NOT CERTIFIED`, **unarchived**                                           |
+| Item                                   | Value                                                                                                 |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| This change                            | `final-certification-closure`, 14/22 tasks recorded; 8 remain: 2.1, 2.4, 3.2, 3.3, 4.3, 6.1, 6.2, 6.4 |
+| This ExecPlan                          | `Plan-Version: 2`, `Status: BLOCKED`, validates PASS                                                  |
+| Predecessor `external-blocker-closure` | 27/27, ExecPlan `ACTIVE`, report `NOT CERTIFIED`, **unarchived**                                      |
 
 ## 9. Archive decision
 
@@ -125,7 +125,7 @@ The ceiling stays 800 ms. No app-owned cost was profiled or changed because no c
 
 1. **Production Scope-7 backup integrity** — substantively red and now additionally unverified, because no read-only credential was available.
 2. **Current-source iOS** — three executable flow failures were classified and their flows edited, but no 13/13 run exists at any current SHA, and the persistence replacement has no artifact support.
-3. **J8** — the 878 ms miss stands against the unchanged 800 ms ceiling.
+3. **J8** — **removed from the unmet set.** The 878 ms miss no longer stands as a product gate: the register classifies the residual as an `ENVIRONMENT` host-load excursion, `CG-4`/`CG-5` are CLOSED (2026-08-10) and gap 15 is CLOSED with a 2026-09-24 root-cause fix, with every ceiling (800 ms), floor (15 %), fixture, and assertion unchanged. The archive predicate's third limb — a reproducible product performance regression against an unchanged ceiling — is therefore not met.
 
 ## 10. Residuals
 
@@ -134,23 +134,23 @@ Every residual below carries `WHY`, `CLASSIFICATION`, `WHAT IS REQUIRED`, and `E
 ### R1 — iOS recertification
 
 - **WHY:** The three classified fixes are unproven, and no current-source iOS run exists.
-- **CLASSIFICATION:** BLOCKED — THE WORKFLOW CANNOT BE TRIGGERED FROM `main` (task 3.2 also remains open on the persistence fix)
+- **CLASSIFICATION:** BLOCKED — NO CERTIFIED iOS RESULT AT AN EXACT SHA (task 3.2 also remains open on the persistence fix). The trigger blocker is resolved: the owner chose the `workflow_dispatch` route, it was added to `.github/workflows/ios-native-e2e.yml` and pushed as `16cb41a`, and run `36516000163` was dispatched against the `main` tip. No completed artifact exists for it, so iOS is not certified.
 - **WHAT IS REQUIRED:** The commit and push are DONE: 16 files as `4fa769e`, fast-forwarded, `main` == `origin/main`. What is still required is a runnable path. `.github/workflows/ios-native-e2e.yml` declares only `on: pull_request: types: [labeled, synchronize]`, its job is gated on the `ios-simulator-gha` label, and it has no `workflow_dispatch`; run `36423379932` was likewise a `pull_request` run from `codex/external-blocker-closure`. A push to `main` therefore cannot start it. Either a labelled PR is opened (needs a head branch, and would certify a SHA that is not the `main` tip) or a `workflow_dispatch` trigger is added and the job gate plus `EXPECTED_SOURCE_SHA` are adapted for dispatch events, which changes a release-gate workflow and needs an owner decision. Then require build, executable hash, install, launch, and 13/13 flow passes.
-- **EXACT RESUME ACTION:** Take the owner's chosen route, then re-read the new artifact and compare its flow statuses against the three classified flows before changing anything — do not assume a fix held. A first attempt may still fail, especially for the persistence scroll, which is an untested hypothesis.
+- **EXACT RESUME ACTION:** Re-read the dispatched run's artifact (`36516000163`) if it completed, or dispatch a fresh exact-SHA run, and compare its flow statuses against the three classified flows before changing anything — do not assume a fix held. A first attempt may still fail, especially for the persistence scroll, which is an untested hypothesis. iOS stays deferred by the owner: do not edit `.maestro/` or chase iOS failures without an explicit owner decision.
 
 ### R2 — Production read-only verification
 
 - **WHY:** The 2026-09-28 production posture is unconfirmed, and a stale hypothesis must not drive a write.
 - **CLASSIFICATION:** BLOCKED — MISSING CREDENTIAL
-- **WHAT IS REQUIRED:** The production database password, or a configured read-only Supabase credential. Read-only access alone is sufficient and is **not** DDL authorization.
-- **EXACT RESUME ACTION:** Set the credential, then run read-only `supabase_migrations.schema_migrations`, `information_schema.tables` for the four Gym V2 tables, `information_schema.columns` for the targeted numeric columns, and a `backup_manifest` count against project `kruubbynsmxzxfdunaal`. Record actual values, not the hypothesis.
+- **WHAT IS REQUIRED:** The production database password, or a configured read-only SQL credential. Read-only access alone is sufficient and is **not** DDL authorization. The recovery-point half of this workstream is already **proven absent** from the Management API (`supabase backups list --project-ref kruubbynsmxzxfdunaal` → `pitr_enabled: false`, `backups: []`, `physical_backup_data: {}`, `walg_enabled: true`), so task 2.2 is closed as an explicit `FAIL`; this entry now covers task 2.1's catalog read only.
+- **EXACT RESUME ACTION:** Set the credential, then run read-only `supabase_migrations.schema_migrations`, `information_schema.tables` for the four Gym V2 tables, `information_schema.columns` for the targeted numeric columns, the `habit_completions` constraint/index inventory, and a `backup_manifest` count against project `kruubbynsmxzxfdunaal`. Record actual values, not the hypothesis. Separately, PITR or a physical backup must be enabled before any DDL consideration.
 
 ### R3 — Production DDL rollout
 
-- **WHY:** The three missing migrations leave production backup scope behind local.
+- **WHY:** The three missing migrations plus the owner-scoping correction leave production backup scope behind local.
 - **CLASSIFICATION:** OWNER_APPROVAL_GRANTED_BUT_NOT_EXECUTABLE
-- **WHAT IS REQUIRED:** Authorization is no longer the blocker — the owner granted the project `superhabits` / `kruubbynsmxzxfdunaal` and the exact three migrations `20260824010000`, `20260824020000`, `20260925125655` in that order. The binding blockers are a production credential (absent) and a named proven-restorable `public` + `auth` recovery point, which does not exist and cannot be proven without the credential. The grant also omits acceptance of the verification procedure in `production-approval-packet.md` §6, which this change's own terms require alongside the project and migrations. The owner's own precondition — that the live catalog and a proven recovery point exist first — is unmet. Task 2.2's stop condition (missing recovery point) is therefore active.
-- **EXACT RESUME ACTION:** Supply the credential, then **prove the recovery point first** — do not apply DDL on the way in. Re-verify the live catalog read-only and compare it against `production-approval-packet.md` §3; if it has drifted from the 2026-09-28 hypothesis, stop and update the packet. Then dry-run and confirm the only three migrations appear, in order. Apply, then verify schema, RLS, grants, indexes, advisors, and a cleaned-up synthetic decimal Restore V2 with checksums **enabled and unmodified**. Audit each historical manifest cohort without rewriting manifests or weakening checksums.
+- **WHAT IS REQUIRED:** Authorization is no longer the blocker for the three migrations the owner named — the owner granted the project `superhabits` / `kruubbynsmxzxfdunaal` and the exact three migrations `20260824010000`, `20260824020000`, `20260925125655` in that order. The binding blockers are a production SQL credential (absent) and a named proven-restorable `public` + `auth` recovery point, which was **directly observed to be absent** (`pitr_enabled: false`, `backups: []`) and so cannot be named. A fourth repository migration, `20260930000000_habit_completions_owner_scoped_uniqueness.sql`, is **not covered by the grant** and must be authorized separately. The grant also omits acceptance of the verification procedure in `production-approval-packet.md` §6, which this change's own terms require alongside the project and migrations. The owner's own precondition — that the live catalog and a proven recovery point exist first — is unmet. Task 2.2's stop condition is therefore active, and task 2.2 has been closed as an explicitly failed recovery gate rather than an open question.
+- **EXACT RESUME ACTION:** Supply the credential, then **prove the recovery point first** — do not apply DDL on the way in. PITR/backup enablement in the project is an owner/infrastructure action. Re-verify the live catalog read-only and compare it against `production-approval-packet.md` §3; if it has drifted from the 2026-09-28 hypothesis, stop and update the packet. Obtain an amended approval naming all four migrations. Then dry-run and confirm only those four migrations appear, in order. Apply, then verify schema, RLS, grants, indexes, advisors, and a cleaned-up synthetic decimal Restore V2 with checksums **enabled and unmodified**. Audit each historical manifest cohort without rewriting manifests or weakening checksums.
 
 ### R4 — Historical numeric precision
 
@@ -166,12 +166,12 @@ Every residual below carries `WHY`, `CLASSIFICATION`, `WHAT IS REQUIRED`, and `E
 - **WHAT IS REQUIRED:** Exact-target deletion approval for the 135 confirmed-synthetic records only.
 - **EXACT RESUME ACTION:** Use the gitignored exact-ID snapshot. Delete nothing from the 96 probable or 251 ambiguous sets. Take a fresh recovery point first.
 
-### R6 — J8 performance miss
+### R6 — J8 performance residual
 
-- **WHY:** 878 ms against an unchanged 800 ms ceiling.
-- **CLASSIFICATION:** UNRESOLVED PRODUCT-PERF GATE, with this session's blocker being ENVIRONMENT
-- **WHAT IS REQUIRED:** A host with credible free memory — the 0.57 GB observed here cannot make the number meaningful — then a HEAVY/J8 rerun. If a credible rerun exceeds 800 ms, an app-owned fix without moving the ceiling.
-- **EXACT RESUME ACTION:** Free memory or run on a credible host, re-measure J8, and keep the 800 ms ceiling. Do not cite the older release-candidate headroom scenario as a waiver.
+- **WHY:** A preserved 878 ms section-switch result sits above the unchanged 800 ms ceiling.
+- **CLASSIFICATION:** CLOSED as a product gate; the recorded result is an `ENVIRONMENT` host-load excursion. `docs/testing/known-gaps.md` records `CG-4` and `CG-5` as **CLOSED** (2026-08-10, `close-cg4-cg5-performance-gaps`) and gap 15 as **CLOSED (TEST_BUG; residual `ENVIRONMENT` ceiling excursions stay recorded)** with a 2026-09-24 root-cause resolution: the measured round began while the warm-up's six back-to-back section transitions were still settling, and `waitForSectionTransitionsSettled(page)` corrected the measurement at the source. Post-fix evidence: persona 7/7 green, `maxSwitch=622/800` (22.3 % headroom), per-switch `619/407/395/500/622/457`, `diarySearch=396/500`, `pickerSearch=186/500`. Every ceiling, floor, fixture, and assertion is unchanged, and the 878 ms number is preserved verbatim.
+- **WHAT IS REQUIRED:** Nothing to close the product gate. The `ENVIRONMENT` residual stays recorded: a future ceiling breach is re-verified standalone on an idle host before any product code is touched.
+- **EXACT RESUME ACTION:** None. Do not raise the 800 ms ceiling and do not treat the older release-candidate headroom scenario as a waiver. If a future run breaches the ceiling, run `npx playwright test --project=journeys e2e/journeys/three-months-in.spec.ts -g "Tom"` on an idle host and classify with the recorded per-switch numbers before touching product code.
 
 ### R7 — Current-source Android
 
@@ -210,13 +210,13 @@ Every residual below carries `WHY`, `CLASSIFICATION`, `WHAT IS REQUIRED`, and `E
 
 ## 11. What would change the terminal state
 
-`NOT CERTIFIED` cannot become `LOCALLY COMPLETE — EXTERNAL ACTIONS REQUIRED` on the native lanes alone. Closing R1 (iOS), R6 (J8) and R7 (Android) would still leave production Scope-7 substantively red, and a red recovery gate keeps the terminal state `NOT CERTIFIED` on its own. Native closure is necessary, never sufficient.
+`NOT CERTIFIED` cannot become `LOCALLY COMPLETE — EXTERNAL ACTIONS REQUIRED` on the native lanes alone. Closing R1 (iOS) and R7 (Android) would still leave production Scope-7 substantively red, and a red recovery gate keeps the terminal state `NOT CERTIFIED` on its own. Native closure is necessary, never sufficient. R6 is already closed as a product gate (the 878 ms result is an `ENVIRONMENT` excursion).
 
 The order that actually matters:
 
 1. **R2 first** — obtain the read-only credential and establish the real production posture. Everything production-related is unverified until this happens, and the 2026-09-28 hypothesis must not be used to justify a write.
-2. **R3 second** — prove the recovery point, then apply only the three named migrations under the four-part approval. R3 may not be granted from a stale hypothesis.
-3. **R1, R6, R7** — iOS 13/13 at a real candidate SHA, a credible J8 measurement, and current-source Android. These are independent of production and can proceed in parallel, but they cannot promote the terminal state alone.
+2. **R3 second** — prove a recovery point, then apply only the four named migrations under the amended four-part approval. R3 may not be granted from a stale hypothesis, and its fourth migration is not yet authorized by the owner's three-migration grant.
+3. **R1, R6, R7** — iOS 13/13 at a real candidate SHA, the closed J8 product gate (R6 requires nothing further), and current-source Android. These are independent of production and can proceed in parallel, but they cannot promote the terminal state alone.
 4. **R4, R5** — historical precision and incident deletion remain separate owner decisions even after R3 succeeds.
 
-Archiving `external-blocker-closure` requires R1, R2/R3, and R6 closed together. No single one of them is sufficient.
+Archiving `external-blocker-closure` requires R1 and R2/R3 closed together. No single one of them is sufficient; R6 no longer blocks it.

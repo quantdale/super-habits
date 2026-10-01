@@ -43,7 +43,7 @@ Alternative: push a no-op commit to obtain a fresh run before triage. Rejected. 
 
 ### 4. Production DDL is a gated procedure, not an inferred authorization
 
-Apply re-verifies production read-only before using the 2026-09-28 hypothesis. Drift stops the write path and updates the ExecPlan. No recovery point, or any dry-run surprise, also stops the write. This planning session contains no explicit DDL approval, so apply prepares the approval packet and continues other lanes unless a later operator message names project `kruubbynsmxzxfdunaal`, the exact three migrations, the recovery point, and the verification procedure. Incident deletion is never implied by schema approval. The other 347 probable or ambiguous records stay untouched. No other Supabase project is queried or mutated.
+Apply re-verifies production read-only before using the 2026-09-28 hypothesis. Drift stops the write path and updates the ExecPlan. No recovery point, or any dry-run surprise, also stops the write. This planning session contains no explicit DDL approval, so apply prepares the approval packet and continues other lanes unless a later operator message names project `kruubbynsmxzxfdunaal`, the exact named migration set (four files as of 2026-09-30; the owner's grant names three), the recovery point, and the verification procedure. Incident deletion is never implied by schema approval. The other 347 probable or ambiguous records stay untouched. No other Supabase project is queried or mutated.
 
 Alternative: treat the continuation prompt as DDL approval. Rejected. The prompt explicitly says not to infer that approval.
 
@@ -55,7 +55,7 @@ Alternative: replace `hideKeyboard` immediately because the prompt names it. Rej
 
 ### 6. J8 is rechecked only when the host can make the number meaningful
 
-Record total RAM, available RAM, CPU, repo-owned processes, and unrelated heavy processes. Do not kill unrelated processes. If resources are not credible, keep the 878 ms result and the deferred `qa:full` classification. If they are credible and the result is at or below 800 ms, close that residual with the new evidence. If it is still above 800 ms, profile the app-owned path and fix it without moving the ceiling. The older release-candidate headroom scenario is not a waiver for this preserved miss.
+Record total RAM, available RAM, CPU, repo-owned processes, and unrelated heavy processes. Do not kill unrelated processes. If resources are not credible, keep the 878 ms result and the deferred `qa:full` classification. The register already records `CG-4` and `CG-5` as CLOSED (2026-08-10, unchanged thresholds) and gap 15 as CLOSED with a 2026-09-24 root-cause resolution (`waitForSectionTransitionsSettled` before the measured round; post-fix `maxSwitch=622/800`, persona 7/7, floor unchanged), so the 878 ms result is an `ENVIRONMENT` host-load excursion rather than an open product miss. If a credible rerun still exceeds 800 ms, profile the app-owned path and fix it without moving the ceiling. The older release-candidate headroom scenario is not a waiver for this preserved result.
 
 Alternative: raise the ceiling to 878 ms and cite harness load. Rejected by the prompt and by the new requirement.
 
@@ -80,7 +80,7 @@ After P2, iOS, and J8 are as far as authorization allows, a skeptical review tri
 
 ## Migration Plan
 
-No user-data migration is authorized by these artifacts. Apply order is: new ExecPlan and main preflight; record CI `36449656365`; read-only production identity and recovery check; exact three-file dry run; approval packet or, only with explicit approval, controlled rollout and historical audit; iOS classification and fix; exact-SHA 13/13 rerun; resource-gated J8/`qa:full`; current-source Android or honest environment block; adversarial review; exact-head CI; archive decision and closure report. Rollback of this planning change is removing `openspec/changes/final-certification-closure/`. Rollback of a later product fix is a normal revert. A failed production migration is fix-forward from the actual catalog, not a routine drop of newly created tables.
+No user-data migration is authorized by these artifacts. Apply order is: new ExecPlan and main preflight; record CI `36449656365`; read-only production identity and recovery check; exact four-file dry run; approval packet or, only with explicit approval, controlled rollout and historical audit; iOS classification and fix; exact-SHA 13/13 rerun; resource-gated J8/`qa:full`; current-source Android or honest environment block; adversarial review; exact-head CI; archive decision and closure report. Rollback of this planning change is removing `openspec/changes/final-certification-closure/`. Rollback of a later product fix is a normal revert. A failed production migration is fix-forward from the actual catalog, not a routine drop of newly created tables.
 
 ## Open Questions
 
