@@ -15,9 +15,9 @@
 
 ## 3. Android smoke diagnosis and scoped repair
 
-- [ ] 3.1 Read the raw build/tag/command/hierarchy/screenshot artifacts and current command/render/provider/profile contracts; write reviewed triage explaining the original `PRODUCT_BUG` label versus evidence-supported classification without altering raw artifacts.
-- [ ] 3.2 Confirm supported platform/profile flow syntax and implement the smallest Android-specific correction for the hidden Create selector; preserve the iOS command sequence, all draft/review/confirmation assertions and default-off Ask/Auto behavior.
-- [ ] 3.3 Add meaningful regression protection for ordinary Android surface behavior, provider/release guards and unchanged iOS command semantics; prove the guard fails on the original defect without optional steps, test IDs or timing/assertion weakening.
+- [x] 3.1 Read the raw build/tag/command/hierarchy/screenshot artifacts and current command/render/provider/profile contracts; write reviewed triage explaining the original `PRODUCT_BUG` label versus evidence-supported classification without altering raw artifacts.
+- [x] 3.2 Confirm supported platform/profile flow syntax and implement the smallest Android-specific correction for the hidden Create selector; preserve the iOS command sequence, all draft/review/confirmation assertions and default-off Ask/Auto behavior.
+- [x] 3.3 Add meaningful regression protection for ordinary Android surface behavior, provider/release guards and unchanged iOS command semantics; prove the guard fails on the original defect without optional steps, test IDs or timing/assertion weakening.
 - [ ] 3.4 Commit the executable correction after affected validation; qualify its complete smoke/persistence/lifecycle batteries from a clean exact-source checkout using hermetic provisioning, recording flow sets, per-flow results, target/API/ABI, package and installed APK hash; fix any newly revealed in-scope defect rather than assuming the old aborted flow's later steps pass.
 - [ ] 3.5 Reconcile canonical Android status and native hardening task 5.3/current checkpoint from actual evidence; close it only on complete required smoke proof, or retain a precise non-passable residual and replay action with persistence/lifecycle identities intact.
 

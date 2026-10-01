@@ -38,7 +38,24 @@ tags:
 - extendedWaitUntil:
     visible: 'Command center'
     timeout: 10000
-- tapOn: 'Create'
+# The ordinary (default-off) build renders the Create surface directly: the
+# Ask/Auto selector is rollout-gated (features/command/commandSurface.ts) and
+# CommandScreen returns the content without mounting ModeToggle while
+# AI_ASK_EXPERIMENT_ENABLED is false, so there is no mode chip to tap.
+# Android asserts the ordinary Create surface and the absence of the paid-mode
+# controls; the iOS branch keeps the historical command sequence unchanged.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible: 'Command input'
+      - assertNotVisible: 'Ask'
+      - assertNotVisible: 'Auto'
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: 'Create'
 - scrollUntilVisible:
     element: 'Command input'
     direction: UP
