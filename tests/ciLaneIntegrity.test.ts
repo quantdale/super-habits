@@ -215,15 +215,29 @@ describe('CI lane integrity: the quality job runs every guard qa:fast runs', () 
 });
 
 describe('CI lane integrity: credential-gated and report-only lanes match their claims', () => {
-  it('conditions the disposable-backend lane on the secrets context and maps the token in', () => {
+  it('gates the disposable-backend lane on a shell-probed credential, never on the secrets context', () => {
     const nightly = job(ci, 'nightly');
     const step = stepsRunning(nightly, 'simulation/backend/provision.ts')[0];
     expect(step, 'disposable-backend lane step not found').toBeDefined();
-    expect(step?.if).toContain("secrets.SUPABASE_ACCESS_TOKEN != ''");
-    // Step-level env is the only way the token reaches the process body; the
-    // old `env.SUPABASE_ACCESS_TOKEN` condition was never populated.
-    expect(step?.if).not.toContain('env.SUPABASE_ACCESS_TOKEN');
+    // `secrets` is NOT an allowed context in a step's `if:` — GitHub's
+    // context-availability table lists only github, needs, strategy, matrix,
+    // job, runner, env, vars, steps and inputs there. An invalid expression
+    // fails the WHOLE workflow at parse time: run 36807888273 (2026-10-01)
+    // reported zero jobs and "This run likely failed because of a workflow file
+    // issue" for exactly the construct this test used to require. Pin the valid
+    // wiring instead, and keep the intent: the lane runs only when the token is
+    // configured, and the token reaches the process through `env:`.
+    expect(step?.if).toBe("steps.disposable-credentials.outputs.configured == 'true'");
+    const probe = nightly.steps.find((candidate) => candidate.id === 'disposable-credentials');
+    expect(probe, 'credential probe step not found').toBeDefined();
+    expect(probe?.run).toContain('SUPABASE_ACCESS_TOKEN');
+    expect(probe?.run).toContain('configured=true');
+    // Step-level env is the only way the token reaches either process body; the
+    // old `env.SUPABASE_ACCESS_TOKEN` condition was never populated, and the
+    // `secrets.X != ''` replacement was rejected by the workflow parser.
     expect(nightly.text).toContain('SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}');
+    // No `if:` anywhere in the workflow may reference the secrets context.
+    expect(ci.text).not.toMatch(/^\s*if:.*\bsecrets\./m);
   });
 
   it('marks every report-only nightly lane as continue-on-error', () => {

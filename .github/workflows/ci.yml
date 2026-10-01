@@ -425,21 +425,38 @@ jobs:
 
       # ---- disposable-backend lane (lane disposable-backend) ----
       # Runs ONLY when a Supabase access token is configured as a repo secret;
-      # otherwise this step is skipped and nightly stays green with the lane
-      # visibly "not configured". The condition reads the `secrets` context
-      # directly: `env.SUPABASE_ACCESS_TOKEN` was never populated (step-level
-      # `env:` does not feed a step's own `if:`), so the lane could never run
-      # even with the secret set. The token is mapped into the step's `env:`
-      # block so `simulation/backend/provision.ts` receives it. The
-      # hard-isolation guard (guard.ts / provision.ts check /
+      # otherwise the lane is skipped and nightly stays green with the lane
+      # visibly "not configured".
+      #
+      # WHY A PROBE STEP: `secrets` is NOT an allowed context in a step's `if:`.
+      # GitHub's context-availability table permits only github, needs, strategy,
+      # matrix, job, runner, env, vars, steps and inputs there, and an invalid
+      # expression fails the ENTIRE workflow at parse time — run 36807888273 on
+      # 2026-10-01 reported zero jobs and "This run likely failed because of a
+      # workflow file issue" for exactly this line. A step's own `env:` is also
+      # not readable from its own `if:`, so the token is mapped into a probe
+      # step's `env`, tested in the shell, and published as a step output the
+      # lane conditions on. The token stays scoped to the two steps that need it.
+      # The hard-isolation guard (guard.ts / provision.ts check /
       # build-dist-live.sh) runs BEFORE any build or network call and aborts
       # non-zero if a rule fires. Round-trip scenario execution against
       # dist-live/ (roundTripScenarios.ts) is task 8.5 wiring — pending; the
       # next nightly's create-or-wipe cleans up the previous project (task 8.2
-      # semantics). A skipped step reports as "not configured" in the run
-      # summary; a configured-but-failing step reports its failure.
+      # semantics). A skipped lane reports as "not configured" in the run
+      # summary; a configured-but-failing lane reports its failure.
+      - name: Detect disposable-backend credentials (configuration probe)
+        id: disposable-credentials
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -n "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Disposable-backend lane (guarded; needs SUPABASE_ACCESS_TOKEN)
-        if: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' }}
+        if: steps.disposable-credentials.outputs.configured == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SIMULATION_PRODUCTION_SUPABASE_HOSTS: ${{ vars.SIMULATION_PRODUCTION_SUPABASE_HOSTS }}
