@@ -1,10 +1,12 @@
 import { Text } from '@/core/ui/Text';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Animated, Pressable, TextInput, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useReducedMotion } from '@/core/theme/motion';
 import { opacity, radius, size, spacing, springs } from '@/core/theme/designTokens';
+import { createSubmitGuard } from '@/lib/submitGuard';
+import { submitInlineQuickAdd } from '@/features/todos/todoQuickCapture.submit';
 
 type Props = {
   /** Creates the task; resolves after persistence so the input only clears on success. */
@@ -18,6 +20,11 @@ type Props = {
  * the chunky circular add button creates a task with just a title; the optional
  * details action keeps advanced task editing reachable without another
  * floating action. The add button sinks and springs back under the finger.
+ *
+ * Both entry paths funnel through `submitInlineQuickAdd`, which owns the
+ * same-tick re-entry guard (see that module for why the `isSubmitting` state
+ * alone cannot do this job). `isSubmitting` here is only the button's loading
+ * presentation.
  */
 export function TodoQuickCapture({ onSubmit, onOpenDetails }: Props) {
   const { tokens, sectionAccents } = useAppTheme();
@@ -25,6 +32,7 @@ export function TodoQuickCapture({ onSubmit, onOpenDetails }: Props) {
   const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pressScale] = useState(() => new Animated.Value(1));
+  const submitGuard = useRef(createSubmitGuard());
   const trimmed = title.trim();
   const canSubmit = trimmed.length > 0 && !isSubmitting;
 
@@ -37,14 +45,14 @@ export function TodoQuickCapture({ onSubmit, onOpenDetails }: Props) {
   };
 
   const handleSubmit = async () => {
-    if (!canSubmit) return;
-    setIsSubmitting(true);
-    try {
-      await onSubmit(trimmed);
-      setTitle('');
-    } finally {
-      setIsSubmitting(false);
-    }
+    await submitInlineQuickAdd({
+      guard: submitGuard.current,
+      canSubmit,
+      title: trimmed,
+      persist: onSubmit,
+      onSubmittingChange: setIsSubmitting,
+      onPersisted: () => setTitle(''),
+    });
   };
 
   return (

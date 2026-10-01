@@ -167,7 +167,7 @@ export async function addCalorieEntry(
     consumedOn?: string;
   },
   opts?: { maintainSavedMeal?: boolean },
-): Promise<void> {
+): Promise<string> {
   const id = createId('cal');
   const now = nowIso();
   const consumedOn = input.consumedOn ?? toDateKey();
@@ -229,6 +229,10 @@ export async function addCalorieEntry(
       console.error('[calories] saved-meal maintenance failed after add', error);
     }
   }
+  // The created row's id: a caller that offers an undo of this write must
+  // resolve the exact row it captured rather than re-matching by value (two
+  // identical captures in one session are indistinguishable by content).
+  return id;
 }
 
 /**

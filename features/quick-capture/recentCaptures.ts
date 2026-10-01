@@ -16,8 +16,16 @@ export type RecentCapture = {
   key: string;
   label: string;
   /**
-   * Calorie-only match fields. `addCalorieEntry` does not return the row id,
-   * so undo re-resolves the entry from today's newest-first list by content.
+   * Calorie-only identity of the row this capture created. Undo deletes exactly
+   * this row, so two identical captures in one session stay individually
+   * undoable (a value match cannot tell them apart and would delete the newer
+   * row when the older one is undone).
+   */
+  calorieEntryId?: string;
+  /**
+   * @deprecated Legacy content-match fields from before `addCalorieEntry`
+   * returned the row id. Read only when rebuilding an entry persisted by an
+   * older build; never used to resolve an undo on its own.
    */
   calorieRef?: { foodName: string; calories: number; mealType: string };
   /** Canonical data-API undo; may resolve to a status value, which is ignored. */
@@ -31,7 +39,10 @@ export const RECENT_CAPTURES_STORAGE_KEY = 'superhabits.quickCapture.recents';
 export const LAST_CAPTURE_MODE_STORAGE_KEY = 'superhabits.quickCapture.lastMode';
 
 /** Serializable snapshot of one recent capture (the undo closure is rebuilt by the caller). */
-export type PersistedRecentCapture = Pick<RecentCapture, 'key' | 'label' | 'calorieRef'>;
+export type PersistedRecentCapture = Pick<
+  RecentCapture,
+  'key' | 'label' | 'calorieEntryId' | 'calorieRef'
+>;
 
 /** Prepend a capture, keeping only the most recent `MAX_RECENT_CAPTURES`. */
 export function pushRecentCapture(list: RecentCapture[], entry: RecentCapture): RecentCapture[] {
@@ -62,8 +73,10 @@ export async function undoRecentCapture(
 export function persistRecentCaptures(list: RecentCapture[]): void {
   const snapshot: PersistedRecentCapture[] = list
     .slice(0, MAX_RECENT_CAPTURES)
-    .map(({ key, label, calorieRef }) =>
-      calorieRef ? { key, label, calorieRef } : { key, label },
+    .map(({ key, label, calorieEntryId, calorieRef }) =>
+      calorieEntryId
+        ? { key, label, calorieEntryId, ...(calorieRef ? { calorieRef } : {}) }
+        : { key, label },
     );
   AsyncStorage.setItem(RECENT_CAPTURES_STORAGE_KEY, JSON.stringify(snapshot)).catch(() => {
     // The in-memory list still works for this session.
@@ -97,16 +110,15 @@ export function persistLastCaptureMode(mode: string): void {
 }
 
 /**
- * Unique key for an id-less calorie capture: `addCalorieEntry` does not
- * return the row id, so keys were bare `Date.now()` — two captures in the
- * same millisecond collided and `removeRecentCapture` dropped both list
- * entries (one undo became unreachable). The monotonic suffix makes keys
- * unique within a session and never equal to persisted legacy `calorie:<ms>`
- * keys.
+ * Unique key for a calorie capture. Calories historically had no row id
+ * (`addCalorieEntry` returned nothing), so keys were bare `Date.now()` and two
+ * captures in the same millisecond collided, making `removeRecentCapture` drop
+ * both list entries. The row id plus a monotonic suffix keeps keys unique
+ * within a session and never equal to persisted legacy `calorie:<ms>` keys.
  */
-export function nextCalorieCaptureKey(): string {
+export function nextCalorieCaptureKey(entryId?: string): string {
   calorieCaptureSequence += 1;
-  return `calorie:${Date.now()}_${calorieCaptureSequence}`;
+  return `calorie:${entryId ?? Date.now()}_${calorieCaptureSequence}`;
 }
 
 let calorieCaptureSequence = 0;

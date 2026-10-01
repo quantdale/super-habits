@@ -1,7 +1,7 @@
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { defineJourney } from '../helpers/journey';
 import { resetAll } from '../helpers/reset';
-import { returnToApp } from '../helpers/dbHarness';
+import { queryRows, returnToApp } from '../helpers/dbHarness';
 import {
   expectRows,
   expectUnchanged,
@@ -9,7 +9,7 @@ import {
   ACTIVE_SECTION_SELECTOR,
 } from '../helpers/oracles';
 import { openNewTodoModal, submitTodoModal } from '../helpers/navigation';
-import { swipeLeftToRevealRowActions } from '../helpers/gestures';
+import { swipeLeftToRevealRowActions, rapidPress } from '../helpers/gestures';
 
 /**
  * J7 — "Fat fingers" (P4, error-prone-user persona).
@@ -41,45 +41,6 @@ import { swipeLeftToRevealRowActions } from '../helpers/gestures';
  * double-submit probe (the most likely to expose an R5 duplicate-write defect)
  * runs last so a genuine defect aborts the least amount of the journey.
  */
-
-/** Rapid-fire a full press sequence `times` times synchronously on a Pressable. */
-async function rapidPress(locator: Locator, times: number): Promise<void> {
-  await locator.evaluate((el, n) => {
-    const btn = el as HTMLElement;
-    const r = btn.getBoundingClientRect();
-    const x = r.left + r.width / 2;
-    const y = r.top + r.height / 2;
-    for (let i = 0; i < n; i++) {
-      btn.dispatchEvent(
-        new PointerEvent('pointerdown', {
-          bubbles: true,
-          cancelable: true,
-          clientX: x,
-          clientY: y,
-          pointerId: i + 1,
-          pointerType: 'mouse',
-          isPrimary: true,
-          buttons: 1,
-        }),
-      );
-      btn.dispatchEvent(
-        new PointerEvent('pointerup', {
-          bubbles: true,
-          cancelable: true,
-          clientX: x,
-          clientY: y,
-          pointerId: i + 1,
-          pointerType: 'mouse',
-          isPrimary: true,
-          buttons: 0,
-        }),
-      );
-      btn.dispatchEvent(
-        new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y }),
-      );
-    }
-  }, times);
-}
 
 /** Open the add-habit modal and create a habit through the real UI. */
 async function createHabitViaUi(page: Page, name: string): Promise<void> {
@@ -506,6 +467,122 @@ defineJourney({
           "SELECT COUNT(*) AS n FROM todos WHERE title = 'Double-submit todo' AND deleted_at IS NULL",
           (rows) => {
             expect(Number(rows[0]?.n ?? 0)).toBe(1);
+          },
+        );
+      },
+    },
+    {
+      name: 'inline quick-add input: two same-tick presses and one Enter keypress land exactly ONE row each',
+      run: async ({ page }) => {
+        await returnToApp(page);
+        await switchSection(page, 'todos');
+        // The persistent inline input pinned above the pending list. It is NOT
+        // the modal: its own press path and its Enter-key path converge in one
+        // handler that must carry the same synchronous re-entry guard.
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        const inlineInput = page.getByPlaceholder('Quick add', { exact: true });
+        await expect(inlineInput).toBeVisible();
+        // The quick-capture row renders exactly two "Add task" controls: the
+        // circular add button, then the Details button that opens the modal.
+        // Assert the inventory so a third match (an open modal) fails here
+        // rather than pressing the wrong control below.
+        const addTaskButtons = page.getByRole('button', { name: 'Add task', exact: true });
+        await expect(addTaskButtons).toHaveCount(2);
+        const inlineAdd = addTaskButtons.first();
+
+        // (a) Two complete presses in the same tick.
+        await inlineInput.fill('Inline double-submit');
+        await rapidPress(inlineAdd, 2);
+        await expect(page.getByText('Inline double-submit', { exact: true }).first()).toBeVisible();
+        await expectRows(
+          page,
+          "SELECT COUNT(*) AS n FROM todos WHERE title = 'Inline double-submit' AND deleted_at IS NULL",
+          (rows) => {
+            expect(Number(rows[0]?.n ?? 0)).toBe(1);
+          },
+        );
+
+        // (b) The keyboard submit path still writes exactly one row.
+        // A row oracle navigates the page into the DB harness, so the app is
+        // restored and the To Do section re-selected before driving the UI.
+        await returnToApp(page);
+        await switchSection(page, 'todos');
+        await expect(inlineInput).toBeVisible();
+        await inlineInput.fill('Inline enter-submit');
+        await inlineInput.press('Enter');
+        await expect(page.getByText('Inline enter-submit', { exact: true }).first()).toBeVisible();
+        await expectRows(
+          page,
+          "SELECT COUNT(*) AS n FROM todos WHERE title = 'Inline enter-submit' AND deleted_at IS NULL",
+          (rows) => {
+            expect(Number(rows[0]?.n ?? 0)).toBe(1);
+          },
+        );
+      },
+    },
+    {
+      name: 'two identical quick captures: undoing the FIRST deletes the row it captured and keeps the second',
+      run: async ({ page }) => {
+        await returnToApp(page);
+        await page.getByRole('button', { name: 'Quick capture', exact: true }).click();
+        await expect(page.getByText('Add something', { exact: true })).toBeVisible();
+        // Calorie destination, two identical captures.
+        await page.getByRole('button', { name: 'Calorie', exact: true }).click();
+        await page.getByRole('textbox', { name: 'Food name', exact: true }).fill('Double capture');
+        await page.getByRole('textbox', { name: 'Calories', exact: true }).fill('250');
+        await page.getByRole('button', { name: 'lunch', exact: true }).click();
+        await page.getByText('Capture', { exact: true }).click({ force: true });
+        await expect(page.getByText('Double capture · 250 kcal').first()).toBeVisible();
+
+        // The capture path resets the form; wait for that before the second,
+        // identical capture so the fill cannot race the reset.
+        const foodName = page.getByRole('textbox', { name: 'Food name', exact: true });
+        const kcalInput = page.getByRole('textbox', { name: 'Calories', exact: true });
+        await expect(foodName).toHaveValue('');
+        await expect(kcalInput).toHaveValue('');
+        await foodName.fill('Double capture');
+        await kcalInput.fill('250');
+        await page.getByText('Capture', { exact: true }).click({ force: true });
+        // Two entries in the recent list, newest first.
+        await expect(page.getByRole('button', { name: /^Undo Double capture/ })).toHaveCount(2);
+
+        // Row identity before the undo: oldest first, so [0] is the FIRST capture.
+        const before = await queryRows(
+          page,
+          "SELECT id, food_name, calories FROM calorie_entries WHERE deleted_at IS NULL AND food_name = 'Double capture' ORDER BY created_at ASC",
+        );
+        expect(before).toHaveLength(2);
+        const [firstCapture, secondCapture] = before;
+
+        // The row oracle navigates into the DB harness, so the overlay is
+        // reopened from scratch: its recent-capture list is restored from
+        // storage and the undo closures are REBUILT, which is the path that
+        // must resolve the captured row's identity.
+        await returnToApp(page);
+        await page.getByRole('button', { name: 'Quick capture', exact: true }).click();
+        await expect(page.getByText('Add something', { exact: true })).toBeVisible();
+        // The restore effect applies the persisted last-used destination AFTER
+        // it loads the recent list, so the Calorie inputs appearing is the
+        // signal that the restore has committed and the Undo controls are the
+        // rebuilt closures (clicking before that races the restore).
+        await expect(page.getByRole('textbox', { name: 'Calories', exact: true })).toBeVisible();
+
+        // Recent captures are listed newest first, so the OLDER capture is the
+        // last Undo control in the list.
+        const undoButtons = page.getByRole('button', { name: /^Undo Double capture/ });
+        await expect(undoButtons).toHaveCount(2);
+        // No force: Playwright's stability check waits out the modal's fade-in
+        // and the auto-focus scroll, so the press cannot land on a stale box.
+        await undoButtons.last().click();
+        await expect(undoButtons).toHaveCount(1);
+        // Exactly one matching row remains, and it is the SECOND capture — the
+        // pre-change value-matching undo deleted the newer row instead.
+        await expectRows(
+          page,
+          "SELECT id FROM calorie_entries WHERE deleted_at IS NULL AND food_name = 'Double capture' ORDER BY created_at ASC",
+          (rows) => {
+            expect(rows.map((row) => row.id)).toEqual([secondCapture.id]);
+            expect(rows[0]?.id).not.toBe(firstCapture.id);
           },
         );
       },

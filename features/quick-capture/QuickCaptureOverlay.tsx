@@ -10,15 +10,12 @@ import { useCommandCenter } from '@/features/command/commandCenterContext';
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { addTodo, removeTodo } from '@/features/todos/todos.data';
 import { addHabit, deleteHabit } from '@/features/habits/habits.data';
-import {
-  addCalorieEntry,
-  deleteCalorieEntry,
-  listCalorieEntries,
-} from '@/features/calories/calories.data';
+import { addCalorieEntry, deleteCalorieEntry } from '@/features/calories/calories.data';
 import { addProject, listProjects, softDeleteProject } from '@/features/projects/projects.data';
 import { addGoal, listGoals, softDeleteGoal } from '@/features/goals/goals.data';
 import { PROJECT_COLORS } from '@/features/projects/projects.types';
 import { parseQuickCapture } from '@/features/quick-capture/quickCapture.domain';
+import { rebuildRecentCapture } from '@/features/quick-capture/rebuildRecentCapture';
 import { sanitizeNumericInput, parseNumericInput } from '@/lib/numericInput';
 import { createSubmitGuard } from '@/lib/submitGuard';
 import {
@@ -30,7 +27,6 @@ import {
   pushRecentCapture,
   removeRecentCapture,
   undoRecentCapture,
-  type PersistedRecentCapture,
   type RecentCapture,
 } from '@/features/quick-capture/recentCaptures';
 import type { TodoPriority } from '@/core/db/types';
@@ -51,54 +47,6 @@ const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
 
 /** Destinations whose capture can optionally link to a project. */
 const LINKS_TO_PROJECT: readonly CaptureMode[] = ['todo', 'habit', 'goal'];
-
-/**
- * Rebuild a persisted capture's undo closure after a reload. Entries from an
- * unknown/older schema, or kinds without a resolvable target, restore
- * without undo instead of breaking the list.
- */
-function rebuildRecentCapture(record: PersistedRecentCapture): RecentCapture | null {
-  const separatorIndex = record.key.indexOf(':');
-  if (separatorIndex <= 0) return null;
-  const kind = record.key.slice(0, separatorIndex);
-  const entityId = record.key.slice(separatorIndex + 1);
-  let undo: () => Promise<unknown>;
-  switch (kind) {
-    case 'todo':
-      undo = () => removeTodo(entityId);
-      break;
-    case 'habit':
-      undo = () => deleteHabit(entityId);
-      break;
-    case 'project':
-      undo = () => softDeleteProject(entityId);
-      break;
-    case 'goal':
-      undo = () => softDeleteGoal(entityId);
-      break;
-    case 'calorie': {
-      const ref = record.calorieRef;
-      if (!ref) return null;
-      undo = async () => {
-        // Same content-match resolution as the live path: addCalorieEntry
-        // does not return the row id.
-        const entries = await listCalorieEntries();
-        const match = entries.find(
-          (entry) =>
-            entry.food_name === ref.foodName &&
-            entry.calories === ref.calories &&
-            entry.meal_type === ref.mealType,
-        );
-        if (!match) return;
-        await deleteCalorieEntry(match.id);
-      };
-      break;
-    }
-    default:
-      return null;
-  }
-  return { key: record.key, label: record.label, calorieRef: record.calorieRef, undo };
-}
 
 export function QuickCaptureOverlay() {
   const { tokens, sectionAccents } = useAppTheme();
@@ -265,24 +213,19 @@ export function QuickCaptureOverlay() {
           return;
         }
         const capturedFood = title.trim();
-        await addCalorieEntry({ foodName: capturedFood, calories: cal, mealType });
+        const entryId = await addCalorieEntry({
+          foodName: capturedFood,
+          calories: cal,
+          mealType,
+        });
         pushRecent({
-          key: nextCalorieCaptureKey(),
+          key: nextCalorieCaptureKey(entryId),
           label: `${capturedFood} · ${cal} kcal`,
-          calorieRef: { foodName: capturedFood, calories: cal, mealType },
-          undo: async () => {
-            // addCalorieEntry does not return the row id; resolve the
-            // just-added entry from today's newest-first list before deleting.
-            const entries = await listCalorieEntries();
-            const match = entries.find(
-              (entry) =>
-                entry.food_name === capturedFood &&
-                entry.calories === cal &&
-                entry.meal_type === mealType,
-            );
-            if (!match) return;
-            await deleteCalorieEntry(match.id);
-          },
+          // Undo resolves the exact row this capture created: two identical
+          // captures are indistinguishable by content, and value matching
+          // deleted the newer row when the older one was undone.
+          calorieEntryId: entryId,
+          undo: () => deleteCalorieEntry(entryId),
         });
       } else if (mode === 'project') {
         if (!title.trim()) {

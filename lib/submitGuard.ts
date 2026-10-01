@@ -17,7 +17,9 @@
  * Call finish() from the caller's finally block so validation/errors do
  * not permanently lock the form.
  */
-export function createSubmitGuard(): { tryStart: () => boolean; finish: () => void } {
+export type SubmitGuard = { tryStart: () => boolean; finish: () => void };
+
+export function createSubmitGuard(): SubmitGuard {
   let inFlight = false;
 
   return {
