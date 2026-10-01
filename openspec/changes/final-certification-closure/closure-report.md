@@ -1,14 +1,14 @@
-# Closure report — DRAFT, not yet the final published report
+# Closure report — current, published with the campaign
 
 Change: `final-certification-closure` · Prepared: 2026-09-29 · Updated: 2026-10-01 · Schema: `spec-driven`
 
-> **Task 6.4 is not checked.** This draft is not yet the final published report because the linked successor `windows-closure-reconciliation` still holds the Android smoke qualification, the full ten-surface adversarial review (task 6.1), the final source candidate, and the exact-head CI attestation for that candidate. Task 6.2 is now **closed** for the verified candidate `210afd39a99e2b2dbf5026b58a1191182e05f368` (run `36824132137`); any later commit is a new tip and is re-attested through the successor's commit-linked final attestation rather than reused parent-SHA CI. The residual blocks below are the part that does not depend on the missing evidence. This draft deliberately keeps superseded events visible as history instead of deleting them.
+> **This is the current report.** All ten required sections are present and reconciled against direct evidence: the verified CI candidate, the full-QA deferral-then-pass chronology, the J8 conditional posture, the complete Android battery, the owner-deferred iOS posture, the credential-blocked production posture with a proven-absent recovery point, both archive predicates, and four-field blocks for every residual. Task 6.4 is checked on this report. Because a committed report cannot contain the hash of the commit that carries it, its final published SHA and exact-head CI results are recorded in the campaign's immutable commit-linked post-CI attestation; the report names its **source candidate** and never relabels an ancestor as the final tip. Superseded events are kept visible as history instead of deleted.
 
 ## Terminal state
 
 # NOT CERTIFIED
 
-A substantive unresolved product/recovery gate keeps this state red. Production Scope-7 backup integrity is substantively red and, for the catalog read, still unverified — but its recovery-point limb is now **proven absent** from a direct read-only observation (`pitr_enabled: false`, `backups: []`), which is a `FAIL`, not an open question. Current-source iOS has three classified flow failures with edits applied but no recertification. J8's preserved 878 ms section-switch result is reclassified as an `ENVIRONMENT` host-load excursion, not an open product gate: `docs/testing/known-gaps.md` records `CG-4` and `CG-5` as CLOSED (2026-08-10, unchanged thresholds) and gap 15 as CLOSED with a 2026-09-24 root-cause fix. `external-blocker-closure` stays **unarchived**.
+**Windows/local engineering is exhausted; overall certification is not.** The two are different statements, and this report keeps them apart. Every Windows-executable lane is now green or precisely classified: CI on the verified candidate, the full-QA chronology, J8, the ten-surface adversarial review, and the complete Android battery (provisioning PASS, smoke 2/2, persistence 11/11, lifecycle 6/6) on the current-source hermetic APK. A substantive unresolved production/recovery gate keeps the terminal state red on its own: Scope-7 backup integrity is substantively red and, for the catalog read, still unverified, while its recovery-point limb is **proven absent** from a direct read-only observation (`pitr_enabled: false`, `backups: []`, re-observed 2026-10-01). iOS stays `DEFERRED_BY_OWNER / ENVIRONMENT` and is never called certified. J8's preserved 878 ms section-switch result is an `ENVIRONMENT` host-load excursion, not an open product gate: `docs/testing/known-gaps.md` records `CG-4` and `CG-5` as CLOSED (2026-08-10, unchanged thresholds) and gap 15 as CLOSED with a 2026-09-24 root-cause fix, and task 4.3 is `NOT_TRIGGERED`. Neither `external-blocker-closure` nor this change is archived.
 
 ## 1. Identities
 
@@ -22,6 +22,8 @@ A substantive unresolved product/recovery gate keeps this state red. Production 
 | Tree state                    | tracked tree clean; untracked foreign evidence only (`.tmp-ios36423379932/` and prior change directories), never staged                          |
 | `.tmp-ios36423379932/`        | untracked and **not** ignored by `.gitignore`; never staged, never committed, never deleted                                                      |
 | Integration Node              | pinned `v22.23.2` used for every gate; ambient `v24.3.0` never ran a gate                                                                        |
+
+**Source candidate vs publishing tip.** This report is committed as the campaign's final content commit, so it cannot contain its own commit hash: writing that hash would change it. The report therefore identifies the **source candidate** — the tree carrying this report and the campaign's verified changes — and its exact-head CI plus final SHA are published in an **immutable commit-linked post-CI attestation** (a GitHub commit comment on that commit) containing the final SHA, run id, job results, the report permalink and the residual list. The ancestor `210afd3` is recorded above as the verified candidate for task 6.2 only; it is never relabelled as the final tip. |
 
 ## 2. CI
 
@@ -59,7 +61,9 @@ The lesson is operational and preserved: a follow-up commit on the same branch s
 
 The 2026-09-28 hypothesis (12 migrations through `20260822000000`; three missing; four Gym V2 tables absent; numeric columns still `REAL`; ~41 manifests) **was not re-verified** in this session and must not be treated as current state.
 
-Confirmed read-only facts: project `kruubbynsmxzxfdunaal` is named `superhabits` and is the linked project; the repo `.env` points at it; the IPv4 pooler is reachable from this host. A live query is **impossible without the database password** — `psql` returns `fe_sendauth: no password supplied`, the Supabase CLI SQL paths require an interactive password, and no Supabase MCP server is configured. The predecessor's "AAAA-only host" blocker is specific to the direct database host, not the pooler.
+Confirmed read-only facts: project `kruubbynsmxzxfdunaal` is named `superhabits` and is the linked project; the repo `.env` points at it; the IPv4 pooler is reachable from this host. A live query is **impossible without the database password** — `psql` returns `fe_sendauth: no password supplied`, the Supabase CLI SQL paths require an interactive password, and no Supabase MCP server is configured. The predecessor's "AAAA-only host" blocker is specific to the direct database host, not the pooler. The 2026-10-01 campaign re-checked credential availability once and found no `SUPABASE_DB_PASSWORD` / `DATABASE_URL` / `PGPASSWORD` / `SUPABASE_DB_URL` and no DB credential in `.env`/`.env.local`, so the catalog read stays `CREDENTIAL / EXTERNAL` without a passwordless retry loop.
+
+Recovery inventory, re-observed read-only on 2026-10-01 at 15:08Z via the authenticated Management API: `{"region":"ap-northeast-1","walg_enabled":true,"pitr_enabled":false,"backups":[],"physical_backup_data":{}}` — no restorable point covers `public` or `auth`.
 
 No production SQL was executed. No production object was created, altered, or dropped. DDL is `OWNER_APPROVAL_REQUIRED`; see `production-approval-packet.md`.
 
@@ -87,21 +91,21 @@ The predecessor's 2026-09-28 read-only classification reported 482 candidate rec
 
 Tasks 3.2 and 3.3 are explicitly `DEFERRED_BY_OWNER / ENVIRONMENT`. All three failures were classified `TEST_BUG` with in-artifact evidence and all three flows carry edits (see `ios-flow-classification.md`), but the edits remain **unproven** — no iOS run exists and none is dispatched or chased by this campaign. iOS is never called certified, `12/13` would not be certified either, and the historical evidence above is preserved verbatim rather than rewritten by the deferral. Reopening iOS requires a macOS host and an explicit owner decision.
 
-## 6. Android — current source and binary identity
+## 6. Android — current source and binary identity, FULLY GREEN
 
-| Item              | Value                                                                                                                                          |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Source SHA        | `68db684d0915d8cd781d52b282a3934ca214171b` (clean tree, detached exact-source checkout)                                                        |
-| Target            | `Nitro_API_36`, `emulator-5554`, API 36, `x86_64`                                                                                              |
-| Package / version | `com.dale16.superhabits`, versionName `1.0.0`, versionCode 1                                                                                   |
-| APK SHA-256       | `5DF9D5DC72EF13B4B88DF32527244C50BD750D1C48EF79EB0CA3B6D2ADFA1014`                                                                             |
-| Provisioning      | **PASS** — hermetic build (`EXPO_NO_DOTENV=1`, no ambient `EXPO_PUBLIC_*`), 0 bundle-scan matches for `supabase.co`                            |
-| Smoke             | **1/2** — `native-smoke` PASS, `command-center-v2` `FAILED_NEEDS_TRIAGE`                                                                       |
-| Persistence       | **11/11 PASS** (coverage verdict `OK`)                                                                                                         |
-| Lifecycle         | **6/6 PASS** (coverage verdict `OK`)                                                                                                           |
-| Residual          | `command-center-v2` step 14 `tapOn: 'Create'` — the ordinary build never mounts the rollout-gated mode selector, so no `Create` element exists |
+| Item              | Value                                                                                                                                     |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Source SHA        | `80b0b33ba9c0de2abe89d7ba57f2889be1f75e93` (clean tree, detached exact-source checkout)                                                   |
+| Target            | `Nitro_API_36`, `emulator-5554`, API 36, `x86_64`                                                                                         |
+| Package / version | `com.dale16.superhabits`, versionName `1.0.0`, versionCode 1                                                                              |
+| APK SHA-256       | `E2F43FBBE37FFA28D31EB3379DAB7C06B352EBF456748AF958D367245C3690D2`                                                                        |
+| Provisioning      | **PASS** — hermetic build (`EXPO_NO_DOTENV=1`, no ambient `EXPO_PUBLIC_*`), bundle scan 1 JS/bytecode entry / 0 matches for `supabase.co` |
+| Smoke             | **2/2 PASS** — `command-center-v2` 37 s, `native-smoke` 53 s (`flowCoverage.verdict: OK`)                                                 |
+| Persistence       | **11/11 PASS** in 13 m 32 s (`flowCoverage.verdict: OK`)                                                                                  |
+| Lifecycle         | **6/6 PASS** in 7 m 28 s (`flowCoverage.verdict: OK`)                                                                                     |
+| Artifacts         | `simulation-output/native/windows-closure-2026-10-01/` (three tag reports, the build record, and the repaired flow's debug tree)          |
 
-The historical APK was not reused. The `command-center-v2` failure is a stale flow step against the intentional default-off render boundary (`features/command/commandSurface.ts`, `CommandScreen`'s `if (!AI_ASK_EXPERIMENT_ENABLED) return commandContent` branch); the raw report labels it `PRODUCT_BUG` while the hierarchy shows no `Create`, `Ask`, or `Auto` element at all. The scoped Android repair, its regression guard, and the current-source re-qualification are the successor's task 3 and are recorded there; this section is superseded by that result when it lands.
+The historical APK was not reused. The earlier `command-center-v2` failure at `68db684` was a stale flow step against the intentional default-off render boundary (`features/command/commandSurface.ts`, `CommandScreen`'s `if (!AI_ASK_EXPERIMENT_ENABLED) return commandContent` branch): the raw report labelled it `PRODUCT_BUG`, while the step-14 hierarchy contains no `Create`, `Ask`, or `Auto` element at all. The reviewed triage classified it `TEST_BUG`, the scoped platform-conditional flow repair landed as `80b0b33` with a non-vacuous regression guard (`tests/maestroCommandCenterFlowGuards.test.ts`), and the complete batteries were then re-run green on the current-source hermetic APK above. The previous APK `5DF9D5DC…` remains recorded as the historical `68db684` build whose smoke lane was 1/2.
 
 ## 7. J8 environment and measurement
 
@@ -122,22 +126,29 @@ The ceiling stays 800 ms and the 15 % floor stays 15 %. No app-owned cost was pr
 
 ## 8. OpenSpec and ExecPlan status
 
-| Item                                   | Value                                                                                            |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| This change                            | `final-certification-closure`, **15/22 tasks recorded** (2.1, 2.4, 3.2, 3.3, 4.3, 6.1, 6.4 open) |
-| This ExecPlan                          | `Plan-Version: 2`, `Status: BLOCKED`, validates PASS                                             |
-| Predecessor `external-blocker-closure` | 27/27, ExecPlan `ACTIVE`, report `NOT CERTIFIED`, **unarchived**                                 |
-| Successor this campaign runs           | `windows-closure-reconciliation`, 42-task apply checklist; owns the seven open tasks below       |
+| Item                                   | Value                                                                                     |
+| -------------------------------------- | ----------------------------------------------------------------------------------------- |
+| This change                            | `final-certification-closure`, **17/22 tasks recorded** (2.1, 2.4, 3.2, 3.3, 4.3 open)    |
+| This ExecPlan                          | `Plan-Version: 2`, `Status: BLOCKED` (production prerequisite unmet), validates PASS      |
+| Predecessor `external-blocker-closure` | 27/27, ExecPlan `ACTIVE`, report `NOT CERTIFIED`, **unarchived**                          |
+| Successor this campaign runs           | `windows-closure-reconciliation`, 42-task apply checklist; owns the five open tasks above |
+| Sibling change at 26/26                | `harden-native-evidence-and-release-posture` — task 5.3 closed on the green battery above |
 
-The successor's review and reporting checkpoints do **not** depend on the production SQL credential. Live production facts stay explicitly blocked; the repository-level review of all ten certification-critical surfaces proceeds independently, and only the live catalog assertions remain unverified. Task 6.1 is therefore in progress rather than gated behind 2.1.
+The successor's review and reporting checkpoints do **not** depend on the production SQL credential. Live production facts stay explicitly blocked; the repository-level review of all ten certification-critical surfaces proceeds independently, and only the live catalog assertions remain unverified. Task 6.1 is complete and is recorded in `windows-closure-reconciliation/adversarial-review.md`.
 
 ## 9. Archive decision
 
-**`external-blocker-closure` is NOT archived.** Its closure predicate is not met. Unmet gates, by name:
+Both predecessor/active changes stay **unarchived**, evaluated on predicates rather than on checkbox counts or repository tidiness.
 
-1. **Production Scope-7 backup integrity** — substantively red and now additionally unverified, because no read-only credential was available.
-2. **Current-source iOS** — three executable flow failures were classified and their flows edited, but no 13/13 run exists at any current SHA, and the persistence replacement has no artifact support.
+**`external-blocker-closure` — NOT archived.** Its closure predicate is not met. Unmet gates, by name:
+
+1. **Production Scope-7 backup integrity** — substantively red and additionally unverified at the catalog level, because no read-only SQL credential is available.
+2. **Current-source iOS** — three executable flow failures were classified and their flows edited, but no 13/13 run exists at any current SHA, and the persistence replacement has no artifact support. Owner-deferred, preserved as history.
 3. **J8** — **removed from the unmet set.** The 878 ms miss no longer stands as a product gate: the register classifies the residual as an `ENVIRONMENT` host-load excursion, `CG-4`/`CG-5` are CLOSED (2026-08-10) and gap 15 is CLOSED with a 2026-09-24 root-cause fix, with every ceiling (800 ms), floor (15 %), fixture, and assertion unchanged. The archive predicate's third limb — a reproducible product performance regression against an unchanged ceiling — is therefore not met.
+
+**`final-certification-closure` (this change) — NOT archived.** Its own predicates are unmet by construction: tasks 2.1, 2.4, 3.2, 3.3 and 4.3 remain open as `CREDENTIAL / EXTERNAL`, `BLOCKED`, `DEFERRED_BY_OWNER / ENVIRONMENT` and `NOT_TRIGGERED`, and the terminal report still records `NOT CERTIFIED`. Task 6.2's exact-head result and task 6.4's publication are complete, but a change whose remaining tasks include an unmet production prerequisite is not archived for tidiness.
+
+**Other local changes — inventoried, not absorbed:** `windows-closure-reconciliation` (this campaign's apply change, 42-task checklist) owns the reconciliation performed here and IS committed with it. The other prior change directories — `harden-native-evidence-and-release-posture`, `harden-silent-failure-certification`, `harden-ci-lane-integrity`, `harden-interaction-idempotency`, `reduce-section-activation-render-work`, `fix-local-calendar-day-windows` and `harden-agent-guidance-truth` — are **untracked prior-work directories** preserved locally and deliberately excluded from every campaign commit by the preservation rule. The local reconciliation of the sibling's Android task 5.3 (now 26/26, ExecPlan `COMPLETED`) lives inside that untracked directory; the **published** record of the green Android battery is §6 above. No change directory was absorbed, rewritten, or archived by this campaign.
 
 ## 10. Residuals
 
@@ -187,10 +198,10 @@ Every residual below carries `WHY`, `CLASSIFICATION`, `WHAT IS REQUIRED`, and `E
 
 ### R7 — Current-source Android smoke residual
 
-- **WHY:** The `command-center-v2` smoke flow failed at `tapOn: 'Create'` on the current-source hermetic APK.
-- **CLASSIFICATION:** `TEST_BUG` (successor task 3.1) — the ordinary build never mounts the rollout-gated mode selector, so the stale step can never match; the raw report's `PRODUCT_BUG` label is reconciled as raw-machine triage, not a product defect. Provisioning PASS, persistence 11/11, lifecycle 6/6, smoke 1/2 at `68db684`.
-- **WHAT IS REQUIRED:** The scoped platform-aware flow correction plus regression guard, then the complete smoke/persistence/lifecycle batteries from a clean exact-source checkout at the final candidate, with source/APK identity recorded. This is successor task 3.4/3.5 work; this draft is superseded by its result.
-- **EXACT RESUME ACTION:** `node scripts/qa-native.mjs --platform android --tag smoke --serial <verified-serial>`, then `--tag persistence`, then `--tag lifecycle`, from a clean checkout of the committed candidate with pinned Node 22.23.2 and ambient Supabase variables unset. Do not reuse the historical APK and do not add app test IDs or expose the hidden AI controls to satisfy the flow.
+- **WHY:** The `command-center-v2` smoke flow previously failed at `tapOn: 'Create'` on the current-source hermetic APK.
+- **CLASSIFICATION:** **CLOSED — `TEST_BUG` repaired and device-verified.** The ordinary build never mounts the rollout-gated mode selector, so the stale step could never match; the raw report's `PRODUCT_BUG` label is reconciled as raw-machine triage. Provisioning PASS, smoke **2/2**, persistence **11/11**, lifecycle **6/6** at source `80b0b33`, APK SHA-256 `E2F43FBB…C3690D2`.
+- **WHAT IS REQUIRED:** Nothing to close the residual. The repair is platform-conditional, so iOS semantics are unchanged, and the regression guard fails if the unconditional step returns.
+- **EXACT RESUME ACTION:** None. If the flow or the render boundary changes later, re-run `node scripts/qa-native.mjs --platform android --tag smoke --serial <verified-serial>`, then `--tag persistence`, then `--tag lifecycle`, from a clean checkout of the committed candidate with pinned Node 22.23.2 and ambient Supabase variables unset. Do not add app test IDs, optional steps, or exposed AI controls to satisfy the flow.
 
 ### R8 — `qa:full`
 
@@ -222,13 +233,48 @@ Every residual below carries `WHY`, `CLASSIFICATION`, `WHAT IS REQUIRED`, and `E
 
 ## 11. What would change the terminal state
 
-`NOT CERTIFIED` cannot become `LOCALLY COMPLETE — EXTERNAL ACTIONS REQUIRED` on the native lanes alone. Closing R1 (iOS) and R7 (Android) would still leave production Scope-7 substantively red, and a red recovery gate keeps the terminal state `NOT CERTIFIED` on its own. Native closure is necessary, never sufficient. R6 is already closed as a product gate (the 878 ms result is an `ENVIRONMENT` excursion).
+`NOT CERTIFIED` cannot become `LOCALLY COMPLETE — EXTERNAL ACTIONS REQUIRED` on the native lanes alone. R7 (Android) is now **closed and device-verified** and R6 is closed as a product gate, yet production Scope-7 remains substantively red, and a red recovery gate keeps the terminal state `NOT CERTIFIED` on its own. Native closure is necessary, never sufficient.
 
 The order that actually matters:
 
 1. **R2 first** — obtain the read-only credential and establish the real production posture. Everything production-related is unverified until this happens, and the 2026-09-28 hypothesis must not be used to justify a write.
 2. **R3 second** — prove a recovery point, then apply only the four named migrations under the amended four-part approval. R3 may not be granted from a stale hypothesis, and its fourth migration is not yet authorized by the owner's three-migration grant.
-3. **R1, R6, R7** — iOS 13/13 at a real candidate SHA, the closed J8 product gate (R6 requires nothing further), and current-source Android. These are independent of production and can proceed in parallel, but they cannot promote the terminal state alone.
+3. **R1** — iOS 13/13 at a real candidate SHA. Independent of production, but it cannot promote the terminal state alone and it stays `DEFERRED_BY_OWNER / ENVIRONMENT` until the owner reopens iOS on a macOS host.
 4. **R4, R5** — historical precision and incident deletion remain separate owner decisions even after R3 succeeds.
 
-Archiving `external-blocker-closure` requires R1 and R2/R3 closed together. No single one of them is sufficient; R6 no longer blocks it.
+Archiving `external-blocker-closure` requires R1 and R2/R3 closed together. No single one of them is sufficient; R6 no longer blocks it, and R7's closure removes the Android limb from the unmet set.
+
+## Appendix A — canonical 22-task audit (task 6.1)
+
+Every canonical task is audited individually below, not only the previously unchecked
+ones. `COMPLETE` means the task's own deliverable exists and is evidenced;
+`CREDENTIAL / EXTERNAL`, `BLOCKED`, `DEFERRED_BY_OWNER / ENVIRONMENT` and
+`NOT_TRIGGERED` are **not** passes and stay unchecked on purpose.
+
+| Task | Disposition                       | Evidence / reason                                                                                                                                                                                                                                                |
+| ---- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1  | COMPLETE                          | `main` == `origin/main`, stash `pre-recovery-local-changes` preserved, `.tmp-ios36423379932/` never staged; re-verified by the successor preflight at `210afd3`.                                                                                                 |
+| 1.2  | COMPLETE                          | Pinned Node `v22.23.2` recorded and used for every integration gate, including the successor's Android batteries.                                                                                                                                                |
+| 1.3  | COMPLETE                          | `final-certification-closure/execplan.md` exists with `Plan-Version: 2`; `agent:plan:validate` PASS.                                                                                                                                                             |
+| 1.4  | COMPLETE                          | Run `36449656365` recorded as docs-only green and explicitly insufficient to certify production/iOS/Android/J8.                                                                                                                                                  |
+| 2.1  | `CREDENTIAL / EXTERNAL`           | No authorized read-only SQL credential (checked once; no `SUPABASE_DB_PASSWORD`/`DATABASE_URL`/`PGPASSWORD`/`SUPABASE_DB_URL`, no DB secret in `.env`/`.env.local`). Bounded read-only resume queries recorded in `windows-closure-reconciliation/design.md` §7. |
+| 2.2  | COMPLETE as `PROVEN_FAIL`         | Recovery point explicitly observed absent (2026-10-01, re-observed 15:08Z): `pitr_enabled: false`, `backups: []`, `physical_backup_data: {}`. A proven failure, never promoted to green.                                                                         |
+| 2.3  | COMPLETE                          | `production-approval-packet.md` records the four-file contract, the three-file grant, the unaccepted verification procedure and `OWNER_APPROVAL_REQUIRED`; no production mutation.                                                                               |
+| 2.4  | BLOCKED                           | No write: recovery absent, fourth migration unauthorized, live catalog unread, procedure unaccepted.                                                                                                                                                             |
+| 2.5  | COMPLETE                          | Confirmed-synthetic cleanup kept separate and owner-gated; probable/ambiguous left untouched; no production records deleted.                                                                                                                                     |
+| 3.1  | COMPLETE                          | All three iOS failures classified `TEST_BUG` in `ios-flow-classification.md` from artifact `10980993163`.                                                                                                                                                        |
+| 3.2  | `DEFERRED_BY_OWNER / ENVIRONMENT` | Flow edits committed with regression guards, but unproven; iOS is deferred on a Windows host.                                                                                                                                                                    |
+| 3.3  | `DEFERRED_BY_OWNER / ENVIRONMENT` | No iOS run dispatched or chased; iOS is never called certified, and the 10/13 evidence is preserved.                                                                                                                                                             |
+| 4.1  | COMPLETE                          | Host RAM/CPU/processes recorded without terminating unrelated processes.                                                                                                                                                                                         |
+| 4.2  | COMPLETE                          | J8 preserved as the recorded `ENVIRONMENT` posture with the 800 ms ceiling and 15 % floor unchanged.                                                                                                                                                             |
+| 4.3  | `NOT_TRIGGERED`                   | Conditional antecedent never fired; the register records the root-cause fix and post-fix `maxSwitch=622/800`; no current product remediation is required.                                                                                                        |
+| 4.4  | COMPLETE                          | `qa:full` chronology recorded: resource-deferred, then `QA_FULL_EXIT=0` at `c2ec475` (249 files passed / 1 skipped; e2e 235/49/0; deterministic 23/23).                                                                                                          |
+| 5.1  | COMPLETE                          | Android qualified twice; final green battery at `80b0b33` (provisioning PASS, smoke 2/2, persistence 11/11, lifecycle 6/6), hermetic APK `E2F43FBB…`.                                                                                                            |
+| 5.2  | COMPLETE                          | Disposable battery, default-off AI, store non-submission, gap-21 fail-closed and disabled anonymous signup confirmed external or already proven.                                                                                                                 |
+| 6.1  | COMPLETE                          | Ten-surface adversarial review in `windows-closure-reconciliation/adversarial-review.md`: two findings (one fixed documentation claim, one fixed and device-verified flow defect), four withdrawn candidates, second pass recorded.                              |
+| 6.2  | COMPLETE                          | Exact-head run `36824132137` on `210afd3` (quality success, e2e success with the main lane, nightly skipped as expected); the final pushed tip is re-attested by the commit-linked post-CI attestation.                                                          |
+| 6.3  | COMPLETE                          | Archive predicates evaluated for both predecessors and the other local changes; nothing archived from checkbox counts or tidiness.                                                                                                                               |
+| 6.4  | COMPLETE                          | This report: ten required sections, chronological superseded results, explicit production-mutation declaration, four-field residual blocks, conservative terminal state.                                                                                         |
+
+**Actual checked count: 17/22.** Open and deliberately unchecked: 2.1, 2.4 (production),
+3.2, 3.3 (owner-deferred), 4.3 (conditional, not triggered).
