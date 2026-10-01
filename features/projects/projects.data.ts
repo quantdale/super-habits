@@ -1,7 +1,7 @@
 import { getDatabase } from '@/core/db/client';
 import { runBackupMutation } from '@/core/sync/syncedMutation';
 import { createId } from '@/lib/id';
-import { nowIso, toDateKey } from '@/lib/time';
+import { inclusiveWindowStartDateKey, nowIso } from '@/lib/time';
 import {
   normalizeProjectColor,
   normalizeProjectStatus,
@@ -338,9 +338,9 @@ export type ProjectRollup = {
  */
 export async function getProjectRollup(projectId: string): Promise<ProjectRollup> {
   const db = await getDatabase();
-  const windowStart = toDateKey(
-    new Date(Date.now() - (PROJECT_HABIT_WINDOW_DAYS - 1) * 86_400_000),
-  );
+  // Inclusive local-calendar window (see `inclusiveWindowStartDateKey`): a DST
+  // boundary inside it cannot add or drop a day.
+  const windowStart = inclusiveWindowStartDateKey(PROJECT_HABIT_WINDOW_DAYS, new Date(nowIso()));
 
   const todoRow = await db.getFirstAsync<{ total: number; done: number }>(
     `SELECT COUNT(*) AS total, COALESCE(SUM(completed), 0) AS done
@@ -385,9 +385,9 @@ export async function getProjectRollup(projectId: string): Promise<ProjectRollup
  */
 export async function listProjectRollups(): Promise<Record<string, ProjectRollup>> {
   const db = await getDatabase();
-  const windowStart = toDateKey(
-    new Date(Date.now() - (PROJECT_HABIT_WINDOW_DAYS - 1) * 86_400_000),
-  );
+  // Inclusive local-calendar window (see `inclusiveWindowStartDateKey`): a DST
+  // boundary inside it cannot add or drop a day.
+  const windowStart = inclusiveWindowStartDateKey(PROJECT_HABIT_WINDOW_DAYS, new Date(nowIso()));
 
   const todoRows = await db.getAllAsync<{ project_id: string; total: number; done: number }>(
     `SELECT project_id, COUNT(*) AS total, COALESCE(SUM(completed), 0) AS done

@@ -16,6 +16,16 @@ const { syncEngine } = vi.hoisted(() => ({
     enqueue: vi.fn(),
     prepare: vi.fn((record: Record<string, unknown>) => ({ ...record, revision: 1 })),
     enqueuePrepared: vi.fn(),
+    getStatus: () => ({
+      lastSuccessAt: null,
+      consecutiveFailures: 0,
+      lastErrorMessage: null,
+      nextRetryAt: null,
+      blockedEntities: [],
+    }),
+    getBlockedKeys: () => [],
+    getAttemptLedger: () => ({}),
+    isBlocked: () => false,
   },
 }));
 

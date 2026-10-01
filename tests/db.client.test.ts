@@ -16,11 +16,34 @@ type LoadClientOptions = {
 };
 
 function buildDb(version: string | null = '13'): MockDatabase {
+  // `db_schema_version` is STATEFUL in this mock: `runMigrations` writes it as
+  // each block applies, and the head assertion reads it back afterwards. A spy
+  // that never updated the value would report the starting version and fail the
+  // real chain assertion (harden-silent-failure-certification 5.3).
+  let storedVersion = version;
   return {
     execAsync: vi.fn().mockResolvedValue(undefined),
-    runAsync: vi.fn().mockResolvedValue(undefined),
+    runAsync: vi.fn(async (sql: string, args?: unknown[]) => {
+      if (String(sql).includes('INSERT OR REPLACE INTO app_meta')) {
+        const params = Array.isArray(args) ? args : [];
+        if (params[0] === 'db_schema_version' && typeof params[1] === 'string') {
+          storedVersion = params[1];
+        }
+      }
+      return undefined;
+    }),
     getAllAsync: vi.fn().mockResolvedValue([]),
-    getFirstAsync: vi.fn().mockResolvedValue(version ? { value: version } : null),
+    getFirstAsync: vi.fn(async (sql: string, args?: unknown[]) => {
+      // `getAppMetaText` passes the KEY as a bind arg, not in the SQL text, so
+      // both the statement and the args have to be inspected.
+      const params = Array.isArray(args) ? args : [];
+      const isSchemaVersionRead =
+        String(sql).includes('db_schema_version') || params[0] === 'db_schema_version';
+      if (isSchemaVersionRead) {
+        return storedVersion ? { value: storedVersion } : null;
+      }
+      return version ? { value: version } : null;
+    }),
     closeAsync: vi.fn().mockResolvedValue(undefined),
     // Pass-through that awaits the callback so rejections propagate exactly
     // like a rolled-back real transaction would (abort-on-failure paths in

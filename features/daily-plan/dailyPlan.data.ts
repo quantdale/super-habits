@@ -3,7 +3,7 @@ import { getDatabase } from '@/core/db/client';
 import { runBackupMutation } from '@/core/sync/syncedMutation';
 import type { SyncRecord } from '@/core/sync/sync.engine';
 import { createId } from '@/lib/id';
-import { isValidDateKey, nowIso, toDateKey } from '@/lib/time';
+import { inclusiveWindowStartDateKey, isValidDateKey, nowIso, toDateKey } from '@/lib/time';
 import type { DailyPlan } from '@/core/db/types';
 import {
   clampFocusTargetMinutes,
@@ -291,7 +291,9 @@ export async function softDeleteDailyPlan(id: string): Promise<void> {
 
 export async function listRecentDailyPlans(days = 14): Promise<DailyPlan[]> {
   const db = await getDatabase();
-  const since = toDateKey(new Date(Date.now() - (days - 1) * 24 * 60 * 60 * 1000));
+  // Inclusive local-calendar window (a DST boundary inside it cannot add or
+  // drop a day the way fixed-millisecond arithmetic does).
+  const since = inclusiveWindowStartDateKey(days, new Date(nowIso()));
   return db.getAllAsync<DailyPlan>(
     `SELECT ${DAILY_PLAN_SELECT} FROM daily_plans WHERE deleted_at IS NULL AND date_key >= ? ORDER BY date_key DESC`,
     [since],

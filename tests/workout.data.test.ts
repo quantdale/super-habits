@@ -18,6 +18,22 @@ const { linkedActionsEngine } = vi.hoisted(() => ({
   },
 }));
 
+// The owner-resolution path now inspects local data on the unprimed-cache path
+// (harden-silent-failure-certification 4.5). This fixture owns a bare db with
+// order-sensitive getFirstAsync queues, so the inspection is stubbed rather than
+// shifting every queue; the pristine-check behaviour has its own coverage.
+vi.mock('@/core/auth/account.data', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/core/auth/account.data')>()),
+  inspectLocalAccountDataState: vi.fn(async () => ({
+    hasUserData: false,
+    pendingOutboxCount: 0,
+    unownedOutboxCount: 0,
+    ownerBinding: null,
+    ownerBindingProvisional: false,
+    outboxOwnerIds: [],
+    lastImportOwnerFingerprint: null,
+  })),
+}));
 vi.mock('@/core/db/client', () => ({
   getDatabase,
 }));

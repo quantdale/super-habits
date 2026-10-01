@@ -7,6 +7,9 @@ describe('calorie authoritative ledger integrity', () => {
     const calories = await import('@/features/calories/calories.data');
     await db.execAsync('DROP TABLE saved_meals');
 
+    // The ledger write commits and the call resolves with the created row's
+    // identity (additive return: a caller that offers an undo of this write can
+    // resolve the exact row) even when the saved-meal cache maintenance fails.
     await expect(
       calories.addCalorieEntry({
         foodName: 'cache failure meal',
@@ -18,7 +21,7 @@ describe('calorie authoritative ledger integrity', () => {
         mealType: 'dinner',
         consumedOn: '2026-08-14',
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toMatch(/^cal_/);
 
     expect(
       await db.getFirstAsync<{ count: number }>(

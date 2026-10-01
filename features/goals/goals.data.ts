@@ -1,7 +1,7 @@
 import { getDatabase } from '@/core/db/client';
 import { runBackupMutation } from '@/core/sync/syncedMutation';
 import { createId } from '@/lib/id';
-import { nowIso, toDateKey } from '@/lib/time';
+import { inclusiveWindowStartDateKey, nowIso } from '@/lib/time';
 import {
   clampProgressPercent,
   GOAL_HORIZON_WINDOW_DAYS,
@@ -329,7 +329,9 @@ export async function getGoalRollup(goalId: string): Promise<GoalRollupData> {
     [goalId],
   );
   const effectiveDays = GOAL_HORIZON_WINDOW_DAYS[goal?.horizon ?? 'month'] ?? 30;
-  const windowStart = toDateKey(new Date(Date.now() - (effectiveDays - 1) * 86_400_000));
+  // Inclusive window over the goal's horizon: local-calendar arithmetic, so a
+  // DST boundary inside the window cannot stretch or shrink it by a day.
+  const windowStart = inclusiveWindowStartDateKey(effectiveDays, new Date(nowIso()));
 
   const todoRow = await db.getFirstAsync<{ total: number; done: number }>(
     `SELECT COUNT(*) AS total, COALESCE(SUM(completed), 0) AS done

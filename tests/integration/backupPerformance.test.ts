@@ -16,12 +16,32 @@ type UpsertCall = { entity: string; rows: Record<string, unknown>[] };
 
 function buildRecordingSupabase() {
   const upserted: UpsertCall[] = [];
+  /** Rows the fake remote stored, so the push read-back can verify them. */
+  const stored = new Map<string, Map<string, Record<string, unknown>>>();
   const from = vi.fn((entity: string) => ({
     upsert: vi.fn(async (rows: Record<string, unknown>[]) => {
       const rowList = Array.isArray(rows) ? rows : [rows];
       upserted.push({ entity, rows: rowList });
+      const table = stored.get(entity) ?? new Map<string, Record<string, unknown>>();
+      for (const row of rowList) table.set(String(row.id), row);
+      stored.set(entity, table);
       return { error: null };
     }),
+    // Push verification read-back (harden-silent-failure-certification 3.1).
+    // This file records round-trip COUNTS, so the read-back requests it makes
+    // are counted too rather than hidden.
+    select: vi.fn((_columns: string) => ({
+      in: vi.fn((_column: string, ids: string[]) => ({
+        eq: vi.fn(async (_eqColumn: string, value: string) => ({
+          data: ids
+            .map((id) => stored.get(entity)?.get(id))
+            .filter((row): row is Record<string, unknown> => row !== undefined)
+            .filter((row) => row.user_id === value || row.user_id === undefined)
+            .map((row) => ({ id: row.id })),
+          error: null,
+        })),
+      })),
+    })),
     delete: vi.fn(() => ({
       in: vi.fn(() => ({
         eq: vi.fn(async () => ({ error: null })),
