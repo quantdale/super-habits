@@ -1,7 +1,7 @@
 # ExecPlan: Apply-closure resolution (land, reconcile, finish the seven-change wave)
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -96,8 +96,10 @@ kruubbynsmxzxfdunaal` (`pitr_enabled: false`, `backups: []`, `physical_backup_da
   structured register entries stay exactly as change 5 left them (`quarantine-register-parity`
   OK, none stale); no ceiling, threshold, checksum, or assertion was weakened.
 - Blockers: none.
-- Exact next action: None — campaign complete; the only remaining work is the recorded
-  owner-gated residual (the `.maestro/` flow edit) and the deferred iOS lane.
+- Exact next action: None — campaign complete. The only remaining work is the recorded
+  owner-gated residual (the `.maestro/flows/command-center-v2.yaml` step edit) and the deferred
+  iOS lane; both carry WHY / CLASSIFICATION / WHAT IS REQUIRED / EXACT RESUME ACTION in their
+  owning change's ExecPlan.
 - Remaining definition of done: complete. §7.4 resolves to "24/26 with a precise blocker":
   task 5.3 is unchecked because the smoke lane is 1/2, with the classification, evidence, and
   exact resume action recorded in the change's ExecPlan.
