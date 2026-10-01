@@ -313,6 +313,11 @@ npm run build:web    # npx expo export -p web → dist/ (one-shot, finite)
 
 # E2E (requires dist/ to be up to date — build with `npm run build:e2e`, the
 # hermetic export; plain `build:web` inlines local `.env` Supabase creds)
+# The hermetic envelope ABORTS non-zero while ambient EXPO_PUBLIC_SUPABASE_URL /
+# EXPO_PUBLIC_SUPABASE_ANON_KEY are exported, naming the offending variables.
+# Run `unset EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY` first —
+# this applies to build:e2e, e2e:full, qa:journeys, qa:full, web:verify,
+# qa:repeat, web-lifecycle, and qa:native:provision.
 npm run e2e          # playwright test (chromium + journeys + simulation + pwa projects)
 npm run e2e:sync     # remote-boundary journeys against dist-sync/ (:8082) — opt-in, main/nightly only
 npm run e2e:report   # open HTML report
@@ -506,6 +511,23 @@ choosing the cheapest sufficient gates. A pure domain change normally stops at
 its unit/integration gates; native UI, settings persistence, Pomodoro,
 notifications, and lifecycle changes escalate to the corresponding native
 commands. A native command that cannot run must remain visible in the handoff.
+
+### Hermetic build environment (ambient `EXPO_PUBLIC_*`)
+
+`npm run build:e2e` and every lane built on it refuse to run while
+`EXPO_PUBLIC_SUPABASE_URL` or `EXPO_PUBLIC_SUPABASE_ANON_KEY` are exported: the
+hermetic envelope aborts non-zero and names the offending variables. This is
+correct behavior, not a bug to work around. Run
+`unset EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY` before
+`build:e2e`, `e2e:full`, `qa:journeys`, `qa:full`, `web:verify`, `qa:repeat`,
+`web-lifecycle`, or `qa:native:provision`.
+
+The native certification path (`qa:native:provision` and the Android runner's
+`checkTarget`) additionally requires an EMPTY
+`git status --porcelain=v1 --untracked-files=all`, so untracked evidence kept on
+disk (for example a preserved iOS extract or an active `openspec/changes/*`
+directory) blocks it even when every tracked change is committed. Certify from a
+clean checkout of the same commit instead of deleting preserved evidence.
 
 ## Environment Variables
 
