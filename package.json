@@ -31,6 +31,7 @@
     "validate:themes": "node scripts/validate-theme-contrast.mjs",
     "supabase:schema:validate": "node scripts/validate-supabase-schema.mjs",
     "openspec:validate": "openspec validate --all",
+    "release:profiles:guard": "node scripts/release-profile-guard.mjs",
     "doctor": "npx expo-doctor",
     "e2e": "playwright test --project=chromium --project=journeys --project=simulation --project=pwa",
     "e2e:full": "npm run build:e2e && npm run e2e",
@@ -44,7 +45,7 @@
     "sim:validate": "tsc -p simulation/tsconfig.json && node simulation/.build/simulation/runner/cli.js validate",
     "sim:repro:capture": "tsc -p simulation/tsconfig.json && node simulation/.build/simulation/repro/cli.js capture",
     "sim:repro:replay": "tsc -p simulation/tsconfig.json && node simulation/.build/simulation/repro/cli.js replay",
-    "qa:fast": "npm run typecheck && npm run lint && npm run test:unit && node scripts/journey-label-parity.mjs && node scripts/quarantine-register-parity.mjs",
+    "qa:fast": "npm run typecheck && npm run lint && npm run test:unit && node scripts/journey-label-parity.mjs && node scripts/quarantine-register-parity.mjs && node scripts/release-profile-guard.mjs",
     "qa:integration": "npm run test:integration",
     "qa:journeys": "npm run build:e2e && npm run e2e:journeys:p0",
     "qa:simulation": "node scripts/qa-simulation.mjs",
@@ -137,7 +138,8 @@
     },
     "patch-package": {
       "tmp": "0.2.7"
-    }
+    },
+    "brace-expansion@^5.0.0": "^5.0.12"
   },
   "simple-git-hooks": {
     "pre-commit": "npx lint-staged"
@@ -169,6 +171,7 @@
     "prettier": "^3.9.4",
     "simple-git-hooks": "^2.13.1",
     "supabase": "2.113.0",
+    "tsx": "^4.8.1",
     "typescript": "~5.9.2",
     "vitest": "^3.2.7"
   },

@@ -60,7 +60,7 @@ The journeys layer simulates how a real person uses the app over time — create
 - **Session scoping.** One `test.describe.serial` block per journey file, one shared `page`, a single `clearDatabase()` + seed at the start, then ordered steps. A failed step aborts the rest of that journey file only. Do not `clearDatabase()` inside a journey that must accumulate state.
 - **Fixtures.** Named volumes shared with the integration level: `SMALL` (empty/1–3 rows), `TYPICAL` (~14 days), `HEAVY` (~90 days, ≥200 todos, ≥600 calorie entries). Heavy fixtures are seeded via `page.evaluate()` through the real data layers, not clicked.
 - **Oracles.** Mutating steps assert a triple: the acting surface's UI, an independent surface (Overview aggregate, Settings eligibility, heatmap), and persisted state after a reload — plus a **negative oracle** for what must _not_ have changed.
-- **Quarantined steps.** All decided performance contracts are closed and run unquarantined with their strict assertions (CG-4 section-switch ≤ 800ms and CG-5 diary search ≤ 500ms, both closed 2026-08-10; see `e2e/journeys/three-months-in.spec.ts` steps 3 and 6). The remaining `test.fixme()`/`test.skip()` sites are lane attributes tracked in `docs/testing/known-gaps.md` (dist-sync remote boundary, internal-eval opt-in lanes, the Sunday calendar skip) — never weakened assertions. The WM2.4 sustained-headroom floor on the same J8 step is a documented host-load flake class (known-gap 15), not a quarantine: the ceiling and floor assertions stay exactly as they are.
+- **Gated steps.** All decided performance contracts are closed and run ungated with their strict assertions (CG-4 section-switch ≤ 800ms and CG-5 diary search ≤ 500ms, both closed 2026-08-10; see `e2e/journeys/three-months-in.spec.ts` steps 3 and 6). The remaining `test.fixme()`/`test.skip()` sites are lane attributes tracked in `docs/testing/known-gaps.md` (dist-sync remote boundary, internal-eval opt-in lanes, the Sunday calendar skip) — never weakened assertions. There is no per-step `quarantine` field in `helpers/journey.ts`: each gate is conditional on a runtime detection, so it belongs in the spec file, and `scripts/quarantine-register-parity.mjs` verifies every gate site is registered. The WM2.4 sustained-headroom floor on the same J8 step is a documented host-load flake class (known-gap 15), not a gate: the ceiling and floor assertions stay exactly as they are.
 
 See `docs/testing/known-gaps.md` and the change's `design.md` for the full model.
 
@@ -137,7 +137,7 @@ reconnect assertions run in the `journeys-sync` lane against `dist-sync/`.
 - E2E failures are logged; see test output for artifacts.
 - Known flaky tests or infrastructure issues are documented in the knowledge base.
 - Skipped tests are marked with reasons in the codebase and knowledge base.
-- Any skipped or quarantined test is registered in `docs/testing/known-gaps.md` with its reason — reduced coverage is never silently presented as passing coverage, and an assertion is never weakened to make a test pass.
+- Any skipped or quarantined test is registered in `docs/testing/known-gaps.md` with its reason and a `**Gate site:**` line naming the file — reduced coverage is never silently presented as passing coverage, and an assertion is never weakened to make a test pass. `node scripts/quarantine-register-parity.mjs` enforces this in both directions (unregistered gate sites and entries whose named file no longer carries a gate).
 
 ## Notes
 

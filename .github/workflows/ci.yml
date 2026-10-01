@@ -75,6 +75,13 @@ jobs:
       - name: Validate openspec contracts
         run: npm run openspec:validate
 
+      # The same guard set `qa:fast` runs locally, so a main/nightly-only lane
+      # cannot rot behind a green PR: journey-label parity (the rail labels the
+      # E2E layer clicks) and quarantine-register parity (every gate site is
+      # registered in docs/testing/known-gaps.md, per its standing rule).
+      - name: Validate journey-label and quarantine-register parity
+        run: node scripts/journey-label-parity.mjs && node scripts/quarantine-register-parity.mjs
+
       # Historical ExecPlans predate the versioned lifecycle and remain
       # discoverable without being CI-enforced. New Plan-Version: 2 plans must
       # be structurally valid before the quality tests run.
@@ -95,24 +102,29 @@ jobs:
         env:
           TZ: Asia/Manila
 
-      # Advisory policy (production-closure Phase 8; snapshot dated 2026-09-24,
-      # verify live with `npm audit --omit=dev`): non-force fixes are applied
-      # as soon as they exist; fixes requiring an incompatible framework change
-      # (e.g. vitest@5 / router@5.1.11 / Expo-major proposals) are NEVER forced
-      # and wait for an upstream coordinated release. Severity policy:
-      # critical/high must be zero (the gate below enforces that); moderate
-      # findings are framework-owned and report-only. Dated snapshot: 0
-      # critical / 0 high / 14 moderate (all production; two leaf advisories:
-      # decode-uri-component via expo-router's query-string chain — an override
-      # to 0.5.0 was REJECTED 2026-09-24 as a semver-major swap under a
-      # pinned ^0.2 dependency with untested URL-decode behavior (policy:
-      # framework-owned, wait for upstream); uuid via @expo/config-plugins →
-      # xcode is build-time only. The vitest chain is dev-only. This step
-      # stays continue-on-error: moderates must not gate, while any NEW high
-      # or critical still fails the command and surfaces here visibly.
-      - name: Audit runtime dependencies (advisory)
-        continue-on-error: true
-        run: npm audit --omit=dev --audit-level=high
+      # Production-dependency advisory gate (production-closure Phase 8).
+      # GATING: a NEW high or critical advisory in the production tree fails
+      # here, so the "critical/high must be zero" policy is enforced rather than
+      # asserted. The gate (`scripts/audit-runtime-deps.mjs`) reads
+      # `npm audit --omit=dev --json`, prints EVERY high/critical finding, and
+      # fails on any that is not in its dated, narrowly-scoped allowlist.
+      #
+      # Allowlisted (dated 2026-09-29, build-time-only): three `brace-expansion`
+      # advisories reached through `test-exclude` (`babel-plugin-istanbul`,
+      # coverage) and `glob@9` -> `minimatch@8`, with no non-breaking fix —
+      # npm's only offered resolution is `react-native@0.87.1`. Neither module
+      # is loaded by the web or native bundle. The 5.x copy IS fixed by an
+      # `overrides` entry (`brace-expansion@^5.0.0` -> `^5.0.12`) and is not
+      # allowlisted.
+      #
+      # Moderates stay report-only by the dated policy in
+      # docs/testing/known-gaps.md (framework-owned: decode-uri-component via
+      # expo-router's query-string chain — an override to 0.5.0 was REJECTED
+      # 2026-09-24 as a semver-major swap under a pinned ^0.2 dependency with
+      # untested URL-decode behavior; uuid via @expo/config-plugins -> xcode is
+      # build-time only). Non-force fixes are applied as soon as they exist.
+      - name: Audit runtime dependencies (gates on new high/critical)
+        run: node scripts/audit-runtime-deps.mjs
 
   e2e:
     runs-on: ubuntu-latest
@@ -161,16 +173,44 @@ jobs:
 
       # ---- PR lane: fast, fake-backed, deterministic ----
       - name: Run feature E2E suite (lane journeys@pr — chromium project)
+        id: playwright-chromium
         if: github.event_name == 'pull_request'
         run: npx playwright test --project=chromium
         env:
           TZ: Asia/Manila
 
+      # Retry-report gate (harden-ci-lane-integrity 5.2): CI runs with
+      # `retries: 2`, so a timing ceiling (`≤ 800ms` section switch) or a row
+      # oracle (one row or zero, never two) can fail attempt 1, pass attempt 2,
+      # and still leave the lane exit 0. This gate reads the Playwright JSON
+      # report of the invocation that just ran and fails the lane when a strict
+      # assertion is among the retried-then-passed tests; flake-class retries
+      # are listed without failing.
+      #
+      # Placement is deliberate: EVERY Playwright invocation REWRITES
+      # report.json, so a single gate at the end of the job would only ever see
+      # the last invocation's report. One gate per invocation, immediately
+      # after it, so no lane's retries are overwritten unread.
+      #
+      # `always() && steps.<id>.outcome != 'skipped'` means "this lane actually
+      # ran" — a lane that never ran (cancelled, or an earlier build failure)
+      # is skipped, while a lane that ran and failed still gets its retries
+      # reported. Deliberately no `continue-on-error`: a strict assertion that
+      # only held on a retry is not a clean pass.
+      - name: Retry-report gate — feature suite (strict assertions must not depend on a retry)
+        if: always() && steps.playwright-chromium.outcome != 'skipped'
+        run: node scripts/e2e-retry-report.mjs
+
       - name: Run P0 journey subset (lane journeys@pr — @p0, J1, J2a, J2b)
+        id: playwright-p0
         if: github.event_name == 'pull_request'
         run: npm run e2e:journeys:p0
         env:
           TZ: Asia/Manila
+
+      - name: Retry-report gate — P0 journey subset (strict assertions must not depend on a retry)
+        if: always() && steps.playwright-p0.outcome != 'skipped'
+        run: node scripts/e2e-retry-report.mjs
 
       - name: Validate simulation model + lane matrix (lane scenarios-pr)
         if: github.event_name == 'pull_request'
@@ -178,6 +218,7 @@ jobs:
 
       # ---- main lane: full suite ----
       - name: Run full E2E suite incl. full journeys + simulation self-test (lane journeys@main)
+        id: playwright-main
         if: github.event_name != 'pull_request'
         run: |
           set +e
@@ -207,6 +248,14 @@ jobs:
           exit $code
         env:
           TZ: Asia/Manila
+
+      # Same gate as the PR lane, for the main lane's single full-suite
+      # invocation. It runs even when the suite itself failed, so a retried
+      # strict assertion is still reported instead of being lost with the
+      # failure summary.
+      - name: Retry-report gate — full main suite (strict assertions must not depend on a retry)
+        if: always() && steps.playwright-main.outcome != 'skipped'
+        run: node scripts/e2e-retry-report.mjs
 
       # ---- scenario lane (deterministic; needs the served dist/) ----
       - name: Start static server for the scenario lane
@@ -243,17 +292,11 @@ jobs:
         if: github.event_name != 'pull_request'
         run: npm run build:sync
 
-      # ---- dist-sync lane (parent task 6.1a / Q5) ----
-      # The dedicated journeys-sync Playwright project runs the remote-boundary
-      # journeys (J3 reconnect-push, J4 backend failures, J5 restore round-trip,
-      # all tagged @sync) against dist-sync/ on :8082 (serve-e2e --port). This
-      # step runs only where dist-sync was built (main/nightly, never PRs) and
-      # AFTER the build (the e2e:sync env points the harness at dist-sync).
-      - name: Run remote-boundary journey lane against dist-sync/ (lane dist-sync)
-        if: github.event_name != 'pull_request'
-        run: npm run e2e:sync
-        env:
-          TZ: Asia/Manila
+      # NOTE: the `journeys-sync` (e2e:sync) lane does NOT run here. The lane
+      # table (simulation/matrix.ts) declares dist-sync `gates: false`, so a
+      # gating run of it was a contradiction; it stays where the matrix puts
+      # it — the nightly (report-only) job. The build above still runs so the
+      # artifact is available for the upload below and for manual inspection.
 
       - name: Upload E2E report
         if: always()
@@ -323,9 +366,21 @@ jobs:
         run: npm run build:e2e
 
       - name: Run full suite incl. full journeys (lane journeys@nightly)
+        id: playwright-nightly
+        continue-on-error: true
         run: npm run e2e
         env:
           TZ: Asia/Manila
+
+      # Report-only by design, matching this job's header and the lane table
+      # (journeys@nightly `gates: false`): the gate lists every retried test and
+      # still prints the strict-retry verdict, but `continue-on-error` keeps a
+      # host-noise retry from turning the whole nightly job red. The same
+      # verdict BLOCKS in the gating `e2e` job above.
+      - name: Retry-report gate — nightly full suite (report-only)
+        continue-on-error: true
+        if: always() && steps.playwright-nightly.outcome != 'skipped'
+        run: node scripts/e2e-retry-report.mjs
 
       - name: Start static server for the scenario lanes
         run: |
@@ -333,6 +388,7 @@ jobs:
           echo $! > /tmp/serve-e2e.pid
 
       - name: Run seeded scenario lane (lane scenarios-seeded)
+        continue-on-error: true
         run: |
           for i in $(seq 1 90); do curl -sf http://localhost:8081 >/dev/null 2>&1 && break; sleep 1; done
           npm run sim:run -- --mode seeded
@@ -353,23 +409,39 @@ jobs:
       # is non-gating by design (report-only), but the lane still runs so the
       # remote-boundary branches are exercised on the schedule.
       - name: Run remote-boundary journey lane against dist-sync/ (lane dist-sync)
+        id: playwright-sync
+        continue-on-error: true
         run: npm run e2e:sync
         env:
           TZ: Asia/Manila
 
+      # Second Playwright invocation in this job: it rewrites report.json, so it
+      # gets its own gate read of the report it produced (same report-only
+      # posture as the nightly gate above).
+      - name: Retry-report gate — remote-boundary lane (report-only)
+        continue-on-error: true
+        if: always() && steps.playwright-sync.outcome != 'skipped'
+        run: node scripts/e2e-retry-report.mjs
+
       # ---- disposable-backend lane (lane disposable-backend) ----
       # Runs ONLY when a Supabase access token is configured as a repo secret;
       # otherwise this step is skipped and nightly stays green with the lane
-      # visibly "not configured". The hard-isolation guard (guard.ts /
-      # provision.ts check / build-dist-live.sh) runs BEFORE any build or
-      # network call and aborts non-zero if a rule fires. Round-trip scenario
-      # execution against dist-live/ (roundTripScenarios.ts) is task 8.5
-      # wiring — pending; the next nightly's create-or-wipe cleans up the
-      # previous project (task 8.2 semantics). Live-run verification is
-      # pending credential configuration.
+      # visibly "not configured". The condition reads the `secrets` context
+      # directly: `env.SUPABASE_ACCESS_TOKEN` was never populated (step-level
+      # `env:` does not feed a step's own `if:`), so the lane could never run
+      # even with the secret set. The token is mapped into the step's `env:`
+      # block so `simulation/backend/provision.ts` receives it. The
+      # hard-isolation guard (guard.ts / provision.ts check /
+      # build-dist-live.sh) runs BEFORE any build or network call and aborts
+      # non-zero if a rule fires. Round-trip scenario execution against
+      # dist-live/ (roundTripScenarios.ts) is task 8.5 wiring — pending; the
+      # next nightly's create-or-wipe cleans up the previous project (task 8.2
+      # semantics). A skipped step reports as "not configured" in the run
+      # summary; a configured-but-failing step reports its failure.
       - name: Disposable-backend lane (guarded; needs SUPABASE_ACCESS_TOKEN)
-        if: env.SUPABASE_ACCESS_TOKEN != ''
+        if: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' }}
         env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SIMULATION_PRODUCTION_SUPABASE_HOSTS: ${{ vars.SIMULATION_PRODUCTION_SUPABASE_HOSTS }}
         run: |
           set -euo pipefail

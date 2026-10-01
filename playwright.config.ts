@@ -45,6 +45,12 @@ export default defineConfig({
     ],
     // Also log to terminal during run so you can see progress
     ['list'],
+
+    // Machine-readable report for the retry-report gate
+    // (scripts/e2e-retry-report.mjs): a test that only passed on a retry must
+    // never be recorded as a clean pass when it asserts a timing ceiling or a
+    // row-level oracle. Written inside the gitignored output folder.
+    ['json', { outputFile: '.cursor/playwright-output/e2e-report/report.json' }],
   ],
 
   use: {
@@ -70,6 +76,15 @@ export default defineConfig({
     // Individual tests can override with page.waitForLoadState("networkidle")
     // when they specifically need it.
     navigationTimeout: 20_000,
+
+    // Pin the browser context's timezone and locale to the same values every
+    // lane sets through the shell `TZ` and the app's `en` date formatting.
+    // Chromium uses the OS timezone on Windows and macOS, so `TZ` alone is not
+    // enough: the documented dev host is Windows (docs/testing/known-gaps.md),
+    // and a host-local zone changes what "today" means for the local-calendar
+    // date keys the whole suite asserts against.
+    timezoneId: 'Asia/Manila',
+    locale: 'en-US',
   },
 
   // Failure screenshots and traces go to the gitignored output folder

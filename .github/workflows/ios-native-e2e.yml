@@ -15,6 +15,15 @@ on:
 permissions:
   contents: read
 
+# Same per-ref concurrency pattern as ci.yml: a new run for the same workflow +
+# event + ref cancels the superseded one, so a follow-up commit or re-dispatch
+# does not leave two 300-minute macOS runners simulating side by side. The event
+# type is part of the group so a dispatch is never cancelled by an unrelated
+# labelled PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ios-simulator:
     if: >-

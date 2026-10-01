@@ -53,9 +53,17 @@ export interface JourneyContext {
 export interface JourneyStep {
   /** Human name; appears in the report as the Playwright test title. */
   name: string;
-  /** Explicit expected-failure quarantine for a decided contract gap. */
-  quarantine?: string;
-  /** Async step body. Throwing aborts the remaining steps (serial). */
+  /**
+   * Async step body. Throwing aborts the remaining steps (serial).
+   *
+   * There is deliberately no per-step `quarantine` field: every real gate is
+   * conditional on a RUNTIME detection (`remoteBoundaryDetected`,
+   * `supabaseRequestsSeen`), which a static per-step field cannot express, so a
+   * step-level fixme would be a second, weaker mechanism next to the one the
+   * steps already use. Gated assertions live in the spec files themselves and
+   * are registered in docs/testing/known-gaps.md, where
+   * `scripts/quarantine-register-parity.mjs` verifies them.
+   */
   run: (ctx: JourneyContext) => Promise<void>;
 }
 
@@ -139,9 +147,6 @@ export function defineJourney(declaration: JourneyDeclaration): JourneyDeclarati
         // Keep Playwright's required object-destructured fixture signature
         // without creating the unused per-test page fixture.
         void browserName;
-        if (step.quarantine) {
-          test.fixme(true, step.quarantine);
-        }
         const ctx: JourneyContext = {
           page,
           switchSection: async (tab) => {
