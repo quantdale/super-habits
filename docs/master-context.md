@@ -380,7 +380,7 @@ Companion docs in this folder:
 
 ### Confirmed from code
 
-- `npm run lint` exists (`eslint . --max-warnings 81`).
+- `npm run lint` exists (`eslint . --max-warnings 0`).
 
 ## Coding Conventions Detected
 

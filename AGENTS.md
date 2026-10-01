@@ -58,9 +58,17 @@ For Codex-based workflows, also read: `docs/codex-workflow.md`
 - `docs/PROJECT_STRUCTURE_MAP.md`
 - `.cursorrules`
 - `.cursor/rules/superhabits-rules.mdc`
-- `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`
 
 If this file conflicts with the documents above, follow the more specific authoritative document.
+
+## Historical reference (superseded — not authoritative)
+
+`docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md` is kept as
+historical record only. Its own header declares it superseded and its baselines
+stale, so read it for background and never treat a number in it as current;
+derive live values from source (and let `tests/agentDocConsistency.test.ts`
+enforce that). Its existing pins are deliberately still asserted so it cannot
+rot further while it remains on disk.
 
 ## Project Overview
 

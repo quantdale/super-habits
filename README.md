@@ -78,7 +78,7 @@ Settings exposes **Protect backup with email** for an anonymous owner and **Reco
 `AppProviders` wires sync and the account coordinator:
 
 - Initializes SQLite, inspects all user-owned tables plus durable outbox owners, and calls `ensureAnonymousSession()` only for an empty/unbound dataset when Supabase env vars are configured
-- Hydrates the durable outbox and restore preview only after account ownership is reconciled
+- Hydrates the durable outbox before account ownership is reconciled (hydration is local I/O and never waits on the network); the restore preview is read only after ownership reconciliation
 - Registers `syncEngine.flush()` on:
   - 30-second interval
   - Web `visibilitychange` when page becomes hidden
@@ -145,7 +145,7 @@ The Command Center is an experimental overlay-first quick-command shell, not a g
 - Optional model-backed parsing uses `remote_with_fallback`, but only on internal-capable builds after a tester enables it locally.
 - The local parser remains the fallback and guardrail path when remote parsing is disabled or unavailable.
 - Todo due dates stay limited to `today`, `tomorrow`, or explicit `YYYY-MM-DD`.
-- The CommandScreen's Ask/Auto modes are gated behind `AI_ASK_EXPERIMENT_ENABLED` (currently `true`, enabled 2026-08-05 alongside the deployed ask edge function); Create mode remains the primary surface.
+- The CommandScreen's Ask/Auto modes are hidden by default. They are revealed only when `EXPO_PUBLIC_AI_ASK_INTERNAL_ROLLOUT` is set to exactly `true` at build time (`features/command/types.ts` derives `AI_ASK_EXPERIMENT_ENABLED` from it), which is an internal build/distribution opt-in rather than an on-device preference or a shipped enablement; Create mode remains the primary surface.
 - The Command Center copy stays intentionally experimental and draft-focused; it does not imply broad production AI availability.
 
 Relevant env vars for the optional real parser path:
@@ -155,6 +155,10 @@ Relevant env vars for the optional real parser path:
 - `EXPO_PUBLIC_AI_COMMAND_BACKEND_HOST`
 - `EXPO_PUBLIC_AI_COMMAND_SUPABASE_FUNCTION_NAME`
 - `EXPO_PUBLIC_AI_COMMAND_PROXY_URL`
+
+Relevant env var for the optional Ask/Auto surfaces:
+
+- `EXPO_PUBLIC_AI_ASK_INTERNAL_ROLLOUT` — build-time opt-in, default OFF: Ask/Auto stay hidden unless it is exactly `true`; it is not a device-local preference and never a shipped enablement
 
 Internal rollout note:
 

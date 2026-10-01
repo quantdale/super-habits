@@ -204,6 +204,9 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 ### 8. Restore remote boundary (standard `dist/` build) — CLOSED by the `journeys-sync` lane
 
+**Gate site:** `e2e/journeys/new-phone.spec.ts`
+**Gate site:** `e2e/journeys/recoverable-account-v1.spec.ts`
+
 **Reason:** the restore prompt needs a Supabase-backed remote to appear. The standard `dist/` web export bundles no `EXPO_PUBLIC_SUPABASE_*` env, so `supabase` is null and `getRestorePreview()` reports `remote_backup_unavailable` — the prompt can never appear and no import can run. In the standard lane, the journey branches that observe that boundary (J5: dismiss, no re-prompt after dismissal, accept-restore, what-does-not-come-back) stay gated with `test.fixme(!remoteBackupDetected, …)` and show as skipped — a lane attribute, not a coverage hole.
 
 **Resolution (closed 2026-08-04, task 6.1a/Q5; real-worker boundary verified 2026-08-09):** the dummy-Supabase `dist-sync/` build (non-routable `https://dummy.supabase.co` + placeholder anon key) is served on `localhost:8082` by the dedicated `journeys-sync` Playwright project (`npm run e2e:sync`, main/nightly only, never PRs). Against it, the J5 mock backup makes the prompt appear and all restore branches **run and pass** with the production service worker active (verified: 7/7 J5 steps green, including the CG-2 tombstone branch). The worker now bypasses cross-origin API/auth traffic while preserving same-origin shell caching; the gates remain in the code only so the standard `dist/` lane can keep the same files, releasing when a boundary is present rather than weakening an assertion. J5's CG-2 branch is now released separately under CG-2.
@@ -214,6 +217,9 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 ### 9. Reconnect-push boundary (standard `dist/` build) — CLOSED by the `journeys-sync` lane
 
+**Gate site:** `e2e/journeys/the-commute.spec.ts`
+**Gate site:** `e2e/journeys/bad-backend.spec.ts`
+
 **Reason:** J3 (the-commute) "pushed exactly once" needs a real remote boundary. On the standard `dist/` build the outbox grows, dedupes per (entity, id), and survives a reload — but a flush with `supabase` null no-ops and would **drop** the records, which is not a push and cannot be asserted as one. The reconnect-push step is runtime-gated (`test.fixme(!remoteBoundaryDetected, …)`) and skipped there.
 
 **Resolution (closed 2026-08-04, task 6.1a/Q5):** against `dist-sync/` in the `journeys-sync` project, the counting upsert injector observes the flush at the network boundary and asserts each of the four outbox records (todos ×2, habits, calorie_entries) is delivered **exactly once** and the outbox drains — **passing** (verified). J4's backend-failure steps (503 / malformed / timeout / partial / backoff) run under the same lane and pass 6/6. The gates remain so the standard `dist/` lane skips them with an honest reason instead of failing on a no-op flush.
@@ -222,11 +228,15 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 ### 10. Internal command evaluation suite — env-gated opt-in lane
 
+**Gate site:** `e2e/command.eval.internal.spec.ts`
+
 **Reason:** `e2e/command.eval.internal.spec.ts` (2 tests) drives the real remote parser path (model-proxy outcomes, forced fallback) against a live backend. The whole describe is gated with `test.skip(...)` unless `E2E_COMMAND_INTERNAL_EVAL=true` AND the internal-rollout build flags are set (`EXPO_PUBLIC_AI_COMMAND_INTERNAL_ROLLOUT=true`, `EXPO_PUBLIC_AI_COMMAND_PARSE_MODE=remote_with_fallback`) AND a remote backend is configured (`EXPO_PUBLIC_AI_COMMAND_PROXY_URL`, or Supabase env vars). The standard lane and CI never set the gate, so the suite shows as skipped there — an opt-in lane attribute, not a coverage hole: the same assertions run on the standard lane against the mock parser (`e2e/command.eval.mock.spec.ts`).
 
 **Closing path:** opt in on demand — `E2E_COMMAND_INTERNAL_EVAL=true` against an internal-capable build with a reachable backend. The run writes its quality artifact to `test-results/command-eval-internal.json` and fails on semantic mismatches or unexpected mock effective paths.
 
 ### 11. Internal command observation suite — env-gated opt-in lane
+
+**Gate site:** `e2e/command.observation.internal.spec.ts`
 
 **Reason:** `e2e/command.observation.internal.spec.ts` (4 tests) observes the internal real-parser flow (opt-in metadata visibility, representative todo/habit outcomes, parse→preview→confirm, forced-fallback metadata) against a live backend. Gated identically to entry 10 at describe level via `E2E_COMMAND_INTERNAL_OBSERVATION=true` plus the same build flags and backend requirements; never set by the standard lane or CI, so it shows as skipped there. The mock-parser twin (`e2e/command.observation.mock.spec.ts`) covers the same surface on the standard lane.
 
@@ -234,23 +244,29 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 ### 12. Command shell internal-rollout suite — env-gated opt-in lane
 
+**Gate site:** `e2e/command.spec.ts`
+
 **Reason:** the `Command shell internal rollout` describe in `e2e/command.spec.ts` is skipped unless the build is internal-capable (`EXPO_PUBLIC_AI_COMMAND_INTERNAL_ROLLOUT=true` with a remote parser mode) and a remote backend is configured. The standard lane and CI never set the gates, so it shows as skipped there — an opt-in lane attribute; the mock-parser shell surface is asserted by the earlier describes in the same file.
 
 **Closing path:** opt in on demand, same gates as entries 10–11.
 
 ### 13. Ask provider-unavailable journey step — skipped on remote-configured builds
 
-**Reason:** `e2e/journeys/command-center-v2.spec.ts` “shows provider-unavailable Ask state without changing local data” skips when `EXPO_PUBLIC_SUPABASE_URL` is present, because remote Ask builds route through the mock edge route and can never surface the provider-unavailable state. The assertion runs on the standard local-only `dist/` lane and is skipped only in `dist-sync`/`journeys-sync` runs — a lane attribute, not a coverage hole.
+**Gate site:** `e2e/journeys/command-center-v2-ask.spec.ts`
+
+**Reason:** `e2e/journeys/command-center-v2-ask.spec.ts` “shows provider-unavailable Ask state without changing local data” skips when `EXPO_PUBLIC_SUPABASE_URL` is present, because remote Ask builds route through the mock edge route and can never surface the provider-unavailable state. The assertion runs on the standard local-only `dist/` lane and is skipped only in `dist-sync`/`journeys-sync` runs — a lane attribute, not a coverage hole. (The step originally lived in `command-center-v2.spec.ts` and moved into the Ask-specific file when that suite was split; this entry names where the gate lives now.)
 
 **Closing path:** none needed; keep the runtime gate.
 
 ### 14. Calories week-strip calendar skip (Sunday)
 
+**Gate site:** `e2e/calories-day-navigation.spec.ts`
+
 **Reason:** the week-strip test in `e2e/calories-day-navigation.spec.ts` skips when the browser-local day is Sunday, because a Sunday start leaves no selectable future day in the strip. Structural calendar dependency; the unchanged assertions run on every other weekday.
 
 **Closing path:** none needed; keep the calendar gate (do not fake the clock for this suite).
 
-### 15. J8 section-switch headroom floor fails under full-battery host load (documented flake)
+### 15. J8 section-switch headroom floor fails under full-battery host load — CLOSED (TEST_BUG; residual `ENVIRONMENT` ceiling excursions stay recorded)
 
 **Reason:** the P2 "Tom, the Weekend Returner" switch-budget step (`e2e/journeys/three-months-in.spec.ts`, WM2.4 sustained-headroom gate) requires ≥15% headroom under the 800 ms section-switch ceiling. On this Windows host during back-to-back full `npm run e2e` batteries it measured 692 ms (13.5%) and 697 ms (12.9%) — failing the floor while comfortably under the ceiling — yet passed standalone on the same tree at 646 ms (19.3%). The product diff between the last green battery and the failing tree touched no mounted section code (verified: one save-handler try/catch in `TodosScreen.tsx` plus Planning-hub-only files), so the sensitivity is host noise (Defender/user browsers) accumulating across the 18-minute single-worker battery, not a performance regression.
 
@@ -443,6 +459,11 @@ using a fill hue directly.
 
 ### 20. V2-era restore/account/Ask boundary files ride the same `journeys-sync` lane
 
+**Gate site:** `e2e/journeys/new-phone-v2.spec.ts`
+**Gate site:** `e2e/journeys/new-phone-v2-settings-failures.spec.ts`
+**Gate site:** `e2e/journeys/portable-owner-recovery.spec.ts`
+**Gate site:** `e2e/journeys/command-center-v2-ask.spec.ts`
+
 **Reason:** these journeys postdate entries 8/9 and gate their remote steps
 with the same `test.fixme(!<boundaryDetected>, …)` protocol, so on the standard
 local-only `dist/` build they show as skipped lane attributes — not coverage
@@ -466,6 +487,14 @@ holes — and run for real against `dist-sync/` in the `journeys-sync` lane
 the standing rule holds — every skipped or quarantined test is named here —
 and so the quarantine-register parity guard
 (`scripts/quarantine-register-parity.mjs`, wired into `qa:fast`) can verify it.
+
+### 22. Disposable-cloud integration suite — credential-gated opt-in lane
+
+**Gate site:** `tests/integration/disposableCloudRoundTrip.test.ts`
+
+**Reason:** the whole real-Supite round-trip suite is gated at describe level with `describe.skipIf(!run)` (`tests/integration/disposableCloudRoundTrip.test.ts:104`), and its edge-function certify block with a second `describe.skipIf(!run || process.env.DISPOSABLE_CERTIFY_EDGE !== '1')` (`:489`). The gates open only when a disposable Supabase project is provisioned with `DISPOSABLE_CERTIFY_URL`, `..._NAME`, `..._PUBLIC_KEY`, and `..._SERVICE_KEY` — the nightly disposable-backend lane, which itself needs `SUPABASE_ACCESS_TOKEN`. The unit/integration gate (`npm test`) and CI's `quality` job never set them, so the suite shows as skipped there — a lane attribute, not a coverage hole: the same recovery contracts are asserted against the dummy-Supabase `dist-sync/` boundary and the local-only fixtures.
+
+**Closing path:** run the nightly disposable-backend lane with a configured access token, then re-run the integration project with the certify variables set. The lane's hard-isolation guard aborts before any build or network call if a rule fires.
 
 ---
 

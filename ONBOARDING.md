@@ -69,7 +69,7 @@ npm run qa:fast
 npm run qa:integration
 npm run openspec:validate
 npm run qa:impact:validate
-npm run build:web
+npm run build:e2e
 npm run web:verify    # finite live-web verification; must exit by itself and free its port
 npm run e2e:journeys:p0
 ```

@@ -32,7 +32,10 @@ Cursor rule files (for example `.cursorrules` and `.cursor/rules/superhabits-rul
 ## Server Lifecycle Rule
 
 - `npm run web` / `npm run web:dev` is a **persistent Metro server**. Never await it as a validation gate; it does not exit on its own.
-- Finite web validation only: `npm run build:web`, Playwright (server owned by `scripts/serve-e2e.js`), or `npm run web:verify` (build → owned server → bounded probe → guaranteed cleanup → port release).
+- Finite web validation only: `npm run build:e2e` (the hermetic export), Playwright (server owned by `scripts/serve-e2e.js`), or `npm run web:verify` (build → owned server → bounded probe → guaranteed cleanup → port release).
+
+Never feed a Playwright lane a `dist/` made by plain `build:web`: that export inlines local `.env` Supabase credentials.
+
 - Before finishing a task/campaign, run `npm run web:hygiene`; free only exact campaign-owned PIDs, and never use `taskkill /IM node.exe` / `killall node`.
 
 ## Wave-Based Execution
@@ -66,8 +69,8 @@ Cursor rule files (for example `.cursorrules` and `.cursor/rules/superhabits-rul
 
 - Always: `npm test`.
 - For business logic changes: `npm test`; run targeted tests if relevant.
-- For web/UI changes: `npm run build:web`; run impacted Playwright specs; run full `npm run e2e` when web infra or cross-cutting UI behavior changed.
-- For pre-PR validation: `npm test`, `npm run build:web`, `npm run e2e`, `npm run typecheck`.
+- For web/UI changes: `npm run build:e2e`; run impacted Playwright specs; run full `npm run e2e` when web infra or cross-cutting UI behavior changed.
+- For pre-PR validation: `npm test`, `npm run build:e2e`, `npm run e2e`, `npm run typecheck`.
 - If the worktree is fresh and tools are missing (for example `tsc` not found), run `npm ci` first, then rerun the full validation sequence.
 
 ## Validation Toolbox

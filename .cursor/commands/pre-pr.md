@@ -259,7 +259,7 @@ Report final status using one of:
 - `schema.sql` is a stale reference snapshot, not runtime authority
 - Sync flush gated on isRemoteEnabled() — intentional, remote off
 - tests/calories.data.test.ts — mocked data-layer coverage
-- Lint runs via `npm run lint` (eslint with a `--max-warnings` cap in package.json) — warnings tolerated; lint runs in the CI quality job
+- Lint runs via `npm run lint` (eslint with a pinned `--max-warnings 0` cap in package.json — any warning fails) — lint runs in the CI quality job
 
 ---
 
