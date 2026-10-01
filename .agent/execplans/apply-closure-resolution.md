@@ -145,6 +145,18 @@ kruubbynsmxzxfdunaal` (`pitr_enabled: false`, `backups: []`, `physical_backup_da
 - Do NOT edit `.maestro/` (owner freeze) or the D14/J8/floor assertions; record the
   smoke failure as a classified residual instead.
 - Move `HANDOFF.md` into the change it documents rather than leaving a stray root file.
+- **Corrected a CI-lane doc drift discovered while verifying the sync lane:**
+  `AGENTS.md` claimed the gating main-lane `e2e` job runs `npm run e2e:sync`, but
+  `harden-ci-lane-integrity` deliberately removed that step (the matrix marks
+  dist-sync `gates: false`) and `tests/ciLaneIntegrity.test.ts` pins the removal.
+  `AGENTS.md` now says the main lane builds and uploads `dist-sync/` without
+  running the lane, and that the nightly job runs it report-only — so the next
+  session looks for restore-prompt runtime evidence in the right lane.
+- **Fixed the wave's own CI-breaking defect rather than only reporting it:** the
+  invalid `secrets`-in-`if:` expression failed the entire workflow at parse time
+  (run `36807888273`, zero jobs). Corrected with a credential-probe step, and the
+  guard that had pinned the invalid construct now pins the valid one plus a
+  class-level "no `if:` references `secrets`" assertion.
 
 ## Validation Ledger
 
@@ -168,8 +180,8 @@ kruubbynsmxzxfdunaal` (`pitr_enabled: false`, `backups: []`, `physical_backup_da
 | 2026-10-01 | `grep -o 'if (version < [0-9]*)' core/db/client.ts`                                | Local schema still **25** — no new local migration                                                                                                                                |
 | 2026-10-01 | `git diff c1bc380 HEAD -- e2e/journeys/three-months-in.spec.ts .maestro`           | Empty — the J8 800 ms ceiling, 15 % floor, D14 500 ms diary ceiling, and every `.maestro/` flow are byte-identical to `HEAD`                                                      |
 | 2026-10-01 | `git status --short`                                                               | Only `.tmp-ios36423379932/` and the seven active `openspec/changes/*` directories                                                                                                 |
-| ---------- | -------                                                                            | -------                                                                                                                                                                           |
-| (live log) | —                                                                                  | —                                                                                                                                                                                 |
+| 2026-10-01 | Push `a019e21` → CI run `36807888273`                                              | **FAILURE — zero jobs, "workflow file issue"**: the wave's `ci.yml` put `secrets` in a step `if:`, which GitHub rejects at parse time. Fixed in `a9db86d`.                        |
+| 2026-10-01 | Push `a9db86d` → CI run `36808868543`                                              | **SUCCESS** — `quality` success, `e2e` success (full main lane incl. full journeys + deterministic scenarios + the `dist-sync` build), `nightly` skipped as expected on a push    |
 
 ## Changed Files / Areas
 

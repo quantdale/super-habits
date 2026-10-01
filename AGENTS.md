@@ -319,7 +319,7 @@ npm run build:web    # npx expo export -p web → dist/ (one-shot, finite)
 # this applies to build:e2e, e2e:full, qa:journeys, qa:full, web:verify,
 # qa:repeat, web-lifecycle, and qa:native:provision.
 npm run e2e          # playwright test (chromium + journeys + simulation + pwa projects)
-npm run e2e:sync     # remote-boundary journeys against dist-sync/ (:8082) — opt-in, main/nightly only
+npm run e2e:sync     # remote-boundary journeys against dist-sync/ (:8082) — nightly report-only lane
 npm run e2e:report   # open HTML report
 npm run e2e:headed   # visible browser for debugging
 npm run e2e:debug    # Playwright inspector
@@ -472,14 +472,20 @@ eas build -p android --profile preview
      scenario subset, ≤ 10 min budget).
    - **main lane:** full `npm run e2e` (feature + full journeys + simulation
      self-test + pwa) + `npm run sim:run -- --mode deterministic` (full library) +
-     `dist-sync/` build with DUMMY Supabase env (never PRs, never quality) +
-     `npm run e2e:sync` (the dedicated `journeys-sync` project runs the
-     remote-boundary journey steps against `dist-sync/` on :8082).
+     `dist-sync/` build with DUMMY Supabase env (never PRs, never quality). The
+     `dist-sync/` artifact is built and uploaded here for inspection, but the
+     `journeys-sync` lane itself does NOT run in this gating job — the lane table
+     (`simulation/matrix.ts`) declares it `gates: false`, and
+     `tests/ciLaneIntegrity.test.ts` pins that (`does not run the dist-sync lane
+as a hard step in the gating e2e job`). It runs in the `nightly` job below,
+     report-only.
    - Uploads `e2e-report`, `simulation-output/` (run reports, digests, traces,
      repro bundles), and `dist-sync/` — all 7-day retention.
 3. **nightly** — `schedule`-only, after `quality`: full `npm run e2e` (full
    journeys) + seeded scenario lane (`sim:run -- --mode seeded`) + `dist-sync/`
-   build + the disposable-backend lane (runs only when `SUPABASE_ACCESS_TOKEN`
+   build + `npm run e2e:sync` (the `journeys-sync` project runs the remote-boundary
+   journey steps, including the restore-prompt branches, against `dist-sync/` on
+   :8082) + the disposable-backend lane (runs only when `SUPABASE_ACCESS_TOKEN`
    is configured; `simulation/backend/guard.ts` hard-isolates it). Non-gating.
 
 The AI exploratory lane and the disposable backend never run on PRs, and the
