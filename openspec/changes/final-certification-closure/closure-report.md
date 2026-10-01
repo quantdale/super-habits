@@ -1,8 +1,8 @@
 # Closure report — DRAFT, not yet the final published report
 
-Change: `final-certification-closure` · Prepared: 2026-09-29 · Schema: `spec-driven`
+Change: `final-certification-closure` · Prepared: 2026-09-29 · Updated: 2026-10-01 · Schema: `spec-driven`
 
-> **Task 6.4 is not checked.** The final candidate SHA now exists — `4fa769e` — but this draft is still not the final published report for two reasons: exact-head CI run `36515101194` has not completed, and the spec's required review (task 6.1) is still gated behind the production read-only verification (2.1, 2.2) that this change's own ordering places first. Both must close before this is the published report. The residual blocks below are complete and are the part that does not depend on the missing evidence.
+> **Task 6.4 is not checked.** This draft is not yet the final published report because the linked successor `windows-closure-reconciliation` still holds the Android smoke qualification, the full ten-surface adversarial review (task 6.1), the final source candidate, and the exact-head CI attestation for that candidate. Task 6.2 is now **closed** for the verified candidate `210afd39a99e2b2dbf5026b58a1191182e05f368` (run `36824132137`); any later commit is a new tip and is re-attested through the successor's commit-linked final attestation rather than reused parent-SHA CI. The residual blocks below are the part that does not depend on the missing evidence. This draft deliberately keeps superseded events visible as history instead of deleting them.
 
 ## Terminal state
 
@@ -12,53 +12,48 @@ A substantive unresolved product/recovery gate keeps this state red. Production 
 
 ## 1. Identities
 
-| Item                        | Value                                                                                                                                   |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Final candidate SHA         | `16cb41a25cced14ba1f3c20b1815dc17c8506bc6` — committed, pushed, and pinned as the head both open runs certify                           |
-| `main` == `origin/main`     | `16cb41a` (fast-forward `575c403..4fa769e..16cb41a`, 0 ahead / 0 behind)                                                                |
-| Superseded head             | `4fa769e4c12b78a47f42f2137be1204b1725e705` — carried the three iOS flow fixes; its CI `36515101194` was cancelled by the follow-up push |
-| Base this change applied on | `575c4035e7b48e9d84df47f7a5f28dfcb14d7e27`                                                                                              |
-| Branch                      | `main` only; one worktree; no branch, tag, stash, or history rewrite was created                                                        |
-| Foreign stash               | `stash@{0}` `pre-recovery-local-changes` — preserved, never applied or dropped                                                          |
-| Tree state                  | clean at `16cb41a`; only `.tmp-ios36423379932/` is untracked, and it is gitignored at `.gitignore:81`                                   |
-| `.tmp-ios36423379932/`      | untracked, never staged, never committed, never deleted                                                                                 |
-| Integration Node            | pinned `v22.23.2` used for every gate; ambient `v24.3.0` never ran a gate                                                               |
+| Item                          | Value                                                                                                                                            |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Base this change applied on   | `575c4035e7b48e9d84df47f7a5f28dfcb14d7e27`                                                                                                       |
+| Verified candidate (task 6.2) | `210afd39a99e2b2dbf5026b58a1191182e05f368` — `main` == `origin/main`, fast-forward only, 0 ahead / 0 behind                                      |
+| Superseded heads              | `4fa769e4c12b78a47f42f2137be1204b1725e705` (CI `36515101194` cancelled), `16cb41a25cced14ba1f3c20b1815dc17c8506bc6` (CI `36515963710` cancelled) |
+| Branch                        | `main` only; one worktree; no branch, tag, stash, or history rewrite was created                                                                 |
+| Foreign stash                 | `stash@{0}` `pre-recovery-local-changes` — preserved, never applied or dropped                                                                   |
+| Tree state                    | tracked tree clean; untracked foreign evidence only (`.tmp-ios36423379932/` and prior change directories), never staged                          |
+| `.tmp-ios36423379932/`        | untracked and **not** ignored by `.gitignore`; never staged, never committed, never deleted                                                      |
+| Integration Node              | pinned `v22.23.2` used for every gate; ambient `v24.3.0` never ran a gate                                                                        |
 
 ## 2. CI
 
-**Green run — `36518073584` on `c1dc252` (push): completed SUCCESS.**
+**Exact-head record for the verified candidate — `36824132137` on `210afd39a99e2b2dbf5026b58a1191182e05f368` (push): completed SUCCESS.**
 
-| Job       | Status    | Conclusion  | Verdict                                         |
-| --------- | --------- | ----------- | ----------------------------------------------- |
-| `quality` | completed | **success** | pass                                            |
-| `e2e`     | completed | **success** | pass                                            |
-| `nightly` | completed | skipped     | not a pass, not a failure — expected for a push |
+| Job       | Status    | Conclusion  | Verdict                                                                                                                                                                      |
+| --------- | --------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `quality` | completed | **success** | pass                                                                                                                                                                         |
+| `e2e`     | completed | **success** | pass — main lane: full E2E (feature + full journeys + simulation self-test + pwa), full deterministic scenario library 23/23, `dist-sync/` build, plus the retry-report gate |
+| `nightly` | completed | skipped     | not a pass, not a failure — expected for a push (schedule-only job)                                                                                                          |
 
-`c1dc252` is the tip that carries every product change in this change: the three iOS flow fixes, the regression test, and the `workflow_dispatch` lane. This run is **not** the exact-head record for whatever tip exists after this report is committed, because `ci.yml` declares `concurrency: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}` with `cancel-in-progress: true`, so the push that lands these documents starts a new run. Task 6.2 therefore stays **open**: it requires exact-head CI to complete on the final candidate SHA.
+Run `36824132137` is the newest CI run for `main` at the time this draft was updated, its `headSha` is exactly `210afd3`, and no source-changing commit superseded it. Task `6.2` is therefore **closed for this verified candidate**. The run's `e2e` job also records the expected PR-lane skips (the feature/P0-scenario steps conclude `skipped` on a push, not on a PR) — expected skips, not failures.
 
-**In flight — `36516000163`, iOS simulator E2E, `workflow_dispatch` on `16cb41a`.** This run is the task 3.3 recertification attempt. It was still `in_progress` when active monitoring was stopped at the operator's request, so **no iOS result exists and iOS is not certified**. `ios-native-e2e.yml` declares no concurrency group, so this run was never affected by later pushes and will still complete on its own; its result is simply not being awaited.
+Any later commit is a new tip: `ci.yml` declares `concurrency: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}` with `cancel-in-progress: true`, so the push that lands a later commit starts a new run and supersedes this one. Exact-head CI for the final pushed tip of this campaign is published through the successor's immutable commit-linked final attestation; parent-SHA CI is never reused as a child commit's exact-head proof.
 
-**Superseded — `36515963710` on `16cb41a`: completed CANCELLED, not green.** `quality` had completed success; `e2e` finished cancelled. Cancelled by the same `cancel-in-progress` rule when a later push landed. Recorded as cancelled, not as evidence.
+**Superseded — `36812850832` on `c2ec475` (push): SUCCESS.** Green `quality`/`e2e`, `nightly` skipped. Its `qa:full` record is the durable one in `.agent/execplans/apply-closure-resolution.md`.
 
-**Superseded — `36515101194` on `4fa769e`: completed CANCELLED, not green.**
+**Superseded — `36808868543` on `a9db86d` (push): SUCCESS** — the first green run after the workflow-parse repair.
 
-| Job       | Result                       |
-| --------- | ---------------------------- |
-| `quality` | success                      |
-| `e2e`     | **cancelled** — not a pass   |
-| `nightly` | skipped, expected for a push |
+**Superseded — `36807888273` on `a019e21` (push): FAILURE with zero jobs** — GitHub rejected the workflow at parse time because a step `if:` referenced the `secrets` context. Fixed in `a9db86d`; the class-level guard now pins the valid construct.
 
-`4fa769e` carried the three iOS flow fixes. It was cancelled when `16cb41a` landed. The lesson is operational: a follow-up commit on the same branch supersedes the earlier run, so the final candidate SHA has to be fixed before its CI is treated as the record.
+**Superseded — `36518073584` on `c1dc252` (push): SUCCESS** — `quality` success, `e2e` success, `nightly` skipped.
 
-**Prior head — `575c403`: run `36449656365` completed success.**
+**Superseded — `36515963710` on `16cb41a`: CANCELLED, not green.** `quality` had completed success; `e2e` finished cancelled when a later push landed. Recorded as cancelled, not as evidence.
 
-| Job       | Result                                                     |
-| --------- | ---------------------------------------------------------- |
-| `quality` | success                                                    |
-| `e2e`     | success, including deterministic scenarios and `dist-sync` |
-| `nightly` | skipped, expected for a push                               |
+**Superseded — `36515101194` on `4fa769e`: CANCELLED, not green.** `quality` success, `e2e` cancelled, `nightly` skipped. `4fa769e` carried the three iOS flow fixes.
 
-`575c403` was a documentation-only tip and certifies no production, iOS, Android, or J8 result. The iOS workflow did not run on `575c403` or `4fa769e`: `ios-native-e2e.yml` triggered only on `pull_request` with the `ios-simulator-gha` label, so a push to `main` could not start it. It now also accepts `workflow_dispatch`, which is how `36516000163` was started against the main tip.
+**Superseded — `575c403`: run `36449656365` SUCCESS.** `quality` success, `e2e` success including deterministic scenarios and `dist-sync`, `nightly` skipped. `575c403` was a documentation-only tip and certifies no production, iOS, Android, or J8 result.
+
+**iOS lane — `36516000163`, `workflow_dispatch` on `16cb41a`.** The task 3.3 recertification attempt; active monitoring was stopped at the operator's request, so **no iOS result exists and iOS is not certified**. With the owner's 2026-10-01 deferral the lane is no longer chased; iOS stays `DEFERRED_BY_OWNER / ENVIRONMENT`.
+
+The lesson is operational and preserved: a follow-up commit on the same branch supersedes the earlier run, so the final candidate SHA has to be fixed before its CI is treated as the record.
 
 ## 3. Production schema and historical manifests — RED, and the stated posture is unconfirmed
 
@@ -78,23 +73,35 @@ The predecessor's 2026-09-28 read-only classification reported 482 candidate rec
 - The 96 probable and 251 ambiguous records were left untouched.
 - Schema approval would not imply deletion approval; they are separate gates.
 
-## 5. iOS — source and executable identity, fixed but NOT recertified
+## 5. iOS — source and executable identity, `DEFERRED_BY_OWNER / ENVIRONMENT`
 
-| Item                            | Value                                                                        |
-| ------------------------------- | ---------------------------------------------------------------------------- |
-| Source SHA of the evidence      | `e9b42a3f31984f86dd50e0b337300df74898f422`                                   |
-| Run / attempt                   | `36423379932` / 1, repository `quantdale/super-habits`                       |
-| Executable SHA-256              | `ef22674b03518115bd465ac7a1293a7ad9e5439238a5af1ac9a6ac6085be9010`           |
-| Bundle / simulator              | `com.dale16.superhabits`, iPhone 17 Pro, iOS 26.2, Xcode 26.2, Maestro 2.2.0 |
-| Result                          | `NOT_CERTIFIED` at **10/13**; 10 PASS, 3 `FAILED_NEEDS_TRIAGE`               |
-| Artifact                        | `10980993163`, read via the confirmed local extract                          |
-| Current-source iOS at `575c403` | **unproven** — no run exists at this or any newer SHA                        |
+| Item                       | Value                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------- |
+| Source SHA of the evidence | `e9b42a3f31984f86dd50e0b337300df74898f422`                                            |
+| Run / attempt              | `36423379932` / 1, repository `quantdale/super-habits`                                |
+| Executable SHA-256         | `ef22674b03518115bd465ac7a1293a7ad9e5439238a5af1ac9a6ac6085be9010`                    |
+| Bundle / simulator         | `com.dale16.superhabits`, iPhone 17 Pro, iOS 26.2, Xcode 26.2, Maestro 2.2.0          |
+| Result                     | `NOT_CERTIFIED` at **10/13**; 10 PASS, 3 `FAILED_NEEDS_TRIAGE`                        |
+| Artifact                   | `10980993163`, read via the confirmed local extract                                   |
+| Current-source iOS         | **not run** — `DEFERRED_BY_OWNER / ENVIRONMENT` because this campaign host is Windows |
 
-All three failures are classified `TEST_BUG` with in-artifact evidence, and all three flows are edited (see `ios-flow-classification.md`). The edits are **unproven**, and the persistence replacement is the weakest of the three: the artifact shows the flow left the routine detail but not which gesture did it, so task 3.2 is left unchecked. All three require a new exact-SHA run to reach 13/13. `12/13` would not be certified either.
+Tasks 3.2 and 3.3 are explicitly `DEFERRED_BY_OWNER / ENVIRONMENT`. All three failures were classified `TEST_BUG` with in-artifact evidence and all three flows carry edits (see `ios-flow-classification.md`), but the edits remain **unproven** — no iOS run exists and none is dispatched or chased by this campaign. iOS is never called certified, `12/13` would not be certified either, and the historical evidence above is preserved verbatim rather than rewritten by the deferral. Reopening iOS requires a macOS host and an explicit owner decision.
 
 ## 6. Android — current source and binary identity
 
-`Nitro_API_36` exists and no device is attached. Classification: **`ENVIRONMENT`**. No current-source Android smoke, persistence, or lifecycle run was performed, and the historical APK was **not** reused — a historical binary cannot certify drifted source.
+| Item              | Value                                                                                                                                          |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source SHA        | `68db684d0915d8cd781d52b282a3934ca214171b` (clean tree, detached exact-source checkout)                                                        |
+| Target            | `Nitro_API_36`, `emulator-5554`, API 36, `x86_64`                                                                                              |
+| Package / version | `com.dale16.superhabits`, versionName `1.0.0`, versionCode 1                                                                                   |
+| APK SHA-256       | `5DF9D5DC72EF13B4B88DF32527244C50BD750D1C48EF79EB0CA3B6D2ADFA1014`                                                                             |
+| Provisioning      | **PASS** — hermetic build (`EXPO_NO_DOTENV=1`, no ambient `EXPO_PUBLIC_*`), 0 bundle-scan matches for `supabase.co`                            |
+| Smoke             | **1/2** — `native-smoke` PASS, `command-center-v2` `FAILED_NEEDS_TRIAGE`                                                                       |
+| Persistence       | **11/11 PASS** (coverage verdict `OK`)                                                                                                         |
+| Lifecycle         | **6/6 PASS** (coverage verdict `OK`)                                                                                                           |
+| Residual          | `command-center-v2` step 14 `tapOn: 'Create'` — the ordinary build never mounts the rollout-gated mode selector, so no `Create` element exists |
+
+The historical APK was not reused. The `command-center-v2` failure is a stale flow step against the intentional default-off render boundary (`features/command/commandSurface.ts`, `CommandScreen`'s `if (!AI_ASK_EXPERIMENT_ENABLED) return commandContent` branch); the raw report labels it `PRODUCT_BUG` while the hierarchy shows no `Create`, `Ask`, or `Auto` element at all. The scoped Android repair, its regression guard, and the current-source re-qualification are the successor's task 3 and are recorded there; this section is superseded by that result when it lands.
 
 ## 7. J8 environment and measurement
 
@@ -106,18 +113,23 @@ All three failures are classified `TEST_BUG` with in-artifact evidence, and all 
 | Largest unrelated consumers | `vmmemWSL` 5,217 MB, `Memory Compression` 4,758 MB, `opencode` 875 MB, plus agent/editor runtimes                                                                                                                  |
 | Terminated                  | nothing — no unrelated process was killed                                                                                                                                                                          |
 | Preserved result            | **878 ms against the unchanged 800 ms ceiling** — recorded `ENVIRONMENT` host-load excursion, not an open product gate (register: `CG-4`/`CG-5` CLOSED 2026-08-10; gap 15 CLOSED with a 2026-09-24 root-cause fix) |
-| HEAVY/J8 rerun              | **not run** — host headroom is not credible                                                                                                                                                                        |
-| `qa:full`                   | **deferred**, and not marked passed from narrower gates                                                                                                                                                            |
+| HEAVY/J8 rerun              | **not run** — host headroom is not credible in the original session; task 4.3 is `NOT_TRIGGERED` because its conditional antecedent never fired                                                                    |
+| `qa:full`                   | **PASS at `c2ec475`** — chronology: previously resource-deferred, then completed successfully on pinned Node `v22.23.2` (`QA_FULL_EXIT=0`)                                                                         |
 
-The ceiling stays 800 ms and the 15 % floor stays 15 %. No app-owned cost was profiled or changed because no credible measurement was possible in this session — and none is required: the register's 2026-09-24 resolution already removed the app-owned/measurement contribution (`waitForSectionTransitionsSettled` before the measured round), with post-fix evidence persona 7/7, `maxSwitch=622/800` (22.3 % headroom), per-switch `619/407/395/500/622/457`, `diarySearch=396/500`, `pickerSearch=186/500`. The 878 ms result is retained verbatim as an `ENVIRONMENT` excursion under full-battery host load. Broad `qa:fast`/`qa:full` were not run for the same reason; the gates that were run are listed in the ExecPlan ledger.
+The ceiling stays 800 ms and the 15 % floor stays 15 %. No app-owned cost was profiled or changed because none is required: the register's 2026-09-24 resolution already removed the app-owned/measurement contribution (`waitForSectionTransitionsSettled` before the measured round), with post-fix evidence persona 7/7, `maxSwitch=622/800` (22.3 % headroom), per-switch `619/407/395/500/622/457`, `diarySearch=396/500`, `pickerSearch=186/500`. The 878 ms result is retained verbatim as an `ENVIRONMENT` excursion under full-battery host load; it is not reclassified as passing and its condition stays conditional (`NOT_TRIGGERED` for task 4.3).
+
+**`qa:full` chronology, recorded rather than rewritten:** the gate was first deferred because host memory was not credible, and the deferral was left visible at the time. It was subsequently completed successfully at `c2ec475` on pinned Node `v22.23.2`: `QA_FULL_EXIT=0`, `npm test` 249 test files passed / 1 skipped, `openspec:validate` 68/68, `npm run e2e` 284 tests on one worker with **235 passed / 49 skipped / 0 failed** (29.7 m), deterministic simulation **23/23**. Host at run time: 3,762 MB free of 32,488 MB total, CPU 63 %, 41 h uptime. The durable record is `.agent/execplans/apply-closure-resolution.md`; its source applicability to the current tree is corroborated by the empty runtime/config diff `c2ec475..210afd3`. The counts are that run's inventory, not a fixed expectation, and the original deferral is preserved as history.
 
 ## 8. OpenSpec and ExecPlan status
 
-| Item                                   | Value                                                                                                 |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| This change                            | `final-certification-closure`, 14/22 tasks recorded; 8 remain: 2.1, 2.4, 3.2, 3.3, 4.3, 6.1, 6.2, 6.4 |
-| This ExecPlan                          | `Plan-Version: 2`, `Status: BLOCKED`, validates PASS                                                  |
-| Predecessor `external-blocker-closure` | 27/27, ExecPlan `ACTIVE`, report `NOT CERTIFIED`, **unarchived**                                      |
+| Item                                   | Value                                                                                            |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| This change                            | `final-certification-closure`, **15/22 tasks recorded** (2.1, 2.4, 3.2, 3.3, 4.3, 6.1, 6.4 open) |
+| This ExecPlan                          | `Plan-Version: 2`, `Status: BLOCKED`, validates PASS                                             |
+| Predecessor `external-blocker-closure` | 27/27, ExecPlan `ACTIVE`, report `NOT CERTIFIED`, **unarchived**                                 |
+| Successor this campaign runs           | `windows-closure-reconciliation`, 42-task apply checklist; owns the seven open tasks below       |
+
+The successor's review and reporting checkpoints do **not** depend on the production SQL credential. Live production facts stay explicitly blocked; the repository-level review of all ten certification-critical surfaces proceeds independently, and only the live catalog assertions remain unverified. Task 6.1 is therefore in progress rather than gated behind 2.1.
 
 ## 9. Archive decision
 
@@ -134,16 +146,16 @@ Every residual below carries `WHY`, `CLASSIFICATION`, `WHAT IS REQUIRED`, and `E
 ### R1 — iOS recertification
 
 - **WHY:** The three classified fixes are unproven, and no current-source iOS run exists.
-- **CLASSIFICATION:** BLOCKED — NO CERTIFIED iOS RESULT AT AN EXACT SHA (task 3.2 also remains open on the persistence fix). The trigger blocker is resolved: the owner chose the `workflow_dispatch` route, it was added to `.github/workflows/ios-native-e2e.yml` and pushed as `16cb41a`, and run `36516000163` was dispatched against the `main` tip. No completed artifact exists for it, so iOS is not certified.
-- **WHAT IS REQUIRED:** The commit and push are DONE: 16 files as `4fa769e`, fast-forwarded, `main` == `origin/main`. What is still required is a runnable path. `.github/workflows/ios-native-e2e.yml` declares only `on: pull_request: types: [labeled, synchronize]`, its job is gated on the `ios-simulator-gha` label, and it has no `workflow_dispatch`; run `36423379932` was likewise a `pull_request` run from `codex/external-blocker-closure`. A push to `main` therefore cannot start it. Either a labelled PR is opened (needs a head branch, and would certify a SHA that is not the `main` tip) or a `workflow_dispatch` trigger is added and the job gate plus `EXPECTED_SOURCE_SHA` are adapted for dispatch events, which changes a release-gate workflow and needs an owner decision. Then require build, executable hash, install, launch, and 13/13 flow passes.
-- **EXACT RESUME ACTION:** Re-read the dispatched run's artifact (`36516000163`) if it completed, or dispatch a fresh exact-SHA run, and compare its flow statuses against the three classified flows before changing anything — do not assume a fix held. A first attempt may still fail, especially for the persistence scroll, which is an untested hypothesis. iOS stays deferred by the owner: do not edit `.maestro/` or chase iOS failures without an explicit owner decision.
+- **CLASSIFICATION:** `DEFERRED_BY_OWNER / ENVIRONMENT` — the campaign host is Windows, and the owner deferred iOS rather than chasing 13/13. iOS is **not certified**.
+- **WHAT IS REQUIRED:** A macOS host plus an explicit owner decision to reopen iOS, then a new exact-SHA run demonstrating build, executable hash, install, launch, and 13/13 flow passes. The three flow edits are committed and their regression guards pass, but they remain unproven until that run exists. iOS deferral never waives the certification contract and never becomes an archival pass.
+- **EXACT RESUME ACTION:** On a macOS host, dispatch the iOS native workflow at the then-current `main` SHA, re-read the artifact, and compare its flow statuses against the three classified flows before changing anything — do not assume a fix held, and treat the persistence scroll as the likeliest first failure. Do not edit `.maestro/` or chase iOS failures on Windows.
 
 ### R2 — Production read-only verification
 
 - **WHY:** The 2026-09-28 production posture is unconfirmed, and a stale hypothesis must not drive a write.
-- **CLASSIFICATION:** BLOCKED — MISSING CREDENTIAL
-- **WHAT IS REQUIRED:** The production database password, or a configured read-only SQL credential. Read-only access alone is sufficient and is **not** DDL authorization. The recovery-point half of this workstream is already **proven absent** from the Management API (`supabase backups list --project-ref kruubbynsmxzxfdunaal` → `pitr_enabled: false`, `backups: []`, `physical_backup_data: {}`, `walg_enabled: true`), so task 2.2 is closed as an explicit `FAIL`; this entry now covers task 2.1's catalog read only.
-- **EXACT RESUME ACTION:** Set the credential, then run read-only `supabase_migrations.schema_migrations`, `information_schema.tables` for the four Gym V2 tables, `information_schema.columns` for the targeted numeric columns, the `habit_completions` constraint/index inventory, and a `backup_manifest` count against project `kruubbynsmxzxfdunaal`. Record actual values, not the hypothesis. Separately, PITR or a physical backup must be enabled before any DDL consideration.
+- **CLASSIFICATION:** `CREDENTIAL / EXTERNAL`
+- **WHAT IS REQUIRED:** The production database password, or a configured **read-only** SQL credential. Read-only access alone is sufficient for this task and is **not** DDL authorization. The recovery-point half is already **proven absent** from the Management API (`supabase backups list --project-ref kruubbynsmxzxfdunaal` → `pitr_enabled: false`, `backups: []`, `physical_backup_data: {}`, `walg_enabled: true`), so task 2.2 is closed as an explicit `FAIL`; this entry covers task 2.1's catalog read only. Missing credentials never block the independent repository review or reporting workstreams.
+- **EXACT RESUME ACTION:** Set the credential, then run the bounded read-only query set in `openspec/changes/windows-closure-reconciliation/design.md` §7 (`BEGIN READ ONLY`, `statement_timeout` 15 s, migration head, Gym V2 tables, numeric column types, `habit_completions` constraint/index inventory, `backup_manifest` counts, `ROLLBACK`) against project `kruubbynsmxzxfdunaal`. Record actual values, not the hypothesis. Separately, PITR or a physical backup must be enabled before any DDL consideration.
 
 ### R3 — Production DDL rollout
 
@@ -169,23 +181,23 @@ Every residual below carries `WHY`, `CLASSIFICATION`, `WHAT IS REQUIRED`, and `E
 ### R6 — J8 performance residual
 
 - **WHY:** A preserved 878 ms section-switch result sits above the unchanged 800 ms ceiling.
-- **CLASSIFICATION:** CLOSED as a product gate; the recorded result is an `ENVIRONMENT` host-load excursion. `docs/testing/known-gaps.md` records `CG-4` and `CG-5` as **CLOSED** (2026-08-10, `close-cg4-cg5-performance-gaps`) and gap 15 as **CLOSED (TEST_BUG; residual `ENVIRONMENT` ceiling excursions stay recorded)** with a 2026-09-24 root-cause resolution: the measured round began while the warm-up's six back-to-back section transitions were still settling, and `waitForSectionTransitionsSettled(page)` corrected the measurement at the source. Post-fix evidence: persona 7/7 green, `maxSwitch=622/800` (22.3 % headroom), per-switch `619/407/395/500/622/457`, `diarySearch=396/500`, `pickerSearch=186/500`. Every ceiling, floor, fixture, and assertion is unchanged, and the 878 ms number is preserved verbatim.
-- **WHAT IS REQUIRED:** Nothing to close the product gate. The `ENVIRONMENT` residual stays recorded: a future ceiling breach is re-verified standalone on an idle host before any product code is touched.
+- **CLASSIFICATION:** `NOT_TRIGGERED` (task 4.3) — the conditional antecedent never fired, and the product gate is CLOSED by the recorded root cause. `docs/testing/known-gaps.md` records `CG-4` and `CG-5` as **CLOSED** (2026-08-10, `close-cg4-cg5-performance-gaps`) and gap 15 as **CLOSED (TEST_BUG; residual `ENVIRONMENT` ceiling excursions stay recorded)** with a 2026-09-24 root-cause resolution: the measured round began while the warm-up's six back-to-back section transitions were still settling, and `waitForSectionTransitionsSettled(page)` corrected the measurement at the source. Post-fix evidence: persona 7/7 green, `maxSwitch=622/800` (22.3 % headroom), per-switch `619/407/395/500/622/457`, `diarySearch=396/500`, `pickerSearch=186/500`. Every ceiling, floor, fixture, and assertion is unchanged, and the 878 ms number is preserved verbatim.
+- **WHAT IS REQUIRED:** Nothing to close the product gate, and no current product remediation is required. The `ENVIRONMENT` residual stays recorded: a future ceiling breach is re-verified standalone on an idle host before any product code is touched.
 - **EXACT RESUME ACTION:** None. Do not raise the 800 ms ceiling and do not treat the older release-candidate headroom scenario as a waiver. If a future run breaches the ceiling, run `npx playwright test --project=journeys e2e/journeys/three-months-in.spec.ts -g "Tom"` on an idle host and classify with the recorded per-switch numbers before touching product code.
 
-### R7 — Current-source Android
+### R7 — Current-source Android smoke residual
 
-- **WHY:** `ENVIRONMENT`; the historical APK cannot certify drifted source.
-- **CLASSIFICATION:** ENVIRONMENT
-- **WHAT IS REQUIRED:** Enough host memory to boot `Nitro_API_36` safely, then current-source smoke, persistence, and lifecycle.
-- **EXACT RESUME ACTION:** On a host with credible headroom, run `npm run qa:native:android -- --tag smoke`, then persistence, then lifecycle, at the candidate SHA. Do not reuse the historical APK.
+- **WHY:** The `command-center-v2` smoke flow failed at `tapOn: 'Create'` on the current-source hermetic APK.
+- **CLASSIFICATION:** `TEST_BUG` (successor task 3.1) — the ordinary build never mounts the rollout-gated mode selector, so the stale step can never match; the raw report's `PRODUCT_BUG` label is reconciled as raw-machine triage, not a product defect. Provisioning PASS, persistence 11/11, lifecycle 6/6, smoke 1/2 at `68db684`.
+- **WHAT IS REQUIRED:** The scoped platform-aware flow correction plus regression guard, then the complete smoke/persistence/lifecycle batteries from a clean exact-source checkout at the final candidate, with source/APK identity recorded. This is successor task 3.4/3.5 work; this draft is superseded by its result.
+- **EXACT RESUME ACTION:** `node scripts/qa-native.mjs --platform android --tag smoke --serial <verified-serial>`, then `--tag persistence`, then `--tag lifecycle`, from a clean checkout of the committed candidate with pinned Node 22.23.2 and ambient Supabase variables unset. Do not reuse the historical APK and do not add app test IDs or expose the hidden AI controls to satisfy the flow.
 
 ### R8 — `qa:full`
 
-- **WHY:** Deferred for host memory; it is not passed.
-- **CLASSIFICATION:** ENVIRONMENT / DEFERRED
-- **WHAT IS REQUIRED:** A credible host.
-- **EXACT RESUME ACTION:** Run `npm run qa:full` on pinned Node 22.23.2. Until then this stays visibly deferred and is never inferred from `qa:fast` or CI.
+- **WHY:** The gate was originally deferred for host memory, so its result could not be inferred from narrower gates at that time.
+- **CLASSIFICATION:** **PASS (later, at `c2ec475`)** — the original deferral is preserved as history and is not rewritten.
+- **WHAT IS REQUIRED:** Nothing further unless a later change invalidates the run's source applicability; `npm run qa:full` completed `QA_FULL_EXIT=0` on pinned Node `v22.23.2` with `npm test` 249 files passed / 1 skipped, `openspec:validate` 68/68, `npm run e2e` 235 passed / 49 skipped / 0 failed (284 tests, 29.7 m), and deterministic simulation 23/23. Source applicability to the current tree is corroborated by the empty runtime/config diff `c2ec475..210afd3`.
+- **EXACT RESUME ACTION:** None. If a later source change touches runtime, shared QA, or DB/time infrastructure, re-run `npm run qa:full` on pinned Node 22.23.2 rather than reusing this record.
 
 ### R9 — Owner-only release actions
 
