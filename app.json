@@ -34,6 +34,8 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.dale16.superhabits",
       "versionCode": 1,
+      "allowBackup": false,
+      "blockedPermissions": ["android.permission.SYSTEM_ALERT_WINDOW"],
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.VIBRATE",

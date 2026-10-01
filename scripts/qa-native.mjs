@@ -32,6 +32,14 @@ import {
   selectAndroidDevice,
 } from './native-qa-utils.mjs';
 import { readGitProvenance } from './native-provenance.mjs';
+import {
+  COVERAGE_OK,
+  COVERAGE_UNPROVEN,
+  describeBinaryEvidence,
+  evaluateFlowCoverage,
+  readExecutedFlows,
+  resolveExpectedFlows,
+} from './native-flow-coverage.mjs';
 import { baseReplayCommand, replayForAvd } from './qa-native-replay.mjs';
 import { checkIosSimulatorReadiness, runNativeCommand } from './qa-native-process.mjs';
 import {
@@ -64,6 +72,7 @@ const MOCK_SERVER_SCRIPT = resolve(ROOT, 'scripts', 'native-auth-mock-server.mjs
 // per-request failure modes under `adb reverse`. The literal is proven.
 const MOCK_DEVICE_HOST = '127.0.0.1';
 const E2E_ENV_NAME = 'EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST';
+const MAESTRO_FLOWS_DIR = resolve(ROOT, '.maestro', 'flows');
 const FAILURE_CLASSES = [
   'PRODUCT_BUG',
   'TEST_BUG',
@@ -258,8 +267,8 @@ function blocked(platform, tag, replayCommand, reason, details) {
     : null;
   const report = {
     schemaVersion: 1,
-    status: 'BLOCKED',
-    classification: 'ENVIRONMENT',
+    status: details.status ?? 'BLOCKED',
+    classification: details.classification ?? 'ENVIRONMENT',
     failureClasses: FAILURE_CLASSES,
     platform,
     appId: APP_ID,
@@ -280,10 +289,39 @@ function blocked(platform, tag, replayCommand, reason, details) {
     replayCommand,
     capturedAt: new Date().toISOString(),
   };
-  console.error(`Native QA blocked [ENVIRONMENT]: ${reason}`);
+  console.error(`Native QA blocked [${details.classification ?? 'ENVIRONMENT'}]: ${reason}`);
   if (details.remediation) console.error(`Remediation: ${details.remediation}`);
   const reportPath = writeReport(report);
   return { exitCode: 2, report, reportPath };
+}
+
+/**
+ * SHA-256 of the APK the target actually has installed.
+ *
+ * `pm path` names the installed APK; Android's toybox provides `sha256sum` on
+ * every API level this lane targets. This is what makes a `--no-provision`
+ * record self-identifying: the report can name the binary it ran on instead of
+ * implying it ran the current-source build.
+ *
+ * @param {string} adb
+ * @param {string} serial
+ * @returns {string | null}
+ */
+function installedApkSha256(adb, serial) {
+  const located = run(adb, ['-s', serial, 'shell', 'pm', 'path', APP_ID]);
+  if (located.status !== 0) return null;
+  const remotePath = String(located.stdout ?? '')
+    .split(/\r?\n/)
+    .map((line) => line.trim().replace(/^package:/, ''))
+    .find((line) => line.length > 0);
+  if (!remotePath) return null;
+  for (const prefix of ['', 'toybox ']) {
+    const hashed = run(adb, ['-s', serial, 'shell', `${prefix}sha256sum ${remotePath}`]);
+    if (hashed.status !== 0) continue;
+    const digest = /([0-9a-f]{64})/i.exec(String(hashed.stdout ?? ''));
+    if (digest) return digest[1].toUpperCase();
+  }
+  return null;
 }
 
 function provisionAndroid(serial, options) {
@@ -390,13 +428,24 @@ function checkTarget(platform, options) {
         ? metadata?.buildKind === 'test-only' &&
           metadata?.mockAuthUrl === deviceAuthMockUrl(options)
         : metadata?.buildKind !== 'test-only';
+      // A build that cannot state its remote configuration, or that has not
+      // been scanned for a leaked Supabase host, is not current-source
+      // evidence: the 2026-09-24 "credential-free" APK carried a live project
+      // host and recorded nothing about it. Both fields are required so an
+      // older record is re-provisioned instead of trusted.
+      const remoteRecorded =
+        typeof metadata?.remoteConfiguration?.mode === 'string' &&
+        metadata.remoteConfiguration.endpoint === null;
+      const bundleScanned = Number(metadata?.bundleScan?.scannedEntries ?? 0) > 0;
       return (
         metadata?.status === 'PASS' &&
         metadata.sourceTreeClean === true &&
         metadata.appId === APP_ID &&
         metadata.sourceSha === currentSha &&
         metadata.e2eEnvironment?.[E2E_ENV_NAME] === 'true' &&
-        buildKindOk
+        buildKindOk &&
+        remoteRecorded &&
+        bundleScanned
       );
     };
     const refreshPackageState = () => {
@@ -464,7 +513,7 @@ function checkTarget(platform, options) {
       return {
         blocked: `Installed Android build identity does not match current source ${currentSha ?? '<unknown SHA>'}.`,
         remediation:
-          'Allow automatic provisioning or run npm run qa:native:provision -- --force --serial <serial>.',
+          'Drop --no-provision so the lane provisions and hash-verifies the current-source APK, or run npm run qa:native:provision -- --serial <serial> first.',
       };
     }
     return {
@@ -474,6 +523,18 @@ function checkTarget(platform, options) {
       targetIdentity,
       packageIdentity,
       buildMetadata: metadata,
+      // Binary identity (task 2.3): when the lane installed the APK it hashed
+      // (metadata.apkSha256); with --no-provision the hash comes from the
+      // target itself, so the record names the binary rather than implying the
+      // current-source build.
+      provisioned: options.provision !== false,
+      installedApkSha256:
+        options.provision === false
+          ? installedApkSha256(adb, serial)
+          : (metadata?.apkSha256 ?? null),
+      hermeticBuild: metadata?.hermeticBuild ?? null,
+      remoteConfiguration: metadata?.remoteConfiguration ?? null,
+      bundleScan: metadata?.bundleScan ?? null,
     };
   }
 
@@ -486,7 +547,17 @@ function checkTarget(platform, options) {
   }
   const simulatorReadiness = checkIosSimulatorReadiness(run, xcrun, APP_ID, IOS_SIMCTL_TIMEOUT_MS);
   if (simulatorReadiness) return simulatorReadiness;
-  return { command: maestro, target: 'iOS simulator' };
+  return {
+    command: maestro,
+    target: 'iOS simulator',
+    // iOS has no local provisioning path on this host (see the script header),
+    // so the binary is always whatever the simulator already carries.
+    provisioned: false,
+    installedApkSha256: null,
+    hermeticBuild: null,
+    remoteConfiguration: null,
+    bundleScan: null,
+  };
 }
 
 function runPlatform(platform, options) {
@@ -507,6 +578,28 @@ function runPlatform(platform, options) {
       );
     }
   }
+
+  // Coverage is resolved BEFORE the target is touched (task 2.1): a tag that
+  // matches no flow is a lane-definition defect, and finding it after a green
+  // Maestro exit code is how a zero-flow run used to be recorded as a pass.
+  const expectedFlows = resolveExpectedFlows({
+    flowsDir: MAESTRO_FLOWS_DIR,
+    tag: options.tag,
+    flow: options.flow ? flow : null,
+  });
+  if (expectedFlows.errors.length > 0) {
+    return blocked(platform, options.tag, options.replayCommand, expectedFlows.errors.join(' '), {
+      status: 'NOT_CERTIFIED',
+      classification: 'TEST_BUG',
+      flow: options.flow ?? '.maestro',
+      serial: options.serial ?? null,
+      remediation:
+        'List the flows this selection matches under .maestro/flows and fix the tag or the flow file. A native pass requires a non-empty, duplicate-free flow list, so a selection that matches nothing is never a pass.',
+    });
+  }
+  console.log(
+    `Expected native ${platform} coverage: ${expectedFlows.flows.length} flow(s) [${expectedFlows.flows.map((entry) => entry.id).join(', ')}]`,
+  );
 
   const target = checkTarget(platform, options);
   const avdContext = options.avdContext ?? null;
@@ -567,10 +660,38 @@ function runPlatform(platform, options) {
         }
       : undefined,
   });
+  const executed = readExecutedFlows(debugOutputDir);
+  const coverage = evaluateFlowCoverage({
+    expected: expectedFlows.flows,
+    errors: [],
+    executed: executed.executed,
+    reason: executed.reason,
+    exitCode: result.status,
+  });
+  const coverageProven = coverage.verdict === COVERAGE_OK;
+  // A run is a PASS only when Maestro exited 0 AND the executed flow set
+  // equals the expected one. A run that cannot prove its coverage is recorded
+  // as NOT_CERTIFIED rather than passing by omission.
+  let runStatus;
+  if (result.status !== 0) runStatus = 'FAILED_NEEDS_TRIAGE';
+  else if (coverageProven) runStatus = 'PASS';
+  else runStatus = 'NOT_CERTIFIED';
+  const provisioned = target.provisioned ?? null;
+  const binaryEvidence = describeBinaryEvidence({
+    provisioned,
+    installedApkSha256: target.installedApkSha256 ?? null,
+  });
+  const binaryNote = binaryEvidence.note;
+  if (!binaryEvidence.binaryVerified) console.warn(binaryNote);
+  if (!coverageProven) {
+    console.error(
+      `Native coverage NOT proven: ${coverage.reason ?? coverage.verdict} (expected ${coverage.expected.length}, executed ${coverage.executed?.length ?? 'unknown'}).`,
+    );
+  }
   const report = {
-    schemaVersion: 1,
-    status: result.status === 0 ? 'PASS' : 'FAILED_NEEDS_TRIAGE',
-    classification: null,
+    schemaVersion: 2,
+    status: runStatus,
+    classification: result.status === 0 ? null : 'PRODUCT_BUG',
     failureClasses: FAILURE_CLASSES,
     platform,
     appId: APP_ID,
@@ -579,6 +700,21 @@ function runPlatform(platform, options) {
     avd: avdContext?.avd ?? target.targetIdentity?.avd ?? null,
     ownedEmulator: avdContext?.owned ?? false,
     stateReset,
+    provisioned,
+    installedApkSha256: target.installedApkSha256 ?? null,
+    binaryNote,
+    hermeticBuild: target.hermeticBuild ?? null,
+    remoteConfiguration: target.remoteConfiguration ?? null,
+    bundleScan: target.bundleScan ?? null,
+    flowCoverage: {
+      verdict: coverage.verdict,
+      expected: coverage.expected,
+      executed: coverage.executed,
+      missing: coverage.missing,
+      unexpected: coverage.unexpected,
+      reason: coverage.reason,
+      source: executed.runDir,
+    },
     mockState:
       options.authMock && options.authSlice
         ? mockProofSlice(options.authSlice.logPath, options.authSlice.startOffset)
@@ -603,8 +739,16 @@ function runPlatform(platform, options) {
     console.error(
       'Native QA failed without an automatic classification. Preserve artifacts, replay, and classify with evidence.',
     );
+  } else if (!coverageProven) {
+    console.error(
+      `Native QA is NOT_CERTIFIED [${coverage.verdict === COVERAGE_UNPROVEN ? 'ENVIRONMENT' : 'TEST_BUG'}]: the run did not prove the flow coverage it claims.`,
+    );
   }
-  return { exitCode: result.status === 0 ? 0 : 1, report, reportPath };
+  return {
+    exitCode: result.status === 0 && coverageProven ? 0 : 1,
+    report,
+    reportPath,
+  };
 }
 
 function sleepMs(ms) {

@@ -1,4 +1,5 @@
 import { getSupabaseAccessToken, getSupabaseAnonKey, getSupabaseFunctionUrl } from '@/lib/supabase';
+import { AI_ASK_EXPERIMENT_ENABLED } from './types';
 import {
   AskRetrievalError,
   retrieveCalorieSummary,
@@ -78,6 +79,24 @@ export async function callAskFunction(
   | { ok: false; result: Extract<AskResult, { outcome: 'unavailable' }> }
 > {
   const question = typeof body.question === 'string' ? body.question : '';
+  // No paid provider request is reachable without the rollout flag
+  // (harden-native-evidence-and-release-posture task 4.2). The render boundary
+  // already keeps Ask and Auto unreachable — `features/command/commandSurface.ts`
+  // is what its coverage asserts — so this guard is the second, independent
+  // lock: even a caller that bypassed the surface (a restored mode, a deep link,
+  // a future screen) cannot spend money. It sits at the single choke point every
+  // Ask and Auto request passes through, so it cannot be forgotten by a new
+  // caller either.
+  if (!AI_ASK_EXPERIMENT_ENABLED) {
+    return {
+      ok: false,
+      result: buildUnavailableResult(
+        question,
+        'Ask is not available in this build.',
+        'rollout_disabled',
+      ),
+    };
+  }
   const url = resolveRequestUrl();
   if (!url) {
     return {

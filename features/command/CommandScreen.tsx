@@ -31,6 +31,7 @@ import type {
   ParseCommandResult,
 } from './types';
 import { AI_ASK_EXPERIMENT_ENABLED, COMMAND_EXPERIMENT_ENABLED } from './types';
+import { canRenderCommandMode, resolveRenderedMode } from './commandSurface';
 import { AskConversationView } from './AskConversationView';
 import { AutoModeView } from './AutoModeView';
 import { CommandInputCard } from './CommandInputCard';
@@ -269,10 +270,13 @@ export function CommandScreen({
     let cancelled = false;
     const initialTransitionId = modeTransitionId.current;
     void getLastUsedCommandMode().then((storedMode) => {
-      if (!cancelled && initialTransitionId === modeTransitionId.current) {
-        modeRef.current = storedMode;
-        setMode(storedMode);
-      }
+      if (cancelled || initialTransitionId !== modeTransitionId.current) return;
+      // A persisted ask/auto mode from a rollout build must not restore the
+      // command center into a hidden mode here: the selector is absent in an
+      // ordinary build, so there would be no way back to Create.
+      const renderedMode = resolveRenderedMode(AI_ASK_EXPERIMENT_ENABLED, storedMode);
+      modeRef.current = renderedMode;
+      setMode(renderedMode);
     });
 
     return () => {
@@ -733,8 +737,12 @@ export function CommandScreen({
     <View className="gap-4 pb-1 pt-1">
       <ModeToggle mode={mode} onChange={handleModeChange} />
       {mode === 'create' ? commandContent : null}
-      {mode === 'ask' ? <AskConversationView placeholder={commandPlaceholder} /> : null}
-      {mode === 'auto' ? (
+      {/* Rendered reachability comes from the same pure surface the mode chips
+          do, so the selector and the views cannot disagree. */}
+      {mode === 'ask' && canRenderCommandMode(AI_ASK_EXPERIMENT_ENABLED, 'ask') ? (
+        <AskConversationView placeholder={commandPlaceholder} />
+      ) : null}
+      {mode === 'auto' && canRenderCommandMode(AI_ASK_EXPERIMENT_ENABLED, 'auto') ? (
         <>
           <AutoModeView
             placeholder={commandPlaceholder}

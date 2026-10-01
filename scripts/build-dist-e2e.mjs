@@ -12,15 +12,22 @@
  * guarantee, plus a post-build leak guard so a future env leak fails loudly
  * instead of silently re-attaching local E2E to production.
  *
+ * The build envelope and the leak guard now live in the shared module
+ * `scripts/hermetic-build.mjs`, which the native APK lane calls too: two
+ * copies of a credential-leak guard drift, and the drift direction is exactly
+ * the failure this guard exists to prevent
+ * (`harden-native-evidence-and-release-posture`, task 1.1).
+ *
  * Contract: dist/ produced here must contain NO Supabase host at all
  * (boundaryDetected=false → @sync steps stay fixme-gated, exactly like CI).
  */
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { runHermeticBuild, scanDirectoryForNeedle } from './hermetic-build.mjs';
 
 const root = process.cwd();
 const distDir = path.join(root, 'dist');
+const SUPABASE_HOST = 'supabase.co';
 
 function fail(message) {
   console.error(`ABORT[build:e2e]: ${message}`);
@@ -29,28 +36,25 @@ function fail(message) {
 
 // 1. Hermetic export: block dotenv files AND strip ALL ambient EXPO_PUBLIC_*
 // (exact CI parity: runners export none of them; public-by-design flags
-// still change app behavior between local and CI builds).
-const env = { ...process.env, EXPO_NO_DOTENV: '1' };
-for (const key of Object.keys(env)) {
-  if (key.startsWith('EXPO_PUBLIC_')) delete env[key];
-}
-
-// Pre-clean: a stale file from a prior plain `build:web` export must never
-// survive into the guarded scan window (fails-closed either way, but a clean
-// tree makes the leak verdict exact).
+// still change app behavior between local and CI builds). Pre-clean first: a
+// stale file from a prior plain `build:web` export must never survive into the
+// guarded scan window (fails-closed either way, but a clean tree makes the leak
+// verdict exact).
 fs.rmSync(distDir, { recursive: true, force: true });
 
 console.log(
   '[build:e2e] exporting dist/ with EXPO_NO_DOTENV=1 (no .env, no ambient Supabase env)…',
 );
 try {
-  execFileSync('npx', ['expo', 'export', '-p', 'web', '--clear'], {
-    env,
-    stdio: 'inherit',
-    shell: process.platform === 'win32', // npx is a .cmd shim on Windows
+  runHermeticBuild({
+    label: 'build:e2e',
+    command: 'npx',
+    args: ['expo', 'export', '-p', 'web', '--clear'],
   });
-} catch {
-  fail('expo export failed (exit non-zero).');
+} catch (error) {
+  fail(
+    error?.code === 'HERMETIC_REMOTE_ENV' ? error.message : 'expo export failed (exit non-zero).',
+  );
 }
 
 // 2. Leak guard: no Supabase host may survive into the test export — scan
@@ -59,24 +63,7 @@ try {
 if (!fs.existsSync(path.join(distDir, 'index.html'))) {
   fail('dist/index.html missing after export.');
 }
-const leakFiles = [];
-const scan = (dir) => {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const p = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      scan(p);
-    } else {
-      try {
-        if (fs.readFileSync(p).toString('utf8').toLowerCase().includes('supabase.co')) {
-          leakFiles.push(path.relative(root, p));
-        }
-      } catch (error) {
-        fail(`cannot scan ${path.relative(root, p)}: ${error.message}`);
-      }
-    }
-  }
-};
-scan(distDir);
+const leakFiles = scanDirectoryForNeedle(distDir, root, SUPABASE_HOST);
 if (leakFiles.length > 0) {
   fail(
     `Supabase host leaked into the E2E export (${leakFiles.length} file(s): ` +

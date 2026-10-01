@@ -140,6 +140,12 @@ describe('native auth-mock proof helpers', () => {
       appId: 'com.dale16.superhabits',
       buildKind: 'canonical',
       mockAuthUrl: null,
+      remoteConfiguration: {
+        mode: 'local-only',
+        endpoint: null,
+        anonKeyFingerprint: null,
+        note: 'no remote configured',
+      },
       e2eEnvironment: { EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST: 'true' },
     };
     const expected = {
@@ -150,10 +156,51 @@ describe('native auth-mock proof helpers', () => {
     expect(validateInstallOnlyMetadata(canonical, expected)).toEqual({ ok: true, reason: null });
     expect(
       validateInstallOnlyMetadata(
-        { ...canonical, buildKind: 'test-only', mockAuthUrl: 'http://127.0.0.1:4545' },
+        {
+          ...canonical,
+          buildKind: 'test-only',
+          mockAuthUrl: 'http://127.0.0.1:4545',
+          remoteConfiguration: {
+            mode: 'test-only-mock',
+            endpoint: 'http://127.0.0.1:4545',
+            anonKeyFingerprint: 'ABCDEF0123456789',
+            note: 'device loopback',
+          },
+        },
         expected,
       ).ok,
     ).toBe(true);
+    // A record that cannot state its remote configuration is not current-source
+    // evidence: a pre-change APK may carry a live Supabase host and say
+    // nothing about it (the 2026-09-24 artifact did exactly that).
+    expect(
+      validateInstallOnlyMetadata({ ...canonical, remoteConfiguration: undefined }, expected)
+        .reason,
+    ).toContain('does not record its remote configuration');
+    expect(
+      validateInstallOnlyMetadata(
+        {
+          ...canonical,
+          remoteConfiguration: { mode: 'local-only', endpoint: 'https://live.supabase.co' },
+        },
+        expected,
+      ).ok,
+    ).toBe(false);
+    expect(
+      validateInstallOnlyMetadata(
+        {
+          ...canonical,
+          remoteConfiguration: { mode: 'test-only-mock', endpoint: 'https://live.supabase.co' },
+        },
+        expected,
+      ).ok,
+    ).toBe(false);
+    expect(
+      validateInstallOnlyMetadata(
+        { ...canonical, remoteConfiguration: { mode: 'unknown' } },
+        expected,
+      ).ok,
+    ).toBe(false);
     expect(validateInstallOnlyMetadata(null, expected).ok).toBe(false);
     expect(validateInstallOnlyMetadata({ ...canonical, sourceSha: 'other' }, expected).ok).toBe(
       false,

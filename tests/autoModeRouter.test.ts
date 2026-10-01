@@ -4,6 +4,16 @@ import type { AskIntent, AskParseInput } from '@/features/command/ask.types';
 import { classifyForAutoMode } from '@/features/command/autoModeRouter';
 import { AskParser } from '@/features/command/askParser';
 
+// Auto mode is rollout-gated: without `EXPO_PUBLIC_AI_ASK_INTERNAL_ROLLOUT` the
+// provider entry point refuses every request, and the render boundary never
+// offers the mode at all (`features/command/commandSurface.ts`; the default-off
+// proof lives in `tests/askDefaultOffSurface.test.ts`). These tests exercise the
+// router's routing behaviour, so they declare the opt-in before the import
+// graph is evaluated.
+vi.hoisted(() => {
+  process.env.EXPO_PUBLIC_AI_ASK_INTERNAL_ROLLOUT = 'true';
+});
+
 const { getSupabaseAccessToken, getSupabaseAnonKey, getSupabaseFunctionUrl } = vi.hoisted(() => ({
   getSupabaseAccessToken: vi.fn(),
   getSupabaseAnonKey: vi.fn(),

@@ -214,6 +214,14 @@
         is created on your device at your explicit request; what you do with that file (store it,
         send it, delete it) is entirely under your control.
       </p>
+      <p>
+        <strong>Operating-system backup and device-to-device transfer are disabled.</strong> The
+        Android build sets <code>allowBackup: false</code>, so neither Google's automatic Android
+        backup nor device-to-device transfer copies this app's data — including its local database
+        and the saved authentication session — into the operating system's backup. iOS is covered by
+        the same product decision: the supported way to move to a new device is the portable export
+        above, or restoring the configured remote backup after signing in.
+      </p>
 
       <h2>5. Notifications</h2>
       <p>

@@ -3,6 +3,16 @@ import type { AskParseInput } from '@/features/command/ask.types';
 
 import { AskParser } from '@/features/command/askParser';
 
+// The Ask pipeline is rollout-gated: `callAskFunction` refuses to issue a paid
+// provider request unless `EXPO_PUBLIC_AI_ASK_INTERNAL_ROLLOUT` is set at module
+// load (see `features/command/commandSurface.ts` for the render-boundary half,
+// and `tests/askDefaultOffSurface.test.ts` for the default-off proof). These
+// tests exercise the pipeline's behaviour, so they opt in before the import
+// graph is evaluated; the default-off obligation is covered there, not here.
+vi.hoisted(() => {
+  process.env.EXPO_PUBLIC_AI_ASK_INTERNAL_ROLLOUT = 'true';
+});
+
 const { getSupabaseAccessToken, getSupabaseAnonKey, getSupabaseFunctionUrl } = vi.hoisted(() => ({
   getSupabaseAccessToken: vi.fn(),
   getSupabaseAnonKey: vi.fn(),

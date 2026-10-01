@@ -107,6 +107,17 @@ device. The file is created on your device at your explicit request; what
 you do with that file (store it, send it, delete it) is entirely under your
 control.
 
+**Operating-system backup and device-to-device transfer are disabled.** The
+Android build sets `allowBackup: false`, so neither Google's automatic
+Android backup nor device-to-device transfer copies this app's data —
+including its local database and the saved authentication session — into the
+operating system's backup. iOS is covered by the same product decision: the
+supported way to move to a new device is the portable export above, or
+restoring the configured remote backup (§2) after signing in. This is a
+deliberate tradeoff: you do not get an automatic OS-level restore of app
+data, in exchange for the app never being copied into an OS backup you did
+not choose.
+
 ## 5. Notifications
 
 Reminders (habits, todos, daily plans, weekly reviews) are scheduled

@@ -164,6 +164,7 @@ export type AskUnsupportedReasonCode =
   | 'invalid_range';
 
 export type AskUnavailableReasonCode =
+  | 'rollout_disabled'
   | 'remote_not_configured'
   | 'auth_session_unavailable'
   | 'request_timed_out'

@@ -20,6 +20,7 @@ export type ParsePath = 'mock' | 'remote' | 'remote_with_fallback' | 'preflight'
 export type ParseLatencyBucket = 'fast' | 'noticeable' | 'frustrating';
 export type ParseUnsupportedReasonCode = 'unsupported';
 export type ParseUnavailableReasonCode =
+  | 'rollout_disabled'
   | 'remote_not_configured'
   | 'auth_session_unavailable'
   | 'request_timed_out'

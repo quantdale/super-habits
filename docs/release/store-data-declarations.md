@@ -80,6 +80,22 @@ work on session mismatch instead of rebinding silently. Play's form includes
 even ephemeral off-device processing; the owner must assess the final
 provider route and retention rather than assuming AI requests are exempt.
 
+### 2a. OS-level backup and device-to-device transfer (must match the artifact)
+
+Answer the **"Does your app allow users to transfer their data between
+devices?"** and data-at-rest questions with the shipped configuration, not the
+old assumption:
+
+| Question                  | Answer                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OS-level app backup       | **Disabled.** The Android build sets `expo.android.allowBackup: false`, so the merged manifest carries `android:allowBackup="false"` and no backup-rules file. The local SQLite database and the persisted Supabase session are therefore NOT copied into the user's Google account backup.                                                                                      |
+| Device-to-device transfer | **Not used as a data path.** The app ships no backup-rules XML that would opt in, and its supported migration routes are (a) the in-app portable export file, and (b) restoring the configured remote backup after signing in. A user who migrates by OS transfer therefore gets an app with no local dataset and must restore or import — the honest statement of the behavior. |
+| Consequence to declare    | There is no automatic OS-level restore of app data. If the owner later adds backup-rules XML or flips `allowBackup` to `true`, this section and `privacy-policy.md` §4 must be updated in the same change; `tests/store-declaration-drift.test.ts` pins the flag so the drift fails the gate first.                                                                              |
+
+`[OWNER ACTION]` before submission: re-read the uploaded artifact's merged
+manifest (`android:allowBackup` and the permission list in
+`app-store-readiness.md`) rather than trusting this draft.
+
 ## 3. Google Play — listing copy (drafts)
 
 **Short description (≤ 80 chars):**
@@ -135,3 +151,9 @@ shows automatic anonymous Auth and backup in configured builds; the Ask
 route can also process submitted data through a model provider. The filed
 answers remain an owner action until the exact build and provider terms are
 reviewed. This revision changes documentation, not product behavior.
+
+The 2026-09-30 revision adds section 2a (OS-level backup and
+device-to-device transfer, now explicitly disabled in tracked
+configuration) and the built-manifest permission inventory in
+`app-store-readiness.md`, which supersedes the earlier four-permission
+statement that a library merge had already outgrown.

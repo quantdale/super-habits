@@ -16,6 +16,13 @@ import {
 } from './native-qa-utils.mjs';
 import { addCleartextAttr, validateInstallOnlyMetadata } from './native-avd.mjs';
 import { readGitProvenance, requireCleanGitTree } from './native-provenance.mjs';
+import {
+  describeRemoteConfiguration,
+  describeStrippedEnv,
+  hermeticBuildEnv,
+  remoteEnvRefusal,
+} from './hermetic-build.mjs';
+import { assertApkHasNoHost } from './native-apk-scan.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const APP_ID = 'com.dale16.superhabits';
@@ -28,7 +35,6 @@ const MOCK_SUPABASE_ANON_KEY = 'mock-anon-key-for-tests-only';
 function parseArgs(argv) {
   const args = {
     serial: process.env.NATIVE_ANDROID_SERIAL ?? process.env.ANDROID_SERIAL ?? null,
-    force: false,
     mockAuthUrl: null,
     installOnly: false,
     metadataPath: null,
@@ -36,13 +42,12 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--serial') args.serial = argv[++i];
-    else if (arg === '--force') args.force = true;
     else if (arg === '--mock-auth-url') args.mockAuthUrl = argv[++i];
     else if (arg === '--install-only') args.installOnly = true;
     else if (arg === '--metadata-path') args.metadataPath = argv[++i];
     else if (arg === '--help' || arg === '-h') {
       console.log(
-        'Usage: node scripts/qa-native-provision.mjs [--serial SERIAL] [--force] [--mock-auth-url URL] [--install-only --metadata-path PATH]',
+        'Usage: node scripts/qa-native-provision.mjs [--serial SERIAL] [--mock-auth-url URL] [--install-only --metadata-path PATH]',
       );
       process.exit(0);
     } else {
@@ -52,9 +57,9 @@ function parseArgs(argv) {
   if (args.installOnly && !args.metadataPath) {
     throw new Error('--install-only requires --metadata-path.');
   }
-  if (args.installOnly && (args.mockAuthUrl !== null || args.force)) {
+  if (args.installOnly && args.mockAuthUrl !== null) {
     throw new Error(
-      '--install-only cannot be combined with --mock-auth-url or --force; build kind is read from the metadata file.',
+      '--install-only cannot be combined with --mock-auth-url; build kind is read from the metadata file.',
     );
   }
   if (
@@ -297,18 +302,34 @@ function main(args) {
   console.log(`Preparing clean source ${sourceProvenance.sourceSha} for ${serial}...`);
 
   const prebuildCommand = 'npx expo prebuild --platform android --clean';
-  const buildEnv = { ...process.env, [E2E_ENV_NAME]: 'true' };
+  // Hermetic by construction (harden-native-evidence-and-release-posture
+  // task 1.2): `EXPO_NO_DOTENV=1` blocks `.env`/`.env.local`, every ambient
+  // `EXPO_PUBLIC_*` is stripped, and a Supabase variable in the ambient
+  // environment stops the run with a message that names it. The previous
+  // `{ ...process.env }` envelope let a developer's `.env` inline a live
+  // project host into an APK the lane then reported as credential-free
+  // (verified against the 2026-09-24 artifact:
+  // assets/index.android.bundle carried kruubbynsmxzxfdunaal.supabase.co).
+  const buildValues = { [E2E_ENV_NAME]: 'true' };
   const mockMode = args.mockAuthUrl !== null;
   if (mockMode) {
-    buildEnv.EXPO_PUBLIC_SUPABASE_URL = args.mockAuthUrl;
-    buildEnv.EXPO_PUBLIC_SUPABASE_ANON_KEY = MOCK_SUPABASE_ANON_KEY;
-    console.log(
-      `TEST-ONLY mock-auth build: Supabase endpoint is ${args.mockAuthUrl} (device loopback) with a non-secret placeholder key.`,
-    );
+    buildValues.EXPO_PUBLIC_SUPABASE_URL = args.mockAuthUrl;
+    buildValues.EXPO_PUBLIC_SUPABASE_ANON_KEY = MOCK_SUPABASE_ANON_KEY;
   }
+  const { env: hermeticEnv, stripped, remoteStripped } = hermeticBuildEnv({ set: buildValues });
+  console.log(
+    `Hermetic native build environment: EXPO_NO_DOTENV=1; ${describeStrippedEnv(stripped)}.`,
+  );
+  if (remoteStripped.length > 0) throw new Error(remoteEnvRefusal(remoteStripped, 'Android E2E'));
+  const remote = describeRemoteConfiguration(hermeticEnv, mockMode, createHash);
+  console.log(
+    remote.endpoint
+      ? `TEST-ONLY mock-auth build: Supabase endpoint is ${remote.endpoint} (device loopback) with a non-secret placeholder key (fingerprint ${remote.anonKeyFingerprint}).`
+      : `Local-only build: ${remote.note}.`,
+  );
+  const buildEnv = hermeticEnv;
   const npx = findCommand('npx');
   if (!npx) throw new Error('npx is not installed or not discoverable on PATH.');
-  if (args.force) console.log('Forcing a fresh current-source Android E2E build.');
   const prebuild = run(npx, ['expo', 'prebuild', '--platform', 'android', '--clean'], {
     env: buildEnv,
     stdio: 'inherit',
@@ -368,6 +389,11 @@ function main(args) {
     'release',
     'app-release.apk',
   );
+  // Post-build leak guard (task 1.3): read the JS bundle out of the archive
+  // and fail BEFORE any flow runs, so a "credential-free" APK that carries a
+  // live host can never be installed, let alone certified.
+  const scan = assertApkHasNoHost(apkPath);
+  console.log(`Bundle scan: ${scan.scanned} JS/bytecode entry(ies) in the APK, no Supabase host.`);
   const apkHash = apkSha256(apkPath);
   const install = run(adb, ['-s', serial, 'install', '-r', '-d', '-g', apkPath], {
     stdio: 'inherit',
@@ -390,13 +416,20 @@ function main(args) {
   const builtAt = new Date().toISOString();
   const metadataPath = mockMode ? MOCK_METADATA_PATH : METADATA_PATH;
   const metadata = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     status: 'PASS',
     classification: null,
     platform: 'android',
     appId: APP_ID,
     buildKind: mockMode ? 'test-only' : 'canonical',
     mockAuthUrl: mockMode ? args.mockAuthUrl : null,
+    remoteConfiguration: remote,
+    hermeticBuild: {
+      envFileLoading: 'blocked (EXPO_NO_DOTENV=1)',
+      strippedAmbientEnv: stripped,
+      remoteEnvRefused: remoteStripped,
+    },
+    bundleScan: { host: scan.host, scannedEntries: scan.scanned, matches: 0 },
     sourceSha: builtSourceProvenance.sourceSha,
     sourceTreeClean: builtSourceProvenance.sourceTreeClean,
     sourceTreeStatus: builtSourceProvenance.sourceTreeStatus,
@@ -418,12 +451,14 @@ function main(args) {
   console.log(
     `${mockMode ? 'TEST-ONLY mock-auth' : 'Android E2E'} APK installed: ${APP_ID} ${packageIdentity.versionName ?? '<unknown>'} on ${serial} (source ${metadata.sourceSha}, APK SHA-256 ${apkHash}).`,
   );
+  console.log(
+    `Remote configuration recorded: ${remote.endpoint ?? 'none configured (local-only)'} (mode ${remote.mode}).`,
+  );
   console.log(`Build provenance: ${relative(ROOT, metadataPath)}`);
 }
 
 let args = {
   serial: process.env.NATIVE_ANDROID_SERIAL ?? process.env.ANDROID_SERIAL ?? null,
-  force: false,
   mockAuthUrl: null,
   installOnly: false,
   metadataPath: null,

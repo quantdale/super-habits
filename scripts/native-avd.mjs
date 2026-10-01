@@ -285,6 +285,30 @@ export function validateInstallOnlyMetadata(metadata, expected) {
   if (!env || env[expected.e2eEnvName] !== 'true') {
     return fail('metadata lacks the required E2E environment marker; full provision required');
   }
+  // A build record that cannot state which remote it targets cannot be
+  // reinstalled as current-source evidence: the reader would have no way to
+  // tell a credential-free APK from one that inlined a live project.
+  const remote = /** @type {Record<string, unknown> | null} */ (record.remoteConfiguration ?? null);
+  if (!remote || typeof remote !== 'object' || typeof remote.mode !== 'string') {
+    return fail('metadata does not record its remote configuration; full provision required');
+  }
+  if (remote.mode === 'local-only' && remote.endpoint !== null) {
+    return fail(
+      'metadata records a local-only build with a remote endpoint; full provision required',
+    );
+  }
+  if (remote.mode === 'test-only-mock') {
+    if (
+      typeof remote.endpoint !== 'string' ||
+      !/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(remote.endpoint)
+    ) {
+      return fail('test-only metadata lacks a loopback remote endpoint; full provision required');
+    }
+  } else if (remote.mode !== 'local-only') {
+    return fail(
+      `metadata remote mode '${String(remote.mode)}' is not a recognised hermetic build; full provision required`,
+    );
+  }
   return { ok: true, reason: null };
 }
 
