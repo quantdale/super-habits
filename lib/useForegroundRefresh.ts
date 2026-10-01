@@ -1,30 +1,27 @@
 import { useCallback, useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
+import { createActivationRefresh, registerForegroundListeners } from '@/lib/foregroundListeners';
 
+/**
+ * Refresh on every foreground transition.
+ *
+ * On web, `AppState` is derived from the DOM `visibilitychange` event, so only
+ * the `AppState` listener is registered — adding the DOM listener as well would
+ * run the consumer's refresh twice per foreground. See
+ * `lib/foregroundListeners.ts` for the contract and its coverage.
+ */
 export function useForegroundRefresh(onRefresh: () => void | Promise<void>) {
   useEffect(() => {
-    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
+    return registerForegroundListeners(
+      () => {
         void onRefresh();
-      }
-    });
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        void onRefresh();
-      }
-    };
-
-    if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-    }
-
-    return () => {
-      appStateSubscription.remove();
-      if (Platform.OS === 'web' && typeof document !== 'undefined') {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-      }
-    };
+      },
+      {
+        appState: AppState,
+        appStateIsDomDriven: Platform.OS === 'web',
+        document: typeof document !== 'undefined' ? document : undefined,
+      },
+    );
   }, [onRefresh]);
 }
 
@@ -43,9 +40,8 @@ export function useActiveForegroundRefresh(
   }, [onRefresh]);
 
   useEffect(() => {
-    if (isActive) {
-      handleRefresh();
-    }
+    // One refresh per generation bump / activation change, on its own signal.
+    createActivationRefresh({ isActive, onRefresh: handleRefresh })();
   }, [dayGeneration, isActive, handleRefresh]);
 
   useForegroundRefresh(handleRefresh);

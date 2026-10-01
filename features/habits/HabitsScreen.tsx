@@ -62,10 +62,8 @@ import {
   formatHabitSchedule,
   getHabitRuleForDate,
   getHabitSchedulePreset,
-  getHabitTargetForDate,
   habitCreationDateKey,
   isHabitActionableOn,
-  isHabitScheduledOn,
   normalizeHabitWeekdays,
   shouldAwardHabitFastPath,
   sortHabits,
@@ -78,6 +76,11 @@ import { migrateLegacyHabitLifecycle } from '@/features/habits/habitLifecycle.st
 import type { HeatmapDay } from '@/features/shared/activityTypes';
 import { HabitCircle } from '@/features/habits/HabitCircle';
 import { HabitDayStrip, type HabitDayStripDay } from '@/features/habits/HabitDayStrip';
+import {
+  buildHabitDayStrip,
+  buildHabitRuleHistoryIndex,
+  summarizeHabitsToday,
+} from '@/features/habits/habitsScreen.derivations';
 import { ProgressRing } from '@/features/habits/ProgressRing';
 import { HabitsOverviewGrid } from '@/features/habits/HabitsOverviewGrid';
 import { HabitProgressInsightsModal } from '@/features/habits/HabitProgressInsightsModal';
@@ -128,9 +131,6 @@ const GROUP_ICONS: Record<HabitCategory, keyof typeof MaterialIcons.glyphMap> = 
   afternoon: 'wb-twilight',
   evening: 'nightlight-round',
 };
-
-/** Mon-start single-letter labels for the day strip (index 0 = Monday). */
-const WEEKDAY_STRIP_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
 
 function formatStripDateLabel(dateKey: string): string {
   return dateKeyToLocalDate(dateKey).toLocaleDateString('en', {
@@ -687,47 +687,37 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const todayKey = toDateKey();
   const viewingPastDay = selectedDateKey !== todayKey;
   // Paused/archived habits carry no obligation today (F1): only durable-active
-  // rows count toward the scheduled/completed denominators.
-  const activeHabits = habits.filter((habit) => (habit.status ?? 'active') === 'active');
-  const scheduledTodayCount = activeHabits.filter((habit) =>
-    isHabitScheduledOn(habit.rule_history, todayKey, habit.target_per_day),
-  ).length;
-  const completedTodayCount = activeHabits.filter(
-    (habit) =>
-      isHabitScheduledOn(habit.rule_history, todayKey, habit.target_per_day) &&
-      (countsByHabitDate[habit.id]?.[todayKey] ?? 0) >= habit.target_per_day,
-  ).length;
-  const todayProgress =
-    scheduledTodayCount === 0
-      ? null
-      : Math.round((completedTodayCount / scheduledTodayCount) * 100);
+  // rows count toward the scheduled/completed denominators. Memoized on the
+  // source list so a re-render with unchanged data recomputes nothing, and so
+  // the strip memo below has a referentially stable dependency.
+  const activeHabits = useMemo<Habit[]>(
+    () => habits.filter((habit) => (habit.status ?? 'active') === 'active'),
+    [habits],
+  );
+
+  // Each active habit's rule history is parsed once per data change: the day
+  // loop used to re-parse it for every habit on every strip day, on every
+  // render, because `activeHabits` had a fresh identity each render.
+  const ruleHistoryById = useMemo(() => buildHabitRuleHistoryIndex(activeHabits), [activeHabits]);
+
+  const { scheduledTodayCount, completedTodayCount, todayProgress } = useMemo(
+    () =>
+      summarizeHabitsToday({
+        activeHabits,
+        ruleHistoryById,
+        countsByHabitDate,
+        todayKey,
+      }),
+    [activeHabits, ruleHistoryById, countsByHabitDate, todayKey],
+  );
 
   // Last 7 days ending at today (today anchored last), with per-day
   // scheduled/completed aggregates over durable-active habits only.
-  const stripDays = useMemo<HabitDayStripDay[]>(() => {
-    const out: HabitDayStripDay[] = [];
-    for (let offset = 6; offset >= 0; offset -= 1) {
-      const day = new Date();
-      day.setDate(day.getDate() - offset);
-      const dateKey = toDateKey(day);
-      let scheduledCount = 0;
-      let completedCount = 0;
-      for (const habit of activeHabits) {
-        if (!isHabitScheduledOn(habit.rule_history, dateKey, habit.target_per_day)) continue;
-        scheduledCount += 1;
-        const target = getHabitTargetForDate(habit.rule_history, dateKey, habit.target_per_day);
-        if ((countsByHabitDate[habit.id]?.[dateKey] ?? 0) >= target) completedCount += 1;
-      }
-      out.push({
-        dateKey,
-        weekdayLabel: WEEKDAY_STRIP_LETTERS[(day.getDay() === 0 ? 7 : day.getDay()) - 1],
-        dayOfMonth: String(day.getDate()),
-        scheduledCount,
-        completedCount,
-      });
-    }
-    return out;
-  }, [activeHabits, countsByHabitDate]);
+  const stripDays = useMemo<HabitDayStripDay[]>(
+    () =>
+      buildHabitDayStrip({ activeHabits, ruleHistoryById, countsByHabitDate, today: new Date() }),
+    [activeHabits, ruleHistoryById, countsByHabitDate],
+  );
 
   const heroSubtitle =
     todayProgress === null
