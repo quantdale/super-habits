@@ -9,13 +9,13 @@ no gate.
 
 ## A. Repository state
 
-| Item              | Value                                                                                                                                                                                                           |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Starting HEAD     | `891ed228ffc39f002ac13cc62aad2ee0b69ef1fe` == `main` == `origin/main` (re-verified after fetch; no newer remote commit)                                                                                         |
-| Final local state | campaign commits added locally on `main` (see A below); **nothing pushed** — publication is an unfulfilled conditional task (§7) while the audit is truthfully red                                              |
-| CI at HEAD        | run `36965502815` at `891ed228`: `quality` FAILED at `Audit runtime dependencies`, `e2e` skipped (because quality failed), `nightly` skipped — unchanged, never reinterpreted as green                          |
-| Foreign state     | 125 files across 8 untracked roots byte-verified unchanged (`preservation-baseline-apply.json`); stash `pre-recovery-local-changes` (`c35e281d…`) untouched; one worktree; no reset/stash-drop/force operations |
-| Commits created   | local-only, logical (audit seam + tests; dependency/test guards + test-only devDependency; evidence/reconciliation docs). No force push, no history rewrite                                                     |
+| Item                                                    | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Starting HEAD                                           | `891ed228ffc39f002ac13cc62aad2ee0b69ef1fe` == `main` == `origin/main` (re-verified after fetch; no newer remote commit)                                                                                                                                                                                                                                                                                                                                     |
+| Final local state                                       | campaign + correction commits added locally on `main` (commits-created row below); **nothing pushed** — publication is an unfulfilled conditional task (§7) while the audit is truthfully red. The precise final local SHA, remote SHA, dirty status and commit list live in the immutable post-commit receipt `simulation-output/security-correction-2026-10-02/final-state-receipt.json` (this report intentionally does not embed its own commit's hash) |
+| Remote-baseline historical CI (NOT CI at the local tip) | run `36965502815` is historical CI **at the pushed baseline** `891ed228ffc39f002ac13cc62aad2ee0b69ef1fe` (= then `origin/main`): `quality` FAILED at `Audit runtime dependencies`, `e2e` skipped (because quality failed), `nightly` skipped. It is **not** CI on the unpublished local tip, which has no hosted run and none is claimed                                                                                                                    |
+| Foreign state                                           | 125 files across 8 untracked roots byte-verified unchanged (`preservation-baseline-apply.json`); stash `pre-recovery-local-changes` (`c35e281d…`) untouched; one worktree; no reset/stash-drop/force operations                                                                                                                                                                                                                                             |
+| Commits created                                         | local-only, logical (audit seam + tests; dependency/test guards + test-only devDependency; evidence/reconciliation docs; then the 2026-10-02 correction commits: audit schema/exit-threshold boundary + regressions, correction evidence/report docs). No force push, no history rewrite. Exact SHAs in the final-state receipt                                                                                                                             |
 
 ## B. node-forge root cause
 
@@ -64,10 +64,18 @@ no gate.
   - `scripts/audit-runtime-deps.mjs` — fail-closed command/report seam
     (`validateAuditCommandResult`, `evaluateAudit`, injectable `main`);
     CLI behavior/allowlist policy unchanged. Before/after dependency versions:
-    none (no dependency repair exists).
+    none (no dependency repair exists). Corrective phase (2026-10-02): the
+    supported report schema is now explicit (auditReportVersion 2, severity
+    enums, non-negative integer metadata counts coherent with the reported
+    findings, non-empty dependency paths, via references resolving to usable
+    advisory evidence) and the npm audit exit threshold is pinned
+    (`--audit-level=info`); allowlist/policy unchanged.
   - `tests/auditRuntimeDeps.test.ts` — kept all 4 meaningful policy tests;
-    added 23 executing seam/CLI-contract tests incl. the original-false-green
-    demonstration.
+    added 23 executing seam/CLI-contract tests (18 seam + 5 CLI) incl. the
+    original-false-green demonstration — 27 tests total (4 policy-text + 23
+    executing), correcting the earlier "23 seam + 5 CLI / 28 executing"
+    miscount. The corrective phase adds 23 more (13 seam + 10 CLI), so the
+    file now holds **50 tests = 4 policy-text + 46 executing**.
   - `tests/nodeForgeSecurityGuards.test.ts` — semantic resolution guard
     (documented-state pin + bad-graph rejection) and the cryptographic
     nested-DigestAlgorithm tripwire with synthetic keys and RSA controls.
@@ -110,9 +118,20 @@ no gate.
 - **Documented exceptions:** unchanged — the three `brace-expansion`
   entries only. **No forge entry, no wildcard, no new exception** was added
   (`DOCUMENTED_BUILD_TIME_ADVISORIES` diff is empty of policy changes).
-- The audit gate is now fail-closed: npm error JSON / empty failed output /
-  malformed / unsupported / signalled / incoherent results fail visibly instead
-  of printing a clean verdict (previously exit 0 on two of these).
+- The audit gate is now fail-closed across the whole boundary: npm error JSON /
+  empty failed output / malformed / unsupported / signalled / incoherent
+  results fail visibly instead of printing a clean verdict (previously exit 0
+  on two of these at apply time, and — as the 2026-10-02 independent review
+  proved — on seven more malformed/incoherent report shapes). The corrected
+  boundary validates the supported schema (auditReportVersion 2 only), known
+  severity enums, non-negative integer metadata counts coherent with the
+  reported findings, usable non-empty dependency paths, and `via` references
+  that resolve to usable advisory evidence (dangling references and
+  evidence-free cycles rejected before any verdict). The npm audit exit
+  threshold is pinned (`--audit-level=info`, plus the matching `npm_config`
+  override) so inherited npm configuration cannot turn valid lower-severity
+  reports into false reds; report-only lower severities and the
+  exit-0-with-findings fail-closed contradiction check are preserved.
 
 ## E. Validation (pinned toolchain; commands actually run)
 
@@ -135,6 +154,32 @@ no gate.
 | mutation red-proof                                      | reverting the seam to the original fail-open turns 12 tests red (captured); restored file hash-identical                                                                                            |
 | not run (correctly)                                     | `qa:native:*` (no native/runtime impact — 6.6 documents retained applicability), iOS lanes (owner-deferred), `e2e:sync`/nightly/disposable cloud (unchanged scope), any Supabase access (forbidden) |
 
+### E′. Correction-phase validation and evidence identity (2026-10-02 review follow-up)
+
+The independent review found the apply's historical receipts incomplete
+(parent-query, pinned-preflight, clean-install, source-identity) — an evidence
+limitation, not proof the commands never ran. The corrective phase re-attests
+what is re-verifiable and narrows the rest; raw artifacts under
+`simulation-output/security-correction-2026-10-02/`.
+
+| Gate / claim                          | Receipt                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| pinned toolchain                      | `toolchain-receipt.txt` — Node v22.23.2 / npm 10.9.8 first on PATH; ambient Node 24 ran no gate                                                                                                                                                                                                                                                                                                                                                                                                     |
+| focused audit suite                   | **50/50** at corrected source (`green-after-vitest.log`); guards 7/7                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| red-before / green-after              | 17 of the new tests FAIL against the pre-correction seam (`red-before-vitest.log`); per-fixture before/after at the real seam AND real CLI in `repro-replay.json` — all 7 review false greens flip exit 0 → 1, clean/high controls unchanged                                                                                                                                                                                                                                                        |
+| live audit                            | `audit-gate-corrected.log` — exit 1 retained red (undocumented forge high), documented findings still printed                                                                                                                                                                                                                                                                                                                                                                                       |
+| npm audit-level semantics             | `audit-level-{info,moderate,high,critical}.json` — identical 23-entry reports at every level, exits 1/1/1/0: the configured threshold changes only the exit code (why the pin is required)                                                                                                                                                                                                                                                                                                          |
+| clean reconstruction                  | `npm-ci.log` — `npm ci` PASS under pinned npm; lockfile byte-unchanged by the install; `npm-ls-node-forge-after-ci.log` — one `node-forge@1.4.0`, same two tooling parents + root test devDep                                                                                                                                                                                                                                                                                                       |
+| parent/registry/advisory re-query     | `view-*.json`, `advisory-current.json`, `upstream-pr-1152-current.json` — forge latest 1.4.0 still vulnerable, advisory range `<= 1.4.0`, `first_patched_version: null`, CLI 55.0.36 and 57.0.27 both keep `node-forge@^1.3.3`, helper 0.0.7 keeps `^1.4.0`, PR 1152 open/unmerged (`ceba344…`)                                                                                                                                                                                                     |
+| `+1 line` package/lock claim          | re-attested from Git: `git diff 891ed228..HEAD --numstat -- package.json package-lock.json` = `1 0` each                                                                                                                                                                                                                                                                                                                                                                                            |
+| typecheck / lint (correction)         | `typecheck.log` exit 0 (no diagnostics, standalone receipt); `lint-after-prettier.log` exit 0 (0 errors / 0 warnings)                                                                                                                                                                                                                                                                                                                                                                               |
+| full unit + integration               | `npm-test.log` — 2510 passed / 2 pre-existing opt-in skips (252 files) at corrected source                                                                                                                                                                                                                                                                                                                                                                                                          |
+| OpenSpec + plans                      | OpenSpec 70/70 (in `qa-full.log`); `plan-validation.log` for versioned plans                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `qa:affected` → `qa:fast` → `qa:full` | `qa-affected.log` resolves `qa:fast → qa:full`; `qa-fast.log` PASS; `qa-full.log` stages: typecheck/lint/tests 2510-2/OpenSpec 70/70 PASS, `e2e:full` **235 passed / 49 skipped / 0 failed (30.9 m)**, deterministic simulation lane 27 scenario runs PASSED then `soak-sustained-use` failed at chromium launch (exit `0xC0000142`, `browserType.launch: Target page, context or browser has been closed`) before the 3600 s tool window killed the chain — preserved non-pass, rerun result below |
+| host resources at that non-pass       | `host-resources-post-timeout.txt` — 137 MiB free of 32 GiB, CPU 68 %, top consumers unrelated (Memory Compression, vmmemWSL, opencode ×3, MsMpEng); nothing unrelated was terminated                                                                                                                                                                                                                                                                                                                |
+| deterministic-simulation rerun        | PENDING — recorded in the corrective ExecPlan Validation Ledger and `qa-simulation-rerun.log`                                                                                                                                                                                                                                                                                                                                                                                                       |
+| final source identity                 | `final-state-receipt.json` — final local SHA, remote SHA, dirty status, commit list (written after the last commit)                                                                                                                                                                                                                                                                                                                                                                                 |
+
 ## F. Hosted CI
 
 - Exact SHA `891ed228ffc39f002ac13cc62aad2ee0b69ef1fe`, run **36965502815**
@@ -145,15 +190,31 @@ no gate.
   publishing requires a proven repaired candidate with green exact-head
   quality/audit/E2E (task 7.x, unfulfilled). The campaign's local commits are
   the prepared candidate for the resume in J.
+- Run `36965502815` is labeled **remote-baseline historical CI** (2026-10-02
+  review correction): it attests only the pushed baseline `891ed228`. The
+  unpublished local tip (apply + correction commits) has **no** hosted CI run,
+  and no exact-head hosted claim is made for it.
 
 ## G. Regression protection (executing, non-vacuous)
 
-- **Audit seam:** 23 executing tests at the real `validateAuditCommandResult` /
-  `evaluateAudit` seams + 5 CLI-contract tests through the actual script with a
-  stub npm: clean/documented/uncovered-path/new-advisory/future-critical/
-  error-JSON/empty/malformed/unsupported/invalid-shape/spawn/signal/status/
-  incoherent fixtures. Red-capable: the original-false-green demonstration pins
-  the defect, and a mutation run turned 12 tests red before restore.
+- **Audit seam:** 27 tests at apply time = 4 policy-text + 23 executing (18 at
+  the real `validateAuditCommandResult` / `evaluateAudit` seams + 5 CLI-contract
+  through the actual script with a stub npm) — correcting the earlier
+  "23 seam + 5 CLI / 28 executing" miscount. Coverage: clean/documented/
+  uncovered-path/new-advisory/future-critical/error-JSON/empty/malformed/
+  unsupported/invalid-shape/spawn/signal/status/incoherent fixtures. Red-capable:
+  the original-false-green demonstration pins the defect, and a mutation run
+  turned 12 tests red before restore.
+- **Correction regressions (2026-10-02):** +23 executing tests (13 seam +
+  10 CLI) covering every review false-green fixture (report version 999,
+  metadata-vs-findings incoherence, `HIGH` severity, empty `via`, dangling via
+  reference, documented advisory with empty paths, negative/non-integer
+  counts) plus reference-cycle and valid grouped-meta/multi-advisory controls,
+  at BOTH the real seam and the real CLI, and the P2 exit-threshold
+  normalization (inherited `audit-level=critical` configuration, info/low
+  report-only controls, exit-0-with-findings still fail-closed). Red-before:
+  17 fail against the pre-correction seam; green-after 50/50;
+  `repro-replay.json` carries per-fixture before/after at both seams.
 - **Dependency resolution:** semantic guard pins the documented copy/parent/
   version state and demonstrably rejects nested copies, extra parents, version
   drift and dev-relocation fixtures; it executes against the real lockfile and
@@ -194,8 +255,12 @@ no gate.
 - **Actionable Windows/local:** none — every executable campaign task is done
   or truthfully conditional; the Windows/local dependency-security follow-up is
   exhausted pending upstream.
-- **Owner action:** none required for this campaign (publication is prepared
-  but intentionally withheld until the upstream condition lands).
+- **Owner action:** return the corrected apply for **independent re-review** —
+  the 2026-10-02 review's P1/P2 blocking findings are corrected per
+  `simulation-output/security-review-2026-10-02/correction-prompt.md`; this
+  correction session pushed nothing and claims no certification. Publication
+  remains prepared but intentionally withheld until the upstream condition
+  lands.
 - **Credential/external (exact upstream condition):** any ONE of
   (1) a published, independently verified fixed `node-forge` (≥ 1.4.1
   satisfying both parents' `^1.3.3` ranges) — PR merge alone is insufficient;
@@ -219,7 +284,11 @@ options/exposure proof (B/C, `exposure-assessment.md`, `options-ledger.md`)
 rules out updates, overrides, family changes, removal/substitution and any
 eligible exemption, so the audit gate cannot truthfully pass and remains red.
 The independent audit fail-open was repaired and covered by executing
-regression tests, but that is explicitly **not** claimed to resolve forge.
+regression tests, and the independent review's fail-closed boundary defect
+(P1 schema/coherence) plus npm exit-semantics issue (P2) were corrected with
+executing seam + CLI regressions and evidence-identity reconciliation (§E′).
+That correction is audit-gate correctness only and is explicitly **not**
+claimed to resolve forge.
 Unfulfilled conditional tasks (4.x dependency repair, 7.x publication) remain
 unchecked. Overall project state remains **NOT CERTIFIED**.
 
@@ -228,26 +297,28 @@ unchecked. Overall project state remains **NOT CERTIFIED**.
 Each normative requirement of
 `specs/dependency-security-closure/spec.md` verified against direct evidence:
 
-| Requirement                                             | Evidence                                                                                                                                                                        |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Repository state verified, foreign state preserved      | preflight logs; `preservation-baseline-apply.json` (125 files/8 roots re-verified); stash `c35e281d…` untouched                                                                 |
-| Pinned supported toolchain                              | every gate under Node v22.23.2 / npm 10.9.8; ambient Node 24 ran none                                                                                                           |
-| Diagnosis covers every dependency path                  | `lockfile-traversal.log`, `npm-ls`/`npm-explain`, both parent paths + ranges + lineage; aggregate `*` vs individual `<=1.4.0` distinguished                                     |
-| Exposure proven independently of dependency labels      | source-bound map sections (web 3/1992, android 1/2342, zero forge modules), tooling call trace (helper main.js:176/203/246), APK 1630/1630 supplementary + provenance limit     |
-| Smallest proven safe remediation                        | `options-ledger.md` — all five options evidenced and rejected; no forced fix, no invented target, no vendored patch                                                             |
-| Exceptions require every strict predicate               | predicate table; #4 (affected API unused) FAILS → exception ineligible; policy unchanged                                                                                        |
-| Audit execution fails closed on invalid results         | `validateAuditCommandResult` + 23 seam tests + 5 CLI tests; error JSON/empty/malformed/unsupported/signalled/incoherent all fail visibly                                        |
-| New high/critical remain gating                         | live audit exit 1 retained after every change; undocumented forge high still fails; documented findings still printed                                                           |
-| Regression protection executes actual security behavior | mutation red-proof (12 tests), bad-graph fixtures rejected, RSA controls + fixture self-check + defect tripwire                                                                 |
-| Clean reconstruction proves the change                  | `npm ci` after the +1-line devDependency; `npm ls`/audit verified unchanged                                                                                                     |
-| Validation follows actual impact                        | `qa:affected` → `qa:fast → qa:full`, both executed green at current source                                                                                                      |
-| Artifact validation hermetic and source-bound           | hermetic envelope (no dotenv, no ambient EXPO_PUBLIC_*), source maps primary, byte scans corroboration; Android applicability documented (no rerun for ceremony); iOS untouched |
-| Failures and safety stops explicit                      | lint-crash and TS2322 preserved+classified (6.7 ledger); no stop condition crossed (no production/signing/secret/force operations)                                              |
-| Publication scoped, fast-forward only                   | publication deliberately unfulfilled; commits local-only; no force push/rewrite; foreign state intact                                                                           |
-| Hosted success tied to exact pushed SHA                 | no push → no hosted claim; run 36965502815 kept red-with-skipped-E2E; skipped E2E never counted green                                                                           |
-| Closure reconciliation preserves certification truth    | `final-certification-closure/{closure-report,execplan}.md` triage notes only; NOT CERTIFIED, 17/22, Android/J8/iOS/production truths intact                                     |
-| Two truthful terminal outcomes                          | `PRECISELY BLOCKED` chosen on complete proof; conditional tasks unchecked; no fake green                                                                                        |
-| Final handoff and process hygiene auditable             | this A–J report + categorized residuals; `web:hygiene` + foreign verification in the campaign ledger                                                                            |
+| Requirement                                             | Evidence                                                                                                                                                                                                                            |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Repository state verified, foreign state preserved      | preflight logs; `preservation-baseline-apply.json` (125 files/8 roots re-verified); stash `c35e281d…` untouched                                                                                                                     |
+| Pinned supported toolchain                              | every gate under Node v22.23.2 / npm 10.9.8; ambient Node 24 ran none                                                                                                                                                               |
+| Diagnosis covers every dependency path                  | `lockfile-traversal.log`, `npm-ls`/`npm-explain`, both parent paths + ranges + lineage; aggregate `*` vs individual `<=1.4.0` distinguished                                                                                         |
+| Exposure proven independently of dependency labels      | source-bound map sections (web 3/1992, android 1/2342, zero forge modules), tooling call trace (helper main.js:176/203/246), APK 1630/1630 supplementary + provenance limit                                                         |
+| Smallest proven safe remediation                        | `options-ledger.md` — all five options evidenced and rejected; no forced fix, no invented target, no vendored patch                                                                                                                 |
+| Exceptions require every strict predicate               | predicate table; #4 (affected API unused) FAILS → exception ineligible; policy unchanged                                                                                                                                            |
+| Audit execution fails closed on invalid results         | `validateAuditCommandResult` + 46 executing tests (31 seam + 15 CLI); error JSON/empty/malformed/unsupported/signalled/incoherent, all seven review false-green shapes, and reference cycles all fail visibly (`repro-replay.json`) |
+| Supported report schema and coherence are explicit      | auditReportVersion 2 only; severity enums; non-negative integer metadata counts coherent with findings; usable non-empty dependency paths; via references resolving to usable advisory evidence                                     |
+| npm audit exit threshold normalized (review P2)         | `--audit-level=info` pinned on the command line + `npm_config` override; inherited-`audit-level=critical` CLI regression; lower severities stay report-only; exit 0 with findings stays fail-closed                                 |
+| New high/critical remain gating                         | live audit exit 1 retained after every change; undocumented forge high still fails; documented findings still printed                                                                                                               |
+| Regression protection executes actual security behavior | mutation red-proof (12 tests), bad-graph fixtures rejected, RSA controls + fixture self-check + defect tripwire; correction red-before 17 failing tests / green-after 50/50 at seam + real CLI                                      |
+| Clean reconstruction proves the change                  | `npm ci` after the +1-line devDependency; `npm ls`/audit verified unchanged                                                                                                                                                         |
+| Validation follows actual impact                        | `qa:affected` → `qa:fast → qa:full`, both executed green at current source                                                                                                                                                          |
+| Artifact validation hermetic and source-bound           | hermetic envelope (no dotenv, no ambient EXPO_PUBLIC_*), source maps primary, byte scans corroboration; Android applicability documented (no rerun for ceremony); iOS untouched                                                     |
+| Failures and safety stops explicit                      | lint-crash and TS2322 preserved+classified (6.7 ledger); no stop condition crossed (no production/signing/secret/force operations)                                                                                                  |
+| Publication scoped, fast-forward only                   | publication deliberately unfulfilled; commits local-only; no force push/rewrite; foreign state intact                                                                                                                               |
+| Hosted success tied to exact pushed SHA                 | no push → no hosted claim; run 36965502815 relabeled remote-baseline historical CI (kept red-with-skipped-E2E at `891ed228`); skipped E2E never counted green; the unpublished local tip has no hosted run                          |
+| Closure reconciliation preserves certification truth    | `final-certification-closure/{closure-report,execplan}.md` triage notes only; NOT CERTIFIED, 17/22, Android/J8/iOS/production truths intact                                                                                         |
+| Two truthful terminal outcomes                          | `PRECISELY BLOCKED` chosen on complete proof; conditional tasks unchecked; no fake green                                                                                                                                            |
+| Final handoff and process hygiene auditable             | this A–J report + categorized residuals; `web:hygiene` + foreign verification in the campaign ledger                                                                                                                                |
 
 Brief sections 0–19 are covered by A–J and the tables above; the design's
 input-coverage mapping (all 19 sections) stands unchanged.

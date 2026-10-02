@@ -39,14 +39,14 @@ Unfulfilled by design: no safe executable vulnerability repair exists (options-l
 ## 5. Fail-closed audit execution boundary
 
 - [x] 5.1 Turn the reproduced registry-error JSON and empty-failed-output false greens into executing tests at the real command/report seam; show that the original gate wrongly passes those equivalent fixtures.
-- [x] 5.2 Implement the smallest audit command-result/schema validation seam, rejecting error/empty/malformed/unsupported/signalled/incoherent results while still evaluating valid advisory reports with npm's advisory-related nonzero status.
-- [x] 5.3 Extend behavioral coverage for valid clean/documented reports, undocumented forge/future critical findings, uncovered paths and new advisory IDs, malformed/transport/termination errors and CLI output/exit semantics; preserve meaningful existing tests and visible documented findings.
-- [x] 5.4 Prove the new tests are red-capable and the repaired seam passes controls/fails errors; rerun the actual live audit, which must remain red if forge is still vulnerable and green only after legitimate complete-path remediation.
+- [x] 5.2 Implement the smallest audit command-result/schema validation seam, rejecting error/empty/malformed/unsupported/signalled/incoherent results while still evaluating valid advisory reports with npm's advisory-related nonzero status. — Reconciled after the independent review proved the first boundary still passed seven invalid/incoherent report shapes; tasks 10.1–10.2 close that gap with explicit schema/coherence validation.
+- [x] 5.3 Extend behavioral coverage for valid clean/documented reports, undocumented forge/future critical findings, uncovered paths and new advisory IDs, malformed/transport/termination errors and CLI output/exit semantics; preserve meaningful existing tests and visible documented findings. — Reconciled after the review proved coverage gaps at the same seams; task 10.2 adds the missing executing regressions.
+- [x] 5.4 Prove the new tests are red-capable and the repaired seam passes controls/fails errors; rerun the actual live audit, which must remain red if forge is still vulnerable and green only after legitimate complete-path remediation. — Re-earned in the corrective phase: red-before 17 failing tests / green-after 50/50, `repro-replay.json` before/after at seam + CLI, live audit re-run exit 1 (retained red).
 
 ## 6. Required local and artifact validation
 
 - [x] 6.1 Resolve `npm run qa:affected -- --files <actual owned paths>`, inspect its current gates and focused suites, and record impact without absorbing foreign untracked evidence.
-- [x] 6.2 Run current typecheck, zero-warning lint, exact runtime audit and all unit/integration tests on the pinned toolchain, recording commands actually run, counts and expected skips.
+- [x] 6.2 Run current typecheck, zero-warning lint, exact runtime audit and all unit/integration tests on the pinned toolchain, recording commands actually run, counts and expected skips. — Reconciled: the review found no standalone typecheck/lint receipts; the corrective phase re-ran all of these with retained receipts (E′).
 - [x] 6.3 Run `tests/auditRuntimeDeps.test.ts`, the selected semantic/crypto guards and required focused suites; validate all OpenSpec artifacts and versioned plans with the repository commands.
 - [x] 6.4 Run required `qa:fast` and broad-resolution/runtime/shared-QA `qa:full` gates, including hermetic build/E2E/deterministic simulations as selected; do not reuse historical QA solely to avoid a long gate.
 - [x] 6.5 Recheck current-source web/native/edge/server output/API reachability after the candidate repair using complete module graphs and existing hermetic/ZIP scans; record provenance, coverage and security results.
@@ -73,9 +73,24 @@ Unfulfilled by design: publication requires a proven repaired candidate with gre
 
 ## 9. Requirement audit, owner report and final hygiene
 
-- [x] 9.1 Audit the brief, proposal and each normative requirement against direct source/command/artifact/Git/CI evidence, fixing omissions before choosing either terminal branch; no Markdown/status/checkbox-only completion proof.
-- [x] 9.2 Produce all final report sections A–J with exact repository, root-cause, remediation, security, validation, hosted-CI, regression and existing-closure evidence; distinguish commands not run and all expected/non-pass skips.
+- [x] 9.1 Audit the brief, proposal and each normative requirement against direct source/command/artifact/Git/CI evidence, fixing omissions before choosing either terminal branch; no Markdown/status/checkbox-only completion proof. — Reconciled: the review proved two blocking defects this audit had missed; tasks 10.1–10.4 correct them and the requirement table is updated.
+- [x] 9.2 Produce all final report sections A–J with exact repository, root-cause, remediation, security, validation, hosted-CI, regression and existing-closure evidence; distinguish commands not run and all expected/non-pass skips. — Reconciled: the review proved the test-count accounting and CI-identity claims wrong; corrected in C/G/F and §E′.
 - [x] 9.3 Separate actionable Windows/local, owner, credential/external and deliberately deferred residuals with exact resumes; determine Windows exhaustion from executable work, not overall certification or a parser-only fix.
 - [x] 9.4 Verify foreign content/link hashes, stash/worktree/ref identities, task-owned final diff/status and absence of unrelated changes; retain all failure evidence and do not archive for tidiness.
 - [x] 9.5 Run `npm run web:hygiene`, verify no owned server/process tree remains and ports 8081/8082 are free or have unrelated owners; clean up only exact owned processes.
 - [x] 9.6 Record exactly one earned campaign verdict, WINDOWS SECURITY FOLLOW-UP COMPLETE or PRECISELY BLOCKED, preserve overall NOT CERTIFIED, and update/validate the durable checkpoint without inventing CI or publication results.
+
+## 10. Independent-review corrections (2026-10-02 corrective phase)
+
+Reconciliation of this change's checked audit/validation/report tasks against
+the independent review's proven gaps
+(`simulation-output/security-review-2026-10-02/review-report.md` and
+`correction-prompt.md`). Conditional dependency-repair (4.x) and publication
+(7.x) tasks remain genuinely unchecked.
+
+- [x] 10.1 P1 — make the supported npm report schema explicit and fail closed on invalid/incoherent reports: auditReportVersion 2 only, known severity enums, non-empty via (advisory or resolved reference), usable non-empty dependency paths, non-negative integer metadata counts coherent with the reported findings, via references resolving to usable advisory evidence (dangling references and evidence-free cycles rejected), plus vacuous empty-path protection in `isDocumented`.
+- [x] 10.2 P1 — permanent executing seam AND real-CLI regressions for all seven review false-green fixtures plus the reference-cycle case, with valid grouped-meta and multi-advisory controls preserved; red-before/green-after demonstrated (17 tests red on the pre-correction seam; per-fixture before/after at both seams in `simulation-output/security-correction-2026-10-02/repro-replay.json`).
+- [x] 10.3 P2 — normalize the npm audit exit threshold explicitly (`--audit-level=info` + matching `npm_config` override) so inherited npm configuration cannot flip valid lower-severity reports into false reds; keep the any-finding/status-1 invariant and keep refusing exit 0 with findings; CLI regression with inherited `audit-level=critical` proves the report-only verdict end to end.
+- [x] 10.4 P2 — reconcile final evidence identity: run 36965502815 relabeled remote-baseline historical CI (never CI at the unpublished local tip), immutable post-commit final-state receipt (final local SHA, remote SHA, dirty status, commit list), corrected test accounting (27 = 4 policy-text + 23 executing at apply; 50 = 4 + 46 after correction), and re-attested pinned-toolchain / clean-install / parent-query / source-identity receipts.
+- [x] 10.5 Validate corrected source on the pinned toolchain: focused audit + guard suites, typecheck 0, zero-warning lint, full unit/integration, OpenSpec 70/70, versioned-plan validation, `qa:affected` → `qa:fast` → `qa:full` with preserved non-passes and reruns recorded, final web hygiene.
+- [x] 10.6 Preserve foreign state (125 files/8 roots + review evidence + pre-existing formatting delta), commit only task-owned paths locally, and hand the corrected work back for independent re-review without pushing.

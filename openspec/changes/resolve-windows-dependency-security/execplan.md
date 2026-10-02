@@ -19,6 +19,12 @@ This plan previously (2026-10-02) completed its planning-only lifecycle; that
 history is preserved below. It is now re-activated for **apply** on the owner's
 explicit request (`D:\Downloads\superhabits.md`).
 
+2026-10-02: re-activated again for the **independent-review corrective
+phase** (`simulation-output/security-review-2026-10-02/{review-report,correction-prompt}.md`):
+correct only the audit boundary/tests and the necessary evidence/report/
+checkpoint claims, then hand the corrected work back for independent
+re-review without pushing.
+
 ## Context
 
 - Change artifacts: [exploration](exploration.md), [proposal](proposal.md),
@@ -82,69 +88,54 @@ actual impact requires it.
 
 ## Current Checkpoint
 
-- Current milestone: COMPLETED — apply campaign finished on the
-  `PRECISELY BLOCKED` terminal branch (earned verdict; see
-  [final-report.md](final-report.md) §J). This is Windows/local exhaustion
-  pending upstream, NOT project certification (overall remains NOT CERTIFIED).
-- Completed: (apply phase, 2026-10-02) full preflight (refs `891ed228` ==
-  main == origin/main, history/stash/worktrees, 8 foreign roots, 125-file
-  preservation baseline, CI `36965502815` reconciled); pinned toolchain used
-  for every gate; audit red reproduced and raw reports retained; complete
-  path/lockfile/API/exposure proof (web 3 map sections/1992 sources + android
-  JS 1 section/2342 sources with zero forge modules, byte needles clean, APK
-  1630/1630 entries scanned supplementary with provenance mismatch preserved,
-  edge sources forge-free); apply-time registry/advisory/parent/PR re-query
-  confirming NO published fix anywhere (forge latest 1.4.0 still affected,
-  `first_patched_version: null`, CLI 55→58 all keep `node-forge@^1.3.3`, helper
-  0.0.7 keeps `^1.4.0`, PR 1152 unmerged); ranked options ledger rejecting all
-  five options incl. the exemption (affected-API-used predicate fails); the
-  fail-closed audit command/report seam with 28 executing tests (23 seam + 5
-  CLI contract) incl. the original-false-green demonstration and a 12-test
-  mutation red-proof; dependency-resolution guard + cryptographic
-  nested-DigestAlgorithm tripwire (7 tests, synthetic keys, controls);
-  test-only devDependency `node-forge@^1.3.3` (+1 line package.json/lock,
-  deduped single copy, `npm ci` reconstruction verified, audit unchanged red);
-  narrow `simulation-output/**` eslint-ignore fix after preserving the typed-
-  rule crash; full validation (typecheck 0, lint 0/0, tests 2487/2-skip,
-  focused 34/34, OpenSpec 70/70, plans PASS, qa:fast PASS, qa:full PASS with
-  E2E 235/49-skip/0-fail + deterministic simulation 23/23, post-change bundle
-  recheck byte-identical); canonical reconciliation of
-  `final-certification-closure/{closure-report,execplan}.md` triage notes only.
+- Current milestone: COMPLETED — corrective phase finished: the independent
+  review's P1 (invalid/incoherent reports producing false security greens) and
+  P2 (npm exit-threshold semantics producing a false red) are corrected with
+  permanent executing regressions, evidence identity is reconciled, and the
+  corrected work is handed back for independent re-review. Nothing was pushed.
+- Completed: everything in the prior corrective checkpoint, plus the
+  deterministic-simulation rerun (**23/23** including `soak-sustained-use` —
+  the first-attempt crash classified ENVIRONMENT: chromium launch under
+  measured memory pressure), scoped Prettier, final lint 0/0, focused suites
+  68/68 (50 audit + 7 guards + 11 doc-consistency), OpenSpec 70/70,
+  versioned-plan validation, foreign-state re-verification (368 entries,
+  0 mismatches) and `web:hygiene` PASS (8081/8082 free).
 - In progress: None.
-- Important modified files: `scripts/audit-runtime-deps.mjs` (fail-closed
-  seam), `tests/auditRuntimeDeps.test.ts` (+23 tests, policy tests preserved),
-  `tests/nodeForgeSecurityGuards.test.ts` (new guards),
-  `package.json`/`package-lock.json` (test-only devDep, +1 line each),
-  `eslint.config.mjs` (derived-output ignore, +3 lines), this change's
-  `tasks.md`/`exposure-assessment.md`/`options-ledger.md`/`final-report.md`/
-  this plan, and `final-certification-closure/{closure-report,execplan}.md`
-  (triage outcome only). All evidence under
-  `simulation-output/security-apply-2026-10-02/` (ignored).
-- Last successful validation: full pinned-toolchain battery above; live audit
-  re-run exit 1 (retained red, by design); foreign 125 files/links and
-  stash/worktrees reverified; `web:hygiene` PASS (8081/8082 free).
+- Important modified files: `scripts/audit-runtime-deps.mjs` (corrected
+  boundary; the pre-existing formatting-only delta is folded in,
+  behavior-identical per the review), `tests/auditRuntimeDeps.test.ts`
+  (+23 regressions), this change's `tasks.md` / `final-report.md` / this
+  plan. No product/UI/schema/dependency changes; the allowlist and advisory
+  policy are untouched.
+- Last successful validation: the full battery in the Validation Ledger below
+  — red-before 17 failing / green-after 50/50, `repro-replay.json` closing all
+  seven review false greens at seam + real CLI, live audit retained red,
+  `npm ci` clean with byte-identical lockfile, `qa:fast` PASS, `qa:full`
+  stages green with the one preserved ENVIRONMENT non-pass rerun 23/23.
 - Current failures: the live audit gate remains exit 1
-  (`DEPENDENCY_VULNERABILITY`, expected and retained). That is the precise
-  blocker itself, not a broken gate.
-- Relevant quarantines: None changed; the two opt-in cloud skips remain as
-  found.
-- Blockers: no published fixed `node-forge` (registry latest 1.4.0 affected;
-  all `@expo/cli` 55–58 keep `node-forge@^1.3.3`; helper 0.0.7 keeps `^1.4.0`;
-  upstream PR 1152 open/unmerged); narrow exemption ineligible (tooling calls
-  the affected verification API); publication therefore unfulfilled (no push).
-- Condition required to unblock: a published, independently verified compatible
-  fixed `node-forge` release (≥1.4.1 satisfying both `^1.3.3` ranges), or a
-  supported parent release removing both vulnerable paths, or a proven safe
-  supported substitution with its own provenance.
-- Exact resume action after unblock: fetch then-current `main`; re-query
-  advisory/registry/parent metadata; repeat graph/exposure checks; pursue only
-  an evidenced safe candidate per options-ledger order; then run tasks 4.x
-  (repair + guards), 6.x and 7.x (fast-forward publication with green
-  quality/audit/E2E at the final exact SHA) and reconcile records.
+  (`DEPENDENCY_VULNERABILITY` — the upstream blocker itself, expected and
+  retained). That is the precise blocker, not a broken gate.
+- Relevant quarantines: None changed; the two opt-in cloud skips remain.
+- Blockers: unchanged upstream — no published fixed `node-forge` (latest 1.4.0
+  affected, `first_patched_version: null`, CLI 55.0.36/57.0.27 keep
+  `node-forge@^1.3.3`, helper 0.0.7 keeps `^1.4.0`, PR 1152 open/unmerged).
+- Condition required to unblock: (upstream, unchanged) a published,
+  independently verified compatible fixed `node-forge` release, or a supported
+  parent release removing both vulnerable paths, or a proven safe supported
+  substitution.
+- Exact resume action after unblock: (upstream resume, unchanged) follow
+  final-report.md section I; re-query state before any repair attempt.
 - Exact next action: None — task complete.
-- Remaining definition of done: None for this campaign. Conditional tasks 4.x
-  and 7.x remain unchecked by design (final-report.md §I); they belong to the
-  resume above.
+- Remaining definition of done: None for the correction itself. The close-out
+  task-owned commits land immediately after this checkpoint and the post-commit
+  `simulation-output/security-correction-2026-10-02/final-state-receipt.json`
+  records final local/remote SHA, dirty status, commit list and the final
+  preservation/hygiene check as the immutable handoff identity. Conditional
+  tasks 4.x and 7.x remain unchecked by design.
+
+Apply-phase terminal state (preserved): the campaign finished on the earned
+`PRECISELY BLOCKED` branch at `eae3dee` — see Progress, the Validation Ledger
+and Outcomes below for the complete apply record.
 
 ## Progress
 
@@ -159,6 +150,15 @@ Apply milestones:
 - [x] 7. Publication disposition (tasks 7.1–7.6) — withheld: audit red, no push; the conditional tasks.md items remain unchecked by design
 - [x] 8. Canonical reconciliation + precise-blocked evidence (8.1–8.4)
 - [x] 9. Requirement audit, A–J report, residuals, hygiene, verdict (9.1–9.6)
+
+Corrective phase (2026-10-02 independent review):
+
+- [x] C1. Reactivate from the correction prompt; pin git state and the correction preservation baseline.
+- [x] C2. P1 — explicit supported report schema/coherence validation + vacuous empty-path guard (tasks 10.1).
+- [x] C3. P2 — normalize the npm audit exit threshold (tasks 10.3).
+- [x] C4. Permanent seam + real-CLI regressions; red-before/green-after and the replay artifact (tasks 10.2).
+- [x] C5. Evidence-identity reconciliation plus report/task checkpoint corrections (tasks 10.4).
+- [x] C6. Finish validation (deterministic-simulation rerun 23/23, plan validation) and hand back for re-review (tasks 10.5–10.6).
 
 Planning history (2026-10-02, completed planning-only request — preserved):
 
@@ -195,6 +195,16 @@ Planning history (2026-10-02, completed planning-only request — preserved):
   a narrow fail-closed boundary with semantic tests; this is not a forge fix.
 - Apply-time re-query (2026-10-02): registry/advisory/parent/upstream state is
   unchanged from planning — no published fix exists anywhere in the chain.
+- 2026-10-02 independent review: seven malformed/incoherent report shapes
+  produced false security greens and a valid configured-npm moderate report
+  produced a false red — the report schema/coherence and the audit exit
+  threshold were the missing pieces, not the advisory policy. The review's
+  "23 seam + 5 CLI / 28 executing" claim was an accounting miscount
+  (27 = 4 policy-text + 23 executing).
+- 2026-10-02 host state: severe memory pressure (137 MiB free of 32 GiB,
+  CPU 68 %) crashed chromium at launch inside the deterministic-simulation
+  lane (exit `0xC0000142`) — the same ENVIRONMENT class as the review's
+  lint timeout; unrelated consumers were not touched.
 
 ## Decision Log
 
@@ -211,6 +221,20 @@ Planning history (2026-10-02, completed planning-only request — preserved):
   test budgets or kill unrelated consumers to manufacture artifact proof.
 - 2026-10-02 — Re-activate this plan for apply on the owner's explicit request;
   re-verify every planning-time fact before relying on it (all held).
+- 2026-10-02 — Corrective phase: normalize the npm audit exit threshold with
+  `--audit-level=info` (plus the `npm_config` override) instead of trusting
+  exit 0 with findings; keep the any-finding/status-1 invariant fail-closed.
+- 2026-10-02 — Validate the report schema explicitly (version 2, severity
+  enums, count coherence, reference resolution) rather than adding ad-hoc
+  shape checks; reject dangling references and evidence-free cycles.
+- 2026-10-02 — Keep every review repro fixture as a permanent seam AND
+  real-CLI regression; prove red-before against the pre-correction seam
+  instead of asserting coverage in prose.
+- 2026-10-02 — Label run 36965502815 remote-baseline historical CI and
+  record final identity in a post-commit receipt instead of embedding
+  hashes before the commits exist.
+- 2026-10-02 — Do not push; hand the corrected work back for independent
+  re-review per the correction prompt.
 
 ## Validation Ledger
 
@@ -253,6 +277,47 @@ Apply (2026-10-02):
   `preservation-baseline-apply.json`.
 - Product source + `supabase/functions` forge search — clean (no imports).
 
+Correction (2026-10-02 independent review):
+
+- `git fetch` + status/stash/worktree + 368-entry preservation baseline —
+  PASS, 0 hash mismatches (`preservation-baseline-correction.json`).
+- `npx vitest run tests/auditRuntimeDeps.test.ts` on the pre-correction
+  seam — FAIL as required (`red-before-vitest.log`, 17 failing); corrected
+  seam — PASS 50/50 (`green-after-vitest.log`); guards 7/7.
+- `node repro-replay.mjs` (real seam + real CLI, review fixtures) — PASS;
+  `repro-replay.json`: all 7 false greens exit 0 to 1 at both seams,
+  controls unchanged, P2 report-only delivered end-to-end under inherited
+  `audit-level=critical`.
+- `node scripts/audit-runtime-deps.mjs` (live) — exit 1 retained red
+  (`audit-gate-corrected.log`); `npm audit --audit-level=...` sweeps show
+  identical 23-entry reports with exits 1/1/1/0 (info/moderate/high/critical).
+- `npm ci` (pinned npm) — PASS, lockfile byte-unchanged (`npm-ci.log`);
+  `npm ls node-forge --all` — one copy, same parents.
+- Registry/advisory/parent re-query (`view-*.json`, `advisory-current.json`,
+  `upstream-pr-1152-current.json`) — READ; forge latest 1.4.0 affected,
+  `first_patched_version: null`, parents unchanged, PR 1152 open/unmerged.
+- `npm run typecheck` — PASS exit 0 (`typecheck.log`); `npm run lint` —
+  PASS 0/0 (`lint-after-prettier.log`); scoped Prettier — PASS.
+- `npm test` — PASS 2510 / 2 pre-existing opt-in skips (`npm-test.log`).
+- `npm run qa:affected -- --files <owned>` — `qa:fast -> qa:full`
+  (`qa-affected.log`); `npm run qa:fast` — PASS (`qa-fast.log`).
+- `npm run qa:full` — PARTIAL at the 3600 s tool window (`qa-full.log`):
+  typecheck/lint/tests 2510-2/OpenSpec 70/70 PASS, `e2e:full` 235 passed /
+  49 skipped / 0 failed (30.9 m), deterministic simulation 27 scenario
+  runs PASSED then `soak-sustained-use` ENVIRONMENT failure at chromium
+  launch (exit `0xC0000142`; `host-resources-post-timeout.txt`).
+- `npm run qa:simulation -- --all --mode deterministic` (rerun of the
+  failed lane, pinned toolchain) — PASS 23/23 (`qa-simulation-rerun.log`)
+  including `soak-sustained-use`; the first-attempt crash is classified
+  ENVIRONMENT (chromium launch exit `0xC0000142` under measured memory
+  pressure — 137 MiB free of 32 GiB, CPU 68 %).
+- scoped Prettier + `npm run lint` — PASS 0 errors / 0 warnings
+  (`lint-final.log`); focused audit + guards + doc-consistency — 68/68.
+- `npm run openspec:validate` — PASS 70/70 (`openspec-validation.log`);
+  `npm run agent:plan:validate` + `:all` — PASS (`plan-validation.log`).
+- foreign-state re-verification (368 entries) + `web:hygiene` — PASS,
+  0 mismatches, ports 8081/8082 free (`preservation-precommit.json`).
+
 Planning-era ledger (2026-10-02, preserved verbatim in spirit; see git history
 of this file for the full planning record):
 
@@ -271,6 +336,16 @@ of this file for the full planning record):
   (audit reports, lockfile traversal, advisory/registry captures, web/android
   exports + analyses, APK scans, preservation baseline). No existing evidence
   overwritten.
+- `scripts/audit-runtime-deps.mjs` — corrective boundary: explicit supported
+  report schema/coherence validation, via-reference resolution, pinned npm
+  audit exit threshold (the pre-existing formatting-only delta is preserved).
+- `tests/auditRuntimeDeps.test.ts` — +23 correction regressions (13 seam +
+  10 CLI); all prior tests preserved unchanged.
+- `openspec/changes/resolve-windows-dependency-security/{tasks.md,final-report.md,execplan.md}` —
+  task reconciliation (10.1–10.6), corrected report claims/identity
+  (section E-prime), and this corrective-phase record.
+- `simulation-output/security-correction-2026-10-02/` — ignored correction
+  evidence (replay artifact, red/green logs, receipts, rerun logs).
 
 ## Recovery / Resume Instructions
 
@@ -294,13 +369,31 @@ of this file for the full planning record):
   calls the affected verifier. Shipped-artifact exposure is now source-bound
   proven absent (complete map-section coverage for web and android JS, byte
   corroboration, APK supplementary with its provenance mismatch preserved).
-  The independent audit false-green was repaired fail-closed with 28 executing
-  tests (mutation red-proof retained), and non-vacuous dependency-resolution
+  The independent audit false-green was repaired fail-closed with 27 tests
+  (4 policy-text + 23 executing — accounting corrected after the review;
+  the corrective phase brings the file to 50 = 4 policy-text + 46
+  executing) with mutation red-proof retained, and non-vacuous
+  dependency-resolution
   and cryptographic tripwires pin the known-vulnerable state. Full pinned-
   toolchain validation passed (typecheck 0, lint 0/0, 2487 tests / 2 pre-
   existing skips, OpenSpec 70/70, qa:fast, qa:full with E2E 235/49/0 and
   deterministic simulation 23/23). Nothing was pushed: publication stays an
   unfulfilled conditional task while the audit truthfully stays red.
+- Correction follow-up (2026-10-02 independent review): both blocking
+  findings are corrected — P1 by making the supported report
+  schema/coherence explicit (invalid and incoherent reports now fail closed
+  before any verdict), P2 by pinning the npm audit exit threshold
+  (`--audit-level=info`) so inherited configuration cannot false-red a
+  report-only result. 23 permanent seam + real-CLI regressions cover every
+  review fixture with red-before (17 failing on the pre-correction seam) /
+  green-after (50/50) proof and per-fixture before/after at both seams.
+  Evidence identity is reconciled: run 36965502815 relabeled
+  remote-baseline historical CI, the 27-to-50 test accounting corrected,
+  toolchain/npm-ci/parent-query receipts re-attested, and a post-commit
+  final-state receipt adopted. The qa:full deterministic-simulation
+  ENVIRONMENT non-pass reran 23/23. Nothing was pushed; the corrected work
+  is handed back for independent re-review. Verdict unchanged:
+  PRECISELY BLOCKED; overall NOT CERTIFIED.
 - Remaining campaign risk: the advisory gate is red until upstream publishes a
   fix; a future apply must re-query state rather than trusting this ledger, and
   must flip the cryptographic tripwire to rejection when a fixed forge lands.
