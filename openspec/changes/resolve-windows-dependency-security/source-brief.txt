@@ -1,0 +1,863 @@
+You are operating on the repository:
+
+`quantdale/super-habits`
+
+This is an autonomous continuation campaign. Work for substantial progress without routine clarification. Do not stop after the first red result if the remaining work is executable and safe.
+
+The owner is on Windows and has explicitly deferred iOS. Production-sensitive Supabase mutation is also outside this campaign unless all existing safety predicates somehow become satisfied and explicit authorization exists; assume they do not.
+
+The goal is NOT another broad feature or hardening campaign.
+
+The goal is:
+
+> Resolve the newly surfaced dependency-security blocker at current `main`, restore exact-head CI to green without weakening security policy, reconcile the resulting evidence, and determine whether Windows/local engineering can now be considered exhausted.
+
+---
+
+# 0. Operating principles
+
+Treat repository documentation, prior reports, ExecPlans, commit messages, and task checkboxes as **claims to verify**, not ground truth.
+
+Always prefer:
+
+1. direct repository state,
+2. current dependency graph,
+3. actual command output,
+4. GitHub Actions evidence,
+5. source inspection,
+6. then documentation.
+
+Do not modify product behavior merely to satisfy CI.
+
+Do not silence or broadly exempt a security advisory merely to make a gate green.
+
+Do not reduce assertion strength, loosen quality gates, raise performance thresholds, skip relevant tests, or relabel failures as environment issues without evidence.
+
+Use pinned Node:
+
+`22.23.2`
+
+Use the repository's intended npm version/tooling.
+
+Preserve existing local/foreign state, ignored evidence, stashes, unrelated worktrees, and previous evidence directories.
+
+Do not force-push, rewrite history, squash existing history, delete foreign files, drop stashes, or alter unrelated branches.
+
+Use normal fast-forward-only publication to `main` once a candidate is proven.
+
+---
+
+# 1. Known starting state — VERIFY BEFORE TRUSTING
+
+The last remotely observed state was:
+
+`main = 891ed228ffc39f002ac13cc62aad2ee0b69ef1fe`
+
+Commit:
+
+`docs: disclose Windows publication dependency audit blocker`
+
+Current-head GitHub CI observed:
+
+run `36965502815`
+
+Result:
+
+- `quality`: FAILED
+- `e2e`: skipped because quality failed
+- `nightly`: skipped
+- failure step:
+  `Audit runtime dependencies (gates on new high/critical)`
+
+Everything earlier in `quality` passed:
+
+- install
+- typecheck
+- Supabase edge-function Deno checks
+- lint
+- theme validation
+- OpenSpec validation
+- journey/quarantine parity
+- ExecPlan validation
+- unit + integration tests
+
+The audit failure reported:
+
+`node-forge`
+
+advisory:
+
+`GHSA-86w9-cpqp-85rv`
+
+severity:
+
+`high`
+
+description observed in CI:
+
+`node-forge RSA PKCS#1 v1.5 signature verification accepts extra nested DigestAlgorithm elements`
+
+reported vulnerable range:
+
+`*`
+
+The repository's audit gate reported this as:
+
+`[UNDOCUMENTED] high node-forge GHSA-86w9-cpqp-85rv`
+
+and:
+
+`1 undocumented high/critical advisory(ies) in the production tree`
+
+The pre-existing `brace-expansion` advisories are already separately documented and are not the newly blocking advisory.
+
+Before editing anything, independently verify that this is still the current situation.
+
+---
+
+# 2. Campaign boundary
+
+## In scope
+
+Primary:
+
+- `node-forge` dependency-security triage
+- dependency graph/root-cause analysis
+- exposure/reachability analysis
+- safe dependency remediation if possible
+- audit-policy correctness if the current classification itself proves wrong
+- focused regression protection where appropriate
+- package/lockfile changes if justified
+- exact-head CI restoration
+- evidence reconciliation
+- closure documentation updates required by the remediation
+- narrow security follow-up discoveries caused directly by the same dependency chain
+
+Secondary only if necessary:
+
+- dependency resolution changes in parent packages
+- npm overrides/resolutions
+- compatible patch/minor upgrades
+- package substitutions
+- removal of unused dependency chains
+- limited build/test configuration changes needed because of the dependency remediation
+
+## Out of scope
+
+Do NOT reopen these just because they exist:
+
+- iOS certification
+- iOS Maestro fixes/reruns
+- production SQL/DDL
+- Supabase migrations
+- production record deletion
+- historical synthetic cleanup
+- J8 optimization unless new source changes directly invalidate the previous evidence
+- Android flow repair that is already green
+- broad UX work
+- feature development
+- speculative refactoring
+- style cleanup
+- unrelated dependencies
+- app-store submission
+- signing/release publication
+- unrelated OpenSpec cleanup
+
+Do not mutate any Supabase project in this campaign.
+
+The only named production project from prior work is:
+
+`superhabits`
+ref:
+`kruubbynsmxzxfdunaal`
+
+Do not touch it.
+
+---
+
+# 3. Phase A — exact repository preflight
+
+Start by establishing current reality.
+
+Record:
+
+```bash
+git status --short
+git branch --show-current
+git rev-parse HEAD
+git rev-parse origin/main
+git log --oneline -20
+git stash list
+git worktree list
+node --version
+npm --version
+```
+
+Fetch first.
+
+Verify:
+
+- branch is `main`
+- whether `HEAD == origin/main`
+- whether there are newer commits since `891ed228`
+- whether CI has since rerun or changed
+- whether any local state is foreign/unowned
+- whether any security work has already begun
+
+Inspect:
+
+- `.agent/execplans/windows-closure-publication.md`
+- `openspec/changes/final-certification-closure/closure-report.md`
+- `openspec/changes/final-certification-closure/tasks.md`
+- `openspec/changes/final-certification-closure/execplan.md`
+- `openspec/changes/windows-closure-reconciliation/`
+- `scripts/audit-runtime-deps.mjs`
+- `.github/workflows/ci.yml`
+- `package.json`
+- `package-lock.json`
+
+Do not blindly continue from the prior handoff if the repository has moved.
+
+If the current dependency advisory differs from the handoff, follow current evidence.
+
+---
+
+# 4. Phase B — reproduce the security failure locally
+
+Run the exact dependency audit gate locally before changing anything.
+
+At minimum:
+
+```bash
+node scripts/audit-runtime-deps.mjs
+```
+
+Also inspect the underlying npm data with commands such as:
+
+```bash
+npm audit --json
+npm ls node-forge --all
+npm explain node-forge
+```
+
+Use whatever additional dependency-inspection commands are necessary.
+
+Record:
+
+- exact installed `node-forge` version
+- all parent packages
+- all distinct paths
+- whether it appears once or multiple times
+- dependency vs devDependency lineage
+- whether npm labels it as production-reachable
+- advisory metadata
+- whether a patched version exists
+- whether npm proposes a fix
+- whether that fix requires a breaking upgrade
+- whether lockfile refresh changes the answer
+
+Do NOT run `npm audit fix --force`.
+
+Do NOT accept npm's suggested major upgrade blindly.
+
+---
+
+# 5. Phase C — determine real exposure
+
+This phase is mandatory.
+
+The audit script says the advisory is in the production tree. Verify whether that classification corresponds to actual shipped/runtime exposure.
+
+Trace `node-forge` to its parent package(s).
+
+For every path determine:
+
+- why the parent dependency exists
+- whether that parent executes at runtime
+- whether it is bundler/build tooling only
+- whether it is used only in development
+- whether it is transitively included in the production dependency tree despite being unreachable in the shipped app
+- whether `node-forge` itself is bundled into:
+  - web output
+  - React Native JS bundle
+  - Android APK JS
+  - Supabase Edge Function bundle
+  - any server/runtime artifact
+- whether the vulnerable RSA signature-verification API is actually imported or reachable
+
+Use source and artifact evidence, not intuition.
+
+Appropriate techniques may include:
+
+```bash
+rg "node-forge|forge\\." .
+npm explain node-forge
+```
+
+plus dependency source inspection and, where useful, build-output searching.
+
+If the repository already has hermetic bundle scanning infrastructure, use it rather than inventing a weaker scan.
+
+Classify the advisory using an evidence-backed taxonomy such as:
+
+- `RUNTIME_VULNERABILITY`
+- `RUNTIME_TRANSITIVE_BUT_UNREACHABLE`
+- `BUILD_TIME_ONLY`
+- `TEST_TOOLING_ONLY`
+- `AUDIT_CLASSIFICATION_BUG`
+- `DEPENDENCY_METADATA_AMBIGUITY`
+- `NO_PATCH_AVAILABLE`
+- `SAFE_UPGRADE_AVAILABLE`
+
+Do not classify it as build-only merely because the app itself never directly imports `node-forge`.
+
+Trace the entire parent path.
+
+---
+
+# 6. Phase D — identify remediation options
+
+Enumerate realistic fixes before editing.
+
+Consider in this order:
+
+### Option 1 — upgrade the direct parent safely
+
+If a patch/minor parent upgrade removes the vulnerable dependency or brings in a patched `node-forge`, prefer it.
+
+### Option 2 — compatible `node-forge` override
+
+If `node-forge` has a fixed version compatible with all parents, consider an npm override.
+
+Before applying an override, verify:
+
+- API compatibility
+- parent version range
+- package usage
+- lockfile resolution
+- affected tests
+
+Do not use an override merely because npm accepts it.
+
+### Option 3 — update a dependency family
+
+If a parent package needs a compatible minor/patch update, perform the smallest safe update.
+
+### Option 4 — remove unused dependency path
+
+If the chain is genuinely unused and removable without reducing functionality, remove it.
+
+### Option 5 — narrowly documented exemption
+
+This is LAST RESORT.
+
+Only consider it if all of the following are proven:
+
+1. no safe patched dependency exists;
+2. no safe parent upgrade exists;
+3. the dependency is demonstrably not runtime-reachable in shipped artifacts;
+4. the vulnerability's affected API is not used;
+5. the classification is reproducible;
+6. the exemption can name exact package/path/advisory;
+7. it has a date, rationale, and removal condition;
+8. it does not broadly exempt `node-forge`, all highs, or an entire dependency family.
+
+If these conditions are not met, do not add an exemption.
+
+Never change the audit policy from “new high/critical fails” to a weaker global policy.
+
+---
+
+# 7. Phase E — implement the smallest evidence-backed repair
+
+Choose the least invasive valid remediation.
+
+Potential modified files should stay narrowly scoped, such as:
+
+- `package.json`
+- `package-lock.json`
+- security-audit documentation
+- `scripts/audit-runtime-deps.mjs` only if its classification logic is demonstrably wrong
+- tests for audit classification if the audit script changes
+- closure evidence files after validation
+
+Avoid changing product source unless the vulnerable package turns out to be directly used by product code and remediation genuinely requires it.
+
+After dependency changes, run:
+
+```bash
+npm ci
+node scripts/audit-runtime-deps.mjs
+npm ls node-forge --all
+```
+
+The security audit must be green for a legitimate reason.
+
+Capture the before/after dependency path.
+
+---
+
+# 8. Phase F — add regression protection
+
+If the remediation depends on a dependency resolution invariant, add a guard appropriate to the failure mode.
+
+Examples:
+
+- the vulnerable `node-forge` version must not reappear;
+- production dependency traversal must not classify the known build-only path incorrectly;
+- the fixed parent version must remain above a minimum;
+- a security exception, if absolutely necessary, must match exact advisory/path rather than wildcarding future advisories.
+
+Do not write a brittle lockfile-text snapshot if a semantic check is feasible.
+
+Prove any new guard is non-vacuous by demonstrating it fails against the reconstructed bad state or an equivalent fixture.
+
+---
+
+# 9. Phase G — affected validation
+
+Use repository impact tooling first if available:
+
+```bash
+npm run qa:affected -- --files <changed-files>
+```
+
+Then run the required focused gates.
+
+At minimum for dependency/security changes:
+
+```bash
+npm run typecheck
+npm run lint
+node scripts/audit-runtime-deps.mjs
+npm test
+npm run openspec:validate
+npm run agent:plan:validate:all
+```
+
+Run the repository's dependency-audit unit tests, including:
+
+`tests/auditRuntimeDeps.test.ts`
+
+if still present.
+
+If `qa:affected` escalates to `qa:fast`, run it.
+
+If the dependency change can affect runtime/bundles or broad package resolution, run:
+
+```bash
+npm run qa:full
+```
+
+Do not avoid `qa:full` solely because it is long.
+
+If host resources are temporarily poor, measure:
+
+- available RAM
+- CPU
+- repository-owned processes
+- unrelated heavy processes
+
+Do not kill unrelated processes.
+
+Use resource-aware worker limits only if the repository already supports them or the test runner supports them without changing repository semantics.
+
+Do not increase test timeouts to compensate for host contention.
+
+---
+
+# 10. Phase H — verify artifacts if dependency was runtime-adjacent
+
+If the dependency graph suggests `node-forge` may enter shipped output, perform artifact-level verification after the fix.
+
+Where applicable inspect:
+
+- web bundle
+- native JS bundle
+- APK bundle contents
+- Edge Function dependency graph
+
+Search for relevant signatures or package traces.
+
+Do not require a full Android recertification unless package-resolution changes plausibly affect the Android runtime or the repository's impact rules require it.
+
+If current-source Android is required by impact rules, use the existing hermetic path and current `Nitro_API_36`.
+
+Do not touch iOS.
+
+---
+
+# 11. Phase I — commit discipline
+
+Create logical commits.
+
+A likely structure:
+
+1. dependency/security remediation
+2. test/guard updates if meaningfully separable
+3. evidence/closure reconciliation after validation
+
+Avoid unnecessary bookkeeping commits.
+
+Before every commit:
+
+```bash
+git diff --check
+git status --short
+```
+
+Stage only task-owned files explicitly.
+
+Run appropriate validation before committing.
+
+Do not include foreign evidence or unrelated untracked files.
+
+---
+
+# 12. Phase J — publish candidate and require exact-head CI
+
+After local validation is green and source is stable:
+
+- fetch
+- verify no unexpected remote divergence
+- fast-forward only
+- push `main`
+- record exact pushed SHA
+
+Then inspect GitHub Actions on that exact SHA.
+
+Required:
+
+### `quality`
+must be `success`
+
+The dependency audit step specifically must be `success`.
+
+### `e2e`
+must be `success`
+
+Do not treat `skipped` as success if it was skipped because quality failed.
+
+### `nightly`
+may be skipped when that is the expected push behavior.
+
+Inspect job steps.
+
+Confirm:
+
+- audit passed
+- unit/integration passed
+- strict retry-report gates remain enforced
+- no cancelled ancestor run is being reused
+- exact `head_sha` equals the candidate
+
+If CI exposes another legitimate high/critical dependency issue, classify it and continue if it is within the same dependency-security scope.
+
+Do not enter an endless general dependency modernization campaign.
+
+---
+
+# 13. Phase K — current exact-head reconciliation
+
+Once exact-head CI is green, update only the necessary canonical records.
+
+Reconcile:
+
+- `openspec/changes/final-certification-closure/closure-report.md`
+- relevant ExecPlan/checkpoint
+- any dedicated security campaign plan you create
+
+Do NOT falsely change overall state to `CERTIFIED`.
+
+Overall certification still has external residuals.
+
+The expected high-level terminal state after this campaign, if successful, is:
+
+> Windows/local engineering and current exact-head CI green; Android green; iOS owner-deferred; production certification still blocked by recovery/catalog conditions.
+
+Preserve the canonical production truth:
+
+- production SQL catalog read remains credential-dependent unless new authorized evidence exists;
+- recovery point was directly observed absent:
+  - `pitr_enabled: false`
+  - `backups: []`
+  - `physical_backup_data: {}`
+- production DDL remains stopped;
+- no production mutation was authorized by this campaign.
+
+Do not modify the 17/22 task ledger merely to improve the number.
+
+A task can remain unchecked because it is deferred, blocked, or conditional.
+
+---
+
+# 14. Do not reopen already resolved findings
+
+Preserve these current conclusions unless new direct evidence invalidates them:
+
+### Android
+
+Current-source Android is green:
+
+- provisioning PASS
+- smoke 2/2
+- persistence 11/11
+- lifecycle 6/6
+
+The command-center-v2 failure was classified `TEST_BUG` and corrected.
+
+Do not redo that work without evidence.
+
+### J8
+
+Preserve:
+
+- historical noisy result: 878 ms
+- valid post-fix result: 622/800 ms
+- ceiling: 800 ms
+- floor: 15%
+- task 4.3: `NOT_TRIGGERED`
+
+Do not raise thresholds.
+
+### Full QA
+
+A fresh campaign `qa:full` already passed:
+
+- 250 files passed / 1 skipped
+- 2457 tests passed / 2 skipped
+- OpenSpec 69/69
+- E2E 235 passed / 49 skipped / 0 failed
+- deterministic simulation 23/23
+
+Run it again only if current impact requires it.
+
+### iOS
+
+Owner deferred.
+
+Do not dispatch, repair, monitor, or reinterpret iOS evidence.
+
+---
+
+# 15. Parallelization
+
+Use sub-agents/worktrees for independent read-only work where useful.
+
+Good parallel lanes:
+
+### Lane A — dependency graph
+Trace `node-forge` parents, versions, resolution and remediation candidates.
+
+### Lane B — exposure analysis
+Determine whether it enters runtime/shipped artifacts and whether the vulnerable API is reachable.
+
+### Lane C — advisory/audit policy review
+Inspect `audit-runtime-deps.mjs`, npm audit classification and existing documented advisory logic.
+
+### Lane D — regression/validation planning
+Determine appropriate affected gates and non-vacuous guard.
+
+These lanes should initially be read-only.
+
+Do not allow multiple agents to edit the same dependency files simultaneously.
+
+The integrating agent owns:
+
+- final remediation choice
+- package changes
+- validation
+- commits
+- publication
+- canonical reconciliation
+
+---
+
+# 16. Failure classification discipline
+
+For every red result, classify before fixing.
+
+Use an explicit taxonomy:
+
+- `PRODUCT_BUG`
+- `DEPENDENCY_VULNERABILITY`
+- `DEPENDENCY_RESOLUTION`
+- `AUDIT_POLICY_BUG`
+- `TEST_BUG`
+- `CI_CONFIGURATION`
+- `FLAKY_TEST`
+- `ENVIRONMENT`
+- `CREDENTIAL / EXTERNAL`
+- `DEFERRED_BY_OWNER`
+- `NOT_TRIGGERED`
+- `OWNER_APPROVAL_REQUIRED`
+- `UNKNOWN_NEEDS_TRIAGE`
+
+For each failure write:
+
+**WHY**
+
+**CLASSIFICATION**
+
+**EVIDENCE**
+
+**WHAT IS REQUIRED**
+
+**EXACT NEXT ACTION**
+
+Do not classify by convenience.
+
+---
+
+# 17. Security-specific stop conditions
+
+Pause instead of improvising if remediation would require:
+
+- knowingly accepting a runtime high/critical vulnerability;
+- adding a broad security exception;
+- major React Native/Expo migration solely to remove this one advisory without sufficient validation;
+- destructive production mutation;
+- changing signing/release credentials;
+- touching secrets;
+- force-pushing;
+- rewriting history.
+
+Otherwise continue autonomously.
+
+---
+
+# 18. Definition of done
+
+This campaign is complete only when one of these two truthful terminal conditions is reached.
+
+## Preferred: RESOLVED
+
+All must be true:
+
+- exact dependency path understood;
+- security applicability classified;
+- safe remediation implemented;
+- new high `node-forge` advisory no longer blocks audit;
+- no broad waiver added;
+- required local validation passes;
+- exact-head GitHub `quality` passes;
+- exact-head GitHub `e2e` passes;
+- nightly behavior is understood/expected;
+- current closure records reflect the new evidence;
+- no unrelated work absorbed.
+
+Then report:
+
+**WINDOWS SECURITY FOLLOW-UP COMPLETE**
+
+while preserving overall project:
+
+**NOT CERTIFIED**
+
+because production/iOS external residuals remain.
+
+## Acceptable: PRECISELY BLOCKED
+
+Only if no safe executable remediation exists.
+
+Then provide concrete proof of:
+
+- dependency path;
+- why available updates/overrides/removal are unsafe or unavailable;
+- runtime/build exposure;
+- whether the vulnerability is reachable;
+- why the audit cannot truthfully pass;
+- exact upstream condition needed;
+- exact resume action.
+
+Do not convert this into a fake green audit.
+
+---
+
+# 19. Final report format
+
+At the end provide a concise but evidence-dense report with:
+
+## A. Repository state
+- final HEAD
+- origin/main
+- clean/dirty status
+- commits created
+
+## B. `node-forge` root cause
+- installed version
+- parent dependency chain
+- prod/build/test classification
+- vulnerable API reachability
+
+## C. Remediation
+- files changed
+- dependency versions before/after
+- why this fix was selected
+- alternatives rejected and why
+
+## D. Security result
+- local audit result
+- remaining highs/criticals
+- documented exceptions, if any
+- proof no blanket exemption was introduced
+
+## E. Validation
+Exact commands and results.
+
+## F. Hosted CI
+- exact SHA
+- run ID
+- `quality`
+- audit step
+- `e2e`
+- nightly
+- expected skips
+
+## G. Regression protection
+What prevents recurrence.
+
+## H. Existing closure state
+- Android
+- J8
+- qa:full
+- iOS deferral
+- production blocker
+- current canonical task count
+
+## I. Remaining work
+Separate into:
+
+- actionable Windows/local
+- owner action
+- credential/external
+- deliberately deferred
+
+## J. Terminal verdict
+
+Use exactly one:
+
+`WINDOWS SECURITY FOLLOW-UP COMPLETE`
+
+or
+
+`PRECISELY BLOCKED`
+
+Do not say the overall app is certified unless all production and deferred certification requirements genuinely become satisfied.
+
+---
+
+# Immediate first action
+
+Begin now by verifying current `main`, reproducing:
+
+```bash
+node scripts/audit-runtime-deps.mjs
+npm audit --json
+npm ls node-forge --all
+npm explain node-forge
+```
+
+Then trace the complete `node-forge` dependency chain and determine whether the vulnerability is truly runtime-reachable before making any change.
+
+Do not start by editing the audit exception list.
