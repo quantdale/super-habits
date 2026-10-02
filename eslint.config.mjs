@@ -71,6 +71,10 @@ export default [
       'playwright-report/**',
       'package/**',
       'coverage/**',
+      // Derived campaign/QA evidence (gitignored, like the output dirs
+      // above). Diagnostic tooling kept there is the same lint-exempt class
+      // as scripts/*.mjs; typed rules crash on it without project options.
+      'simulation-output/**',
     ],
   },
 
