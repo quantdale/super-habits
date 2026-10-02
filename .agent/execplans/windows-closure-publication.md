@@ -1,7 +1,7 @@
 # ExecPlan: Finalize and publish Windows closure documentation
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -13,11 +13,13 @@ publication-status error without changing certification outcomes.
 
 - Publication starts from `main == origin/main ==
 7a6aeb22b31d6d70935c77d5ff6c4cacff2a7e94`; fetch confirmed 0 ahead / 0 behind.
-- The original campaign was published and qualified at that SHA. Its report
-  did not contain **Final validation**; that section exists only in the local
-  correction. Its CI/native attestation cannot attest this new revision.
-- The two canonical documents are modified. The independent review plan,
-  resolution plan and resolution prompt are task-owned untracked documents.
+- At preflight, the original campaign was published and qualified at that
+  SHA, but its report lacked **Final validation**; that section existed only
+  in the local correction. The correction is now separately published. The
+  original CI/native attestation cannot attest this new revision.
+- At preflight, the two canonical documents were modified; the independent
+  review plan, resolution plan and resolution prompt were task-owned
+  untracked documents. They are now in the verified publication commit.
 - Preserve stash `pre-recovery-local-changes` at
   `c35e281d740df1e367c1be0f38383237ca080239`, the iOS extract, seven foreign
   change directories and ignored evidence. No other staged changes exist.
@@ -40,13 +42,17 @@ mutation or external attestation publication. Preserve `BLOCKED`,
 
 ## Current Checkpoint
 
-- Current milestone: Validated six-file staged scope; ready to commit/push.
+- Current milestone: COMPLETE — task-owned documentation published and remote identity verified.
 - Completed: Instructions/recovery orientation, fetched refs, Git inventory,
   inspected full owned documents, confirmed GitHub push permission and explicit
   six-file impact; corrected canonical/resolution wording and captured a
-  SHA-256 preservation baseline (214 files/links across 11 evidence roots).
-- In progress: Hook-enabled commit and fast-forward publication.
-- Important modified files: The six owned Markdown paths below.
+  SHA-256 preservation baseline (214 files/links across 11 evidence roots);
+  all local gates passed, the six-file commit was pushed, remote identity
+  verified and its exact-head CI state observed.
+- In progress: None for documentation publication. Hosted CI is asynchronous
+  and was observed in progress, not claimed as a pass or native qualification.
+- Important modified files: Six owned Markdown paths published in `d582183`;
+  only this plan carries the final completion-record revision.
 - Last successful validation: Pinned Node 22.23.2 `qa:fast` PASS with one
   worker (170 unit files / 2060 tests); combined `npm test -- --maxWorkers=1`
   PASS (250 files / 2457 tests; 1 file / 2 cloud tests skipped); focused
@@ -60,22 +66,22 @@ mutation or external attestation publication. Preserve `BLOCKED`,
 - Blockers: None for documentation publication; production/iOS remain external.
 - Condition required to unblock: None for this task.
 - Exact resume action after unblock: Not applicable.
-- Exact next action: Re-stage the final plan/report wording, verify the same
-  six-file scope, commit with hooks enabled and push `main` normally; stop if
-  the remote has advanced or any unintended staged path appears.
-- Remaining definition of done: Correct wording, green local documentation
-  gates plus `npm test`, preserved foreign state and canonical task ledger,
-  explicit-path commit, successful fast-forward push and verified remote SHA.
-  Observe the new SHA's hosted CI and report its actual state; do not infer
-  success or native certification from ancestor runs.
+- Exact next action: None — documentation publication task complete.
+- Remaining definition of done: Complete — six owned Markdown files committed
+  with hooks and fast-forward pushed as `d5821837dc80675d2fdcac34ffad1e580f2c53c3`;
+  local/remote refs matched at verification (0/0), all local gates passed,
+  foreign state preserved, and exact-head CI `36964273942` observed
+  `in_progress`. This completion-record revision is bookkeeping only; inspect
+  Git/Actions for its own containing commit and live CI state. No hosted-CI
+  PASS or new native certification is inferred.
 
 ## Progress
 
 - [x] Establish authority, current refs, ownership and QA impact.
 - [x] Resolve publication wording and preserve historical evidence boundaries.
 - [x] Run local gates and verify the exact staged scope/preservation.
-- [ ] Commit and fast-forward push the documentation to `main`.
-- [ ] Verify remote identity and observe exact-head CI; record the handoff.
+- [x] Commit and fast-forward push the documentation to `main`.
+- [x] Verify remote identity and observe exact-head CI; record the handoff.
 
 ## Surprises & Discoveries
 
@@ -103,6 +109,10 @@ mutation or external attestation publication. Preserve `BLOCKED`,
   not blind retry. All 20 affected tests and the full 2060-test unit suite
   passed unchanged; keep Vitest worker caps at one for this resource-starved
   host. No timeout, assertion, config or unrelated process was changed.
+- 2026-10-02 — Close this plan with a ledger-only follow-up commit after the
+  publication receipt exists, rather than inventing a future push result or
+  amending history. That follow-up starts its own CI and may supersede the
+  first run; verify/report its live state separately, never transfer a PASS.
 
 ## Validation Ledger
 
@@ -151,6 +161,16 @@ tests/portableExportSize.test.ts tests/restore.coordinator.test.ts` — PASS,
   PASS, exactly six owned Markdown paths, no app/test/task/foreign content;
   staged whitespace clean. Clarified that `80b0b33` postdates the source
   covered by the old `c2ec475` run. Diff saved as `staged-documentation.patch`.
+- 2026-10-02 — Hook-enabled commit and `git push origin main` — PASS,
+  `7a6aeb2..d582183`, exactly six owned Markdown files; formatter hook passed
+  and its temporary backup was cleaned up. Original stash retained; tracked
+  and staged trees clean, only the eight foreign directories untracked.
+- 2026-10-02 — `git rev-parse HEAD origin/main`, `git ls-remote origin
+refs/heads/main`, divergence check — PASS, exact
+  `d5821837dc80675d2fdcac34ffad1e580f2c53c3` on local and remote main, 0/0.
+- 2026-10-02 — `gh run list --branch main --commit d582183 --event push` —
+  OBSERVED, CI `36964273942` matches the full pushed SHA and is `in_progress`,
+  conclusion empty. Snapshot: `ci-first-push.json`. This is not a CI PASS.
 
 ## Changed Files / Areas
 
@@ -177,9 +197,16 @@ tests/portableExportSize.test.ts tests/restore.coordinator.test.ts` — PASS,
 
 ## Outcomes & Retrospective
 
-- Status: ACTIVE; publication not yet performed.
-- Summary: Scope/authorization reconciled and publication wording corrected.
-- Proof: Local validation/preservation ledger above; historical failures kept.
-- Remaining work: Scoped commit/push and remote/CI-state verification.
+- Status: COMPLETED — the authorized documentation publication is verified.
+- Summary: Published the corrected canonical checkpoint/report, truthful
+  historical resolution handoff, unchanged independent review/prompt and this
+  separate publication plan. Original campaign evidence stays at its tested
+  SHAs; the report refresh is not attributed to the old attestation.
+- Proof: `d5821837dc80675d2fdcac34ffad1e580f2c53c3` push/remote receipt;
+  local QA and preservation ledger above; historical failures retained.
+- Remaining work: None for the documentation publication task. Hosted CI was
+  still running at observation and must not be reported green without its
+  actual result; live final-ref CI is recorded in Actions and the handoff.
+  Production, owner-deferred iOS and overall `NOT CERTIFIED` are unchanged.
 - Lesson: A published campaign and an uncommitted report refresh are different
   source identities even when the latter only describes historical evidence.
