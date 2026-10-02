@@ -156,6 +156,172 @@ const documentedBraceReport = () =>
     { high: 1, total: 1 },
   );
 
+// ---------------------------------------------------------------------------
+// Review-correction fixtures (2026-10-02 independent review of the apply).
+// Each of the seven invalid/incoherent reports below produced a false clean
+// verdict (exit 0) through the real seam AND the real CLI before the schema/
+// coherence validation landed. They are permanent executing regressions.
+// ---------------------------------------------------------------------------
+
+const moderateOnlyReport = () =>
+  report(
+    {
+      'some-package': {
+        name: 'some-package',
+        severity: 'moderate',
+        nodes: ['node_modules/some-package'],
+        range: '*',
+        via: [
+          advisoryEntry({ name: 'some-package', severity: 'moderate', title: 'moderate thing' }),
+        ],
+      },
+    },
+    { moderate: 1, total: 1 },
+  );
+
+const infoAndLowReport = () =>
+  report(
+    {
+      'info-package': {
+        name: 'info-package',
+        severity: 'info',
+        nodes: ['node_modules/info-package'],
+        range: '*',
+        via: [advisoryEntry({ name: 'info-package', severity: 'info', title: 'info thing' })],
+      },
+      'low-package': {
+        name: 'low-package',
+        severity: 'low',
+        nodes: ['node_modules/low-package'],
+        range: '*',
+        via: [advisoryEntry({ name: 'low-package', severity: 'low', title: 'low thing' })],
+      },
+    },
+    { info: 1, low: 1, total: 2 },
+  );
+
+const syntheticFinding = (over: Record<string, unknown>) => ({
+  name: 'synthetic-package',
+  severity: 'high',
+  nodes: ['node_modules/synthetic-package'],
+  via: [advisoryEntry({ name: 'synthetic-package', title: 'synthetic high finding' })],
+  ...over,
+});
+
+/** Review false-green 1: an unknown report schema version with a "clean" body. */
+const unsupportedVersionReport = () => report({}, {}, { auditReportVersion: 999 });
+
+/** Review false-green 2: metadata claiming a high while findings are empty. */
+const metadataHighEmptyFindingsReport = () => report({}, { high: 1, total: 1 });
+
+/** Review false-green 3: severity "HIGH" hiding a reported high. */
+const uppercaseSeverityReport = () =>
+  report({ 'synthetic-package': syntheticFinding({ severity: 'HIGH' }) }, { high: 1, total: 1 });
+
+/** Review false-green 4: a high finding with no via entries at all. */
+const emptyViaReport = () =>
+  report({ 'synthetic-package': syntheticFinding({ via: [] }) }, { high: 1, total: 1 });
+
+/** Review false-green 5: a critical finding whose only via is a dangling reference. */
+const unresolvedReferenceReport = () =>
+  report(
+    { 'synthetic-package': syntheticFinding({ severity: 'critical', via: ['missing-package'] }) },
+    { critical: 1, total: 1 },
+  );
+
+/** Review false-green 6: a documented advisory reported with no dependency paths. */
+const emptyPathsReport = () => {
+  const payload = documentedBraceReport();
+  (payload.vulnerabilities as Record<string, MutableFinding>)['brace-expansion'].nodes = [];
+  return payload;
+};
+
+/** Review false-green 7: negative/non-numeric metadata counts. */
+const invalidCountsReport = () => {
+  const payload = report({}, {}) as unknown as {
+    metadata: { vulnerabilities: Record<string, unknown> };
+  };
+  payload.metadata.vulnerabilities.high = -1;
+  payload.metadata.vulnerabilities.total = 'not-a-number';
+  return payload;
+};
+
+/** Extra structural case: a via reference cycle with no advisory evidence. */
+const referenceCycleReport = () =>
+  report(
+    {
+      'a-package': {
+        name: 'a-package',
+        severity: 'high',
+        nodes: ['node_modules/a-package'],
+        via: ['b-package'],
+      },
+      'b-package': {
+        name: 'b-package',
+        severity: 'high',
+        nodes: ['node_modules/b-package'],
+        via: ['a-package'],
+      },
+    },
+    { high: 2, total: 2 },
+  );
+
+/** Control: valid npm meta-vulnerability references (the real grouped shape). */
+const groupedMetaReport = () =>
+  report(
+    {
+      'meta-parent': {
+        name: 'meta-parent',
+        severity: 'high',
+        nodes: ['node_modules/meta-parent'],
+        via: ['leaf-package'],
+      },
+      'leaf-package': {
+        name: 'leaf-package',
+        severity: 'high',
+        nodes: ['node_modules/leaf-package'],
+        via: [
+          advisoryEntry({
+            name: 'leaf-package',
+            title: 'leaf advisory',
+            url: 'https://github.com/advisories/GHSA-leaf0-0000-leaf',
+          }),
+        ],
+      },
+    },
+    { high: 2, total: 2 },
+  );
+
+/** Control: a valid multi-advisory finding must keep both advisories visible. */
+const multiAdvisoryReport = () =>
+  report(
+    {
+      'brace-expansion': {
+        name: 'brace-expansion',
+        severity: 'high',
+        nodes: [
+          'node_modules/glob/node_modules/brace-expansion',
+          'node_modules/test-exclude/node_modules/brace-expansion',
+        ],
+        range: '<=1.1.20 || 2.0.0 - 2.1.6',
+        via: [
+          advisoryEntry({
+            name: 'brace-expansion',
+            title: 'brace-expansion first advisory',
+            url: 'https://github.com/advisories/GHSA-q2hr-2g5m-vwhr',
+          }),
+          advisoryEntry({
+            name: 'brace-expansion',
+            title: 'brace-expansion second advisory',
+            url: 'https://github.com/advisories/GHSA-qhr7-859c-m2p7',
+          }),
+        ],
+        fixAvailable: false,
+      },
+    },
+    { high: 1, total: 1 },
+  );
+
 const ok = (result: CommandResult) => validateAuditCommandResult(result);
 const asResult = (payload: unknown, status = 1): CommandResult => ({
   status,
@@ -400,6 +566,115 @@ describe('audit command/report seam (fail closed)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 2026-10-02 independent review corrections (P1): malformed, incoherent and
+// structurally broken reports must fail closed BEFORE any clean/documented
+// verdict. Each of the seven review fixtures below produced a false clean
+// verdict (exit 0) through this real seam and the real CLI.
+// ---------------------------------------------------------------------------
+
+describe('invalid or incoherent audit reports fail closed (2026-10-02 review corrections)', () => {
+  it('rejects an unsupported report schema version instead of trusting a clean body', () => {
+    expect(() => ok(asResult(unsupportedVersionReport(), 0))).toThrowError(
+      /unsupported auditReportVersion 999/,
+    );
+    const outLines: string[] = [];
+    const errLines: string[] = [];
+    const exitCode = main({
+      runCommand: () => asResult(unsupportedVersionReport(), 0),
+      out: (line: string) => outLines.push(line),
+      err: (line: string) => errLines.push(line),
+    });
+    expect(exitCode).toBe(1);
+    expect(outLines.join('\n')).not.toContain('OK — 0 high/critical');
+    expect(errLines.join('\n')).toContain('refusing to report a clean production tree');
+  });
+
+  it('rejects metadata counts that contradict empty findings', () => {
+    expect(() => ok(asResult(metadataHighEmptyFindingsReport(), 0))).toThrowError(
+      /do not match the reported findings/,
+    );
+  });
+
+  it('rejects negative or non-integer metadata counts', () => {
+    expect(() => ok(asResult(invalidCountsReport(), 0))).toThrowError(/non-negative integers/);
+  });
+
+  it('rejects a severity outside the known npm severity enum ("HIGH")', () => {
+    expect(() => ok(asResult(uppercaseSeverityReport(), 1))).toThrowError(/invalid finding shape/);
+  });
+
+  it('rejects a high finding that carries no via entries at all', () => {
+    expect(() => ok(asResult(emptyViaReport(), 1))).toThrowError(/invalid finding shape/);
+  });
+
+  it('rejects a critical finding with an unresolved via reference', () => {
+    expect(() => ok(asResult(unresolvedReferenceReport(), 1))).toThrowError(
+      /unresolved via reference/,
+    );
+  });
+
+  it('rejects via reference cycles with no usable advisory evidence', () => {
+    expect(() => ok(asResult(referenceCycleReport(), 1))).toThrowError(
+      /no usable advisory evidence/,
+    );
+  });
+
+  it('rejects a documented advisory reported with no dependency paths', () => {
+    expect(() => ok(asResult(emptyPathsReport(), 1))).toThrowError(/dependency paths/);
+    // ...and the allowlist matcher itself refuses the vacuous every-path match
+    // an empty path list would otherwise produce.
+    expect(
+      isDocumented({ advisory: 'GHSA-q2hr-2g5m-vwhr', name: 'brace-expansion', nodes: [] }),
+    ).toBeNull();
+  });
+
+  it('accepts valid grouped meta-vulnerability references and gates the leaf advisory', () => {
+    const audit = ok(asResult(groupedMetaReport(), 1));
+    const verdict = evaluateAudit(audit);
+    expect(verdict.exitCode).toBe(1);
+    expect(verdict.undocumented.map((finding) => finding.name)).toEqual(['leaf-package']);
+  });
+
+  it('keeps every advisory of a valid multi-advisory finding visible and documented', () => {
+    const audit = ok(asResult(multiAdvisoryReport(), 1));
+    const verdict = evaluateAudit(audit);
+    expect(verdict.exitCode).toBe(0);
+    expect(verdict.documented).toHaveLength(2);
+    expect(verdict.lines.join('\n')).toContain('GHSA-q2hr-2g5m-vwhr');
+    expect(verdict.lines.join('\n')).toContain('GHSA-qhr7-859c-m2p7');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2026-10-02 independent review corrections (P2): the gate pins npm's audit
+// exit threshold (`--audit-level=info`) so inherited npm configuration cannot
+// change its status semantics. Valid lower-severity reports stay report-only
+// (exit 0) even when npm's configured threshold would have hidden them, while
+// exit 0 together with findings remains a fail-closed contradiction.
+// ---------------------------------------------------------------------------
+
+describe('npm audit exit-threshold normalization (2026-10-02 review corrections)', () => {
+  it('evaluates a valid moderate-only report as a report-only pass', () => {
+    const audit = ok(asResult(moderateOnlyReport(), 1));
+    const verdict = evaluateAudit(audit);
+    expect(verdict.exitCode).toBe(0);
+    expect(verdict.lines.join('\n')).toContain('1 moderate');
+  });
+
+  it('keeps informational and low severities report-only', () => {
+    const audit = ok(asResult(infoAndLowReport(), 1));
+    const verdict = evaluateAudit(audit);
+    expect(verdict.exitCode).toBe(0);
+    expect(verdict.lines.join('\n')).toContain('0 high/critical');
+  });
+
+  it('still refuses to trust exit 0 together with findings (fail-closed preserved)', () => {
+    expect(() => ok(asResult(moderateOnlyReport(), 0))).toThrowError(/exited 0 while reporting/);
+    expect(() => ok(asResult(infoAndLowReport(), 0))).toThrowError(/exited 0 while reporting/);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // The demonstrated false green of the ORIGINAL seam, pinned at the same
 // fixtures (task 5.1): the pre-repair evaluation was
 // `findings(JSON.parse(result.stdout || '{}'))` — parseable npm error JSON and
@@ -450,9 +725,28 @@ describe('audit-runtime-deps CLI contract', () => {
       [
         "const fs = require('node:fs');",
         "const fixture = JSON.parse(fs.readFileSync(process.env.AUDIT_FIXTURE_FILE, 'utf8'));",
+        'if (fixture.argsFile) fs.writeFileSync(fixture.argsFile, JSON.stringify(process.argv.slice(2)));',
         'if (fixture.stdout) process.stdout.write(fixture.stdout);',
         'if (fixture.stderr) process.stderr.write(fixture.stderr);',
-        'process.exit(Number.isInteger(fixture.status) ? fixture.status : 0);',
+        'if (Number.isInteger(fixture.status)) process.exit(fixture.status);',
+        'if (fixture.simulateAuditLevel) {',
+        "  // Emulate npm's audit-level exit threshold: an explicit CLI flag beats",
+        '  // inherited npm_config_audit_level, which beats the default (low).',
+        '  const ranks = { info: 0, low: 1, moderate: 2, high: 3, critical: 4 };',
+        '  const argLevel = process.argv',
+        '    .slice(2)',
+        "    .map((arg) => (arg.startsWith('--audit-level=') ? arg.slice('--audit-level='.length) : null))",
+        '    .filter(Boolean)',
+        '    .pop();',
+        "  const level = argLevel || process.env.npm_config_audit_level || 'low';",
+        '  const threshold = ranks[level] === undefined ? 0 : ranks[level];',
+        '  const counts = JSON.parse(fixture.stdout).metadata.vulnerabilities;',
+        "  const found = ['info', 'low', 'moderate', 'high', 'critical'].some(",
+        '    (severity) => ranks[severity] >= threshold && counts[severity] > 0,',
+        '  );',
+        '  process.exit(found ? 1 : 0);',
+        '}',
+        'process.exit(0);',
       ].join('\n'),
     );
     writeFileSync(
@@ -469,7 +763,7 @@ describe('audit-runtime-deps CLI contract', () => {
     if (shimDir) rmSync(shimDir, { recursive: true, force: true });
   });
 
-  const runCli = (fixture: unknown) => {
+  const runCli = (fixture: Record<string, unknown>, extraEnv: Record<string, string> = {}) => {
     const fixtureFile = join(shimDir, `fixture-${Math.random().toString(36).slice(2)}.json`);
     writeFileSync(fixtureFile, JSON.stringify(fixture));
     return spawnSync(process.execPath, [scriptPath], {
@@ -478,6 +772,7 @@ describe('audit-runtime-deps CLI contract', () => {
         ...process.env,
         [pathKey]: `${shimDir}${delimiter}${process.env[pathKey] ?? ''}`,
         AUDIT_FIXTURE_FILE: fixtureFile,
+        ...extraEnv,
       },
     });
   };
@@ -519,5 +814,71 @@ describe('audit-runtime-deps CLI contract', () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('[DOCUMENTED 2026-09-29');
     expect(result.stdout).toContain('brace-expansion');
+  });
+
+  // 2026-10-02 review corrections (P1): the seven invalid/incoherent reports
+  // plus the reference-cycle case replayed through the real CLI with the exact
+  // command results from the review repro. Each previously exited 0 (false
+  // security green); each must now fail visibly before any clean verdict.
+  it.each([
+    ['unsupported report version', unsupportedVersionReport, 0],
+    ['metadata high with empty findings', metadataHighEmptyFindingsReport, 0],
+    ['uppercase severity hiding a high', uppercaseSeverityReport, 1],
+    ['high finding with empty via', emptyViaReport, 1],
+    ['critical with unresolved via reference', unresolvedReferenceReport, 1],
+    ['documented advisory with empty paths', emptyPathsReport, 1],
+    ['invalid metadata counts', invalidCountsReport, 0],
+    ['via reference cycle without evidence', referenceCycleReport, 1],
+  ] as [string, () => unknown, number][])(
+    'exits 1 without a clean verdict for %s',
+    (_name, build, status) => {
+      const result = runCli({ status, stdout: JSON.stringify(build()) });
+      expect(result.status).toBe(1);
+      expect(result.stdout).not.toContain('OK — 0 high/critical');
+      expect(result.stdout).not.toContain('every high/critical finding is documented');
+      expect(result.stderr).toContain('audit execution failed');
+      expect(result.stderr).toContain('refusing to report a clean production tree');
+    },
+  );
+
+  // 2026-10-02 review corrections (P2): the shim npm emulates npm's real
+  // audit-level semantics (explicit flag > inherited config > default). The
+  // fixture imitates npm 10.9.8 with `audit-level=critical` inherited: without
+  // the gate's explicit `--audit-level=info` normalization the shim would exit
+  // 0 and the gate would reject a perfectly valid moderate report.
+  it('pins the audit exit threshold against inherited npm configuration', () => {
+    const id = Math.random().toString(36).slice(2);
+    const argsFile = join(shimDir, `args-${id}.json`);
+    const fixtureFile = join(shimDir, `fixture-${id}.json`);
+    writeFileSync(
+      fixtureFile,
+      JSON.stringify({
+        stdout: JSON.stringify(moderateOnlyReport()),
+        simulateAuditLevel: true,
+        argsFile,
+      }),
+    );
+    const result = spawnSync(process.execPath, [scriptPath], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        [pathKey]: `${shimDir}${delimiter}${process.env[pathKey] ?? ''}`,
+        AUDIT_FIXTURE_FILE: fixtureFile,
+        npm_config_audit_level: 'critical',
+      },
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('OK — 0 high/critical');
+    expect(result.stdout).toContain('report-only by policy');
+    const args = JSON.parse(readFileSync(argsFile, 'utf8')) as string[];
+    expect(args).toContain('--audit-level=info');
+    expect(args).toContain('--omit=dev');
+    expect(args).toContain('--json');
+  });
+
+  it('evaluates lower-severity-only reports as report-only under the pinned threshold', () => {
+    const result = runCli({ stdout: JSON.stringify(infoAndLowReport()), simulateAuditLevel: true });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('report-only by policy');
   });
 });

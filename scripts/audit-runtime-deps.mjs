@@ -22,6 +22,19 @@
  * results that contradict the report, before any finding is evaluated. npm
  * exiting 1 because valid advisories exist is expected and is still evaluated
  * under the unchanged advisory policy below.
+ *
+ * CORRECTIVE HARDENING (2026-10-02 independent review of the apply): the
+ * boundary now pins the supported npm report schema explicitly —
+ * `auditReportVersion` 2, known severity enums, non-negative integer
+ * `metadata.vulnerabilities` counts coherent with the reported findings,
+ * non-empty dependency paths, and usable advisory evidence at the end of every
+ * `via` reference chain (no dangling references, no evidence-free cycles) — so
+ * malformed or incoherent reports fail visibly instead of producing false
+ * security greens. The audit exit threshold is also normalized on the command
+ * line (`--audit-level=info`, plus the matching `npm_config` override) so
+ * inherited npm configuration cannot flip a valid lower-severity report into a
+ * false red: npm exits 1 iff it reports a vulnerability entry, and the gate
+ * still treats exit 0 together with findings as a contradiction.
  */
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
@@ -101,7 +114,9 @@ export function findings(audit) {
 /**
  * A finding is documented only when an allowlist entry names the same advisory,
  * the same package, AND covers every path npm reported for it — so a new path
- * for a known advisory is still a failure.
+ * for a known advisory is still a failure. An empty path list is never
+ * documented: it would satisfy "every path" vacuously while carrying no
+ * verifiable dependency path at all.
  */
 export function isDocumented(finding) {
   const entry = DOCUMENTED_BUILD_TIME_ADVISORIES.find(
@@ -109,6 +124,7 @@ export function isDocumented(finding) {
       candidate.advisory === finding.advisory && candidate.packageName === finding.name,
   );
   if (!entry) return null;
+  if (!Array.isArray(finding.nodes) || finding.nodes.length === 0) return null;
   const covered = finding.nodes.every((node) => entry.nodes.includes(node));
   return covered ? entry : null;
 }
@@ -133,6 +149,15 @@ function snapshot(text, limit = 500) {
     .trim();
 }
 
+/** The npm `audit --json` report schema this gate supports (npm 7+ = version 2). */
+export const SUPPORTED_AUDIT_REPORT_VERSION = 2;
+
+/** Severity values npm reports; anything else is an invalid finding shape. */
+const SEVERITY_LEVELS = ['info', 'low', 'moderate', 'high', 'critical'];
+
+/** metadata.vulnerabilities keys: one non-negative integer count per severity + total. */
+const METADATA_COUNT_KEYS = [...SEVERITY_LEVELS, 'total'];
+
 function describeNpmError(parsed) {
   const error = parsed.error ?? {};
   const parts = [error.code, error.summary, error.detail].filter(
@@ -147,11 +172,17 @@ function describeNpmError(parsed) {
  *
  * Rejected (fail closed): spawn/transport errors, signal termination, missing or
  * unexpected exit status, empty or malformed output, parseable npm error
- * objects, unsupported report shapes, invalid finding shapes, and results whose
- * exit status contradicts the report (npm exits 1 iff it reports at least one
- * vulnerability at the default audit level). npm exiting 1 with a valid
- * vulnerability report is a normal advisory result and is returned, not
- * rejected.
+ * objects, unsupported report schemas (only `auditReportVersion` 2 is
+ * supported), invalid finding shapes (unknown severity enums, empty `via`,
+ * unusable dependency paths, malformed advisory entries), incoherent reports
+ * (metadata counts that are not non-negative integers or that contradict the
+ * reported findings), advisory/reference defects (dangling `via` references,
+ * reference chains with no usable advisory evidence), and results whose exit
+ * status contradicts the report. The status invariant is sound because
+ * `runAuditCommand()` pins `--audit-level=info`: npm exits 1 iff it reports at
+ * least one vulnerability entry (every severity is at or above `info`). npm
+ * exiting 1 with a valid vulnerability report is a normal advisory result and
+ * is returned, not rejected.
  */
 export function validateAuditCommandResult(result) {
   if (!isPlainObject(result)) {
@@ -203,9 +234,9 @@ export function validateAuditCommandResult(result) {
       snapshot(stdout),
     );
   }
-  if (!Number.isFinite(parsed.auditReportVersion)) {
+  if (parsed.auditReportVersion !== SUPPORTED_AUDIT_REPORT_VERSION) {
     throw new AuditExecutionError(
-      'audit report has no supported auditReportVersion',
+      `audit report has an unsupported auditReportVersion ${JSON.stringify(parsed.auditReportVersion ?? null)} (supported schema: ${SUPPORTED_AUDIT_REPORT_VERSION})`,
       snapshot(stdout),
     );
   }
@@ -218,31 +249,118 @@ export function validateAuditCommandResult(result) {
       snapshot(stdout),
     );
   }
+  const counts = parsed.metadata.vulnerabilities;
+  if (
+    Object.keys(counts).some((key) => !METADATA_COUNT_KEYS.includes(key)) ||
+    METADATA_COUNT_KEYS.some((key) => !Number.isSafeInteger(counts[key]) || counts[key] < 0)
+  ) {
+    throw new AuditExecutionError(
+      'audit report metadata.vulnerabilities counts must be non-negative integers for info, low, moderate, high, critical, and total',
+      snapshot(stdout),
+    );
+  }
   for (const [name, vulnerability] of Object.entries(parsed.vulnerabilities)) {
     if (!isPlainObject(vulnerability)) {
       throw new AuditExecutionError(`audit finding "${name}" is not an object`, snapshot(stdout));
     }
-    if (typeof vulnerability.severity !== 'string' || !Array.isArray(vulnerability.via)) {
+    // Known severity enum + at least one advisory or meta-vulnerability via
+    // entry: a high/critical finding with no via entry hides its advisory
+    // evidence, and an unknown severity enum (e.g. "HIGH") hides a real high.
+    if (
+      !SEVERITY_LEVELS.includes(vulnerability.severity) ||
+      !Array.isArray(vulnerability.via) ||
+      vulnerability.via.length === 0
+    ) {
       throw new AuditExecutionError(
         `audit finding "${name}" has an invalid finding shape`,
         snapshot(stdout),
       );
     }
-    if (!Array.isArray(vulnerability.nodes)) {
+    const usableNodes =
+      Array.isArray(vulnerability.nodes) &&
+      vulnerability.nodes.length > 0 &&
+      vulnerability.nodes.every((node) => typeof node === 'string' && node.length > 0);
+    if (!usableNodes) {
       throw new AuditExecutionError(
-        `audit finding "${name}" has no reported dependency paths`,
+        `audit finding "${name}" has no usable reported dependency paths`,
         snapshot(stdout),
       );
     }
     for (const via of vulnerability.via) {
       if (typeof via === 'string') continue;
-      if (!isPlainObject(via) || typeof via.title !== 'string' || typeof via.url !== 'string') {
+      const usableAdvisory =
+        isPlainObject(via) &&
+        typeof via.title === 'string' &&
+        via.title.length > 0 &&
+        typeof via.url === 'string' &&
+        via.url.length > 0 &&
+        String(via.url).split('/').pop().length > 0 &&
+        (via.severity === undefined || SEVERITY_LEVELS.includes(via.severity));
+      if (!usableAdvisory) {
         throw new AuditExecutionError(
           `audit finding "${name}" has an invalid advisory entry shape`,
           snapshot(stdout),
         );
       }
     }
+  }
+  // Advisory/reference structure: a string via entry is npm's meta-vulnerability
+  // reference to another finding in the same report. Every reference must
+  // resolve, and every finding must reach usable advisory evidence — a dangling
+  // reference or an evidence-free reference cycle is never silently accepted.
+  for (const [name, vulnerability] of Object.entries(parsed.vulnerabilities)) {
+    for (const via of vulnerability.via) {
+      if (
+        typeof via === 'string' &&
+        !Object.prototype.hasOwnProperty.call(parsed.vulnerabilities, via)
+      ) {
+        throw new AuditExecutionError(
+          `audit finding "${name}" has an unresolved via reference "${via}"`,
+          snapshot(stdout),
+        );
+      }
+    }
+  }
+  const evidenced = new Set(
+    Object.entries(parsed.vulnerabilities)
+      .filter(([, vulnerability]) => vulnerability.via.some((via) => typeof via !== 'string'))
+      .map(([name]) => name),
+  );
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const [name, vulnerability] of Object.entries(parsed.vulnerabilities)) {
+      if (evidenced.has(name)) continue;
+      if (vulnerability.via.some((via) => typeof via === 'string' && evidenced.has(via))) {
+        evidenced.add(name);
+        grew = true;
+      }
+    }
+  }
+  for (const name of Object.keys(parsed.vulnerabilities)) {
+    if (!evidenced.has(name)) {
+      throw new AuditExecutionError(
+        `audit finding "${name}" has no usable advisory evidence: its via reference chain never reaches an advisory (reference cycle)`,
+        snapshot(stdout),
+      );
+    }
+  }
+  // Metadata coherence: npm counts every finding once under its severity and
+  // reports the same population as `total`. Counts that contradict the findings
+  // (e.g. `high: 1` with no findings) are an incoherent report, not a clean one.
+  const computedCounts = { info: 0, low: 0, moderate: 0, high: 0, critical: 0 };
+  for (const vulnerability of Object.values(parsed.vulnerabilities)) {
+    computedCounts[vulnerability.severity] += 1;
+  }
+  const computedTotal = Object.keys(parsed.vulnerabilities).length;
+  const countsCoherent =
+    SEVERITY_LEVELS.every((level) => counts[level] === computedCounts[level]) &&
+    counts.total === computedTotal &&
+    counts.total === SEVERITY_LEVELS.reduce((sum, level) => sum + counts[level], 0);
+  if (!countsCoherent) {
+    throw new AuditExecutionError(
+      'audit report metadata.vulnerabilities counts do not match the reported findings',
+      snapshot(stdout),
+    );
   }
   const reported = Object.keys(parsed.vulnerabilities).length > 0;
   if (result.status === 0 && reported) {
@@ -318,11 +436,27 @@ export function evaluateAudit(audit) {
   return { exitCode: 0, lines, errorLines, undocumented, documented };
 }
 
-/** Command transport, separated from report validation and policy decisions. */
+/**
+ * Command transport, separated from report validation and policy decisions.
+ *
+ * The audit exit threshold is pinned explicitly (`--audit-level=info`, plus the
+ * matching `npm_config_audit_level` override) so inherited npm configuration
+ * (user/project `.npmrc`, exported `npm_config_audit_level`, global config)
+ * cannot change the gate's status semantics. With the threshold pinned at
+ * `info` — the lowest level npm knows — npm exits 1 iff it reports at least one
+ * vulnerability entry, which is exactly the invariant
+ * `validateAuditCommandResult()` enforces. Without this pin, a configured
+ * `audit-level=critical` made npm exit 0 for a valid moderate-only report and
+ * the gate rejected it as contradictory instead of applying its report-only
+ * lower-severity policy (review P2).
+ */
+export const AUDIT_COMMAND_ARGS = ['audit', '--omit=dev', '--json', '--audit-level=info'];
+
 export function runAuditCommand() {
-  return spawnSync('npm', ['audit', '--omit=dev', '--json'], {
+  return spawnSync('npm', AUDIT_COMMAND_ARGS, {
     encoding: 'utf8',
     shell: process.platform === 'win32',
+    env: { ...process.env, npm_config_audit_level: 'info' },
   });
 }
 
@@ -336,7 +470,11 @@ export function runAuditCommand() {
  * @param {(line: string) => void} [options.err] diagnostic logger
  * @returns {number} process exit code
  */
-export function main({ runCommand = runAuditCommand, out = console.log, err = console.error } = {}) {
+export function main({
+  runCommand = runAuditCommand,
+  out = console.log,
+  err = console.error,
+} = {}) {
   let audit;
   try {
     audit = validateAuditCommandResult(runCommand());
