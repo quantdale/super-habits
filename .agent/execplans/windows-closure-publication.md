@@ -49,21 +49,28 @@ mutation or external attestation publication. Preserve `BLOCKED`,
   SHA-256 preservation baseline (214 files/links across 11 evidence roots);
   all local gates passed, the six-file commit was pushed, remote identity
   verified and its exact-head CI state observed.
-- In progress: None for documentation publication. Hosted CI is asynchronous
-  and was observed in progress, not claimed as a pass or native qualification.
+- In progress: None for documentation publication. Hosted CI subsequently
+  failed the dependency-audit gate; separate security triage remains open,
+  not a pass and not a new native qualification.
 - Important modified files: Six owned Markdown paths published in `d582183`;
-  only this plan carries the final completion-record revision.
+  this plan and the two canonical documents additionally disclose the later
+  dependency-audit failure without changing executable scope.
 - Last successful validation: Pinned Node 22.23.2 `qa:fast` PASS with one
   worker (170 unit files / 2060 tests); combined `npm test -- --maxWorkers=1`
   PASS (250 files / 2457 tests; 1 file / 2 cloud tests skipped); focused
   documentation 20/20, strict OpenSpec 69/69, all versioned plans, six-file
   Prettier, whitespace and hygiene PASS. All 214 preserved files/links,
   stash and both canonical/successor task files unchanged (canonical 17/22).
-- Current failures: None remaining. Initial portable/import timeouts are
-  ENVIRONMENT under host contention (CPU 100%, 919 MB free); original log
-  retained, assertions/timeouts unchanged, no unrelated process terminated.
+- Current failures: Hosted CI `36964273942` at `d582183` and `36964587154`
+  at `61ba345` both failed the runtime-dependency audit on high `node-forge`
+  advisory `GHSA-86w9-cpqp-85rv` (reported range `*`); exposure/remediation
+  remain UNTRIAGED security follow-up, not an environment waiver. E2E/nightly
+  skipped, not passed. Initial local unit timeouts were separately diagnosed
+  ENVIRONMENT and resolved without changing assertions/timeouts.
 - Relevant quarantines: None changed; existing capability gaps preserved.
-- Blockers: None for documentation publication; production/iOS remain external.
+- Blockers: None for the completed documentation publication. Fresh CI is
+  blocked by the dependency advisory; dependency/audit-policy changes are
+  outside this task and no exception is authorized. Production/iOS stay external.
 - Condition required to unblock: None for this task.
 - Exact resume action after unblock: Not applicable.
 - Exact next action: None — documentation publication task complete.
@@ -73,7 +80,9 @@ mutation or external attestation publication. Preserve `BLOCKED`,
   foreign state preserved, and exact-head CI `36964273942` observed
   `in_progress`. This completion-record revision is bookkeeping only; inspect
   Git/Actions for its own containing commit and live CI state. No hosted-CI
-  PASS or new native certification is inferred.
+  PASS or new native certification is inferred. Later observation confirmed
+  both publication runs failed the dependency-audit gate; that limitation is
+  now disclosed in the canonical documents and retained as security follow-up.
 
 ## Progress
 
@@ -113,6 +122,10 @@ mutation or external attestation publication. Preserve `BLOCKED`,
   publication receipt exists, rather than inventing a future push result or
   amending history. That follow-up starts its own CI and may supersede the
   first run; verify/report its live state separately, never transfer a PASS.
+- 2026-10-02 — Fresh CI exposed a high `node-forge` advisory in the unchanged
+  dependency tree. Preserve/disclose both failed runs and stop at the existing
+  audit gate; do not add a blanket exception or expand this documentation task
+  into dependency remediation. Security applicability remains untriaged.
 
 ## Validation Ledger
 
@@ -171,6 +184,17 @@ refs/heads/main`, divergence check — PASS, exact
 - 2026-10-02 — `gh run list --branch main --commit d582183 --event push` —
   OBSERVED, CI `36964273942` matches the full pushed SHA and is `in_progress`,
   conclusion empty. Snapshot: `ci-first-push.json`. This is not a CI PASS.
+- 2026-10-02 — Subsequent hosted CI inspection — FAIL, first run
+  `36964273942` and later `36964587154` at exact SHA
+  `61ba3452f069ab31ae6ae945c3afd51e3606ddaa` both failed `quality` at
+  `Audit runtime dependencies (gates on new high/critical)`; E2E/nightly
+  skipped. Raw `ci-first-failure.log`, `ci-61ba345-failure.log` and job JSON
+  retained. High `node-forge` `GHSA-86w9-cpqp-85rv`, range `*`, requires
+  separate security triage. No hosted-CI PASS is claimed.
+- 2026-10-02 — `git diff 7a6aeb2..HEAD -- package.json package-lock.json
+scripts/audit-runtime-deps.mjs .github/workflows/ci.yml` — PASS, empty:
+  dependency graph, audit gate and CI configuration untouched. No exemption
+  or runtime change was used to suppress the finding.
 
 ## Changed Files / Areas
 
@@ -204,9 +228,11 @@ refs/heads/main`, divergence check — PASS, exact
   SHAs; the report refresh is not attributed to the old attestation.
 - Proof: `d5821837dc80675d2fdcac34ffad1e580f2c53c3` push/remote receipt;
   local QA and preservation ledger above; historical failures retained.
-- Remaining work: None for the documentation publication task. Hosted CI was
-  still running at observation and must not be reported green without its
-  actual result; live final-ref CI is recorded in Actions and the handoff.
+- Remaining work: None for documentation publication. Hosted CI failed on
+  the unchanged dependency tree's high `node-forge` advisory; a separate
+  security-triage/remediation task is required before CI can be called green.
+  Every subsequent documentation commit still needs its own Actions result;
+  neither prior passes nor these failures are silently transferred to it.
   Production, owner-deferred iOS and overall `NOT CERTIFIED` are unchanged.
 - Lesson: A published campaign and an uncommitted report refresh are different
   source identities even when the latter only describes historical evidence.
