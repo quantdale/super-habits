@@ -35,6 +35,23 @@
  * inherited npm configuration cannot flip a valid lower-severity report into a
  * false red: npm exits 1 iff it reports a vulnerability entry, and the gate
  * still treats exit 0 together with findings as a contradiction.
+ *
+ * SECOND CORRECTIVE HARDENING (2026-10-03 second independent review): the
+ * boundary now validates advisory/package/URL identity and severity coherence
+ * against the supported producer's schema (`@npmcli/arborist` `Vuln.toJSON()` /
+ * `Vuln.addAdvisory`, `@npmcli/metavuln-calculator` `Advisory`) before any
+ * clean or documented verdict: every object `via` entry is a direct advisory
+ * whose `name`/`dependency` equal its finding key, carries a usable http(s)
+ * advisory URL (parseable, non-empty final path segment as the advisory id) and
+ * an explicit severity enum; a finding's severity can never sit below its
+ * explicit advisory severities, and never above the advisory evidence its
+ * `via` reference chain actually reaches (meta references aggregate child
+ * advisories that need not all apply to the parent, so a meta severity below
+ * its referenced finding is legitimate — an unsupported higher one is not).
+ * The transport also normalizes npm's `offline` config (command line and
+ * `npm_config`) — an inherited offline mode made the pinned producer skip the
+ * registry request entirely and serialize a clean-shaped report with exit 0,
+ * which report shape alone cannot distinguish from a completed clean audit.
  */
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
@@ -95,12 +112,7 @@ export function findings(audit) {
       out.push({
         name,
         nodes: vulnerability.nodes ?? [],
-        advisory:
-          String(via.url ?? '')
-            .split('/')
-            .pop() ||
-          via.title ||
-          'unknown',
+        advisory: parseAdvisoryUrl(String(via.url ?? '')) || via.title || 'unknown',
         severity: vulnerability.severity,
         title: via.title,
         range: vulnerability.range,
@@ -140,6 +152,27 @@ export class AuditExecutionError extends Error {
 
 function isPlainObject(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Extract the advisory id from a usable documentation URL, or null when the
+ * string is not one. The supported producer serializes the registry advisory's
+ * `url` verbatim (https://github.com/advisories/GHSA-… or the npm advisory
+ * page); the advisory id is the final path segment of that absolute http(s)
+ * URL. Anything else — a bare `x/ID` string, a non-web scheme, an empty final
+ * segment — is not a parseable advisory identity and must never satisfy the
+ * documented allowlist by its slash suffix alone.
+ */
+function parseAdvisoryUrl(value) {
+  let url;
+  try {
+    url = new URL(String(value));
+  } catch {
+    return null;
+  }
+  if ((url.protocol !== 'http:' && url.protocol !== 'https:') || url.hostname === '') return null;
+  const segment = String(url.pathname).split('/').pop() ?? '';
+  return segment.length > 0 ? segment : null;
 }
 
 /** Bounded diagnostic context — never echo an unbounded report. */
@@ -276,6 +309,15 @@ export function validateAuditCommandResult(result) {
         snapshot(stdout),
       );
     }
+    // Producer identity: the report keys findings by package name and the
+    // producer serializes that same name as `vulnerability.name`. A body that
+    // names a different package is contradictory identity, never documentation.
+    if (vulnerability.name !== name) {
+      throw new AuditExecutionError(
+        `audit finding "${name}" has contradictory package identity (body name ${JSON.stringify(vulnerability.name)})`,
+        snapshot(stdout),
+      );
+    }
     const usableNodes =
       Array.isArray(vulnerability.nodes) &&
       vulnerability.nodes.length > 0 &&
@@ -286,6 +328,7 @@ export function validateAuditCommandResult(result) {
         snapshot(stdout),
       );
     }
+    let maxExplicitSeverityRank = -1;
     for (const via of vulnerability.via) {
       if (typeof via === 'string') continue;
       const usableAdvisory =
@@ -294,14 +337,47 @@ export function validateAuditCommandResult(result) {
         via.title.length > 0 &&
         typeof via.url === 'string' &&
         via.url.length > 0 &&
-        String(via.url).split('/').pop().length > 0 &&
-        (via.severity === undefined || SEVERITY_LEVELS.includes(via.severity));
+        typeof via.name === 'string' &&
+        via.name.length > 0 &&
+        typeof via.dependency === 'string' &&
+        via.dependency.length > 0 &&
+        SEVERITY_LEVELS.includes(via.severity);
       if (!usableAdvisory) {
         throw new AuditExecutionError(
           `audit finding "${name}" has an invalid advisory entry shape`,
           snapshot(stdout),
         );
       }
+      // Every object `via` entry is a DIRECT advisory on this finding in the
+      // supported producer (metavulns serialize as string references): its
+      // `name` and `dependency` both equal the finding key. Anything else is a
+      // package-identity contradiction.
+      if (via.name !== name || via.dependency !== name) {
+        throw new AuditExecutionError(
+          `audit finding "${name}" has an advisory entry with contradictory package identity (advisory name ${JSON.stringify(via.name)}, dependency ${JSON.stringify(via.dependency)})`,
+          snapshot(stdout),
+        );
+      }
+      // Advisory identity URL: a parseable absolute http(s) URL whose final
+      // path segment is the advisory id — not any string with a slash suffix.
+      if (parseAdvisoryUrl(via.url) === null) {
+        throw new AuditExecutionError(
+          `audit finding "${name}" has an advisory entry with an unusable documentation URL ${JSON.stringify(String(via.url))}`,
+          snapshot(stdout),
+        );
+      }
+      const viaSeverityRank = SEVERITY_LEVELS.indexOf(via.severity);
+      if (viaSeverityRank > maxExplicitSeverityRank) maxExplicitSeverityRank = viaSeverityRank;
+    }
+    // Producer severity coherence: a finding's severity is the maximum severity
+    // of its contributing advisories, so it can never sit BELOW an explicit
+    // advisory severity — that would silently erase a high advisory behind a
+    // moderate finding.
+    if (SEVERITY_LEVELS.indexOf(vulnerability.severity) < maxExplicitSeverityRank) {
+      throw new AuditExecutionError(
+        `audit finding "${name}" reports severity "${vulnerability.severity}" below its explicit advisory severity "${SEVERITY_LEVELS[maxExplicitSeverityRank]}"`,
+        snapshot(stdout),
+      );
     }
   }
   // Advisory/reference structure: a string via entry is npm's meta-vulnerability
@@ -340,6 +416,46 @@ export function validateAuditCommandResult(result) {
     if (!evidenced.has(name)) {
       throw new AuditExecutionError(
         `audit finding "${name}" has no usable advisory evidence: its via reference chain never reaches an advisory (reference cycle)`,
+        snapshot(stdout),
+      );
+    }
+  }
+  // Severity/evidence coherence across meta references. The supported producer
+  // gives a finding the MAXIMUM severity of its contributing advisories
+  // (`Vuln.addAdvisory`); object `via` entries are direct advisories (checked
+  // above) while string entries are metavuln references whose contributing
+  // advisory severity is bounded by the referenced finding's own advisory
+  // evidence — never above it. Propagate the evidence-backed maximum over the
+  // reference graph (fixed point, so evidenced cycles resolve) and reject any
+  // reported severity its evidence cannot support. This BOUNDS meta severities
+  // without requiring exact equality across references: npm legitimately
+  // reports a meta parent BELOW its referenced finding's aggregate severity
+  // when only some child advisories apply to the parent.
+  const evidenceRank = new Map();
+  for (const [name, vulnerability] of Object.entries(parsed.vulnerabilities)) {
+    let rank = -1;
+    for (const via of vulnerability.via) {
+      if (typeof via !== 'string') rank = Math.max(rank, SEVERITY_LEVELS.indexOf(via.severity));
+    }
+    evidenceRank.set(name, rank);
+  }
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const [name, vulnerability] of Object.entries(parsed.vulnerabilities)) {
+      let rank = evidenceRank.get(name);
+      for (const via of vulnerability.via) {
+        if (typeof via === 'string') rank = Math.max(rank, evidenceRank.get(via));
+      }
+      if (rank !== evidenceRank.get(name)) {
+        evidenceRank.set(name, rank);
+        grew = true;
+      }
+    }
+  }
+  for (const [name, vulnerability] of Object.entries(parsed.vulnerabilities)) {
+    if (SEVERITY_LEVELS.indexOf(vulnerability.severity) > evidenceRank.get(name)) {
+      throw new AuditExecutionError(
+        `audit finding "${name}" reports severity "${vulnerability.severity}" unsupported by its advisory evidence`,
         snapshot(stdout),
       );
     }
@@ -449,14 +565,46 @@ export function evaluateAudit(audit) {
  * `audit-level=critical` made npm exit 0 for a valid moderate-only report and
  * the gate rejected it as contradictory instead of applying its report-only
  * lower-severity policy (review P2).
+ *
+ * npm's `offline` config is normalized the same way (`--offline=false`, plus
+ * the matching `npm_config_offline` override): the pinned producer
+ * (`@npmcli/arborist` `AuditReport[_getReport]`) returns before the registry
+ * request when effective `offline` is true and still serializes a clean-shaped
+ * report with exit 0 — a skipped audit that report shape alone cannot
+ * distinguish from a completed clean one (second review P1). Both pins follow
+ * npm's verified config precedence (explicit CLI flag > inherited
+ * `npm_config_*` env > project/user `.npmrc`), and any case-variant duplicate
+ * of a pinned env key is removed first so the override is unambiguous on
+ * case-insensitive environments. If the real request cannot run (including
+ * offline hosts), npm fails and the transport/error path fails the gate
+ * visibly instead.
  */
-export const AUDIT_COMMAND_ARGS = ['audit', '--omit=dev', '--json', '--audit-level=info'];
+export const AUDIT_COMMAND_ARGS = [
+  'audit',
+  '--omit=dev',
+  '--json',
+  '--audit-level=info',
+  '--offline=false',
+];
+
+const PINNED_NPM_CONFIG = { npm_config_audit_level: 'info', npm_config_offline: 'false' };
+
+function pinnedAuditEnv(base = process.env) {
+  const pinnedKeys = new Set(Object.keys(PINNED_NPM_CONFIG));
+  const env = {};
+  for (const [key, value] of Object.entries(base)) {
+    if (value === undefined) continue;
+    if (pinnedKeys.has(key.toLowerCase())) continue;
+    env[key] = value;
+  }
+  return { ...env, ...PINNED_NPM_CONFIG };
+}
 
 export function runAuditCommand() {
   return spawnSync('npm', AUDIT_COMMAND_ARGS, {
     encoding: 'utf8',
     shell: process.platform === 'win32',
-    env: { ...process.env, npm_config_audit_level: 'info' },
+    env: pinnedAuditEnv(),
   });
 }
 

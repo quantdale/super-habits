@@ -31,6 +31,27 @@ import {
 const scriptPath = resolve(__dirname, '..', 'scripts', 'audit-runtime-deps.mjs');
 const script = readFileSync(scriptPath, 'utf8');
 
+/**
+ * The clean-shaped report the pinned npm producer serializes when it skips the
+ * audit: `@npmcli/arborist/lib/audit-report.js` `AuditReport[_getReport]`
+ * returns null BEFORE the registry request when the effective `offline` config
+ * is true (`options.offline === true`, line ~304 in npm 10.9.8), while
+ * `toJSON()` still emits this empty report and npm exits 0. This constant is
+ * byte-shaped from the actual pinned-npm capture
+ * (`npm_config_offline=true npm audit --omit=dev --json --audit-level=info` on
+ * this tree; retained in `simulation-output/security-correction-2026-10-03/
+ * npm-audit-offline-actual.json`) — report shape alone cannot distinguish a
+ * skipped audit from a genuinely clean one.
+ */
+const PINNED_PRODUCER_OFFLINE_REPORT = {
+  auditReportVersion: 2,
+  vulnerabilities: {},
+  metadata: {
+    vulnerabilities: { info: 0, low: 0, moderate: 0, high: 0, critical: 0, total: 0 },
+    dependencies: { prod: 780, dev: 472, optional: 136, peer: 1, peerOptional: 0, total: 1273 },
+  },
+};
+
 describe('audit-runtime-deps gate policy', () => {
   it('matches a documented finding on advisory id, package, and every reported path', () => {
     // The allowlist entry must exist for the live tree's three advisories.
@@ -63,6 +84,15 @@ describe('audit-runtime-deps gate policy', () => {
   it('fails the run on an undocumented finding rather than reporting it', () => {
     expect(script).toContain('process.exit(1)');
     expect(script).toContain('undocumented high/critical advisory(ies)');
+  });
+
+  it('normalizes inherited npm offline mode so a skipped audit cannot report clean', () => {
+    // The transport must pin offline on the command line AND in config: when
+    // npm's effective `offline` is true the pinned producer skips the registry
+    // request and serializes a clean-shaped report (exit 0) on the vulnerable
+    // tree — report shape alone cannot prove the audit completed.
+    expect(script).toContain("'--offline=false'");
+    expect(script).toContain('npm_config_offline');
   });
 });
 
@@ -172,7 +202,12 @@ const moderateOnlyReport = () =>
         nodes: ['node_modules/some-package'],
         range: '*',
         via: [
-          advisoryEntry({ name: 'some-package', severity: 'moderate', title: 'moderate thing' }),
+          advisoryEntry({
+            name: 'some-package',
+            dependency: 'some-package',
+            severity: 'moderate',
+            title: 'moderate thing',
+          }),
         ],
       },
     },
@@ -187,14 +222,28 @@ const infoAndLowReport = () =>
         severity: 'info',
         nodes: ['node_modules/info-package'],
         range: '*',
-        via: [advisoryEntry({ name: 'info-package', severity: 'info', title: 'info thing' })],
+        via: [
+          advisoryEntry({
+            name: 'info-package',
+            dependency: 'info-package',
+            severity: 'info',
+            title: 'info thing',
+          }),
+        ],
       },
       'low-package': {
         name: 'low-package',
         severity: 'low',
         nodes: ['node_modules/low-package'],
         range: '*',
-        via: [advisoryEntry({ name: 'low-package', severity: 'low', title: 'low thing' })],
+        via: [
+          advisoryEntry({
+            name: 'low-package',
+            dependency: 'low-package',
+            severity: 'low',
+            title: 'low thing',
+          }),
+        ],
       },
     },
     { info: 1, low: 1, total: 2 },
@@ -204,7 +253,13 @@ const syntheticFinding = (over: Record<string, unknown>) => ({
   name: 'synthetic-package',
   severity: 'high',
   nodes: ['node_modules/synthetic-package'],
-  via: [advisoryEntry({ name: 'synthetic-package', title: 'synthetic high finding' })],
+  via: [
+    advisoryEntry({
+      name: 'synthetic-package',
+      dependency: 'synthetic-package',
+      title: 'synthetic high finding',
+    }),
+  ],
   ...over,
 });
 
@@ -283,6 +338,7 @@ const groupedMetaReport = () =>
         via: [
           advisoryEntry({
             name: 'leaf-package',
+            dependency: 'leaf-package',
             title: 'leaf advisory',
             url: 'https://github.com/advisories/GHSA-leaf0-0000-leaf',
           }),
@@ -307,11 +363,13 @@ const multiAdvisoryReport = () =>
         via: [
           advisoryEntry({
             name: 'brace-expansion',
+            dependency: 'brace-expansion',
             title: 'brace-expansion first advisory',
             url: 'https://github.com/advisories/GHSA-q2hr-2g5m-vwhr',
           }),
           advisoryEntry({
             name: 'brace-expansion',
+            dependency: 'brace-expansion',
             title: 'brace-expansion second advisory',
             url: 'https://github.com/advisories/GHSA-qhr7-859c-m2p7',
           }),
@@ -320,6 +378,239 @@ const multiAdvisoryReport = () =>
       },
     },
     { high: 1, total: 1 },
+  );
+
+// ---------------------------------------------------------------------------
+// Second-correction review fixtures (2026-10-03 independent review of the
+// correction). Each of the five invalid/incoherent reports below produced a
+// false clean verdict (exit 0) through the real seam AND the real CLI despite
+// explicit high/critical evidence or contradictory identity
+// (`simulation-output/security-correction-review-2026-10-03/boundary-replay.json`).
+// They are permanent executing regressions at BOTH seams.
+// ---------------------------------------------------------------------------
+
+const replayBraceAdvisory = (over: Record<string, unknown> = {}) => ({
+  source: 1240913,
+  name: 'brace-expansion',
+  dependency: 'brace-expansion',
+  title: 'brace-expansion documented high',
+  url: 'https://github.com/advisories/GHSA-q2hr-2g5m-vwhr',
+  severity: 'high',
+  range: '<=1.1.20 || 2.0.0 - 2.1.6',
+  ...over,
+});
+
+const replayBraceFinding = (over: Record<string, unknown> = {}) => ({
+  name: 'brace-expansion',
+  severity: 'high',
+  nodes: ['node_modules/glob/node_modules/brace-expansion'],
+  via: [replayBraceAdvisory()],
+  ...over,
+});
+
+/** Second-review false green 1: an outer moderate finding whose explicit direct
+ * advisory says high — the high was suppressed and the gate printed zero. */
+const advisoryHighDisguisedByModerateReport = () =>
+  report(
+    {
+      'node-forge': {
+        name: 'node-forge',
+        severity: 'moderate',
+        nodes: ['node_modules/node-forge'],
+        via: [advisoryEntry({ title: 'node-forge RSA signature validation defect' })],
+      },
+    },
+    { moderate: 1, total: 1 },
+  );
+
+/** Second-review false green 2: a critical meta-parent whose reference chain
+ * reaches only a moderate advisory — the critical evidence does not exist. */
+const criticalMetaToModerateLeafReport = () =>
+  report(
+    {
+      'meta-parent': {
+        name: 'meta-parent',
+        severity: 'critical',
+        nodes: ['node_modules/meta-parent'],
+        via: ['leaf-package'],
+      },
+      'leaf-package': {
+        name: 'leaf-package',
+        severity: 'moderate',
+        nodes: ['node_modules/leaf-package'],
+        via: [
+          advisoryEntry({
+            name: 'leaf-package',
+            dependency: 'leaf-package',
+            severity: 'moderate',
+            title: 'leaf moderate advisory',
+          }),
+        ],
+      },
+    },
+    { critical: 1, moderate: 1, total: 2 },
+  );
+
+/** Second-review false green 3: a critical meta-parent reaching only the
+ * documented high brace advisory — the claimed critical is unsupported. */
+const criticalMetaToAllowlistedHighReport = () =>
+  report(
+    {
+      'meta-parent': {
+        name: 'meta-parent',
+        severity: 'critical',
+        nodes: ['node_modules/meta-parent'],
+        via: ['brace-expansion'],
+      },
+      'brace-expansion': replayBraceFinding(),
+    },
+    { critical: 1, high: 1, total: 2 },
+  );
+
+/** Second-review false green 4: the documented brace advisory reported with a
+ * malformed URL whose slash suffix still impersonated the allowlisted id. */
+const malformedUrlMasqueradingReport = () =>
+  report(
+    {
+      'brace-expansion': replayBraceFinding({
+        via: [replayBraceAdvisory({ url: 'not-a-url/GHSA-q2hr-2g5m-vwhr' })],
+      }),
+    },
+    { high: 1, total: 1 },
+  );
+
+/** Second-review false green 5: the finding key/nodes/URL impersonate the
+ * documented brace entry while the body and advisory name `node-forge`. */
+const nameDependencyMismatchMasqueradingReport = () =>
+  report(
+    {
+      'brace-expansion': replayBraceFinding({
+        name: 'node-forge',
+        via: [replayBraceAdvisory({ name: 'node-forge', dependency: 'node-forge' })],
+      }),
+    },
+    { high: 1, total: 1 },
+  );
+
+/** Control: a documented high reached through a meta reference stays documented. */
+const documentedGroupedMetaControlReport = () =>
+  report(
+    {
+      'meta-parent': {
+        name: 'meta-parent',
+        severity: 'high',
+        nodes: ['node_modules/meta-parent'],
+        via: ['brace-expansion'],
+      },
+      'brace-expansion': replayBraceFinding(),
+    },
+    { high: 2, total: 2 },
+  );
+
+/** Control: a reference cycle whose evidence is a real high advisory is valid
+ * and the leaf advisory still gates (undocumented forge high). */
+const evidencedReferenceCycleControlReport = () =>
+  report(
+    {
+      a: {
+        name: 'a',
+        severity: 'high',
+        nodes: ['node_modules/a'],
+        via: ['b'],
+      },
+      b: {
+        name: 'b',
+        severity: 'high',
+        nodes: ['node_modules/b'],
+        via: ['a', advisoryEntry({ name: 'b', dependency: 'b', title: 'b advisory' })],
+      },
+    },
+    { high: 2, total: 2 },
+  );
+
+/** Control: npm meta references aggregate child advisories that need not all
+ * apply to the parent — a moderate meta-parent below its high leaf is valid. */
+const metaParentBelowLeafSeverityControlReport = () =>
+  report(
+    {
+      'meta-parent': {
+        name: 'meta-parent',
+        severity: 'moderate',
+        nodes: ['node_modules/meta-parent'],
+        via: ['leaf-package'],
+      },
+      'leaf-package': {
+        name: 'leaf-package',
+        severity: 'high',
+        nodes: ['node_modules/leaf-package'],
+        via: [
+          advisoryEntry({
+            name: 'leaf-package',
+            dependency: 'leaf-package',
+            title: 'leaf high advisory',
+            url: 'https://github.com/advisories/GHSA-leaf0-0000-leaf',
+          }),
+        ],
+      },
+    },
+    { moderate: 1, high: 1, total: 2 },
+  );
+
+/** Control: scoped package names and grouped references stay supported. */
+const scopedNamesControlReport = () =>
+  report(
+    {
+      '@scope/parent': {
+        name: '@scope/parent',
+        severity: 'high',
+        nodes: ['node_modules/@scope/parent'],
+        via: ['@scope/child'],
+      },
+      '@scope/child': {
+        name: '@scope/child',
+        severity: 'high',
+        nodes: ['node_modules/@scope/child'],
+        via: [
+          advisoryEntry({
+            name: '@scope/child',
+            dependency: '@scope/child',
+            title: 'scoped advisory',
+            url: 'https://github.com/advisories/GHSA-sc0pe-0000-0000',
+          }),
+        ],
+      },
+    },
+    { high: 2, total: 2 },
+  );
+
+/** Impossible shape: a reference cycle launders a moderate advisory into high
+ * severities with no supporting evidence anywhere in the chain. */
+const severityLaunderingCycleReport = () =>
+  report(
+    {
+      a: {
+        name: 'a',
+        severity: 'high',
+        nodes: ['node_modules/a'],
+        via: ['b'],
+      },
+      b: {
+        name: 'b',
+        severity: 'high',
+        nodes: ['node_modules/b'],
+        via: [
+          'a',
+          advisoryEntry({
+            name: 'b',
+            dependency: 'b',
+            severity: 'moderate',
+            title: 'only moderate evidence',
+            url: 'https://github.com/advisories/GHSA-l0nde-0000-0000',
+          }),
+        ],
+      },
+    },
+    { high: 2, total: 2 },
   );
 
 const ok = (result: CommandResult) => validateAuditCommandResult(result);
@@ -380,7 +671,12 @@ describe('audit command/report seam (fail closed)', () => {
           nodes: ['node_modules/some-package'],
           range: '*',
           via: [
-            advisoryEntry({ name: 'some-package', severity: 'moderate', title: 'moderate thing' }),
+            advisoryEntry({
+              name: 'some-package',
+              dependency: 'some-package',
+              severity: 'moderate',
+              title: 'moderate thing',
+            }),
           ],
         },
       },
@@ -413,6 +709,8 @@ describe('audit command/report seam (fail closed)', () => {
           via: [
             advisoryEntry({
               name: 'future-package',
+              dependency: 'future-package',
+              severity: 'critical',
               title: 'future critical',
               url: 'https://github.com/advisories/GHSA-future-0000-crit',
             }),
@@ -441,6 +739,7 @@ describe('audit command/report seam (fail closed)', () => {
     (newAdvisory.vulnerabilities as Record<string, MutableFinding>)['brace-expansion'].via = [
       advisoryEntry({
         name: 'brace-expansion',
+        dependency: 'brace-expansion',
         title: 'brand new advisory',
         url: 'https://github.com/advisories/GHSA-aaaa-bbbb-cccc',
       }),
@@ -646,6 +945,115 @@ describe('invalid or incoherent audit reports fail closed (2026-10-02 review cor
 });
 
 // ---------------------------------------------------------------------------
+// 2026-10-03 second independent review corrections (P1): severity/advisory/
+// package/URL identity coherence must be validated against the supported npm
+// producer schema BEFORE any clean or documented verdict. Each of the five
+// review fixtures below produced a false clean verdict (exit 0) through this
+// real seam and the real CLI even though its evidence contradicted itself.
+// ---------------------------------------------------------------------------
+
+describe('report identity/severity coherence fails closed (2026-10-03 review corrections)', () => {
+  it('rejects an outer severity below its explicit high advisory instead of suppressing the high', () => {
+    expect(() => ok(asResult(advisoryHighDisguisedByModerateReport(), 1))).toThrowError(
+      /below its explicit advisory severity/,
+    );
+    const outLines: string[] = [];
+    const errLines: string[] = [];
+    const exitCode = main({
+      runCommand: () => asResult(advisoryHighDisguisedByModerateReport(), 1),
+      out: (line: string) => outLines.push(line),
+      err: (line: string) => errLines.push(line),
+    });
+    expect(exitCode).toBe(1);
+    expect(outLines.join('\n')).not.toContain('OK — 0 high/critical');
+    expect(errLines.join('\n')).toContain('refusing to report a clean production tree');
+  });
+
+  it('rejects a critical meta-parent whose chain only reaches a moderate advisory', () => {
+    expect(() => ok(asResult(criticalMetaToModerateLeafReport(), 1))).toThrowError(
+      /unsupported by its advisory evidence/,
+    );
+  });
+
+  it('rejects a critical meta-parent whose chain only reaches the documented high brace advisory', () => {
+    expect(() => ok(asResult(criticalMetaToAllowlistedHighReport(), 1))).toThrowError(
+      /unsupported by its advisory evidence/,
+    );
+  });
+
+  it('rejects a malformed advisory URL masquerading as documentation', () => {
+    expect(() => ok(asResult(malformedUrlMasqueradingReport(), 1))).toThrowError(
+      /unusable documentation URL/,
+    );
+  });
+
+  it('rejects contradictory finding/advisory package identity', () => {
+    expect(() => ok(asResult(nameDependencyMismatchMasqueradingReport(), 1))).toThrowError(
+      /contradictory package identity/,
+    );
+  });
+
+  it('rejects a reference cycle that inflates severities beyond its evidence', () => {
+    expect(() => ok(asResult(severityLaunderingCycleReport(), 1))).toThrowError(
+      /unsupported by its advisory evidence/,
+    );
+  });
+
+  it('fails main() closed on every incoherent fixture without printing a clean verdict', () => {
+    const fixtures = [
+      advisoryHighDisguisedByModerateReport,
+      criticalMetaToModerateLeafReport,
+      criticalMetaToAllowlistedHighReport,
+      malformedUrlMasqueradingReport,
+      nameDependencyMismatchMasqueradingReport,
+      severityLaunderingCycleReport,
+    ];
+    for (const build of fixtures) {
+      const outLines: string[] = [];
+      const errLines: string[] = [];
+      const exitCode = main({
+        runCommand: () => asResult(build(), 1),
+        out: (line: string) => outLines.push(line),
+        err: (line: string) => errLines.push(line),
+      });
+      expect(exitCode).toBe(1);
+      expect(outLines.join('\n')).not.toContain('OK — 0 high/critical');
+      expect(outLines.join('\n')).not.toContain('every high/critical finding is documented');
+      expect(errLines.join('\n')).toContain('refusing to report a clean production tree');
+    }
+  });
+
+  it('keeps a documented high reached through a meta reference documented', () => {
+    const audit = ok(asResult(documentedGroupedMetaControlReport(), 1));
+    const verdict = evaluateAudit(audit);
+    expect(verdict.exitCode).toBe(0);
+    expect(verdict.documented).toHaveLength(1);
+    expect(verdict.lines.join('\n')).toContain('[DOCUMENTED 2026-09-29');
+  });
+
+  it('keeps reference cycles with real advisory evidence valid and gates the leaf advisory', () => {
+    const audit = ok(asResult(evidencedReferenceCycleControlReport(), 1));
+    const verdict = evaluateAudit(audit);
+    expect(verdict.exitCode).toBe(1);
+    expect(verdict.undocumented.map((finding) => finding.name)).toEqual(['b']);
+  });
+
+  it('accepts a meta-parent below its leaf severity (aggregated child advisories need not all apply)', () => {
+    const audit = ok(asResult(metaParentBelowLeafSeverityControlReport(), 1));
+    const verdict = evaluateAudit(audit);
+    expect(verdict.exitCode).toBe(1);
+    expect(verdict.undocumented.map((finding) => finding.name)).toEqual(['leaf-package']);
+  });
+
+  it('keeps scoped package names and grouped references supported', () => {
+    const audit = ok(asResult(scopedNamesControlReport(), 1));
+    const verdict = evaluateAudit(audit);
+    expect(verdict.exitCode).toBe(1);
+    expect(verdict.undocumented.map((finding) => finding.name)).toEqual(['@scope/child']);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 2026-10-02 independent review corrections (P2): the gate pins npm's audit
 // exit threshold (`--audit-level=info`) so inherited npm configuration cannot
 // change its status semantics. Valid lower-severity reports stay report-only
@@ -726,6 +1134,31 @@ describe('audit-runtime-deps CLI contract', () => {
         "const fs = require('node:fs');",
         "const fixture = JSON.parse(fs.readFileSync(process.env.AUDIT_FIXTURE_FILE, 'utf8'));",
         'if (fixture.argsFile) fs.writeFileSync(fixture.argsFile, JSON.stringify(process.argv.slice(2)));',
+        'if (fixture.envFile) fs.writeFileSync(fixture.envFile, JSON.stringify({',
+        '  npm_config_offline: process.env.npm_config_offline ?? null,',
+        '  npm_config_audit_level: process.env.npm_config_audit_level ?? null,',
+        '}));',
+        '// Pinned-producer model (npm 10.9.8): @npmcli/arborist/lib/audit-report.js',
+        '// `AuditReport[_getReport]` returns null BEFORE the registry request when',
+        '// the effective `offline` config is true (options.offline === true), while',
+        '// `toJSON()` still serializes this clean-shaped report and npm exits 0.',
+        '// Effective config follows real npm precedence (validated against the',
+        '// pinned npm with `npm config get` and real `npm audit` runs): explicit CLI',
+        '// flag > inherited npm_config_<key> env > project/user .npmrc > default.',
+        `const PINNED_PRODUCER_OFFLINE_REPORT = ${JSON.stringify(JSON.stringify(PINNED_PRODUCER_OFFLINE_REPORT))};`,
+        'const shimArgv = process.argv.slice(2);',
+        'const flagValue = shimArgv',
+        "  .map((arg) => (arg === '--no-offline' ? 'false' : arg.startsWith('--offline=') ? arg.slice('--offline='.length) : null))",
+        '  .filter(Boolean)',
+        '  .pop() ?? null;',
+        'const envValue = process.env.npm_config_offline;',
+        "const fileValue = fixture.npmrcOffline ? 'true' : undefined;",
+        "const effectiveOffline = flagValue !== null ? flagValue : envValue !== undefined ? envValue : (fileValue ?? 'false');",
+        "if (String(effectiveOffline).toLowerCase() === 'true') {",
+        '  if (fixture.offlineSkipOutputFile) fs.writeFileSync(fixture.offlineSkipOutputFile, PINNED_PRODUCER_OFFLINE_REPORT);',
+        '  process.stdout.write(PINNED_PRODUCER_OFFLINE_REPORT);',
+        '  process.exit(0);',
+        '}',
         'if (fixture.stdout) process.stdout.write(fixture.stdout);',
         'if (fixture.stderr) process.stderr.write(fixture.stderr);',
         'if (Number.isInteger(fixture.status)) process.exit(fixture.status);',
@@ -880,5 +1313,192 @@ describe('audit-runtime-deps CLI contract', () => {
     const result = runCli({ stdout: JSON.stringify(infoAndLowReport()), simulateAuditLevel: true });
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('report-only by policy');
+  });
+
+  // 2026-10-03 second review corrections (P1): the five identity/severity/
+  // URL incoherent reports plus the severity-laundering cycle replayed through
+  // the real CLI with the exact shapes from the review repro. Each previously
+  // exited 0 (false security green); each must fail visibly before any verdict.
+  it.each([
+    [
+      'high advisory disguised by a moderate outer finding',
+      advisoryHighDisguisedByModerateReport,
+      1,
+    ],
+    ['critical meta-parent reaching only a moderate advisory', criticalMetaToModerateLeafReport, 1],
+    [
+      'critical meta-parent reaching only the documented high',
+      criticalMetaToAllowlistedHighReport,
+      1,
+    ],
+    ['malformed advisory URL masquerading as documentation', malformedUrlMasqueradingReport, 1],
+    [
+      'contradictory finding/advisory package identity',
+      nameDependencyMismatchMasqueradingReport,
+      1,
+    ],
+    ['reference cycle inflating severities beyond its evidence', severityLaunderingCycleReport, 1],
+  ] as [string, () => unknown, number][])(
+    'exits 1 without a clean verdict for %s',
+    (_name, build, status) => {
+      const result = runCli({ status, stdout: JSON.stringify(build()) });
+      expect(result.status).toBe(1);
+      expect(result.stdout).not.toContain('OK — 0 high/critical');
+      expect(result.stdout).not.toContain('every high/critical finding is documented');
+      expect(result.stderr).toContain('audit execution failed');
+      expect(result.stderr).toContain('refusing to report a clean production tree');
+    },
+  );
+
+  it('still passes a documented high reached through a meta reference at the CLI', () => {
+    const result = runCli({
+      status: 1,
+      stdout: JSON.stringify(documentedGroupedMetaControlReport()),
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('[DOCUMENTED 2026-09-29');
+  });
+
+  it('still gates the leaf advisory of an evidenced reference cycle at the CLI', () => {
+    const result = runCli({
+      status: 1,
+      stdout: JSON.stringify(evidencedReferenceCycleControlReport()),
+    });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('[UNDOCUMENTED] high b GHSA-86w9-cpqp-85rv');
+  });
+
+  // 2026-10-03 second review corrections (P1): the pinned producer skips the
+  // registry request entirely when npm's effective `offline` config is true and
+  // still serializes a clean-shaped report with exit 0 (actual reproduction in
+  // `simulation-output/security-correction-review-2026-10-03/audit-offline.log`).
+  // The shim below models that producer behavior and npm's real config
+  // precedence (explicit CLI flag > inherited env > project/user config), so
+  // these tests stay deterministic and network-free.
+  it('models the pinned producer: effective offline skips the audit with a clean-shaped report', () => {
+    const runShimDirectly = (
+      extraEnv: Record<string, string>,
+      argv: string[] = [],
+      fixtureOver: Record<string, unknown> = {},
+    ) => {
+      const id = Math.random().toString(36).slice(2);
+      const fixtureFile = join(shimDir, `fixture-shim-${id}.json`);
+      writeFileSync(
+        fixtureFile,
+        JSON.stringify({ stdout: JSON.stringify(forgeHighReport()), ...fixtureOver }),
+      );
+      // Strip ambient npm config channels so the precedence under test is exact.
+      const baseEnv = { ...process.env };
+      for (const key of Object.keys(baseEnv)) {
+        if (
+          key.toLowerCase() === 'npm_config_offline' ||
+          key.toLowerCase() === 'npm_config_audit_level'
+        ) {
+          delete baseEnv[key];
+        }
+      }
+      const env = {
+        ...baseEnv,
+        [pathKey]: `${shimDir}${delimiter}${process.env[pathKey] ?? ''}`,
+        AUDIT_FIXTURE_FILE: fixtureFile,
+        ...extraEnv,
+      };
+      return spawnSync(process.execPath, [join(shimDir, 'npm-fixture.js'), ...argv], {
+        encoding: 'utf8',
+        env,
+      });
+    };
+    const envOfflineOnly = (over: Record<string, string>) => {
+      const env = { npm_config_offline: 'true', ...over };
+      return env;
+    };
+    // Inherited npm_config_offline=true alone → the producer skips the request.
+    const envSkip = runShimDirectly(envOfflineOnly({}));
+    expect(envSkip.status).toBe(0);
+    expect(JSON.parse(envSkip.stdout)).toEqual(PINNED_PRODUCER_OFFLINE_REPORT);
+    // ...an explicit CLI --offline=false beats inherited env (npm precedence).
+    const flagBeatsEnv = runShimDirectly(envOfflineOnly({}), ['audit', '--offline=false']);
+    expect(flagBeatsEnv.stdout.trim()).toContain('node-forge');
+    // ...a project/user .npmrc offline=true alone also skips...
+    const fileSkip = runShimDirectly({}, [], { npmrcOffline: true });
+    expect(fileSkip.status).toBe(0);
+    expect(JSON.parse(fileSkip.stdout)).toEqual(PINNED_PRODUCER_OFFLINE_REPORT);
+    // ...and the explicit CLI flag beats that config file channel too.
+    const flagBeatsFile = runShimDirectly({}, ['audit', '--offline=false'], { npmrcOffline: true });
+    expect(flagBeatsFile.stdout.trim()).toContain('node-forge');
+  });
+
+  it('fails closed when npm inherits offline mode instead of reporting a clean tree', () => {
+    const id = Math.random().toString(36).slice(2);
+    const argsFile = join(shimDir, `args-${id}.json`);
+    const envFile = join(shimDir, `env-${id}.json`);
+    const result = runCli(
+      {
+        stdout: JSON.stringify(forgeHighReport()),
+        simulateAuditLevel: true,
+        argsFile,
+        envFile,
+      },
+      { npm_config_offline: 'true' },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('[UNDOCUMENTED] high node-forge GHSA-86w9-cpqp-85rv');
+    expect(result.stdout).not.toContain('OK — 0 high/critical');
+    // The transport must normalize offline on the command line AND in config.
+    const args = JSON.parse(readFileSync(argsFile, 'utf8')) as string[];
+    expect(args).toContain('--offline=false');
+    const envSeen = JSON.parse(readFileSync(envFile, 'utf8')) as Record<string, string | null>;
+    expect(envSeen.npm_config_offline).toBe('false');
+  });
+
+  it('overrides a project/user npmrc offline=true through the explicit normalization', () => {
+    const id = Math.random().toString(36).slice(2);
+    const argsFile = join(shimDir, `args-npmrc-${id}.json`);
+    const result = runCli({
+      stdout: JSON.stringify(forgeHighReport()),
+      simulateAuditLevel: true,
+      npmrcOffline: true,
+      argsFile,
+    });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain('[UNDOCUMENTED] high node-forge GHSA-86w9-cpqp-85rv');
+    const args = JSON.parse(readFileSync(argsFile, 'utf8')) as string[];
+    expect(args).toContain('--offline=false');
+  });
+
+  it('demonstrates the un-normalized inherited-offline false green the shape cannot catch', () => {
+    // The pre-fix transport inherited npm's offline config: the producer skipped
+    // the registry request and the gate accepted the clean-shaped report —
+    // reproduced exactly as the actual pinned npm did
+    // (`simulation-output/security-correction-review-2026-10-03/audit-offline.log`:
+    // exit 0, OK — 0 high/critical on the vulnerable tree).
+    const id = Math.random().toString(36).slice(2);
+    const fixtureFile = join(shimDir, `fixture-demo-${id}.json`);
+    writeFileSync(
+      fixtureFile,
+      JSON.stringify({ stdout: JSON.stringify(forgeHighReport()), simulateAuditLevel: true }),
+    );
+    const raw = spawnSync(process.execPath, [join(shimDir, 'npm-fixture.js'), 'audit'], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        [pathKey]: `${shimDir}${delimiter}${process.env[pathKey] ?? ''}`,
+        AUDIT_FIXTURE_FILE: fixtureFile,
+        npm_config_offline: 'true',
+      },
+    });
+    expect(raw.status).toBe(0);
+    expect(JSON.parse(raw.stdout)).toEqual(PINNED_PRODUCER_OFFLINE_REPORT);
+    // The skipped-audit report is indistinguishable from a clean audit by shape:
+    // the seam accepts it and the policy would print a clean verdict...
+    // (the pre-fix gate did exactly this — reproduced false green exit 0.)
+    const audit = validateAuditCommandResult({
+      status: 0,
+      stdout: raw.stdout,
+      stderr: raw.stderr,
+    });
+    expect(evaluateAudit(audit).exitCode).toBe(0);
+    // ...which is why the transport must normalize offline instead of trusting
+    // the report shape (the fixed gate fails the same payload closed above).
   });
 });
