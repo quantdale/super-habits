@@ -25,6 +25,14 @@ correct only the audit boundary/tests and the necessary evidence/report/
 checkpoint claims, then hand the corrected work back for independent
 re-review without pushing.
 
+2026-10-03: re-activated again for the **second independent-review
+corrective phase**
+(`simulation-output/security-correction-review-2026-10-03/{review-report,correction-prompt}.md`):
+correct the remaining fail-closed boundary/completion gaps (report
+identity/severity coherence and inherited-offline skipped-audit false
+greens) plus the necessary report/receipt claims, then hand the corrected
+work back for independent re-review without pushing.
+
 ## Context
 
 - Change artifacts: [exploration](exploration.md), [proposal](proposal.md),
@@ -87,6 +95,74 @@ history rewrite, or archiving for tidiness. Android is requalified only when
 actual impact requires it.
 
 ## Current Checkpoint
+
+- Current milestone: COMPLETED — second corrective phase (2026-10-03 review)
+  finished: both remaining P1 mechanisms fail closed with red-capable
+  regressions at the real seam and the actual CLI, P2 report/receipt truth is
+  reconciled, all corrected-source gates pass on the pinned toolchain, and the
+  corrected work is handed back for independent re-review. Nothing was pushed.
+- Completed: startup docs, the second review's report/correction prompt and
+  this plan reconciled against actual git state (`0e0c8a8` local main,
+  `891ed228` origin/main, seven unpublished commits); pinned Node 22.23.2 /
+  npm 10.9.8; actual-npm reproduction of the inherited-offline false green
+  plus CLI/env/project-npmrc config-precedence probes; permanent seam + CLI
+  regressions written FIRST and proven red (16 failing of 74) against the
+  pre-fix source; identity/severity/URL coherence validation and offline
+  transport normalization implemented with no allowlist/policy change;
+  producer-unfaithful synthetic fixtures corrected (advisory `name`/
+  `dependency` identity, aggregate/advisory severity) with original
+  assertions intact; green-after 74/74 + guards 7/7; independent boundary
+  replay of all 17 review payloads at baseline AND corrected source (the five
+  new false greens exit 0 → 1 at both seams, the original seven stay closed,
+  documented/grouped-meta/evidenced-cycle/meta-below-leaf/scoped-name controls
+  preserved, P2 control decided by the actual pinned npm reporter);
+  actual-npm end-to-end receipts (normalized offline exits 1 on the real
+  report, case-variant env covered, live red retained); typecheck 0,
+  lint 0/0, full unit+integration 2534 passed / 2 pre-existing skips,
+  focused 81/81 + plan/docs 20/20, OpenSpec 70/70, versioned-plan validation,
+  owned-path `qa:affected` receipt (`qa:fast → qa:full` + focused plan test),
+  `qa:fast` PASS, `qa:full` **PASS end-to-end** (typecheck/lint/tests 2534-2/
+  OpenSpec 70/70 → hermetic `build:e2e` → `e2e:full` 235 passed / 49 skipped /
+  0 failed (29.4 m) → deterministic simulation all 23 scenarios passed), and
+  the P2 reconciliation of §E′/§E″/appendix/task/checkpoint claims.
+- In progress: None.
+- Important modified files: `scripts/audit-runtime-deps.mjs` (advisory/
+  package/URL identity + severity coherence validation; offline transport
+  normalization with case-variant env dedupe), `tests/auditRuntimeDeps.test.ts`
+  (+24 regressions, +2 fixture-fidelity corrections with assertions intact),
+  this change's `tasks.md` (11.1–11.7 + reconciliations), `final-report.md`
+  (§E″ + corrected claims) and this plan. No product/UI/schema/dependency
+  changes; allowlist and advisory policy byte-unchanged.
+- Last successful validation: the complete second-correction battery —
+  `qa:full` PASS end-to-end at corrected source (receipt in
+  `simulation-output/security-correction-2026-10-03/gates-receipt-qa-full.log`),
+  focused 81/81, plan/docs 20/20, OpenSpec 70/70, plan validation PASS,
+  boundary replay 17/17 (`boundary-replay-fixed.json`), full unit+integration
+  2534 passed / 2 skips, typecheck 0, lint 0/0.
+- Current failures: the live audit gate remains exit 1
+  (`DEPENDENCY_VULNERABILITY` — the upstream blocker itself, expected and
+  retained; `gate-live-postfix.log`).
+- Relevant quarantines: None changed; the two opt-in cloud skips remain.
+- Blockers: unchanged upstream — no published fixed `node-forge` (latest 1.4.0
+  affected, `first_patched_version: null`, CLI 55.0.36/57.0.27 keep
+  `node-forge@^1.3.3`, helper 0.0.7 keeps `^1.4.0`, PR 1152 open/unmerged).
+- Condition required to unblock: (upstream, unchanged) a published,
+  independently verified compatible fixed `node-forge` release, or a supported
+  parent release removing both vulnerable paths, or a proven safe supported
+  substitution.
+- Exact resume action after unblock: (upstream resume, unchanged) follow
+  final-report.md section I; re-query state before any repair attempt.
+- Exact next action: None — task complete.
+- Remaining definition of done: None for the second correction itself. The
+  close-out task-owned commits land immediately after this checkpoint and the
+  post-commit `simulation-output/security-correction-2026-10-03/final-state-receipt.json`
+  records the final local/remote SHA, dirty status, commit list and the final
+  preservation/hygiene recheck as the immutable handoff identity. Conditional
+  tasks 4.x and 7.x remain unchecked by design; overall NOT CERTIFIED,
+  canonical 17/22, historical Android/J8, deferred iOS and production limits
+  are intact.
+
+## First-correction checkpoint (2026-10-02, preserved)
 
 - Current milestone: COMPLETED — corrective phase finished: the independent
   review's P1 (invalid/incoherent reports producing false security greens) and
@@ -159,6 +235,16 @@ Corrective phase (2026-10-02 independent review):
 - [x] C4. Permanent seam + real-CLI regressions; red-before/green-after and the replay artifact (tasks 10.2).
 - [x] C5. Evidence-identity reconciliation plus report/task checkpoint corrections (tasks 10.4).
 - [x] C6. Finish validation (deterministic-simulation rerun 23/23, plan validation) and hand back for re-review (tasks 10.5–10.6).
+
+Second corrective phase (2026-10-03 independent review):
+
+- [x] D1. Reactivate from the second correction prompt; reconcile git state/toolchain and reproduce the inherited-offline false green + config precedence with the actual pinned npm.
+- [x] D2. Write permanent seam/CLI regressions first and prove red (16 failing of 74) against the pre-fix source.
+- [x] D3. P1 — advisory/package/URL identity + severity coherence validation (fixed-point meta bounds; legitimate subset semantics preserved).
+- [x] D4. P1 — normalize inherited npm offline suppression on the transport (`--offline=false` + `npm_config_offline`, case-variant dedupe).
+- [x] D5. Boundary replay of every review payload at both seams + actual-npm end-to-end receipts (tasks 11.1–11.3).
+- [x] D6. P2 report/receipt truth reconciliation + recomputed test accounting (tasks 11.4–11.5).
+- [x] D7. Full corrected-source validation (`qa:fast`, `qa:full` PASS end-to-end, OpenSpec/plans) and hand back for re-review without pushing (tasks 11.6–11.7).
 
 Planning history (2026-10-02, completed planning-only request — preserved):
 
@@ -235,6 +321,32 @@ Planning history (2026-10-02, completed planning-only request — preserved):
   hashes before the commits exist.
 - 2026-10-02 — Do not push; hand the corrected work back for independent
   re-review per the correction prompt.
+- 2026-10-03 — Validate producer identity/severity coherence with BOUNDS
+  (explicit-advisory minimum, evidence-backed maximum over the reference
+  graph) instead of exact equality: npm legitimately reports meta parents
+  below their referenced findings' aggregate severity when only some child
+  advisories apply, and blind equality would reject those real reports.
+- 2026-10-03 — Normalize npm `offline` on the transport (`--offline=false` +
+  the `npm_config_offline` override, case-variant env dedupe) rather than
+  trying to detect a skipped audit from its clean-shaped report: the pinned
+  producer serializes the same shape either way, so completion must be
+  enforced at the command boundary, with genuine request failures still
+  failing visibly through the transport/error path.
+- 2026-10-03 — Keep the permanent offline tests network-free with a shim that
+  models the pinned producer's skip shape and npm's verified config precedence
+  (flag > env > project/user config) — proven by self-tests and actual-npm
+  probes — instead of copying the gate's own normalization into the shim.
+- 2026-10-03 — Correct producer-unfaithful synthetic fixtures (advisory
+  `name`/`dependency` identity, aggregate/advisory severity) in place with
+  their original assertions and purpose intact; keep intentionally invalid
+  identity/severity fixtures negative.
+- 2026-10-03 — Reconcile the P2 claims to the retained evidence: mark the
+  missing correction `qa:affected` receipt unverified (with a truthful
+  receipted rerun), never relabel the correction-time `qa:full` wrapper green
+  from its stage results or its separate simulation rerun, and narrow the
+  standalone typecheck/lint claims while re-running both with full receipts.
+- 2026-10-03 — Do not push; return for independent re-review per the second
+  correction prompt.
 
 ## Validation Ledger
 
@@ -318,6 +430,53 @@ Correction (2026-10-02 independent review):
 - foreign-state re-verification (368 entries) + `web:hygiene` — PASS,
   0 mismatches, ports 8081/8082 free (`preservation-precommit.json`).
 
+Second correction (2026-10-03 independent review):
+
+- `git fetch` + status/refs/stash/worktree inventory — PASS; local `0e0c8a8`,
+  remote `891ed228`, 10 untracked roots (2 review plans + 8 foreign), no
+  tracked changes; review preservation baseline (453 protected entries) and
+  all prior evidence treated read-only.
+- Pinned `node --version` / `npm --version` — v22.23.2 / 10.9.8; every gate
+  receipt records command + exit + toolchain + source hash (`gates-receipt-*.log`).
+- Actual pinned npm offline reproduction + config-precedence probes —
+  `npm-precedence-probe.log`, `npm-audit-offline-actual.json` (clean-shaped
+  empty report, exit 0), `npm-audit-offline-flag-normalized.json` (real
+  23-entry report with `--offline=false`),
+  `npm-audit-audit-config-false.json` (`audit=false` does NOT skip the audit
+  command) — offline is the only request-skipping channel and is normalized.
+- `npx vitest run tests/auditRuntimeDeps.test.ts` on the pre-fix source —
+  FAIL as required (`red-before-vitest.log`, **16 failing** / 58 passed of 74,
+  exactly the new red-capable set); corrected source — PASS 74/74 + guards
+  7/7 (`green-after-vitest.log`).
+- `node replay-boundary-fixed.mjs` (real seam + real CLI, all 17 review
+  payloads) — PASS (`boundary-replay-fixed.json`): the five new false greens
+  flip exit 0 → 1 at both seams, the original seven stay closed, valid
+  documented/grouped-meta/evidenced-cycle controls unchanged, P2 report-only
+  delivered under inherited `audit-level=critical` via the actual pinned npm
+  reporter (the review's identity-less P2 fixture adapted in memory, recorded).
+- `node scripts/audit-runtime-deps.mjs` with inherited/case-variant offline —
+  exit 1 (`gate-offline-postfix.log`, `gate-offline-casevariant.log`); live
+  online — exit 1 retained red with documented findings visible
+  (`gate-live-postfix.log`, `gate-postfix-receipts.log`).
+- `npm run typecheck` — PASS exit 0; `npm run lint` — PASS 0 errors /
+  0 warnings; scoped Prettier — PASS (`gates-receipt-typecheck-lint.log`).
+- `npm test` — PASS **2534 passed / 2 pre-existing opt-in skips** (252 files)
+  (`npm-test.log`, `gates-receipt-npm-test.log`).
+- focused audit + guards — **81/81** (`gates-receipt-focused.log`); plan/docs
+  — **20/20** (9 ExecPlan + 11 doc-consistency); `npm run openspec:validate` —
+  PASS 70/70; `npm run agent:plan:validate` + `:all` — PASS
+  (`plan-validation.log`).
+- `npm run qa:affected -- --files <owned 5 paths>` — `qa:fast → qa:full` +
+  focused `tests/agent-execplan.test.ts` (`qa-affected.log` — the truthful
+  receipted rerun that replaces the missing first-correction receipt).
+- `npm run qa:fast` — PASS (`qa-fast.log`, `gates-receipt-qa-fast.log`).
+- `npm run qa:full` — **PASS end-to-end, exit 0** (`qa-full.log`,
+  `gates-receipt-qa-full.log`): typecheck/lint/tests 2534-2/OpenSpec 70/70 →
+  hermetic `build:e2e` → `e2e:full` **235 passed / 49 skipped / 0 failed
+  (29.4 m)** → deterministic simulation **all 23 scenarios passed**. This is
+  the second-correction run at its own source; the correction-time wrapper
+  non-pass (E′) is preserved and not relabeled by it.
+
 Planning-era ledger (2026-10-02, preserved verbatim in spirit; see git history
 of this file for the full planning record):
 
@@ -346,6 +505,20 @@ of this file for the full planning record):
   (section E-prime), and this corrective-phase record.
 - `simulation-output/security-correction-2026-10-02/` — ignored correction
   evidence (replay artifact, red/green logs, receipts, rerun logs).
+- `scripts/audit-runtime-deps.mjs` — second-correction boundary: advisory/
+  package/URL identity + severity coherence validation (evidence-bounded meta
+  severities) and npm `offline` transport normalization; allowlist/policy
+  byte-unchanged.
+- `tests/auditRuntimeDeps.test.ts` — +24 second-correction regressions
+  (1 policy-text + 11 seam + 12 CLI) with a pinned-producer offline shim;
+  2 pre-existing synthetic fixtures corrected for producer fidelity with
+  assertions intact.
+- `openspec/changes/resolve-windows-dependency-security/{tasks.md,final-report.md,execplan.md}` —
+  task reconciliation (11.1–11.7), corrected report claims (§E″) and this
+  second-correction record.
+- `simulation-output/security-correction-2026-10-03/` — ignored second-
+  correction evidence (replay, red/green logs, receipts, final-state receipt);
+  no prior evidence overwritten.
 
 ## Recovery / Resume Instructions
 
@@ -394,6 +567,25 @@ of this file for the full planning record):
   ENVIRONMENT non-pass reran 23/23. Nothing was pushed; the corrected work
   is handed back for independent re-review. Verdict unchanged:
   PRECISELY BLOCKED; overall NOT CERTIFIED.
+- Second correction follow-up (2026-10-03 independent review): the review
+  proved that correction incomplete — five further report-coherence/
+  advisory-identity false greens (moderate outer finding suppressing a high
+  advisory; critical meta-parents riding on moderate-only or merely
+  documented leaves; malformed advisory URLs and contradictory package
+  identities masquerading as documentation) and an inherited-offline
+  skipped-audit false green — plus P2 receipt/report truth gaps. All are
+  corrected fail-closed with 24 permanent regressions (16 red-before against
+  the pre-fix source / green-after 74/74 + guards 7/7), producer-faithful
+  controls preserved (meta parents below their leaves, evidenced cycles,
+  scoped names, grouped advisories), every review payload replayed at both
+  seams, and the P2 claims reconciled to the retained evidence (missing
+  `qa:affected` receipt marked unverified with a truthful rerun; correction
+  `qa:full` wrapper non-pass no longer overclaimed; standalone typecheck/lint
+  claims narrowed and re-earned with full receipts). `qa:full` at the
+  second-corrected source passed end-to-end (E2E 235/49/0, deterministic
+  simulation 23/23). Nothing was pushed; the twice-corrected work is handed
+  back for independent re-review. Verdict unchanged: PRECISELY BLOCKED;
+  overall NOT CERTIFIED.
 - Remaining campaign risk: the advisory gate is red until upstream publishes a
   fix; a future apply must re-query state rather than trusting this ledger, and
   must flip the cryptographic tripwire to rejection when a fixed forge lands.
