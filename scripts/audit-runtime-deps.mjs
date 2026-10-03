@@ -52,6 +52,23 @@
  * `npm_config`) — an inherited offline mode made the pinned producer skip the
  * registry request entirely and serialize a clean-shaped report with exit 0,
  * which report shape alone cannot distinguish from a completed clean audit.
+ *
+ * THIRD CORRECTIVE HARDENING (2026-10-03 third independent review): the
+ * evidence bound propagated through `via` reference chains is now capped at
+ * EVERY intermediate finding's own reported severity, not just at the distant
+ * descendant advisories reachable anywhere in the graph. A meta parent's
+ * contributing set is a subset of its referenced finding's contributing
+ * advisories (`Vuln.addAdvisory` takes their maximum), so a HIGH advisory that
+ * is reachable only through a MODERATE intermediary can never justify an
+ * impossible HIGH meta-parent — previously the unbounded maximum propagated
+ * straight through the moderate intermediary and the gate printed a documented
+ * security green (exactly the producer-backed `meta-bounds-replay.json` false
+ * green). Each reference hop contributes at most
+ * `min(anchoredEvidence, referencedFinding.severity)` over an evidence-anchored
+ * least fixed point, so self-supporting reference cycles cannot bootstrap
+ * severity from claimed severities alone, while legitimate subset shapes stay
+ * valid (parents BELOW their referenced findings' aggregate severity,
+ * evidenced cycles, multiple contributors, explicit advisory minimums).
  */
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
@@ -424,13 +441,17 @@ export function validateAuditCommandResult(result) {
   // gives a finding the MAXIMUM severity of its contributing advisories
   // (`Vuln.addAdvisory`); object `via` entries are direct advisories (checked
   // above) while string entries are metavuln references whose contributing
-  // advisory severity is bounded by the referenced finding's own advisory
-  // evidence — never above it. Propagate the evidence-backed maximum over the
-  // reference graph (fixed point, so evidenced cycles resolve) and reject any
-  // reported severity its evidence cannot support. This BOUNDS meta severities
-  // without requiring exact equality across references: npm legitimately
-  // reports a meta parent BELOW its referenced finding's aggregate severity
-  // when only some child advisories apply to the parent.
+  // advisory set is a SUBSET of the referenced finding's own contributing
+  // advisories. Two bounds therefore apply to every reference hop (third
+  // review): the contribution is capped by the referenced finding's own
+  // REPORTED severity (the maximum its contributing advisories can hand on —
+  // a parent can sit below its child's aggregate, never above it) AND by the
+  // advisory evidence that reference is anchored to (a least fixed point over
+  // the graph starting only from direct advisories, so evidenced cycles
+  // resolve but claimed severities alone can never self-support a rank).
+  // Propagating the bare maximum of distant descendant advisories — the
+  // previous behavior — let a high advisory behind a moderate intermediary
+  // justify an impossible high meta-parent (false security green).
   const evidenceRank = new Map();
   for (const [name, vulnerability] of Object.entries(parsed.vulnerabilities)) {
     let rank = -1;
@@ -444,7 +465,15 @@ export function validateAuditCommandResult(result) {
     for (const [name, vulnerability] of Object.entries(parsed.vulnerabilities)) {
       let rank = evidenceRank.get(name);
       for (const via of vulnerability.via) {
-        if (typeof via === 'string') rank = Math.max(rank, evidenceRank.get(via));
+        if (typeof via !== 'string') continue;
+        // Dangling references were rejected above, so the referenced finding
+        // and its severity enum are present and known.
+        const referenced = parsed.vulnerabilities[via];
+        const contribution = Math.min(
+          evidenceRank.get(via),
+          SEVERITY_LEVELS.indexOf(referenced.severity),
+        );
+        rank = Math.max(rank, contribution);
       }
       if (rank !== evidenceRank.get(name)) {
         evidenceRank.set(name, rank);

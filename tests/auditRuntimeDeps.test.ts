@@ -529,7 +529,15 @@ const evidencedReferenceCycleControlReport = () =>
   );
 
 /** Control: npm meta references aggregate child advisories that need not all
- * apply to the parent — a moderate meta-parent below its high leaf is valid. */
+ * apply to the parent — the pinned producer's genuine mixed-advisory/version
+ * subset semantics (its leaf finding carries a HIGH advisory affecting only
+ * version 1 and a separate MODERATE advisory affecting only version 2, while a
+ * dependent meta-parent draws only the moderate contribution). A moderate
+ * meta-parent below its leaf's mixed aggregate severity is valid, and both of
+ * the leaf's version-specific advisories stay visible and gating. Provenance:
+ * the producer-generated payloads in
+ * `simulation-output/security-correction-rereview-2026-10-03/meta-bounds-replay.json`
+ * (actual pinned npm `Advisory`/`Vuln`/`AuditReport.toJSON()`). */
 const metaParentBelowLeafSeverityControlReport = () =>
   report(
     {
@@ -547,8 +555,18 @@ const metaParentBelowLeafSeverityControlReport = () =>
           advisoryEntry({
             name: 'leaf-package',
             dependency: 'leaf-package',
-            title: 'leaf high advisory',
+            title: 'leaf high advisory affecting version 1 only',
             url: 'https://github.com/advisories/GHSA-leaf0-0000-leaf',
+            severity: 'high',
+            range: '=1.0.0',
+          }),
+          advisoryEntry({
+            name: 'leaf-package',
+            dependency: 'leaf-package',
+            title: 'leaf moderate advisory affecting version 2 only',
+            url: 'https://github.com/advisories/GHSA-l3af1-0000-mod2',
+            severity: 'moderate',
+            range: '=2.0.0',
           }),
         ],
       },
@@ -611,6 +629,129 @@ const severityLaunderingCycleReport = () =>
       },
     },
     { high: 2, total: 2 },
+  );
+
+// ---------------------------------------------------------------------------
+// Third-correction review fixtures (2026-10-03 re-review of the second
+// correction). The producer-faithful pair below is shaped exactly from the
+// actual pinned npm `Advisory`/`Vuln`/`AuditReport.toJSON()` payloads retained
+// in `simulation-output/security-correction-rereview-2026-10-03/
+// meta-bounds-replay.json`: the grouped brace finding carries a HIGH advisory
+// affecting only version 1 plus a separate MODERATE advisory affecting only
+// version 2 (aggregate high); `child-package` depends exclusively on the
+// moderate-affected version 2 (contributing severity moderate);
+// `parent-package` depends on that child. The valid control exits 0 at
+// main()/seam/CLI; changing ONLY the parent's severity moderate → high (with
+// matching counts) produced a FALSE GREEN (exit 0, "every high/critical
+// finding is documented") at all three seams through the second-correction
+// gate — permanent executing regressions at BOTH seams.
+// ---------------------------------------------------------------------------
+
+const producerTwoHopFindings = (parentSeverity: string) => ({
+  'brace-expansion': {
+    name: 'brace-expansion',
+    severity: 'high',
+    isDirect: false,
+    via: [
+      {
+        source: 1240913,
+        name: 'brace-expansion',
+        dependency: 'brace-expansion',
+        title: 'Synthetic high on version 1 only',
+        url: 'https://github.com/advisories/GHSA-q2hr-2g5m-vwhr',
+        severity: 'high',
+        range: '=1.0.0',
+      },
+      {
+        source: 1240914,
+        name: 'brace-expansion',
+        dependency: 'brace-expansion',
+        title: 'Synthetic moderate on version 2 only',
+        url: 'https://github.com/advisories/GHSA-qhr7-859c-m2p7',
+        severity: 'moderate',
+        range: '=2.0.0',
+      },
+    ],
+    effects: ['child-package'],
+    range: '*',
+    nodes: [
+      'node_modules/glob/node_modules/brace-expansion',
+      'node_modules/test-exclude/node_modules/brace-expansion',
+    ],
+    fixAvailable: true,
+  },
+  'child-package': {
+    name: 'child-package',
+    severity: 'moderate',
+    isDirect: false,
+    via: ['brace-expansion'],
+    effects: ['parent-package'],
+    range: '*',
+    nodes: ['node_modules/child-package'],
+    fixAvailable: true,
+  },
+  'parent-package': {
+    name: 'parent-package',
+    severity: parentSeverity,
+    isDirect: false,
+    via: ['child-package'],
+    effects: [],
+    range: '*',
+    nodes: ['node_modules/parent-package'],
+    fixAvailable: true,
+  },
+});
+
+/** Producer-valid two-hop subset control: brace high → child moderate → parent
+ * moderate, exactly as the pinned npm serializer produced it. */
+const producerTwoHopSubsetControlReport = () =>
+  report(producerTwoHopFindings('moderate'), { moderate: 2, high: 1, total: 3 });
+
+/** Third-review false green 1 (P1): only the parent's severity is changed
+ * moderate → high with matching counts. The parent has no direct advisory and
+ * only its moderate child as `via`; its sole contributing evidence is
+ * moderate, so no producer can serialize the high. */
+const impossibleHighParentViaModerateChildReport = () =>
+  report(producerTwoHopFindings('high'), { moderate: 1, high: 2, total: 3 });
+
+/** Third-review false green 2 (P1): a self-supporting reference cycle claims
+ * high while the only distant high advisory sits behind a lower intermediary
+ * (`mid-package` legitimately reports moderate below its leaf's high aggregate
+ * — subset semantics). A local neighbor-only bound would let the a↔b cycle
+ * bootstrap high from each other's claimed severities; the anchored evidence
+ * chain reaches only moderate. The distant advisory is the DOCUMENTED
+ * allowlisted brace one, so the old gate's verdict was a documented-success
+ * green ("every high/critical finding is documented", exit 0) — not an exit 1
+ * caused by an unrelated undocumented leaf. */
+const highThroughLowerIntermediaryCycleReport = () =>
+  report(
+    {
+      'brace-expansion': {
+        name: 'brace-expansion',
+        severity: 'high',
+        nodes: ['node_modules/glob/node_modules/brace-expansion'],
+        via: [replayBraceAdvisory()],
+      },
+      'mid-package': {
+        name: 'mid-package',
+        severity: 'moderate',
+        nodes: ['node_modules/mid-package'],
+        via: ['brace-expansion'],
+      },
+      'cycle-a': {
+        name: 'cycle-a',
+        severity: 'high',
+        nodes: ['node_modules/cycle-a'],
+        via: ['cycle-b'],
+      },
+      'cycle-b': {
+        name: 'cycle-b',
+        severity: 'high',
+        nodes: ['node_modules/cycle-b'],
+        via: ['cycle-a', 'mid-package'],
+      },
+    },
+    { moderate: 1, high: 3, total: 4 },
   );
 
 const ok = (result: CommandResult) => validateAuditCommandResult(result);
@@ -1042,7 +1183,13 @@ describe('report identity/severity coherence fails closed (2026-10-03 review cor
     const audit = ok(asResult(metaParentBelowLeafSeverityControlReport(), 1));
     const verdict = evaluateAudit(audit);
     expect(verdict.exitCode).toBe(1);
-    expect(verdict.undocumented.map((finding) => finding.name)).toEqual(['leaf-package']);
+    // The leaf's two version-specific advisories both stay visible and gating
+    // (one entry each); the moderate meta-parent is never flagged.
+    expect(verdict.undocumented.map((finding) => finding.name)).toEqual([
+      'leaf-package',
+      'leaf-package',
+    ]);
+    expect(verdict.documented).toHaveLength(0);
   });
 
   it('keeps scoped package names and grouped references supported', () => {
@@ -1050,6 +1197,68 @@ describe('report identity/severity coherence fails closed (2026-10-03 review cor
     const verdict = evaluateAudit(audit);
     expect(verdict.exitCode).toBe(1);
     expect(verdict.undocumented.map((finding) => finding.name)).toEqual(['@scope/child']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2026-10-03 third independent review corrections (P1): multi-hop evidence
+// propagated through meta references must stay bounded at EVERY intermediate
+// finding's own reported severity — a high advisory reachable only through a
+// moderate intermediary can never justify an impossible high meta-parent. The
+// two producer-faithful fixtures come from the actual pinned npm serializer
+// (`meta-bounds-replay.json`): the valid control passed at both seams, and
+// changing ONLY the parent severity moderate → high produced a false green
+// (exit 0, "every high/critical finding is documented") at seam/main/CLI.
+// Negative assertions require AUDIT-EXECUTION failure (an incoherent report
+// rejected before any verdict) and the absence of clean/documented-success
+// verdicts — not merely exit 1 from an unrelated undocumented leaf.
+// ---------------------------------------------------------------------------
+
+describe('multi-hop evidence coherence fails closed (2026-10-03 third review corrections)', () => {
+  const expectExecutionFailureWithoutVerdict = (build: () => unknown) => {
+    expect(() => ok(asResult(build(), 1))).toThrowError(/unsupported by its advisory evidence/);
+    const outLines: string[] = [];
+    const errLines: string[] = [];
+    const exitCode = main({
+      runCommand: () => asResult(build(), 1),
+      out: (line: string) => outLines.push(line),
+      err: (line: string) => errLines.push(line),
+    });
+    expect(exitCode).toBe(1);
+    const out = outLines.join('\n');
+    expect(out).not.toContain('OK — 0 high/critical');
+    expect(out).not.toContain('every high/critical finding is documented');
+    const err = errLines.join('\n');
+    expect(err).toContain('audit execution failed');
+    expect(err).toContain('refusing to report a clean production tree');
+  };
+
+  it('rejects an impossible high meta-parent whose sole contributing child is moderate', () => {
+    expectExecutionFailureWithoutVerdict(impossibleHighParentViaModerateChildReport);
+  });
+
+  it('rejects a high laundered through a self-supporting cycle behind a lower intermediary', () => {
+    expectExecutionFailureWithoutVerdict(highThroughLowerIntermediaryCycleReport);
+  });
+
+  it('accepts the producer-faithful two-hop subset control (high → moderate → moderate)', () => {
+    const audit = ok(asResult(producerTwoHopSubsetControlReport(), 1));
+    const verdict = evaluateAudit(audit);
+    expect(verdict.exitCode).toBe(0);
+    expect(verdict.undocumented).toHaveLength(0);
+    expect(verdict.documented).toHaveLength(2);
+    expect(verdict.lines.join('\n')).toContain('every high/critical finding is documented');
+    const outLines: string[] = [];
+    const errLines: string[] = [];
+    const exitCode = main({
+      runCommand: () => asResult(producerTwoHopSubsetControlReport(), 1),
+      out: (line: string) => outLines.push(line),
+      err: (line: string) => errLines.push(line),
+    });
+    expect(exitCode).toBe(0);
+    expect(errLines.join('\n')).toBe('');
+    expect(outLines.join('\n')).toContain('[DOCUMENTED 2026-09-29');
+    expect(outLines.join('\n')).toContain('every high/critical finding is documented');
   });
 });
 
@@ -1357,6 +1566,44 @@ describe('audit-runtime-deps CLI contract', () => {
     });
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('[DOCUMENTED 2026-09-29');
+  });
+
+  // 2026-10-03 third review corrections (P1): the producer-faithful multi-hop
+  // pair replayed through the real CLI. The impossible high meta-parent (and
+  // the high laundered through a cycle behind a lower intermediary) previously
+  // exited 0 printing "every high/critical finding is documented" — a false
+  // security green, not an exit 1 from an unrelated leaf. Each must now fail
+  // as an audit-EXECUTION failure before any verdict.
+  it.each([
+    [
+      'impossible high meta-parent via a moderate-only child',
+      impossibleHighParentViaModerateChildReport,
+    ],
+    [
+      'high laundered through a self-supporting cycle behind a lower intermediary',
+      highThroughLowerIntermediaryCycleReport,
+    ],
+  ] as [string, () => unknown][])(
+    'exits 1 without a clean or documented verdict for %s',
+    (_name, build) => {
+      const result = runCli({ status: 1, stdout: JSON.stringify(build()) });
+      expect(result.status).toBe(1);
+      expect(result.stdout).not.toContain('OK — 0 high/critical');
+      expect(result.stdout).not.toContain('every high/critical finding is documented');
+      expect(result.stderr).toContain('audit execution failed');
+      expect(result.stderr).toContain('refusing to report a clean production tree');
+    },
+  );
+
+  it('still passes the producer-faithful two-hop subset control at the CLI', () => {
+    const result = runCli({
+      status: 1,
+      stdout: JSON.stringify(producerTwoHopSubsetControlReport()),
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('[DOCUMENTED 2026-09-29');
+    expect(result.stdout).toContain('every high/critical finding is documented');
+    expect(result.stderr).toBe('');
   });
 
   it('still gates the leaf advisory of an evidenced reference cycle at the CLI', () => {

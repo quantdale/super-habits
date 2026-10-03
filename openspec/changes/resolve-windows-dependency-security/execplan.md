@@ -33,6 +33,15 @@ identity/severity coherence and inherited-offline skipped-audit false
 greens) plus the necessary report/receipt claims, then hand the corrected
 work back for independent re-review without pushing.
 
+2026-10-03: re-activated again for the **third independent-review
+corrective phase**
+(`simulation-output/security-correction-rereview-2026-10-03/{review-report,correction-prompt}.md`):
+correct the remaining multi-hop evidence-propagation false green (P1: a
+high meta-parent riding a moderate-only intermediary) plus three P2
+report/provenance inconsistencies (receipt-completeness overstatement,
+mislabeled replay baseline, QA chronology), then hand the corrected work
+back for independent re-review without pushing.
+
 ## Context
 
 - Change artifacts: [exploration](exploration.md), [proposal](proposal.md),
@@ -96,6 +105,87 @@ actual impact requires it.
 
 ## Current Checkpoint
 
+- Current milestone: COMPLETED — third corrective phase (2026-10-03 re-review)
+  finished. The P1 multi-hop evidence bound and all three P2 record
+  corrections are in place with red-before/green-after proof at seam/main/CLI,
+  producer-faithful replay evidence, and the full gate battery green on the
+  pinned toolchain; the corrected work is handed back for independent
+  re-review. Nothing was pushed. Scope was bounded to: (1) P1 — bound
+  propagated multi-hop evidence
+  at each intermediate finding's own reported severity in
+  `scripts/audit-runtime-deps.mjs` (`evidenceRank` reference propagation),
+  with permanent red-capable seam/main + CLI negatives and the retained
+  producer-faithful two-hop positive control; (2) P2 — narrow the receipt-
+  completeness claims, relabel the `boundary-replay-fixed.json` baseline
+  (`eae3dee`, pre-first-correction), and correct the qa:full chronology to
+  three attempts; all re-earned with complete
+  command/exit/toolchain/content receipts and handed back WITHOUT pushing.
+  Evidence root: `simulation-output/security-correction-third-2026-10-03/`.
+  Review evidence (all prior roots) is read-only and preserved (final:
+  553/553 protected entries unchanged, 19/19 reviewed source identities
+  accounted).
+- Completed: preflight/preservation capture (553/553 + 19/19, HEAD `c62c689`,
+  origin `891ed228`); ExecPlan reactivated; red-capable seam/main + CLI tests
+  written FIRST and proven red against `c62c689` (4 failed / 76 passed of 80,
+  `red-before-vitest.log`); P1 propagation fix implemented
+  (`min(anchoredEvidence, referencedFinding.severity)` per reference hop over
+  an evidence-anchored least fixed point); green-after 80/80
+  (`green-after-vitest.log`); producer-faithful replay 26/26 at both seams for
+  pre-fix and corrected sources (`replay-third.json`) — the impossible high
+  parent flips 0 → 1 with the execution-failure diagnostic naming
+  `parent-package`, the valid two-hop subset control stays 0/0, every
+  inherited case/control keeps its outcome; meta-below-leaf control reworked
+  to the producer's mixed-advisory/version subset shape (purpose preserved);
+  P2 records corrected (final-report §E″ narrowed receipt claims, §E″/§G/
+  appendix replay-baseline labels, §H qa:full chronology = three attempts,
+  §E‴ added, §I/§J reconciled, tasks 11.5/12.x, ledger entries below);
+  scoped Prettier PASS; typecheck 0; lint 0/0; focused 87/87 (audit 80 +
+  guards 7); plan/docs 20/20; OpenSpec 70/70; live audit exit 1 red retained
+  with documented findings printed (`gate-live-third.log`).
+- In progress: None — all third-correction gates finished green.
+- Important modified files: `scripts/audit-runtime-deps.mjs` (P1 intermediate
+  evidence bound + header/comment updates), `tests/auditRuntimeDeps.test.ts`
+  (+6 executing tests; producer two-hop fixtures; reworked meta-below-leaf
+  control), this change's `tasks.md` (§12 + reconciliations),
+  `final-report.md` (§C/§E″/§E‴/§G/§H/§I/§J/appendix corrections) and this
+  plan. No product/UI/schema/dependency changes; allowlist and advisory
+  policy byte-unchanged.
+- Last successful validation: the complete third-correction battery —
+  red-before 4 failing at `c62c689` / green-after 80/80; producer replay
+  26/26 at both seams (`replay-third.json`); focused 87/87; plan/docs 20/20;
+  OpenSpec 70/70; typecheck 0; lint 0/0; full unit+integration 2540 passed /
+  2 pre-existing skips; `qa:affected` (`qa:fast → qa:full`); `qa:fast` PASS;
+  `qa:full` PASS end-to-end exit 0 (tests 2540-2, OpenSpec 70/70, hermetic
+  build:e2e, E2E 235 passed / 49 skipped / 0 failed (25.8 m), simulation
+  23/23); scoped Prettier PASS; live audit red retained; web hygiene PASS
+  (8081/8082 free) — every gate with a complete receipt (command, exit,
+  toolchain, HEAD, dirty state, before/after owned-file hashes) in
+  `simulation-output/security-correction-third-2026-10-03/`.
+- Current failures: the live audit gate remains exit 1
+  (`DEPENDENCY_VULNERABILITY` — the upstream blocker itself, expected and
+  retained; `gate-live-third.log`).
+- Relevant quarantines: None changed; the two opt-in cloud skips remain.
+- Blockers: unchanged upstream — no published fixed `node-forge` (latest
+  1.4.0 affected, `first_patched_version: null`, PR 1152 open/unmerged).
+- Condition required to unblock: (upstream, unchanged) a published,
+  independently verified compatible fixed `node-forge` release, or a supported
+  parent release removing both vulnerable paths, or a proven safe supported
+  substitution.
+- Exact resume action after unblock: (upstream resume, unchanged) follow
+  final-report.md section I; re-query state before any repair attempt.
+- Exact next action: None — third correction complete; hand back for
+  independent re-review WITHOUT pushing.
+- Remaining definition of done: complete for the third correction once the
+  close-out task-owned commits land and the post-commit
+  `simulation-output/security-correction-third-2026-10-03/final-state-receipt-third.json`
+  records the final local/remote SHA, dirty status, commit list and the final
+  preservation/hygiene recheck as the immutable handoff identity. Conditional
+  tasks 4.x and 7.x remain unchecked by design; overall NOT CERTIFIED,
+  canonical 17/22, historical Android/J8, deferred iOS and production limits
+  are intact.
+
+## Second-correction checkpoint (2026-10-03 review, preserved)
+
 - Current milestone: COMPLETED — second corrective phase (2026-10-03 review)
   finished: both remaining P1 mechanisms fail closed with red-capable
   regressions at the real seam and the actual CLI, P2 report/receipt truth is
@@ -113,7 +203,11 @@ actual impact requires it.
   `dependency` identity, aggregate/advisory severity) with original
   assertions intact; green-after 74/74 + guards 7/7; independent boundary
   replay of all 17 review payloads at baseline AND corrected source (the five
-  new false greens exit 0 → 1 at both seams, the original seven stay closed,
+  new false greens exit 0 → 1 at both seams, the original seven stay closed
+  **at the corrected source — corrected 2026-10-03 third review: the
+  comparison baseline was the pre-first-correction `eae3dee`, where the
+  original seven were still false greens; the actual `0e0c8a8`-base replay is
+  the re-review's own later `boundary-replay.json`**,
   documented/grouped-meta/evidenced-cycle/meta-below-leaf/scoped-name controls
   preserved, P2 control decided by the actual pinned npm reporter);
   actual-npm end-to-end receipts (normalized offline exits 1 on the real
@@ -436,8 +530,18 @@ Second correction (2026-10-03 independent review):
   remote `891ed228`, 10 untracked roots (2 review plans + 8 foreign), no
   tracked changes; review preservation baseline (453 protected entries) and
   all prior evidence treated read-only.
-- Pinned `node --version` / `npm --version` — v22.23.2 / 10.9.8; every gate
-  receipt records command + exit + toolchain + source hash (`gates-receipt-*.log`).
+- Pinned `node --version` / `npm --version` — v22.23.2 / 10.9.8. **Claim
+  narrowed (2026-10-03 third review): the earlier "every gate receipt records
+  command + exit + toolchain + source hash" overclaimed** —
+  `gates-receipt-qa-full.log`, `-qa-fast.log` and `-qa-affected.log` record
+  toolchain + HEAD + command + exit without tested-source hashes (HEAD stayed
+  `0e0c8a8` while the candidate was uncommitted, so HEAD is not candidate
+  identity); `gates-receipt-npm-test.log` hashes dirty `git status` output
+  ("status-sha256"), not source content; the `source-sha256` digests in
+  `gates-receipt-focused.log` / `-typecheck-lint.log` have an unrecoverable
+  file scope. The recoverable binding is the post-commit
+  `final-state-receipt.json` per-file hashes; the third correction earns full
+  per-gate content receipts (`security-correction-third-2026-10-03/run-gate.mjs`).
 - Actual pinned npm offline reproduction + config-precedence probes —
   `npm-precedence-probe.log`, `npm-audit-offline-actual.json` (clean-shaped
   empty report, exit 0), `npm-audit-offline-flag-normalized.json` (real
@@ -450,7 +554,11 @@ Second correction (2026-10-03 independent review):
   7/7 (`green-after-vitest.log`).
 - `node replay-boundary-fixed.mjs` (real seam + real CLI, all 17 review
   payloads) — PASS (`boundary-replay-fixed.json`): the five new false greens
-  flip exit 0 → 1 at both seams, the original seven stay closed, valid
+  flip exit 0 → 1 at both seams, the original seven stay closed **at the
+  corrected source (baseline label corrected 2026-10-03 third review: the
+  executing script loads the pre-first-correction `eae3dee`, where the
+  original seven were still false greens; the `0e0c8a8`-base replay is the
+  re-review's later `boundary-replay.json`)**, valid
   documented/grouped-meta/evidenced-cycle controls unchanged, P2 report-only
   delivered under inherited `audit-level=critical` via the actual pinned npm
   reporter (the review's identity-less P2 fixture adapted in memory, recorded).
