@@ -1,0 +1,10 @@
+schema: spec-driven
+created: 2026-10-03
+goal: 'Bounded braces advisory triage: establish the complete dependency graph,
+  authoritative advisory and upstream state, shipped-artifact exclusion and
+  tooling input provenance for GHSA-vfj7-8cjw-p6xm; evaluate the full safe
+  remediation ladder; land any genuinely safe non-breaking repair; refresh the
+  retained node-forge blocker only for material upstream change; and record
+  either the landed repair or an exact upstream-blocked state with a resume
+  matrix. No framework migration, no audit-policy weakening, no production
+  action.'
