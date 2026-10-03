@@ -158,8 +158,11 @@ actual impact requires it.
   `qa:full` PASS end-to-end exit 0 (tests 2540-2, OpenSpec 70/70, hermetic
   build:e2e, E2E 235 passed / 49 skipped / 0 failed (25.8 m), simulation
   23/23); scoped Prettier PASS; live audit red retained; web hygiene PASS
-  (8081/8082 free) — every gate with a complete receipt (command, exit,
-  toolchain, HEAD, dirty state, before/after owned-file hashes) in
+  (8081/8082 free); POST-COMMIT re-earn at the exact committed SHA
+  `9ec0a21`: focused 107/107 (audit 80 + guards 7 + plan/docs 20), OpenSpec
+  70/70, plans PASS, lint 0/0, Prettier clean, live red retained, hygiene
+  PASS — every gate with a complete receipt (command, exit, toolchain, HEAD,
+  dirty state, before/after owned-file hashes) in
   `simulation-output/security-correction-third-2026-10-03/`.
 - Current failures: the live audit gate remains exit 1
   (`DEPENDENCY_VULNERABILITY` — the upstream blocker itself, expected and
