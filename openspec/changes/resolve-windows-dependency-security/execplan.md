@@ -343,6 +343,40 @@ Second corrective phase (2026-10-03 independent review):
 - [x] D6. P2 report/receipt truth reconciliation + recomputed test accounting (tasks 11.4–11.5).
 - [x] D7. Full corrected-source validation (`qa:fast`, `qa:full` PASS end-to-end, OpenSpec/plans) and hand back for re-review without pushing (tasks 11.6–11.7).
 
+Third corrective phase (2026-10-03 re-review of the second correction):
+
+- [x] E1. Reactivate from the third correction prompt
+      (`simulation-output/security-correction-rereview-2026-10-03/correction-prompt.md`);
+      preflight reconciliation — HEAD `c62c689`, origin `891ed228`, 553/553
+      protected entries unchanged, 19/19 reviewed source identities (preflight
+      capture committed to the third-correction evidence root).
+- [x] E2. Write the red-capable seam/main + CLI tests FIRST — producer-faithful
+      two-hop pair from `meta-bounds-replay.json`, self-supporting cycle behind a
+      lower intermediary, reworked mixed-advisory meta-below-leaf control — and
+      prove red against `c62c689` (4 failed / 76 passed of 80,
+      `red-before-vitest.log`).
+- [x] E3. P1 — bound every `via` reference hop at
+      `min(anchoredEvidence, referencedFinding.severity)` over an evidence-anchored
+      least fixed point (tasks 12.1); green-after 80/80 (`green-after-vitest.log`).
+- [x] E4. Producer/inherited replay at both seams for pre-fix and corrected
+      sources — 26/26 expected outcomes, impossible parent flips 0 → 1 naming
+      `parent-package` (tasks 12.2; `replay-third.json`).
+- [x] E5. P2 record truth — receipt-completeness narrowing, replay-baseline
+      relabel (`eae3dee`), qa:full chronology → three attempts + fourth run (E‴),
+      requirement-table/checkpoint/local-exhaustion reconciliation, tasks 12.3–12.5,
+      recomputed accounting (80 = 5 + 75; focused 87 = 80 + 7).
+- [x] E6. Full gate battery with complete per-gate receipts (`run-gate.mjs`):
+      typecheck 0, lint 0/0, Prettier, unit+integration 2540/2, OpenSpec 70/70,
+      plan validation, `qa:affected` → `qa:fast` PASS → `qa:full` PASS end-to-end
+      (25.8 m E2E, simulation 23/23), live red retained, resources measured.
+- [x] E7. Task-owned local commits (`9ec0a21`, `7c6b4c7`), post-commit re-earn
+      at each committed SHA, preservation/hygiene recheck, final-state receipt,
+      handback WITHOUT pushing — accepted with notes by the 2026-10-03 re-review
+      (`security-correction-rereview-v3-2026-10-03/review-report.md`); the v3
+      note cleanups (this progress entry, ledger lines, outcomes paragraph,
+      §E″/§E‴ cell/log-name fixes, receipt-field accuracy) were then applied,
+      also without pushing.
+
 Planning history (2026-10-02, completed planning-only request — preserved):
 
 - [x] Read instructions, skills and the complete current brief.
@@ -588,6 +622,47 @@ Second correction (2026-10-03 independent review):
   the second-correction run at its own source; the correction-time wrapper
   non-pass (E′) is preserved and not relabeled by it.
 
+Third-correction ledger (2026-10-03 re-review; every entry below carries a
+complete receipt in `simulation-output/security-correction-third-2026-10-03/`
+— command, exit, pinned toolchain, HEAD, dirty state, before/after owned-file
+hashes — produced by that root's `run-gate.mjs`):
+
+- `red-before`: `npx vitest run tests/auditRuntimeDeps.test.ts` at pre-fix
+  source `c62c689` — FAIL as required, 4 failed / 76 passed of 80
+  (`red-before-vitest.log`), exactly the new multi-hop negatives.
+- `green-after`: same command at corrected source — PASS 80/80
+  (`green-after-vitest.log`); focused audit + guards 87/87
+  (`focused-third.log`); plan/docs 20/20 (`plan-docs-third.log`).
+- `typecheck` — exit 0 (`typecheck-third.log`); `lint` — 0 errors / 0
+  warnings `--max-warnings 0` (`lint-third.log`); scoped Prettier write +
+  check — PASS (`format-write-third.log`, `postcommit-format.log`).
+- `npm test` — PASS **2540 passed / 2 pre-existing opt-in skips** (252 files)
+  (`npm-test-third.log`).
+- `npm run openspec:validate` — PASS 70/70
+  (`openspec-validation-third.log`, `postcommit-openspec.log`);
+  `npm run agent:plan:validate:all` — PASS (`plan-validation-third.log`,
+  `postcommit-plan-validation.log`).
+- `npm run qa:affected -- --files <owned 5 paths>` — `qa:fast → qa:full` +
+  focused plan test (`qa-affected-third.log`).
+- `npm run qa:fast` — PASS (2143 unit tests) (`qa-fast-third.log`).
+- `npm run qa:full` — **PASS end-to-end, exit 0** (`qa-full-third.log`):
+  tests 2540-2, OpenSpec 70/70, hermetic `build:e2e`, `e2e:full` **235 passed /
+  49 skipped / 0 failed (25.8 m)**, deterministic simulation **23/23**. The
+  fourth campaign qa:full run, at the third-corrected source (§E‴). Host
+  resources before launch: 6709 MiB free of 32 GiB, load 0, 20 CPUs
+  (`host-resources.mjs`).
+- `node scripts/audit-runtime-deps.mjs` — exit 1 retained red with
+  documented findings printed (`gate-live-third.log`,
+  `postcommit-gate-live.log`).
+- Producer/inherited replay `replay-third.{json,log}` — 26/26 expected
+  outcomes at both seams for pre-fix and corrected sources.
+- Post-commit re-earn at `9ec0a21`/`7c6b4c7`: focused 107/107 (audit 80 +
+  guards 7 + plan/docs 20), OpenSpec 70/70, plans PASS, lint 0/0,
+  Prettier clean, live red retained, `web:hygiene` PASS — 8081/8082 free
+  (`postcommit-*.log`); final-state receipt
+  `final-state-receipt-third.json`; preservation re-verified 553/553 +
+  19/19 (`preservation-final.json`, `preservation-postcommit.json`).
+
 Planning-era ledger (2026-10-02, preserved verbatim in spirit; see git history
 of this file for the full planning record):
 
@@ -697,6 +772,33 @@ of this file for the full planning record):
   simulation 23/23). Nothing was pushed; the twice-corrected work is handed
   back for independent re-review. Verdict unchanged: PRECISELY BLOCKED;
   overall NOT CERTIFIED.
+- Third correction follow-up (2026-10-03 re-review of the second
+  correction): the review accepted the first two corrections' fixes and the
+  prior five report-coherence false greens as closed, and proved one
+  remaining producer-backed multi-hop severity false green — the evidence
+  bound propagated through `via` reference chains ignored each intermediate
+  finding's own reported severity, so a high meta-parent rode a
+  moderate-only intermediary to a documented-success green at
+  seam/main/CLI — plus three P2 record inconsistencies. All are corrected:
+  every reference hop is capped at `min(anchoredEvidence,
+referencedFinding.severity)` over an evidence-anchored least fixed point
+  (self-supporting cycles cannot bootstrap severity from claimed
+  severities; subset semantics, evidenced cycles, multiple contributors and
+  explicit advisory minimums preserved), with permanent red-capable
+  seam/main + CLI negatives (red-before 4 failing at `c62c689` / green-after
+  80/80; producer + inherited replay 26/26 at both seams for both sources
+  naming `parent-package` in the execution-failure diagnostic), the
+  receipt-completeness overstatement narrowed to the exact per-receipt
+  truth, the replay baseline relabeled to its actual `eae3dee`
+  pre-first-correction base, and the qa:full chronology corrected to three
+  attempts plus this fourth qualifying run. `qa:full` at the
+  third-corrected source passed end-to-end (2540/2, OpenSpec 70/70, E2E
+  235/49/0, simulation 23/23). Nothing was pushed; the thrice-corrected
+  work is handed back for re-review (v3 verdict: Accepted with notes —
+  `security-correction-rereview-v3-2026-10-03/review-report.md` — whose
+  three optional documentation notes were then applied as cleanups, again
+  without pushing). Verdict unchanged: PRECISELY BLOCKED; overall
+  NOT CERTIFIED.
 - Remaining campaign risk: the advisory gate is red until upstream publishes a
   fix; a future apply must re-query state rather than trusting this ledger, and
   must flip the cryptographic tripwire to rejection when a fixed forge lands.
