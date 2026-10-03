@@ -55,7 +55,14 @@ Unfulfilled by design: no safe executable vulnerability repair exists (options-l
 
 ## 7. Scoped fast-forward publication and exact-head hosted gates
 
-Unfulfilled by design: publication requires a proven repaired candidate with green exact-head CI, and the audit gate truthfully remains red while no fixed `node-forge` is published (options-ledger.md). Commits stay local; nothing is pushed.
+The repaired-candidate condition below (publish a fixed forge candidate
+behind green exact-head CI) remains unfulfilled by design — no safe
+executable dependency repair exists (options-ledger.md). **Separately, the
+owner explicitly ordered publication of the accepted gate-hardening candidate
+on 2026-10-03 while the audit stays red; that owner-ordered fast-forward
+push and its hosted-CI outcome are recorded in section 13 — it does not
+satisfy 7.x and does not resolve forge or braces.** No history rewrite, no
+force push.
 
 - [ ] 7.1 After local repair acceptance, review logical commit boundaries, explicit owned staging, status and whitespace before each commit; preserve foreign state and all prohibited-action boundaries.
 - [ ] 7.2 Freeze the source-stable repaired candidate, fetch/recheck divergence, publish by normal fast-forward to main only and verify the exact pushed/local/remote SHA without force push or history rewrite.
@@ -128,3 +135,19 @@ genuinely unchecked.
 - [x] 12.4 P2 — replay-baseline truth: `boundary-replay-fixed.{json,log}` relabeled to its actual pre-first-correction `eae3dee` base (where the original seven were still false greens) in final-report §E″/§G/appendix and ExecPlan checkpoint/ledger, with the actual `0e0c8a8`-base replay attributed to the re-review's own later artifacts; the old artifact is preserved, not overwritten.
 - [x] 12.5 P2 — qa:full chronology truth: final-report §H records three attempts (apply green; first-correction wrapper non-pass + separate simulation-only rerun; second-correction end-to-end success) with their source/receipt limits, and the requirement table/tasks/checkpoint/local-exhaustion claims are reconciled with the new P1 and evidence gaps; conditional 4.x/7.x remain genuinely unchecked.
 - [x] 12.6 Validate corrected source on the pinned toolchain with complete receipts (focused audit/crypto/plan/docs suites 87/87 + 20/20, typecheck 0, zero-warning lint 0/0, scoped Prettier, full unit/integration 2540 passed / 2 pre-existing opt-in skips, OpenSpec 70/70 and versioned-plan validation PASS, owned-path `qa:affected` → `qa:fast` PASS → `qa:full` PASS end-to-end with hermetic build:e2e, E2E 235 passed / 49 skipped / 0 failed and simulation 23/23), retain the live audit red (`gate-live-third.log`), re-verify preservation (553/553 + 19/19)/whitespace/hygiene (8081/8082 free), commit only task-owned paths locally, and hand the corrected work back for independent re-review without pushing.
+
+## 13. Owner-ordered publication of the accepted gate-hardening candidate (2026-10-03)
+
+The three bounded-correction contracts (all "do not push") were satisfied,
+validated and independently accepted (v3 re-review at
+`security-correction-rereview-v3-2026-10-03/review-report.md`: Accepted with
+notes, notes optional and applied). The owner then explicitly instructed
+"push everything to main". This section records that publication and its
+truthful hosted outcome; it does NOT satisfy section 7 (which gates
+publication of a REPAIRED forge candidate on green exact-head CI — no repair
+exists) and does not resolve forge or braces.
+
+- [x] 13.1 Preflight: fetch/reconcile (origin/main `891ed228` still the pushed baseline), confirm normal fast-forward (`git merge-base --is-ancestor origin/main main`), tracked/index clean, "everything" = the 12 unpublished main commits (both other local branches are ancestors of main, verified), then `git push origin main` — fast-forward `891ed22..9c1f843`, no force, no history rewrite; pushed/local remote tips verified equal at `9c1f8436586c9ca26b847bd3657097a4d8d8000d`.
+- [x] 13.2 Hosted CI at the pushed tip (run `37134921791`): `quality` FAILED at exactly the `Audit runtime dependencies` step (exit 1) — checkout/setup/install/typecheck/Deno/edge-functions/lint/theme-tokens/OpenSpec/journey-quarantine-parity/versioned-ExecPlan-validation/unit+integration all passed green; `e2e` and `nightly` skipped (gated on quality; never counted as success). The gate printed TWO undocumented highs (`braces` GHSA-vfj7-8cjw-p6xm — new same-day advisory; `node-forge` GHSA-86w9-cpqp-85rv — retained), i.e. the hardened fail-closed gate is doing its job in hosted CI. Two same-second earlier runs (`37134920947`, `37134921795`) were cancelled by the workflow's `concurrency: cancel-in-progress` design, not gate failures. No green is claimed; PRECISELY BLOCKED and NOT CERTIFIED unchanged.
+- [x] 13.3 Record the publication and hosted outcome in `final-report.md` §A/§D/§F/§I/§J, the ExecPlan (progress/ledger/checkpoint), and the publication receipt + audit excerpt (`security-owner-publication-2026-10-03/`); add the new `braces` observation to the exact upstream conditions in §I without any allowlist/exception/policy change and without re-running an upstream release campaign.
+- [x] 13.4 The publication-record commit's own push run is expected to fail the audit step identically (two undocumented highs) by the gate's design; its actual outcome is captured in `simulation-output/security-owner-publication-2026-10-03/push-receipt.json` + the owner report and is not relabeled by any further commit (no post-push green is claimed anywhere).

@@ -9,13 +9,13 @@ no gate.
 
 ## A. Repository state
 
-| Item                                                    | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Starting HEAD                                           | `891ed228ffc39f002ac13cc62aad2ee0b69ef1fe` == `main` == `origin/main` (re-verified after fetch; no newer remote commit)                                                                                                                                                                                                                                                                                                                                     |
-| Final local state                                       | campaign + correction commits added locally on `main` (commits-created row below); **nothing pushed** — publication is an unfulfilled conditional task (§7) while the audit is truthfully red. The precise final local SHA, remote SHA, dirty status and commit list live in the immutable post-commit receipt `simulation-output/security-correction-2026-10-02/final-state-receipt.json` (this report intentionally does not embed its own commit's hash) |
-| Remote-baseline historical CI (NOT CI at the local tip) | run `36965502815` is historical CI **at the pushed baseline** `891ed228ffc39f002ac13cc62aad2ee0b69ef1fe` (= then `origin/main`): `quality` FAILED at `Audit runtime dependencies`, `e2e` skipped (because quality failed), `nightly` skipped. It is **not** CI on the unpublished local tip, which has no hosted run and none is claimed                                                                                                                    |
-| Foreign state                                           | 125 files across 8 untracked roots byte-verified unchanged (`preservation-baseline-apply.json`); stash `pre-recovery-local-changes` (`c35e281d…`) untouched; one worktree; no reset/stash-drop/force operations                                                                                                                                                                                                                                             |
-| Commits created                                         | local-only, logical (audit seam + tests; dependency/test guards + test-only devDependency; evidence/reconciliation docs; then the 2026-10-02 correction commits: audit schema/exit-threshold boundary + regressions, correction evidence/report docs). No force push, no history rewrite. Exact SHAs in the final-state receipt                                                                                                                             |
+| Item                                                    | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Starting HEAD                                           | `891ed228ffc39f002ac13cc62aad2ee0b69ef1fe` == `main` == `origin/main` (re-verified after fetch; no newer remote commit)                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Final local state                                       | campaign + correction commits added locally on `main` (commits-created row below); **at this record's writing nothing was pushed** — publication was later executed by explicit owner instruction on 2026-10-03 (normal fast-forward `891ed22..9c1f843`; hosted outcome in §F) while the audit stays truthfully red. The precise final local SHA, remote SHA, dirty status and commit list live in the immutable post-commit receipt `simulation-output/security-correction-2026-10-02/final-state-receipt.json` (this report intentionally does not embed its own commit's hash) |
+| Remote-baseline historical CI (NOT CI at the local tip) | run `36965502815` is historical CI **at the pushed baseline** `891ed228ffc39f002ac13cc62aad2ee0b69ef1fe` (= then `origin/main`): `quality` FAILED at `Audit runtime dependencies`, `e2e` skipped (because quality failed), `nightly` skipped. It is **not** CI on the unpublished local tip, which has no hosted run and none is claimed                                                                                                                                                                                                                                          |
+| Foreign state                                           | 125 files across 8 untracked roots byte-verified unchanged (`preservation-baseline-apply.json`); stash `pre-recovery-local-changes` (`c35e281d…`) untouched; one worktree; no reset/stash-drop/force operations                                                                                                                                                                                                                                                                                                                                                                   |
+| Commits created                                         | local-only, logical (audit seam + tests; dependency/test guards + test-only devDependency; evidence/reconciliation docs; then the 2026-10-02 correction commits: audit schema/exit-threshold boundary + regressions, correction evidence/report docs). No force push, no history rewrite. Exact SHAs in the final-state receipt                                                                                                                                                                                                                                                   |
 
 ## B. node-forge root cause
 
@@ -135,9 +135,22 @@ no gate.
 
 ## D. Security result
 
-- **Local audit (`node scripts/audit-runtime-deps.mjs`): exit 1** — 1
-  undocumented high (`node-forge GHSA-86w9-cpqp-85rv [node_modules/node-forge]`).
-  This red is retained by design; faking it green is explicitly out of bounds.
+- **Local audit (`node scripts/audit-runtime-deps.mjs`): exit 1** — 2
+  undocumented highs as of 2026-10-03: the gating forge advisory
+  (`node-forge GHSA-86w9-cpqp-85rv [node_modules/node-forge]`) and, **new
+  today (published after the re-review's 2026-10-03 ~00:27Z live audit —
+  absent from all retained second-correction-era logs),
+  `braces GHSA-vfj7-8cjw-p6xm [node_modules/braces]`** — "braces vulnerable
+  to stack-exhaustion denial of service through deeply nested patterns",
+  HIGH, range `<=3.0.3`: the installed latest (3.0.3 via `tailwindcss@3.4.19`
+  → `chokidar`/`micromatch`, single copy, no `dev` flag) is itself affected,
+  no fixed version is published, and npm's only offered resolution is
+  `tailwindcss@4.3.3` — a major bump NativeWind-4 pins exclude, the same
+  ineligible class as forge. Shipped exposure proven absent by byte-needle
+  scan of the fresh hermetic export (71 files: zero `braces`/`micromatch`/
+  `tailwindcss` hits). **No allowlist entry was added** — a new high stays
+  gating, which is exactly what hosted CI then demonstrated (§F). This red
+  is retained by design; faking it green is explicitly out of bounds.
 - **Remaining highs/criticals:** prod report 12 high / 11 moderate / 0 critical
   package entries (propagated parent entries, not distinct advisories); the only
   high advisories are the documented `brace-expansion` trio (exact-path
@@ -275,7 +288,7 @@ ran. Review evidence roots remain read-only and unchanged (preflight:
 | red-before (pre-fix source `c62c689`) | **4 of the new tests FAIL against the unfixed source** (`red-before-vitest.log`: 4 failed / 76 passed of 80 — exactly the 2 seam/main + 2 CLI multi-hop negatives); the controls (including the reworked meta-below-leaf and the producer two-hop subset control) already pass there, so the new negatives are red-capable and not vacuous                                                                                                                                                                                                                                                             |
 | green-after (corrected source)        | **80/80 audit tests** (`green-after-vitest.log`); the full battery re-run with complete receipts in this table and the Validation Ledger                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | producer-faithful replay              | `replay-third.{json,log}` — the actual pinned npm `Advisory`/`Vuln`/`AuditReport.toJSON()` two-hop payloads plus all 24 inherited boundary cases re-executed at BOTH seams against the pre-fix source AND the corrected source (26/26 expected outcomes): the impossible high parent flips 0 → 1 at seam and CLI with the execution-failure diagnostic naming `parent-package` ("reports severity \"high\" unsupported by its advisory evidence"), the valid two-hop subset control stays 0 at both seams with the documented verdict, and every inherited negative/control keeps its expected outcome |
-| live audit                            | `gate-live-third.log` — exit 1 retained red (undocumented forge high); documented findings still printed; no allowlist/policy change (`DOCUMENTED_BUILD_TIME_ADVISORIES` untouched)                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| live audit                            | `gate-live-third.log` — exit 1 retained red; documented findings still printed; no allowlist/policy change (`DOCUMENTED_BUILD_TIME_ADVISORIES` untouched). **Finding-count note (2026-10-03 publication phase): the retained log shows TWO undocumented highs — the known forge one and the new same-day `braces` GHSA-vfj7-8cjw-p6xm; this row's original "undocumented forge high" wording undercounted it (now corrected in §D); the log itself was always the authoritative record**                                                                                                               |
 | typecheck / lint / format / tests     | `typecheck-third.log` + `typecheck-third-receipt.json` (0 errors), `lint-third.log` + receipt (0 errors / 0 warnings, `--max-warnings 0`), `format-write-third.log` + receipt (all five owned files Prettier-clean), `npm-test-third.log` + receipt — **2540 passed / 2 pre-existing opt-in skips (252 files at corrected source)**; every receipt records command, exit, toolchain, HEAD, dirty state and before/after owned-file hashes                                                                                                                                                              |
 | focused / plan / docs / OpenSpec      | focused audit 80 + crypto guards 7; plan/doc suites; `openspec:validate`; `agent:plan:validate` + `:all` — receipts in the third-correction root                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `qa:affected` → `qa:fast` / `qa:full` | owned-path impact resolution with full receipts; every non-pass preserved and classified                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
@@ -283,18 +296,41 @@ ran. Review evidence roots remain read-only and unchanged (preflight:
 
 ## F. Hosted CI
 
+**Publication executed 2026-10-03 by explicit owner instruction** ("push
+everything to main"): the bounded-correction contracts (all "do not push")
+had been satisfied and accepted (v3 re-review: Accepted with notes at
+`c62c689...7c6b4c7`), and the owner then ordered the publication of that
+accepted gate-hardening candidate while the audit truthfully stays red.
+Normal fast-forward push `891ed22..9c1f843 main -> main` — no force, no
+history rewrite; remote and local tip became
+`9c1f8436586c9ca26b847bd3657097a4d8d8000d` (verified).
+
 - Exact SHA `891ed228ffc39f002ac13cc62aad2ee0b69ef1fe`, run **36965502815**
   (push): `quality` **failure** (audit step), `e2e` **skipped** (because quality
   failed — never counted as success), `nightly` **skipped** (expected on push).
-  No newer run exists; no ancestor success is reused.
-- **No publication occurred**, so there is no post-publication CI to attest:
-  publishing requires a proven repaired candidate with green exact-head
-  quality/audit/E2E (task 7.x, unfulfilled). The campaign's local commits are
-  the prepared candidate for the resume in J.
-- Run `36965502815` is labeled **remote-baseline historical CI** (2026-10-02
-  review correction): it attests only the pushed baseline `891ed228`. The
-  unpublished local tip (apply + correction commits) has **no** hosted CI run,
-  and no exact-head hosted claim is made for it.
+  No ancestor success is reused.
+- **Published tip `9c1f8436586c9ca26b847bd3657097a4d8d8000d`, run
+  37134921791** (push): `quality` **FAILED at exactly the
+  `Audit runtime dependencies` step** (exit code 1) — every other quality
+  step passed green on hosted CI (checkout, setup, install, typecheck,
+  Deno install, Supabase edge-fn type-check, lint, theme-token validation,
+  OpenSpec validation, journey/quarantine parity, ExecPlan validation,
+  unit+integration tests); `e2e` and `nightly` **skipped** (gated on
+  quality). The gate printed `[UNDOCUMENTED] high braces GHSA-vfj7-8cjw-p6xm`
+  (new same-day advisory, §D) and `[UNDOCUMENTED] high node-forge
+GHSA-86w9-cpqp-85rv` — the fail-closed gate and the retained red are doing
+  their job in hosted CI; **no green is claimed anywhere**. Two earlier
+  same-second runs (37134920947, 37134921795) were cancelled by the
+  workflow's own `concurrency: cancel-in-progress` design and are not
+  failures of the gate. Run excerpt retained:
+  `simulation-output/security-owner-publication-2026-10-03/ci-run-37134921791-audit-excerpt.log`.
+- The publication-record commit created immediately below gets its own run,
+  expected to fail the audit step identically by design; its outcome is
+  recorded in the publication receipt, not relabeled.
+- Run `36965502815` remains labeled **remote-baseline historical CI** (never
+  CI at the newer tips). The §7 repaired-candidate condition (green
+  exact-head quality/audit/E2E) remains unfulfilled — publication of the
+  hardening work does not resolve §7 and does not resolve forge or braces.
 
 ## G. Regression protection (executing, non-vacuous)
 
@@ -430,6 +466,16 @@ ran. Review evidence roots remain read-only and unchanged (preflight:
   (2) a supported `@expo/cli` / `@expo/code-signing-certificates` release
   removing **both** vulnerable paths;
   (3) a proven safe supported substitution with its own provenance.
+  **NEW 2026-10-03 upstream observation — `braces`:**
+  `GHSA-vfj7-8cjw-p6xm` (HIGH, "stack-exhaustion denial of service through
+  deeply nested patterns", range `<=3.0.3`) is an additional gate blocker
+  with its own exact resume condition: a published fixed `braces` release
+  (`>3.0.3`) reaching both consumer paths (`tailwindcss@3.4.19` →
+  `chokidar@3.6.0` and `micromatch@4.0.8`), or a supported non-breaking
+  parent/toolchain change (npm's only offered resolution,
+  `tailwindcss@4.3.3`, is a major NativeWind-4 pin exclusion — re-query
+  upstream state before any attempt; disclose/fix state first observed
+  2026-10-03).
   **Exact resume:** fetch then-current `main`; re-query advisory/registry/parent
   metadata; repeat the graph/exposure checks; pursue only an evidenced safe
   candidate (options-ledger order); then run tasks 4.x (repair + guards),
@@ -462,8 +508,13 @@ three P2 record inconsistencies; the P1 is closed with an intermediate-bound
 evidence propagation (each reference capped by the referenced finding's own
 reported severity over an evidence-anchored least fixed point), permanent
 seam/main + CLI negatives with the producer-faithful two-hop subset control
-(§E‴), and the P2 records are corrected above. The live forge red,
-PRECISELY BLOCKED and NOT CERTIFIED verdicts are unchanged by design.
+(§E‴), and the P2 records are corrected above. The live audit red,
+PRECISELY BLOCKED and NOT CERTIFIED verdicts are unchanged by design; it now
+reports TWO undocumented highs — forge and the new same-day `braces`
+advisory (§D/§I). After the v3 acceptance the owner explicitly ordered
+publication of the accepted candidate (§F); hosted CI at the pushed tip
+fails exactly the audit step, so the blocked verdict and the red gate remain
+truthful — publication resolves neither advisory.
 Each correction is audit-gate correctness only and is explicitly **not**
 claimed to resolve forge.
 Unfulfilled conditional tasks (4.x dependency repair, 7.x publication) remain

@@ -186,6 +186,13 @@ actual impact requires it.
   tasks 4.x and 7.x remain unchecked by design; overall NOT CERTIFIED,
   canonical 17/22, historical Android/J8, deferred iOS and production limits
   are intact.
+- Publication addendum (2026-10-03, owner-ordered): the accepted candidate
+  was subsequently published to `main` by explicit owner instruction
+  (`891ed22..9c1f843` fast-forward; hosted run `37134921791` failed exactly
+  the audit step with both undocumented highs — forge + new `braces`), and
+  the publication-record commit records it (tasks §13). This addendum does
+  not reopen the plan and changes no verdict; hosted success conditions
+  (7.x) remain unfulfilled by design.
 
 ## Second-correction checkpoint (2026-10-03 review, preserved)
 
@@ -376,6 +383,17 @@ Third corrective phase (2026-10-03 re-review of the second correction):
       note cleanups (this progress entry, ledger lines, outcomes paragraph,
       §E″/§E‴ cell/log-name fixes, receipt-field accuracy) were then applied,
       also without pushing.
+- [x] E8. Owner-ordered publication (explicit owner instruction "push
+      everything to main"): preflight fetch/fast-forward/clean-state checks,
+      fast-forward push `891ed22..9c1f843` (all 12 unpublished main commits; no
+      force), hosted CI inspected at the pushed tip — quality failed at exactly
+      the audit step (gate printed BOTH undocumented highs: new same-day
+      `braces` GHSA-vfj7-8cjw-p6xm and retained `node-forge`
+      GHSA-86w9-cpqp-85rv), e2e/nightly skipped; publication + outcome + the new
+      braces observation recorded in final-report §A/§D/§F/§I/§J, tasks §13,
+      ledger below, and `simulation-output/security-owner-publication-2026-10-03/`.
+      Verdict stays PRECISELY BLOCKED; nothing green is claimed; §7 repaired-
+      candidate conditions remain unfulfilled.
 
 Planning history (2026-10-02, completed planning-only request — preserved):
 
@@ -654,6 +672,24 @@ hashes — produced by that root's `run-gate.mjs`):
 - `node scripts/audit-runtime-deps.mjs` — exit 1 retained red with
   documented findings printed (`gate-live-third.log`,
   `postcommit-gate-live.log`).
+
+Publication-phase ledger (2026-10-03, owner-ordered; raw evidence under
+`simulation-output/security-owner-publication-2026-10-03/`):
+
+- `git push origin main` — fast-forward `891ed22..9c1f843`, no force; pushed
+  tip verified = local tip (`9c1f8436586c9ca26b847bd3657097a4d8d8000d`);
+  tracked/index clean before push; both other local branches verified
+  ancestors of main ("everything" = the 12 main commits).
+- Hosted CI run `37134921791` at the pushed tip — quality FAILED at exactly
+  the audit step (exit 1), all other quality steps green, e2e + nightly
+  skipped; two same-second runs cancelled by the workflow's
+  cancel-in-progress concurrency (not gate failures); audit excerpt
+  retained; no green claimed anywhere.
+- Fresh prod audit + npm-ls + lockfile + dist byte-needle scan recorded the
+  NEW same-day `braces` GHSA-vfj7-8cjw-p6xm high (installed 3.0.3, tailwind
+  toolchain only, ≤3.0.3 no fixed release, offered fix = breaking
+  tailwindcss@4.3.3 major, zero shipped-output exposure) — recorded in
+  final-report §D/§I with no allowlist/policy change.
 - Producer/inherited replay `replay-third.{json,log}` — 26/26 expected
   outcomes at both seams for pre-fix and corrected sources.
 - Post-commit re-earn at `9ec0a21`/`7c6b4c7`: focused 107/107 (audit 80 +
