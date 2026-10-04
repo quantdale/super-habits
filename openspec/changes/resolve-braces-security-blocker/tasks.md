@@ -25,16 +25,16 @@
 - [x] 4.1 Enumerate every source-map section of the retained hermetic web export: 3 maps, 1992 sources, zero `braces`/`micromatch`/`chokidar`/`tailwindcss` modules (`export-web-braces-analysis.json`)
 - [x] 4.2 Enumerate the retained hermetic Android JS export: 1 map, 2342 sources, zero module hits (`export-android-braces-analysis.json`)
 - [x] 4.3 Corroborate with whole-output byte scans of `dist/`, `dist-sync/`, and both exports; classify every `braces` hit as the React error string or MaterialCommunityIcons glyph names and the one `tailwindcss` hit as the generated-CSS banner inside map `sourcesContent`
-- [x] 4.4 Show source identity for export reuse: `git diff --stat 891ed228..HEAD` contains no `app/`, `features/`, `core/`, `lib/` or bundling source; `dist` and the retained web export share the bundle filename identity (`entry-8c182cd879ebc5bb55e236aa4a22b362`)
+- [x] 4.4 Show source identity for export reuse: `git diff --stat 891ed228..HEAD` contains no `app/`, `features/`, `core/`, `lib/` or bundling source; `dist` and the retained web export share the bundle filename identity (`entry-8c182cd879ebc5bb55e236aa4a22b362`) — corrected 2026-10-04: filename identity only, bytes differ, byte identity was never claimed, and no cause for the difference is asserted (`dist-env-markers.json` retracts the earlier ambient-`.env` explanation)
 - [x] 4.5 Scan the on-disk APK with the existing archive scanner: zero hits for `micromatch`/`chokidar`/`tailwindcss`/`node-forge`; the single `braces` entry hit is the icon glyph map; record the provenance-mismatched hash `F3D9A63C…` (`apk-braces-scan.json`)
 - [x] 4.6 Inspect edge/server sources: `supabase/functions/**` imports no `braces`/`micromatch`
-- [x] 4.7 Characterize every tooling call site and its input provenance (`tooling-call-sites.txt`): micromatch compiles repository/config patterns; chokidar expands watch paths containing `{` only in `tailwindcss --watch`; Metro/Jest matchers test file paths against config globs; no runtime or untrusted-input path exists
+- [x] 4.7 Characterize every executed tooling call site and its input provenance (`tooling-call-sites.txt`, corrected 2026-10-04; `braces-callsite-ledger.json`, `api-reachability.json`): only `micromatch.parse`/`micromatch.braces` (reached by `fast-glob`'s Tailwind content-glob expansion) and `chokidar`'s `braces.expand` (Tailwind `--watch` paths containing `{`) enter the vulnerable parser; `matcher`/`some`/`any`/main calls use picomatch only; all observed inputs are repository/config-owned. npm-invisible bundled copies are recorded separately (`vendored-braces-detection.json`: rollup ×2, vite, prettier, resolve-workspace-root).
 
 ## 5. Remediation ladder
 
 - [x] 5.1 Patched release: none — latest `braces` is `3.0.3` (2024-05-21), advisory range `<=3.0.3`, `patched_versions` absent, upstream PR #72 open/unmerged (head `28d440b5`, updated 2026-10-03), tags end at `3.0.3`, and the PR does not bump the package version
 - [x] 5.2 Compatible parent update: none — `chokidar@3.6.0` is the last 3.x; `micromatch@4.0.8` is latest; `tailwindcss@3.4.19` is the `v3-lts` tag; `fast-glob@3.3.3` latest still requires `micromatch@^4.0.8`; `metro-file-map` `0.83.8`/`0.84.6`/`0.87.1` all require `micromatch@^4.0.4`; `@jest/transform@30.5.2` still uses `jest-haste-map@30.5.1` (`registry-state.json`)
-- [x] 5.3 npm override: no fixed version exists to target; a git-ref override to unmerged PR #72 is rejected (unreleased, unreviewed, provenance change, and the unchanged package version keeps the advisory match); no drop-in replacement package is published (`registry-state.json`, `final-report.md` §E)
+- [x] 5.3 npm override: no fixed version exists to target; a git-ref override to unmerged PR #72 is rejected (unreleased, unreviewed, provenance change, and the unchanged package version keeps the advisory match). Bounded substitution assessment (corrected 2026-10-04; `substitution-assessment.json`): `brace-expansion` is not a drop-in (installed 2.1.4 has no `expand`/`compile`/`parse`/`stringify`/`create`; published 5.0.12 is an object with `expand` only and is not callable, while micromatch calls `braces(pattern, options)` as a function), and `picomatch` is a matcher only. Assessment limits are recorded in the artifact.
 - [x] 5.4 Path removal: rejected — `braces` has exactly two direct parents (`chokidar` = Tailwind watch tooling only; `micromatch` = Metro/Expo, React Native's Jest stack, Tailwind content matching, openspec, patch-package); none is removable without replacing framework build/test tooling
 - [x] 5.5 Smallest family upgrade (npm's own suggestion, Tailwind 4): rejected — breaking (Tailwind 4 publishes zero dependencies but NativeWind 4 / `react-native-css-interop` peer `tailwindcss ~3`; only the `nativewind@5.0.0-rc.0` preview supports Tailwind 4) **and** insufficient (Metro/Jest `micromatch` paths remain, so the audit finding persists)
 - [x] 5.6 Major tooling upgrade (Expo/React Native/Metro families): rejected — every inspected latest release still requires `micromatch`, the migration is disproportionate, and it would not clear the finding
@@ -60,3 +60,12 @@
 
 - [ ] 8.1 Land a safe `braces` remediation if a published patched release or a safe compatible parent/override target appears — NOT EARNED: no such target exists upstream as of 2026-10-03
 - [ ] 8.2 Re-run dependency mutation validation (`npm ci`, `npm ls braces --all`, `npm audit`, gate) and the impact-appropriate QA if a remediation is landed — NOT EARNED: no dependency change is made
+
+## 9. Independent-review correction pass (2026-10-04)
+
+- [x] 9.1 Regenerate executed call-site provenance: `enumerate-braces-callsites.mjs` → `braces-callsite-ledger.json`; `probe-braces-api-reachability.mjs` → `api-reachability.json`
+- [x] 9.2 Detect npm-invisible bundled braces copies: `detect-vendored-braces.mjs` → `vendored-braces-detection.json` (rollup ×2, vite, prettier, resolve-workspace-root)
+- [x] 9.3 Bounded substitution assessment: `substitution-assessment.mjs` → `substitution-assessment.json`
+- [x] 9.4 Correct toolchain attribution: `capture-toolchain-attribution.mjs` → `toolchain-attribution.txt` (ambient Node v24.3.0/npm 11.4.2 ran preflight, first gate and full audit; gate/production audit reproduced on pinned Node v22.23.2/npm 10.9.8)
+- [x] 9.5 Retract the unsupported ambient-`.env` byte explanation: `compare-dist-env-markers.mjs` → `dist-env-markers.json`
+- [x] 9.6 Correct `final-report.md` §D/§E/§H and this plan's context/validation records; reconciliation QA recorded in §H

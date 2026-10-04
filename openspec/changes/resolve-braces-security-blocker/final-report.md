@@ -38,7 +38,11 @@ node_modules/braces@3.0.3   (no dev flag; registry tarball)
 Complete parent/consumer record: `npm-explain-braces-full.txt`,
 `npm-ls-braces.txt`, `braces-path-ledger.json`. `npm ls --omit=dev
 micromatch --all` confirms the Metro and React Native Jest paths are production
-(`--omit=dev` output in the validation log).
+(`--omit=dev` output in the validation log). **Correction (2026-10-04):** this
+is the npm package graph. It understates braces presence: installed tool
+distributions also bundle their own parser copies (rollup ×2, vite, prettier,
+resolve-workspace-root) that `npm ls`/`npm audit` cannot see
+(`vendored-braces-detection.json`).
 
 ## C. Advisory state
 
@@ -78,7 +82,11 @@ hits are the React error string "wrap your children in braces" and
 MaterialCommunityIcons glyph names (`code-braces`, `cloud-braces`); the one
 `tailwindcss` hit is the generated-CSS banner in map `sourcesContent`.
 Current `dist/` and `dist-sync/` byte scans: zero `micromatch`/`chokidar`/
-`tailwindcss`/`node-forge`; same classified `braces` false positives.
+`tailwindcss`/`node-forge`; same classified `braces` false positives. The
+current `dist/` bundle shares the retained export's filename but not its
+bytes; byte identity is not claimed, and after the 2026-10-04 correction no
+cause for the difference is asserted (`dist-env-markers.json` retracts the
+earlier ambient-`.env` explanation).
 
 ### Shipped Android JS (hermetic export, source maps)
 
@@ -105,25 +113,31 @@ package name. No other deployed server artifact exists in the repository.
   that could be checked.
 - **B. Runtime API reachability:** no runtime path — no application or server
   source imports the package; the vulnerable parser is not in any bundle.
-- **C. Tooling exposure:** the affected parser **is** executed by build/test
-  tooling (Tailwind content matcher over `tailwind.config.js` content globs;
-  Metro `metro-file-map` matching file paths against build-config globs; Jest
-  tooling present via React Native; `openspec`/`patch-package` dev flows;
-  `chokidar` only in `tailwindcss --watch`). In every case the vulnerable
-  _pattern_ input is repository/configuration-controlled, and no untrusted or
-  user-controlled string reaches it (`tooling-call-sites.txt`).
+- **C. Tooling exposure (corrected 2026-10-04):** the affected parser **is**
+  executed by build/test tooling, but only through specific entry points:
+  `micromatch.parse`/`micromatch.braces`, reached by `fast-glob@3.3.3`
+  (`out/utils/pattern.js:137`) when `tailwindcss` expands
+  `tailwind.config.js` content globs, and `chokidar`'s `braces.expand`
+  (`index.js:258`) only for `tailwindcss --watch` paths containing `{`.
+  `micromatch.matcher`/`some`/`any`/main and the Jest/Metro consumers use
+  picomatch only and do not enter the parser (`api-reachability.json`,
+  `tooling-call-sites.txt`). Installed tool distributions also bundle
+  npm-invisible parser copies (rollup ×2, vite, prettier,
+  resolve-workspace-root). In every observed case the vulnerable _pattern_
+  input is repository/configuration-controlled, and no untrusted or
+  user-controlled string reaches it.
 
 ## E. Options tested
 
-| #   | Candidate                   | Result                                          | Evidence / reason                                                                                                                                                                                                                                                         |
-| --- | --------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Patched `braces` release    | **Rejected — none exists**                      | Latest 3.0.3 = vulnerable version; `first_patched: null`; PR #72 open/unmerged, unreleased, no version bump                                                                                                                                                               |
-| 2   | Compatible parent update    | **Rejected — none exists**                      | `chokidar` 3.x ends at 3.6.0; `micromatch` ends at 4.0.8; `tailwindcss` 3.x ends at 3.4.19 (`v3-lts`); `fast-glob` 3.3.3 still requires `micromatch ^4.0.8`; `metro-file-map` 0.83.8/0.84.6/0.87.1 all `^4.0.4`; `@jest/transform` 30.5.2 still `jest-haste-map` 30.5.1   |
-| 3   | npm override                | **Rejected — no target**                        | No fixed version exists to point at; PR #72 git-ref override rejected (unreleased/unreviewed, provenance change, version stays 3.0.3 so the advisory still matches); no published drop-in replacement                                                                     |
-| 4   | Remove the path             | **Rejected — not removable**                    | Parents are Tailwind (via `chokidar` and `micromatch`), Expo's `metro-file-map`, React Native's Jest stack, `openspec`, `patch-package`; replacing them means replacing the build/test framework                                                                          |
-| 5   | Smallest family upgrade     | **Rejected — breaking AND insufficient**        | `tailwindcss@4.3.3` publishes zero dependencies but NativeWind 4 / `react-native-css-interop` peer `tailwindcss ~3`; only `nativewind@5.0.0-rc.0` (preview/RC) supports Tailwind 4; and the Metro/Jest `micromatch` production paths persist, so the finding would remain |
-| 6   | Major tooling upgrade       | **Rejected — disproportionate and ineffective** | Latest `@expo/metro` → `metro-file-map@0.84.6` still `micromatch ^4.0.4`; React Native Jest stack still `micromatch`; no inspected release removes the path                                                                                                               |
-| 7   | Narrow documented exemption | **Rejected — not added**                        | Affected recursive walkers are executed by tooling; gate policy is preserved strictly; an entry would not clear CI while `node-forge` remains undocumented, and prefer-truthful-red discipline applies                                                                    |
+| #   | Candidate                   | Result                                          | Evidence / reason                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --- | --------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Patched `braces` release    | **Rejected — none exists**                      | Latest 3.0.3 = vulnerable version; `first_patched: null`; PR #72 open/unmerged, unreleased, no version bump                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 2   | Compatible parent update    | **Rejected — none exists**                      | `chokidar` 3.x ends at 3.6.0; `micromatch` ends at 4.0.8; `tailwindcss` 3.x ends at 3.4.19 (`v3-lts`); `fast-glob` 3.3.3 still requires `micromatch ^4.0.8`; `metro-file-map` 0.83.8/0.84.6/0.87.1 all `^4.0.4`; `@jest/transform` 30.5.2 still `jest-haste-map` 30.5.1                                                                                                                                                                                                                                                                                               |
+| 3   | npm override                | **Rejected — no target**                        | No fixed version exists to point at; PR #72 git-ref override rejected (unreleased/unreviewed, provenance change, version stays 3.0.3 so the advisory still matches). 2026-10-04 bounded substitution assessment (`substitution-assessment.json`): `brace-expansion` not a drop-in (installed 2.1.4 lacks `expand`/`compile`/`parse`/`stringify`/`create`; published 5.0.12 is an object exposing `expand` only and is not callable, while micromatch calls `braces(pattern, options)` as a function); `picomatch` is a matcher only; limits recorded in the artifact. |
+| 4   | Remove the path             | **Rejected — not removable**                    | Parents are Tailwind (via `chokidar` and `micromatch`), Expo's `metro-file-map`, React Native's Jest stack, `openspec`, `patch-package`; replacing them means replacing the build/test framework                                                                                                                                                                                                                                                                                                                                                                      |
+| 5   | Smallest family upgrade     | **Rejected — breaking AND insufficient**        | `tailwindcss@4.3.3` publishes zero dependencies but NativeWind 4 / `react-native-css-interop` peer `tailwindcss ~3`; only `nativewind@5.0.0-rc.0` (preview/RC) supports Tailwind 4; and the Metro/Jest `micromatch` production paths persist, so the finding would remain                                                                                                                                                                                                                                                                                             |
+| 6   | Major tooling upgrade       | **Rejected — disproportionate and ineffective** | Latest `@expo/metro` → `metro-file-map@0.84.6` still `micromatch ^4.0.4`; React Native Jest stack still `micromatch`; no inspected release removes the path                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 7   | Narrow documented exemption | **Rejected — not added**                        | Affected recursive walkers are executed by tooling; gate policy is preserved strictly; an entry would not clear CI while `node-forge` remains undocumented, and prefer-truthful-red discipline applies                                                                                                                                                                                                                                                                                                                                                                |
 
 ## F. Node-forge refresh
 
@@ -154,22 +168,27 @@ edit.
 
 ## H. Validation
 
-| Command (pinned Node `v22.23.2` / npm `10.9.8`)                | Outcome                                                                                                                  |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `node scripts/audit-runtime-deps.mjs`                          | exit 1; exactly 2 undocumented highs (`braces`, `node-forge`) + 3 documented `brace-expansion`; unchanged by this change |
-| `npm audit --json` / `npm audit --omit=dev --json`             | exit 1; reports retained                                                                                                 |
-| `npm ls braces --all` / `npm explain braces`                   | single copy; two direct parents; full consumer paths                                                                     |
-| `npm ls --omit=dev micromatch --all`                           | production consumers confirmed (Metro, Jest stack, Tailwind)                                                             |
-| Source-map module-graph analyses (web/Android)                 | 0 module hits (1992 / 2342 sources)                                                                                      |
-| Byte scans (`dist/`, `dist-sync/`, exports) + APK archive scan | 0 package hits; all name hits classified                                                                                 |
-| `npm run openspec:validate`                                    | passes all items, including this change                                                                                  |
-| `npm run agent:plan:validate:all`                              | passes, including this BLOCKED plan                                                                                      |
+| Command (toolchain as actually executed)                                                             | Outcome                                                                                                                                                                                           |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `node scripts/audit-runtime-deps.mjs` (first run, ambient Node `v24.3.0` / npm `11.4.2`)             | exit 1; 2 undocumented highs + 3 documented `brace-expansion`; later reproduced pinned (retained `audit-gate.log`)                                                                                |
+| `npm audit --json` (ambient) / `npm audit --omit=dev --json` (pinned)                                | exit 1; reports retained                                                                                                                                                                          |
+| `npm ls braces --all` / `npm explain braces` (`npm ls` ambient; explain pinned)                      | single copy; two direct parents; full consumer paths (pinned reproductions in `toolchain-attribution.txt`)                                                                                        |
+| `npm ls --omit=dev micromatch --all`                                                                 | production consumers confirmed (Metro, Jest stack, Tailwind)                                                                                                                                      |
+| Source-map module-graph analyses (web/Android)                                                       | 0 module hits (1992 / 2342 sources)                                                                                                                                                               |
+| Byte scans (`dist/`, `dist-sync/`, exports) + APK archive scan                                       | 0 package hits; all name hits classified                                                                                                                                                          |
+| Executed call-site / API-reachability / vendored-copy / substitution assessment (pinned, 2026-10-04) | corrected evidence in `tooling-call-sites.txt`, `braces-callsite-ledger.json`, `api-reachability.json`, `vendored-braces-detection.json`, `substitution-assessment.json`, `dist-env-markers.json` |
+| `npm run qa:fast` (pinned, 2026-10-03, pre-commit)                                                   | PASS; 171 files / 2143 tests, plus journey-label/quarantine-register/release-profile parity                                                                                                       |
+| Focused security/documentation suites (pinned, pre-commit)                                           | PASS; 6 files / 121 tests (auditRuntimeDeps 80, nodeForgeSecurityGuards 7, agent-execplan 9, agentDocConsistency 11, Maestro guards 14)                                                           |
+| `npm run openspec:validate`                                                                          | passes all items, including this change (re-run 2026-10-04)                                                                                                                                       |
+| `npm run agent:plan:validate:all`                                                                    | passes, including this BLOCKED plan (re-run 2026-10-04)                                                                                                                                           |
 
-No dependency-mutation QA (`npm ci`, `qa:fast`, `qa:full`) was earned: the
-locked dependency graph is untouched. Build-tool validation was done as read-only
-artifact/module-graph inspection of the existing hermetic exports, whose
-source-identity alignment with HEAD is proven in §B/§D and in the ExecPlan
-discoveries.
+`npm ci` and `qa:full` were not run because no dependency changed; the locked
+graph is untouched. Build-tool validation was read-only artifact/module-graph
+inspection of the retained source-bound exports, whose source identity with
+HEAD is shown in §B/§D (the byte difference at equal filename is not claimed
+as identity). `qa:fast` and the focused suites did run on the pinned toolchain
+before the record commit; the earlier statement that no QA was earned was
+incorrect and is superseded by this table.
 
 ## I. Exact-head CI
 
@@ -220,3 +239,29 @@ compatible parent or override target, no removable path, and no proportionate
 family upgrade that would clear the finding), and `node-forge` was refreshed to
 `NO MATERIAL UPSTREAM CHANGE`. The audit gate remains truthfully red; the
 resume matrix above is the exact continuation point.
+
+## N. Independent-review corrections (2026-10-04)
+
+An independent two-axis review of the `8255546`→`1688252` record found six
+valid evidence/reporting defects. All six are resolved in this addendum's
+sibling edits and the regenerated evidence; the security verdict does not
+change.
+
+1. **Tooling provenance completed and corrected.** `tooling-call-sites.txt` now
+   records the executed APIs per consumer and each input's provenance, backed
+   by `braces-callsite-ledger.json` and `api-reachability.json`. The genuine
+   parser entry points are `micromatch.parse`/`micromatch.braces` (via
+   `fast-glob`) and `chokidar`'s `braces.expand`; `matcher`/`some`/`any`/main
+   calls are picomatch-only.
+2. **Reachability classification corrected** in §D/C above.
+3. **npm-invisible bundled copies recorded** (rollup ×2, vite, prettier,
+   resolve-workspace-root) in §B and §D/C.
+4. **Substitution rejection now assessed**, not asserted (§E option 3).
+5. **Toolchain attribution corrected** in §H; ambient Node `v24.3.0`/npm
+   `11.4.2` ran the preflight, first gate and full audit, with pinned
+   reproductions for the retained gate and production audit
+   (`toolchain-attribution.txt`).
+6. **QA reconciliation and byte-claim retraction** in §H/the export note: the
+   earlier ambient-`.env` byte-difference explanation is withdrawn
+   (`dist-env-markers.json`), and the pre-commit `qa:fast`/focused-suite runs
+   are recorded instead of being described as unearned.

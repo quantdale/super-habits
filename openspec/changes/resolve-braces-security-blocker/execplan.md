@@ -27,11 +27,14 @@ weakening, no dependency relocation, no framework migration just to satisfy
 82555461800bea2a0e5ba7cebd5c7db306691476`. Exact-head CI run `37136146011`
   fails `quality` exactly at `Audit runtime dependencies`; `e2e` and `nightly`
   are skipped because quality failed.
-- Pinned toolchain for every gate: Node `v22.23.2`, npm `10.9.8`
-  (`/c/Users/palac/AppData/Local/tools/node-v22.23.2-win-x64`). Ambient Node
-  `v24.3.0` / npm `11.4.2` ran no gate; its extra `npm ls` "invalid" markers
-  were confirmed as ambient-tool artifacts and are absent under the pinned
-  toolchain.
+- Toolchain history (corrected 2026-10-04; `toolchain-attribution.txt`): the
+  preflight, first audit gate and full `npm audit` ran under the ambient
+  toolchain (Node `v24.3.0` / npm `11.4.2`); the retained gate log, the
+  production audit and every later gate were reproduced on the pinned
+  toolchain (Node `v22.23.2`, npm `10.9.8`,
+  `/c/Users/palac/AppData/Local/tools/node-v22.23.2-win-x64`). The ambient
+  `npm ls` "invalid" markers were confirmed as ambient-tool artifacts and are
+  absent under the pinned toolchain.
 - Prior artifact: `resolve-windows-dependency-security` (Status COMPLETED,
   verdict `PRECISELY BLOCKED`) owns the `node-forge` campaign. Its exposure
   findings and audit-boundary hardening are preserved, not rewritten.
@@ -80,21 +83,32 @@ weakening, no dependency relocation, no framework migration just to satisfy
   derived `range: *` distinction; source-map module-graph exclusion for the web
   (1992 sources) and Android (2342 sources) exports; whole-output byte scans of
   `dist/`, `dist-sync/`, and both exports with every hit classified; APK
-  supplementary scan; edge-source inspection; tooling call-site provenance;
+  supplementary scan; edge-source inspection; tooling call-site provenance
+  (corrected 2026-10-04 with executed-API and input-provenance evidence);
   remediation ladder rejection evidence; `NO MATERIAL UPSTREAM CHANGE` for
-  `node-forge`; OpenSpec change and ExecPlan written.
-- In progress: none — triage and its records are complete; only upstream
-  remediation remains, and it is blocked.
+  `node-forge`; OpenSpec change and ExecPlan written; independent-review
+  correction pass executed (executed call-site ledger, API-reachability proof,
+  npm-invisible vendored-copy detection, bounded substitution assessment,
+  toolchain attribution, byte-claim retraction) and re-validated.
+- In progress: none — the triage, its records and the review-correction pass
+  are complete; only upstream remediation remains, and it is blocked.
 - Important modified files: `openspec/changes/resolve-braces-security-blocker/`
   (`proposal.md`, `specs/braces-security-triage/spec.md`, `tasks.md`,
   `execplan.md`, `final-report.md`, `.openspec.yaml`). No dependency, source,
-  test, audit-script, or workflow file is modified.
+  test, audit-script, or workflow file is modified. Correction-pass evidence
+  lives in `simulation-output/security-braces-triage/` (call-site ledger,
+  API-reachability proof, vendored-copy detection, substitution assessment,
+  toolchain attribution, dist/export markers).
 - Last successful validation: pinned Node `v22.23.2` / npm `10.9.8` —
   `node scripts/audit-runtime-deps.mjs` exit 1 reproducing exactly the two
   undocumented highs and three documented entries; `npm run openspec:validate`
   passes all items including this change; `npm run agent:plan:validate:all`
   passes, including this BLOCKED plan; module-graph analyses and APK scan
-  completed with zero package-module hits.
+  completed with zero package-module hits; `npm run qa:fast` 171 files / 2143
+  tests and the six focused suites (121 tests) passed on the pinned toolchain
+  before the record commit; the 2026-10-04 correction pass re-validated
+  call-site/API/vendored/substitution evidence and re-ran OpenSpec, plan
+  validation, the six focused suites and `web:hygiene`.
 - Current failures: exact-head CI `quality` fails at the dependency audit by
   design because two real undocumented high advisories remain; `e2e` is
   skipped behind it. Both advisories are upstream-blocked with no published
@@ -131,9 +145,11 @@ tests/nodeForgeSecurityGuards.test.ts`), plus any new braces guard, and the
   build-tool validation if resolution/bundling changes); then follow the
   publication rules with exact-head green CI. Resume commands are recorded in
   `final-report.md` §L.
-- Exact next action: **hold.** No Windows-executable work remains. Resume only
-  from the unblock condition above, using the exact commands in
-  `final-report.md` §L.
+- Exact next action: **hold after the owner-ordered publication of the
+  corrected records.** The correction pass is complete and validated; publish
+  it, record the exact-head CI outcome truthfully (the audit stays red on both
+  upstream advisories), then resume only from the unblock condition above
+  using the exact commands in `final-report.md` §L.
 - Remaining definition of done: the two conditional tasks in `tasks.md` §8
   (8.1 land a safe remediation, 8.2 dependency-mutation validation) remain
   unchecked because no safe remediation exists; every other task is checked
@@ -149,6 +165,7 @@ tests/nodeForgeSecurityGuards.test.ts`), plus any new braces guard, and the
 - [x] 5. Full remediation ladder with evidence and rejection reasons
 - [x] 6. Bounded `node-forge` refresh — `NO MATERIAL UPSTREAM CHANGE`
 - [x] 7. Records, dual-blocker resume matrix, validation, owned-path commit
+- [x] 9. Independent-review correction pass (executed call-site provenance, npm-invisible vendored copies, bounded substitution assessment, toolchain attribution, byte-claim retraction) and re-validation
 - [ ] 8. Conditional safe remediation and dependency-mutation validation — blocked upstream (not earned)
 
 ## Surprises & Discoveries
@@ -170,6 +187,26 @@ tests/nodeForgeSecurityGuards.test.ts`), plus any new braces guard, and the
   bundle identity while bytes differ because ambient `.env` Supabase values are
   inlined by plain `build:web`; the retained map evidence remains valid because
   no application or bundling source changed between the export commit and HEAD.
+- **Corrected 2026-10-04:** the export/`dist` claim above is narrowed to
+  filename identity only. Their bytes differ, the earlier ambient-`.env`
+  inlining explanation is retracted (neither bundle contains the configured
+  Supabase host — `dist-env-markers.json`), and no cause for the byte
+  difference is asserted. The retained module-graph evidence remains valid on
+  source identity: no application/bundling source or resolved package changed
+  between the export source commit and HEAD.
+- **Corrected 2026-10-04:** the executed vulnerable-parser entry points are
+  `micromatch.parse`/`micromatch.braces` (reached by `fast-glob`'s Tailwind
+  content-glob expansion) and `chokidar`'s `braces.expand`; `matcher`, `some`,
+  `any` and main micromatch calls use picomatch only
+  (`api-reachability.json`, `tooling-call-sites.txt`).
+- **Corrected 2026-10-04:** the npm dependency graph understates braces
+  presence — installed tool distributions also bundle their own copies
+  (rollup ×2, vite, prettier, resolve-workspace-root) that `npm ls`/`npm audit`
+  cannot see (`vendored-braces-detection.json`).
+- **Corrected 2026-10-04:** the bounded substitution assessment found no
+  API-compatible drop-in (`substitution-assessment.json`): `brace-expansion`
+  is not callable and lacks `compile`/`parse`/`stringify`/`create`, and
+  `picomatch` is a matcher only.
 - All `braces` byte hits in shipped outputs are unrelated strings (React error
   copy; MaterialCommunityIcons glyph names) and the one `tailwindcss` hit is
   the generated-CSS license banner inside map `sourcesContent`.
@@ -223,9 +260,18 @@ tests/nodeForgeSecurityGuards.test.ts`), plus any new braces guard, and the
   (recorded in `final-report.md` §H).
 - `npm run agent:plan:validate:all` — passes, including this BLOCKED plan
   (recorded in `final-report.md` §H).
-- No dependency mutation validation was run because no dependency changed;
+- No `npm ci` or `qa:full` was run because no dependency changed;
   `git diff --stat` for `package.json`, `package-lock.json`,
-  `scripts/audit-runtime-deps.mjs` is empty.
+  `scripts/audit-runtime-deps.mjs` is empty. `npm run qa:fast` (pinned,
+  2026-10-03, pre-commit) — PASS, 171 files / 2143 tests plus parity guards;
+  six focused suites (pinned, pre-commit) — PASS, 121 tests (80 audit, 7 forge,
+  9 ExecPlan, 11 doc-consistency, 14 Maestro guards). Evidence:
+  `post-commit-checks.txt`.
+- 2026-10-04 correction pass (pinned): regenerated executed call-site ledger,
+  API-reachability proof, vendored-copy detection, substitution assessment,
+  toolchain attribution and dist/export marker retraction; `npm run
+openspec:validate` 71/71; `npm run agent:plan:validate:all` PASS; six focused
+  suites 121 tests; `npm run web:hygiene` PASS.
 
 ## Changed Files / Areas
 
@@ -264,3 +310,11 @@ prior campaign. What remains is purely upstream release availability; the
 conditional tasks in `tasks.md` §8 stay unchecked by design. The campaign
 deliberately avoided a framework migration, an allowlist entry, and any forced
 fix. Overall project certification is unchanged and remains **NOT CERTIFIED**.
+
+**2026-10-04 correction addendum:** an independent two-axis review found six
+valid evidence/reporting defects (incomplete call-site provenance, incorrect
+picomatch-only classification, asserted-without-assessment substitution
+rejection, false ambient-toolchain denial, missing QA reconciliation, and an
+unproven byte-difference cause). All six were resolved in this correction
+pass with new machine artifacts and corrected records; the security verdict is
+unchanged because none of the findings implied a safe local remediation.
