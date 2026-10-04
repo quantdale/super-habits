@@ -61,14 +61,20 @@ campaign during explore/propose.
 
 ## Current Checkpoint
 
-- Current milestone: **APPLY — tasks 1.x, 2.x, 3.x and 4.x complete; 5.1 is
-  completed by the very commit that carries this checkpoint.** Owner apply
-  instruction received 2026-10-04 via
+- Current milestone: **APPLY — tasks 1.x–5.4 complete; publication and the
+  A–J owner report are observed fact, and the change is now in a
+  post-publication review-correction pass.** Owner apply instruction received
+  2026-10-04 via
   `/opsx:apply reconcile-security-record-upstream-watch`; the planning-only
-  COMPLETED status is superseded and this plan is ACTIVE. Publication (5.2),
-  exact-head CI observation (5.3) and the A–J owner report (5.4) are **pending
-  at this commit by design** — the owner anti-loop rule forbids a later
-  bookkeeping commit to record them.
+  COMPLETED status was superseded and this plan is ACTIVE. Final SHA
+  `230aaeb5e014cf5458972b9616896064c72bb6b9` (one `docs(security)` commit, one
+  fast-forward push `61b295a..230aaeb`, `HEAD == origin/main`); exact-head run
+  `37181917345` — `quality` failure exactly at
+  `Audit runtime dependencies (gates on new high/critical)`, `e2e` skipped,
+  `nightly` skipped. Full detail in the gitignored receipt
+  `simulation-output/security-record-reconcile-2026-10-04/publication-receipt.md`
+  and in the external owner report; a later bookkeeping commit remains
+  forbidden by design §5's anti-loop exception.
 - Completed: planning phase (2026-10-04) — fetched preflight; two-defect
   exploration; same-tool local/clean count proof and exact hosted item-set
   match; starting exact-head CI and registry observations;
@@ -96,22 +102,27 @@ campaign during explore/propose.
   braces ExecPlan checkpoint/ledger/decisions updated, BLOCKED status and
   unchecked 8.1/8.2 retained); 4.1–4.3 proportionate validation and
   adversarial scope review (evidence below).
-- In progress: task 5.1 — stage exactly nine explicit paths (the three braces
-  documents plus this change's six owned artifacts), freeze this checkpoint,
-  create one bounded `docs(security)` commit.
-- Important modified files:
-  `openspec/changes/resolve-braces-security-blocker/{final-report.md,
-execplan.md, tasks.md}` (modified) and this change's six owned artifacts
-  (`.openspec.yaml`, `proposal.md`, `design.md`, `tasks.md`, `exploration.md`,
-  `execplan.md`, currently untracked). Nothing else changed — `git diff
---name-only` is exactly those three documents, nothing is staged yet,
-  protected files (`package.json`, `package-lock.json`,
+- In progress: **post-publication review-correction pass.** Both original P2s
+  and both follow-up P2s are fixed in the three tracked files below; the
+  remaining step is the pinned validation battery followed by the owner's
+  explicit instruction to publish (one `docs(security)` commit, ordinary
+  fast-forward push, exact-new-head CI observed and reported externally; no
+  CI-only bookkeeping commit, no test/timeout hardening here).
+- Important modified files: current correction scope is exactly three tracked
+  files — `openspec/changes/reconcile-security-record-upstream-watch/{execplan.md,
+tasks.md}` and
+  `openspec/changes/resolve-braces-security-blocker/execplan.md`. Nothing else
+  changed — `git diff --name-only` is exactly those three files, nothing is
+  staged yet. The original nine-file publication scope (the three braces
+  documents plus this change's six then-untracked artifacts) is historical
+  fact of commit `230aaeb5e014cf5458972b9616896064c72bb6b9`, where all six are
+  now tracked. Protected files (`package.json`, `package-lock.json`,
   `scripts/audit-runtime-deps.mjs`, source, tests, workflows) are untouched,
   all seven foreign change roots / six review plans / `.tmp-ios36423379932/`
   are untouched, and stash `c35e281d740df1e367c1be0f38383237ca080239` plus the
   single worktree are unchanged.
 - Last successful validation: all on pinned Node `v22.23.2` / npm `10.9.8`,
-  2026-10-04 — `npm run qa:affected -- --files <nine owned paths>` — PASS,
+  2026-10-04 — `npm run qa:affected -- --files <owned paths>` — PASS,
   rule `agent-workflow-and-documentation`, required gate `qa:fast`, focused
   `tests/agent-execplan.test.ts`, no broad regression; `git diff --check`
   exit 0; `npm run openspec:validate` — 72 passed / 0 failed; `npm run
@@ -124,30 +135,43 @@ tests/agentDocConsistency.test.ts` — 20/20; `npm run web:hygiene` — PASS
   (8081/8082 free); scoped `npx prettier --check` over both change directories
   — PASS; `npm run qa:fast` — PASS exit 0 (typecheck, zero-warning lint, 171
   files / 2143 tests, journey-label/quarantine/release-profile parity).
-- Current failures: None on the pinned toolchain. Hosted starting CI
-  `37176255652` at `61b295a` stays audit-red by design (two real undocumented
-  highs) — expected, classified, not a regression. Two earlier full-suite reds
-  were classified `FLAKY_TEST` / `ENVIRONMENT` (see Validation Ledger) and the
-  rerun gate is green.
+  Review-correction passes re-ran the same battery on the current delta with
+  `npm run qa:affected -- --files <three current paths>` selecting `qa:fast`
+  plus `tests/agent-execplan.test.ts`: `qa:fast` PASS exit 0
+  (171 files / 2143 tests), focused suites PASS 20/20, `openspec:validate`
+  PASS 72/72, `agent:plan:validate:all` PASS, scoped Prettier PASS,
+  `git diff --check` PASS, `web:hygiene` PASS (8081/8082 free).
+- Current failures: none unowned. Hosted starting CI `37176255652` at
+  `61b295a` and exact-head run `37181917345` at `230aaeb…` stay audit-red by
+  design (two real undocumented highs) — expected, classified, not a
+  regression. Every local red now carries its own evidenced triage in the
+  Validation Ledger: six reproduced failures classified `TEST_BUG` (unit-project
+  5 s test timeouts plus the `restore.coordinator` 10 s `beforeAll` hook
+  timeout, each asserted by its own retained frame), and three failures
+  explicitly **untriaged** because their original assertions were not retained
+  and later runs did not reproduce them. Final `npm run qa:fast` alone → exit 0
+  (`Test Files 171 passed (171)`).
 - Relevant quarantines: none changed.
 - Blockers: none for apply. Dependency remediation stays upstream-blocked; task
   1.3 detected no upstream event.
 - Condition required to unblock: none for apply. A later remediation campaign
   requires a material upstream event per design §1/§6.
 - Exact resume action after unblock: none applicable while apply is unblocked.
-- Exact next action: **5.2** — `git fetch` again, confirm the remote baseline
-  and fast-forward ancestry of the candidate, push once normally to `main`,
-  then verify full local/fetched remote SHA equality; then 5.3 (inspect the
-  completed hosted run whose `headSha` equals that final SHA) and 5.4 (deliver
-  the A–J owner report externally). The publication, its final SHA, the hosted
-  run and the terminal verdict are NOT pre-recorded as complete; no further
-  repository edit is authorized for them.
-- Remaining definition of done: tasks.md 5.1–5.4 checked with their stated
-  evidence; one bounded commit pushed once by fast-forward to `main`; exact-head
-  hosted CI observed and reported externally (never recorded in another
-  commit); design §A–J owner report delivered with
-  `SECURITY RECORD RECONCILED — DEPENDENCY SECURITY PRECISELY BLOCKED` earned
-  and overall `NOT CERTIFIED` preserved.
+- Exact next action: run the pinned battery on the four documented corrections
+  (per-failure triage incl. the `restore.coordinator` hook red, historical
+  versus later count attribution in `resolve-braces-security-blocker/execplan.md`,
+  and this checkpoint's three-file scope), then — on the owner's explicit
+  "finalize to main" instruction — create one `docs(security)` commit, publish
+  once by ordinary fast-forward, verify `HEAD == fetched origin/main`, observe
+  the exact-new-head hosted run (expected: quality failure only at
+  `Audit runtime dependencies (gates on new high/critical)`, `e2e`/`nightly`
+  skipped) and report it externally. Never force/reset/rebase, never create a
+  CI-only bookkeeping commit, and keep test-timeout hardening a separate
+  unstarted follow-up.
+- Remaining definition of done: four corrections committed and pushed once by
+  fast-forward; exact-new-head CI observed and reported externally; verdict
+  unchanged — `SECURITY RECORD RECONCILED — DEPENDENCY SECURITY PRECISELY
+BLOCKED` with overall `NOT CERTIFIED`.
 
 ## Progress
 
@@ -164,8 +188,13 @@ tests/agentDocConsistency.test.ts` — 20/20; `npm run web:hygiene` — PASS
       and tasks 7.5 wording; braces ExecPlan checkpoint/ledger/decisions).
 - [x] Apply 4.x — proportionate validation and adversarial scope review.
 - [x] Apply 5.x — one commit, one fast-forward push, exact-head CI observation,
-      external A–J owner report (5.1 completed by the commit carrying this
-      checkpoint; 5.2–5.4 pending and reported externally).
+      external A–J owner report (5.1 in the publication commit `230aaeb…`;
+      5.2 fast-forward push verified `HEAD == origin/main`; 5.3 run
+      `37181917345` observed; 5.4 A–J report delivered — detail in the
+      gitignored publication receipt).
+- [ ] Review corrections (post-publication) — per-failure triage split in this
+      ledger and historical-versus-later count attribution in the braces
+      ExecPlan; validate, then await the owner's publish/no-publish decision.
 
 ## Surprises & Discoveries
 
@@ -201,6 +230,24 @@ tests/agentDocConsistency.test.ts` — 20/20; `npm run web:hygiene` — PASS
   owned scope with `qa:affected`-selected gates.
 - 2026-10-04 (apply) — No upstream event at task 1.3, so the documentation-only
   path proceeds; dependency mutation in this change remains forbidden.
+- 2026-10-04 (post-publication review) — The two review P2s are fixed by
+  editing evidence, not by relabelling: each failure gets its own evidenced
+  classification (`TEST_BUG`, reproduced with the assertion
+  `Error: Test timed out in 5000ms`) or an explicit **untriaged** state where
+  the original assertion was not retained; the paired `61b295a` count
+  experiment is split out of the historical correction-pass ledger entry into a
+  separately dated observation. No test, timeout, gate or verdict changed.
+- 2026-10-04 (post-publication review) — Publication state is now recorded in
+  this checkpoint as observed fact (it was pending at the publication commit);
+  the design §5 anti-loop exception still forbids any commit created only to
+  record SHA/run/jobs, so no such commit exists and none will be added.
+- 2026-10-04 (second review pass) — Added the reproduced
+  `tests/restore.coordinator.test.ts:216` `beforeAll` hook timeout
+  (`Hook timed out in 10000ms`, 18 tests skipped) as its own `TEST_BUG` entry
+  with frame and artifact, explicitly without attributing it to event 1's
+  unidentified second file; replaced the stale nine-file staging snapshot with
+  the actual three-file correction scope; owner authorized finalize-to-main for
+  these corrections while keeping timeout hardening out of scope.
 
 ## Validation Ledger
 
@@ -272,17 +319,78 @@ tests/agentDocConsistency.test.ts` 20/20 PASS; `npm run web:hygiene` PASS;
   implication, §F/§G/§K/§M residuals intact, `git diff --name-only` = the three
   owned documents only, nothing staged, stash/worktree/foreign material
   unchanged.
-- 2026-10-04 (apply 4.x rerun) — Two full-suite reds preceded the green run:
-  first `npm run qa:fast` exit 1 (2 files failed, 1 test — portable-export size
-  contract plus one other) and an independent `npx vitest run` exit 1
-  (2 files failed, 1 test — `tests/integration/fixtures.test.ts`,
-  `tests/integration/corpus.test.ts`, 246 s wall). Classified `FLAKY_TEST` /
-  `ENVIRONMENT` (load-dependent, failures moved between runs): both files pass
-  in isolation (`npx vitest run tests/integration/fixtures.test.ts
-tests/integration/corpus.test.ts` → 2/2 green, 25.6 s) and the final
-  `npm run qa:fast` alone → exit 0, `Test Files 171 passed (171)`. Only
-  markdown in `openspec/changes/**` differs from that last green baseline, so
-  no product regression; no test was weakened, skipped, retimed or deleted.
+- 2026-10-04 (apply 4.x rerun) — two red events, triaged **per failure** per
+  `docs/testing/autonomous-qa.md` (exactly one evidenced classification for a
+  reproduced failure; a failure whose retained evidence cannot support one
+  stays explicitly untriaged; a passing retry is evidence to investigate, not
+  permission to label). Original output retained at
+  `…/cortexkit/aft/opencode/bash-tasks/17dea7b80a5befc9/bash-1dfee69178156bee/io/stdout`
+  (event 1, `npm run qa:fast`, `Select-Object -Last 15` tail) and
+  `…/bash-2fa5e90775ad6263/io/stdout` (event 2, `npx vitest run`, filtered to
+  summary lines); reproduction logs `%TEMP%\qa-repro\unit-*.log`,
+  `%TEMP%\qa-repro\full-*.log`.
+  1. **Event 1, `npm run qa:fast` exit 1** (`Test Files 2 failed | 169 passed
+(171)`, `Tests 1 failed`) — `tests/portableExportSize.test.ts` › "fails
+     with reason too_large instead of producing a file beyond the V1 bound"
+     (frame `tests/portableExportSize.test.ts:55`) → **`TEST_BUG`**. Evidence:
+     exact reproduction in `%TEMP%\qa-repro\unit-2.log` (same file, same test,
+     same frame) asserting `Error: Test timed out in 5000ms` with no assertion
+     failure, green in isolation and in `unit-1`; the repo's own precedent for
+     this mechanism is `TEST_BUG` (`docs/testing/known-gaps.md` CG-9: "the
+     bounds being tighter than the operation's meaning under parallel worker
+     load (no assertion ever failed — pure timeouts) … Classification:
+     `TEST_BUG`"). CG-9's closure sized the integration-project bounds only;
+     the unit project still uses the 5 s default.
+  2. **Event 1, second failed file → untriaged.** The retained tail keeps one
+     failed-test block only, so that file's identity and assertion were never
+     captured; later unit runs (`unit-1` green; `unit-2` red on three files —
+     `tests/portableExportSize.test.ts`, `tests/qaNativeProvision.test.ts`,
+     `tests/restore.coordinator.test.ts`) did not re-identify it, and **none of
+     those names is attributed to event 1's unknown file**. No classification
+     is invented for an unevidenced failure.
+  3. **Event 2, `tests/integration/fixtures.test.ts` (4 tests | 1 failed,
+     53811 ms) → untriaged.** The filtered stdout retained the file and
+     duration but not the assertion, and five later full runs (`full-1` red on
+     unrelated unit files, `full-2`…`full-5` green) did not reproduce it.
+     Candidate class for a future reproduction — not a classification — is the
+     CG-9 full-parallel load class (`fixtures` is named in that entry's
+     reason).
+  4. **Event 2, `tests/integration/corpus.test.ts` (2 tests | 1 failed,
+     246013 ms) → untriaged**, same reason as 3 (no retained assertion, no
+     reproduction in five later full runs); `corpus.test.ts:107` documents the
+     same CG-9 load bound as context only.
+     Reproduced reds raised while triaging, each classified on its own retained
+     assertion. `unit-2.log` totals: `Test Files 3 failed | 168 passed (171)` =
+     `tests/portableExportSize.test.ts` (2 failed tests),
+     `tests/qaNativeProvision.test.ts` (1 failed test) and
+     `tests/restore.coordinator.test.ts` (failed **suite**, 18 tests all skipped):
+  - `tests/restore.coordinator.test.ts` `beforeAll` hook — frame
+    `tests/restore.coordinator.test.ts:216`, `Error: Hook timed out in
+10000ms`, file summary `(18 tests | 18 skipped) 10037ms`, under the
+    `Failed Suites 1` block of `%TEMP%\qa-repro\unit-2.log` → **`TEST_BUG`**.
+    Evidenced: a hook-only timeout that skipped all 18 tests, so no assertion
+    failed — the CG-9 pure-timeout mechanism; green in `unit-1`, `full-2`…
+    `full-5`, `%TEMP%\vitest-repro.log`, `%TEMP%\qa-fast-final.log` and the
+    final `qa:fast`. Its 10 s `hookTimeout` bound is a test-bound question
+    (hardening is a separate owner-authorized follow-up), not a product defect.
+  - `tests/portableExportSize.test.ts` "succeeds within the real V1 bound" →
+    **`TEST_BUG`** (`Error: Test timed out in 5000ms`, `unit-2.log`).
+  - `tests/qaNativeProvision.test.ts` "rejects tracked and relevant untracked
+    source changes" → **`TEST_BUG`** (`Error: Test timed out in 5000ms`,
+    `unit-2.log`).
+  - `tests/auditRuntimeDeps.test.ts` "exits 1 without a clean verdict for
+    documented advisory with empty paths" → **`TEST_BUG`**
+    (`Error: Test timed out in 5000ms`, `%TEMP%\qa-repro\full-1.log`).
+  - `tests/nativeAuthMock.test.ts` "probes process liveness without signaling
+    anyone" → **`TEST_BUG`** (`Error: Test timed out in 5000ms`,
+    `%TEMP%\qa-repro\full-1.log`).
+    Green evidence: isolation rerun `2 passed (2)` (25.6 s); `unit-1` green;
+    `full-2`…`full-5` green (251–252 files); `%TEMP%\qa-repro\full-2.log` and
+    later show `tests/restore.coordinator.test.ts (18 tests)` green (1988–3703
+    ms); final `npm run qa:fast` alone → exit 0, `Test Files 171 passed (171)`.
+    Only markdown in `openspec/changes/**` differs from that green baseline, so
+    no product regression; no test was weakened, skipped, retimed or deleted,
+    and no timeout value was changed by this documentation fix.
 - Not run (apply): npm ci, full audit, qa:full, build/E2E/native/Supabase/
   production lanes, clean-checkout reproduction; impact and the owner boundary
   do not authorize them for unchanged product/dependency scope.

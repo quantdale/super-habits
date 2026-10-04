@@ -293,13 +293,23 @@ tests/nodeForgeSecurityGuards.test.ts`), plus any new braces guard, and the
 - 2026-10-04 correction pass (pinned): regenerated executed call-site ledger,
   API-reachability proof, vendored-copy detection, substitution assessment,
   toolchain attribution and dist/export marker retraction; `npm run
-openspec:validate` 71/71 (preserved **local workspace** inventory at 61b295a =
-  59 specs + 12 active change items; the clean tracked-only exact-head inventory
-  is 64/64 = 59 + 5 and matches hosted CI `37176255652`; the entire seven-item
-  delta is untracked change roots with zero index/tree files — ledger in
-  `final-report.md` §H “OpenSpec item-count provenance”); `npm run
-agent:plan:validate:all` PASS; six focused
-  suites 121 tests; `npm run web:hygiene` PASS.
+openspec:validate` 71/71; `npm run agent:plan:validate:all` PASS; six focused
+  suites 121 tests; `npm run web:hygiene` PASS. This entry records only what
+  that pass executed (it is the wording committed in the `868e199` correction
+  object); the paired same-commit inventory experiment at the later baseline
+  `61b295a…` is a separate, later observation and is recorded next.
+- 2026-10-04 later reconciliation observation (recorded by
+  `reconcile-security-record-upstream-watch`; a later measurement, not part of
+  the correction pass above): paired inventory at baseline
+  `61b295a113478d463505e280f8195ebdbcb5ac41` — preserved local workspace
+  `71/71` (59 specs + 12 active change items) versus clean tracked-only
+  exact-head `64/64` (59 + 5), which matches hosted CI `37176255652`; the whole
+  seven-item delta is untracked change roots with zero index/tree files (ledger
+  in `final-report.md` §H “OpenSpec item-count provenance”). Later counts,
+  recorded separately per reconciliation design: hosted `65/65` at the
+  reconciliation commit `230aaeb5e014cf5458972b9616896064c72bb6b9` (its
+  `Validate openspec contracts` step) and local `72/72` in the preserved
+  workspace.
 - 2026-10-04 publication (owner-ordered): `8255546..868e199` fast-forwarded to
   `origin/main`; exact-head run `37176016696` at `868e199` — `quality` failure
   at `Audit runtime dependencies (gates on new high/critical)`, `e2e` and
