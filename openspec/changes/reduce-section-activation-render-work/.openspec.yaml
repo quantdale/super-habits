@@ -1,0 +1,5 @@
+schema: spec-driven
+created: 2026-09-30
+goal: 'Frontier-audit successor wave on main c1bc380: remove duplicated work on
+  the section-activation and web-foreground refresh paths identified during the
+  read-only repository-wide audit.'

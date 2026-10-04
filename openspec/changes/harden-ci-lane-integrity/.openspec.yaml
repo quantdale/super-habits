@@ -1,0 +1,5 @@
+schema: spec-driven
+created: 2026-09-30
+goal: 'Frontier-audit successor wave on main c1bc380: close material gaps
+  discovered by the read-only repository-wide audit that
+  final-certification-closure and external-blocker-closure do not own.'
