@@ -102,7 +102,11 @@ weakening, no dependency relocation, no framework migration just to satisfy
 - Last successful validation: pinned Node `v22.23.2` / npm `10.9.8` —
   `node scripts/audit-runtime-deps.mjs` exit 1 reproducing exactly the two
   undocumented highs and three documented entries; `npm run openspec:validate`
-  passes all items including this change; `npm run agent:plan:validate:all`
+  passes all items including this change (2026-10-04: local workspace 71/71
+  versus clean tracked-only/hosted 64/64 at the same commit and locked CLI —
+  a seven-item untracked-workspace delta, provenance in `final-report.md` §H;
+  not 71 tracked items and not a re-run of the hosted total); `npm run
+agent:plan:validate:all`
   passes, including this BLOCKED plan; module-graph analyses and APK scan
   completed with zero package-module hits; `npm run qa:fast` 171 files / 2143
   tests and the six focused suites (121 tests) passed on the pinned toolchain
@@ -149,8 +153,12 @@ tests/nodeForgeSecurityGuards.test.ts`), plus any new braces guard, and the
   corrected records.** The correction pass is complete and validated; the
   correction commit `868e19959b6335c2abba1af77dd09253844fdfc7` is published
   with exact-head CI run `37176016696` recorded (audit red, `e2e` skipped).
-  Resume only from the unblock condition above using the exact commands in
-  `final-report.md` §L.
+  **No further autonomous remediation campaign should run for `braces` or
+  `node-forge` until an upstream unblock condition changes** (explicit
+  event-driven stop condition; verify any lead through the `final-report.md` §L
+  resume matrix and open a separate minimal repair campaign only on a verified
+  event). Resume only from the unblock condition above using the exact commands
+  in `final-report.md` §L.
 - Remaining definition of done: the two conditional tasks in `tasks.md` §8
   (8.1 land a safe remediation, 8.2 dependency-mutation validation) remain
   unchecked because no safe remediation exists; every other task is checked
@@ -240,6 +248,16 @@ tests/nodeForgeSecurityGuards.test.ts`), plus any new braces guard, and the
    exports predate HEAD, so the triage proved no application/bundling source
    changed between the export commit and HEAD before reusing the module-graph
    results.
+7. **Event-driven continuation, explicitly (2026-10-04).** No further autonomous
+   remediation campaign runs for `braces` or `node-forge` until an upstream
+   unblock condition changes; `final-report.md` §L is the only continuation
+   mechanism, and a PR moving/merging or a larger version number is a lead, not
+   proof of safe remediation.
+8. **Publication chronology and count provenance corrected (2026-10-04).**
+   `reconcile-security-record-upstream-watch` fixed §A's three-phase
+   publication history and added §H's seven-item untracked-workspace ledger;
+   the BLOCKED remediation classification, both findings, truthful audit red and
+   `NOT CERTIFIED` are unchanged by that documentation-only pass.
 
 ## Validation Ledger
 
@@ -275,7 +293,12 @@ tests/nodeForgeSecurityGuards.test.ts`), plus any new braces guard, and the
 - 2026-10-04 correction pass (pinned): regenerated executed call-site ledger,
   API-reachability proof, vendored-copy detection, substitution assessment,
   toolchain attribution and dist/export marker retraction; `npm run
-openspec:validate` 71/71; `npm run agent:plan:validate:all` PASS; six focused
+openspec:validate` 71/71 (preserved **local workspace** inventory at 61b295a =
+  59 specs + 12 active change items; the clean tracked-only exact-head inventory
+  is 64/64 = 59 + 5 and matches hosted CI `37176255652`; the entire seven-item
+  delta is untracked change roots with zero index/tree files — ledger in
+  `final-report.md` §H “OpenSpec item-count provenance”); `npm run
+agent:plan:validate:all` PASS; six focused
   suites 121 tests; `npm run web:hygiene` PASS.
 - 2026-10-04 publication (owner-ordered): `8255546..868e199` fast-forwarded to
   `origin/main`; exact-head run `37176016696` at `868e199` — `quality` failure

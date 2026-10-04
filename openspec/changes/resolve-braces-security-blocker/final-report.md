@@ -8,9 +8,23 @@ No production, Supabase, native, signing, or release action was taken.
 
 - Starting SHA: `82555461800bea2a0e5ba7cebd5c7db306691476`
   (`main == origin/main == HEAD`, re-verified after `git fetch --all --prune`).
-- Ending SHA: the local commit that records this change (`git log -1` at the tip of
-  `main`; the commit adds only this change directory). `origin/main` was not
-  advanced (no publication; see §I).
+- **Initial local termination (historical phase).** The campaign's own commit
+  `16882523937ee39416034b2ab6619ee9fab3e9f2` added only this change directory
+  and, at that point, `origin/main` was not advanced (no publication; see §I).
+  That local-only ending was true for its phase and is retained as provenance,
+  not as the current publication state.
+- **Review-corrected publication (owner-ordered).** On explicit later owner
+  instruction the triage record and the review corrections were fast-forwarded
+  to `origin/main` as `16882523937ee39416034b2ab6619ee9fab3e9f2` and
+  `868e19959b6335c2abba1af77dd09253844fdfc7` (`8255546..868e199`); exact-head
+  CI at `868e199…` is run `37176016696` (§I).
+- **Published pre-correction baseline observed at this record's preflight:**
+  `61b295a113478d463505e280f8195ebdbcb5ac41`
+  (`main == origin/main == HEAD` after `git fetch --all --prune`, 2026-10-04).
+  This is the published baseline the record reconciliation starts from. It is
+  explicitly **not** the SHA of any later reconciliation commit: pre-commit
+  prose cannot name its own final SHA, so Git and the owner handoff carry that
+  identity.
 - Branch: `main`. One worktree. Stash `pre-recovery-local-changes` preserved.
   Foreign untracked roots preserved (iOS extract, prior change directories).
 - Observed exact-head CI at the starting SHA: run `37136146011` — `quality`
@@ -179,7 +193,7 @@ edit.
 | Executed call-site / API-reachability / vendored-copy / substitution assessment (pinned, 2026-10-04) | corrected evidence in `tooling-call-sites.txt`, `braces-callsite-ledger.json`, `api-reachability.json`, `vendored-braces-detection.json`, `substitution-assessment.json`, `dist-env-markers.json` |
 | `npm run qa:fast` (pinned, 2026-10-03, pre-commit)                                                   | PASS; 171 files / 2143 tests, plus journey-label/quarantine-register/release-profile parity                                                                                                       |
 | Focused security/documentation suites (pinned, pre-commit)                                           | PASS; 6 files / 121 tests (auditRuntimeDeps 80, nodeForgeSecurityGuards 7, agent-execplan 9, agentDocConsistency 11, Maestro guards 14)                                                           |
-| `npm run openspec:validate`                                                                          | passes all items, including this change (re-run 2026-10-04)                                                                                                                                       |
+| `npm run openspec:validate`                                                                          | passes all items, including this change (re-run 2026-10-04); item-count provenance in the subsection below                                                                                        |
 | `npm run agent:plan:validate:all`                                                                    | passes, including this BLOCKED plan (re-run 2026-10-04)                                                                                                                                           |
 
 `npm ci` and `qa:full` were not run because no dependency changed; the locked
@@ -189,6 +203,49 @@ HEAD is shown in §B/§D (the byte difference at equal filename is not claimed
 as identity). `qa:fast` and the focused suites did run on the pinned toolchain
 before the record commit; the earlier statement that no QA was earned was
 incorrect and is superseded by this table.
+
+### OpenSpec item-count provenance (2026-10-04)
+
+`openspec validate --all` counts the items present in the **working tree**, not
+the files tracked by Git, so a preserved local workspace and a clean
+tracked-only checkout can report different totals at the very same commit.
+Paired run, same commit `61b295a113478d463505e280f8195ebdbcb5ac41`, same pinned
+Node `v22.23.2` / npm `10.9.8`, same locked CLI `@fission-ai/openspec` `1.8.0`,
+no dependency install:
+
+| Tree at `61b295a…`                       | Specs | Active changes | Total | Result            |
+| ---------------------------------------- | ----: | -------------: | ----: | ----------------- |
+| Preserved local workspace (pre-proposal) |    59 |             12 |    71 | 71 passed, 0 fail |
+| Clean tracked-only detached checkout     |    59 |              5 |    64 | 64 passed, 0 fail |
+| Hosted CI `37176255652`                  |    59 |              5 |    64 | 64 passed, 0 fail |
+
+Both inventories carry the identical 59 spec identities and the clean-minus-
+local set is empty. The whole delta is these seven pre-existing **untracked**
+change items — for each, `git ls-files -- openspec/changes/<item>` and
+`git ls-tree -r --name-only HEAD -- openspec/changes/<item>` are empty:
+
+| OpenSpec change item                         | Local workspace | Tracked at `61b295a` |
+| -------------------------------------------- | --------------- | -------------------- |
+| `fix-local-calendar-day-windows`             | yes             | no                   |
+| `harden-agent-guidance-truth`                | yes             | no                   |
+| `harden-ci-lane-integrity`                   | yes             | no                   |
+| `harden-interaction-idempotency`             | yes             | no                   |
+| `harden-native-evidence-and-release-posture` | yes             | no                   |
+| `harden-silent-failure-certification`        | yes             | no                   |
+| `reduce-section-activation-render-work`      | yes             | no                   |
+
+Narrow reading, no over-claim: the reproduced local `71/71` does **not** mean
+71 items were tracked or committed, and `64/64` is the tracked inventory at
+that SHA rather than a replacement measurement of the local run. The
+reconciliation proposal that follows this record adds one further untracked
+item, so a later local run is `72/72` (measured 2026-10-04); a publication
+carrying it would raise the tracked inventory by one (65 items **if nothing
+else moves**). Historical `71/64`, post-proposal `72`, and any future hosted
+total are dated inventories of a named tree and time — none is a permanent
+acceptance total, and the eventual hosted count is measured, never assumed.
+Evidence: `simulation-output/security-record-explore-2026-10-04/`
+(`local-validation.json`, `clean-validation.json`, `ci-37176255652.log`,
+`provenance-and-preservation.json`).
 
 ## I. Exact-head CI
 
@@ -240,6 +297,25 @@ Unchanged, not reopened, not promoted:
 | ------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `braces`     | `3.0.3`         | A published `braces > 3.0.3` (expected after `micromatch/braces#72` merges and releases) satisfying `chokidar ~3.0.2` / `micromatch ^3.0.3`, or a supported parent/toolchain release removing every production path | `git fetch --all --prune && git rev-parse HEAD origin/main && npm view braces version && curl -s https://api.github.com/advisories/GHSA-vfj7-8cjw-p6xm && npm view micromatch dependencies.braces && npm view chokidar@3 version` — then if safe: minimal `npm install --package-lock-only`/override edit → `npm ci` → `npm ls braces --all` (no vulnerable copy) → `node scripts/audit-runtime-deps.mjs` (no braces finding) → `npm run typecheck && npm run lint && npm run openspec:validate && npm run agent:plan:validate:all && npm test` → `npx vitest run tests/auditRuntimeDeps.test.ts tests/nodeForgeSecurityGuards.test.ts` (+ any new braces guard) → `npm run qa:fast`, escalating to `npm run qa:full` and build-tool validation if resolution/bundling changes |
 | `node-forge` | `1.4.0`         | A published `node-forge > 1.4.0` satisfying both `^1.3.3` parents (PR #1152 merge alone is insufficient), or a supported `@expo/cli` / `@expo/code-signing-certificates` release removing both paths                | `git fetch --all --prune && npm view node-forge version && curl -s https://api.github.com/advisories/GHSA-86w9-cpqp-85rv && npm view @expo/cli@latest dependencies.node-forge && npm view @expo/code-signing-certificates@latest dependencies.node-forge` — then the same minimal-bump → `npm ci` → gate → validation sequence, following `resolve-windows-dependency-security/options-ledger.md`                                                                                                                                                                                                                                                                                                                                                                              |
+
+### Event-driven continuation (explicit stop condition)
+
+> No further autonomous remediation campaign should run for `braces` or
+> `node-forge` until an upstream unblock condition changes.
+
+The matrix above is the whole continuation mechanism: it is a **stop
+condition**, not a monitoring service. Qualifying events are a published
+`braces > 3.0.3`, `GHSA-vfj7-8cjw-p6xm` gaining a `first_patched_version`, or a
+supported parent/toolchain release that removes every audited production path;
+and a published `node-forge > 1.4.0` with a verified patch, `GHSA-86w9-cpqp-85rv`
+gaining a `first_patched_version`, or Expo removing/replacing all affected
+forge paths. A pull request moving or merging, or a merely larger version
+number, is a **lead**, not proof of safe remediation — it must be verified
+through the matrix before any repair begins. On a verified event, open a
+separate minimal repair campaign; this record does not authorize one. No
+scheduled re-audit, repeated exposure/options investigation, GitHub workflow or
+watcher deployment is added, and no dependency mutation happens inside this
+documentation record.
 
 ## M. Verdict
 

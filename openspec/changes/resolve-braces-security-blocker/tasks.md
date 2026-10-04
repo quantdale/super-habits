@@ -54,7 +54,7 @@
 - [x] 7.2 Write the triage record: `proposal.md`, `specs/braces-security-triage/spec.md`, `tasks.md`, `execplan.md`, `final-report.md`
 - [x] 7.3 Record the dual-blocker resume matrix with exact trigger events and commands (`final-report.md` §L)
 - [x] 7.4 Validate the change: `npm run openspec:validate` and `npm run agent:plan:validate:all` pass from the final tree; the audit gate still reproduces the same two undocumented highs (`simulation-output/security-braces-triage/audit-gate.log`)
-- [x] 7.5 Commit only the owned OpenSpec record (no fake dependency change, no push; remote `main` stays at `8255546` and its exact-head CI outcome is unchanged)
+- [x] 7.5 Commit only the owned OpenSpec record (no fake dependency change). **Initial historical phase:** no push was made then — remote `main` stayed at `8255546` and its exact-head CI outcome was unchanged; the later owner-ordered fast-forward publication (`1688252` + `868e199`, see §I/§N) is the subsequent phase and does not contradict this entry
 
 ## 8. Bounded remediation (conditional, not earned)
 
