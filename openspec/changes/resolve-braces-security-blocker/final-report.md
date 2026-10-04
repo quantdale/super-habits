@@ -192,14 +192,25 @@ incorrect and is superseded by this table.
 
 ## I. Exact-head CI
 
-- SHA: `82555461800bea2a0e5ba7cebd5c7db306691476` (remote `main` unchanged).
-- Run: `37136146011` — `quality`: **failure**, failing step exactly
-  `Audit runtime dependencies`; `e2e`: skipped (quality failed); `nightly`:
-  skipped as expected. No cancellations or ancestor runs counted as success.
-- No publication was performed because no dependency remediation exists;
-  committing the triage record alone would not change the audit outcome and
-  would only re-demonstrate the same red. Publication is withheld until the
-  upstream unblock condition (or another safe repair) is met.
+- Starting observation: SHA `82555461800bea2a0e5ba7cebd5c7db306691476`, run
+  `37136146011` — `quality`: **failure**, failing step exactly `Audit runtime
+dependencies`; `e2e`: skipped (quality failed); `nightly`: skipped as
+  expected. No cancellations or ancestor runs counted as success.
+- Correction publication (owner-ordered 2026-10-04): commits
+  `16882523937ee39416034b2ab6619ee9fab3e9f2` (initial triage record) and
+  `868e19959b6335c2abba1af77dd09253844fdfc7` (review corrections) were
+  fast-forwarded to `origin/main` (`8255546..868e199`).
+- Exact-head run at `868e19959b6335c2abba1af77dd09253844fdfc7`: `37176016696`
+  — `quality`: **failure**, failing step exactly `Audit runtime dependencies
+(gates on new high/critical)`; `e2e`: skipped (quality failed); `nightly`:
+  skipped as expected.
+- The audit remains truthfully red because the two undocumented high advisories
+  (`braces`, `node-forge`) have no published fixes; no dependency change was
+  made, so the documentation correction cannot and does not turn CI green.
+  Publication was performed on explicit owner instruction, with the observed
+  outcome recorded rather than claimed as success. The record commit carrying
+  this note changes no dependency and is expected to reproduce the same audit
+  failure.
 
 ## J. Remaining security blockers
 
@@ -245,7 +256,10 @@ resume matrix above is the exact continuation point.
 An independent two-axis review of the `8255546`→`1688252` record found six
 valid evidence/reporting defects. All six are resolved in this addendum's
 sibling edits and the regenerated evidence; the security verdict does not
-change.
+change. The corrected records were published to `origin/main` as
+`868e19959b6335c2abba1af77dd09253844fdfc7` on explicit owner instruction,
+with exact-head CI run `37176016696` observed and recorded in §I (audit red,
+`e2e` skipped).
 
 1. **Tooling provenance completed and corrected.** `tooling-call-sites.txt` now
    records the executed APIs per consumer and each input's provenance, backed

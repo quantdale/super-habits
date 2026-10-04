@@ -146,10 +146,11 @@ tests/nodeForgeSecurityGuards.test.ts`), plus any new braces guard, and the
   publication rules with exact-head green CI. Resume commands are recorded in
   `final-report.md` §L.
 - Exact next action: **hold after the owner-ordered publication of the
-  corrected records.** The correction pass is complete and validated; publish
-  it, record the exact-head CI outcome truthfully (the audit stays red on both
-  upstream advisories), then resume only from the unblock condition above
-  using the exact commands in `final-report.md` §L.
+  corrected records.** The correction pass is complete and validated; the
+  correction commit `868e19959b6335c2abba1af77dd09253844fdfc7` is published
+  with exact-head CI run `37176016696` recorded (audit red, `e2e` skipped).
+  Resume only from the unblock condition above using the exact commands in
+  `final-report.md` §L.
 - Remaining definition of done: the two conditional tasks in `tasks.md` §8
   (8.1 land a safe remediation, 8.2 dependency-mutation validation) remain
   unchecked because no safe remediation exists; every other task is checked
@@ -193,7 +194,11 @@ tests/nodeForgeSecurityGuards.test.ts`), plus any new braces guard, and the
   Supabase host — `dist-env-markers.json`), and no cause for the byte
   difference is asserted. The retained module-graph evidence remains valid on
   source identity: no application/bundling source or resolved package changed
-  between the export source commit and HEAD.
+  between the export source commit and HEAD; exact-head CI at the published
+  correction commit `868e19959b6335c2abba1af77dd09253844fdfc7` (run
+  `37176016696`) failed `quality` exactly at `Audit runtime dependencies
+(gates on new high/critical)` with `e2e`/`nightly` skipped, as expected
+  while both advisories remain upstream-blocked.
 - **Corrected 2026-10-04:** the executed vulnerable-parser entry points are
   `micromatch.parse`/`micromatch.braces` (reached by `fast-glob`'s Tailwind
   content-glob expansion) and `chokidar`'s `braces.expand`; `matcher`, `some`,
@@ -272,6 +277,10 @@ tests/nodeForgeSecurityGuards.test.ts`), plus any new braces guard, and the
   toolchain attribution and dist/export marker retraction; `npm run
 openspec:validate` 71/71; `npm run agent:plan:validate:all` PASS; six focused
   suites 121 tests; `npm run web:hygiene` PASS.
+- 2026-10-04 publication (owner-ordered): `8255546..868e199` fast-forwarded to
+  `origin/main`; exact-head run `37176016696` at `868e199` — `quality` failure
+  at `Audit runtime dependencies (gates on new high/critical)`, `e2e` and
+  `nightly` skipped. Recorded, not claimed green.
 
 ## Changed Files / Areas
 
