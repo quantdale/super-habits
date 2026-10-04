@@ -1,7 +1,7 @@
 # ExecPlan: Apply the final security-record reconciliation
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -61,12 +61,14 @@ campaign during explore/propose.
 
 ## Current Checkpoint
 
-- Current milestone: **APPLY — tasks 1.x–5.4 complete; publication and the
-  A–J owner report are observed fact, and the change is now in a
-  post-publication review-correction pass.** Owner apply instruction received
+- Current milestone: **COMPLETE — tasks 1.x–5.4 and the post-publication
+  review corrections are complete; publication and the A–J owner report are
+  observed fact, and this terminal close-out reconciles the lifecycle
+  status.** Owner apply instruction received
   2026-10-04 via
   `/opsx:apply reconcile-security-record-upstream-watch`; the planning-only
-  COMPLETED status was superseded and this plan is ACTIVE. Final SHA
+  COMPLETED status was superseded, this plan was reactivated for apply, and it
+  is now terminally COMPLETED. Final SHA
   `230aaeb5e014cf5458972b9616896064c72bb6b9` (one `docs(security)` commit, one
   fast-forward push `61b295a..230aaeb`, `HEAD == origin/main`); exact-head run
   `37181917345` — `quality` failure exactly at
@@ -102,18 +104,17 @@ campaign during explore/propose.
   braces ExecPlan checkpoint/ledger/decisions updated, BLOCKED status and
   unchecked 8.1/8.2 retained); 4.1–4.3 proportionate validation and
   adversarial scope review (evidence below).
-- In progress: **post-publication review-correction pass.** Both original P2s
-  and both follow-up P2s are fixed in the three tracked files below; the
-  remaining step is the pinned validation battery followed by the owner's
-  explicit instruction to publish (one `docs(security)` commit, ordinary
-  fast-forward push, exact-new-head CI observed and reported externally; no
-  CI-only bookkeeping commit, no test/timeout hardening here).
-- Important modified files: current correction scope is exactly three tracked
-  files — `openspec/changes/reconcile-security-record-upstream-watch/{execplan.md,
+- In progress: None. The post-publication review-correction pass finished
+  with the `docs(security)` publication
+  `86ebfe34c57bf61167e4c8110b51d3dde3a94a5f` after the owner's finalize-to-main
+  authorization; no executable step remains in this plan's scope (test/timeout
+  hardening stays a separate unstarted follow-up).
+- Important modified files: the review-correction scope was exactly three
+  tracked files — `openspec/changes/reconcile-security-record-upstream-watch/{execplan.md,
 tasks.md}` and
-  `openspec/changes/resolve-braces-security-blocker/execplan.md`. Nothing else
-  changed — `git diff --name-only` is exactly those three files, nothing is
-  staged yet. The original nine-file publication scope (the three braces
+  `openspec/changes/resolve-braces-security-blocker/execplan.md` — published
+  together as `86ebfe34c57bf61167e4c8110b51d3dde3a94a5f`. This terminal
+  lifecycle close-out edits only this ExecPlan. The original nine-file publication scope (the three braces
   documents plus this change's six then-untracked artifacts) is historical
   fact of commit `230aaeb5e014cf5458972b9616896064c72bb6b9`, where all six are
   now tracked. Protected files (`package.json`, `package-lock.json`,
@@ -157,21 +158,28 @@ tests/agentDocConsistency.test.ts` — 20/20; `npm run web:hygiene` — PASS
 - Condition required to unblock: none for apply. A later remediation campaign
   requires a material upstream event per design §1/§6.
 - Exact resume action after unblock: none applicable while apply is unblocked.
-- Exact next action: run the pinned battery on the four documented corrections
-  (per-failure triage incl. the `restore.coordinator` hook red, historical
-  versus later count attribution in `resolve-braces-security-blocker/execplan.md`,
-  and this checkpoint's three-file scope), then — on the owner's explicit
-  "finalize to main" instruction — create one `docs(security)` commit, publish
-  once by ordinary fast-forward, verify `HEAD == fetched origin/main`, observe
-  the exact-new-head hosted run (expected: quality failure only at
-  `Audit runtime dependencies (gates on new high/critical)`, `e2e`/`nightly`
-  skipped) and report it externally. Never force/reset/rebase, never create a
-  CI-only bookkeeping commit, and keep test-timeout hardening a separate
-  unstarted follow-up.
-- Remaining definition of done: four corrections committed and pushed once by
-  fast-forward; exact-new-head CI observed and reported externally; verdict
-  unchanged — `SECURITY RECORD RECONCILED — DEPENDENCY SECURITY PRECISELY
-BLOCKED` with overall `NOT CERTIFIED`.
+- Exact next action: None — task complete.
+- Remaining definition of done: Complete — the four corrections were committed
+  and pushed once by fast-forward (`86ebfe34c…`), their exact-head hosted
+  outcome was observed and reported externally, and the earned verdict stands
+  — `SECURITY RECORD RECONCILED — DEPENDENCY SECURITY PRECISELY BLOCKED` with
+  overall `NOT CERTIFIED`.
+- Terminal reconciliation (2026-10-05): reconciliation finished — all 17 apply
+  tasks complete and the post-publication review corrections published;
+  publication occurred (`230aaeb5e014cf5458972b9616896064c72bb6b9` for the
+  bounded correction commit, `86ebfe34c57bf61167e4c8110b51d3dde3a94a5f` for
+  the review corrections), and the previously untracked OpenSpec/planning
+  artifacts are now tracked (`d262b27be789d138723f91cdb5174eabe967b797`), so
+  the clean hosted OpenSpec inventory at the current tracked tip validates
+  72/72. Exact-head CI remains intentionally red only at the dependency audit
+  on the two known undocumented upstream advisories (`braces`
+  `GHSA-vfj7-8cjw-p6xm`, `node-forge` `GHSA-86w9-cpqp-85rv`) with `e2e` and
+  `nightly` skipped behind it; neither advisory is resolved, both remain
+  event-driven and upstream-blocked, and no in-scope repository action remains
+  for them. This close-out commit's own exact-head run is reported externally
+  per the §5 anti-loop rule rather than by any further record-keeping commit.
+  Future dependency work is event-driven only. Overall application status
+  remains **NOT CERTIFIED**.
 
 ## Progress
 
@@ -192,9 +200,11 @@ BLOCKED` with overall `NOT CERTIFIED`.
       5.2 fast-forward push verified `HEAD == origin/main`; 5.3 run
       `37181917345` observed; 5.4 A–J report delivered — detail in the
       gitignored publication receipt).
-- [ ] Review corrections (post-publication) — per-failure triage split in this
+- [x] Review corrections (post-publication) — per-failure triage split in this
       ledger and historical-versus-later count attribution in the braces
-      ExecPlan; validate, then await the owner's publish/no-publish decision.
+      ExecPlan; validated on the pinned battery and published with the owner's
+      finalize-to-main authorization as
+      `86ebfe34c57bf61167e4c8110b51d3dde3a94a5f`.
 
 ## Surprises & Discoveries
 
@@ -391,6 +401,17 @@ tests/agentDocConsistency.test.ts` 20/20 PASS; `npm run web:hygiene` PASS;
     Only markdown in `openspec/changes/**` differs from that green baseline, so
     no product regression; no test was weakened, skipped, retimed or deleted,
     and no timeout value was changed by this documentation fix.
+- 2026-10-05 (terminal lifecycle reconciliation) — `git diff --check` PASS;
+  `npm run openspec:validate` PASS 72/72;
+  `npm run agent:plan:validate:all` PASS (every versioned plan, this one now
+  `COMPLETED`, the braces and final-certification plans still `BLOCKED` and
+  `windows-closure-reconciliation` still `ACTIVE`);
+  `npx vitest run tests/agent-execplan.test.ts tests/agentDocConsistency.test.ts`
+  PASS 20/20. Documentation-only close-out: the lifecycle status flip and the
+  terminal checkpoint change no task semantics, no test, no dependency, no
+  audit policy and no verdict. Toolchain note: the pinned Node 22.23.2 /
+  npm 10.9.8 are not installed on this host, so the battery ran on
+  Node 24.3.0 / npm 11.4.2 and is recorded truthfully at those versions.
 - Not run (apply): npm ci, full audit, qa:full, build/E2E/native/Supabase/
   production lanes, clean-checkout reproduction; impact and the owner boundary
   do not authorize them for unchanged product/dependency scope.
@@ -428,19 +449,30 @@ execplan.md, tasks.md}` — the two canonical defect corrections (§A chronology
 
 ## Outcomes & Retrospective
 
-- Status: COMPLETED for explore/propose only; reconciliation/publication
-  NOT EXECUTED. All 17 apply tasks are unchecked; no terminal reconciliation
-  verdict or new hosted run is claimed.
-- Summary: created six owned documentation artifacts on a dedicated branch,
-  with no commit/push or existing-record/dependency/source edit. §A's stale
-  chronology is confirmed; the seven-item local 71/clean 64 discrepancy is
-  proven from identical tooling and a clean same-commit checkout, whose full
-  item set also matches hosted CI. Post-proposal local validation is 72/72.
+- Status: COMPLETED — the explore/propose phase and the apply phase are both
+  finished. All 17 apply tasks are complete and published, the post-publication
+  review corrections are published and observed, and the earned terminal
+  verdict is `SECURITY RECORD RECONCILED — DEPENDENCY SECURITY PRECISELY
+BLOCKED` with overall `NOT CERTIFIED`.
+- Summary (explore/propose phase): created six owned documentation artifacts
+  on a dedicated branch, with no commit/push or
+  existing-record/dependency/source edit. §A's stale chronology is confirmed;
+  the seven-item local 71/clean 64 discrepancy is proven from identical
+  tooling and a clean same-commit checkout, whose full item set also matches
+  hosted CI. Post-proposal local validation is 72/72.
+- Summary (apply phase): executed the 17 apply tasks — the bounded corrections
+  to the canonical braces record (§A chronology, §H count provenance, §L
+  event-driven stop condition, tasks 7.5 phase label), proportionate
+  validation, one `docs(security)` publication and its exact-head CI
+  observation, the external A–J owner report, then the reviewed second
+  correction pass published as `86ebfe3…`; the planning artifacts were later
+  tracked in `d262b27…`. No product, dependency, lockfile, workflow or
+  audit-policy change was made.
 - Evidence: pinned planning guards pass, foreign path inventory and stash
   identity preserved, original worktree retained and temporary owned checkout
   removed cleanly, ports free. Security blockers and NOT CERTIFIED unchanged.
-- Follow-up: owner may request apply for this bounded proposal. No further
-  dependency-security remediation campaign is recommended before a material
-  upstream unblock event; larger release numbers still require fix verification.
+- Follow-up: none in scope — apply is complete. No further dependency-security
+  remediation campaign should run before a material upstream unblock event;
+  larger release numbers still require fix verification.
 - Lesson: capture count provenance before creating a new OpenSpec item, and
   report future publication CI externally to avoid a self-referential commit loop.
