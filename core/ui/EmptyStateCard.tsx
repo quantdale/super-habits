@@ -3,7 +3,6 @@ import { View } from 'react-native';
 import { Card } from '@/core/ui/Card';
 import { Text } from '@/core/ui/Text';
 import { SparkIllustration } from '@/core/ui/illustrations/SparkIllustration';
-import { useAppTheme } from '@/core/providers/themeContext';
 import { radius, spacing } from '@/core/theme/designTokens';
 
 type EmptyStateCardProps = {
@@ -20,10 +19,9 @@ type EmptyStateCardProps = {
 };
 
 /**
- * Pop empty state: art, one clear sentence, and (when the caller passes it)
- * exactly one next action. Deliberately not a grey box with a sad icon — the
- * art uses the section's own hue so an empty Habits screen still feels like
- * Habits.
+ * Empty state (V3): modest art, one clear sentence, and (when the caller passes
+ * it) exactly one next action. Quieted from Pop — a smaller illustration on a
+ * neutral surface reads calm instead of celebratory (docs/ui-ux/13 §11).
  */
 export function EmptyStateCard({
   accentColor,
@@ -34,24 +32,19 @@ export function EmptyStateCard({
   children,
   className,
 }: EmptyStateCardProps) {
-  const { tokens } = useAppTheme();
-  // Empty-state descriptions sit on an accent-tinted card that can itself be
-  // nested in another tinted card; muted text there measures ~4.3:1, so the
-  // description uses the primary text colour and keeps hierarchy via size.
-  const descriptionColor = tokens.text;
   return (
-    <Card accentColor={accentColor} className={className}>
-      <View style={{ alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm }}>
+    <Card className={className}>
+      <View style={{ alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md }}>
         <View
           style={{
-            width: 132,
-            height: 132,
-            borderRadius: radius.xl,
+            width: 96,
+            height: 96,
+            borderRadius: radius.lg,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          {illustration ?? icon ?? <SparkIllustration color={accentColor} size={124} />}
+          {illustration ?? icon ?? <SparkIllustration color={accentColor} size={84} />}
         </View>
         <Text variant="titleMd" style={{ textAlign: 'center' }}>
           {title}
@@ -59,7 +52,8 @@ export function EmptyStateCard({
         {description ? (
           <Text
             variant="bodyMd"
-            style={{ color: descriptionColor, textAlign: 'center', paddingHorizontal: spacing.md }}
+            tone="muted"
+            style={{ textAlign: 'center', paddingHorizontal: spacing.md }}
           >
             {description}
           </Text>

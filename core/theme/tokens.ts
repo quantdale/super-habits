@@ -48,12 +48,10 @@ export type ThemeTokens = {
   /** Text/glyph color that must sit on a saturated solid fill. */
   onSolid: string;
 
-  // ── Pop accents (derived) ───────────────────────────────────────────
-  /** Two-stop brand gradient for hero surfaces and primary actions. */
+  // ── Accents (derived) ──────────────────────────────────────────
+  /** Two-stop brand gradient for the primary action and capture affordance. */
   brandGradient: readonly [string, string];
-  /** Ambient wash behind the top of a screen, faded into `background`. */
-  canvasTint: string;
-  /** Colored shadow for brand/primary surfaces. */
+  /** Colored shadow for floating surfaces (capture affordance, modals). */
   glow: string;
   /** Tinted chip/segment fill derived from the brand hue. */
   chipBackground: string;
@@ -111,7 +109,6 @@ export type ThemeInput = Pick<
       | 'textOnAccent'
       | 'onSolid'
       | 'brandGradient'
-      | 'canvasTint'
       | 'glow'
       | 'chipBackground'
       | 'chipBorder'

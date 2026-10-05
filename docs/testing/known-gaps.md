@@ -568,3 +568,20 @@ in `.agent/execplans/integration-tinypool-ipc-channel-closed-v1.md`.
 **Reason:** there is no standing staging Supabase/Vercel environment. The disposable-backend lane creates-or-wipes a throwaway project per run (design D8), which is excellent isolation but means nothing persists between runs: long-lived data, RLS role changes, and cross-day cloud behaviour cannot be observed anywhere.
 
 **Closing path:** deliberate trade (D8 rejected standing infra on cost/security for a single-user app). If a standing env is ever wanted, `schema.sql` is compatible with a local `supabase start` stack, and promotion of the disposable lane to a `main` gating lane is decided only after 14 consecutive flake-free nightly runs (design open questions). Recorded so the absence of staging is a decision, not an accident.
+
+### 24. Frontend V3 rendered-truth audit harness — opt-in `VISUAL_AUDIT` lane
+
+**Gate site:** `e2e/visual-audit.spec.ts`
+
+**Reason:** the campaign's visual-audit harness seeds TYPICAL fixtures and
+captures ~47 screenshots per run (`docs/ui-ux/v3-audit/`). It is gated with
+`test.skip(...)` unless `VISUAL_AUDIT=1`, so the standard battery and CI never
+run it: a full pass takes minutes and writes evidence artifacts that belong to
+the campaign ledger, not to a gating suite.
+
+**Closing path:** opt in on demand — `VISUAL_AUDIT=1 npx playwright test
+e2e/visual-audit.spec.ts`. Screenshots land in `docs/ui-ux/v3-audit/` and are
+inspected against the Calm Momentum reference lock
+(`docs/ui-ux/14-v3-reference-ledger.md`). The curated `toHaveScreenshot`
+regression suite (campaign W15) is a separate deliverable and WILL run in the
+standard battery.

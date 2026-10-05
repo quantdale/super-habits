@@ -17,8 +17,9 @@ type StatBlockProps = {
 };
 
 /**
- * Compact metric tile: a big colored number over a small caps label. Pop keeps
- * the number loud and the label quiet so a row of tiles scans instantly.
+ * Compact metric tile (V3): a neutral surface with the hue carried only by the
+ * value/icon — Pop's per-tile tinted background made five-stat strips read as
+ * rainbow noise (defect SYS-03). The number stays readable via readableAccent.
  */
 export function StatBlock({
   accentColor,
@@ -30,17 +31,12 @@ export function StatBlock({
   align = 'center',
 }: StatBlockProps) {
   const { tokens } = useAppTheme();
-  // The big number is painted with the accent over the tile's 10% tint; a
+  // The big number is painted with the accent over a neutral surface; a
   // mid-tone hue there measures ~2:1, so nudge it toward a readable text
-  // colour against the surface the tint sits on.
-  const valueColor = readableAccent(accentColor, tokens.surfaceElevated);
+  // colour against the surface.
+  const valueColor = readableAccent(accentColor, tokens.surface);
   return (
-    <Card
-      variant="stat"
-      accentColor={accentColor}
-      flat
-      className={['mb-0', className].filter(Boolean).join(' ')}
-    >
+    <Card variant="stat" className={['mb-0', className].filter(Boolean).join(' ')}>
       <View
         style={{
           alignItems: align === 'start' ? 'flex-start' : 'center',
@@ -51,9 +47,9 @@ export function StatBlock({
         {icon ? (
           <View
             style={{
-              width: 40,
-              height: 40,
-              borderRadius: radius.md,
+              width: 36,
+              height: 36,
+              borderRadius: radius.sm,
               alignItems: 'center',
               justifyContent: 'center',
               backgroundColor: `${accentColor}1F`,
@@ -62,14 +58,10 @@ export function StatBlock({
             {icon}
           </View>
         ) : null}
-        <Text variant="titleLg" style={{ color: valueColor, fontSize: 26 }}>
+        <Text variant="metric" style={{ color: valueColor, fontSize: 24 }}>
           {value}
         </Text>
-        <Text
-          variant="label"
-          tone="muted"
-          style={{ textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 11 }}
-        >
+        <Text variant="caption" tone="muted" style={{ fontSize: 11 }} numberOfLines={1}>
           {label}
         </Text>
         {detail ? (

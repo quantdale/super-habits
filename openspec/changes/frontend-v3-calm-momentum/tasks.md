@@ -15,16 +15,16 @@
 
 ## 3. W3 — Foundation (single owner)
 
-- [ ] 3.1 `designTokens.ts`: V3 radii/typography/springs/size values; remove Pop-era one-offs
-- [ ] 3.2 `createTheme` derivation: kill `canvasTint`; dark-hero ink inversion; keep 14 themes valid (`npm run validate:themes`)
-- [ ] 3.3 `Text`: implement V3 role scale; verify weight-family mapping unchanged
-- [ ] 3.4 `Button`: primary/secondary/tertiary/danger + celebrate; retire default lip; absorb TactileButton as deprecated wrapper
-- [ ] 3.5 `Card`: variants standard/inset/hero/stat; remove header bands; radius 16
-- [ ] 3.6 `PageHeader`: compact (22/700, no doc subtitle); deprecate `subtitle`
-- [ ] 3.7 `Screen`: gutters 16/24/32; remove wash; keep safe-area/centering
-- [ ] 3.8 `Modal`: standardize anatomy; sheets keep handle; single primary action
-- [ ] 3.9 New `SectionLabel`; restyle `StatBlock`, `EmptyStateCard`, `PillChip`, `SegmentedControl` (compact 36)
-- [ ] 3.10 Validate: typecheck, lint, `npm test` (unit+integration), theming spec, `qa:fast`
+- [x] 3.1 `designTokens.ts`: V3 radii/typography/springs/size values; remove Pop-era one-offs
+- [x] 3.2 `createTheme` derivation: kill `canvasTint`; dark-hero ink inversion; keep 14 themes valid (`npm run validate:themes`)
+- [x] 3.3 `Text`: implement V3 role scale; verify weight-family mapping unchanged
+- [x] 3.4 `Button`: primary/secondary/tertiary/danger + celebrate; retire default lip; absorb TactileButton as deprecated wrapper
+- [x] 3.5 `Card`: variants standard/inset/hero/stat; remove header bands; radius 16
+- [x] 3.6 `PageHeader`: compact (22/700, no doc subtitle); deprecate `subtitle`
+- [x] 3.7 `Screen`: gutters 16/24/32; remove wash; keep safe-area/centering
+- [x] 3.8 `Modal`: standardize anatomy; sheets keep handle; single primary action
+- [x] 3.9 New `SectionLabel`; restyle `StatBlock`, `EmptyStateCard`, `PillChip`, `SegmentedControl` (compact 36)
+- [x] 3.10 Validate: typecheck, lint, `npm test` (unit+integration), theming spec, `qa:fast`
 
 ## 4. W4 — Shell and navigation
 

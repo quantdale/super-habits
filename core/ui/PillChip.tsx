@@ -3,7 +3,7 @@ import { Animated, Pressable } from 'react-native';
 import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useReducedMotion } from '@/core/theme/motion';
-import { radius, size, spacing, springs, typography } from '@/core/theme/designTokens';
+import { radius, spacing, springs, typography } from '@/core/theme/designTokens';
 import { readableSurface } from '@/core/theme/contrast';
 
 type Props = {
@@ -16,9 +16,10 @@ type Props = {
 };
 
 /**
- * Pop chip: a fat pill that fills with its accent when selected and springs
- * down slightly under the finger. Used for filters, time-of-day pickers, and
- * quick presets, where a tap must feel immediate.
+ * Chip: a compact pill that fills with its accent when selected and settles
+ * quickly under the finger. Used for filters, time-of-day pickers, and quick
+ * presets. V3 quiets the inactive state (neutral surface, hairline border,
+ * muted ink) so a row of inactive chips stops competing with content.
  */
 export function PillChip({ label, accessibilityLabel, active, color, onPress, icon }: Props) {
   const { tokens } = useAppTheme();
@@ -39,17 +40,17 @@ export function PillChip({ label, accessibilityLabel, active, color, onPress, ic
     >
       <Pressable
         onPress={onPress}
-        onPressIn={() => settle(0.94)}
+        onPressIn={() => settle(0.96)}
         onPressOut={() => settle(1)}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
         accessibilityState={{ selected: active }}
         style={{
           borderRadius: radius.full,
-          borderWidth: 1.5,
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.sm + 2,
-          minHeight: size.touchTargetMin,
+          borderWidth: 1,
+          paddingHorizontal: spacing.md + 2,
+          paddingVertical: spacing.xs + 2,
+          minHeight: 40,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
@@ -65,7 +66,7 @@ export function PillChip({ label, accessibilityLabel, active, color, onPress, ic
         ) : null}
         <Text
           variant="label"
-          style={{ color: active ? tokens.onSolid : tokens.textMuted, fontSize: 14 }}
+          style={{ color: active ? tokens.onSolid : tokens.text, fontSize: 13.5 }}
         >
           {label}
         </Text>

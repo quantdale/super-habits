@@ -5,7 +5,7 @@ import { REWARD_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { layers, radius, spacing, typography } from '@/core/theme/designTokens';
 import { useReducedMotion } from '@/core/theme/motion';
-import { TactileButton } from '@/core/ui/TactileButton';
+import { Button } from '@/core/ui/Button';
 import { useGamification } from './gamificationContext';
 import type { CelebrationTier } from './gamification.types';
 
@@ -237,8 +237,9 @@ export function RewardCelebrationOverlay() {
             <Text style={{ ...typography.label, color: visual.color }}>+{celebration.xp} XP</Text>
           </View>
         ) : null}
-        <TactileButton
+        <Button
           label="Continue"
+          variant="celebrate"
           color={visual.color}
           onPress={dismissCelebration}
           className="mt-2"

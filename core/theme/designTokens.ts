@@ -1,17 +1,18 @@
 /**
- * Non-color design tokens for the "Pop" design language.
+ * Non-color design tokens for the "Calm Momentum" design language (V3).
  *
  * Theme-independent by definition: geometry, rhythm, type scale, and motion
  * envelopes. Color semantics live in `ThemeTokens`; features ask for
  * `spacing.lg` or `typography.titleLg`, never for raw numbers.
  *
- * Pop's rules of thumb:
- * - big radii (nothing below 10, cards at 24–32) so every surface reads soft;
+ * V3's rules of thumb (docs/ui-ux/13-calm-momentum-design-system.md):
+ * - modest radii: controls 8–12, cards 16, sheets/hero 24; pills only for chips;
  * - one type family (Nunito) mapped per role, with weight carried by the
  *   family itself rather than `fontWeight` (RN does not reliably synthesise
- *   weight for a custom family);
- * - chunky touch targets (56pt buttons) and generous page gutters, because the
- *   layout should feel like a native app, not a dense dashboard.
+ *   weight for a custom family). Heavy weights (800/900) are rare enough to
+ *   create hierarchy — titles are 700, body 600, 900 only for celebration;
+ * - honest touch targets (44–52pt) and a 16pt phone page gutter, because the
+ *   layout must put content first and keep dense screens dense.
  */
 
 /** 4-point base grid spacing scale. */
@@ -34,18 +35,18 @@ export const spacing = {
   xxxl: 48,
 } as const;
 
-/** Corner-radius roles. Pop keeps every surface generously rounded. */
+/** Corner-radius roles. V3 keeps geometry calm: nothing above 24 except pills. */
 export const radius = {
-  /** Chips, small tags, inline pills. */
-  xs: 10,
+  /** Chips, small tags, inline pills, compact buttons. */
+  xs: 8,
   /** Inputs and compact controls. */
-  sm: 14,
-  /** List rows and standard controls. */
-  md: 20,
-  /** Default cards and buttons. */
-  lg: 26,
+  sm: 10,
+  /** Buttons, list rows, standard controls. */
+  md: 12,
+  /** Default cards. */
+  lg: 16,
   /** Hero panels, sheets, celebration surfaces. */
-  xl: 34,
+  xl: 24,
   /** Pills, avatars, circular status. */
   full: 9999,
 } as const;
@@ -64,26 +65,36 @@ export type FontFamilyRole = keyof typeof fonts;
 /**
  * Semantic typography roles. `fontWeight` is retained for call sites that read
  * it directly, but rendering is driven by `fontFamily`.
+ *
+ * V3 weight ladder (docs/ui-ux/13 §5): 800/900 are celebration-scale only;
+ * titles are 700; body/labels 600. Heavy weights must stay rare enough to
+ * create hierarchy.
  */
 export const typography = {
-  /** Screen hero values and celebratory numbers. */
-  display: { fontSize: 38, fontFamily: fonts.black, fontWeight: '900', letterSpacing: -0.8 },
-  /** Section hero title. */
-  titleXl: { fontSize: 30, fontFamily: fonts.black, fontWeight: '900', letterSpacing: -0.5 },
+  /** Celebratory values and hero numbers (level up, streak record). */
+  display: { fontSize: 34, fontFamily: fonts.bold, fontWeight: '800', letterSpacing: -0.6 },
+  /** Rare emphasis title (empty-state art headers). */
+  titleXl: { fontSize: 26, fontFamily: fonts.bold, fontWeight: '800', letterSpacing: -0.3 },
   /** Screen title. */
-  titleLg: { fontSize: 25, fontFamily: fonts.bold, fontWeight: '800', letterSpacing: -0.3 },
+  titleLg: { fontSize: 22, fontFamily: fonts.semibold, fontWeight: '700', letterSpacing: -0.3 },
   /** Card / sheet title. */
-  titleMd: { fontSize: 20, fontFamily: fonts.bold, fontWeight: '800', letterSpacing: -0.2 },
+  titleMd: { fontSize: 17, fontFamily: fonts.semibold, fontWeight: '700', letterSpacing: -0.2 },
   /** Primary reading text. */
   bodyLg: { fontSize: 16, fontFamily: fonts.medium, fontWeight: '600' },
   /** Standard rows and descriptions. */
   bodyMd: { fontSize: 15, fontFamily: fonts.medium, fontWeight: '600' },
   /** Controls, chips, metadata labels. */
-  label: { fontSize: 13, fontFamily: fonts.bold, fontWeight: '700', letterSpacing: 0.2 },
+  label: { fontSize: 13, fontFamily: fonts.medium, fontWeight: '600', letterSpacing: 0.1 },
   /** Secondary metadata. */
-  caption: { fontSize: 12, fontFamily: fonts.semibold, fontWeight: '700' },
-  /** Key number/value. */
-  metric: { fontSize: 34, fontFamily: fonts.black, fontWeight: '900', letterSpacing: -0.5 },
+  caption: { fontSize: 12, fontFamily: fonts.medium, fontWeight: '600' },
+  /** Key number/value (timer, totals, kcal). Tabular to avoid jitter. */
+  metric: {
+    fontSize: 30,
+    fontFamily: fonts.bold,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    fontVariant: ['tabular-nums'],
+  },
 } as const;
 
 export type TypographyRole = keyof typeof typography;
@@ -140,7 +151,7 @@ export const springs = {
   enter: { speed: 18, bounciness: 8 },
 } as const;
 
-/** Component sizing roles. Frequent mobile targets stay ≥ 48 logical points. */
+/** Component sizing roles. Frequent mobile targets stay ≥ 44–48 logical points. */
 export const size = {
   /** Inline metadata icons. */
   iconXs: 16,
@@ -153,18 +164,20 @@ export const size = {
   iconXl: 32,
   /** Minimum frequent touch target (WCAG/HIG guidance). */
   touchTargetMin: 48,
-  /** Standard button height. */
-  buttonHeight: 56,
+  /** Standard button height (compact md size). */
+  buttonHeight: 44,
+  /** Large button height (primary screen-level actions). */
+  buttonHeightLg: 52,
   /** Bottom tab bar content height (excluding safe area). */
-  tabBarHeight: 66,
-  /** Floating action button diameter. */
-  fab: 60,
+  tabBarHeight: 64,
+  /** Capture affordance diameter (phone center slot / rail header action). */
+  fab: 56,
 } as const;
 
 /** Layout/content-width roles. */
 export const layout = {
   /** Phone horizontal page padding. */
-  pagePadding: 20,
+  pagePadding: 16,
   /** Max reading/content width on tablet/desktop before centering. */
   contentMaxWidth: 760,
   /** Max width for centered modal-style content. */

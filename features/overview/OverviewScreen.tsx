@@ -1,7 +1,6 @@
 import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 
 import { POMODORO_SECTION_KEY } from '@/constants/sectionColors';
@@ -369,21 +368,6 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
 
   return (
     <View className="flex-1" style={{ backgroundColor: tokens.background }}>
-      <LinearGradient
-        pointerEvents="none"
-        colors={[tokens.canvasTint, tokens.background]}
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 420,
-          borderBottomLeftRadius: radius.xl * 2,
-          borderBottomRightRadius: radius.xl * 2,
-        }}
-      />
       <ScrollView
         className="flex-1"
         contentContainerStyle={{

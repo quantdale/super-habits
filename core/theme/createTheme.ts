@@ -101,10 +101,11 @@ function assertContrast(id: string, input: ThemeTokens): void {
  * Fills derived tokens (§4 of docs/multi-theme-system-design.md) so theme
  * authors only specify the roles that meaningfully vary per theme.
  *
- * The Pop layer (tinted canvas, brand gradient, colored glow, chip tints) is
- * derived here on purpose: adding it must never require touching 14 theme
- * files, and every theme — old or new — gets the same expressive surface
- * language from its own primary hue.
+ * The V3 layer (brand gradient, glow, chip tints) is derived here on purpose:
+ * adding it must never require touching 14 theme files, and every theme — old
+ * or new — gets the same interaction language from its own primary hue.
+ * Pop's tinted-canvas wash (`canvasTint`) was removed in V3: a neutral canvas
+ * plus spacing does the separating (see docs/ui-ux/13 §3).
  */
 export function createTheme(input: ThemeInput): ThemeDefinition {
   const { id, name, appearance, description, sectionOverrides, ...rest } = input;
@@ -126,7 +127,6 @@ export function createTheme(input: ThemeInput): ThemeDefinition {
       blend(input.primary, '#ffffff', dark ? 0.06 : 0.16),
       input.primary,
     ],
-    canvasTint: input.canvasTint ?? blend(input.background, input.primary, dark ? 0.24 : 0.1),
     glow: input.glow ?? input.primary,
     chipBackground: input.chipBackground ?? blend(input.surface, input.primary, dark ? 0.2 : 0.1),
     chipBorder: input.chipBorder ?? blend(input.border, input.primary, dark ? 0.4 : 0.3),

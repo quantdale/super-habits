@@ -4,7 +4,7 @@ import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useReducedMotion } from '@/core/theme/motion';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
-import { radius, size, spacing } from '@/core/theme/designTokens';
+import { radius, spacing } from '@/core/theme/designTokens';
 import { readableSurface } from '@/core/theme/contrast';
 import { nextSegmentValue } from '@/core/ui/segmentedControl.model';
 
@@ -52,7 +52,7 @@ function SegmentOptionButton<T extends string>({
         {
           flex: 1,
           minWidth: 0,
-          minHeight: size.touchTargetMin - 4,
+          minHeight: 36,
           justifyContent: 'center',
           alignItems: 'center',
           borderRadius: radius.full,
@@ -64,7 +64,7 @@ function SegmentOptionButton<T extends string>({
     >
       <Text
         variant="label"
-        style={{ color: active ? tokens.onSolid : tokens.textMuted, fontSize: 13.5 }}
+        style={{ color: active ? tokens.onSolid : tokens.textMuted, fontSize: 13 }}
         numberOfLines={1}
       >
         {option.label}
@@ -83,8 +83,10 @@ type SegmentedControlProps<T extends string> = {
 };
 
 /**
- * Pop segmented control: a sunken tray with a solid pill that *slides* between
- * options, so switching modes reads as physical motion rather than a repaint.
+ * Segmented control (V3): a compact sunken tray (36pt segments) with a solid
+ * pill that *slides* between options, so switching modes reads as physical
+ * motion rather than a repaint. Pop's 48pt tray made every mode switch a
+ * dominant surface; V3 keeps it quiet.
  *
  * Accessibility contract (unchanged from the previous implementation):
  * - group announces its `accessibilityLabel` (role `tablist`);
@@ -139,6 +141,9 @@ export function SegmentedControl<T extends string>({
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
+    // SAFETY: only web reaches here; on web the ref is attached to a View,
+    // which react-native-web renders as an HTMLElement. Type checks the RN
+    // ViewProps contract cannot express (a DOM node only exists on web).
     const node = containerRef.current as unknown as HTMLElement | null;
     if (!node) return;
     const listener = (event: KeyboardEvent) => {
@@ -162,7 +167,7 @@ export function SegmentedControl<T extends string>({
         alignItems: 'center',
         padding: spacing.xs,
         borderRadius: radius.full,
-        borderWidth: 1.5,
+        borderWidth: 1,
         borderColor: tokens.border,
         backgroundColor: tokens.surfaceSunken,
       }}

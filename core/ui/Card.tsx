@@ -3,25 +3,37 @@ import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { elevation, radius, spacing } from '@/core/theme/designTokens';
-import { readableSurface } from '@/core/theme/contrast';
 
-export type CardVariant = 'standard' | 'header' | 'stat';
+/**
+ * Card variants (docs/ui-ux/13 §3/§8):
+ * - `standard` — default grouping surface: flat fill one step from canvas,
+ *   hairline border, no shadow.
+ * - `header`   — standard surface plus a quiet title row on the same surface
+ *   (the Pop saturated band is retired; 43 existing call sites keep working).
+ * - `stat`     — compact numeric tile.
+ * - `hero`     — the one emphasis surface a screen may own: section tint at
+ *   low alpha, radius 24 (xl), level-2 elevation.
+ * - `inset`    — sub-group inside a surface: sunken fill, no border, no shadow.
+ *
+ * An `accentColor` tints fill/border subtly; it no longer colors the shadow.
+ */
+export type CardVariant = 'standard' | 'header' | 'stat' | 'hero' | 'inset';
 
 type CardProps = {
   children: ReactNode;
-  /** Tints the surface and its shadow with this hue — the Pop card identity. */
+  /** Tints the surface/border with this hue at low alpha (no colored shadow). */
   accentColor?: string;
   className?: string;
   variant?: CardVariant;
   headerTitle?: string;
-  /** Shown below `headerTitle` in the accent bar (header variant only). */
+  /** Shown below `headerTitle` (header variant only). */
   headerSubtitle?: string;
   headerRight?: ReactNode;
   /** Merged onto the outer card `View` (border/elevation applied first). */
   style?: StyleProp<ViewStyle>;
-  /** Standard variant only: replaces default inner padding when set (e.g. `p-0`). */
+  /** Standard/header variants: replaces default inner padding when set (e.g. `p-0`). */
   innerClassName?: string;
-  /** Uses the flat tinted treatment with no shadow (list rows, dense groups). */
+  /** Accepted for compatibility; V3 cards are flat by default and this is a no-op. */
   flat?: boolean;
 };
 
@@ -34,14 +46,6 @@ function withAlpha(color: string, opacity: number): string {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
-/**
- * The Pop surface: generously rounded, softly colored, and floating in its own
- * hue. An `accentColor` tints both the fill and the shadow, so a Habits card
- * reads green and a Focus card reads violet at a glance.
- *
- * `header` keeps a saturated accent band above the body for cards that need a
- * title strip; `stat` is the compact numeric tile.
- */
 export function Card({
   children,
   accentColor,
@@ -52,44 +56,51 @@ export function Card({
   headerRight,
   style,
   innerClassName,
-  flat = false,
 }: CardProps) {
   const { tokens } = useAppTheme();
   const extra = className?.trim() ?? '';
   const hasConsumerVerticalMargin = /\b(mb-|my-)/.test(extra);
   const marginClass = hasConsumerVerticalMargin ? '' : 'mb-4';
 
-  const tint = accentColor ? withAlpha(accentColor, 0.1) : tokens.surface;
-  const outline = accentColor ? withAlpha(accentColor, 0.28) : tokens.border;
-  const shadow = accentColor ?? tokens.glow;
+  const isHero = variant === 'hero';
+  const isInset = variant === 'inset';
+
+  const backgroundColor = isHero
+    ? withAlpha(accentColor ?? tokens.primary, 0.12)
+    : isInset
+      ? tokens.surfaceSunken
+      : accentColor
+        ? withAlpha(accentColor, 0.06)
+        : tokens.surface;
+  const borderColor = isInset
+    ? 'transparent'
+    : accentColor
+      ? withAlpha(accentColor, 0.22)
+      : tokens.border;
 
   const rootStyle: StyleProp<ViewStyle> = [
-    { borderRadius: radius.lg, borderWidth: 1.5, borderColor: outline, backgroundColor: tint },
-    flat
-      ? null
-      : {
-          ...elevation.level1,
-          shadowColor: shadow,
-          shadowOpacity: 0.16,
-          shadowRadius: 18,
-          shadowOffset: { width: 0, height: 8 },
-        },
+    {
+      borderRadius: isHero ? radius.xl : radius.lg,
+      borderWidth: isInset ? 0 : 1,
+      borderColor,
+      backgroundColor,
+    },
+    isHero ? elevation.level2 : null,
     style,
   ];
 
   const rootClass = ['overflow-hidden', marginClass, extra].filter(Boolean).join(' ');
 
-  if (variant === 'header') {
-    // White text on a mid-tone section hue measures ~2.5:1; deepen the band
-    // (hue preserved) until the title clears WCAG AA.
-    const bandColor = readableSurface(accentColor ?? tokens.primary, tokens.onSolid);
+  if (variant === 'header' || (headerTitle && variant === 'standard')) {
+    // Quiet title row on the same surface — V3 replaces Pop's saturated band.
+    // The title carries the hierarchy; no band, no white-on-hue contrast risk.
     return (
       <View className={rootClass} style={rootStyle}>
         <View
           style={{
-            backgroundColor: bandColor,
-            paddingHorizontal: spacing.xl,
-            paddingVertical: spacing.lg,
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.md,
+            paddingBottom: headerTitle && headerSubtitle ? spacing.xs : 0,
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -98,23 +109,19 @@ export function Card({
         >
           <View className="min-w-0 flex-1">
             {headerTitle ? (
-              <Text variant="titleMd" style={{ color: tokens.onSolid }} numberOfLines={1}>
+              <Text variant="titleMd" style={{ color: tokens.text }} numberOfLines={1}>
                 {headerTitle}
               </Text>
             ) : null}
             {headerSubtitle ? (
-              <Text
-                variant="caption"
-                style={{ color: tokens.onSolid, marginTop: 2 }}
-                numberOfLines={2}
-              >
+              <Text variant="caption" tone="muted" style={{ marginTop: 2 }} numberOfLines={2}>
                 {headerSubtitle}
               </Text>
             ) : null}
           </View>
           {headerRight ? <View className="shrink-0">{headerRight}</View> : null}
         </View>
-        <View className={innerClassName ?? 'p-4'}>{children}</View>
+        <View className={innerClassName ?? 'p-4 pt-3'}>{children}</View>
       </View>
     );
   }
@@ -123,7 +130,7 @@ export function Card({
     return (
       <View
         className={['items-center', rootClass].filter(Boolean).join(' ')}
-        style={[rootStyle, { paddingVertical: spacing.lg, paddingHorizontal: spacing.md }]}
+        style={[rootStyle, { paddingVertical: spacing.md, paddingHorizontal: spacing.md }]}
       >
         {children}
       </View>
@@ -132,7 +139,7 @@ export function Card({
 
   return (
     <View className={rootClass} style={rootStyle}>
-      <View className={innerClassName ?? 'p-[18px]'}>{children}</View>
+      <View className={innerClassName ?? 'p-4'}>{children}</View>
     </View>
   );
 }

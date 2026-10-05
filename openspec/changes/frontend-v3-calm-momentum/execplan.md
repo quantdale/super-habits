@@ -15,25 +15,34 @@ historical evidence only.
 ## Current Checkpoint
 
 - **Date:** 2026-10-05
-- **Phase:** W2 complete → W3 (foundation) next
-- **Exact next action:** Implement design-token/derivation changes in
-  `core/theme/designTokens.ts` + `core/theme/createTheme.ts` (tasks 3.1–3.2),
-  then component restyles (3.3–3.9), validating with typecheck + lint +
-  validate:themes + qa:fast; commit as "V3 foundation".
+- **Phase:** W3 (foundation) implemented + verified → W4 (shell/navigation) next
+- **Exact next action:** W4 — introduce `AppSection` 'health' + parent surface,
+  five-destination phone bar with center capture slot (tasks 4.1–4.5), keeping
+  `journey-label-parity` green; then re-render and inspect.
 - **Decisions so far:** see design.md D1–D7; reference lock in
   `docs/ui-ux/14-v3-reference-ledger.md`; defect ledger
-  `docs/ui-ux/15-v3-defect-ledger.md` (33 defects: 4×S1, 22×S2, 7×S3).
-- **Validation evidence:**
+  `docs/ui-ux/15-v3-defect-ledger.md` (33 defects; SYS-02/SYS-15 VERIFIED-FIXED,
+  SYS-17 token-level FIXED).
+- **Validation evidence (W3):**
   - `npm run typecheck` — 0 errors.
-  - `npx eslint e2e/visual-audit.spec.ts --max-warnings 0` — clean.
-  - `VISUAL_AUDIT=1 npx playwright test e2e/visual-audit.spec.ts` — 5 passed,
-    47 captures in `docs/ui-ux/v3-audit/`.
-- **Changed areas so far:** `e2e/visual-audit.spec.ts` (new harness),
-  `docs/ui-ux/13…15` (design system, reference ledger, defect ledger),
-  `openspec/changes/frontend-v3-calm-momentum/*`.
-- **Blockers:** none. iOS remains DEFERRED_BY_OWNER; braces/node-forge audit
-  reds remain upstream (out of scope).
-- **Remaining definition of done:** tasks.md §3–§16 all checked with evidence;
+  - `npm run lint` — 0 errors/0 warnings.
+  - `npm run validate:themes` — All 140 contrast checks pass.
+  - `npm run test:unit` — 2143/2143 passed.
+  - `scripts/quarantine-register-parity.mjs` — OK (visual-audit registered in
+    known-gaps entry 24).
+  - `npm run build:e2e` + audit re-run (E2E_PORT=8083): 5/5 passed; re-rendered
+    captures confirm compact headers, no slab bands, calm radii. Note: a
+    NON-campaign Expo dev server (user's brain-training project, PID 42924)
+    occupies :8081 — audits must use E2E_PORT=8083; do not kill that process.
+- **Changed areas (W3):** `core/theme/designTokens.ts`, `core/theme/tokens.ts`,
+  `core/theme/createTheme.ts` (canvasTint removed), `core/ui/{Screen,Button,
+Card,PageHeader,StatBlock,PillChip,SegmentedControl,EmptyStateCard}.tsx`,
+  new `core/ui/SectionLabel.tsx`, `core/ui/TactileButton.tsx` deleted (Button
+  `celebrate` variant absorbs it), `features/overview/OverviewScreen.tsx` (wash
+  removal), `features/gamification/RewardCelebrationOverlay.tsx` (Button
+  celebrate), `docs/testing/known-gaps.md` (entry 24).
+- **Blockers:** none. iOS DEFERRED_BY_OWNER; braces/node-forge upstream.
+- **Remaining definition of done:** tasks.md §4–§16 all checked with evidence;
   validation ladder green; visual regression baselines curated; final report
   with truthful verdict per campaign §48.
 

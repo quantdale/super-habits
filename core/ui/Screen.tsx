@@ -1,5 +1,4 @@
 import { PropsWithChildren } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   Platform,
   SafeAreaView,
@@ -11,7 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { layout, radius, spacing } from '@/core/theme/designTokens';
+import { layout, spacing } from '@/core/theme/designTokens';
 
 /** Viewport widths above this get a centered, width-capped content column. */
 const WIDE_VIEWPORT_MIN_WIDTH = 768;
@@ -38,12 +37,10 @@ type ScreenProps = PropsWithChildren<{
 const ANDROID_NAVIGATION_FALLBACK = 48;
 
 /**
- * The Pop page canvas: soft tinted background, an ambient color wash at the
- * top, an optional pinned hero, and a centered content column on wide screens.
- *
- * The wash is what keeps a light screen from reading as flat grey — it fades
- * the brand hue into the canvas behind the hero, so every section opens with
- * depth instead of a hard empty gap.
+ * The V3 page canvas: neutral background, an optional pinned hero, and a
+ * centered content column on wide screens. Surfaces separate through tone,
+ * spacing, and hairlines — not an ambient wash (see docs/ui-ux/13 §3; the
+ * removed Pop wash rendered as a stray arc at the rail breakpoint).
  */
 export function Screen({
   children,
@@ -53,8 +50,8 @@ export function Screen({
   hero,
   refreshControl,
 }: ScreenProps) {
-  const { tokens } = useAppTheme();
   const { width } = useWindowDimensions();
+  const { tokens } = useAppTheme();
   const { bottom: safeAreaBottom } = useSafeAreaInsets();
   const effectiveBottomInset =
     Platform.OS === 'android'
@@ -65,16 +62,6 @@ export function Screen({
     width >= WIDE_VIEWPORT_MIN_WIDTH
       ? { maxWidth: contentMaxWidth ?? layout.contentMaxWidth }
       : null;
-
-  const wash = (
-    <LinearGradient
-      pointerEvents="none"
-      colors={[tokens.canvasTint, tokens.background]}
-      start={{ x: 0.1, y: 0 }}
-      end={{ x: 0.9, y: 1 }}
-      style={styles.wash}
-    />
-  );
 
   const heroBlock = hero ? (
     <View
@@ -90,7 +77,6 @@ export function Screen({
 
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: tokens.background }]}>
-      {wash}
       {heroBlock}
       {scroll ? (
         <ScrollView
@@ -134,16 +120,6 @@ export function Screen({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-  },
-  wash: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 420,
-    borderBottomLeftRadius: radius.xl * 2,
-    borderBottomRightRadius: radius.xl * 2,
-    opacity: 0.9,
   },
   heroShell: {
     width: '100%',
