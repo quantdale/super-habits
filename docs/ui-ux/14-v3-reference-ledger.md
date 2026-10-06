@@ -119,6 +119,26 @@ theme: Light.") — the same fact twice, as prose. Adopt grouped-row grammar
 (label · description · value · control) from mainstream settings apps;
 status pills only for genuinely exceptional states.
 
+## R9. Daily dashboard / Today orientation (W5)
+
+**Queried:** "daily dashboard today overview next task progress summary" (iOS
+screens).
+
+| Reference             | Screen evidence                                                                                                             | Adopt                                                                                     | Reject                                   |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Todoist daily summary | One dominant completed-count + yesterday comparison + flat completed list; orientation via a single number, not a stat wall | One dominant progress signal per domain; yesterday/comparison framing is optional context | Red header blocks                        |
+| Asana Today widget    | "1/2" fractional progress IS the dashboard; add button adjacent                                                             | Fraction-as-state (x/y) for glance metrics                                                | Widget-only framing                      |
+| Structured / Daylish  | Date-first header; one highlighted in-progress item; restrained chips                                                       | Date/context row stays compact; one highlighted item max                                  | Per-item progress bars on a dashboard    |
+| Planny                | Three stat cards with captions + trend labels                                                                               | Caption-under-value glance anatomy                                                        | Full-width chart cards on a daily screen |
+| Clearful              | Progress card + two-up breakdown cards                                                                                      | Two-column secondary use on wide layouts                                                  | Multi-hue chart cards stacked on mobile  |
+
+**Synthesis for Today (W5):** the screen answers in order — compact date/greeting
+row → one UP NEXT hero (solid accent, status eyebrow, subordinate reason,
+contrast-enforced fill) → neutral glance strip (hue on icons only, x/y values,
+tabular numerals) → operational cards → secondary reflection (garden compacted,
+demoted below the core on phone; beside it at ≥1024). Rejected: stat walls,
+per-metric tinted tiles, competing giant modules.
+
 ---
 
 ## Reference lock (campaign §11)

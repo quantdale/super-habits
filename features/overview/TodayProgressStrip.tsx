@@ -26,11 +26,13 @@ type TodayProgressStripProps = {
 };
 
 /**
- * Today progress strip (docs/ui-ux/03-feature-blueprints.md §1C): one compact
- * card summarizing tasks · habits · focus · workout · calories. Pinned daily
- * orientation — rendered regardless of card customization and NOT part of the
- * removable card registry. Each metric deep-links to its feature exactly like
- * the customizable cards do.
+ * Today at a glance (docs/ui-ux/13 §3/§12): one compact cross-domain strip —
+ * neutral surfaces, hairline borders, and section hue carried only by the
+ * small icon. W5 correction for defect SYS-03: the Pop treatment tinted every
+ * tile with its section hue, so the strip read as five competing color fields;
+ * a neutral row with hue-marked icons scans as one measurement, not a rainbow.
+ * Values use tabular numerals; state semantics stay in the text (never
+ * color-only; never danger-red for neutral incomplete progress).
  */
 export function TodayProgressStrip({
   todayKey,
@@ -40,7 +42,7 @@ export function TodayProgressStrip({
   workout,
   calories,
 }: TodayProgressStripProps) {
-  const { sectionAccents } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const navigation = useAppNavigation();
 
   const focusMinutesToday =
@@ -61,6 +63,8 @@ export function TodayProgressStrip({
     id: 'todos' | 'habits' | 'focus' | 'workout' | 'calories';
     value: string;
     label: string;
+    /** Semantic state icon override (status, not decoration). */
+    icon?: keyof typeof MaterialIcons.glyphMap;
     /** Full sentence read by screen readers. */
     spoken: string;
   }[] = [
@@ -100,6 +104,7 @@ export function TodayProgressStrip({
               ? `${workout.sessionsThisWeek}/wk`
               : '—',
       label: 'Workout',
+      icon: workoutDoneToday ? 'check-circle' : undefined,
       spoken: workoutResumable
         ? 'Workout in progress and ready to resume'
         : workoutDoneToday
@@ -124,20 +129,17 @@ export function TodayProgressStrip({
   return (
     <View>
       <Text
-        variant="label"
+        variant="caption"
         tone="muted"
-        style={{ letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: spacing.sm }}
+        style={{ letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: spacing.sm }}
       >
         Today at a glance
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
         {metrics.map((metric) => {
           const meta = OVERVIEW_CARD_META[metric.id];
-          // Fills paint the tint/border; text and glyphs use the contrast-safe
-          // accent variant (light themes ship a darker hue for text) so the
-          // 19px metric clears WCAG AA on its tinted tile.
-          const hue = sectionAccents[metric.id].fill;
-          const ink = sectionAccents[metric.id].text;
+          // Hue marks identity on the icon only; value/label stay in primary
+          // ink on the neutral surface so the strip reads as one measurement.
           return (
             <Pressable
               key={metric.id}
@@ -148,21 +150,27 @@ export function TodayProgressStrip({
                 flexGrow: 1,
                 flexBasis: 96,
                 minWidth: 96,
-                paddingVertical: spacing.md,
+                paddingVertical: spacing.sm + 2,
                 paddingHorizontal: spacing.sm,
                 borderRadius: radius.md,
                 alignItems: 'center',
                 gap: 2,
-                backgroundColor: `${hue}1A`,
-                borderWidth: 1.5,
-                borderColor: `${hue}33`,
+                minHeight: 64,
+                justifyContent: 'center',
+                backgroundColor: tokens.surface,
+                borderWidth: 1,
+                borderColor: tokens.border,
                 opacity: pressed ? 0.85 : 1,
               })}
             >
-              <MaterialIcons name={meta.icon} size={18} color={ink} />
+              <MaterialIcons
+                name={metric.icon ?? meta.icon}
+                size={16}
+                color={sectionAccents[metric.id].text}
+              />
               <Text
-                variant="titleMd"
-                style={{ color: ink, fontSize: 19, lineHeight: 24 }}
+                variant="metric"
+                style={{ color: tokens.text, fontSize: 19, lineHeight: 24 }}
                 numberOfLines={1}
               >
                 {metric.value}

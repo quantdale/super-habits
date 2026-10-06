@@ -84,14 +84,16 @@ export function MomentumCard({ model, onViewGarden }: MomentumCardProps) {
 
         <View
           style={{
-            borderRadius: radius.lg,
-            paddingVertical: spacing.sm,
+            borderRadius: radius.md,
+            paddingVertical: spacing.xs,
             backgroundColor: accent.tint,
-            borderWidth: 1.5,
+            borderWidth: 1,
             borderColor: `${accent.fill}22`,
           }}
         >
-          <MomentumGardenArt day={model.today} height={156} />
+          {/* Compact art (W5 SUR-01): the garden is secondary motivational
+              content — it fits its content and never competes with UP NEXT. */}
+          <MomentumGardenArt day={model.today} height={104} />
         </View>
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>

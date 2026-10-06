@@ -1,7 +1,7 @@
 import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, useWindowDimensions, View } from 'react-native';
 
 import { POMODORO_SECTION_KEY } from '@/constants/sectionColors';
 import { useAppNavigation } from '@/core/providers/navigationContext';
@@ -11,6 +11,7 @@ import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { buildDateRangeOldestFirst, timestampToLocalDateKey, toDateKey } from '@/lib/time';
 import { createPreferencePrecedenceGuard } from '@/lib/preferencePrecedence';
 import { Button } from '@/core/ui/Button';
+import { Card } from '@/core/ui/Card';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { SkeletonBlock } from '@/core/ui/SkeletonBlock';
 import { spacing, layout, radius } from '@/core/theme/designTokens';
@@ -215,7 +216,7 @@ async function loadSummaries(): Promise<OverviewLoadResult> {
 }
 
 export function OverviewScreen({ isActive }: { isActive: boolean }) {
-  const { openPlanningHub, setActiveSection, openSettings } = useAppNavigation();
+  const { openPlanningHub, setActiveSection, openSettings, openWeeklyReview } = useAppNavigation();
   const dayGeneration = useDayRolloverGeneration();
   const { tokens, sectionAccents } = useAppTheme();
 
@@ -366,6 +367,13 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
     [openPlanningHub, setActiveSection],
   );
 
+  const { width } = useWindowDimensions();
+  // ≥1024: the operational core stays in the main column and secondary
+  // reflection modules (Momentum Garden, weekly review) move beside it —
+  // wide layouts use space intentionally instead of stretching a phone stack
+  // (W5: defect SUR-02).
+  const isWideLayout = width >= 1024;
+
   return (
     <View className="flex-1" style={{ backgroundColor: tokens.background }}>
       <ScrollView
@@ -406,7 +414,7 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
                 >
                   {todayHeading}
                 </Text>
-                <Text variant="titleXl">{greeting}</Text>
+                <Text variant="titleLg">{greeting}</Text>
               </View>
               <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                 <Pressable
@@ -487,7 +495,8 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
 
           {/* Pinned daily orientation: Next Best Action hero + Today progress
               strip. Always rendered regardless of customization — they are
-              NOT part of the removable card registry. */}
+              NOT part of the removable card registry. The Momentum Garden is
+              demoted below the operational core (W5: defect SUR-01). */}
           {!isLoading && !loadError ? (
             <View className="mt-5 gap-4">
               {nextBestAction ? <NextBestActionHero action={nextBestAction} /> : null}
@@ -499,9 +508,6 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
                 workout={summaries.workout}
                 calories={summaries.calories}
               />
-              {momentum ? (
-                <MomentumCard model={momentum} onViewGarden={() => openPlanningHub('progress')} />
-              ) : null}
             </View>
           ) : null}
 
@@ -528,29 +534,94 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
             </EmptyStateCard>
           ) : (
             <View className="mt-5 gap-4">
-              {cardLayout.map((id) => (
-                <View key={id}>{renderCard(id)}</View>
-              ))}
-              {!isCustomizing && !hasAnyData ? (
-                <EmptyStateCard
-                  accentColor={sectionAccents[POMODORO_SECTION_KEY].fill}
-                  title="Nothing tracked yet"
-                  description="Start with any feature and this dashboard will begin filling in automatically."
+              {isWideLayout ? (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'flex-start',
+                    gap: spacing.xl,
+                  }}
                 >
-                  <View className="flex-row flex-wrap items-center justify-center gap-2">
-                    {starterCtas.map((cta, index) => (
-                      <Button
-                        key={cta.label}
-                        label={cta.label}
-                        size="sm"
-                        variant={index === 0 ? 'primary' : 'secondary'}
-                        color={index === 0 ? sectionAccents[POMODORO_SECTION_KEY].fill : undefined}
-                        onPress={() => openCtaDestination(cta)}
-                      />
+                  <View style={{ flex: 1, minWidth: 0, gap: spacing.md }}>
+                    {cardLayout.map((id) => (
+                      <View key={id}>{renderCard(id)}</View>
                     ))}
+                    {!isCustomizing && !hasAnyData ? (
+                      <EmptyStateCard
+                        accentColor={sectionAccents[POMODORO_SECTION_KEY].fill}
+                        title="Nothing tracked yet"
+                        description="Start with any feature and this dashboard will begin filling in automatically."
+                      >
+                        <View className="flex-row flex-wrap items-center justify-center gap-2">
+                          {starterCtas.map((cta, index) => (
+                            <Button
+                              key={cta.label}
+                              label={cta.label}
+                              size="sm"
+                              variant={index === 0 ? 'primary' : 'secondary'}
+                              color={
+                                index === 0 ? sectionAccents[POMODORO_SECTION_KEY].fill : undefined
+                              }
+                              onPress={() => openCtaDestination(cta)}
+                            />
+                          ))}
+                        </View>
+                      </EmptyStateCard>
+                    ) : null}
                   </View>
-                </EmptyStateCard>
-              ) : null}
+                  {/* Secondary reflection column (W5 SUR-02): lower-priority
+                      context beside the operational core, never above it. */}
+                  <View style={{ width: 300, flexShrink: 0, gap: spacing.md }}>
+                    {momentum ? (
+                      <MomentumCard
+                        model={momentum}
+                        onViewGarden={() => openPlanningHub('progress')}
+                      />
+                    ) : null}
+                    <WeeklyReviewPromptCard onPress={openWeeklyReview} />
+                  </View>
+                </View>
+              ) : (
+                <>
+                  {cardLayout.map((id) => (
+                    <View key={id}>{renderCard(id)}</View>
+                  ))}
+                  {!isCustomizing && !hasAnyData ? (
+                    <EmptyStateCard
+                      accentColor={sectionAccents[POMODORO_SECTION_KEY].fill}
+                      title="Nothing tracked yet"
+                      description="Start with any feature and this dashboard will begin filling in automatically."
+                    >
+                      <View className="flex-row flex-wrap items-center justify-center gap-2">
+                        {starterCtas.map((cta, index) => (
+                          <Button
+                            key={cta.label}
+                            label={cta.label}
+                            size="sm"
+                            variant={index === 0 ? 'primary' : 'secondary'}
+                            color={
+                              index === 0 ? sectionAccents[POMODORO_SECTION_KEY].fill : undefined
+                            }
+                            onPress={() => openCtaDestination(cta)}
+                          />
+                        ))}
+                      </View>
+                    </EmptyStateCard>
+                  ) : null}
+                  {/* Garden demoted below the operational core on phone
+                      (W5: defect SUR-01). */}
+                  {momentum ? (
+                    <MomentumCard
+                      model={momentum}
+                      onViewGarden={() => openPlanningHub('progress')}
+                    />
+                  ) : null}
+                </>
+              )}
+              {/* Lightweight first-run onboarding (docs/ui-ux/03-feature-
+                  blueprints.md §13): an ordinary card at the very bottom —
+                  never a modal, hidden once completed/skipped or once real
+                  data exists. */}
               {/* Lightweight first-run onboarding (docs/ui-ux/03-feature-
                   blueprints.md §13): an ordinary card at the very bottom —
                   never a modal, hidden once completed/skipped or once real
@@ -568,5 +639,24 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
         </View>
       </ScrollView>
     </View>
+  );
+}
+
+/**
+ * Quiet reflection prompt for the wide-layout secondary column (W5 SUR-02):
+ * one line of context and one action — never a second hero competing with
+ * UP NEXT.
+ */
+function WeeklyReviewPromptCard({ onPress }: { onPress: () => void }) {
+  return (
+    <Card>
+      <Text variant="titleMd">Weekly review</Text>
+      <Text variant="caption" tone="muted" style={{ marginTop: 2 }}>
+        Reflect on the finished week and carry priorities forward.
+      </Text>
+      <View style={{ marginTop: spacing.md }}>
+        <Button label="Open weekly review" variant="secondary" onPress={onPress} />
+      </View>
+    </Card>
   );
 }

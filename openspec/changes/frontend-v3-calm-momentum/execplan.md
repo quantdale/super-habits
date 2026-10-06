@@ -60,13 +60,17 @@ historical evidence only.
 
 ## Current Checkpoint
 
-- Current milestone: W5 — Today reconstruction.
-- Completed: W0–W4 complete; W4.5 complete (hosted ExecPlan validation
-  repaired, hosted unit/integration green, foundation corrections verified —
-  re-rendered rail/Health/gutter captures inspected); W1 audit (47 captures,
-  33-defect ledger); W2 reference lock + design system; W3 foundation
-  commit 8888084; W4 shell commit 282bfce; W4.5 commit 10e1462.
-- In progress: W5.1 — orientation-first Today layout.
+- Current milestone: W6 — To Do + Quick Capture.
+- Completed: W5 — Today reconstruction (orientation-first: compact context
+  row, single UP NEXT hero with contrast-enforced fill and subordinate
+  reason, neutral glance strip, garden demoted/compacted, ≥1024 two-column
+  layout, weekly-review prompt; defects SYS-03/SYS-10/SYS-11/SUR-01/SUR-02
+  VERIFIED-FIXED with re-render evidence). W0–W4 complete; W4.5 complete
+  (hosted run 37509416280 green through unit/integration); W1 audit; W2
+  reference lock; W3 commit 8888084; W4 commit 282bfce; W4.5 commit 10e1462;
+  W5 security lane commit 043920f (shell-quote + source-map-js resolved).
+- In progress: 6.1 — rebuild To Do around flat list anatomy (throughput
+  first: 48–56pt rows, checkbox/title/metadata, list-first view modes).
 - Important modified files: `openspec/changes/frontend-v3-calm-momentum/execplan.md`,
   `core/ui/Button.tsx`, `core/ui/Screen.tsx`, `core/theme/designTokens.ts`,
   `features/health/HealthScreen.tsx`, `app/index.tsx`,
@@ -123,7 +127,7 @@ historical evidence only.
 - [x] W4 — five-destination shell + capture slot + Health parent (`282bfce`)
 - [x] W4.5 — foundation/shell correction pass (commit 10e1462; hosted run
       37509416280 green through unit/integration)
-- [ ] W5 — Today reconstruction
+- [x] W5 — Today reconstruction (orientation-first; 5 defects verified fixed)
 - [ ] W6 — To Do + Quick Capture
 - [ ] W7 — Habits
 - [ ] W8 — Focus
@@ -192,6 +196,10 @@ historical evidence only.
   health accent); unit 2143/2143; journey-label-parity OK (5-label rail);
   chromium: todos+workout+calories 24 passed, habits+pomodoro+overview+
   boundary+theming 44 passed; visual-audit 5/5 with new Health captures.
+- W5 (full local gate): typecheck 0; lint 0/0; chromium overview+theming+
+  boundary 27 passed; visual-audit 5/5 with re-inspected Today captures
+  (390 populated/dark/first-run, 768, 1280, breakpoints); npm test 2546/2546;
+  defect ledger +5 VERIFIED-FIXED (W5).
 - W5 security lane: node scripts/audit-runtime-deps.mjs — undocumented
   count reduced 4 → 2 (braces + node-forge remain; gate exit 1 unchanged
   for those known blockers); installed shell-quote 1.12.0 and
