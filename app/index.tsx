@@ -59,6 +59,21 @@ const NAV_ITEMS: NavItem[] = [
 const NAV_TAB_COUNT = NAV_ITEMS.length;
 const LAST_TAB_INDEX = NAV_TAB_COUNT - 1;
 
+/**
+ * Desktop-rail extension (W4.5 Fix C): on >=900px layouts the rail exposes
+ * direct Workout/Calories destinations under a Health group label. Phone keeps
+ * the five-destination + capture-slot model (compression is a phone-width
+ * problem; campaign §9 — "do not force phone and desktop to use identical
+ * navigation density"). Rail items highlight exactly (no parent-covering),
+ * because every child is directly reachable here.
+ */
+const RAIL_PRIMARY_ITEMS: NavItem[] = NAV_ITEMS.filter((item) => item.name !== 'health');
+const RAIL_HEALTH_ITEMS: NavItem[] = [
+  { name: 'health', label: 'Health', icon: 'favorite', sectionKey: 'health' },
+  { name: 'workout', label: 'Workout', icon: 'fitness-center', sectionKey: 'workout' },
+  { name: 'calories', label: 'Calories', icon: 'restaurant', sectionKey: 'calories' },
+];
+
 /** Rail index a given section reports for swipe/highlight purposes. */
 function railIndexFor(section: AppSection): number {
   const direct = NAV_ITEMS.findIndex((item) => item.name === section);
@@ -361,7 +376,8 @@ export default function Index() {
     </GestureDetector>
   );
 
-  const navItems = NAV_ITEMS.map((item) => {
+  /** One navigation destination button; highlight + layout resolved by caller. */
+  function buildTabButton(item: NavItem, isFocused: boolean, layoutRole: 'bar' | 'rail') {
     const accent =
       item.sectionKey && item.sectionKey !== POMODORO_SECTION_KEY
         ? sectionAccents[item.sectionKey].fill
@@ -384,14 +400,27 @@ export default function Index() {
       <TabButton
         key={item.name}
         item={item}
-        isFocused={navActiveSection === item.name}
+        isFocused={isFocused}
         accent={accent}
         accentInk={accentInk}
-        layout={useSideRail ? 'rail' : 'bar'}
+        layout={layoutRole}
         onPress={() => setActiveSection(item.name)}
       />
     );
-  });
+  }
+
+  const navItems = NAV_ITEMS.map((item) =>
+    buildTabButton(item, navActiveSection === item.name, useSideRail ? 'rail' : 'bar'),
+  );
+
+  /** Rail buttons highlight exactly — every rail child is directly visible. */
+  const buildRailButton = useCallback(
+    (item: NavItem) => buildTabButton(item, activeSection === item.name, 'rail'),
+    // buildTabButton closes over render-scope theme/navigation values; the
+    // activeSection dep is the only reactive input the callback captures.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeSection],
+  );
 
   return (
     <View
@@ -437,7 +466,18 @@ export default function Index() {
             </View>
             <CaptureButton onPress={openCapture} variant="rail" />
           </View>
-          {navItems}
+          {RAIL_PRIMARY_ITEMS.map(buildRailButton)}
+          <View style={{ marginTop: spacing.sm, marginBottom: -spacing.xs }}>
+            <Text
+              variant="caption"
+              tone="muted"
+              style={{ fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' }}
+              numberOfLines={1}
+            >
+              Health
+            </Text>
+          </View>
+          {RAIL_HEALTH_ITEMS.map(buildRailButton)}
         </View>
       ) : null}
 

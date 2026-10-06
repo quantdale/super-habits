@@ -53,6 +53,16 @@ const SIZES: Record<ButtonSize, { height: number; padding: number; fontSize: num
 };
 
 /**
+ * Minimum logical-point interactive target (WCAG/HIG): a control's touch area
+ * must reach 44 even when its visible face is smaller. The `sm` face is 36pt,
+ * so it carries vertical hitSlop of 4pt top+bottom (36 + 8 = 44). Horizontal
+ * slop is deliberately zero so adjacent compact controls never produce
+ * ambiguous overlapping targets. `md`/`lg` already meet 44 visually.
+ */
+const COMPACT_TOUCH_TARGET = 44;
+const SM_TOUCH_SLOP_VERTICAL = (COMPACT_TOUCH_TARGET - SIZES.sm.height) / 2;
+
+/**
  * The V3 action hierarchy (docs/ui-ux/13 §7). One loud action per view:
  *
  * - `primary`   — solid accent fill, white ink. The "do it" button.
@@ -139,6 +149,11 @@ export function Button({
           accessibilityState={{ disabled: inactive, busy: loading }}
           onFocus={focusRing.onFocus}
           onBlur={focusRing.onBlur}
+          hitSlop={
+            sizeRole === 'sm'
+              ? { top: SM_TOUCH_SLOP_VERTICAL, bottom: SM_TOUCH_SLOP_VERTICAL }
+              : undefined
+          }
           onPressIn={() => settle(isCelebration ? LIP_HEIGHT : 1)}
           onPressOut={() => settle(0)}
           onPress={onPress}

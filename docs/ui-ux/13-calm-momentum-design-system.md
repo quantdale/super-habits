@@ -167,9 +167,11 @@ Four semantic levels replace one loud default:
 
 Bottom sheets for lightweight mobile workflows (quick capture, pickers);
 centered dialogs for confirmations; full drawers only for Settings-class
-surfaces. Standard anatomy: handle (sheets), title row, close button, 16pt
-body padding, actions pinned above keyboard safe area, backdrop `overlayScrim`.
-One visible primary action per overlay; destructive actions separated.
+surfaces. Standard anatomy: handle (sheets), title row, close button, body
+padding 24 (comfortable reading inset inside centered panels; compact pickers
+may tighten to 16), actions pinned above keyboard safe area, backdrop
+`overlayScrim`. One visible primary action per overlay; destructive actions
+separated.
 
 ## 11. States
 

@@ -45,6 +45,7 @@ export function PillChip({ label, accessibilityLabel, active, color, onPress, ic
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
         accessibilityState={{ selected: active }}
+        hitSlop={{ top: 2, bottom: 2 }}
         style={{
           borderRadius: radius.full,
           borderWidth: 1,

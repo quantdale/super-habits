@@ -21,8 +21,8 @@
 - [x] 3.4 `Button`: primary/secondary/tertiary/danger + celebrate; retire default lip; absorb TactileButton as deprecated wrapper
 - [x] 3.5 `Card`: variants standard/inset/hero/stat; remove header bands; radius 16
 - [x] 3.6 `PageHeader`: compact (22/700, no doc subtitle); deprecate `subtitle`
-- [x] 3.7 `Screen`: gutters 16/24/32; remove wash; keep safe-area/centering
-- [x] 3.8 `Modal`: standardize anatomy; sheets keep handle; single primary action
+- [x] 3.7 `Screen`: gutters 16/24/32; remove wash; keep safe-area/centering (W4.5: gutters made real — `pageGutterForWidth` 16/24/32 applied to scroll content, padded fills, and pinned heroes; verified at 360/768/1280)
+- [x] 3.8 `Modal`: standardize anatomy; sheets keep handle; single primary action (W4.5 audit: existing primitive already satisfies the V3 anatomy — scrim, 48pt close, 24pt body padding, safe-area/keyboard handling, reduced motion, level-3 elevation; stale Pop wording replaced, design doc §10 padding corrected to match; no code churn required)
 - [x] 3.9 New `SectionLabel`; restyle `StatBlock`, `EmptyStateCard`, `PillChip`, `SegmentedControl` (compact 36)
 - [x] 3.10 Validate: typecheck, lint, `npm test` (unit+integration), theming spec, `qa:fast`
 
@@ -30,7 +30,7 @@
 
 - [x] 4.1 Introduce `AppSection` 'health' + parent surface with Workout/Nutrition entries
 - [x] 4.2 Phone bar: five destinations + center capture slot; tonal active capsule; ≥11px labels; keep `journey-label-parity` green (update rail + parity test in one commit if labels change)
-- [x] 4.3 Rail (≥900): richer destinations; remove stray wash artifact (SYS-15)
+- [x] 4.3 Rail (≥900): primary group + Health group with direct Workout/Calories destinations and exact active highlight (W4.5 Fix C — the original W4 commit shipped the same 5 items on both layouts; the richer two-group rail is the correction); wash artifact removed in W3 (SYS-15)
 - [x] 4.4 FAB policy: capture slot replaces floating FAB on phone; rail keeps header action; no FAB over forms (SUR-07)
 - [x] 4.5 Update e2e tab navigation helpers; run full chromium battery
 

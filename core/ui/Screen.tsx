@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { layout, spacing } from '@/core/theme/designTokens';
+import { layout, pageGutterForWidth, spacing } from '@/core/theme/designTokens';
 
 /** Viewport widths above this get a centered, width-capped content column. */
 const WIDE_VIEWPORT_MIN_WIDTH = 768;
@@ -62,12 +62,16 @@ export function Screen({
     width >= WIDE_VIEWPORT_MIN_WIDTH
       ? { maxWidth: contentMaxWidth ?? layout.contentMaxWidth }
       : null;
+  // V3 responsive gutter (16/24/32) — one resolved value so scroll content,
+  // padded fills, and pinned heroes share identical horizontal rhythm and the
+  // hero aligns exactly with body content.
+  const gutter = pageGutterForWidth(width);
 
   const heroBlock = hero ? (
     <View
       style={[
         styles.heroShell,
-        { paddingHorizontal: layout.pagePadding, paddingBottom: spacing.lg },
+        { paddingHorizontal: gutter, paddingBottom: spacing.lg },
         wideShellStyle,
       ]}
     >
@@ -83,6 +87,8 @@ export function Screen({
           style={[styles.scroll, { backgroundColor: 'transparent' }]}
           contentContainerStyle={[
             padded ? styles.scrollContentPadded : styles.scrollContent,
+            // Dynamic gutter overrides the static style's 16pt phone default.
+            padded ? { paddingHorizontal: gutter } : null,
             bottomPadding > 0 ? { paddingBottom: bottomPadding } : null,
           ]}
           keyboardShouldPersistTaps="handled"
@@ -101,6 +107,7 @@ export function Screen({
         <View
           style={[
             padded ? [styles.fill, styles.padded] : styles.fill,
+            padded ? { paddingHorizontal: gutter } : null,
             { paddingBottom: bottomPadding },
           ]}
         >

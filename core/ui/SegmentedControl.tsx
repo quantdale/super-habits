@@ -48,6 +48,9 @@ function SegmentOptionButton<T extends string>({
       }}
       onFocus={ring.onFocus}
       onBlur={ring.onBlur}
+      // Vertical-only slop lifts the 36pt segment face to the 44pt touch
+      // contract without overlapping horizontally adjacent segments.
+      hitSlop={{ top: 4, bottom: 4 }}
       style={[
         {
           flex: 1,

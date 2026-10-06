@@ -39,15 +39,18 @@ const ANDROID_MODAL_NAVIGATION_FALLBACK = 64;
 const MODAL_FOOTER_HEIGHT_RESERVE = 88;
 
 /**
- * Pop overlay surface.
+ * Overlay surface (V3 anatomy — docs/ui-ux/13 §10; audited W4.5).
  *
  * The shell is a full-screen scrim plus a rounded panel that springs into
  * place: `bottom-sheet` rises from the bottom edge with a grab handle,
  * `drawer` slides in from the right on wide screens and behaves like a large
  * sheet on phones, `dialog` is the centered card.
  *
- * The close affordance is always the same circular button so muscle memory
- * holds across every overlay in the app.
+ * Anatomy contract, verified against the V3 spec: scrim (`overlayScrim`),
+ * title row, one consistent close control (48pt target), 24pt body padding,
+ * footer actions pinned above the keyboard/safe area, level-3 elevation,
+ * radius 24 panels, and reduced-motion support (the entrance spring is
+ * skipped entirely when reduced motion is requested).
  */
 export function Modal({
   visible,

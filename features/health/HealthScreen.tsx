@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, View } from 'react-native';
-import { SECTION_COLORS, POMODORO_SECTION_KEY } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useAppNavigation, type AppSection } from '@/core/providers/navigationContext';
 import { Card } from '@/core/ui/Card';
@@ -102,7 +101,9 @@ export function HealthScreen({ isActive }: { isActive: boolean }) {
         </View>
       </Card>
 
-      {/* The two halves — one tap each, generous targets. */}
+      {/* The two halves — one tap each, generous targets. Focus stays a
+          top-level destination; duplicating it here would turn Health into a
+          misc dashboard (W4.5 Fix D). */}
       <View style={{ gap: 12, marginTop: 16 }}>
         <HealthEntry
           label="Workout"
@@ -117,13 +118,6 @@ export function HealthScreen({ isActive }: { isActive: boolean }) {
           icon="restaurant"
           accent={sectionAccents.calories.fill}
           onPress={() => openSection('calories')}
-        />
-        <HealthEntry
-          label="Focus"
-          description="Guided focus sessions and breaks"
-          icon="timer"
-          accent={sectionAccents[POMODORO_SECTION_KEY].fill}
-          onPress={() => openSection('pomodoro')}
         />
       </View>
     </Screen>
@@ -186,6 +180,3 @@ function HealthEntry({
     </Pressable>
   );
 }
-
-// SECTION_COLORS is re-exported for the shell's accent lookup symmetry.
-export { SECTION_COLORS };

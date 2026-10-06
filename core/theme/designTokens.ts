@@ -178,6 +178,14 @@ export const size = {
 export const layout = {
   /** Phone horizontal page padding. */
   pagePadding: 16,
+  /** Tablet horizontal page padding (768–1279). */
+  pagePaddingTablet: 24,
+  /** Desktop horizontal page padding (>=1280, alongside the rail). */
+  pagePaddingDesktop: 32,
+  /** Width at which the gutter steps up from phone to tablet. */
+  gutterTabletBreakpoint: 768,
+  /** Width at which the gutter steps up from tablet to desktop. */
+  gutterDesktopBreakpoint: 1280,
   /** Max reading/content width on tablet/desktop before centering. */
   contentMaxWidth: 760,
   /** Max width for centered modal-style content. */
@@ -185,6 +193,18 @@ export const layout = {
   /** Width at which the shell switches from bottom tabs to a side rail. */
   railBreakpoint: 900,
 } as const;
+
+/**
+ * Resolves the V3 responsive page gutter (docs/ui-ux/13 §6): 16 on phones,
+ * 24 on tablets, 32 on desktop. Screen applies it to scroll content, padded
+ * fills, and pinned heroes so all three stay aligned. Centralized here — call
+ * sites must not re-derive breakpoints from raw numbers.
+ */
+export function pageGutterForWidth(width: number): number {
+  if (width >= layout.gutterDesktopBreakpoint) return layout.pagePaddingDesktop;
+  if (width >= layout.gutterTabletBreakpoint) return layout.pagePaddingTablet;
+  return layout.pagePadding;
+}
 
 /** Shared opacity states. */
 export const opacity = {
