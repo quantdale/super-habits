@@ -18,6 +18,8 @@ export const SECTION_COLORS = {
   focus: '#8B5CF6', // Deep Purple
   workout: '#F97316', // Red-Orange
   calories: '#F59E0B', // Warm Amber
+  /** Health parent surface (Workout + Nutrition home). */
+  health: '#14B8A6', // Vitality Teal
 } as const;
 
 export type SectionKey = keyof typeof SECTION_COLORS;
@@ -36,6 +38,7 @@ export const SECTION_COLORS_LIGHT = {
   focus: '#F5F3FF', // violet-50
   workout: '#FFF7ED', // orange-50
   calories: '#FFFBEB', // amber-50
+  health: '#F0FDFA', // teal-50
 } as const;
 
 /**
@@ -49,6 +52,7 @@ export const SECTION_TEXT_COLORS = {
   focus: '#6D28D9', // violet-700
   workout: '#C2410C', // orange-700
   calories: '#92400E', // amber-800 (deeper for yellow-50 / warm surface)
+  health: '#0F766E', // teal-700
 } as const;
 
 /**
@@ -63,6 +67,7 @@ export const SECTION_TEXT_COLORS_DARK = {
   focus: '#A78BFA', // violet-400
   workout: '#FB923C', // orange-400
   calories: '#FCD34D', // amber-300
+  health: '#2DD4BF', // teal-400
 } as const;
 
 export type SectionAccent = { fill: string; text: string; tint: string };

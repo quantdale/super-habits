@@ -15,14 +15,14 @@ historical evidence only.
 ## Current Checkpoint
 
 - **Date:** 2026-10-05
-- **Phase:** W3 (foundation) implemented + verified → W4 (shell/navigation) next
-- **Exact next action:** W4 — introduce `AppSection` 'health' + parent surface,
-  five-destination phone bar with center capture slot (tasks 4.1–4.5), keeping
-  `journey-label-parity` green; then re-render and inspect.
+- **Phase:** W4 (shell/navigation) implemented + verified → W5 (Today) next
+- **Exact next action:** W5 — rebuild Today orientation-first (tasks 5.1–5.3): one hero, neutral glance strip (OverviewScreen renders its own tinted stat cards — replace with neutral StatBlock), garden card sized-to-content, doc-subtitle removal.
 - **Decisions so far:** see design.md D1–D7; reference lock in
   `docs/ui-ux/14-v3-reference-ledger.md`; defect ledger
   `docs/ui-ux/15-v3-defect-ledger.md` (33 defects; SYS-02/SYS-15 VERIFIED-FIXED,
   SYS-17 token-level FIXED).
+- **Validation evidence (W4):** typecheck 0 errors; lint 0/0; validate:themes 140 checks (incl. new health accent); unit 2143/2143; journey-label-parity OK (5-label rail); e2e chromium: todos+workout+calories (24), habits+pomodoro+overview+boundary+theming (44), visual-audit 5/5 with new Health captures. Non-campaign Expo server (user brain-training, PID 42924) holds :8081 — audits use E2E_PORT=8083.
+- **W4 changed areas:** app/index.tsx (five-destination rail + capture slot, FAB removed), features/health/HealthScreen.tsx (new), core/providers/navigationContext+NavigationProvider (health section), constants/sectionColors (health accent), features/command/commandCenterConfig (health launch context), e2e/helpers/navigation+oracles (Health routing), tests/journeyLabelParity (5-label pin).
 - **Validation evidence (W3):**
   - `npm run typecheck` — 0 errors.
   - `npm run lint` — 0 errors/0 warnings.

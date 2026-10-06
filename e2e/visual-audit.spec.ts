@@ -97,6 +97,12 @@ audit.describe('V3 current-state audit', () => {
     await goToTab(page, 'calories');
     await shot(page, '390-calories-populated');
 
+    // Health parent surface + child routing (V3 five-destination model).
+    await goToTab(page, 'health');
+    await shot(page, '390-health');
+    await goToTab(page, 'workout');
+    await shot(page, '390-workout-via-health');
+
     // Secondary experiences.
     await goToTab(page, 'overview');
     await openQuickCapture(page);

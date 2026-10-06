@@ -1,11 +1,17 @@
 import { createContext, useContext } from 'react';
 
 /**
- * The six primary app sections. These double as command-center launch contexts
+ * The primary app sections. These double as command-center launch contexts
  * and linked-action navigation targets. "pomodoro" is the canonical feature
  * name even though the user-facing section label is "Focus".
+ *
+ * V3 adds `health`, the phone navigation parent for workout + calories
+ * (five-destination model — docs/ui-ux/13 §9). `workout` and `calories` stay
+ * first-class sections: deep links, linked-action targets, and the command
+ * executor keep working; the Health surface is their phone-nav home.
  */
-export type AppSection = 'overview' | 'todos' | 'habits' | 'pomodoro' | 'workout' | 'calories';
+export type AppSection =
+  'overview' | 'todos' | 'habits' | 'pomodoro' | 'workout' | 'calories' | 'health';
 
 export type PlanningHubView = 'today' | 'projects' | 'goals' | 'progress' | 'timeline';
 

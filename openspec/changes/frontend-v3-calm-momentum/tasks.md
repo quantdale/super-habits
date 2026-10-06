@@ -28,11 +28,11 @@
 
 ## 4. W4 — Shell and navigation
 
-- [ ] 4.1 Introduce `AppSection` 'health' + parent surface with Workout/Nutrition entries
-- [ ] 4.2 Phone bar: five destinations + center capture slot; tonal active capsule; ≥11px labels; keep `journey-label-parity` green (update rail + parity test in one commit if labels change)
-- [ ] 4.3 Rail (≥900): richer destinations; remove stray wash artifact (SYS-15)
-- [ ] 4.4 FAB policy: capture slot replaces floating FAB on phone; rail keeps header action; no FAB over forms (SUR-07)
-- [ ] 4.5 Update e2e tab navigation helpers; run full chromium battery
+- [x] 4.1 Introduce `AppSection` 'health' + parent surface with Workout/Nutrition entries
+- [x] 4.2 Phone bar: five destinations + center capture slot; tonal active capsule; ≥11px labels; keep `journey-label-parity` green (update rail + parity test in one commit if labels change)
+- [x] 4.3 Rail (≥900): richer destinations; remove stray wash artifact (SYS-15)
+- [x] 4.4 FAB policy: capture slot replaces floating FAB on phone; rail keeps header action; no FAB over forms (SUR-07)
+- [x] 4.5 Update e2e tab navigation helpers; run full chromium battery
 
 ## 5. W5 — Today
 

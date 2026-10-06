@@ -25,6 +25,7 @@ import { HabitsScreen } from '@/features/habits/HabitsScreen';
 import { PomodoroScreen } from '@/features/pomodoro/PomodoroScreen';
 import { WorkoutScreen } from '@/features/workout/WorkoutScreen';
 import { CaloriesScreen } from '@/features/calories/CaloriesScreen';
+import { HealthScreen } from '@/features/health/HealthScreen';
 import { SettingsScreen } from '@/features/settings/SettingsScreen';
 import { WeeklyReviewScreen } from '@/features/weekly-review/WeeklyReviewScreen';
 import { PlanningHubScreen } from '@/features/planning-hub/PlanningHubScreen';
@@ -39,21 +40,34 @@ type NavItem = {
 };
 
 /**
- * Six sections in product order. Labels are part of the test/observability
- * contract (`journey-label-parity`), so they stay verbatim while the rail they
- * render into is free to change shape.
+ * Five phone destinations (V3 five-destination model — docs/ui-ux/13 §9):
+ * Health parents Workout + Calories; the bar's center slot is quick capture.
+ * Labels are part of the test/observability contract (`journey-label-parity`),
+ * so they stay verbatim while the rail they render into is free to change
+ * shape. `workout`/`calories` remain first-class AppSections — deep links,
+ * linked actions, and the command executor keep working; on phone they render
+ * with the Health tab highlighted (see navActiveSection).
  */
 const NAV_ITEMS: NavItem[] = [
   { name: 'overview', label: 'Today', icon: 'today' },
   { name: 'todos', label: 'To Do', icon: 'checklist', sectionKey: 'todos' },
   { name: 'habits', label: 'Habits', icon: 'auto-awesome', sectionKey: 'habits' },
   { name: 'pomodoro', label: 'Focus', icon: 'timer', sectionKey: POMODORO_SECTION_KEY },
-  { name: 'workout', label: 'Workout', icon: 'fitness-center', sectionKey: 'workout' },
-  { name: 'calories', label: 'Calories', icon: 'restaurant', sectionKey: 'calories' },
+  { name: 'health', label: 'Health', icon: 'favorite', sectionKey: 'health' },
 ];
 
 const NAV_TAB_COUNT = NAV_ITEMS.length;
 const LAST_TAB_INDEX = NAV_TAB_COUNT - 1;
+
+/** Rail index a given section reports for swipe/highlight purposes. */
+function railIndexFor(section: AppSection): number {
+  const direct = NAV_ITEMS.findIndex((item) => item.name === section);
+  if (direct >= 0) return direct;
+  if (section === 'workout' || section === 'calories') {
+    return NAV_ITEMS.findIndex((item) => item.name === 'health');
+  }
+  return -1;
+}
 
 const SECTION_SCREENS: Record<AppSection, React.ComponentType<{ isActive: boolean }>> = {
   // Navigation changes only the active screen's `isActive` prop. Memoizing
@@ -66,7 +80,11 @@ const SECTION_SCREENS: Record<AppSection, React.ComponentType<{ isActive: boolea
   pomodoro: memo(PomodoroScreen),
   workout: memo(WorkoutScreen),
   calories: memo(CaloriesScreen),
+  health: memo(HealthScreen),
 };
+
+/** Sections that highlight the Health tab instead of their own (absent) tab. */
+const HEALTH_CHILD_SECTIONS: ReadonlySet<AppSection> = new Set(['workout', 'calories']);
 
 type TabButtonProps = {
   item: NavItem;
@@ -122,7 +140,7 @@ function TabButton({
     >
       <MaterialIcons
         name={item.icon}
-        size={isRail ? 26 : 23}
+        size={isRail ? 24 : 23}
         color={isFocused ? ink : tokens.iconMuted}
       />
       <Text
@@ -136,6 +154,43 @@ function TabButton({
       >
         {item.label}
       </Text>
+    </Pressable>
+  );
+}
+
+/**
+ * The quick-capture affordance: the phone bar's raised center slot (or the
+ * rail's header action on wide screens). V3 replaces Pop's free-floating FAB,
+ * which overlapped card content and form fields on 4 of 6 sections (defect
+ * SYS-04). This is the one surface the brand gradient survives on.
+ */
+function CaptureButton({ onPress, variant }: { onPress: () => void; variant: 'bar' | 'rail' }) {
+  const { tokens } = useAppTheme();
+  const diameter = variant === 'bar' ? 52 : 44;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Quick capture"
+      onPress={onPress}
+      style={{
+        width: diameter,
+        height: diameter,
+        borderRadius: radius.full,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        ...elevation.level2,
+        shadowColor: tokens.glow,
+        shadowOpacity: 0.3,
+      }}
+    >
+      <LinearGradient
+        colors={[tokens.brandGradient[0], tokens.brandGradient[1]]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <MaterialIcons name="add" size={variant === 'bar' ? 28 : 24} color={tokens.buttonText} />
     </Pressable>
   );
 }
@@ -221,17 +276,20 @@ export default function Index() {
   const overviewColor = resolvedTheme === 'dark' ? tokens.text : tokens.textMuted;
   const useSideRail = screenWidth >= layout.railBreakpoint;
 
-  const currentIndex = useMemo(
-    () => NAV_ITEMS.findIndex((item) => item.name === activeSection),
-    [activeSection],
-  );
+  // The tab a rail item highlights for the current section: Health covers its
+  // workout/calories children on phone.
+  const navActiveSection: AppSection = HEALTH_CHILD_SECTIONS.has(activeSection)
+    ? 'health'
+    : activeSection;
+
+  const currentIndex = useMemo(() => railIndexFor(activeSection), [activeSection]);
 
   const isDeadZone = useSharedValue(false);
-  const tabIndex = useSharedValue(currentIndex);
+  const tabIndex = useSharedValue(Math.max(currentIndex, 0));
   const screenWidthSV = useSharedValue(screenWidth);
 
   useEffect(() => {
-    tabIndex.value = currentIndex;
+    if (currentIndex >= 0) tabIndex.value = currentIndex;
   }, [currentIndex, tabIndex]);
 
   useEffect(() => {
@@ -277,15 +335,24 @@ export default function Index() {
     [navigateToIndex],
   );
 
+  const openCapture = useCallback(() => {
+    // Open the sheet after the opening gesture completes. Creating
+    // the modal window synchronously inside the press lets the
+    // gesture's release re-target to freshly laid-out sheet content
+    // under the finger, skipping the sheet straight into advanced
+    // capture on small screens.
+    setTimeout(() => openQuickCapture(), 0);
+  }, [openQuickCapture]);
+
   const sections = (
     <GestureDetector gesture={pan}>
       <View className="flex-1" style={{ flex: 1, backgroundColor: tokens.background }}>
-        {NAV_ITEMS.map((item) => {
-          const ScreenComponent = SECTION_SCREENS[item.name];
-          const isActive = activeSection === item.name;
-          const isMounted = mountedSections[item.name] || isActive;
+        {(Object.keys(SECTION_SCREENS) as AppSection[]).map((section) => {
+          const ScreenComponent = SECTION_SCREENS[section];
+          const isActive = activeSection === section;
+          const isMounted = mountedSections[section] || isActive;
           return (
-            <SectionContainer key={item.name} isActive={isActive}>
+            <SectionContainer key={section} isActive={isActive}>
               {isMounted ? <ScreenComponent isActive={isActive} /> : null}
             </SectionContainer>
           );
@@ -296,24 +363,28 @@ export default function Index() {
 
   const navItems = NAV_ITEMS.map((item) => {
     const accent =
-      item.name === 'overview'
-        ? overviewColor
-        : item.sectionKey
-          ? sectionAccents[item.sectionKey].fill
-          : tokens.primary;
+      item.sectionKey && item.sectionKey !== POMODORO_SECTION_KEY
+        ? sectionAccents[item.sectionKey].fill
+        : item.name === 'overview'
+          ? overviewColor
+          : item.name === 'pomodoro'
+            ? sectionAccents[POMODORO_SECTION_KEY].fill
+            : sectionAccents.health.fill;
     // The active capsule tints from the fill; the icon/label use the
     // contrast-safe variant (identical on dark themes, darker on light).
     const accentInk =
-      item.name === 'overview'
-        ? overviewColor
-        : item.sectionKey
-          ? sectionAccents[item.sectionKey].text
-          : tokens.primary;
+      item.sectionKey && item.sectionKey !== POMODORO_SECTION_KEY
+        ? sectionAccents[item.sectionKey].text
+        : item.name === 'overview'
+          ? overviewColor
+          : item.name === 'pomodoro'
+            ? sectionAccents[POMODORO_SECTION_KEY].text
+            : sectionAccents.health.text;
     return (
       <TabButton
         key={item.name}
         item={item}
-        isFocused={activeSection === item.name}
+        isFocused={navActiveSection === item.name}
         accent={accent}
         accentInk={accentInk}
         layout={useSideRail ? 'rail' : 'bar'}
@@ -346,7 +417,7 @@ export default function Index() {
             borderRightColor: tokens.tabRailBorder,
           }}
         >
-          <View style={{ alignItems: 'center', marginBottom: spacing.md }}>
+          <View style={{ alignItems: 'center', marginBottom: spacing.md, gap: spacing.sm }}>
             <View
               style={{
                 width: 44,
@@ -364,6 +435,7 @@ export default function Index() {
               />
               <MaterialIcons name="bolt" size={24} color={tokens.buttonText} />
             </View>
+            <CaptureButton onPress={openCapture} variant="rail" />
           </View>
           {navItems}
         </View>
@@ -387,8 +459,6 @@ export default function Index() {
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 2,
               paddingHorizontal: spacing.xs,
               paddingVertical: spacing.xs,
               borderRadius: radius.xl,
@@ -400,48 +470,14 @@ export default function Index() {
               shadowOpacity: 0.18,
             }}
           >
-            {navItems}
+            {navItems.slice(0, 3)}
+            <View style={{ width: 64, alignItems: 'center', justifyContent: 'center' }}>
+              <CaptureButton onPress={openCapture} variant="bar" />
+            </View>
+            {navItems.slice(3)}
           </View>
         </View>
       ) : null}
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Quick capture"
-        onPress={() => {
-          // Open the sheet after the opening gesture completes. Creating
-          // the modal window synchronously inside the press lets the
-          // gesture's release re-target to freshly laid-out sheet content
-          // under the finger, skipping the sheet straight into advanced
-          // capture on small screens.
-          setTimeout(() => openQuickCapture(), 0);
-        }}
-        style={{
-          position: 'absolute',
-          right: useSideRail ? spacing.xl : spacing.lg,
-          bottom: useSideRail
-            ? Math.max(safeAreaBottom, spacing.xl)
-            : Math.max(safeAreaBottom, spacing.sm) + size.tabBarHeight + spacing.md,
-          width: size.fab,
-          height: size.fab,
-          borderRadius: radius.full,
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'hidden',
-          zIndex: 21,
-          ...elevation.level2,
-          shadowColor: tokens.glow,
-          shadowOpacity: 0.35,
-        }}
-      >
-        <LinearGradient
-          colors={[tokens.brandGradient[0], tokens.brandGradient[1]]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <MaterialIcons name="add" size={30} color={tokens.buttonText} />
-      </Pressable>
 
       <Modal
         visible={isSettingsOpen}

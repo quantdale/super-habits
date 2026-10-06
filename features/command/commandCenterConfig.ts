@@ -1,7 +1,7 @@
 import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
 
 export type CommandCenterLaunchContext =
-  'overview' | 'todos' | 'habits' | 'pomodoro' | 'workout' | 'calories';
+  'overview' | 'todos' | 'habits' | 'pomodoro' | 'workout' | 'calories' | 'health';
 
 export type CommandCenterContextCopy = {
   sectionLabel: string;
@@ -49,6 +49,12 @@ export const COMMAND_CENTER_CONTEXT_COPY: Record<
     helperCopy: 'Capture nutrition-related todos or habits without changing screens.',
     inputPlaceholder: 'Create a habit to log lunch every afternoon',
     accentColor: SECTION_COLORS.calories,
+  },
+  health: {
+    sectionLabel: 'Health',
+    helperCopy: 'Capture workout prep or nutrition habits without changing screens.',
+    inputPlaceholder: 'Create a habit to meal-prep on Sunday',
+    accentColor: SECTION_COLORS.health,
   },
 };
 

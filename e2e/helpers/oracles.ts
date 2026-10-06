@@ -21,6 +21,8 @@ const SECTION_HEADINGS: Record<keyof typeof TAB_LABELS, string> = {
   // The redesigned Calories hero leads with the kcal-remaining number, so the
   // section's stable identity string is the preserved hero subtitle.
   calories: 'Switch between manual entry and a diary grouped by meal.',
+  // The V3 Health parent surface keeps a stable PageHeader title.
+  health: 'Health',
 };
 
 /** The single-page shell keeps every section mounted; this matches the
@@ -111,6 +113,9 @@ export async function expectOutbox(
      FROM sync_outbox
      ORDER BY revision ASC`,
   );
+  // SAFETY: the SELECT projects exactly the OutboxRecord columns the harness's
+  // generic row shape cannot express (queryRows returns Record<string,
+  // unknown>[]); the column list above is the type contract.
   const outbox = rows as unknown as OutboxRecord[];
   if (typeof expected === 'function') {
     expected(outbox);

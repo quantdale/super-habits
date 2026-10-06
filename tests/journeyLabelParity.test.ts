@@ -6,7 +6,7 @@ import { parseRailLabels } from '../scripts/journey-label-parity.mjs';
 const APP_INDEX = join(__dirname, '..', 'app', 'index.tsx');
 
 describe('journey-label-parity parser', () => {
-  it('parses the real app rail into six named labels', () => {
+  it('parses the real app rail into five named labels', () => {
     const source = readFileSync(APP_INDEX, 'utf8');
     const labels = parseRailLabels(source);
     expect(labels).not.toBeNull();
@@ -15,8 +15,7 @@ describe('journey-label-parity parser', () => {
       ['todos', 'To Do'],
       ['habits', 'Habits'],
       ['pomodoro', 'Focus'],
-      ['workout', 'Workout'],
-      ['calories', 'Calories'],
+      ['health', 'Health'],
     ]);
   });
 

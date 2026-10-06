@@ -16,6 +16,7 @@ export function NavigationProvider({ children }: PropsWithChildren) {
     pomodoro: false,
     workout: false,
     calories: false,
+    health: false,
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isWeeklyReviewOpen, setIsWeeklyReviewOpen] = useState(false);

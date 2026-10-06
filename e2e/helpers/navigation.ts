@@ -1,5 +1,10 @@
 import { Page } from '@playwright/test';
 
+/**
+ * Rail labels (V3 five-destination model). `workout` and `calories` remain
+ * AppSections but live behind the Health tab on phone — `goToTab` routes them
+ * through Health so every existing spec keeps working unchanged.
+ */
 export const TAB_LABELS = {
   overview: 'Today',
   todos: 'To Do',
@@ -7,11 +12,48 @@ export const TAB_LABELS = {
   pomodoro: 'Focus',
   workout: 'Workout',
   calories: 'Calories',
+  health: 'Health',
 } as const;
 
+/** Sections reachable only through the Health parent on the phone rail. */
+const HEALTH_CHILDREN: ReadonlySet<string> = new Set(['workout', 'calories']);
+
 /**
- * Click a top-tab button to switch sections in the single-page layout.
+ * Click a rail tab — routing through Health for workout/calories — to switch
+ * sections in the single-page layout.
  */
+export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS): Promise<void> {
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  // Scope to the tab rail landmark: the first-run onboarding card on Overview
+  // exposes interest chips whose labels can equal a tab label (Habits, Focus,
+  // Workout), so an unscoped lookup strict-matches two buttons.
+  const rail = page.getByRole('tablist', { name: 'Section tabs' });
+  if (HEALTH_CHILDREN.has(tab)) {
+    await rail.getByRole('button', { name: 'Health', exact: true }).click();
+    await page.getByRole('button', { name: `Open ${TAB_LABELS[tab]}` }).click();
+  } else {
+    await rail.getByRole('button', { name: TAB_LABELS[tab], exact: true }).click();
+  }
+  // Wait until React has hydrated all inputs — React attaches __reactFiber$xxx
+  // properties to DOM nodes during hydration. Filling SSR-rendered inputs before
+  // hydration sets DOM values that React immediately overrides with controlled state.
+  // The habits tests avoid this because they first click a button (which retries
+  // until onPress fires, implicitly waiting for hydration). Form-first tests like
+  // calories must wait explicitly.
+  await page
+    .waitForFunction(
+      () => {
+        const inputs = Array.from(document.querySelectorAll('input'));
+        if (inputs.length === 0) return true; // no inputs on this tab
+        return inputs.some((el) => Object.keys(el).some((k) => k.startsWith('__reactFiber')));
+      },
+      { timeout: 10_000 },
+    )
+    .catch(() => {
+      // If we time out waiting for React fibers (e.g. no inputs), proceed anyway
+    });
+}
+
 /**
  * FAB opens new todo — no visible "Make a Task" copy; use accessible name.
  * The quick-capture submit shares the "Add task" label but is disabled while
@@ -40,35 +82,6 @@ export async function submitTodoModal(page: Page, options?: { waitForClose?: boo
 /** The open new/edit-todo dialog, for specs that fill modal fields directly. */
 export async function openTodoDialog(page: Page) {
   return page.getByRole('dialog');
-}
-
-export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS) {
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  // Scope to the tab rail landmark: the first-run onboarding card on Overview
-  // exposes interest chips whose labels can equal a tab label (Habits, Focus,
-  // Workout), so an unscoped lookup strict-matches two buttons.
-  await page
-    .getByRole('tablist', { name: 'Section tabs' })
-    .getByRole('button', { name: TAB_LABELS[tab], exact: true })
-    .click();
-  // Wait until React has hydrated all inputs — React attaches __reactFiber$xxx
-  // properties to DOM nodes during hydration. Filling SSR-rendered inputs before
-  // hydration sets DOM values that React immediately overrides with controlled state.
-  // The habits tests avoid this because they first click a button (which retries
-  // until onPress fires, implicitly waiting for hydration). Form-first tests like
-  // calories must wait explicitly.
-  await page
-    .waitForFunction(
-      () => {
-        const inputs = Array.from(document.querySelectorAll('input'));
-        if (inputs.length === 0) return true; // no inputs on this tab
-        return inputs.some((el) => Object.keys(el).some((k) => k.startsWith('__reactFiber')));
-      },
-      { timeout: 10_000 },
-    )
-    .catch(() => {
-      // If we time out waiting for React fibers (e.g. no inputs), proceed anyway
-    });
 }
 
 /**
