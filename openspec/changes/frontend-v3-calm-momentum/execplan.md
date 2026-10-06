@@ -60,30 +60,37 @@ historical evidence only.
 
 ## Current Checkpoint
 
-- Current milestone: W4.5 corrections implemented and locally verified — handoff
-  to W5 pending exact-head hosted CI confirmation.
-- Completed: W0–W4 implemented, subject to W4.5 corrections — W1 audit (47
-  captures, 33-defect ledger), W2 reference lock + design system, W3
-  foundation commit `8888084` (typecheck 0, lint 0/0, themes 140 checks,
-  unit 2143/2143, re-render verified), W4 shell commit `282bfce` (five-tab
-  rail + capture slot + Health screen; 68 chromium specs + 5 audit passes).
-- In progress: publication — one coherent W4.5 commit, push, and hosted-CI
-  inspection (must pass every quality step; dependency-audit reds are accepted).
+- Current milestone: W5 — Today reconstruction.
+- Completed: W0–W4 complete; W4.5 complete (hosted ExecPlan validation
+  repaired, hosted unit/integration green, foundation corrections verified —
+  re-rendered rail/Health/gutter captures inspected); W1 audit (47 captures,
+  33-defect ledger); W2 reference lock + design system; W3 foundation
+  commit 8888084; W4 shell commit 282bfce; W4.5 commit 10e1462.
+- In progress: W5.1 — orientation-first Today layout.
 - Important modified files: `openspec/changes/frontend-v3-calm-momentum/execplan.md`,
   `core/ui/Button.tsx`, `core/ui/Screen.tsx`, `core/theme/designTokens.ts`,
   `features/health/HealthScreen.tsx`, `app/index.tsx`,
   `openspec/changes/frontend-v3-calm-momentum/tasks.md`,
   `docs/ui-ux/15-v3-defect-ledger.md`, plus W4.5 regression tests.
-- Last successful validation: W4 publication gate at commit `282bfce` —
-  typecheck 0 errors; lint 0/0; `validate:themes` 140/140; unit 2143/2143;
-  journey-label-parity OK; chromium todos/workout/calories (24) +
-  habits/pomodoro/overview/boundary/theming (44) + visual-audit 5/5.
-- Current failures: exact-head hosted run 37479209183 fails at "Validate
-  versioned ExecPlans" — plan lacked the canonical sections (scope, non-goals,
-  progress, discoveries, decisions, validation, changed files, recovery,
-  outcomes) and structured checkpoint fields; local
-  `npm run agent:plan:validate:all` reproduced it identically before this
-  rewrite.
+- Last successful validation: exact-head hosted CI run 37509416280 at
+  10e1462 — install, typecheck, Deno, lint, theme validation, OpenSpec,
+  parity, versioned ExecPlans, and unit + integration (252 files / 2545
+  tests, 3 skipped) all pass; dependency audit is the only hosted failure
+  (E2E skipped because quality stopped at the audit gate).
+- Current failures: hosted dependency audit reports two UNDOCUMENTED
+  high/critical advisories — braces GHSA-vfj7-8cjw-p6xm (HIGH) and node-forge
+  GHSA-86w9-cpqp-85rv (HIGH); fix paths remain semver-major framework
+  upgrades (tailwindcss 4.x / expo 44) — NO MATERIAL UPSTREAM CHANGE. The
+  two NEW advisories surfaced at run 37509416280 are RESOLVED (W5 security
+  lane, semver-compatible overrides): shell-quote GHSA-pqg4-j6r4-53mv
+  (CRITICAL, range >=1.8.4 <1.11.0) fixed at 1.12.0 via the existing
+  shell-quote override — dev-tooling-only chain react-native →
+  react-devtools-core, no shipped bundle presence; source-map-js
+  GHSA-68fv-2mgg-jv7q (HIGH, range >=1.0.0 <1.2.2) fixed at 1.2.2 via a new
+  override — build-time-only chain tailwindcss → postcss, no shipped bundle
+  presence. The pre-existing brace-expansion advisories are documented
+  policy entries and are not part of the undocumented count. The W4.5 ExecPlan-schema red is resolved (run
+  37509416280 passes that step).
 - Relevant quarantines: only the standing `VISUAL_AUDIT=1` opt-in lane for
   `e2e/visual-audit.spec.ts`, registered in `docs/testing/known-gaps.md`
   entry 24; no failure quarantines registered for this campaign.
@@ -114,7 +121,8 @@ historical evidence only.
       Button (+celebrate), Card, PageHeader, StatBlock, PillChip,
       SegmentedControl, EmptyStateCard, SectionLabel; TactileButton absorbed
 - [x] W4 — five-destination shell + capture slot + Health parent (`282bfce`)
-- [ ] W4.5 — foundation/shell correction pass (this campaign; in progress)
+- [x] W4.5 — foundation/shell correction pass (commit 10e1462; hosted run
+      37509416280 green through unit/integration)
 - [ ] W5 — Today reconstruction
 - [ ] W6 — To Do + Quick Capture
 - [ ] W7 — Habits
@@ -130,6 +138,15 @@ historical evidence only.
 - [ ] W17 — final regression + adversarial review
 
 ## Surprises & Discoveries
+
+- Security lane (W5, bounded): both NEW advisories had patched releases
+  available and parent ranges permitting semver-compatible overrides —
+  the repo's existing overrides block already carried a shell-quote pin
+  that had aged into the vulnerable range; refreshing it was the minimal
+  repair per the ladder (override before parent-upgrade). Neither package
+  ships in the web/Android bundles (verified by dist grep + dependency
+  chain classification), so the fix is defense-in-depth for the CI gate,
+  not a runtime rescue.
 
 - The W1 audit showed the damage was systemic (Pop reflexes), not isolated
   bugs: every primary screen reproduced the same five defects patterns.
@@ -175,6 +192,10 @@ historical evidence only.
   health accent); unit 2143/2143; journey-label-parity OK (5-label rail);
   chromium: todos+workout+calories 24 passed, habits+pomodoro+overview+
   boundary+theming 44 passed; visual-audit 5/5 with new Health captures.
+- W5 security lane: node scripts/audit-runtime-deps.mjs — undocumented
+  count reduced 4 → 2 (braces + node-forge remain; gate exit 1 unchanged
+  for those known blockers); installed shell-quote 1.12.0 and
+  source-map-js 1.2.2 verified out of vulnerable ranges.
 - W4.5 (full local gate, post-corrections): typecheck 0 errors; lint 0/0;
   validate:themes 140/140; openspec:validate 73/73; agent:plan:validate:all
   120 PASS / 0 FAIL (frontend-v3-calm-momentum PASS); npm test (unit +

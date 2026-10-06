@@ -100,8 +100,10 @@ export const typography = {
 export type TypographyRole = keyof typeof typography;
 
 /**
- * Elevation levels. Pop uses *colored* shadows: components pass the surface's
- * own accent as `shadowColor`, so a card floats in its own hue instead of grey.
+ * Elevation levels. Calm Momentum keeps elevation neutral and sparing:
+ * hierarchy comes from tone and spacing first, borders where necessary — not
+ * from shadows on ordinary cards. Shadow tokens exist for genuinely floating
+ * surfaces only (capture affordance, active overlays, modals).
  */
 export const elevation = {
   /** Page background. */
