@@ -178,7 +178,7 @@ defineJourney({
       name: 'Add a todo on Todos; Overview pending count rises (stale-aggregate catch)',
       run: async ({ page }) => {
         await switchTab(page, 'todos');
-        await page.getByRole('button', { name: 'Add task' }).last().click();
+        await page.getByRole('button', { name: 'Add task with details', exact: true }).click();
         await page.getByPlaceholder(/Add a task/i).fill('Buy groceries');
         await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
         await expect(page.getByPlaceholder(/Add a task/i)).toBeHidden({ timeout: 15_000 });

@@ -288,4 +288,48 @@ audit.describe('V3 current-state audit', () => {
       await shot(page, `breakpoint-${w}-overview`);
     }
   });
+
+  audit('W6 To Do states (long-title, bulk, completed, HEAVY)', async ({ page }) => {
+    await setDark(page, false);
+    await setViewport(page, PHONE);
+    await goToTab(page, 'todos');
+    await seedFixture(page, 'TYPICAL');
+    await goToTab(page, 'todos');
+    await page.waitForTimeout(900);
+
+    // Long title + rich metadata must not break row geometry (brief §25).
+    await page
+      .getByPlaceholder('Quick add', { exact: true })
+      .fill(
+        'Call the insurance company about the renewed policy premium schedule before the end of the quarterly billing window',
+      );
+    await page.getByRole('button', { name: 'Add task', exact: true }).click();
+    await page.waitForTimeout(600);
+    await shot(page, '390-todos-long-title');
+
+    // Bulk mode: distinct chrome, obvious selected count and exit (brief §21).
+    await page.getByRole('button', { name: 'Enter multi-select mode' }).click();
+    const firstSelect = page.getByRole('checkbox', { name: /^Select / }).first();
+    await firstSelect.click();
+    await page.waitForTimeout(300);
+    await shot(page, '390-todos-bulk-select');
+    await page.getByRole('button', { name: 'Exit multi-select mode' }).click();
+
+    // Completed group: quiet, readable, collapsed behind one toggle (brief §22).
+    const completeBox = page.getByRole('checkbox', { name: /^Mark complete: / }).first();
+    await completeBox.click();
+    await page.waitForTimeout(700);
+    await page.getByText('Show completed', { exact: true }).click();
+    await page.waitForTimeout(400);
+    await shot(page, '390-todos-completed-group');
+
+    // HEAVY state: 200+ seeded todos through the virtualized list (brief §24).
+    await seedFixture(page, 'HEAVY');
+    await goToTab(page, 'todos');
+    await page.waitForTimeout(1200);
+    await shot(page, '390-todos-heavy');
+    await setViewport(page, DESKTOP);
+    await page.waitForTimeout(600);
+    await shot(page, '1280-todos-heavy');
+  });
 });

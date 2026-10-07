@@ -263,15 +263,16 @@ defineJourney({
         // visits do not add another today-instance for a covered series.
         await goToSection(page, 'todos');
         await expectSectionActive(page, SECTION_MARKERS.todos);
-        const headerEl = page.getByText(/^\d+ pending, 57 completed$/).first();
-        await expect(headerEl).toBeVisible();
-        const headerText = (await headerEl.textContent()) ?? '';
-        const pending = Number(headerText.match(/^(\d+) pending/)?.[1] ?? 0);
+        const openEl = page.getByText(/^\d+ open$/).first();
+        await expect(openEl).toBeVisible();
+        const openText = (await openEl.textContent()) ?? '';
+        const pending = Number(openText.match(/^(\d+) open/)?.[1] ?? 0);
         expect(
           pending,
           `pending after expansion (${pending}) should exceed the seeded 127`,
         ).toBeGreaterThan(127);
-        const completed = 57; // the fixture's seeded completed count, pinned by the header regex
+        const completed = 57; // the fixture's seeded completed count, pinned by the summary atom
+        await expect(page.getByText(`${completed} completed`, { exact: true })).toBeVisible();
 
         // Large-list scroll: 200+ seed todos rendered through a virtualized
         // FlatList — wheel inside the list body until a deep seeded row is
@@ -289,15 +290,13 @@ defineJourney({
         // completed rows (i=5 → 5%5==0; i=7 → 7%7==0) that are NOT in the
         // pending list, so they are the honest filter oracle.
         await expect(page.getByText('Task 6', { exact: true })).toBeHidden();
-        await page.getByText(`Show completed (${completed})`, { exact: true }).click();
+        await page.getByText('Show completed', { exact: true }).click();
         await expect(page.getByText('Task 6', { exact: true })).toBeVisible();
         await expect(page.getByText('Task 8', { exact: true })).toBeVisible();
-        // The toggle flipped to "Hide completed (N)" — the completed section is shown.
-        await expect(
-          page.getByText(`Hide completed (${completed})`, { exact: true }),
-        ).toBeVisible();
+        // The toggle flipped to "Hide completed" — the completed section is shown.
+        await expect(page.getByText('Hide completed', { exact: true })).toBeVisible();
         // Toggle back: completed rows leave the DOM.
-        await page.getByText(`Hide completed (${completed})`, { exact: true }).click();
+        await page.getByText('Hide completed', { exact: true }).click();
         await expect(page.getByText('Task 6', { exact: true })).toBeHidden();
       },
     },
@@ -544,7 +543,7 @@ const SECTION_MARKERS: Record<SectionName, string> = {
   // The redesigned Overview's customize toggle is an icon button; "Plan today"
   // is the always-rendered hero text on every load state.
   overview: 'Plan today',
-  todos: 'Offline-first task manager.',
+  todos: 'TO DO',
   habits: "Today's rhythm",
   pomodoro: 'Classic sequence: focus → short breaks → long break — durations saved on device.',
   workout:

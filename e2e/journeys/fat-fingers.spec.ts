@@ -54,55 +54,20 @@ async function createHabitViaUi(page: Page, name: string): Promise<void> {
 }
 
 /**
- * Toggle a todo's completion by firing a REAL pointer press sequence on the
- * semantic checkbox column of its row. This deliberately exercises the same
- * browser interaction path as a user press rather than mutating the DOM.
+ * Toggle a todo's completion through its semantic checkbox (the stable
+ * accessibility contract) and wait for the aria-checked flip so the caller's
+ * next assertion cannot race the toggle. A real click exercises the browser
+ * interaction path rather than mutating state directly.
  */
 async function toggleTodoCompletion(page: Page, title: string): Promise<void> {
-  const textNode = page.getByText(title, { exact: true }).first();
-  await textNode.waitFor({ state: 'visible', timeout: 15_000 });
-  await textNode.scrollIntoViewIfNeeded();
-  await textNode.evaluate((el) => {
-    let n: HTMLElement | null = el as HTMLElement;
-    for (let d = 0; d < 12 && n; d++) {
-      const row = n.closest?.("[class*='flex-row']");
-      if (row && row.children.length >= 2) {
-        const box = row.children[1] as HTMLElement;
-        const r = box.getBoundingClientRect();
-        const x = r.left + r.width / 2;
-        const y = r.top + r.height / 2;
-        box.dispatchEvent(
-          new PointerEvent('pointerdown', {
-            bubbles: true,
-            cancelable: true,
-            clientX: x,
-            clientY: y,
-            pointerId: 1,
-            pointerType: 'mouse',
-            isPrimary: true,
-            buttons: 1,
-          }),
-        );
-        box.dispatchEvent(
-          new PointerEvent('pointerup', {
-            bubbles: true,
-            cancelable: true,
-            clientX: x,
-            clientY: y,
-            pointerId: 1,
-            pointerType: 'mouse',
-            isPrimary: true,
-            buttons: 0,
-          }),
-        );
-        box.dispatchEvent(
-          new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y }),
-        );
-        return;
-      }
-      n = n.parentElement;
-    }
+  const checkbox = page.getByRole('checkbox', {
+    name: new RegExp(`^Mark (?:in)?complete: ${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
   });
+  const before = await checkbox.getAttribute('aria-checked');
+  await checkbox.click({ force: true });
+  await expect
+    .poll(() => checkbox.getAttribute('aria-checked'), { timeout: 5_000 })
+    .not.toBe(before);
 }
 
 /** Enter habit edit mode and click the Delete button for the named habit. */
@@ -482,12 +447,13 @@ defineJourney({
         await expect(page.getByRole('dialog')).toHaveCount(0);
         const inlineInput = page.getByPlaceholder('Quick add', { exact: true });
         await expect(inlineInput).toBeVisible();
-        // The quick-capture row renders exactly two "Add task" controls: the
-        // circular add button, then the Details button that opens the modal.
-        // Assert the inventory so a third match (an open modal) fails here
-        // rather than pressing the wrong control below.
+        // The quick-add row renders exactly one "Add task" control: the
+        // circular add button. The full composer lives behind the distinct
+        // "Add task with details" header button, so an open modal or a third
+        // match fails the inventory here rather than pressing the wrong
+        // control below.
         const addTaskButtons = page.getByRole('button', { name: 'Add task', exact: true });
-        await expect(addTaskButtons).toHaveCount(2);
+        await expect(addTaskButtons).toHaveCount(1);
         const inlineAdd = addTaskButtons.first();
 
         // (a) Two complete presses in the same tick.

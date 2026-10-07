@@ -175,8 +175,9 @@ test.describe('Todos', () => {
       .click({ force: true });
     await expect(page.getByText('Daily stretch').filter({ visible: true }).last()).toBeVisible();
     // Wait for the post-completion refresh: the remaining visible copy must
-    // be the spawned pending one (1 pending / 1 completed), not a stale row.
-    await expect(page.getByText('1 pending, 1 completed')).toBeVisible();
+    // be the spawned pending one (1 open / 1 completed), not a stale row.
+    await expect(page.getByText('1 open', { exact: true })).toBeVisible();
+    await expect(page.getByText('1 completed', { exact: true })).toBeVisible();
 
     // Series-scope rename on the pending copy: history keeps the old title.
     await page.getByLabel('More actions for Daily stretch').first().click({ force: true });

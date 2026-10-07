@@ -70,7 +70,7 @@ test.describe('Todos — boundary inputs', () => {
     await goToTab(page, 'todos');
     for (let i = 1; i <= 30; i++) {
       // Fresh locator each iteration. Use scrollIntoView via evaluate — Playwright's scrollIntoViewIfNeeded waits for "stable" layout and can detach on RN Web.
-      const openCreate = page.getByRole('button', { name: 'Add task' }).last(); // FAB renders last; quick-capture twin is first.
+      const openCreate = page.getByRole('button', { name: 'Add task with details', exact: true }); // Header composer opens the full editor.
       await openCreate.evaluate((el) =>
         (el as HTMLElement).scrollIntoView({ block: 'nearest', inline: 'nearest' }),
       );
@@ -79,7 +79,7 @@ test.describe('Todos — boundary inputs', () => {
       try {
         await titleInput.waitFor({ state: 'visible', timeout: 2_000 });
       } catch {
-        const retryOpen = page.getByRole('button', { name: 'Add task' }).last();
+        const retryOpen = page.getByRole('button', { name: 'Add task with details', exact: true });
         await retryOpen.evaluate((el) =>
           (el as HTMLElement).scrollIntoView({ block: 'nearest', inline: 'nearest' }),
         );

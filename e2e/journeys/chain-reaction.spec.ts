@@ -41,11 +41,10 @@ function executionsSql(): string {
     ORDER BY e.created_at ASC`;
 }
 
-/** @returns the queue-count line rendered in the Todos "Today's queue" card. */
+/** @returns the authoritative summary atoms rendered in the Todos header. */
 async function expectQueueCounts(page: Page, pending: number, completed: number): Promise<void> {
-  await expect(
-    page.getByText(`${pending} pending, ${completed} completed`, { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText(`${pending} open`, { exact: true })).toBeVisible();
+  await expect(page.getByText(`${completed} completed`, { exact: true })).toBeVisible();
 }
 
 /** Toggle the semantic todo checkbox in the active section and wait for the

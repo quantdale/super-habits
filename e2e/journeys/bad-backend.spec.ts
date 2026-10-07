@@ -94,7 +94,7 @@ async function readSyncStatus(page: Page): Promise<Record<string, unknown> | nul
 async function addTodoViaUi(page: Page, title: string): Promise<void> {
   await ensureAppContext(page);
   await switchSection(page, 'todos');
-  await page.getByRole('button', { name: 'Add task' }).last().click();
+  await page.getByRole('button', { name: 'Add task with details', exact: true }).click();
   await page.getByPlaceholder(/Add a task/i).fill(title);
   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
   await expect(page.getByText(title).first()).toBeVisible();

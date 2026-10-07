@@ -55,13 +55,13 @@ export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS): Promise
 }
 
 /**
- * FAB opens new todo — no visible "Make a Task" copy; use accessible name.
- * The quick-capture submit shares the "Add task" label but is disabled while
- * its input is empty, and react-native-web does not expose aria-disabled for
- * it, so select by position: the FAB renders after all Screen content.
+ * The page-header composer button ("Add task with details") opens the full
+ * task editor. The inline quick-add row owns the exact "Add task" label for
+ * its circular submit button, so the opener is selected by its own distinct
+ * accessible name.
  */
 export async function openNewTodoModal(page: Page) {
-  await page.getByRole('button', { name: 'Add task' }).last().click();
+  await page.getByRole('button', { name: 'Add task with details', exact: true }).click();
 }
 
 /**

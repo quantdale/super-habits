@@ -202,7 +202,7 @@ defineJourney({
       name: 'online baseline: create a todo (Commute ride)',
       run: async ({ page }) => {
         await switchSection(page, 'todos');
-        await page.getByRole('button', { name: 'Add task' }).last().click();
+        await page.getByRole('button', { name: 'Add task with details', exact: true }).click();
         await page.getByPlaceholder(/Add a task/i).fill('Commute ride');
         await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
         await expect(page.getByText('Commute ride').first()).toBeVisible();
@@ -215,7 +215,7 @@ defineJourney({
 
         // todos: create then complete (update) — must dedupe to one record.
         await switchSection(page, 'todos');
-        await page.getByRole('button', { name: 'Add task' }).last().click();
+        await page.getByRole('button', { name: 'Add task with details', exact: true }).click();
         await page.getByPlaceholder(/Add a task/i).fill('Draft reply');
         await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
         await expect(page.getByText('Draft reply').first()).toBeVisible();

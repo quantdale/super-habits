@@ -377,7 +377,7 @@ defineJourney({
         // rows before remote availability, so adding a todo blocks restore
         // regardless of whether a remote boundary exists.
         await page.getByRole('button', { name: 'To Do', exact: true }).click();
-        await page.getByRole('button', { name: 'Add task' }).last().click();
+        await page.getByRole('button', { name: 'Add task with details', exact: true }).click();
         await page.getByPlaceholder(/Add a task/i).fill('New phone todo');
         await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
         await expect(page.getByText('New phone todo').first()).toBeVisible();
