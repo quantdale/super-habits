@@ -254,61 +254,20 @@ export async function actionToggleTodo(
   return `toggleTodo title=${JSON.stringify(step.title)}`;
 }
 
-/**
- * Runner-owned toggle: fire a REAL pointer press sequence on the checkbox
- * column of the todo row. The parent's `gestures.clickTodoCheckboxForTitle`
- * dispatches a bare DOM `.click()`, which does not fire RNGH `RectButton`'s
- * onPress on web (row stays unchecked — documented in the parent's
- * `fat-fingers.spec.ts`). The text lookup is scoped to VISIBLE nodes: the
- * Overview section stays mounted behind the active tab and can render the same
- * title earlier in DOM order, so a plain `.first()` can hit the hidden copy.
+/** Use W6's semantic checkbox, not the retired drag-handle/child-1 anatomy.
+ * Scope to the active section because Overview remains mounted. Await the old
+ * state disappearing before the runner navigates to its unchanged SQL oracle.
  */
 async function toggleTodoCheckboxForTitle(page: Page, title: string): Promise<void> {
-  const textNode = activeScopedText(page, title);
-  await textNode.waitFor({ state: 'visible', timeout: 15_000 });
-  await textNode.scrollIntoViewIfNeeded();
-  await textNode.evaluate((el) => {
-    let n: HTMLElement | null = el as HTMLElement;
-    for (let d = 0; d < 12 && n; d++) {
-      const row = n.closest?.("[class*='flex-row']");
-      if (row && row.children.length >= 2) {
-        const box = row.children[1] as HTMLElement;
-        const r = box.getBoundingClientRect();
-        const x = r.left + r.width / 2;
-        const y = r.top + r.height / 2;
-        box.dispatchEvent(
-          new PointerEvent('pointerdown', {
-            bubbles: true,
-            cancelable: true,
-            clientX: x,
-            clientY: y,
-            pointerId: 1,
-            pointerType: 'mouse',
-            isPrimary: true,
-            buttons: 1,
-          }),
-        );
-        box.dispatchEvent(
-          new PointerEvent('pointerup', {
-            bubbles: true,
-            cancelable: true,
-            clientX: x,
-            clientY: y,
-            pointerId: 1,
-            pointerType: 'mouse',
-            isPrimary: true,
-            buttons: 0,
-          }),
-        );
-        box.dispatchEvent(
-          new MouseEvent('click', { bubbles: true, cancelable: true, clientX: x, clientY: y }),
-        );
-        return;
-      }
-      n = n.parentElement;
-    }
+  const section = page.locator(ACTIVE_SECTION_SELECTOR);
+  const checkbox = section.getByRole('checkbox', {
+    name: new RegExp(`^Mark (?:in)?complete: ${escRegExp(title)}$`),
   });
-  await page.waitForTimeout(400);
+  await expect(checkbox).toBeVisible({ timeout: 15_000 });
+  const oldLabel = await checkbox.getAttribute('aria-label');
+  if (!oldLabel) throw new Error('Todo checkbox is missing its semantic label');
+  await checkbox.click();
+  await expect(section.getByRole('checkbox', { name: oldLabel, exact: true })).toHaveCount(0);
 }
 
 /**

@@ -297,6 +297,10 @@ defineJourney({
         // it), then reveal the completed row and edit it. The save must update in
         // place, never duplicate.
         await toggleTodoCompletion(page, 'Stale edit target');
+        // Wait for the existing completion-settle window to remove the pending
+        // copy before expanding virtualized history. The checked flip alone
+        // precedes that removal; swiping the retiring copy races its unmount.
+        await expect(page.getByText('0 open', { exact: true })).toBeVisible();
         await expect(page.getByText(/Show completed/).first()).toBeVisible();
         await page
           .getByText(/Show completed/)

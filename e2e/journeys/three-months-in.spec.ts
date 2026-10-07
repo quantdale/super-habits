@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import { defineJourney } from '../helpers/journey';
 import { seedFixture } from '../helpers/seed';
+import { scrollTodoListTo, scrollTodoListToTop } from '../helpers/todoHeavy';
 import { ensureDbContext, queryRows, returnToApp } from '../helpers/dbHarness';
 
 /**
@@ -291,11 +292,19 @@ defineJourney({
         // pending list, so they are the honest filter oracle.
         await expect(page.getByText('Task 6', { exact: true })).toBeHidden();
         await page.getByText('Show completed', { exact: true }).click();
+        // W6.5: history is now windowed item data in a SectionList, not an
+        // eager footer. Reveal the same seeded completed-row oracle by real
+        // scrolling; it is intentionally absent outside the render window.
+        await scrollTodoListTo(
+          page,
+          page.getByRole('checkbox', { name: 'Mark incomplete: Task 6', exact: true }),
+        );
         await expect(page.getByText('Task 6', { exact: true })).toBeVisible();
         await expect(page.getByText('Task 8', { exact: true })).toBeVisible();
         // The toggle flipped to "Hide completed" — the completed section is shown.
         await expect(page.getByText('Hide completed', { exact: true })).toBeVisible();
         // Toggle back: completed rows leave the DOM.
+        await scrollTodoListToTop(page);
         await page.getByText('Hide completed', { exact: true }).click();
         await expect(page.getByText('Task 6', { exact: true })).toBeHidden();
       },

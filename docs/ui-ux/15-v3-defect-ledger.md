@@ -81,3 +81,39 @@ Counts: 20 systemic + 13 per-surface = 33 defects logged (S1 ×4, S2 ×22, S3 ×
 - SYS-17 To Do portion: rendered typography is V3 roles only (titleLg header,
   bodyMd rows, caption metadata); the Pop-era 25–30px/900 titles are gone from
   this surface.
+
+## W6.5 convergence verification (2026-10-07)
+
+W6's flat anatomy, hierarchy and existing closures remain valid. This bounded
+pass repairs measured residual density/scalability, not a redesign restart.
+Fresh evidence is in `docs/ui-ux/v3-audit/w6.5/`; earlier W1–W6 images are
+untouched.
+
+- **Density VERIFIED-FIXED:** baseline standard row65px (48px checkbox +16px
+  padding +1px separator), metadata65, long title+metadata75; More40. Now
+  standard55 / metadata55 / two-line title55 / two-line+metadata65, checkbox48
+  and actual More44. No fixed row height or title clamp; long strings wrap.
+  Browser large-type proxy expands without clipping. Native largest-font
+  coverage is unverified, not implied by this web measurement.
+- **HEAVY windowing VERIFIED-FIXED:** query/filter and bulk selection no
+  longer eagerly map rows inside ScrollViews; expanded history is SectionList
+  item data, not a mapped footer. Manual collapsed pending mode retains
+  DraggableFlatList. All modes own bounded scrolling, support deep scroll,
+  and mount fewer rows than the dataset. Extended fixture520 seeded;
+  observed311 open /217 completed, No-date246, query152ms against500ms ceiling,
+  completed window23 near History task160. Dates/recurrence may change counts.
+- **Selection/order semantics verified:** selected middle id unmounts/remounts
+  checked; Enter toggles with focus retained; visible-id Select all survives
+  equal-sized query changes. SQL oracles verify bulk complete, priority,
+  project assignment, cancelled/confirmed soft delete and durable delete
+  outbox. Query/filter leaves global sort_order unchanged; full-list drag
+  after history collapse persists the expected order. Non-manual/subset/
+  duplicate-id writes are explicitly rejected in the screen guard.
+- **Planning capture VERIFIED-FIXED:** Project/Goal chip and primary action
+  use `tokens.accent`, not Health hue. Destination section hues are preserved.
+- Audit7/7 PASS, 60fresh captures. Sixteen affected captures visually inspected:
+  populated, long-title, bulk, empty, HEAVY normal/query/filter/selection/deep
+  history, completed boundary, dark, 360/768/1280, Project and Goal. No clipping
+  or navigation collision introduced; completed state stays muted + check.
+  Broad gates/publication evidence lives in the task ExecPlan; this note is
+  not overall campaign or cross-platform certification.

@@ -24,7 +24,8 @@ test.describe('Weekly Review', () => {
 
     // Progress surface entry (Momentum Garden button opens the hub on Progress).
     await page.getByRole('button', { name: 'View Momentum Garden' }).click();
-    const openReview = page.getByRole('button', { name: 'Open weekly review' });
+    // Today also has a Weekly Review entry; exercise the Progress modal entry.
+    const openReview = page.getByRole('dialog').getByRole('button', { name: 'Open weekly review' });
     await expect(openReview).toBeVisible({ timeout: 20_000 });
     await openReview.click();
 

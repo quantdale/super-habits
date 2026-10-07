@@ -126,6 +126,9 @@ test.describe('Workout Gym V2', () => {
     await page.getByText('Plan week', { exact: true }).click();
     const plan = page.getByRole('dialog');
     const mondayRest = plan.getByRole('button', { name: 'Monday rest', exact: true });
+    // The modal opens with a scale animation. Actionability waits for stable
+    // geometry without activating the control or loosening the 40px oracle.
+    await mondayRest.click({ trial: true });
     const box = await mondayRest.boundingBox();
     expect(box?.width ?? 0).toBeGreaterThanOrEqual(40);
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(40);

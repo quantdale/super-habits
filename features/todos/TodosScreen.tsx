@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, View } from 'react-native';
+import { Platform, Pressable, SectionList, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import DraggableFlatList, {
@@ -176,6 +176,31 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     [visiblePending, todayKey],
   );
   const completedTasks = useMemo(() => items.filter((t) => t.completed === 1), [items]);
+  // Two scrolling architectures: manual pending order stays draggable. Query,
+  // selection, and expanded history share one windowed SectionList; history is
+  // item data, never an eagerly rendered footer or a nested scrolling list.
+  const listSections = useMemo(() => {
+    if (selectionMode || queryActive) {
+      return (
+        [
+          ['overdue', 'Overdue'],
+          ['today', 'Today'],
+          ['upcoming', 'Upcoming'],
+          ['noDue', 'No date'],
+        ] as const
+      )
+        .map(([key, title]) => ({ key, title, data: dueGroups[key] }))
+        .filter((section) => section.data.length > 0);
+    }
+    return [
+      { key: 'pending', title: null, data: visiblePending },
+      {
+        key: 'completed',
+        title: 'Completed',
+        data: completedTasks.filter((todo) => !settlingIds.includes(todo.id)),
+      },
+    ];
+  }, [selectionMode, queryActive, dueGroups, visiblePending, completedTasks, settlingIds]);
   const hasCompleted = useMemo(() => completedTasks.length > 0, [completedTasks]);
   const editingTodo = useMemo(
     () => (editingId ? (items.find((item) => item.id === editingId) ?? null) : null),
@@ -581,10 +606,16 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     [runBulkAction, selectedIds],
   );
 
-  const allSelected = visiblePending.length > 0 && selectedIds.length === visiblePending.length;
+  // Selection lives above the render window and is keyed by durable todo id.
+  // Count equality is insufficient when the search/filter changes to another
+  // same-sized result set: Select all must always describe the visible ids.
+  const allSelected =
+    visiblePending.length > 0 && visiblePending.every((todo) => selectedIds.includes(todo.id));
   const toggleSelectAll = useCallback(() => {
     setSelectedIds((current) =>
-      current.length === visiblePending.length ? [] : visiblePending.map((t) => t.id),
+      visiblePending.every((todo) => current.includes(todo.id))
+        ? []
+        : visiblePending.map((todo) => todo.id),
     );
   }, [visiblePending]);
 
@@ -598,11 +629,13 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
           accessibilityRole="checkbox"
           accessibilityLabel={`${selected ? 'Deselect' : 'Select'} ${todo.title}`}
           accessibilityState={{ checked: selected }}
+          aria-checked={selected}
           style={{
+            minHeight: 48,
             flexDirection: 'row',
             alignItems: 'center',
             gap: 12,
-            paddingVertical: 10,
+            paddingVertical: 3,
             paddingLeft: 2,
             paddingRight: 2,
             borderBottomWidth: 1,
@@ -624,12 +657,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
           >
             {selected ? <MaterialIcons name="check" size={16} color={tokens.onSolid} /> : null}
           </View>
-          <Text
-            variant="bodyMd"
-            className="min-w-0 flex-1"
-            style={{ color: tokens.text }}
-            numberOfLines={2}
-          >
+          <Text variant="bodyMd" className="min-w-0 flex-1" style={{ color: tokens.text }}>
             {todo.title}
           </Text>
         </Pressable>
@@ -651,7 +679,10 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   // selection/filtered views; this flag additionally gates the drag activation
   // and persistence below so a filtered subset can never rewrite sort_order.
   const canReorderManually =
-    !selectionMode && !queryActive && visiblePending.length === pendingTasks.length;
+    !selectionMode &&
+    !queryActive &&
+    !showCompleted &&
+    visiblePending.length === pendingTasks.length;
   const pendingIdSet = useMemo(() => new Set(pendingTasks.map((t) => t.id)), [pendingTasks]);
   const handleDragBegin = useCallback(() => {}, []);
   const handleDragEnd = useCallback(
@@ -660,8 +691,10 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
       // receives, so persisting a reordered filtered subset would corrupt the
       // global manual order. Persist only the full pending list.
       const isFullPendingList =
-        data.length === pendingTasks.length && data.every((item) => pendingIdSet.has(item.id));
-      if (!isFullPendingList) return;
+        data.length === pendingTasks.length &&
+        new Set(data.map((item) => item.id)).size === pendingTasks.length &&
+        data.every((item) => pendingIdSet.has(item.id));
+      if (!canReorderManually || !isFullPendingList) return;
       setItems((prev) =>
         prev.map((item) => {
           const newIndex = data.findIndex((d) => d.id === item.id);
@@ -671,7 +704,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
       await updateTodoOrder(data.map((d) => d.id));
       void refresh();
     },
-    [pendingIdSet, pendingTasks, refresh],
+    [canReorderManually, pendingIdSet, pendingTasks, refresh],
   );
   const projectNameById = useMemo(
     () => new Map(projectOptions.map((p) => [p.id, p.name])),
@@ -695,6 +728,33 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     ),
     [canReorderManually, handleToggleTodo, projectNameById, requestDeleteTodo, startEdit],
   );
+  const renderGroupedTodoItem = ({ item }: { item: Todo }) =>
+    selectionMode ? (
+      renderSelectableRow(item)
+    ) : (
+      <TodoItem
+        todo={item}
+        onLongPress={() => {}}
+        isActive={false}
+        onToggle={() => handleToggleTodo(item)}
+        onDelete={() => void requestDeleteTodo(item)}
+        onEdit={() => void startEdit(item)}
+        projectName={item.project_id ? (projectNameById.get(item.project_id) ?? null) : null}
+      />
+    );
+
+  const completedDisclosure = hasCompleted ? (
+    <View className="flex-row py-2">
+      <PillChip
+        label={showCompleted ? 'Hide completed' : 'Show completed'}
+        accessibilityLabel={`${showCompleted ? 'Hide' : 'Show'} completed tasks`}
+        active={showCompleted}
+        color={todosAccent}
+        onPress={() => setShowCompleted((value) => !value)}
+      />
+    </View>
+  ) : null;
+
   const todoLinkedActionSource: LinkedActionEditorSourceOption = {
     key: TODO_LINKED_ACTION_SOURCE_KEY,
     feature: 'todos',
@@ -798,7 +858,10 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                 />
                 <IconButton
                   icon="playlist-add-check"
-                  onPress={() => setSelectionMode(true)}
+                  onPress={() => {
+                    void loadAssociationOptions();
+                    setSelectionMode(true);
+                  }}
                   accessibilityLabel="Enter multi-select mode"
                   accentColor={colorText}
                 />
@@ -836,140 +899,65 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                 />
               </View>
               <ScreenSection className="min-h-0 mb-0 flex-1">
-                {selectionMode ? (
-                  <ScrollView
-                    className="flex-1"
-                    contentContainerStyle={{ paddingBottom: spacing.lg }}
-                  >
-                    {(
-                      [
-                        ['overdue', 'Overdue'],
-                        ['today', 'Today'],
-                        ['upcoming', 'Upcoming'],
-                        ['noDue', 'No date'],
-                      ] as const
-                    ).map(([groupKey, label]) => {
-                      const groupItems = dueGroups[groupKey];
-                      if (groupItems.length === 0) return null;
-                      return (
-                        <View key={groupKey}>
-                          <Text
-                            variant="label"
-                            className="mb-1 px-1 uppercase tracking-wide"
-                            style={{
-                              color: groupKey === 'overdue' ? tokens.dangerText : tokens.textMuted,
-                              fontSize: 12,
-                            }}
-                          >
-                            {label} ({groupItems.length})
-                          </Text>
-                          {groupItems.map(renderSelectableRow)}
-                        </View>
-                      );
-                    })}
-                  </ScrollView>
-                ) : queryActive ? (
-                  <ScrollView
-                    className="flex-1"
-                    contentContainerStyle={{ paddingBottom: spacing.lg }}
-                  >
-                    {visiblePending.length === 0 ? (
+                {selectionMode || queryActive || showCompleted ? (
+                  <SectionList
+                    // Mode changes remount the window, never the screen's id-
+                    // keyed selection. Query changes retain input focus.
+                    key={selectionMode ? 'selection' : queryActive ? 'query' : 'history'}
+                    className="min-h-0 flex-1"
+                    sections={listSections}
+                    extraData={selectedIds}
+                    keyExtractor={todoKeyExtractor}
+                    renderItem={renderGroupedTodoItem}
+                    initialNumToRender={12}
+                    maxToRenderPerBatch={12}
+                    windowSize={5}
+                    stickySectionHeadersEnabled={false}
+                    keyboardShouldPersistTaps="handled"
+                    contentContainerStyle={{ flexGrow: 1, paddingBottom: spacing.lg }}
+                    ListHeaderComponent={
+                      !selectionMode && !queryActive ? completedDisclosure : null
+                    }
+                    ListEmptyComponent={
                       <EmptyStateCard
                         accentColor={todosAccent}
                         className="mb-0"
                         title="No matching tasks"
                         description="Try a different search or reset the filters."
                       />
-                    ) : null}
-                    {(['overdue', 'today', 'upcoming', 'noDue'] as const).map((groupKey) => {
-                      const groupItems = dueGroups[groupKey];
-                      if (groupItems.length === 0) return null;
-                      const labels = {
-                        overdue: 'Overdue',
-                        today: 'Today',
-                        upcoming: 'Upcoming',
-                        noDue: 'No date',
-                      } as const;
-                      return (
-                        <View key={groupKey} className="mb-3">
-                          <Text
-                            variant="label"
-                            className="mb-1 px-1 uppercase tracking-wide"
-                            style={{
-                              color: groupKey === 'overdue' ? tokens.dangerText : tokens.textMuted,
-                              fontSize: 12,
-                            }}
-                            accessibilityLabel={`${labels[groupKey]} group, ${groupItems.length} tasks`}
-                          >
-                            {labels[groupKey]} ({groupItems.length})
-                          </Text>
-                          {groupItems.map((item) => (
-                            <TodoItem
-                              key={item.id}
-                              todo={item}
-                              onLongPress={() => {}}
-                              isActive={false}
-                              onToggle={() => handleToggleTodo(item)}
-                              onDelete={() => void requestDeleteTodo(item)}
-                              onEdit={() => {
-                                void startEdit(item);
-                              }}
-                              projectName={
-                                item.project_id
-                                  ? (projectNameById.get(item.project_id) ?? null)
-                                  : null
-                              }
-                            />
-                          ))}
-                        </View>
-                      );
-                    })}
-                  </ScrollView>
+                    }
+                    renderSectionHeader={({ section }) =>
+                      section.title && section.data.length > 0 ? (
+                        <Text
+                          variant="label"
+                          className="mb-1 mt-2 px-1 uppercase tracking-wide"
+                          style={{
+                            color: section.key === 'overdue' ? tokens.dangerText : tokens.textMuted,
+                            fontSize: 12,
+                          }}
+                          accessibilityLabel={`${section.title} group, ${section.data.length} tasks`}
+                        >
+                          {section.key === 'completed'
+                            ? section.title
+                            : `${section.title} (${section.data.length})`}
+                        </Text>
+                      ) : null
+                    }
+                  />
                 ) : (
                   <DraggableFlatList
                     data={visiblePending}
                     keyExtractor={todoKeyExtractor}
                     containerStyle={{ flex: 1 }}
                     contentContainerStyle={{ flexGrow: 1, paddingBottom: 96 }}
+                    initialNumToRender={12}
+                    maxToRenderPerBatch={12}
+                    windowSize={5}
                     activationDistance={10}
                     onDragBegin={handleDragBegin}
                     onDragEnd={handleDragEnd}
                     ListEmptyComponent={<View className="mb-3">{noPendingTasksCard}</View>}
-                    ListFooterComponent={
-                      hasCompleted ? (
-                        <View>
-                          <View className="flex-row pt-2">
-                            <PillChip
-                              label={showCompleted ? 'Hide completed' : 'Show completed'}
-                              accessibilityLabel={`${showCompleted ? 'Hide' : 'Show'} completed tasks`}
-                              active={showCompleted}
-                              color={todosAccent}
-                              onPress={() => setShowCompleted((v) => !v)}
-                            />
-                          </View>
-                          {showCompleted
-                            ? completedTasks.map((item) => (
-                                <TodoItem
-                                  key={item.id}
-                                  todo={item}
-                                  onLongPress={() => {}}
-                                  isActive={false}
-                                  onToggle={() => handleToggleTodo(item)}
-                                  onDelete={() => void requestDeleteTodo(item)}
-                                  onEdit={() => {
-                                    void startEdit(item);
-                                  }}
-                                  projectName={
-                                    item.project_id
-                                      ? (projectNameById.get(item.project_id) ?? null)
-                                      : null
-                                  }
-                                />
-                              ))
-                            : null}
-                        </View>
-                      ) : null
-                    }
+                    ListFooterComponent={completedDisclosure}
                     renderItem={renderTodoItem}
                   />
                 )}
