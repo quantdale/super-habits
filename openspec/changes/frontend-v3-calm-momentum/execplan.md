@@ -40,11 +40,10 @@ historical evidence only.
   `app/index.tsx` shell/navigation; one screen wave per feature area
   (W5–W13); persistent visual-regression suite (W15); Android qualification
   (W16); final regression (W17).
-- Correction pass W4.5 (current): bring this ExecPlan to the repository's
-  canonical schema; enforce compact-button touch-target contracts; reconcile
-  desktop-rail task truth; resolve Health IA duplication; implement the
-  documented responsive Screen gutter contract; evidence-audit the Modal task
-  claim; truth-check W3/W4 task claims; re-render representative captures.
+- W6 (current): To Do + Quick Capture reconstruction — flat list anatomy,
+  one authoritative summary, flat search/filter, single quick-add path,
+  focused quick-capture sheet with semantic type chips and one primary save,
+  plus long-title/bulk/completed/empty/HEAVY validation.
 
 ## Non-Goals
 
@@ -55,64 +54,78 @@ historical evidence only.
 - No broad redesign restart: Calm Momentum direction is preserved unless
   rendered evidence proves a decision wrong.
 - No Android full certification before W16 (bounded native checks only if a
-  W4.5 correction makes it necessary).
-- No W5 screen work until W4.5 closes.
+  wave correction makes it necessary).
+- No casual changes to todo persistence, sync, recurrence, completion
+  semantics, project linkage, priority meaning, due-date calculations,
+  notification scheduling, or backup/restore during W6.
 
 ## Current Checkpoint
 
-- Current milestone: W6 — To Do + Quick Capture.
-- Completed: W5 — Today reconstruction (orientation-first: compact context
-  row, single UP NEXT hero with contrast-enforced fill and subordinate
-  reason, neutral glance strip, garden demoted/compacted, ≥1024 two-column
-  layout, weekly-review prompt; defects SYS-03/SYS-10/SYS-11/SUR-01/SUR-02
-  VERIFIED-FIXED with re-render evidence). W0–W4 complete; W4.5 complete
-  (hosted run 37509416280 green through unit/integration); W1 audit; W2
-  reference lock; W3 commit 8888084; W4 commit 282bfce; W4.5 commit 10e1462;
-  W5 security lane commit 043920f (shell-quote + source-map-js resolved).
-- In progress: 6.1 — rebuild To Do around flat list anatomy (throughput
-  first: 48–56pt rows, checkbox/title/metadata, list-first view modes).
+- Current milestone: W7 — Habits.
+- Completed: W6 — To Do + Quick Capture (flat 48–56pt list anatomy with
+  priority-ordered metadata line and row-disclosure editor; single
+  authoritative summary [SYS-05]; flat search + filter sheet [SUR-03]; one
+  quick-add path with composer behind "Add task with details" [SUR-04]; Quick
+  Capture input-first sheet with semantic section-hue type chips [SUR-10], one
+  primary save + X close [SYS-13], neutral priority chips; bulk mode,
+  completed group, empty/long-title/HEAVY states rendered and inspected;
+  defects SYS-05/SYS-13/SUR-03/SUR-04/SUR-10 VERIFIED-FIXED with re-render
+  evidence). W5 — Today reconstruction; W0–W4.5 complete as recorded below.
+- In progress: 7.1 — daily check-in list reconstruction (one row anatomy:
+  check ring, name, streak; kill the 5-treatment state pile [SUR-05]).
+- Important modified files: `features/todos/*` (TodosScreen, TodoItem,
+  TodoQuickCapture, TodoListToolbar, TodoBulkBar, todos.domain,
+  badges retired), `features/quick-capture/QuickCaptureOverlay.tsx`,
+  `tests/todos.domain.test.ts`, `e2e/` contract updates (todos, fat-fingers,
+  chain-reaction, three-months-in, boundary, navigation helper, journey
+  openers), `e2e/visual-audit.spec.ts` (W6 state captures),
+  `docs/ui-ux/14`, `docs/ui-ux/15`, `openspec/.../tasks.md`, this plan.
+- Last successful validation: W6 full local gate on the W6 tip — typecheck 0;
+  lint 0/0; validate:themes 140/140; openspec:validate 73/73;
+  agent:plan:validate:all PASS; npm test (unit + integration) 2554 passed /
+  2 skipped across 252 files (0 failures); Chromium: todos+theming+boundary
+  34 passed, command+chain-reaction×2 16 passed (+1 skipped), fat-fingers 13
+  passed, three-months-in HEAVY journey 7 passed with D14 ceilings measured
+  (cold start 641ms/5000ms, max switch 558ms/800ms at 200+ todos);
+  visual-audit 6/6 with W6 states inspected (long-title, bulk, completed,
+  HEAVY 390/1280, quick capture, dark, empty). Last exact-head hosted CI:
+  run 37528351498 at b7c6885 (scheduled confirmation 37533751566) — W6 tip
+  runs pending at publication.
 - Important modified files: `openspec/changes/frontend-v3-calm-momentum/execplan.md`,
   `core/ui/Button.tsx`, `core/ui/Screen.tsx`, `core/theme/designTokens.ts`,
   `features/health/HealthScreen.tsx`, `app/index.tsx`,
   `openspec/changes/frontend-v3-calm-momentum/tasks.md`,
   `docs/ui-ux/15-v3-defect-ledger.md`, plus W4.5 regression tests.
-- Last successful validation: exact-head hosted CI run 37509416280 at
-  10e1462 — install, typecheck, Deno, lint, theme validation, OpenSpec,
-  parity, versioned ExecPlans, and unit + integration (252 files / 2545
-  tests, 3 skipped) all pass; dependency audit is the only hosted failure
-  (E2E skipped because quality stopped at the audit gate).
-- Current failures: hosted dependency audit reports two UNDOCUMENTED
-  high/critical advisories — braces GHSA-vfj7-8cjw-p6xm (HIGH) and node-forge
-  GHSA-86w9-cpqp-85rv (HIGH); fix paths remain semver-major framework
-  upgrades (tailwindcss 4.x / expo 44) — NO MATERIAL UPSTREAM CHANGE. The
-  two NEW advisories surfaced at run 37509416280 are RESOLVED (W5 security
-  lane, semver-compatible overrides): shell-quote GHSA-pqg4-j6r4-53mv
-  (CRITICAL, range >=1.8.4 <1.11.0) fixed at 1.12.0 via the existing
-  shell-quote override — dev-tooling-only chain react-native →
-  react-devtools-core, no shipped bundle presence; source-map-js
-  GHSA-68fv-2mgg-jv7q (HIGH, range >=1.0.0 <1.2.2) fixed at 1.2.2 via a new
-  override — build-time-only chain tailwindcss → postcss, no shipped bundle
-  presence. The pre-existing brace-expansion advisories are documented
-  policy entries and are not part of the undocumented count. The W4.5 ExecPlan-schema red is resolved (run
-  37509416280 passes that step).
+- Last successful validation: exact-head hosted CI run 37528351498 at
+  b7c6885 (scheduled confirmation run 37533751566 on the same SHA) — npm ci,
+  typecheck, Deno/Supabase checks, lint, theme validation, OpenSpec,
+  journey/quarantine parity, versioned ExecPlans, and unit + integration
+  (252 files / 2545 tests passed, 1 file skipped, 3 tests skipped) all pass;
+  the dependency audit is the only hosted failure.
+- Current failures: hosted dependency audit reports exactly the two known,
+  documented high advisories — braces GHSA-vfj7-8cjw-p6xm (HIGH) and
+  node-forge GHSA-86w9-cpqp-85rv (HIGH); fix paths remain semver-major
+  framework upgrades (tailwindcss 4.x / expo 44) — NO MATERIAL UPSTREAM
+  CHANGE. shell-quote GHSA-pqg4-j6r4-53mv and source-map-js GHSA-68fv-2mgg-
+  jv7q remain RESOLVED (W5 security lane, semver-compatible overrides;
+  dev-tooling/build-time-only chains, no shipped bundle presence). The
+  pre-existing brace-expansion advisories are documented policy entries and
+  are not part of the undocumented count.
 - Relevant quarantines: only the standing `VISUAL_AUDIT=1` opt-in lane for
   `e2e/visual-audit.spec.ts`, registered in `docs/testing/known-gaps.md`
   entry 24; no failure quarantines registered for this campaign.
 - Blockers: none blocking W4.5 work; the braces/node-forge dependency-audit
   reds remain known upstream failures after the quality gate (accepted,
   campaign §36/§12 of this plan's proposal).
-- Exact next action: finish W4.5 corrections (Button hitSlop contract +
-  regression test, desktop-rail decision evidence, Health IA removal of the
-  Focus duplicate, Screen responsive gutters, Modal audit evidence, task
-  truth pass), re-render representative captures, run the full local gate,
-  commit once, push, and verify exact-head hosted CI reaches the known
-  dependency-audit step with no new campaign failure.
-- Remaining definition of done: every W4.5 condition in the correction-pass
-  brief holds (validator green, Button contract tested, rail claim true,
-  Health IA resolved, gutter docs == code, Modal claim evidenced, task
-  checkboxes truthful, captures re-reviewed, hosted CI clean before the
-  known audit reds); then checkpoint flips to W5 with exact next action
-  "5.1 orientation-first Today layout".
+- Exact next action: W7.1 — rebuild daily habit rows around one clear
+  completion anatomy (check ring + name + streak per row; kill the 5-treatment
+  state pile [SUR-05]) in `features/habits/`, keeping habit completion
+  semantics and `habit_completions` contracts untouched.
+- Remaining definition of done: every W7 condition holds — daily check-in
+  list is one row anatomy (SUR-05); quiet group headers with collapsed filter
+  stack (SYS-16); neutral progress fixed (SYS-12); analytics moved to a
+  per-habit progress sheet; rendered captures inspected; local validation
+  green; exact-head hosted frontend gates green before the known audit reds.
 
 ## Progress
 
@@ -128,7 +141,9 @@ historical evidence only.
 - [x] W4.5 — foundation/shell correction pass (commit 10e1462; hosted run
       37509416280 green through unit/integration)
 - [x] W5 — Today reconstruction (orientation-first; 5 defects verified fixed)
-- [ ] W6 — To Do + Quick Capture
+- [x] W6 — To Do + Quick Capture (flat list anatomy; SYS-05/SUR-03/SUR-04/
+      SUR-10/SYS-13 verified fixed; HEAVY/long-title/bulk/completed/empty
+      states rendered and inspected)
 - [ ] W7 — Habits
 - [ ] W8 — Focus
 - [ ] W9 — Workout
@@ -200,6 +215,19 @@ historical evidence only.
   boundary 27 passed; visual-audit 5/5 with re-inspected Today captures
   (390 populated/dark/first-run, 768, 1280, breakpoints); npm test 2546/2546;
   defect ledger +5 VERIFIED-FIXED (W5).
+- W5 hosted (exact-head): run 37528351498 at b7c6885 — install, typecheck,
+  Deno/Supabase, lint, themes, OpenSpec, parity, ExecPlans, unit+integration
+  (252 files / 2545 tests passed, 3 skipped) all PASS; audit red only on the
+  documented braces + node-forge. Scheduled run 37533751566 confirmed the
+  same SHA. W5 tasks 5.1–5.3 verified against source and re-render evidence
+  and checked in `tasks.md`.
+- W6 (full local gate): typecheck 0; lint 0/0; themes 140/140; openspec 73/73;
+  plans PASS; npm test 2554 passed / 2 skipped (0 failures); chromium todos+
+  theming+boundary 34, command+chain-reactions 16 (+1 skip), fat-fingers 13
+  (helper geometry-selector replaced with the semantic checkbox contract
+  after one PRODUCT_BUG-class test breakage), three-months-in HEAVY 7/7 with
+  D14 ceilings recorded (max switch 558/800ms at 200+ todos); visual-audit
+  6/6 incl. new W6 states; completed-toggle geometry pixel-verified post-fix.
 - W5 security lane: node scripts/audit-runtime-deps.mjs — undocumented
   count reduced 4 → 2 (braces + node-forge remain; gate exit 1 unchanged
   for those known blockers); installed shell-quote 1.12.0 and
@@ -244,22 +272,24 @@ historical evidence only.
 - Fresh session: run `npm run agent:resume -- --plan
 openspec/changes/frontend-v3-calm-momentum/execplan.md`, then
   `git status --short` / `git log --oneline -5` and reconcile against the
-  checkpoint above before editing anything.
+  checkpoint above before editing anything. W5 tasks (5.1–5.3) are verified
+  and checked in `tasks.md`; do not reopen them without contrary evidence.
 - If hosted CI fails at "Validate versioned ExecPlans": run
   `npm run agent:plan:validate:all` locally, fix the named plan sections
   against `scripts/agent-execplan.mjs` aliases, re-run until PASS.
 - Local render/audit lanes: `npm run build:e2e` then
   `E2E_PORT=8083 VISUAL_AUDIT=1 npx playwright test e2e/visual-audit.spec.ts`
   (8081 is the owner's unrelated dev server — never kill PID-tree 42924).
-- Resume point after W4.5: checkpoint flips to W5; exact next action
-  "5.1 orientation-first Today layout" in `features/overview/`.
+- Resume point for W7: exact next action "W7.1 — rebuild daily habit rows
+  around one clear completion anatomy" in `features/habits/`.
 
 ## Outcomes & Retrospective
 
-- Campaign is mid-flight (W4.5). Outcome so far: the rendered product no
-  longer shows slab headers, FAB-over-content collisions, the desktop wash
-  arc, or cramped six-tab navigation; verification is screenshot-backed at
-  every wave instead of assertion-only.
+- Campaign is mid-flight (W7 active; W6 complete). Outcome so far: the
+  rendered product no longer shows slab headers, FAB-over-content
+  collisions, the desktop wash arc, cramped six-tab navigation, the Today
+  hierarchy problems, or the To Do dashboard-in-front-of-tasks pattern —
+  verification is screenshot-backed at every wave instead of assertion-only.
 - What worked: rendered-truth-first auditing (W1) before any redesign; a
   single-owner foundation wave; committing per wave with green gates.
 - What to keep doing: inspect screenshots visually at every wave; record

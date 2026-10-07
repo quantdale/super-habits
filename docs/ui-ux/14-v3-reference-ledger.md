@@ -141,6 +141,36 @@ per-metric tinted tiles, competing giant modules.
 
 ---
 
+## R10. To Do throughput + Quick Capture reconstruction (W6, fresh research)
+
+**Queried:** "task list checkbox quick add todo" (screens), "quick add task
+composer" (flows), "multi select bulk actions selection mode list" (screens),
+"search filter sort tasks inline editing" (screens).
+
+| Reference (product / interaction)                          | Pattern studied                                                                                                                   | Adopt                                                                                                                                      | Reject / why it does not fit SuperHabits                                                 |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Todoist inbox (screens `a7d62ea2`, `3fdc1db5`)             | Flat single-column inbox; collapsible groups with small text headers; checkbox + title + tiny inline metadata; one add affordance | Flat 48–56pt row anatomy; due-group headers as quiet text labels; one obvious fast-add                                                     | Red header slab; FAB as the _only_ add path (we keep an always-present inline quick add) |
+| Superlist Tasks (screen `c1f6b311`)                        | Searchable flat checklist; completed = checked circle + muted strikethrough; metadata as quiet second line; search under header   | Completed treatment (muted ink + line-through + filled check); metadata as one compact caption line; flat search directly under the header | Per-row avatars/dark chrome (our rows carry no collaboration metadata)                   |
+| Amie task list (screen `0f72c930`)                         | Section headers with counts, right-aligned date/time badges, keyboard-first add                                                   | Date labels as words ("Today", "Overdue · Oct 6") carrying state in text, not row tint; Enter-to-submit deterministic quick add            | Timeline/calendar chrome (To Do is a list, not a schedule)                               |
+| Structured Inbox flow `3296` + composer flow `3269`        | Task actions in a lightweight sheet; auto-focused title field first with live preview; one primary to continue                    | Quick Capture input-first + autofocus; live parse-preview chips; one primary action                                                        | Mandatory multi-field composer before save; suggestion cards that gate capture           |
+| Joi "Add task to Today" flow `4379`                        | Bottom sheet: input → submit → row appears in list; close is the sheet's own affordance                                           | Sheet = input + one save + X close (SYS-13: no third "Done"); capture confirms inline (recent list + "Captured.") and stays open for speed | Extra ghost "Done" exit duplicating the close control                                    |
+| Asana sort/filter sheets (screens `b0ae8e71`, `913dddc4`)  | Infrequent sort/due/priority controls in a bottom sheet over the list, not permanent chip rows                                    | Filter & sort sheet behind one tune button with active-count state; search stays flat and permanent                                        | Permanent rows of filter chips eating the first screenful (the W1 defect)                |
+| CocoonWeaver multi-select (screens `bb8c243d`, `64b3edaa`) | Distinct selection chrome: count + Cancel/Select-all at top, batch actions grouped at bottom                                      | Bulk mode = "N selected" header + X exit, Select all (n)/Cancel row, grouped chips + Complete/Delete                                       | Checkbox-on-the-right rows (left checkbox keeps row rhythm with browsing mode)           |
+
+**Why this fits SuperHabits (not just "inspired by Todoist"):** To Do is the
+app's throughput surface (§2 of the design system: _What do I need to do?_),
+so every adopted pattern reduces steps to the four core verbs — see, add,
+complete, find. SuperHabits rows must also carry metadata Todoist/Superlist
+put in panels (recurrence, linked-action sources, goal/project links), so the
+row shows a priority-ordered subset (due → priority → project → recurrence)
+and defers the rest to the row-disclosure editor, which already owns series
+semantics and linked actions. The reconstruction deliberately keeps the
+proven domain seams (recurring expansion, linked-action execution,
+gamification fast-path, manual `sort_order` reordering) untouched — W6 only
+changed presentation, query chrome, and sheet composition.
+
+---
+
 ## Reference lock (campaign §11)
 
 **Primary:** calm, information-first productivity UI (R1 synthesis).

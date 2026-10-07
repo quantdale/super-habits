@@ -36,16 +36,16 @@
 
 ## 5. W5 — Today
 
-- [ ] 5.1 Orientation-first layout: date/context → next action hero → critical/overdue → compact glance → secondary modules
-- [ ] 5.2 One hero (UP NEXT) with single status model (SYS-11); glance strip neutralized (SYS-03)
-- [ ] 5.3 Momentum Garden card sized to content, demoted (SUR-01); desktop two-column glance (SUR-02)
+- [x] 5.1 Orientation-first layout: date/context → next action hero → critical/overdue → compact glance → secondary modules
+- [x] 5.2 One hero (UP NEXT) with single status model (SYS-11); glance strip neutralized (SYS-03)
+- [x] 5.3 Momentum Garden card sized to content, demoted (SUR-01); desktop two-column glance (SUR-02)
 
 ## 6. W6 — To Do + Quick Capture
 
-- [ ] 6.1 Flat list anatomy (48–56 rows, checkbox/title/metadata); List-first view modes
-- [ ] 6.2 Collapse triple count duplication (SYS-05); flat search row (SUR-03); single quick-add row (SUR-04)
-- [ ] 6.3 Quick-capture sheet: focused input, section-hue type chips (SUR-10), single primary + X (SYS-13)
-- [ ] 6.4 Long-title/metadata/bulk/completed/empty states pass; 100+ item perf check (HEAVY fixture)
+- [x] 6.1 Flat list anatomy (48–56 rows, checkbox/title/metadata); List-first view modes
+- [x] 6.2 Collapse triple count duplication (SYS-05); flat search row (SUR-03); single quick-add row (SUR-04)
+- [x] 6.3 Quick-capture sheet: focused input, section-hue type chips (SUR-10), single primary + X (SYS-13)
+- [x] 6.4 Long-title/metadata/bulk/completed/empty states pass; 100+ item perf check (HEAVY fixture)
 
 ## 7. W7 — Habits
 
