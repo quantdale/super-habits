@@ -1,4 +1,3 @@
-import { Text } from '@/core/ui/Text';
 import { useRef, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Animated, Pressable, TextInput, View } from 'react-native';
@@ -11,22 +10,22 @@ import { submitInlineQuickAdd } from '@/features/todos/todoQuickCapture.submit';
 type Props = {
   /** Creates the task; resolves after persistence so the input only clears on success. */
   onSubmit: (title: string) => Promise<void>;
-  /** Opens the full task editor for dates, links, recurrence, and rules. */
-  onOpenDetails?: () => void;
 };
 
 /**
- * Persistent single-line quick capture pinned above the pending list. Enter or
- * the chunky circular add button creates a task with just a title; the optional
- * details action keeps advanced task editing reachable without another
- * floating action. The add button sinks and springs back under the finger.
+ * The single fast-add interaction for To Do (campaign SUR-04): one input +
+ * one add button. Enter or the chunky circular add button creates a task with
+ * just a title — metadata never blocks saving. Enrichment happens after
+ * creation via row disclosure (tap the row → editor); the full composer for
+ * details-first creation lives in the page header, clearly separate from this
+ * row. The add button sinks and springs back under the finger.
  *
  * Both entry paths funnel through `submitInlineQuickAdd`, which owns the
  * same-tick re-entry guard (see that module for why the `isSubmitting` state
  * alone cannot do this job). `isSubmitting` here is only the button's loading
  * presentation.
  */
-export function TodoQuickCapture({ onSubmit, onOpenDetails }: Props) {
+export function TodoQuickCapture({ onSubmit }: Props) {
   const { tokens, sectionAccents } = useAppTheme();
   const reducedMotion = useReducedMotion();
   const [title, setTitle] = useState('');
@@ -56,19 +55,19 @@ export function TodoQuickCapture({ onSubmit, onOpenDetails }: Props) {
   };
 
   return (
-    <View className="mb-4 flex-row items-center" style={{ gap: spacing.sm }}>
+    <View className="mb-3 flex-row items-center" style={{ gap: spacing.sm }}>
       <TextInput
         accessibilityLabel="Quick add task title"
         className="min-w-0 flex-1 text-base"
         style={{
           minHeight: size.touchTargetMin,
-          borderRadius: radius.full,
-          borderWidth: 2,
+          borderRadius: radius.md,
+          borderWidth: 1,
           borderColor: tokens.border,
-          backgroundColor: tokens.surfaceElevated,
+          backgroundColor: tokens.surfaceSunken,
           color: tokens.text,
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.md,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
         }}
         value={title}
         onChangeText={setTitle}
@@ -98,26 +97,6 @@ export function TodoQuickCapture({ onSubmit, onOpenDetails }: Props) {
           <MaterialIcons name="add" size={26} color={tokens.textOnAccent} />
         </Pressable>
       </Animated.View>
-      {onOpenDetails ? (
-        <Pressable
-          onPress={onOpenDetails}
-          accessibilityRole="button"
-          accessibilityLabel="Add task"
-          accessibilityHint="Open task details"
-          className="items-center justify-center border"
-          style={{
-            minHeight: size.touchTargetMin,
-            borderRadius: radius.full,
-            borderColor: tokens.border,
-            paddingHorizontal: spacing.md,
-            backgroundColor: tokens.surface,
-          }}
-        >
-          <Text variant="label" tone="muted">
-            Details
-          </Text>
-        </Pressable>
-      ) : null}
     </View>
   );
 }

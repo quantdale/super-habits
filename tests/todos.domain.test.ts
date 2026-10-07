@@ -4,6 +4,7 @@ import {
   getTomorrowDateKey,
   findMissingRecurrenceIds,
   applyTodoListQuery,
+  buildTodoRowMeta,
   filterTodos,
   groupTodosByDueWindow,
   searchTodos,
@@ -207,6 +208,69 @@ describe('todos list query (search/filter/sort/group)', () => {
     expect(groups.today.map((t) => t.title)).toEqual(['Write report']);
     expect(groups.upcoming.map((t) => t.title)).toEqual(['Read book']);
     expect(groups.noDue.map((t) => t.title)).toEqual(['No date task']);
+  });
+});
+
+describe('buildTodoRowMeta (W6 row metadata hierarchy)', () => {
+  const today = '2026-10-07';
+  const plain = {
+    due_date: null,
+    priority: 'normal' as const,
+    recurrence: null,
+  };
+
+  it('a plain task carries no metadata at all', () => {
+    expect(buildTodoRowMeta(plain, today)).toEqual([]);
+  });
+
+  it('orders metadata by the campaign hierarchy: due → priority → project → recurrence', () => {
+    const meta = buildTodoRowMeta(
+      {
+        due_date: '2026-10-10',
+        priority: 'urgent',
+        recurrence: 'daily',
+      },
+      today,
+      { projectName: 'Home' },
+    );
+    expect(meta.map((m) => m.key)).toEqual(['due', 'priority', 'project', 'recurrence']);
+  });
+
+  it('overdue dates are danger-toned text — never a red row', () => {
+    const meta = buildTodoRowMeta({ ...plain, due_date: '2026-10-01' }, today);
+    expect(meta).toHaveLength(1);
+    expect(meta[0]).toMatchObject({ key: 'due', tone: 'danger' });
+    expect(meta[0]?.text).toMatch(/^Overdue · /);
+  });
+
+  it('due-today is warning-toned with a Today label', () => {
+    const meta = buildTodoRowMeta({ ...plain, due_date: today }, today);
+    expect(meta[0]).toMatchObject({ key: 'due', text: 'Today', tone: 'warning' });
+  });
+
+  it('future dates are quiet (muted) compact labels', () => {
+    const meta = buildTodoRowMeta({ ...plain, due_date: '2026-12-25' }, today);
+    expect(meta[0]).toMatchObject({ key: 'due', tone: 'muted' });
+    expect(meta[0]?.text).toBe('Dec 25');
+  });
+
+  it('normal priority is omitted; urgent/low are words, not colour-only', () => {
+    expect(buildTodoRowMeta(plain, today)).toEqual([]);
+    const urgent = buildTodoRowMeta({ ...plain, priority: 'urgent' }, today);
+    expect(urgent[0]).toMatchObject({ text: 'Urgent', tone: 'danger' });
+    const low = buildTodoRowMeta({ ...plain, priority: 'low' }, today);
+    expect(low[0]).toMatchObject({ text: 'Low', tone: 'muted' });
+  });
+
+  it('project is included only when a name resolved', () => {
+    expect(buildTodoRowMeta(plain, today, { projectName: null })).toEqual([]);
+    const withProject = buildTodoRowMeta(plain, today, { projectName: 'Home' });
+    expect(withProject[0]).toMatchObject({ key: 'project', text: 'Home' });
+  });
+
+  it('daily recurrence renders the pinned ↻ daily flag', () => {
+    const meta = buildTodoRowMeta({ ...plain, recurrence: 'daily' }, today);
+    expect(meta[0]).toMatchObject({ key: 'recurrence', text: '↻ daily' });
   });
 });
 

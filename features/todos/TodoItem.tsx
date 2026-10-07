@@ -3,27 +3,27 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Animated, Pressable, View } from 'react-native';
 import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Swipeable } from 'react-native-gesture-handler';
-import { Card } from '@/core/ui/Card';
 import { MenuSheet } from '@/core/ui/MenuSheet';
 import { SwipeRightActions } from '@/core/ui/SwipeRightActions';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useMotionDuration, useReducedMotion } from '@/core/theme/motion';
-import { spacing, springs, size } from '@/core/theme/designTokens';
+import { size, springs } from '@/core/theme/designTokens';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { toDateKey } from '@/lib/time';
-import { DueDateBadge } from './DueDateBadge';
-import { PriorityBadge } from './PriorityBadge';
-import type { Todo, TodoViewMode } from './types';
+import { buildTodoRowMeta, type TodoRowMetaTone } from './todos.domain';
+import type { Todo } from './types';
 
 type Props = {
   todo: Todo;
+  /** Long-press starts drag-reorder when manual order is active. */
   onLongPress: () => void;
   isActive: boolean;
   onToggle: () => void;
   onDelete: () => void;
+  /** Row disclosure: tapping the row opens the task editor. */
   onEdit: () => void;
-  viewMode?: TodoViewMode;
-  cardWidth?: number;
+  /** Resolved project name for the metadata line (omitted when unknown). */
+  projectName?: string | null;
 };
 
 /**
@@ -48,28 +48,28 @@ function RowMoreButton({ title, onPress }: { title: string; onPress: () => void 
 /**
  * The chunky circular completion control. Sinks slightly under the finger and
  * pops with a spring when the todo flips to done; under Reduce Motion the state
- * change is instant.
+ * change is instant. Quiet ring when incomplete (never louder than the title),
+ * unmistakable filled check when done — the state is also carried by the
+ * checkbox's checked semantics, not by color alone.
  *
  * The Pressable keeps the semantic checkbox contract (role, label, checked
- * state) exactly as the previous square control did, and stays a 48pt target.
+ * state) and stays a 48pt target.
  */
 function TodoCheckControl({
   title,
   done,
   onPress,
-  compact = false,
 }: {
   title: string;
   done: boolean;
   onPress: () => void;
-  compact?: boolean;
 }) {
   const { tokens, sectionAccents } = useAppTheme();
   const reducedMotion = useReducedMotion();
   const [scale] = useState(() => new Animated.Value(1));
   const wasDoneRef = useRef(done);
-  const circleSize = compact ? 26 : 34;
-  const targetSize = compact ? 34 : size.touchTargetMin;
+  const circleSize = 24;
+  const targetSize = size.touchTargetMin;
 
   useEffect(() => {
     const wasDone = wasDoneRef.current;
@@ -113,7 +113,7 @@ function TodoCheckControl({
           width: circleSize,
           height: circleSize,
           borderRadius: circleSize / 2,
-          borderWidth: 2.5,
+          borderWidth: 2,
           borderColor: done ? sectionAccents.todos.fill : tokens.borderStrong,
           backgroundColor: done ? sectionAccents.todos.fill : 'transparent',
           alignItems: 'center',
@@ -122,32 +122,25 @@ function TodoCheckControl({
         }}
       >
         {done ? (
-          <MaterialIcons name="check" size={circleSize * 0.58} color={tokens.onSolid} />
+          <MaterialIcons name="check" size={circleSize * 0.6} color={tokens.onSolid} />
         ) : null}
       </Animated.View>
     </Pressable>
   );
 }
 
-/** Recurrence pill; keeps the literal `↻ daily` copy the journey suite asserts. */
-function RecurringBadge({ compact = false }: { compact?: boolean }) {
-  const { sectionAccents } = useAppTheme();
-  return (
-    <View
-      className={`self-start rounded-full ${compact ? 'px-2 py-0.5' : 'px-2.5 py-1'}`}
-      style={{ backgroundColor: sectionAccents.todos.tint }}
-    >
-      <Text variant="label" style={{ color: sectionAccents.todos.text, fontSize: 11 }}>
-        {compact ? '↻' : '↻ daily'}
-      </Text>
-    </View>
-  );
+function metaToneColor(tone: TodoRowMetaTone, tokens: ReturnType<typeof useAppTheme>['tokens']) {
+  if (tone === 'danger') return tokens.dangerText;
+  if (tone === 'warning') return tokens.warningText;
+  return tokens.textMuted;
 }
 
 /**
- * Pop row: a generously rounded, state-tinted card tile with a chunky circular
- * check control. Swipe actions and the visible overflow menu still cover
- * edit/delete, and long-press on the grip still starts drag-reorder.
+ * Flat V3 list row (docs/ui-ux/13 §6/§8): 48–56pt standard anatomy — check +
+ * title + at most one compact metadata line, hairline separator, no card
+ * geometry. A plain task is just checkbox + title; state is carried by quiet
+ * text (never a fully tinted row). Tap opens the task editor (row disclosure),
+ * long-press starts drag-reorder when manual order is active.
  */
 export const TodoItem = memo(function TodoItem({
   todo,
@@ -156,31 +149,18 @@ export const TodoItem = memo(function TodoItem({
   onToggle,
   onDelete,
   onEdit,
-  viewMode = 'content',
-  cardWidth,
+  projectName = null,
 }: Props) {
-  const { tokens, sectionAccents } = useAppTheme();
+  const { tokens } = useAppTheme();
   const done = todo.completed === 1;
-  const today = toDateKey();
-  const isOverdue = !done && !!todo.due_date && todo.due_date < today;
-  const isDueToday = !done && todo.due_date === today;
-  const stateAccent = isOverdue
-    ? tokens.dangerSolid
-    : isDueToday
-      ? sectionAccents.calories.fill
-      : undefined;
-  const tileFill = isOverdue
-    ? tokens.dangerBackground
-    : isDueToday
-      ? tokens.warningBackground
-      : tokens.surface;
-  const hasBadges = todo.recurrence === 'daily' || todo.priority !== 'normal' || !!todo.due_date;
   const [menuVisible, setMenuVisible] = useState(false);
   const reducedMotion = useReducedMotion();
   const settleDuration = useMotionDuration('feedback');
   const prevDoneRef = useRef(done);
   const [settleOpacity] = useState(() => new Animated.Value(1));
   const swipeableRef = useRef<Swipeable>(null);
+  const todayKey = toDateKey();
+  const metaItems = buildTodoRowMeta(todo, todayKey, { projectName });
 
   // Completion settle: a brief opacity dip-and-recover when the row flips to
   // done. Purely cosmetic — skipped entirely under Reduce Motion and never
@@ -211,161 +191,75 @@ export const TodoItem = memo(function TodoItem({
   }, [onDelete]);
 
   const titleColor = done ? tokens.textMuted : tokens.text;
-  const checkControl = (
-    <TodoCheckControl
-      title={todo.title}
-      done={done}
-      onPress={onToggle}
-      compact={viewMode === 'grid'}
-    />
-  );
-  const dragHandle = (
-    <Pressable
-      onLongPress={onLongPress}
-      delayLongPress={180}
-      hitSlop={8}
-      accessibilityLabel={`Reorder ${todo.title}`}
-      className={viewMode === 'content' ? 'pt-3' : ''}
-    >
-      <MaterialIcons
-        name="drag-indicator"
-        size={viewMode === 'grid' ? 18 : 22}
-        color={tokens.iconMuted}
-      />
-    </Pressable>
-  );
 
-  let row: ReactNode;
-  if (viewMode === 'grid') {
-    row = (
-      <View className="flex-row items-start gap-2">
-        {dragHandle}
-        {checkControl}
-        <View className="min-w-0 flex-1 gap-1">
+  let metaLine: ReactNode = null;
+  if (metaItems.length > 0) {
+    metaLine = (
+      <Text variant="caption" numberOfLines={1} className="mt-0.5">
+        {metaItems.map((item, index) => (
           <Text
-            numberOfLines={2}
+            key={item.key}
             variant="caption"
-            className={`leading-4 ${done ? 'line-through' : ''}`}
-            style={{ color: titleColor }}
+            style={{ color: metaToneColor(item.tone, tokens) }}
           >
-            {todo.title}
+            {index > 0 ? ' · ' : ''}
+            {item.text}
           </Text>
-          {hasBadges ? (
-            <View className="flex-row flex-wrap items-center gap-1">
-              {todo.priority !== 'normal' ? (
-                <PriorityBadge priority={todo.priority} compact />
-              ) : null}
-              {todo.due_date ? <DueDateBadge dueDate={todo.due_date} compact /> : null}
-            </View>
-          ) : null}
-          <View className="flex-row items-center justify-end">
-            <RowMoreButton title={todo.title} onPress={openMenu} />
-          </View>
-        </View>
-      </View>
-    );
-  } else if (viewMode === 'list') {
-    row = (
-      <View className="flex-row items-center gap-2">
-        {dragHandle}
-        {checkControl}
-        <Text
-          numberOfLines={1}
-          variant="bodyMd"
-          className={`min-w-0 flex-1 ${done ? 'line-through' : ''}`}
-          style={{ color: titleColor }}
-        >
-          {todo.title}
-        </Text>
-        <View className="flex-row items-center gap-1">
-          {todo.recurrence === 'daily' ? <RecurringBadge compact /> : null}
-          {todo.priority !== 'normal' ? <PriorityBadge priority={todo.priority} compact /> : null}
-          {todo.due_date ? <DueDateBadge dueDate={todo.due_date} compact /> : null}
-        </View>
-        <RowMoreButton title={todo.title} onPress={openMenu} />
-      </View>
-    );
-  } else {
-    // content (default)
-    row = (
-      <View className="flex-row items-start gap-2">
-        {dragHandle}
-        {checkControl}
-        <View className="min-w-0 flex-1">
-          <Text
-            variant="bodyLg"
-            className={done ? 'line-through' : ''}
-            style={{ color: titleColor }}
-          >
-            {todo.title}
-          </Text>
-          {todo.notes ? (
-            <Text variant="bodyMd" tone="muted" className="mt-1" numberOfLines={2}>
-              {todo.notes}
-            </Text>
-          ) : null}
-          {hasBadges ? (
-            <View className="mt-2 flex-row flex-wrap items-center gap-2">
-              {todo.recurrence === 'daily' ? <RecurringBadge /> : null}
-              {todo.priority !== 'normal' ? <PriorityBadge priority={todo.priority} /> : null}
-              {todo.due_date ? <DueDateBadge dueDate={todo.due_date} /> : null}
-            </View>
-          ) : null}
-        </View>
-        <RowMoreButton title={todo.title} onPress={openMenu} />
-      </View>
+        ))}
+      </Text>
     );
   }
-
-  const containerStyle =
-    viewMode === 'grid'
-      ? { width: cardWidth, margin: 2, opacity: isActive ? 0.85 : 1 }
-      : { marginBottom: viewMode === 'list' ? spacing.sm : 10, opacity: isActive ? 0.85 : 1 };
 
   return (
     <>
       <Animated.View style={{ opacity: settleOpacity }}>
-        <Card
-          variant="standard"
-          accentColor={stateAccent}
-          className="mb-0 overflow-hidden"
-          innerClassName="p-0"
-          style={containerStyle}
+        <Swipeable
+          ref={swipeableRef}
+          renderRightActions={() => (
+            <SwipeRightActions
+              editColor={SECTION_COLORS.todos}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+          )}
+          rightThreshold={40}
+          overshootRight={false}
         >
-          <Swipeable
-            ref={swipeableRef}
-            renderRightActions={() => (
-              <SwipeRightActions
-                editColor={SECTION_COLORS.todos}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                compact={viewMode === 'grid'}
-              />
-            )}
-            rightThreshold={40}
-            overshootRight={false}
+          <Pressable
+            onPress={onEdit}
+            onLongPress={onLongPress}
+            delayLongPress={180}
+            accessibilityRole="button"
+            accessibilityLabel={`Edit task: ${todo.title}`}
+            accessibilityHint="Opens task details"
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+              paddingVertical: 8,
+              paddingLeft: 2,
+              paddingRight: 2,
+              backgroundColor: isActive ? tokens.surfaceElevated : 'transparent',
+              opacity: isActive ? 0.85 : 1,
+              borderBottomWidth: 1,
+              borderBottomColor: tokens.border,
+            }}
           >
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'stretch',
-                backgroundColor: tileFill,
-              }}
-            >
-              <View style={{ width: 4, backgroundColor: stateAccent ?? SECTION_COLORS.todos }} />
-              <View
-                style={{
-                  flex: 1,
-                  paddingVertical: 12,
-                  paddingLeft: 12,
-                  paddingRight: 16,
-                }}
+            <TodoCheckControl title={todo.title} done={done} onPress={onToggle} />
+            <View className="min-w-0 flex-1">
+              <Text
+                variant="bodyMd"
+                numberOfLines={2}
+                className={done ? 'line-through' : ''}
+                style={{ color: titleColor }}
               >
-                {row}
-              </View>
+                {todo.title}
+              </Text>
+              {metaLine}
             </View>
-          </Swipeable>
-        </Card>
+            <RowMoreButton title={todo.title} onPress={openMenu} />
+          </Pressable>
+        </Swipeable>
       </Animated.View>
       <MenuSheet
         visible={menuVisible}
@@ -388,8 +282,7 @@ function areTodoItemPropsEqual(previous: Props, next: Props): boolean {
     previous.todo.sort_order === next.todo.sort_order &&
     previous.todo.due_date === next.todo.due_date &&
     previous.todo.deleted_at === next.todo.deleted_at &&
-    previous.viewMode === next.viewMode &&
-    previous.cardWidth === next.cardWidth &&
+    previous.projectName === next.projectName &&
     previous.isActive === next.isActive
   );
 }

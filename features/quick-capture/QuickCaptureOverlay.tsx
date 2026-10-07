@@ -42,6 +42,21 @@ const MODES: { key: CaptureMode; label: string }[] = [
   { key: 'focus', label: 'Focus' },
 ];
 
+/**
+ * Destination identity (campaign SUR-10): the selected type chip and the
+ * primary action carry that destination's section hue — one hue visible at a
+ * time, never a rainbow sheet. Planning destinations (Project/Goal) use the
+ * theme accent because they have no section of their own.
+ */
+const MODE_ACCENT: Record<CaptureMode, string> = {
+  todo: SECTION_COLORS.todos,
+  habit: SECTION_COLORS.habits,
+  calorie: SECTION_COLORS.calories,
+  project: SECTION_COLORS.health,
+  goal: SECTION_COLORS.health,
+  focus: SECTION_COLORS.focus,
+};
+
 const PRIORITIES: TodoPriority[] = ['urgent', 'normal', 'low'];
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
 
@@ -109,6 +124,14 @@ export function QuickCaptureOverlay() {
     persistRecentCaptures(recent);
   }, [recent]);
 
+  // Brief inline success acknowledgment (design system §11): never blocks the
+  // next capture, clears itself after ~2s.
+  useEffect(() => {
+    if (!saved) return;
+    const timer = setTimeout(() => setSaved(false), 2000);
+    return () => clearTimeout(timer);
+  }, [saved]);
+
   // Live natural-language parse preview for todo mode (parser stays pure;
   // the loaded lists are passed in here).
   const parsed = useMemo(() => {
@@ -127,7 +150,6 @@ export function QuickCaptureOverlay() {
     setProjectLink(null);
     setLinksExpanded(false);
     setError(null);
-    setSaved(false);
   }, []);
 
   const switchMode = useCallback(
@@ -135,6 +157,8 @@ export function QuickCaptureOverlay() {
       setMode(next);
       persistLastCaptureMode(next);
       resetForm();
+      setError(null);
+      setSaved(false);
     },
     [resetForm],
   );
@@ -254,8 +278,11 @@ export function QuickCaptureOverlay() {
         closeQuickCapture();
         return;
       }
-      setSaved(true);
+      // resetForm clears the inputs; the acknowledgment lands after it so the
+      // confirmation survives the reset (it used to be cleared in the same
+      // batch and never rendered).
       resetForm();
+      setSaved(true);
       await refreshOptions();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not capture.');
@@ -279,18 +306,35 @@ export function QuickCaptureOverlay() {
     pushRecent,
   ]);
 
+  const accent = MODE_ACCENT[mode];
+
   return (
     <View className="gap-3">
-      <Text className="text-lg font-bold" style={{ color: tokens.text }}>
+      <Text variant="titleMd" style={{ color: tokens.text }}>
         Add something
       </Text>
+
+      {mode !== 'focus' ? (
+        <CaptureInput
+          label={mode === 'calorie' ? 'Food name' : mode === 'habit' ? 'Habit name' : 'Title'}
+          value={title}
+          onChangeText={(t) => {
+            setSaved(false);
+            setTitle(t);
+          }}
+          placeholder="What do you want to remember?"
+          autoFocus
+          onSubmitEditing={handleSubmit}
+        />
+      ) : null}
+
       <View className="flex-row flex-wrap">
         {MODES.map((m) => (
           <PillChip
             key={m.key}
             label={m.label}
             active={mode === m.key}
-            color={SECTION_COLORS.todos}
+            color={MODE_ACCENT[m.key]}
             onPress={() => switchMode(m.key)}
           />
         ))}
@@ -298,23 +342,13 @@ export function QuickCaptureOverlay() {
 
       {mode === 'focus' ? (
         <View className="items-center gap-3 py-4">
-          <Text style={{ fontSize: 18 }}>•</Text>
-          <Text className="text-base" style={{ color: tokens.text }}>
+          <Text variant="bodyMd" tone="muted">
             Jump straight into a focus session.
           </Text>
           <Button label="Start Focus" onPress={handleSubmit} color={SECTION_COLORS.focus} />
         </View>
       ) : (
         <>
-          <CaptureInput
-            label={mode === 'calorie' ? 'Food name' : mode === 'habit' ? 'Habit name' : 'Title'}
-            value={title}
-            onChangeText={setTitle}
-            placeholder="What do you want to remember?"
-            autoFocus
-            onSubmitEditing={handleSubmit}
-          />
-
           {parsed &&
           (parsed.dueDateKey ||
             parsed.priority !== 'normal' ||
@@ -326,7 +360,7 @@ export function QuickCaptureOverlay() {
                   className="rounded-full border px-3 py-1"
                   style={{ borderColor: tokens.border }}
                 >
-                  <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                  <Text variant="caption" style={{ color: tokens.textMuted }}>
                     Due {parsed.dueDateKey}
                   </Text>
                 </View>
@@ -336,7 +370,7 @@ export function QuickCaptureOverlay() {
                   className="rounded-full border px-3 py-1"
                   style={{ borderColor: tokens.border }}
                 >
-                  <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                  <Text variant="caption" style={{ color: tokens.textMuted }}>
                     {parsed.priority}
                   </Text>
                 </View>
@@ -346,7 +380,7 @@ export function QuickCaptureOverlay() {
                   className="rounded-full border px-3 py-1"
                   style={{ borderColor: tokens.border }}
                 >
-                  <Text className="text-xs" style={{ color: tokens.textMuted }} numberOfLines={1}>
+                  <Text variant="caption" style={{ color: tokens.textMuted }} numberOfLines={1}>
                     #{parsed.matchedProjectName}
                   </Text>
                 </View>
@@ -356,7 +390,7 @@ export function QuickCaptureOverlay() {
                   className="rounded-full border px-3 py-1"
                   style={{ borderColor: tokens.border }}
                 >
-                  <Text className="text-xs" style={{ color: tokens.textMuted }} numberOfLines={1}>
+                  <Text variant="caption" style={{ color: tokens.textMuted }} numberOfLines={1}>
                     @{parsed.matchedGoalName}
                   </Text>
                 </View>
@@ -365,13 +399,13 @@ export function QuickCaptureOverlay() {
           ) : null}
 
           {mode === 'todo' ? (
-            <View className="flex-row flex-wrap gap-2">
+            <View className="flex-row flex-wrap">
               {PRIORITIES.map((p) => (
                 <PillChip
                   key={p}
                   label={p}
                   active={priorityTouched ? priority === p : p === (parsed?.priority ?? 'normal')}
-                  color={SECTION_COLORS.todos}
+                  color={tokens.iconMuted}
                   onPress={() => {
                     setPriority(p);
                     setPriorityTouched(true);
@@ -391,7 +425,7 @@ export function QuickCaptureOverlay() {
                 placeholder="0"
                 onSubmitEditing={handleSubmit}
               />
-              <View className="flex-row flex-wrap gap-2">
+              <View className="flex-row flex-wrap">
                 {MEAL_TYPES.map((mt) => (
                   <PillChip
                     key={mt}
@@ -441,12 +475,12 @@ export function QuickCaptureOverlay() {
           ) : null}
 
           {error ? (
-            <Text className="text-sm" style={{ color: tokens.dangerSolid }}>
+            <Text variant="caption" style={{ color: tokens.dangerSolid }}>
               {error}
             </Text>
           ) : null}
           {saved ? (
-            <Text className="text-sm" style={{ color: sectionAccents.habits.text }}>
+            <Text variant="caption" style={{ color: sectionAccents.habits.text }}>
               Captured.
             </Text>
           ) : null}
@@ -454,12 +488,18 @@ export function QuickCaptureOverlay() {
           <Button
             label={submitting ? 'Capturing…' : 'Capture'}
             onPress={handleSubmit}
-            color={SECTION_COLORS.todos}
+            color={accent}
+          />
+          <Button
+            label="Describe it"
+            variant="ghost"
+            icon="auto-awesome"
+            onPress={openAdvancedCapture}
           />
 
           {recent.length > 0 ? (
             <View className="gap-2">
-              <Text className="text-sm font-medium" style={{ color: tokens.textMuted }}>
+              <Text variant="label" tone="muted">
                 Recent captures
               </Text>
               {recent.map((r) => (
@@ -468,7 +508,12 @@ export function QuickCaptureOverlay() {
                   className="flex-row items-center justify-between gap-3 rounded-xl border px-3 py-2"
                   style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
                 >
-                  <Text className="flex-1 text-xs" style={{ color: tokens.text }} numberOfLines={1}>
+                  <Text
+                    variant="caption"
+                    className="flex-1"
+                    style={{ color: tokens.text }}
+                    numberOfLines={1}
+                  >
                     {r.label}
                   </Text>
                   <Pressable
@@ -477,7 +522,7 @@ export function QuickCaptureOverlay() {
                     onPress={() => void handleUndo(r.key)}
                     hitSlop={8}
                   >
-                    <Text className="text-xs font-semibold" style={{ color: tokens.dangerSolid }}>
+                    <Text variant="label" style={{ color: tokens.dangerSolid }}>
                       Undo
                     </Text>
                   </Pressable>
@@ -485,9 +530,6 @@ export function QuickCaptureOverlay() {
               ))}
             </View>
           ) : null}
-
-          <Button label="Describe it" variant="ghost" onPress={openAdvancedCapture} />
-          <Button label="Done" variant="ghost" onPress={closeQuickCapture} />
         </>
       )}
     </View>
@@ -524,8 +566,8 @@ function CaptureInput({
   }, [autoFocus]);
 
   return (
-    <View className="mb-3">
-      <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
+    <View className="mb-1">
+      <Text variant="label" tone="muted" className="mb-1.5">
         {label}
       </Text>
       <TextInput
@@ -567,12 +609,14 @@ function LinkPicker({
   if (options.length === 0) return null;
   return (
     <View className="mt-1">
-      <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
+      <Text variant="label" tone="muted" className="mb-1.5">
         {label}
       </Text>
       <View className="flex-row flex-wrap gap-2">
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Link to no project"
+          accessibilityState={{ selected: selectedId === null }}
           className="rounded-full border px-4 py-2"
           style={
             selectedId === null
@@ -589,6 +633,8 @@ function LinkPicker({
           <Pressable
             key={o.id}
             accessibilityRole="button"
+            accessibilityLabel={`Link to project ${o.name}`}
+            accessibilityState={{ selected: selectedId === o.id }}
             className="rounded-full border px-4 py-2"
             style={
               selectedId === o.id

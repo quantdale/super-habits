@@ -223,6 +223,73 @@ export function groupTodosByDueWindow<T extends { due_date: string | null }>(
   return groups;
 }
 
+export type TodoRowMetaTone = 'danger' | 'warning' | 'muted';
+
+export type TodoRowMetaItem = {
+  key: 'due' | 'priority' | 'project' | 'recurrence';
+  text: string;
+  tone: TodoRowMetaTone;
+};
+
+export type TodoLikeForRowMeta = {
+  due_date: string | null;
+  priority: TodoPriority;
+  recurrence: string | null;
+};
+
+/** `Mar 4`-style compact label for a YYYY-MM-DD date key (locale-fixed for determinism). */
+function formatDueMeta(dueDate: string): string {
+  const date = new Date(dueDate + 'T12:00:00');
+  return date.toLocaleDateString('en', { month: 'short', day: 'numeric' });
+}
+
+/**
+ * The metadata line for a task row, in the campaign's priority hierarchy
+ * (docs/ui-ux/13 §6 + campaign brief §12):
+ *
+ *   1. overdue / due date when it matters (state-toned text, never a red row)
+ *   2. priority when meaningful (urgent/low only — plain tasks say nothing)
+ *   3. project/context when linked
+ *   4. recurrence (secondary flag)
+ *
+ * A plain task yields `[]` and renders as checkbox + title only. Ordering is
+ * stable so rows scan consistently; the caller may omit `projectName` when it
+ * has not resolved project names (the project item is then skipped).
+ */
+export function buildTodoRowMeta<T extends TodoLikeForRowMeta>(
+  todo: T,
+  todayKey: string,
+  options: { projectName?: string | null } = {},
+): TodoRowMetaItem[] {
+  const items: TodoRowMetaItem[] = [];
+
+  if (todo.due_date !== null) {
+    if (todo.due_date < todayKey) {
+      items.push({ key: 'due', text: `Overdue · ${formatDueMeta(todo.due_date)}`, tone: 'danger' });
+    } else if (todo.due_date === todayKey) {
+      items.push({ key: 'due', text: 'Today', tone: 'warning' });
+    } else {
+      items.push({ key: 'due', text: formatDueMeta(todo.due_date), tone: 'muted' });
+    }
+  }
+
+  if (todo.priority === 'urgent') {
+    items.push({ key: 'priority', text: 'Urgent', tone: 'danger' });
+  } else if (todo.priority === 'low') {
+    items.push({ key: 'priority', text: 'Low', tone: 'muted' });
+  }
+
+  if (options.projectName) {
+    items.push({ key: 'project', text: options.projectName, tone: 'muted' });
+  }
+
+  if (todo.recurrence === 'daily') {
+    items.push({ key: 'recurrence', text: '↻ daily', tone: 'muted' });
+  }
+
+  return items;
+}
+
 /**
  * True when a todo toggle may take the gamification fast path.
  *

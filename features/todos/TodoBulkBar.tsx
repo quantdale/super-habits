@@ -1,14 +1,17 @@
 import { Text } from '@/core/ui/Text';
-import { View } from 'react-native';
+import { View, Pressable } from 'react-native';
 import { Button } from '@/core/ui/Button';
-import { Card } from '@/core/ui/Card';
 import { PillChip } from '@/core/ui/PillChip';
+import { useAppTheme } from '@/core/providers/themeContext';
+import { spacing } from '@/core/theme/designTokens';
 import type { TodoPriority } from './types';
 
 /**
- * Action bar shown while a bulk multi-select is active. Floated in a tinted
- * Pop card with pill chips and chunky buttons so the batch actions read as one
- * tactile surface.
+ * Action bar shown while a bulk multi-select is active (campaign brief §21).
+ * A flat bar with hairline top rule — not a card — so bulk mode reads as a
+ * distinct chrome state without a nested surface: selected count and Cancel
+ * live in the page header, actions stay grouped here, and nothing reserves
+ * screen space outside selection mode.
  *
  * There is intentionally no Reopen action: selection rows are built from the
  * pending list only, so completed items can never be selected in this mode
@@ -19,6 +22,9 @@ type ProjectOption = { id: string; name: string };
 
 type Props = {
   selectedCount: number;
+  totalCount: number;
+  allSelected: boolean;
+  onToggleSelectAll: () => void;
   onComplete: () => void;
   onDelete: () => void;
   onPriorityChange: (priority: TodoPriority) => void;
@@ -30,6 +36,9 @@ type Props = {
 
 export function TodoBulkBar({
   selectedCount,
+  totalCount,
+  allSelected,
+  onToggleSelectAll,
   onComplete,
   onDelete,
   onPriorityChange,
@@ -38,39 +47,59 @@ export function TodoBulkBar({
   onExit,
   accentColor,
 }: Props) {
+  const { tokens } = useAppTheme();
   const disabled = selectedCount === 0;
 
   return (
-    <Card accentColor={accentColor} className="mb-0" innerClassName="p-4">
-      <View accessibilityLabel={`Bulk actions for ${selectedCount} selected tasks`}>
-        <View className="mb-3 flex-row items-center justify-between gap-2">
-          <Text variant="titleMd">{selectedCount} selected</Text>
+    <View
+      accessibilityLabel={`Bulk actions for ${selectedCount} selected tasks`}
+      style={{
+        borderTopWidth: 1,
+        borderTopColor: tokens.border,
+        paddingTop: spacing.md,
+        paddingBottom: spacing.sm,
+        gap: spacing.sm,
+      }}
+    >
+      <View className="flex-row items-center justify-between gap-2">
+        <Pressable
+          onPress={onToggleSelectAll}
+          accessibilityRole="button"
+          accessibilityLabel={allSelected ? 'Deselect all tasks' : 'Select all tasks'}
+          hitSlop={6}
+        >
+          <Text variant="label" style={{ color: accentColor }}>
+            {allSelected ? 'Deselect all' : `Select all (${totalCount})`}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={onExit}
+          accessibilityRole="button"
+          accessibilityLabel="Exit selection mode"
+          hitSlop={6}
+        >
+          <Text variant="label" tone="muted">
+            Cancel
+          </Text>
+        </Pressable>
+      </View>
+      <View className="flex-row flex-wrap">
+        {(['urgent', 'normal', 'low'] as TodoPriority[]).map((priority) => (
           <PillChip
-            label="Cancel"
-            accessibilityLabel="Exit selection mode"
+            key={priority}
+            label={priority}
             active={false}
             color={accentColor}
-            onPress={onExit}
+            onPress={() => {
+              // Same 0-selected guard as Complete/Delete so a stray tap can't
+              // run a no-op batch that silently exits selection mode.
+              if (disabled) return;
+              onPriorityChange(priority);
+            }}
           />
-        </View>
-        <View className="flex-row flex-wrap gap-2">
-          {(['urgent', 'normal', 'low'] as TodoPriority[]).map((priority) => (
-            <PillChip
-              key={priority}
-              label={priority}
-              active={false}
-              color={accentColor}
-              onPress={() => {
-                // Same 0-selected guard as Complete/Delete so a stray tap can't
-                // run a no-op batch that silently exits selection mode.
-                if (disabled) return;
-                onPriorityChange(priority);
-              }}
-            />
-          ))}
-        </View>
+        ))}
         {projects.length > 0 ? (
-          <View className="mt-1 flex-row flex-wrap gap-2">
+          <>
             <PillChip
               label="No project"
               active={false}
@@ -91,31 +120,31 @@ export function TodoBulkBar({
                 }}
               />
             ))}
-          </View>
+          </>
         ) : null}
-        <View className="mt-3 flex-row gap-2">
-          <View className="flex-1">
-            <Button
-              label="Complete"
-              onPress={() => {
-                if (!disabled) onComplete();
-              }}
-              disabled={disabled}
-              color={accentColor}
-            />
-          </View>
-          <View className="flex-1">
-            <Button
-              label="Delete"
-              variant="ghost"
-              onPress={() => {
-                if (!disabled) onDelete();
-              }}
-              disabled={disabled}
-            />
-          </View>
+      </View>
+      <View className="flex-row gap-2">
+        <View className="flex-1">
+          <Button
+            label="Complete"
+            onPress={() => {
+              if (!disabled) onComplete();
+            }}
+            disabled={disabled}
+            color={accentColor}
+          />
+        </View>
+        <View className="flex-1">
+          <Button
+            label="Delete"
+            variant="ghost"
+            onPress={() => {
+              if (!disabled) onDelete();
+            }}
+            disabled={disabled}
+          />
         </View>
       </View>
-    </Card>
+    </View>
   );
 }
