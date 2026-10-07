@@ -117,3 +117,14 @@ untouched.
   or navigation collision introduced; completed state stays muted + check.
   Broad gates/publication evidence lives in the task ExecPlan; this note is
   not overall campaign or cross-platform certification.
+- **Bounded closure:** qa:full PASS (2559 local unit/integration tests,243
+  browser checks,23 deterministic scenarios; existing skips explicit). Final
+  HEAVY query129ms; standard geometry55/55/55/65 and full targets unchanged.
+  Twelve baseline-reproduced stale QA contracts repaired without weakening
+  contrast/geometry/SQLite oracles. Product/evidence f0e0291 published normally
+  in PR58; exact-head hosted push37635421767 /PR37635650147 pass through
+  unit/integration, then fail only the known braces/node-forge audit. Hosted
+  E2E skipped behind audit, not passed. Final documentation head rechecked
+  separately. Native API35-vs36 preflight BLOCKED, Android full W16, iOS
+  owner-deferred; browser font scaling is not native largest-font coverage.
+  W7.1 next, not implemented.

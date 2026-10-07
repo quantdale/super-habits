@@ -41,10 +41,10 @@ historical evidence only.
   `app/index.tsx` shell/navigation; one screen wave per feature area
   (W5–W13); persistent visual-regression suite (W15); Android qualification
   (W16); final regression (W17).
-- W7 is the next feature milestone; W6.5 first closes the bounded W6
-  residuals: measured standard-row density, virtualized query/selection and
-  completed-heavy states, planning capture accent, and campaign reconciliation.
-  Preserve W6's flat anatomy, hierarchy, reference lock, and domain semantics.
+- W6.5 closed the bounded W6 residuals: measured standard-row density,
+  windowed query/selection/completed-heavy states, planning capture accent,
+  and campaign reconciliation. W7.1 is the next feature checkpoint, not
+  started. Preserve W6's flat anatomy/reference lock and domain semantics.
 
 ## Non-Goals
 
@@ -62,63 +62,51 @@ historical evidence only.
 
 ## Current Checkpoint
 
-- Current milestone: W6.5 — To Do density + HEAVY-state convergence; W7
-  Habits remains the next feature milestone, not started.
-- Completed: W0–W6 product work remains valid and checked. W6.5 preflight:
-  fetched all refs; HEAD and origin/main both
-  `adc4844b26e31788f8f97c557d7afd55bf196079`; branch
-  `fix/ui-v3-w6.5-convergence`; stash `pre-recovery-local-changes`,
-  `.tmp-ios36423379932/`, and historical W1–W6 evidence preserved.
-- In progress: implementation, audit, baseline triage and final qa:full PASS.
-  Final full gate:2559 unit/integration PASS (2 existing skips); browser243
-  PASS/56 existing skips/0 fail/0 flaky; all23 deterministic scenarios PASS.
-  Baseline12 TEST_BUGs repaired with strict contrast/geometry/SQL preserved;
-  red-first paint contracts pass. Extra impact gates all PASS (P0 25/25,
-  integration397/397 +2 existing skips, themes140/140, plans120/120).
-  Publication/hosted review remain. Standard55 / checkbox48 / More44;
-  audit60fresh/16inspected.
-- Important modified files: TodoItem, TodosScreen, QuickCaptureOverlay,
-  `tests/todos.listContract.test.ts`, `e2e/todos-convergence.spec.ts`,
-  `e2e/helpers/todoHeavy.ts`, `e2e/visual-audit.spec.ts`, fat-fingers and
-  three-months-in journeys, this plan; a11y paint helper+contract, simulation
-  toggle, planning-hub/weekly-review/workout-gym-v2/P5 harness drift repairs.
-  No data-layer/dependency or other product UI changes.
-- Last successful validation: historical W6 exact-head hosted run
-  `37583824728` at `adc4844b26e31788f8f97c557d7afd55bf196079` — npm ci,
-  typecheck, Deno/Supabase, lint, themes, OpenSpec, journey/quarantine parity,
-  versioned ExecPlans, unit/integration PASS (252 files passed / 1 skipped;
-  2553 tests passed / 3 skipped). W6 local evidence remains in the ledger.
-  W6.5 resume validator and qa:affected reconciled against Git. qa:fast PASS
-  (typecheck0, lint0/0, unit2162/2162, three parity/profile guards). Focused
-  convergence + fat-fingers rerun19/19 PASS; visual audit7/7 PASS. Reports in
-  `.cursor/playwright-output/w65-focused-rerun/` and `w65-visual/`.
-- Current failures: local QA None. Publication ENVIRONMENT: Git hook's
-  POSIX npx shim picked a downloaded extensionless stub instead of node.exe.
-  Ignored runtime probe now confirms Node22.23.2/npm10.9.4; no commit/push yet.
-  Plan validator rejected the quoted stub wording as a lifecycle token;
-  wording corrected.79 campaign files staged; foreign iOS evidence excluded.
-  First historical hosted failure is dependency audit:
-  `[UNDOCUMENTED] high braces GHSA-vfj7-8cjw-p6xm` and
-  `[UNDOCUMENTED] high node-forge GHSA-86w9-cpqp-85rv`. Both are known in
-  repository security records but UNDOCUMENTED TO THE AUDIT GATE. Audit is
-  not green; no overall certification. shell-quote/source-map-js resolved.
-- Relevant quarantines: standing VISUAL_AUDIT=1 opt-in lane only (known-gaps
-  entry 24); no new failure quarantine.
-- Blockers: no W6.5 product blocker. Known dependency-audit reds out of
-  scope. Native smoke/targeted preflight BLOCKED/ENVIRONMENT: connected
-  emulator-5554 is API35/x86_64, not required API36. No device state changed.
-  A supported target and clean same-commit checkout are required (preserved
-  iOS evidence must not be deleted). iOS qualification owner-deferred.
-- Exact next action: use an ignored Node22.exe/npm10 launch directory so
-  normal Git pre-commit hooks run (no skip flags), commit/push the79 selected
-  campaign files, then inspect exact-head hosted quality. Record closure only
-  after expected audit-only result; W7.1 next, without Habits implementation.
-- Remaining definition of done: standard row 48–56pt with checkbox >=48 and
-  More >=44; long text expands; all HEAVY states rendered/windowed and tested;
-  selection survives recycling; full-list drag and subset order guard hold;
-  planning capture accent reconciled; screenshots inspected; local gates PASS.
-  Remaining: publish normally; exact-head hosted CI reaches only braces/
-  node-forge audit red; then hand off W7.1 without Habits implementation.
+- Current milestone: W6.5 COMPLETE; W7.1 Habits is next, not started.
+- Completed: W0–W6 unchanged; W6.5 density/windowing/selection/order/capture
+  and rendered evidence closed. Standard55 / checkbox48 / More44; long/scaled
+  text expands; HEAVY query129ms, completed window23.60 fresh captures/16
+  visually inspected. No data/dependency/security policy or Habits changes.
+  Product/evidence commit `f0e02910aae56fe2902fae4ec1574e3aa7c502f8` published
+  normally on `fix/ui-v3-w6.5-convergence`, [PR58](https://github.com/quantdale/super-habits/pull/58)
+  OPEN (not merged).79 files; normal hooks ran. Stash, foreign iOS evidence
+  and historical captures preserved; owned baseline worktree removed.
+- In progress: campaign W7–W17 remain, with W7.1 not started. Closure is
+  documentation-only; normal publication and exact final-head CI are required
+  before handoff. Terminal evidence uses `w65-publication/final-ci.json` and
+  `final-ci-failed.log` (compare headSha with Git before relying on it).
+  Campaign Status stays ACTIVE, not overall certification.
+- Important modified files: committed TodoItem/TodosScreen/QuickCaptureOverlay,
+  list contracts/convergence/HEAVY helpers, fresh audit, bounded a11y/semantic
+  toggle/modal harness repairs. Closure records: this plan, tasks, defect ledger.
+- Last successful validation: qa:full local2559 PASS/2 existing skips,
+  browser243 PASS/56 existing gated skips/0 fail/0 flaky, deterministic23/23.
+  qa:fast unit2162, integration397 +2 skips, P0 25/25, themes140/140,
+  plans120/120, OpenSpec73/73 PASS. Exact product-head push CI37635421767
+  and PR CI37635650147 pass install/typecheck/Deno/lint/themes/OpenSpec/
+  parity/plans/unit+integration (hosted2558 PASS/3 existing skips), then
+  fail only the two known HIGH advisories. Local reports and hosted logs in
+  `.cursor/playwright-output/w65-final-full/`, `w65-final-impact-rerun/`,
+  `w65-publication/`; full scenario reports in simulation-output.
+- Current failures: hosted dependency audit remains red: braces
+  GHSA-vfj7-8cjw-p6xm and node-forge GHSA-86w9-cpqp-85rv, known in repository
+  records but UNDOCUMENTED TO THE AUDIT GATE. No local failures. Hosted E2E
+  is skipped behind quality/audit, not passed. No security waiver or bypass.
+- Relevant quarantines: existing opt-in/internal/remote-boundary gates only;
+  none added. Full browser56 existing skips; visual audit ran separately7/7.
+- Blockers: no W6.5 product blocker. Native smoke/targeted ENVIRONMENT:
+  preflight emulator-5554 API35/x86_64 versus required36; no device mutation.
+  Native/current-source largest-font qualification remains unverified; Android
+  full qualification W16, iOS owner-deferred. Require supported target plus
+  clean same-commit checkout; never delete preserved foreign evidence.
+- Exact next action: W7.1 — after normal fresh-session Git/CI reconciliation,
+  read HabitsScreen plus domain/data and the locked V3 rules, then rebuild
+  daily habit rows around one clear completion anatomy. Handoff only here:
+  do not implement Habits in this session.
+- Remaining definition of done: W6.5 behavior/evidence/local gates/product
+  publication/exact-product-head review verified; final documentation-head
+  publication/CI evidence must also be captured before handoff. No further
+  To Do implementation remains. Campaign W7–W17 stay unchecked.
 
 ## Progress
 
@@ -137,8 +125,9 @@ historical evidence only.
 - [x] W6 — To Do + Quick Capture (flat list anatomy; SYS-05/SUR-03/SUR-04/
       SUR-10/SYS-13 verified fixed; HEAVY/long-title/bulk/completed/empty
       states rendered and inspected)
-- [ ] W6.5 — bounded density / HEAVY virtualization / completed scalability /
-      campaign-record convergence
+- [x] W6.5 — bounded density / HEAVY virtualization / completed scalability /
+      campaign-record convergence (local gates PASS; hosted audit-only red;
+      native qualification limits explicit)
 - [ ] W7 — Habits
 - [ ] W8 — Focus
 - [ ] W9 — Workout
@@ -322,6 +311,22 @@ historical evidence only.
   HEAD remains adc4844; no commit/push.79 files staged (19 text/60 fresh
   images), foreign iOS unstaged, stash preserved. Use exact Node22.exe/npm10
   through ignored launch shims; normal hooks remain mandatory.
+- 2026-10-07 normal publication: f0e02910aae56fe2902fae4ec1574e3aa7c502f8
+  pushed on dedicated fix/ui-v3-w6.5-convergence;79 campaign files,60 fresh
+  images, no foreign/data/dependency paths staged. Node22.exe/npm10 launch
+  shims in ignored QA output resolved Git-hook ENVIRONMENT; lint-staged ran
+  normally. Plan validator's literal stub wording triggered a lifecycle-token
+  check; corrected wording then PASS. After commit, only foreign iOS dir is
+  untracked; original stash remains. Hosted exact-head review next.
+- 2026-10-07 W6.5 exact product-head hosted: push37635421767 and PR37635650147
+  at f0e02910aae56fe2902fae4ec1574e3aa7c502f8. Install, typecheck, Deno/
+  Supabase, lint, themes, OpenSpec, parity, plans, unit/integration PASS
+  (hosted253 files PASS/1 skipped,2558 tests PASS/3 existing skips). Only
+  failed step: audit; exact two undocumented HIGHs braces GHSA-vfj7-8cjw-p6xm
+  and node-forge GHSA-86w9-cpqp-85rv. Hosted E2E/nightly skipped, not green.
+  PR58 OPEN; normal branch publication, no merge/bypass/security change.
+  Source hashes verified against remote and CI metadata; evidence/logs in
+  `w65-publication/`. Final documentation head gets its own CI recheck.
 - W1: `VISUAL_AUDIT=1 npx playwright test e2e/visual-audit.spec.ts` — 5/5
   passes, 47 captures; manual inspection of 12+ key captures.
 - W3 (commit `8888084`): typecheck 0 errors; lint 0 errors/0 warnings;
@@ -362,7 +367,7 @@ historical evidence only.
 
 ## Changed Files / Areas
 
-Current W6.5 scope (earlier waves are committed history, not an active diff):
+W6.5 delivered areas (Git history establishes changes; closure diff is docs only):
 
 - `features/todos/TodoItem.tsx` — compact variable-height row; full targets.
 - `features/todos/TodosScreen.tsx` — windowed query/selection/history;
@@ -403,13 +408,22 @@ openspec/changes/frontend-v3-calm-momentum/execplan.md`, then
   `E2E_PORT=8083 VISUAL_AUDIT=1 VISUAL_AUDIT_OUTPUT_DIR=docs/ui-ux/v3-audit/w6.5
 npx playwright test e2e/visual-audit.spec.ts`. Inspect port owners first;
   never kill historical PID42924 or any unrelated process.
-- Resume point for W7: exact next action "W7.1 — rebuild daily habit rows
-  around one clear completion anatomy" in `features/habits/`.
+- Final documentation-only publication: use normal hooks, then inspect
+  `gh run list --commit $(git rev-parse HEAD) --workflow CI` and exact run
+  metadata/logs; do not substitute product-head evidence for a newer HEAD.
+- Resume point after W6.5 handoff: W7.1 — read `features/habits/HabitsScreen.tsx`
+  plus domain/data and the locked V3 rules, then rebuild daily habit rows around
+  one clear completion anatomy. This wave stops before implementing Habits.
 
 ## Outcomes & Retrospective
 
-- Campaign is mid-flight (W6.5 convergence; W6 complete; W7 next, not
-  started). Outcome so far: the
+- W6.5 COMPLETE and published for review in PR58; W7.1 next, not started.
+  Compact expanding rows and windowed HEAVY states preserve order/persistence;
+  baseline12 stale harness failures were repaired, not quarantined/relaxed.
+  Broad local checks and23 deterministic scenarios PASS; hosted quality passes
+  through unit/integration then audit-only red. Native coverage remains
+  blocked/deferred; no campaign or cross-platform certification claimed.
+- Campaign remains mid-flight (W7–W17). Outcome so far: the
   rendered product no longer shows slab headers, FAB-over-content
   collisions, the desktop wash arc, cramped six-tab navigation, the Today
   hierarchy problems, or the To Do dashboard-in-front-of-tasks pattern —
