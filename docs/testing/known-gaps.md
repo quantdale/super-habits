@@ -284,6 +284,14 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 **2026-09-24 post-settle battery addendum (second documented hard-ceiling excursion):** with the settle fix in place, standalone J8 measures `calories→todos=619` and CI runs `35987777309` + `35997911294` both pass the full persona on ubuntu — but a local full `qa:full` battery still recorded `calories→todos 884ms > 800ms` ceiling (fail) followed immediately by a green `qa:full` (234 e2e passed + deterministic 23/23, idle host between runs). This is the same documented host-load inflation that produced Wave-8's 910ms breach and the 861/1006ms CPU-loaded replays, now isolated to its residual component after the animation-backlog component was removed: the assertion correctly caught a real excursion; product code was unchanged all day and CDP shows no app hotspot. Classified `ENVIRONMENT` (intermittent, battery-load-dependent); guard, ceiling, floor all unchanged; re-run guidance stays "timing checks when host CPU < 60%".
 
+**2026-10-09 W7 addendum (same `ENVIRONMENT` class, two distinct D14 budgeted steps, Windows host, branch `frontend-v3-w7-habits` at tree `d29c67b`):** the fresh supported-runtime `qa:full` (`E2E_PORT=8083 TZ=Asia/Manila`, pinned node v22.23.2/npm 10.9.8) recorded 253 e2e passed / 64 skipped / 2 unexpected, deterministic simulation 23/23, Vitest 2571 passed / 2 skipped — with both unexpected results being D14 budgeted steps that were then re-verified standalone per this entry's closing path:
+
+- `e2e/habits-w7.spec.ts:452` (HEAVY history: 120 habits, 10 800 completion rows) measured `checkInMs` 1045.08 ms against the unchanged 800 ms ceiling in the full battery, and 1049.79 ms on the first isolated replay at host CPU ~95 %.
+- `e2e/journeys/three-months-in.spec.ts` (P2 persona, WM2.4 headroom floor) failed at three _different_ measurements across three runs on the identical tree — 435 ms of the 500 ms diary ceiling = 13.0 % headroom (full battery), `calories→todos` 854 ms > 800 ms (replay 1), and worst-switch 683 ms of 800 ms = 14.6 % headroom (replay 2, host CPU averaged 95.0 %).
+- A second isolated replay of the HEAVY step **passed in 7.2 s wall** while host CPU averaged 84.8 % (samples 72.7–97.7 %), and the same test passed in 5.7 s in the 22:45 corrective matrix on habits source last modified 22:30:59 — i.e. the same tree. The assertion therefore flips PASS/FAIL on unchanged product code purely with host load, which is the registered signature of this gap rather than a performance regression.
+
+Ambient load at the time was foreign and not reducible by this campaign: a QEMU Android emulator (`emulator-5554`, API 35/x86_64) plus an editor and a browser held the host at ~95 % CPU. No device mutation was performed. Guard, 800 ms ceiling, 15 % headroom floor, and every assertion remain **unchanged**; nothing was retried blindly, skipped, or quarantined. Classification: `ENVIRONMENT` (host load), matching the 861/884/910/1006 ms excursions already recorded above and the 1077/1369/1167 ms band in `.agent/execplans/parallel-headless-hardening.md`. Re-run guidance unchanged: standalone verification on a host below 60 % CPU, or CI.
+
 ### 16. Habit target-edit rule-history commit race under full-battery load — CLOSED (TEST_BUG)
 
 **Reason:** during the 2026-09-10 full `npm run e2e` battery, `e2e/habits.spec.ts`
@@ -572,16 +580,23 @@ in `.agent/execplans/integration-tinypool-ipc-channel-closed-v1.md`.
 ### 24. Frontend V3 rendered-truth audit harness — opt-in `VISUAL_AUDIT` lane
 
 **Gate site:** `e2e/visual-audit.spec.ts`
+**Gate site:** `e2e/habits-w7-audit.spec.ts`
 
 **Reason:** the campaign's visual-audit harness seeds TYPICAL fixtures and
 captures ~47 screenshots per run (`docs/ui-ux/v3-audit/`). It is gated with
 `test.skip(...)` unless `VISUAL_AUDIT=1`, so the standard battery and CI never
 run it: a full pass takes minutes and writes evidence artifacts that belong to
-the campaign ledger, not to a gating suite.
+the campaign ledger, not to a gating suite. The W7-specific instrument uses
+real-OPFS habit scenes and the same opt-in gate to capture 43 responsive/state
+images in `docs/ui-ux/v3-audit/w7/`. Its behavioral twin
+`e2e/habits-w7.spec.ts` runs unconditionally in the standard Chromium battery;
+no failed behavioral test is quarantined by this evidence-only gate.
 
 **Closing path:** opt in on demand — `VISUAL_AUDIT=1 npx playwright test
 e2e/visual-audit.spec.ts`. Screenshots land in `docs/ui-ux/v3-audit/` and are
 inspected against the Calm Momentum reference lock
 (`docs/ui-ux/14-v3-reference-ledger.md`). The curated `toHaveScreenshot`
 regression suite (campaign W15) is a separate deliverable and WILL run in the
-standard battery.
+standard battery. For W7 captures, run `VISUAL_AUDIT=1 npx playwright test
+e2e/habits-w7-audit.spec.ts --project=chromium` after a hermetic `build:e2e`;
+images require separate rendered inspection, not just a green instrument.
