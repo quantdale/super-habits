@@ -48,12 +48,10 @@ const MODES: { key: CaptureMode; label: string }[] = [
  * time, never a rainbow sheet. Planning destinations (Project/Goal) use the
  * theme accent because they have no section of their own.
  */
-const MODE_ACCENT: Record<CaptureMode, string> = {
+const MODE_ACCENT: Partial<Record<CaptureMode, string>> = {
   todo: SECTION_COLORS.todos,
   habit: SECTION_COLORS.habits,
   calorie: SECTION_COLORS.calories,
-  project: SECTION_COLORS.health,
-  goal: SECTION_COLORS.health,
   focus: SECTION_COLORS.focus,
 };
 
@@ -306,7 +304,7 @@ export function QuickCaptureOverlay() {
     pushRecent,
   ]);
 
-  const accent = MODE_ACCENT[mode];
+  const accent = MODE_ACCENT[mode] ?? tokens.accent;
 
   return (
     <View className="gap-3">
@@ -334,7 +332,7 @@ export function QuickCaptureOverlay() {
             key={m.key}
             label={m.label}
             active={mode === m.key}
-            color={MODE_ACCENT[m.key]}
+            color={MODE_ACCENT[m.key] ?? tokens.accent}
             onPress={() => switchMode(m.key)}
           />
         ))}

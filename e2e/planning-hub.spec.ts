@@ -118,7 +118,9 @@ test.describe('Planning Hub', () => {
     // --- Progress view: the disposition-ledger Weekly Review entry and the
     // insight cards (fed live by progress.data through real SQLite). ---
     await page.getByRole('tab', { name: 'Progress' }).click();
-    await expect(page.getByRole('button', { name: 'Open weekly review' })).toBeVisible({
+    await expect(
+      page.getByRole('dialog').getByRole('button', { name: 'Open weekly review' }),
+    ).toBeVisible({
       timeout: 20_000,
     });
     await expect(page.getByText(/^Last 7 days \(/)).toBeVisible({ timeout: 20_000 });

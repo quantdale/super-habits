@@ -2,6 +2,7 @@ import { test, type Page } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { seedFixture } from './helpers/seed';
 import { resetAll } from './helpers/reset';
+import { seedTodoHeavy, scrollTodoListTo, scrollTodoListToTop } from './helpers/todoHeavy';
 
 /**
  * Frontend V3 "Calm Momentum" — current-state visual audit harness.
@@ -21,7 +22,8 @@ import { resetAll } from './helpers/reset';
  * (campaign W15) so that early captures are never treated as "approved".
  */
 
-const OUT_DIR = 'docs/ui-ux/v3-audit';
+// A convergence wave writes a fresh evidence directory, preserving W1–W6.
+const OUT_DIR = process.env.VISUAL_AUDIT_OUTPUT_DIR ?? 'docs/ui-ux/v3-audit';
 
 const audit = test.extend({});
 test.skip(process.env.VISUAL_AUDIT !== '1', 'Set VISUAL_AUDIT=1 to run the visual audit');
@@ -298,13 +300,14 @@ audit.describe('V3 current-state audit', () => {
     await page.waitForTimeout(900);
 
     // Long title + rich metadata must not break row geometry (brief §25).
-    await page
-      .getByPlaceholder('Quick add', { exact: true })
-      .fill(
-        'Call the insurance company about the renewed policy premium schedule before the end of the quarterly billing window',
-      );
+    const longTitle =
+      'Call the insurance company about the renewed policy premium schedule before the end of the quarterly billing window';
+    await page.getByPlaceholder('Quick add', { exact: true }).fill(longTitle);
     await page.getByRole('button', { name: 'Add task', exact: true }).click();
-    await page.waitForTimeout(600);
+    await scrollTodoListTo(
+      page,
+      page.getByRole('button', { name: `Edit task: ${longTitle}`, exact: true }),
+    );
     await shot(page, '390-todos-long-title');
 
     // Bulk mode: distinct chrome, obvious selected count and exit (brief §21).
@@ -320,7 +323,7 @@ audit.describe('V3 current-state audit', () => {
     await completeBox.click();
     await page.waitForTimeout(700);
     await page.getByText('Show completed', { exact: true }).click();
-    await page.waitForTimeout(400);
+    await scrollTodoListTo(page, page.getByRole('checkbox', { name: /^Mark incomplete:/ }).first());
     await shot(page, '390-todos-completed-group');
 
     // HEAVY state: 200+ seeded todos through the virtualized list (brief §24).
@@ -331,5 +334,41 @@ audit.describe('V3 current-state audit', () => {
     await setViewport(page, DESKTOP);
     await page.waitForTimeout(600);
     await shot(page, '1280-todos-heavy');
+  });
+
+  audit('W6.5 HEAVY query/selection/history and planning capture accents', async ({ page }) => {
+    await setDark(page, false);
+    await setViewport(page, PHONE);
+    await goToTab(page, 'todos');
+    await seedTodoHeavy(page);
+    await page.getByRole('textbox', { name: 'Search tasks' }).fill('Task');
+    await shot(page, '390-todos-heavy-search');
+    await page.getByRole('button', { name: 'Clear search' }).click();
+    await page.getByRole('button', { name: 'Filter and sort', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'No date', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+    await shot(page, '390-todos-heavy-filter');
+    await page.getByRole('button', { name: 'Enter multi-select mode' }).click();
+    await page
+      .getByRole('checkbox', { name: /^Select / })
+      .first()
+      .click();
+    await shot(page, '390-todos-heavy-selection');
+    await page.getByRole('button', { name: 'Exit multi-select mode' }).click();
+    await page.getByRole('button', { name: /Filter and sort, 1 active/ }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Reset filters' }).click();
+    await page.getByRole('button', { name: 'Show completed tasks' }).click();
+    await scrollTodoListTo(
+      page,
+      page.getByRole('checkbox', { name: 'Mark incomplete: History task 160', exact: true }),
+    );
+    await shot(page, '390-todos-heavy-completed');
+    await scrollTodoListToTop(page);
+    await page.getByRole('button', { name: 'Hide completed tasks' }).click();
+    await openQuickCapture(page);
+    await page.getByRole('dialog').getByRole('button', { name: 'Project', exact: true }).click();
+    await shot(page, '390-quick-capture-project');
+    await page.getByRole('dialog').getByRole('button', { name: 'Goal', exact: true }).click();
+    await shot(page, '390-quick-capture-goal');
   });
 });

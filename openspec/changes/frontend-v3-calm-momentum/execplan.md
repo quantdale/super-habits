@@ -30,9 +30,10 @@ historical evidence only.
 - Design system doc `docs/ui-ux/13-calm-momentum-design-system.md` is the
   campaign authority; Pop doc `12` is superseded for visual rules.
 - W4 shipped the five-destination phone model (Health parents
-  Workout/Calories) with the capture slot replacing the floating FAB. A
-  non-campaign Expo dev server (the owner's `brain-training` project) occupies
-  host port 8081, so local render/audit lanes use `E2E_PORT=8083`.
+  Workout/Calories) with the capture slot replacing the floating FAB. At W4,
+  the owner's unrelated `brain-training` server occupied 8081. W6.5 preflight
+  found 8081/8082 free; continue isolated `E2E_PORT=8083` lanes and inspect
+  current owners rather than acting on historical PID 42924.
 
 ## Scope
 
@@ -40,10 +41,10 @@ historical evidence only.
   `app/index.tsx` shell/navigation; one screen wave per feature area
   (W5–W13); persistent visual-regression suite (W15); Android qualification
   (W16); final regression (W17).
-- W6 (current): To Do + Quick Capture reconstruction — flat list anatomy,
-  one authoritative summary, flat search/filter, single quick-add path,
-  focused quick-capture sheet with semantic type chips and one primary save,
-  plus long-title/bulk/completed/empty/HEAVY validation.
+- W6.5 closed the bounded W6 residuals: measured standard-row density,
+  windowed query/selection/completed-heavy states, planning capture accent,
+  and campaign reconciliation. W7.1 is the next feature checkpoint, not
+  started. Preserve W6's flat anatomy/reference lock and domain semantics.
 
 ## Non-Goals
 
@@ -61,71 +62,63 @@ historical evidence only.
 
 ## Current Checkpoint
 
-- Current milestone: W7 — Habits.
-- Completed: W6 — To Do + Quick Capture (flat 48–56pt list anatomy with
-  priority-ordered metadata line and row-disclosure editor; single
-  authoritative summary [SYS-05]; flat search + filter sheet [SUR-03]; one
-  quick-add path with composer behind "Add task with details" [SUR-04]; Quick
-  Capture input-first sheet with semantic section-hue type chips [SUR-10], one
-  primary save + X close [SYS-13], neutral priority chips; bulk mode,
-  completed group, empty/long-title/HEAVY states rendered and inspected;
-  defects SYS-05/SYS-13/SUR-03/SUR-04/SUR-10 VERIFIED-FIXED with re-render
-  evidence). W5 — Today reconstruction; W0–W4.5 complete as recorded below.
-- In progress: 7.1 — daily check-in list reconstruction (one row anatomy:
-  check ring, name, streak; kill the 5-treatment state pile [SUR-05]).
-- Important modified files: `features/todos/*` (TodosScreen, TodoItem,
-  TodoQuickCapture, TodoListToolbar, TodoBulkBar, todos.domain,
-  badges retired), `features/quick-capture/QuickCaptureOverlay.tsx`,
-  `tests/todos.domain.test.ts`, `e2e/` contract updates (todos, fat-fingers,
-  chain-reaction, three-months-in, boundary, navigation helper, journey
-  openers), `e2e/visual-audit.spec.ts` (W6 state captures),
-  `docs/ui-ux/14`, `docs/ui-ux/15`, `openspec/.../tasks.md`, this plan.
-- Last successful validation: W6 full local gate on the W6 tip — typecheck 0;
-  lint 0/0; validate:themes 140/140; openspec:validate 73/73;
-  agent:plan:validate:all PASS; npm test (unit + integration) 2554 passed /
-  2 skipped across 252 files (0 failures); Chromium: todos+theming+boundary
-  34 passed, command+chain-reaction×2 16 passed (+1 skipped), fat-fingers 13
-  passed, three-months-in HEAVY journey 7 passed with D14 ceilings measured
-  (cold start 641ms/5000ms, max switch 558ms/800ms at 200+ todos);
-  visual-audit 6/6 with W6 states inspected (long-title, bulk, completed,
-  HEAVY 390/1280, quick capture, dark, empty). Last exact-head hosted CI:
-  run 37528351498 at b7c6885 (scheduled confirmation 37533751566) — W6 tip
-  runs pending at publication.
-- Important modified files: `openspec/changes/frontend-v3-calm-momentum/execplan.md`,
-  `core/ui/Button.tsx`, `core/ui/Screen.tsx`, `core/theme/designTokens.ts`,
-  `features/health/HealthScreen.tsx`, `app/index.tsx`,
-  `openspec/changes/frontend-v3-calm-momentum/tasks.md`,
-  `docs/ui-ux/15-v3-defect-ledger.md`, plus W4.5 regression tests.
-- Last successful validation: exact-head hosted CI run 37528351498 at
-  b7c6885 (scheduled confirmation run 37533751566 on the same SHA) — npm ci,
-  typecheck, Deno/Supabase checks, lint, theme validation, OpenSpec,
-  journey/quarantine parity, versioned ExecPlans, and unit + integration
-  (252 files / 2545 tests passed, 1 file skipped, 3 tests skipped) all pass;
-  the dependency audit is the only hosted failure.
-- Current failures: hosted dependency audit reports exactly the two known,
-  documented high advisories — braces GHSA-vfj7-8cjw-p6xm (HIGH) and
-  node-forge GHSA-86w9-cpqp-85rv (HIGH); fix paths remain semver-major
-  framework upgrades (tailwindcss 4.x / expo 44) — NO MATERIAL UPSTREAM
-  CHANGE. shell-quote GHSA-pqg4-j6r4-53mv and source-map-js GHSA-68fv-2mgg-
-  jv7q remain RESOLVED (W5 security lane, semver-compatible overrides;
-  dev-tooling/build-time-only chains, no shipped bundle presence). The
-  pre-existing brace-expansion advisories are documented policy entries and
-  are not part of the undocumented count.
-- Relevant quarantines: only the standing `VISUAL_AUDIT=1` opt-in lane for
-  `e2e/visual-audit.spec.ts`, registered in `docs/testing/known-gaps.md`
-  entry 24; no failure quarantines registered for this campaign.
-- Blockers: none blocking W4.5 work; the braces/node-forge dependency-audit
-  reds remain known upstream failures after the quality gate (accepted,
-  campaign §36/§12 of this plan's proposal).
-- Exact next action: W7.1 — rebuild daily habit rows around one clear
-  completion anatomy (check ring + name + streak per row; kill the 5-treatment
-  state pile [SUR-05]) in `features/habits/`, keeping habit completion
-  semantics and `habit_completions` contracts untouched.
-- Remaining definition of done: every W7 condition holds — daily check-in
-  list is one row anatomy (SUR-05); quiet group headers with collapsed filter
-  stack (SYS-16); neutral progress fixed (SYS-12); analytics moved to a
-  per-habit progress sheet; rendered captures inspected; local validation
-  green; exact-head hosted frontend gates green before the known audit reds.
+- Current milestone: W6.5 COMPLETE; owner-requested main publication and
+  full report now in progress. W7.1 Habits remains next, not started.
+- Completed: W0–W6 unchanged; W6.5 density/windowing/selection/order/capture
+  and rendered evidence closed. Standard55 / checkbox48 / More44; long/scaled
+  text expands; HEAVY query129ms, completed window23.60 fresh captures/16
+  visually inspected. No data/dependency/security policy or Habits changes.
+  Product/evidence commit `f0e02910aae56fe2902fae4ec1574e3aa7c502f8` published
+  normally on `fix/ui-v3-w6.5-convergence`, [PR58](https://github.com/quantdale/super-habits/pull/58)
+  OPEN (not merged).79 files; normal hooks ran. Stash, foreign iOS evidence
+  and historical captures preserved; owned baseline worktree removed.
+- In progress: owner-directed publication of the completed W6.5 release
+  tree (bbd06a9 + PWA cache v8/doc pins + HEAVY bulk-settle race fix) to
+  main: normal merge of PR58 into unprotected main (no force/admin flags or
+  security-policy changes), exact-main hosted CI capture, then the final
+  documentation-head closure and full report. Foreign `.tmp-ios…` evidence
+  and the original stash stay preserved and unpublishable. Campaign Status
+  ACTIVE; no Habits and no overall certification.
+- Important modified files: committed TodoItem/TodosScreen/QuickCaptureOverlay,
+  list contracts/convergence/HEAVY helpers, fresh audit, bounded a11y/semantic
+  toggle/modal harness repairs. Main-publication follow-up: public/sw.js
+  generation only, CLAUDE.md /pre-pr cache pins, this plan. No data changes.
+- Last successful validation: release tree — qa:fast PASS (typecheck0,
+  lint0/0, unit2162/2162 + journey/quarantine/profile guards). Final-tree
+  qa:full phases all green: typecheck/lint/`npm test`2559 PASS/2 existing
+  skips/OpenSpec73/73; chromium159 PASS/14 existing opt-in skips (incl. all
+  six convergence tests re-passing in-suite after the race fix); pwa5/5 with
+  the v8 cache. Two full qa:full invocations were externally interrupted
+  mid-journeys (ENVIRONMENT, harness abort; zero failure artifacts), so every
+  remaining lane re-ran green as bounded commands: journeys76 PASS/42 existing
+  @sync skips with J8 D14 ceilings (cold615/5000, maxSwitch578/800,
+  diary304/500, picker184/500), simulation project3/3, deterministic library
+  23/23. Focused convergence6/6 with measured bulk settle (9065ms attached to
+  heavy-selection.json). Evidence `.cursor/playwright-output/w65-main/`.
+- Current failures: None local. Hosted dependency audit remains red only
+  for the known out-of-scope HIGH braces GHSA-vfj7-8cjw-p6xm and node-forge
+  GHSA-86w9-cpqp-85rv (UNDOCUMENTED TO THE AUDIT GATE). Hosted E2E is
+  skipped behind quality/audit, not passed. No security waiver, bypass, or
+  new quarantine. The two full-suite interruptions are ENVIRONMENT and are
+  covered by the bounded completion runs above.
+- Relevant quarantines: existing opt-in/internal/remote-boundary gates only;
+  none added. Full browser56 existing skips; visual audit ran separately7/7.
+- Blockers: no W6.5 product blocker. Native smoke/targeted ENVIRONMENT:
+  preflight emulator-5554 API35/x86_64 versus required36; no device mutation.
+  Native/current-source largest-font qualification remains unverified; Android
+  full qualification W16, iOS owner-deferred. Require supported target plus
+  clean same-commit checkout; never delete preserved foreign evidence.
+- Exact next action: merge the release branch into main with a normal
+  merge and push; capture exact-main CI for the merge commit into
+  `w65-main/final-ci.json`/`final-ci-failed.log`; then land the final
+  documentation-head closure commit carrying those run IDs, verify its CI
+  the same way, and hand off W7.1. Do not implement Habits here.
+- Remaining definition of done: all scoped W6.5 work (product, tests, fresh
+  audit captures, v8 cache generation + validated doc pins, race fix) reaches
+  main by normal merge; exact-main hosted results for the merge commit and
+  the final documentation head recorded truthfully; preservation/hygiene
+  verified; full report delivered. Known audit/native blockers stay explicit;
+  campaign W7–W17 unchecked.
 
 ## Progress
 
@@ -144,6 +137,11 @@ historical evidence only.
 - [x] W6 — To Do + Quick Capture (flat list anatomy; SYS-05/SUR-03/SUR-04/
       SUR-10/SYS-13 verified fixed; HEAVY/long-title/bulk/completed/empty
       states rendered and inspected)
+- [x] W6.5 — bounded density / HEAVY virtualization / completed scalability /
+      campaign-record convergence (local gates PASS; hosted audit-only red;
+      native qualification limits explicit)
+- [ ] Owner-requested W6.5 main publication — deploy-generation bump,
+      normal merge, exact-main CI and full report (2026-10-07)
 - [ ] W7 — Habits
 - [ ] W8 — Focus
 - [ ] W9 — Workout
@@ -158,6 +156,27 @@ historical evidence only.
 
 ## Surprises & Discoveries
 
+- W6.5 rendered baseline: plain 65px (48 checkbox + 16 padding + 1 separator),
+  metadata 65px, two-line title 65px, two-line + metadata 75px. More face 40px.
+  Regression deliberately failed before implementation; baseline screenshot,
+  geometry attachment and trace preserved in `.cursor/playwright-output/w65-baseline/`.
+- W6.5 broad12 failures reproduce on baseline; not product regressions.
+  Button paints solid face through an absolute sibling, not ancestor bg;
+  Weekly Review has page+modal entries; workout modal is measured mid-scale;
+  P5 expects pre-W6 Show-completed copy; simulation expects pre-W6 child1.
+  Baseline junction export puts WASM under assets/_superhabits/node_modules;
+  first attempt ENVIRONMENT before any UI. Aliased that exact generated asset
+  directory to the harness's standard path without changing source/bundle;
+  clean rerun reproduces all12. Isolated owned detached worktree
+  `../superhabits-w65-baseline` at adc4844; evidence preserved, clean owned
+  worktree and junction removed (shared node_modules untouched).
+- W6.5: Select all's count-only comparison fails if a query changes to another
+  same-sized result set. Use membership of visible ids, with selection state
+  retained in TodosScreen and passed through SectionList.extraData.
+- W6.5 release gate: a 160-row HEAVY bulk-complete settles5.1–9.1s (per-row
+  post-commit dispatch) — beyond the 5s UI expect default though well within
+  one user action. No D14-style ceiling covers bulk batch cost; the test now
+  measures it as evidence instead of absorbing it into an assertion timeout.
 - Security lane (W5, bounded): both NEW advisories had patched releases
   available and parent ranges permitting semver-compatible overrides —
   the repo's existing overrides block already carried a shell-quote pin
@@ -171,9 +190,10 @@ historical evidence only.
   bugs: every primary screen reproduced the same five defects patterns.
 - `canvasTint` rendered as a stray quarter-disc arc at the 900px rail
   breakpoint — removed entirely rather than patched.
-- The host port 8081 is occupied by the owner's unrelated Expo dev server
-  (brain-training, PID 42924); audit lanes must use `E2E_PORT=8083` and must
-  never kill that process.
+- At W4, port8081 was occupied by unrelated brain-training (then PID42924).
+  W6.5 preflight/final hygiene find8081/8082 free; owned8083 also released.
+  Historical PID is not present ownership evidence; never kill unrelated
+  processes. Continue isolated finite `E2E_PORT=8083` lanes.
 - The repository enforces ExecPlan schema as a hosted quality gate
   (`Validate versioned ExecPlans`), so plan drift is a build failure, not
   paperwork — discovered when run 37479209183 failed before the known
@@ -199,9 +219,179 @@ historical evidence only.
   action on desktop; floating FAB removed everywhere (SYS-04).
 - D7: W4.5 is a convergence pass — Calm Momentum stands unless rendered
   evidence disproves a specific decision.
+- D8 (W6.5): two explicit list paths, not a fragile generic drag abstraction.
+  Collapsed normal/manual uses pending-only DraggableFlatList; query/filter,
+  selection and expanded completed history use one SectionList (window5,
+  initial/batch12, variable height). Expanded history retains pending order
+  but disables drag until collapsed; no nested virtualized lists.
+- D9 (W6.5): planning capture uses tokens.accent (no borrowed Health identity).
+  Preserve destination section hues and the W6 reference lock. New captures
+  go to `docs/ui-ux/v3-audit/w6.5/`, leaving earlier audit files untouched.
+- D10 (main publication): owner authorizes normal PR58 merge despite known
+  audit-only red. Main has no protection/rules; do not use admin/force or
+  weaken audit. Actual PWA generation is static; bump v7→v8 for shell-changing
+  deployment and keep asserted guidance pins aligned. Cache strategy unchanged.
+- D11 (2026-10-08) — HEAVY bulk-complete settle is batch-scoped — the
+  160-row durable batch (updates + outbox enqueue + per-row post-commit
+  reminder/linked-action dispatch) measures5.1s under suite load (trace
+  `w65-main/trace-analysis/`) and9065ms focused. The toolbar-restore expect
+  uses one documented20s batch window with the measured settle attached;
+  every row/count/SQL oracle and the geometry/timing ceilings stay exact.
+  This widens only the settle synchronization for a known heavy batch — it
+  creates no bulk-performance acceptance threshold and no D14 ceiling.
 
 ## Validation Ledger
 
+- 2026-10-08 W6.5 HEAVY bulk-settle race (TEST_BUG): the release-gate run
+  failed `HEAVY selection survives…` at toolbar restore while the failure
+  screenshot showed correct product state (377 completed). Trace proof: the
+  160-row batch settles5.0–5.1s under suite load, just past the 5s UI
+  default. Repaired with one batch-scoped settle window + attached
+  measurement (`bulkSettleMs`, 9065ms focused); no oracle weakened. Focused
+  convergence6/6 PASS, and the same test re-passed in-suite (21.1s) in the
+  next full run. Trace preserved in `w65-main/trace-analysis/`.
+- 2026-10-08 release-tree final gates: qa:fast PASS (typecheck0, lint0/0,
+  unit2162/2162, journey/quarantine/profile guards). qa:full final-tree
+  phases: typecheck/lint/npm test2559 PASS/2 existing skips, OpenSpec73/73,
+  chromium159 PASS/14 existing opt-in skips, pwa5/5 (v8 freshness), then two
+  invocations externally interrupted mid-journeys (ENVIRONMENT, harness
+  abort, exit1073807364; zero failure artifacts from either). Bounded
+  completion runs all PASS on the same tree: journeys76/42 existing @sync
+  skips + J8 D14 (cold615/5000, maxSwitch578/800, diary304/500,
+  picker184/500), simulation project3/3, deterministic library23/23.
+  Deploy preparation: PWA CACHE_VERSION v7→v8 with the two derived guidance
+  pins (tests/agentDocConsistency derives them from source).
+- 2026-10-07 main-release impact: explicit four follow-up paths resolve
+  qa:fast +qa:full; no foreign iOS paths treated as task changes. SW diff is
+  one generation literal; no handler/strategy edits. Active diagnostics has
+  two pre-existing auxiliary AST findings at unchanged SW lines95/140
+  (async map's implicit undefined return, URL(Request.url) without catch),
+  not introduced by v8; repo lint/TypeScript and rendered gates decide this
+  release. CLAUDE/pre-pr Markdown probe unavailable; Prettier/gates still run.
+- 2026-10-07 final W6.5 documentation head bbd06a9: push37639196888 and
+  PR37639207906 PASS through unit/integration (2558/3 existing skips), fail
+  only the same two audit HIGHs; E2E skipped. Local doc-only fast2162 and
+  focused agent-plan9/9, plans120/120 PASS. Owner now explicitly requests
+  promotion to main. Fresh fetch: mainadc4844, PR58 headbbd06a9 mergeable;
+  main unprotected with no active branch rules. Original stash object
+  c35e281d740df1e367c1be0f38383237ca080239 and foreign iOS dir preserved.
+  public/sw.js still has static v7, not asset-derived: v8 deploy bump needed,
+  plus CLAUDE/pre-pr source-consistency pins. New release validation follows.
+- W6 historical exact-head hosted: `37583824728` at
+  `adc4844b26e31788f8f97c557d7afd55bf196079` — PASS through unit/integration
+  (252 files passed / 1 skipped; 2553 tests passed / 3 skipped). First failure
+  dependency audit: exactly braces GHSA-vfj7-8cjw-p6xm and node-forge
+  GHSA-86w9-cpqp-85rv HIGH, known in repo but undocumented to the audit gate.
+- W6.5 preflight: baseline equals expected remote main; resume validation
+  PASS; web:hygiene 8081/8082 free. No security files changed.
+- W6.5 focused unit/integration: typecheck PASS; Todo domain/data/list-contract,
+  inline-submit and real-SQLite bulk suites 73/73 PASS. Active LSP reported
+  no diagnostics but all four checks inconclusive; tsc is the confirmed gate.
+- W6.5 baseline Chromium density repro: FAIL (PRODUCT_BUG) at 65px >56;
+  four geometry samples attached and preserved before implementing repair.
+- W6.5 focused rendered: standard55 / metadata55 / two-line55 / two-line+meta65
+  px; checkbox48 and More44; browser large-type expansion PASS. Expanded
+  HEAVY: 520 seeded, 311 open /217 completed after recurrence, 246 No-date
+  results, query117ms, completed window23 near end; all deep scroll paths
+  pass. Bulk priority/project/delete and full-order drag row oracles PASS.
+- W6.5 targeted battery first pass: 56 PASS /2 FAIL /6 not run. Failures
+  preserved under `.cursor/playwright-output/w65-chromium/`: density asserted
+  floating rect47.999984px as <48 (TEST_BUG; round sub-millipixel noise only);
+  fat-fingers stale-edit swipe bound a completion-settle copy that unmounted
+  (TEST_BUG; await the existing 0-open atom, not a timeout). J8 strict D14
+  PASS: cold685/5000, maxswitch599/800, diary419/500, picker224/500ms.
+  New selection-test authoring failures were TEST_BUGs: initial batch pinning,
+  Space versus supported Enter activation, and 201–209 being nine fixture ids.
+- 2026-10-07 W6.5: qa:fast PASS (typecheck0, lint0/0, unit2162 across173 files,
+  journey/quarantine/profile parity). Focused convergence+fat-fingers19/19
+  PASS, geometry55/55/55/65; query152ms, completed window23. Fresh audit7/7
+  PASS, 60captures in `docs/ui-ux/v3-audit/w6.5/`; 16 affected captures read
+  visually (phone populated/long/bulk/empty, heavy normal/query/filter/
+  selection/history, completed boundary, dark, 360/768/1280, Project/Goal).
+  Historical W1–W6 files unchanged. Browser large-type proxy PASS; largest
+  native OS font still unverified, not claimed. Earlier local gates used
+  Node22.23.2 with host npm11.4.2; final broad gate pins npm10.9.4 too.
+- 2026-10-07 W6.5 qa:full first invocation: typecheck/lint PASS, npm test253
+  files passed/1 skipped, 2559 tests passed/2 skipped, OpenSpec73/73 PASS.
+  Build then aborted EUSAGE before Expo: outer npx -c exported
+  npm_config_call, npm10 rejects inherited --call plus positional Expo args.
+  ENVIRONMENT, no repo-tooling change; precise probe confirmed call=true and
+  unsetting only that flag made nested `npx expo --version` PASS (55.0.36).
+  Original log `.cursor/playwright-output/w65-full/command.log`; its report
+  JSON is the earlier focused report, not full-suite evidence.
+- 2026-10-07 W6.5 native smoke (2 expected flows) /targeted (11 flows):
+  both EXIT2, BLOCKED/ENVIRONMENT, API35 target versus required36. Reports
+  `simulation-output/native/native-android-smoke-2026-10-07T111110202Z.json`
+  and `native-android-persistence-2026-10-07T111117918Z.json`. No emulator
+  started/stopped, no APK provisioning/reset. iOS NOT RUN (owner-deferred).
+- 2026-10-07 qa:full clean launcher: typecheck/lint, unit+integration2559
+  passed/2 skipped, OpenSpec73/73, hermetic export PASS. Full web227 passed,
+  12 failed,55 skipped,3 not run (24.7min); no retries. Evidence preserved in
+  `.cursor/playwright-output/w65-full-rerun/` plus simulation run_muy1libm_
+  zsv988hk and run_muy1lpbq_3khghp7p. All six new convergence tests and J8
+  PASS (cold614/5000, maxswitch574/800, diary414/500, picker174/500ms).
+  Full simulation-library phase not reached. Extra theme140/140 and
+  versioned ExecPlans PASS. Broad failures are not quarantined or waived.
+- 2026-10-07 full-gate baseline differential: unchanged adc4844, hermetic
+  export, same Node/npm/8083,21 selected tests:6 PASS/12 FAIL/3 not run,
+  identical failure signatures. `.cursor/playwright-output/w65-full-baseline/`
+  holds report/log/screenshots/traces/simulation; first WASM-path ENVIRONMENT
+  attempt separately in `w65-baseline-infra/`, not product evidence. QA drift
+  repairs retain4.5:1/3:1 contrast,40px chips, completed/outbox SQL oracles.
+- 2026-10-07 bounded QA-drift corrections:22 PASS/1 existing remote-boundary
+  skip,0 flaky; all12 original reproductions pass, SQLite assertions intact.
+  Paint contracts first2 FAIL (false-positive and false-negative), then2 PASS;
+  no new exclusions/relaxed thresholds. Workout trial-click waits for stable
+  actionability. Simulation activates semantic checkbox and awaits old state
+  disappearing (removed400ms settle). Typecheck PASS; focused Prettier
+  flagged2 formatting-only files, correction required before broad rerun.
+  Evidence `.cursor/playwright-output/w65-a11y-helper-red/`, `w65-qa-drift/`.
+- 2026-10-07 FINAL qa:full PASS (Node22.23.2/npm10.9.4; inherited call cleared;
+  hermetic8083): typecheck0, lint0/0,253 test files passed/1 existing skip;
+  2559 tests passed/2 existing skips; OpenSpec73/73; hermetic exports PASS.
+  Browser243 PASS/56 existing skips/0 FAIL/0 flaky (chromium159, journeys76,
+  pwa5, simulation3); six convergence tests PASS, measured55/55/55/65,
+  checkbox48/More44, search129ms, completed window23. Full deterministic
+  library23/23 PASS, including132-step soak (one run, not a new resource
+  certification). `.cursor/playwright-output/w65-final-full/` preserves
+  report/log/artifacts; scenario reports in simulation-output (soak
+  run_muy4hsqv_rjxcah8i; smoke run_muy4ljgh_wzxzb1uk). All56 skips are existing
+  gates (visual opt-in7, command-internal7, journeys42); no skipped regressions.
+  Active LSP: no TS errors, existing deprecation hints;5 checks unconfirmed,
+  generic auxiliary style warnings are not repo policy. tsc confirms types.
+  Post-run hygiene8081/8082 free;8083 has no listener. Owned baseline removed
+  after evidence capture; stash/foreign iOS/historical captures untouched.
+- 2026-10-07 final extra impact gates PASS: qa:fast (typecheck0/lint0/0,
+  unit2162 across173 files, journey/quarantine/profile guards); qa:integration
+  397 PASS/2 existing disposable-cloud skips (80 files PASS/1 skipped);
+  qa:journeys hermetic rebuild + P0 25/25 PASS,0 skips/0 flaky; themes140/140;
+  versioned plans120/120. Evidence `w65-final-impact-rerun/` (P0 report/log).
+  Prior quoted-&& launcher SyntaxError occurred before any gate; log retained
+  in `w65-final-impact/launcher-error.log`, its copied report is explicitly
+  previous-full-not-p0-report.json, not claimed as P0 evidence. Separate
+  supported-runtime spawns resolved it. Final hygiene8081/8082/8083 free.
+- 2026-10-07 publication first attempt ENVIRONMENT: normal Git pre-commit
+  could not launch npx because npm's POSIX shim selects adjacent `node`, which
+  the Windows downloaded node package marks as an intentional blank file.
+  HEAD remains adc4844; no commit/push.79 files staged (19 text/60 fresh
+  images), foreign iOS unstaged, stash preserved. Use exact Node22.exe/npm10
+  through ignored launch shims; normal hooks remain mandatory.
+- 2026-10-07 normal publication: f0e02910aae56fe2902fae4ec1574e3aa7c502f8
+  pushed on dedicated fix/ui-v3-w6.5-convergence;79 campaign files,60 fresh
+  images, no foreign/data/dependency paths staged. Node22.exe/npm10 launch
+  shims in ignored QA output resolved Git-hook ENVIRONMENT; lint-staged ran
+  normally. Plan validator's literal stub wording triggered a lifecycle-token
+  check; corrected wording then PASS. After commit, only foreign iOS dir is
+  untracked; original stash remains. Hosted exact-head review next.
+- 2026-10-07 W6.5 exact product-head hosted: push37635421767 and PR37635650147
+  at f0e02910aae56fe2902fae4ec1574e3aa7c502f8. Install, typecheck, Deno/
+  Supabase, lint, themes, OpenSpec, parity, plans, unit/integration PASS
+  (hosted253 files PASS/1 skipped,2558 tests PASS/3 existing skips). Only
+  failed step: audit; exact two undocumented HIGHs braces GHSA-vfj7-8cjw-p6xm
+  and node-forge GHSA-86w9-cpqp-85rv. Hosted E2E/nightly skipped, not green.
+  PR58 OPEN; normal branch publication, no merge/bypass/security change.
+  Source hashes verified against remote and CI metadata; evidence/logs in
+  `w65-publication/`. Final documentation head gets its own CI recheck.
 - W1: `VISUAL_AUDIT=1 npx playwright test e2e/visual-audit.spec.ts` — 5/5
   passes, 47 captures; manual inspection of 12+ key captures.
 - W3 (commit `8888084`): typecheck 0 errors; lint 0 errors/0 warnings;
@@ -242,30 +432,34 @@ historical evidence only.
 
 ## Changed Files / Areas
 
-- `docs/ui-ux/13-calm-momentum-design-system.md` — V3 design authority (new)
-- `docs/ui-ux/14-v3-reference-ledger.md` — Refero decisions + lock (new)
-- `docs/ui-ux/15-v3-defect-ledger.md` — 33 defects with status tracking (new)
-- `docs/ui-ux/v3-audit/` — 47+ audit captures (evidence, committed)
-- `docs/testing/known-gaps.md` — entry 24 registers the VISUAL_AUDIT lane
-- `e2e/visual-audit.spec.ts` — permanent rendered-truth harness (new)
-- `core/theme/designTokens.ts`, `core/theme/tokens.ts`,
-  `core/theme/createTheme.ts` — V3 values; canvasTint removed
-- `core/ui/Screen.tsx`, `core/ui/Button.tsx`, `core/ui/Card.tsx`,
-  `core/ui/PageHeader.tsx`, `core/ui/StatBlock.tsx`, `core/ui/PillChip.tsx`,
-  `core/ui/SegmentedControl.tsx`, `core/ui/EmptyStateCard.tsx` — V3 rebuilds
-- `core/ui/SectionLabel.tsx` — new primitive; `core/ui/TactileButton.tsx`
-  deleted (absorbed by Button celebrate)
-- `features/overview/OverviewScreen.tsx` — wash removal
-- `features/gamification/RewardCelebrationOverlay.tsx` — Button celebrate
-- `app/index.tsx` — five-destination shell + capture slot
-- `features/health/HealthScreen.tsx` — new Health parent surface
-- `core/providers/navigationContext.ts`, `core/providers/NavigationProvider.tsx`
-  — `health` AppSection wiring
-- `constants/sectionColors.ts` — health accent (all 14 themes derive)
-- `features/command/commandCenterConfig.ts` — health launch context
-- `e2e/helpers/navigation.ts`, `e2e/helpers/oracles.ts` — Health routing
-- `tests/journeyLabelParity.test.ts` — 5-label rail pin
-- `openspec/changes/frontend-v3-calm-momentum/*` — campaign plan artifacts
+W6.5 delivered areas (Git history establishes changes; closure diff is docs only):
+
+- `features/todos/TodoItem.tsx` — compact variable-height row; full targets.
+- `features/todos/TodosScreen.tsx` — windowed query/selection/history;
+  screen-owned selection, full-order drag guards; existing data APIs only.
+- `features/quick-capture/QuickCaptureOverlay.tsx` — planning theme accent.
+- `tests/todos.listContract.test.ts` — narrow architecture/target contracts.
+- `e2e/helpers/todoHeavy.ts`, `e2e/todos-convergence.spec.ts` — volume, scroll,
+  geometry, recycling and durable mutation regression.
+- `e2e/journeys/three-months-in.spec.ts` — scroll to windowed history oracle.
+- `e2e/journeys/fat-fingers.spec.ts` — await completion-settle removal before
+  swiping history (same one-row/no-duplicate assertions).
+- `e2e/visual-audit.spec.ts`, `docs/ui-ux/v3-audit/w6.5/` — fresh evidence
+  routing and expanded HEAVY/capture coverage. Earlier images preserved.
+- `e2e/helpers/a11yAudit.ts`, `e2e/a11y-audit-contract.spec.ts` — measure
+  actual solid sibling paint and guard both contrast false positives/negatives.
+- `e2e/planning-hub.spec.ts`, `e2e/weekly-review.spec.ts`,
+  `e2e/workout-gym-v2.spec.ts`, `e2e/journeys/the-commute.spec.ts`,
+  `simulation/runner/actions.ts` — baseline-reproduced harness drift repair;
+  modal scope/stability and semantic todo controls, unchanged strict oracles.
+- `public/sw.js`, `CLAUDE.md`, `.cursor/commands/pre-pr.md` — main-deploy
+  cache-generation bump and its existing source-truth guidance pins only.
+- `docs/ui-ux/15-v3-defect-ledger.md` — bounded convergence verification note.
+- `openspec/changes/frontend-v3-calm-momentum/tasks.md`,
+  `openspec/changes/frontend-v3-calm-momentum/execplan.md` — living scope,
+  decisions, truthful validation and next milestone.
+- Preserved foreign state: `.tmp-ios36423379932/` and existing stash. They
+  are not campaign changes and must not be staged, cleaned or quarantined.
 
 ## Recovery / Resume Instructions
 
@@ -278,14 +472,28 @@ openspec/changes/frontend-v3-calm-momentum/execplan.md`, then
   `npm run agent:plan:validate:all` locally, fix the named plan sections
   against `scripts/agent-execplan.mjs` aliases, re-run until PASS.
 - Local render/audit lanes: `npm run build:e2e` then
-  `E2E_PORT=8083 VISUAL_AUDIT=1 npx playwright test e2e/visual-audit.spec.ts`
-  (8081 is the owner's unrelated dev server — never kill PID-tree 42924).
-- Resume point for W7: exact next action "W7.1 — rebuild daily habit rows
-  around one clear completion anatomy" in `features/habits/`.
+  `E2E_PORT=8083 VISUAL_AUDIT=1 VISUAL_AUDIT_OUTPUT_DIR=docs/ui-ux/v3-audit/w6.5
+npx playwright test e2e/visual-audit.spec.ts`. Inspect port owners first;
+  never kill historical PID42924 or any unrelated process.
+- Final documentation-only publication: use normal hooks, then inspect
+  `gh run list --commit $(git rev-parse HEAD) --workflow CI` and exact run
+  metadata/logs; do not substitute product-head evidence for a newer HEAD.
+  Exact-main CI capture for the merge commit and the final documentation
+  head lives at `w65-main/final-ci*.json`/`final-ci*-failed.log`; compare
+  each `headSha` with Git before relying on it.
+- Resume point after W6.5 handoff: W7.1 — read `features/habits/HabitsScreen.tsx`
+  plus domain/data and the locked V3 rules, then rebuild daily habit rows around
+  one clear completion anatomy. This wave stops before implementing Habits.
 
 ## Outcomes & Retrospective
 
-- Campaign is mid-flight (W7 active; W6 complete). Outcome so far: the
+- W6.5 COMPLETE and published for review in PR58; W7.1 next, not started.
+  Compact expanding rows and windowed HEAVY states preserve order/persistence;
+  baseline12 stale harness failures were repaired, not quarantined/relaxed.
+  Broad local checks and23 deterministic scenarios PASS; hosted quality passes
+  through unit/integration then audit-only red. Native coverage remains
+  blocked/deferred; no campaign or cross-platform certification claimed.
+- Campaign remains mid-flight (W7–W17). Outcome so far: the
   rendered product no longer shows slab headers, FAB-over-content
   collisions, the desktop wash arc, cramped six-tab navigation, the Today
   hierarchy problems, or the To Do dashboard-in-front-of-tasks pattern —

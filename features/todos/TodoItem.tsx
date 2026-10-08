@@ -38,7 +38,7 @@ function RowMoreButton({ title, onPress }: { title: string; onPress: () => void 
       accessibilityRole="button"
       accessibilityLabel={`More actions for ${title}`}
       hitSlop={6}
-      className="h-10 w-10 items-center justify-center rounded-full"
+      className="h-11 w-11 items-center justify-center rounded-full"
     >
       <MaterialIcons name="more-vert" size={20} color={tokens.iconMuted} />
     </Pressable>
@@ -236,7 +236,7 @@ export const TodoItem = memo(function TodoItem({
               flexDirection: 'row',
               alignItems: 'center',
               gap: 4,
-              paddingVertical: 8,
+              paddingVertical: 3,
               paddingLeft: 2,
               paddingRight: 2,
               backgroundColor: isActive ? tokens.surfaceElevated : 'transparent',
@@ -249,7 +249,6 @@ export const TodoItem = memo(function TodoItem({
             <View className="min-w-0 flex-1">
               <Text
                 variant="bodyMd"
-                numberOfLines={2}
                 className={done ? 'line-through' : ''}
                 style={{ color: titleColor }}
               >

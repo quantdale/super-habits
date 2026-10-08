@@ -81,3 +81,57 @@ Counts: 20 systemic + 13 per-surface = 33 defects logged (S1 ×4, S2 ×22, S3 ×
 - SYS-17 To Do portion: rendered typography is V3 roles only (titleLg header,
   bodyMd rows, caption metadata); the Pop-era 25–30px/900 titles are gone from
   this surface.
+
+## W6.5 convergence verification (2026-10-07)
+
+W6's flat anatomy, hierarchy and existing closures remain valid. This bounded
+pass repairs measured residual density/scalability, not a redesign restart.
+Fresh evidence is in `docs/ui-ux/v3-audit/w6.5/`; earlier W1–W6 images are
+untouched.
+
+- **Density VERIFIED-FIXED:** baseline standard row65px (48px checkbox +16px
+  padding +1px separator), metadata65, long title+metadata75; More40. Now
+  standard55 / metadata55 / two-line title55 / two-line+metadata65, checkbox48
+  and actual More44. No fixed row height or title clamp; long strings wrap.
+  Browser large-type proxy expands without clipping. Native largest-font
+  coverage is unverified, not implied by this web measurement.
+- **HEAVY windowing VERIFIED-FIXED:** query/filter and bulk selection no
+  longer eagerly map rows inside ScrollViews; expanded history is SectionList
+  item data, not a mapped footer. Manual collapsed pending mode retains
+  DraggableFlatList. All modes own bounded scrolling, support deep scroll,
+  and mount fewer rows than the dataset. Extended fixture520 seeded;
+  observed311 open /217 completed, No-date246, query152ms against500ms ceiling,
+  completed window23 near History task160. Dates/recurrence may change counts.
+- **Selection/order semantics verified:** selected middle id unmounts/remounts
+  checked; Enter toggles with focus retained; visible-id Select all survives
+  equal-sized query changes. SQL oracles verify bulk complete, priority,
+  project assignment, cancelled/confirmed soft delete and durable delete
+  outbox. Query/filter leaves global sort_order unchanged; full-list drag
+  after history collapse persists the expected order. Non-manual/subset/
+  duplicate-id writes are explicitly rejected in the screen guard.
+- **Planning capture VERIFIED-FIXED:** Project/Goal chip and primary action
+  use `tokens.accent`, not Health hue. Destination section hues are preserved.
+- Audit7/7 PASS, 60fresh captures. Sixteen affected captures visually inspected:
+  populated, long-title, bulk, empty, HEAVY normal/query/filter/selection/deep
+  history, completed boundary, dark, 360/768/1280, Project and Goal. No clipping
+  or navigation collision introduced; completed state stays muted + check.
+  Broad gates/publication evidence lives in the task ExecPlan; this note is
+  not overall campaign or cross-platform certification.
+- **Bounded closure:** qa:full PASS (2559 local unit/integration tests,243
+  browser checks,23 deterministic scenarios; existing skips explicit). Final
+  HEAVY query129ms; standard geometry55/55/55/65 and full targets unchanged.
+  Twelve baseline-reproduced stale QA contracts repaired without weakening
+  contrast/geometry/SQLite oracles. Product/evidence f0e0291 published normally
+  in PR58; exact-head hosted push37635421767 /PR37635650147 pass through
+  unit/integration, then fail only the known braces/node-forge audit. Hosted
+  E2E skipped behind audit, not passed. Final documentation head rechecked
+  separately. Native API35-vs36 preflight BLOCKED, Android full W16, iOS
+  owner-deferred; browser font scaling is not native largest-font coverage.
+  W7.1 next, not implemented.
+- **Release-gate repair:** the HEAVY 160-row bulk-complete settles ~5.1–9.1s
+  (per-row post-commit dispatch) past the 5s UI expect default — reproduced
+  from the failure trace with the product state already correct. The
+  convergence test now uses one documented batch-scoped settle window and
+  attaches the measured `bulkSettleMs`; geometry, row-count and SQL oracles
+  unchanged. PWA cache generation is v8 for this shell deploy, with its two
+  derived guidance pins updated (source-derived, test-checked).

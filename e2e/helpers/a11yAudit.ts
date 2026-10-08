@@ -38,7 +38,32 @@ export const auditPage = () => {
     let cur: Element | null = el;
     let acc: { r: number; g: number; b: number; a: number } | null = null;
     while (cur && cur !== document.documentElement) {
-      const cs2 = getComputedStyle(cur);
+      // Solid Button faces are full-size absolute sibling layers. Resolve
+      // their real paint instead of treating the transparent control as the
+      // canvas. Unlike the existing gradient exemption, these stay audited.
+      let paint: Element = cur;
+      if (cur.matches('button, [role="button"]')) {
+        const bounds = cur.getBoundingClientRect();
+        const face = Array.from(cur.children).find((child) => {
+          const style = getComputedStyle(child);
+          const color = parse(style.backgroundColor);
+          const rect = child.getBoundingClientRect();
+          return (
+            style.position === 'absolute' &&
+            style.display !== 'none' &&
+            style.visibility !== 'hidden' &&
+            !(child.textContent ?? '').trim() &&
+            color != null &&
+            color.a > 0 &&
+            rect.left <= bounds.left + 0.5 &&
+            rect.top <= bounds.top + 0.5 &&
+            rect.right >= bounds.right - 0.5 &&
+            rect.bottom >= bounds.bottom - 0.5
+          );
+        });
+        if (face) paint = face;
+      }
+      const cs2 = getComputedStyle(paint);
       // Gradient-backed surfaces paint with `background-image`; use the first
       // stop so gradient hero/button faces are measured, not skipped.
       const img = cs2.backgroundImage;

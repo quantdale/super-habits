@@ -226,7 +226,9 @@ defineJourney({
         // Completion moves the row into the collapsed "completed" set; the
         // deterministic immediate-UI signal is the reveal toggle appearing
         // (completed tasks render only once the user expands them).
-        await expect(page.getByText(/Show completed \(\d+\)/).first()).toBeVisible();
+        await expect(
+          page.getByRole('button', { name: 'Show completed tasks', exact: true }),
+        ).toBeVisible();
 
         // habits: create then delete — must dedupe to one delete record.
         await switchSection(page, 'habits');
@@ -334,10 +336,7 @@ defineJourney({
         await expect(page.getByText('Commute ride').first()).toBeVisible();
         // Completed todos are collapsed behind the reveal toggle on a fresh
         // mount; expand it to confirm the completed row came back too.
-        await page
-          .getByText(/Show completed \(\d+\)/)
-          .first()
-          .click();
+        await page.getByRole('button', { name: 'Show completed tasks', exact: true }).click();
         await expect(page.getByText('Draft reply').first()).toBeVisible();
         await switchSection(page, 'habits');
         await expect(page.getByText('Stretch').first()).not.toBeVisible();
