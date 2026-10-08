@@ -10,6 +10,17 @@ import {
   todoOrderSnapshot,
 } from './helpers/todoHeavy';
 
+/**
+ * Batch-scoped settle window for one HEAVY bulk mutation (160 rows: updates +
+ * outbox enqueue in one transaction, then per-row post-commit reminder and
+ * linked-action dispatch before selection mode exits). The 5s UI default is
+ * below the measured ~5.1s settle under suite load; 20s keeps ~4x headroom for
+ * host variance without touching any row/count/SQL oracle. Not a retry and not
+ * a timing ceiling: bulk cost is asserted as evidence (heavy-selection.json),
+ * not as an acceptance threshold.
+ */
+const BULK_SETTLE_TIMEOUT_MS = 20_000;
+
 test.describe('W6.5 To Do convergence', () => {
   test.beforeEach(async ({ page }) => {
     await goToTab(page, 'todos');
@@ -227,8 +238,19 @@ test.describe('W6.5 To Do convergence', () => {
     await search.fill('Task HEAVY');
     await page.getByRole('button', { name: 'Select all tasks', exact: true }).click();
     await expect(page.getByText('160 selected', { exact: true })).toBeVisible();
+    // One durable 160-row batch: row updates + outbox enqueue commit together,
+    // then per-row post-commit reminder/linked-action dispatch runs before
+    // selection mode exits. Measured at HEAVY under suite load this settle
+    // reaches ~5.1s (trace: w65-main/trace-analysis), just past the 5s UI
+    // default, so the settle window is batch-scoped rather than relaxed per
+    // assertion. Every oracle below stays exact: toolbar restore, 160
+    // completed rows, and the remaining pending count.
+    const bulkSettleStartedAt = Date.now();
     await page.getByRole('button', { name: 'Complete', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Enter multi-select mode' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Enter multi-select mode' })).toBeVisible({
+      timeout: BULK_SETTLE_TIMEOUT_MS,
+    });
+    const bulkSettleMs = Date.now() - bulkSettleStartedAt;
     const rows = await queryRows(
       page,
       `SELECT completed,COUNT(*) AS n FROM todos WHERE title LIKE 'Task HEAVY %' GROUP BY completed`,
@@ -240,9 +262,11 @@ test.describe('W6.5 To Do convergence', () => {
     );
     expect(otherPending).toEqual([{ n: volume.open - 160 }]);
     await testInfo.attach('heavy-selection.json', {
-      body: JSON.stringify({ ...volume, firstTen, completedVisible: 160 }),
+      body: JSON.stringify({ ...volume, firstTen, completedVisible: 160, bulkSettleMs }),
       contentType: 'application/json',
     });
+    // eslint-disable-next-line no-console -- measured QA evidence, also attached
+    console.log('[W6.5 HEAVY bulk settle]', JSON.stringify({ ...volume, bulkSettleMs }));
   });
 
   test('HEAVY completed expansion windows history, scrolls deeply, and collapses safely', async ({

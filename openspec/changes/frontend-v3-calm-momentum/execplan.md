@@ -62,7 +62,8 @@ historical evidence only.
 
 ## Current Checkpoint
 
-- Current milestone: W6.5 COMPLETE; W7.1 Habits is next, not started.
+- Current milestone: W6.5 COMPLETE; owner-requested main publication and
+  full report now in progress. W7.1 Habits remains next, not started.
 - Completed: W0–W6 unchanged; W6.5 density/windowing/selection/order/capture
   and rendered evidence closed. Standard55 / checkbox48 / More44; long/scaled
   text expands; HEAVY query129ms, completed window23.60 fresh captures/16
@@ -71,27 +72,35 @@ historical evidence only.
   normally on `fix/ui-v3-w6.5-convergence`, [PR58](https://github.com/quantdale/super-habits/pull/58)
   OPEN (not merged).79 files; normal hooks ran. Stash, foreign iOS evidence
   and historical captures preserved; owned baseline worktree removed.
-- In progress: campaign W7–W17 remain, with W7.1 not started. Closure is
-  documentation-only; normal publication and exact final-head CI are required
-  before handoff. Terminal evidence uses `w65-publication/final-ci.json` and
-  `final-ci-failed.log` (compare headSha with Git before relying on it).
-  Campaign Status stays ACTIVE, not overall certification.
+- In progress: owner-directed publication of the completed W6.5 release
+  tree (bbd06a9 + PWA cache v8/doc pins + HEAVY bulk-settle race fix) to
+  main: normal merge of PR58 into unprotected main (no force/admin flags or
+  security-policy changes), exact-main hosted CI capture, then the final
+  documentation-head closure and full report. Foreign `.tmp-ios…` evidence
+  and the original stash stay preserved and unpublishable. Campaign Status
+  ACTIVE; no Habits and no overall certification.
 - Important modified files: committed TodoItem/TodosScreen/QuickCaptureOverlay,
   list contracts/convergence/HEAVY helpers, fresh audit, bounded a11y/semantic
-  toggle/modal harness repairs. Closure records: this plan, tasks, defect ledger.
-- Last successful validation: qa:full local2559 PASS/2 existing skips,
-  browser243 PASS/56 existing gated skips/0 fail/0 flaky, deterministic23/23.
-  qa:fast unit2162, integration397 +2 skips, P0 25/25, themes140/140,
-  plans120/120, OpenSpec73/73 PASS. Exact product-head push CI37635421767
-  and PR CI37635650147 pass install/typecheck/Deno/lint/themes/OpenSpec/
-  parity/plans/unit+integration (hosted2558 PASS/3 existing skips), then
-  fail only the two known HIGH advisories. Local reports and hosted logs in
-  `.cursor/playwright-output/w65-final-full/`, `w65-final-impact-rerun/`,
-  `w65-publication/`; full scenario reports in simulation-output.
-- Current failures: hosted dependency audit remains red: braces
-  GHSA-vfj7-8cjw-p6xm and node-forge GHSA-86w9-cpqp-85rv, known in repository
-  records but UNDOCUMENTED TO THE AUDIT GATE. No local failures. Hosted E2E
-  is skipped behind quality/audit, not passed. No security waiver or bypass.
+  toggle/modal harness repairs. Main-publication follow-up: public/sw.js
+  generation only, CLAUDE.md /pre-pr cache pins, this plan. No data changes.
+- Last successful validation: release tree — qa:fast PASS (typecheck0,
+  lint0/0, unit2162/2162 + journey/quarantine/profile guards). Final-tree
+  qa:full phases all green: typecheck/lint/`npm test`2559 PASS/2 existing
+  skips/OpenSpec73/73; chromium159 PASS/14 existing opt-in skips (incl. all
+  six convergence tests re-passing in-suite after the race fix); pwa5/5 with
+  the v8 cache. Two full qa:full invocations were externally interrupted
+  mid-journeys (ENVIRONMENT, harness abort; zero failure artifacts), so every
+  remaining lane re-ran green as bounded commands: journeys76 PASS/42 existing
+  @sync skips with J8 D14 ceilings (cold615/5000, maxSwitch578/800,
+  diary304/500, picker184/500), simulation project3/3, deterministic library
+  23/23. Focused convergence6/6 with measured bulk settle (9065ms attached to
+  heavy-selection.json). Evidence `.cursor/playwright-output/w65-main/`.
+- Current failures: None local. Hosted dependency audit remains red only
+  for the known out-of-scope HIGH braces GHSA-vfj7-8cjw-p6xm and node-forge
+  GHSA-86w9-cpqp-85rv (UNDOCUMENTED TO THE AUDIT GATE). Hosted E2E is
+  skipped behind quality/audit, not passed. No security waiver, bypass, or
+  new quarantine. The two full-suite interruptions are ENVIRONMENT and are
+  covered by the bounded completion runs above.
 - Relevant quarantines: existing opt-in/internal/remote-boundary gates only;
   none added. Full browser56 existing skips; visual audit ran separately7/7.
 - Blockers: no W6.5 product blocker. Native smoke/targeted ENVIRONMENT:
@@ -99,14 +108,17 @@ historical evidence only.
   Native/current-source largest-font qualification remains unverified; Android
   full qualification W16, iOS owner-deferred. Require supported target plus
   clean same-commit checkout; never delete preserved foreign evidence.
-- Exact next action: W7.1 — after normal fresh-session Git/CI reconciliation,
-  read HabitsScreen plus domain/data and the locked V3 rules, then rebuild
-  daily habit rows around one clear completion anatomy. Handoff only here:
-  do not implement Habits in this session.
-- Remaining definition of done: W6.5 behavior/evidence/local gates/product
-  publication/exact-product-head review verified; final documentation-head
-  publication/CI evidence must also be captured before handoff. No further
-  To Do implementation remains. Campaign W7–W17 stay unchecked.
+- Exact next action: merge the release branch into main with a normal
+  merge and push; capture exact-main CI for the merge commit into
+  `w65-main/final-ci.json`/`final-ci-failed.log`; then land the final
+  documentation-head closure commit carrying those run IDs, verify its CI
+  the same way, and hand off W7.1. Do not implement Habits here.
+- Remaining definition of done: all scoped W6.5 work (product, tests, fresh
+  audit captures, v8 cache generation + validated doc pins, race fix) reaches
+  main by normal merge; exact-main hosted results for the merge commit and
+  the final documentation head recorded truthfully; preservation/hygiene
+  verified; full report delivered. Known audit/native blockers stay explicit;
+  campaign W7–W17 unchecked.
 
 ## Progress
 
@@ -128,6 +140,8 @@ historical evidence only.
 - [x] W6.5 — bounded density / HEAVY virtualization / completed scalability /
       campaign-record convergence (local gates PASS; hosted audit-only red;
       native qualification limits explicit)
+- [ ] Owner-requested W6.5 main publication — deploy-generation bump,
+      normal merge, exact-main CI and full report (2026-10-07)
 - [ ] W7 — Habits
 - [ ] W8 — Focus
 - [ ] W9 — Workout
@@ -159,6 +173,10 @@ historical evidence only.
 - W6.5: Select all's count-only comparison fails if a query changes to another
   same-sized result set. Use membership of visible ids, with selection state
   retained in TodosScreen and passed through SectionList.extraData.
+- W6.5 release gate: a 160-row HEAVY bulk-complete settles5.1–9.1s (per-row
+  post-commit dispatch) — beyond the 5s UI expect default though well within
+  one user action. No D14-style ceiling covers bulk batch cost; the test now
+  measures it as evidence instead of absorbing it into an assertion timeout.
 - Security lane (W5, bounded): both NEW advisories had patched releases
   available and parent ranges permitting semver-compatible overrides —
   the repo's existing overrides block already carried a shell-quote pin
@@ -209,9 +227,56 @@ historical evidence only.
 - D9 (W6.5): planning capture uses tokens.accent (no borrowed Health identity).
   Preserve destination section hues and the W6 reference lock. New captures
   go to `docs/ui-ux/v3-audit/w6.5/`, leaving earlier audit files untouched.
+- D10 (main publication): owner authorizes normal PR58 merge despite known
+  audit-only red. Main has no protection/rules; do not use admin/force or
+  weaken audit. Actual PWA generation is static; bump v7→v8 for shell-changing
+  deployment and keep asserted guidance pins aligned. Cache strategy unchanged.
+- D11 (2026-10-08) — HEAVY bulk-complete settle is batch-scoped — the
+  160-row durable batch (updates + outbox enqueue + per-row post-commit
+  reminder/linked-action dispatch) measures5.1s under suite load (trace
+  `w65-main/trace-analysis/`) and9065ms focused. The toolbar-restore expect
+  uses one documented20s batch window with the measured settle attached;
+  every row/count/SQL oracle and the geometry/timing ceilings stay exact.
+  This widens only the settle synchronization for a known heavy batch — it
+  creates no bulk-performance acceptance threshold and no D14 ceiling.
 
 ## Validation Ledger
 
+- 2026-10-08 W6.5 HEAVY bulk-settle race (TEST_BUG): the release-gate run
+  failed `HEAVY selection survives…` at toolbar restore while the failure
+  screenshot showed correct product state (377 completed). Trace proof: the
+  160-row batch settles5.0–5.1s under suite load, just past the 5s UI
+  default. Repaired with one batch-scoped settle window + attached
+  measurement (`bulkSettleMs`, 9065ms focused); no oracle weakened. Focused
+  convergence6/6 PASS, and the same test re-passed in-suite (21.1s) in the
+  next full run. Trace preserved in `w65-main/trace-analysis/`.
+- 2026-10-08 release-tree final gates: qa:fast PASS (typecheck0, lint0/0,
+  unit2162/2162, journey/quarantine/profile guards). qa:full final-tree
+  phases: typecheck/lint/npm test2559 PASS/2 existing skips, OpenSpec73/73,
+  chromium159 PASS/14 existing opt-in skips, pwa5/5 (v8 freshness), then two
+  invocations externally interrupted mid-journeys (ENVIRONMENT, harness
+  abort, exit1073807364; zero failure artifacts from either). Bounded
+  completion runs all PASS on the same tree: journeys76/42 existing @sync
+  skips + J8 D14 (cold615/5000, maxSwitch578/800, diary304/500,
+  picker184/500), simulation project3/3, deterministic library23/23.
+  Deploy preparation: PWA CACHE_VERSION v7→v8 with the two derived guidance
+  pins (tests/agentDocConsistency derives them from source).
+- 2026-10-07 main-release impact: explicit four follow-up paths resolve
+  qa:fast +qa:full; no foreign iOS paths treated as task changes. SW diff is
+  one generation literal; no handler/strategy edits. Active diagnostics has
+  two pre-existing auxiliary AST findings at unchanged SW lines95/140
+  (async map's implicit undefined return, URL(Request.url) without catch),
+  not introduced by v8; repo lint/TypeScript and rendered gates decide this
+  release. CLAUDE/pre-pr Markdown probe unavailable; Prettier/gates still run.
+- 2026-10-07 final W6.5 documentation head bbd06a9: push37639196888 and
+  PR37639207906 PASS through unit/integration (2558/3 existing skips), fail
+  only the same two audit HIGHs; E2E skipped. Local doc-only fast2162 and
+  focused agent-plan9/9, plans120/120 PASS. Owner now explicitly requests
+  promotion to main. Fresh fetch: mainadc4844, PR58 headbbd06a9 mergeable;
+  main unprotected with no active branch rules. Original stash object
+  c35e281d740df1e367c1be0f38383237ca080239 and foreign iOS dir preserved.
+  public/sw.js still has static v7, not asset-derived: v8 deploy bump needed,
+  plus CLAUDE/pre-pr source-consistency pins. New release validation follows.
 - W6 historical exact-head hosted: `37583824728` at
   `adc4844b26e31788f8f97c557d7afd55bf196079` — PASS through unit/integration
   (252 files passed / 1 skipped; 2553 tests passed / 3 skipped). First failure
@@ -387,6 +452,8 @@ W6.5 delivered areas (Git history establishes changes; closure diff is docs only
   `e2e/workout-gym-v2.spec.ts`, `e2e/journeys/the-commute.spec.ts`,
   `simulation/runner/actions.ts` — baseline-reproduced harness drift repair;
   modal scope/stability and semantic todo controls, unchanged strict oracles.
+- `public/sw.js`, `CLAUDE.md`, `.cursor/commands/pre-pr.md` — main-deploy
+  cache-generation bump and its existing source-truth guidance pins only.
 - `docs/ui-ux/15-v3-defect-ledger.md` — bounded convergence verification note.
 - `openspec/changes/frontend-v3-calm-momentum/tasks.md`,
   `openspec/changes/frontend-v3-calm-momentum/execplan.md` — living scope,
@@ -411,6 +478,9 @@ npx playwright test e2e/visual-audit.spec.ts`. Inspect port owners first;
 - Final documentation-only publication: use normal hooks, then inspect
   `gh run list --commit $(git rev-parse HEAD) --workflow CI` and exact run
   metadata/logs; do not substitute product-head evidence for a newer HEAD.
+  Exact-main CI capture for the merge commit and the final documentation
+  head lives at `w65-main/final-ci*.json`/`final-ci*-failed.log`; compare
+  each `headSha` with Git before relying on it.
 - Resume point after W6.5 handoff: W7.1 — read `features/habits/HabitsScreen.tsx`
   plus domain/data and the locked V3 rules, then rebuild daily habit rows around
   one clear completion anatomy. This wave stops before implementing Habits.

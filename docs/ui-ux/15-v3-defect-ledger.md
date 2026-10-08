@@ -128,3 +128,10 @@ untouched.
   separately. Native API35-vs36 preflight BLOCKED, Android full W16, iOS
   owner-deferred; browser font scaling is not native largest-font coverage.
   W7.1 next, not implemented.
+- **Release-gate repair:** the HEAVY 160-row bulk-complete settles ~5.1–9.1s
+  (per-row post-commit dispatch) past the 5s UI expect default — reproduced
+  from the failure trace with the product state already correct. The
+  convergence test now uses one documented batch-scoped settle window and
+  attaches the measured `bulkSettleMs`; geometry, row-count and SQL oracles
+  unchanged. PWA cache generation is v8 for this shell deploy, with its two
+  derived guidance pins updated (source-derived, test-checked).

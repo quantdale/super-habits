@@ -86,12 +86,12 @@ Evaluate:
 | Expression | Expected | Actual |
 |------------|----------|--------|
 | `navigator.serviceWorker.controller !== null` | `true` | ? |
-| `await (await caches.keys()).join(", ")` | includes `superhabits-shell-v7` (current `CACHE_VERSION` in `public/sw.js`) | ? |
+| `await (await caches.keys()).join(", ")` | includes `superhabits-shell-v8` (current `CACHE_VERSION` in `public/sw.js`) | ? |
 
 If an older `superhabits-shell-vN` (e.g. v1/v3) appears in cache keys: stale SW cache
 still present — user should clear site data and reload.
 
-If `superhabits-shell-v7` missing: SW may not have activated yet —
+If `superhabits-shell-v8` missing: SW may not have activated yet —
 reload once and re-check.
 
 ### 2c — All 6 sections
@@ -165,7 +165,7 @@ Produce this table:
 | crossOriginIsolated | true | ? | PASS/FAIL |
 | SharedArrayBuffer | "function" | ? | PASS/FAIL |
 | SW active | true | ? | PASS/FAIL |
-| Cache name | superhabits-shell-v7 | ? | PASS/FAIL |
+| Cache name | superhabits-shell-v8 | ? | PASS/FAIL |
 | DB init error | none | ? | PASS/FAIL |
 | Overview screen | renders | ? | PASS/FAIL |
 | Todos screen | renders | ? | PASS/FAIL |
