@@ -64,37 +64,37 @@ historical evidence only.
 
 - Current milestone: W6.5 COMPLETE; owner-requested main publication and
   full report now in progress. W7.1 Habits remains next, not started.
-- Completed: W0–W6 unchanged; W6.5 density/windowing/selection/order/capture
-  and rendered evidence closed. Standard55 / checkbox48 / More44; long/scaled
-  text expands; HEAVY query129ms, completed window23.60 fresh captures/16
-  visually inspected. No data/dependency/security policy or Habits changes.
-  Product/evidence commit `f0e02910aae56fe2902fae4ec1574e3aa7c502f8` published
-  normally on `fix/ui-v3-w6.5-convergence`, [PR58](https://github.com/quantdale/super-habits/pull/58)
-  OPEN (not merged).79 files; normal hooks ran. Stash, foreign iOS evidence
-  and historical captures preserved; owned baseline worktree removed.
-- In progress: owner-directed publication of the completed W6.5 release
-  tree (bbd06a9 + PWA cache v8/doc pins + HEAVY bulk-settle race fix) to
-  main: normal merge of PR58 into unprotected main (no force/admin flags or
-  security-policy changes), exact-main hosted CI capture, then the final
-  documentation-head closure and full report. Foreign `.tmp-ios…` evidence
-  and the original stash stay preserved and unpublishable. Campaign Status
-  ACTIVE; no Habits and no overall certification.
-- Important modified files: committed TodoItem/TodosScreen/QuickCaptureOverlay,
+- Completed: W0–W6 unchanged; W6.5 closed and MERGED to main as merge
+  commit `f37539a969bdc7c3dc539c2d47db3f6580429c64` ([PR58](https://github.com/quantdale/super-habits/pull/58)
+  MERGED 2026-10-08): W6.5 product/evidence f0e0291 + records bbd06a9 +
+  release tree 0db6ab3 (HEAVY bulk-settle race fix, PWA cache v8 + derived
+  guidance pins). Normal merge and push throughout — no force, no admin
+  flags, no security-policy change. Standard55 / checkbox48 / More44;
+  long/scaled text expands; HEAVY query129ms;60 fresh captures/16 inspected.
+  Stash, foreign iOS evidence and historical captures preserved.
+- In progress: final documentation-head hosted CI capture into
+  `w65-main/final-doc-ci*.json` and the full W6.5 handoff report. Campaign
+  W7–W17 remain, with W7.1 not started. No Habits and no overall
+  certification in this wave.
+- Important modified files: TodoItem/TodosScreen/QuickCaptureOverlay,
   list contracts/convergence/HEAVY helpers, fresh audit, bounded a11y/semantic
-  toggle/modal harness repairs. Main-publication follow-up: public/sw.js
-  generation only, CLAUDE.md /pre-pr cache pins, this plan. No data changes.
-- Last successful validation: release tree — qa:fast PASS (typecheck0,
-  lint0/0, unit2162/2162 + journey/quarantine/profile guards). Final-tree
-  qa:full phases all green: typecheck/lint/`npm test`2559 PASS/2 existing
-  skips/OpenSpec73/73; chromium159 PASS/14 existing opt-in skips (incl. all
-  six convergence tests re-passing in-suite after the race fix); pwa5/5 with
-  the v8 cache. Two full qa:full invocations were externally interrupted
-  mid-journeys (ENVIRONMENT, harness abort; zero failure artifacts), so every
-  remaining lane re-ran green as bounded commands: journeys76 PASS/42 existing
-  @sync skips with J8 D14 ceilings (cold615/5000, maxSwitch578/800,
-  diary304/500, picker184/500), simulation project3/3, deterministic library
-  23/23. Focused convergence6/6 with measured bulk settle (9065ms attached to
-  heavy-selection.json). Evidence `.cursor/playwright-output/w65-main/`.
+  toggle/modal harness repairs, bulk-settle batch window, public/sw.js cache
+  generation + its two derived guidance pins, and these closure records.
+  No data-layer, dependency, or security-policy changes.
+- Last successful validation: exact-main CI run
+  [37716057446](https://github.com/quantdale/super-habits/actions/runs/37716057446)
+  at merge head `f37539a` — install/typecheck/Deno/lint/themes/OpenSpec/parity/
+  plans and unit+integration PASS (253 files PASS/1 existing skip;2558 tests
+  PASS/3 existing skips; OpenSpec73/73), then fails only the two known HIGH
+  advisories; hosted E2E/nightly skipped behind quality. Release tree local
+  gates: qa:fast PASS (unit2162/2162 + guards); qa:full phases all green —
+  typecheck/lint/npm test2559 PASS/2 existing skips, OpenSpec73/73, chromium
+  159 PASS/14 existing opt-in skips, pwa5/5 (v8 freshness), journeys76 PASS/42
+  existing @sync skips with J8 D14 ceilings (cold615/5000, maxSwitch578/800,
+  diary304/500, picker184/500), simulation3/3, deterministic library23/23.
+  Focused convergence6/6 with measured bulk settle (9065ms). Product-head CI
+  37635421767 /37635650147 and final-doc evidence in
+  `.cursor/playwright-output/w65-main/`, `w65-publication/`.
 - Current failures: None local. Hosted dependency audit remains red only
   for the known out-of-scope HIGH braces GHSA-vfj7-8cjw-p6xm and node-forge
   GHSA-86w9-cpqp-85rv (UNDOCUMENTED TO THE AUDIT GATE). Hosted E2E is
@@ -108,17 +108,17 @@ historical evidence only.
   Native/current-source largest-font qualification remains unverified; Android
   full qualification W16, iOS owner-deferred. Require supported target plus
   clean same-commit checkout; never delete preserved foreign evidence.
-- Exact next action: merge the release branch into main with a normal
-  merge and push; capture exact-main CI for the merge commit into
-  `w65-main/final-ci.json`/`final-ci-failed.log`; then land the final
-  documentation-head closure commit carrying those run IDs, verify its CI
-  the same way, and hand off W7.1. Do not implement Habits here.
-- Remaining definition of done: all scoped W6.5 work (product, tests, fresh
-  audit captures, v8 cache generation + validated doc pins, race fix) reaches
-  main by normal merge; exact-main hosted results for the merge commit and
-  the final documentation head recorded truthfully; preservation/hygiene
-  verified; full report delivered. Known audit/native blockers stay explicit;
-  campaign W7–W17 unchecked.
+- Exact next action: capture this documentation head's hosted CI into
+  `w65-main/final-doc-ci*.json`, confirm the same audit-only result, then
+  deliver the full W6.5 report and stop. Campaign resume is W7.1 — read
+  HabitsScreen plus domain/data and the locked V3 rules, then rebuild daily
+  habit rows around one clear completion anatomy. Do not implement Habits
+  in this session.
+- Remaining definition of done: the final documentation head's exact hosted
+  CI result captured as evidence and cited in the full report. All other W6.5
+  conditions (behavior, evidence, local gates, main publication, exact-main
+  CI) are complete. Known audit/native blockers stay explicit; campaign
+  W7–W17 unchecked.
 
 ## Progress
 
@@ -140,8 +140,9 @@ historical evidence only.
 - [x] W6.5 — bounded density / HEAVY virtualization / completed scalability /
       campaign-record convergence (local gates PASS; hosted audit-only red;
       native qualification limits explicit)
-- [ ] Owner-requested W6.5 main publication — deploy-generation bump,
-      normal merge, exact-main CI and full report (2026-10-07)
+- [x] Owner-requested W6.5 main publication — deploy-generation bump,
+      normal merge (PR58 MERGED, main=f37539a), exact-main CI
+      (run37716057446, audit-only red) and full report (2026-10-08)
 - [ ] W7 — Habits
 - [ ] W8 — Focus
 - [ ] W9 — Workout
@@ -241,6 +242,19 @@ historical evidence only.
   creates no bulk-performance acceptance threshold and no D14 ceiling.
 
 ## Validation Ledger
+
+- 2026-10-08 W6.5 merged to main and exact-main CI verified: normal
+  `--no-ff` merge of PR58 as `f37539a969bdc7c3dc539c2d47db3f6580429c64`
+  (PR state MERGED), pushed to origin/main; release tree commit `0db6ab3`
+  (bulk-settle race fix + PWA v8 + guidance pins + closure records). Exact
+  main CI run37716057446: install/typecheck/Deno/lint/themes/OpenSpec/parity/
+  plans PASS, unit+integration253 files PASS/1 skip +2558 tests PASS/3 skips,
+  OpenSpec73/73, then ONLY `Audit runtime dependencies` fails on exactly the
+  two known undocumented HIGHs (braces GHSA-vfj7-8cjw-p6xm, node-forge
+  GHSA-86w9-cpqp-85rv; no critical). Hosted E2E/nightly skipped behind
+  quality — not passed, not claimed. Evidence `w65-main/final-ci.json`,
+  `final-ci-failed.log`, `final-quality.log`, `main-merge.log`,
+  `pr-post-merge.json`.
 
 - 2026-10-08 W6.5 HEAVY bulk-settle race (TEST_BUG): the release-gate run
   failed `HEAVY selection survives…` at toolbar restore while the failure

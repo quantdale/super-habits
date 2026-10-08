@@ -52,7 +52,7 @@
 - [x] 6.5.1 Measure and repair standard 48–56pt density, checkbox ≥48pt / More ≥44pt; long titles and scaled text expand without clipping
 - [x] 6.5.2 Window HEAVY query/filter, bulk selection and expanded completed history; retain manual reorder and full-global-order safety; prove recycling and durable mutations
 - [x] 6.5.3 Use theme accent for Project/Goal capture; preserve the W6 reference lock, fresh screenshots, and truthful campaign records
-- [x] 6.5.4 Complete broad local gates, record native qualification limits, publish normally, inspect exact-head hosted CI, then hand off W7.1 without Habits changes (PR58; product-head CI passes through tests, audit-only red; native BLOCKED/deferred, not certified)
+- [x] 6.5.4 Complete broad local gates, record native qualification limits, publish normally, inspect exact-head hosted CI, then hand off W7.1 without Habits changes (PR58 MERGED to main as f37539a; exact-main CI passes through tests, audit-only red; native BLOCKED/deferred, not certified)
 
 ## 7. W7 — Habits
 
