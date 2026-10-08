@@ -319,11 +319,12 @@ defineJourney({
         await returnToApp(page);
         await goToSection(page, 'habits');
         await expectSectionActive(page, SECTION_MARKERS.habits);
+        await page.getByRole('button', { name: 'Trends', exact: true }).click();
 
         await expect(
           page.getByText(`${activeHabits} habits across your daily routine`, { exact: true }),
         ).toBeVisible();
-        await expect(page.getByText('Best streak', { exact: true })).toBeVisible();
+        await expect(page.getByText('Highest current streak', { exact: true })).toBeVisible();
         await expect(
           page.getByText('All habits over the last 52 weeks', { exact: true }),
         ).toBeVisible();
@@ -553,7 +554,7 @@ const SECTION_MARKERS: Record<SectionName, string> = {
   // is the always-rendered hero text on every load state.
   overview: 'Plan today',
   todos: 'TO DO',
-  habits: "Today's rhythm",
+  habits: 'Daily check-in',
   pomodoro: 'Classic sequence: focus → short breaks → long break — durations saved on device.',
   workout:
     'Plan your week, build prescriptions, train with guidance, and review progress in one place.',

@@ -20,13 +20,13 @@ tags:
     childOf:
       text: 'Section tabs'
 - scrollUntilVisible:
-    element: 'Add anytime habit'
+    element: 'Add habit'
     direction: DOWN
     # Center the bottom-edge add tile: without this the tile settles under the
     # emulator taskbar and the tap lands on the launcher home button.
     centerElement: true
-- tapOn: 'Add anytime habit'
-# Index 1 targets the input: index 0 is the visible label (tapping it focuses nothing and drops typed text).
+- tapOn: 'Add habit'
+# Index 1 targets the input; index 0 is the label and drops typed text.
 - tapOn:
     text: 'Habit name'
     index: 1
@@ -54,13 +54,14 @@ tags:
     visible: 'Native delivery habit'
     timeout: 5000
 - scrollUntilVisible:
-    element: 'Enter habit edit mode'
+    element: 'Open Native delivery habit details'
     direction: UP
-- tapOn: 'Enter habit edit mode'
+- tapOn: 'Open Native delivery habit details'
+- tapOn: 'Settings'
 - scrollUntilVisible:
-    element: 'Edit Native delivery habit'
+    element: 'Edit habit'
     direction: DOWN
-- tapOn: 'Edit Native delivery habit'
+- tapOn: 'Edit habit'
 - scrollUntilVisible:
     element: 'Schedule test notification'
     direction: DOWN

@@ -98,9 +98,39 @@ export const auditPage = () => {
   const hiddenFocusable: string[] = [];
   const seen = new Set<string>();
 
+  // Mounted inactive sections still have layout boxes. Zero-opacity ancestor
+  // content has no painted contrast; audit focus traps independently below.
+  const rendered = new WeakMap<Element, boolean>();
+  const isRendered = (el: Element): boolean => {
+    const cached = rendered.get(el);
+    if (cached !== undefined) return cached;
+    const style = getComputedStyle(el);
+    const visible =
+      style.display !== 'none' &&
+      style.visibility !== 'hidden' &&
+      style.visibility !== 'collapse' &&
+      Number(style.opacity) !== 0 &&
+      (!el.parentElement || isRendered(el.parentElement));
+    rendered.set(el, visible);
+    return visible;
+  };
+
   for (const el of Array.from(document.querySelectorAll('*'))) {
+    if (el.getAttribute('aria-hidden') === 'true') {
+      const focusable = el.querySelector<HTMLElement>(
+        'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable && !el.closest('[inert]')) {
+        focusable.focus();
+        if (document.activeElement === focusable) {
+          hiddenFocusable.push(
+            `${focusable.tagName}:${(focusable.getAttribute('aria-label') ?? '').slice(0, 40)}`,
+          );
+        }
+      }
+    }
+    if (!isRendered(el)) continue;
     const cs = getComputedStyle(el);
-    if (cs.display === 'none' || cs.visibility === 'hidden') continue;
     const rect = el.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) continue;
     const isIconGlyph = /material/i.test(cs.fontFamily);
@@ -166,20 +196,6 @@ export const auditPage = () => {
         if (!seen.has(key)) {
           seen.add(key);
           nameless.push(`${tag}[${role ?? ''}]`);
-        }
-      }
-    }
-
-    if (el.getAttribute('aria-hidden') === 'true') {
-      const focusable = el.querySelector<HTMLElement>(
-        'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      );
-      if (focusable && !el.closest('[inert]')) {
-        focusable.focus();
-        if (document.activeElement === focusable) {
-          hiddenFocusable.push(
-            `${focusable.tagName}:${(focusable.getAttribute('aria-label') ?? '').slice(0, 40)}`,
-          );
         }
       }
     }

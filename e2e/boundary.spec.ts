@@ -112,22 +112,12 @@ test.describe('Todos — boundary inputs', () => {
 test.describe('Habits — boundary inputs', () => {
   test('habit with target_per_day = 1 shows correct progress', async ({ page }) => {
     await goToTab(page, 'habits');
-    await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
-    await page
-      .getByLabel('Habit groups')
-      .getByText('+', { exact: true })
-      .first()
-      .locator('..')
-      .click({ force: true });
+    await expect(page.getByText('Daily check-in')).toBeVisible({ timeout: 15_000 });
+    await page.getByLabel('Add habit').click({ force: true });
     await page.getByLabel('Habit name').fill('One tap');
     await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
     await expect(page.getByText('One tap').first()).toBeVisible();
-    // Increment via the habit circle's accessible button (stable contract),
-    // then assert no NaN/Infinity leaks into the rendered progress.
-    await page
-      .getByRole('button', { name: /One tap: \d+ of 1 today\. Tap to add one/ })
-      .first()
-      .click();
+    await page.getByRole('checkbox', { name: /One tap: 0 of 1 today\. Check in\./ }).click();
     await expect(page.locator('body')).not.toContainText('NaN');
     await expect(page.locator('body')).not.toContainText('Infinity');
   });
@@ -135,28 +125,29 @@ test.describe('Habits — boundary inputs', () => {
   test('creating 10 habits across groups renders all groups', async ({ page }) => {
     test.setTimeout(90_000);
     await goToTab(page, 'habits');
-    await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Daily check-in')).toBeVisible({ timeout: 15_000 });
+    const groupNames = ['Anytime', 'Morning', 'Afternoon', 'Evening'] as const;
     for (let i = 0; i < 10; i++) {
-      // Fresh locator chain each iteration — avoids stale handles after modal close / list reflow.
-      const groupNames = ['anytime', 'morning', 'afternoon', 'evening'] as const;
-      await page
-        .getByLabel('Habit groups')
-        .getByLabel(`Add ${groupNames[i % 4]} habit`)
-        .click({ force: true });
+      await page.getByLabel('Add habit').click({ force: true });
       await expect(page.getByLabel('Habit name')).toBeVisible({ timeout: 15_000 });
       await page.getByLabel('Habit name').fill(`Boundary habit ${i + 1}`);
+      await page
+        .getByRole('dialog')
+        .getByRole('button', { name: groupNames[i % 4], exact: true })
+        .click();
       await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
       await expect(page.getByLabel('Habit name')).toBeHidden({ timeout: 15_000 });
     }
-    await expect(page.getByText('ANYTIME').first()).toBeVisible();
-    await expect(page.getByText('MORNING').first()).toBeVisible();
-    await expect(page.getByText('AFTERNOON').first()).toBeVisible();
-    await expect(page.getByText('EVENING').first()).toBeVisible();
+    await expect(page.getByText('Anytime', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Morning', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Afternoon', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Evening', { exact: true }).first()).toBeVisible();
     await expect(page.locator('body')).not.toContainText('Error');
   });
 
   test('overview grid renders with no habits (empty state)', async ({ page }) => {
     await goToTab(page, 'habits');
+    await page.getByRole('button', { name: 'Trends', exact: true }).click();
     await expect(page.locator('body')).toContainText('0%');
     await expect(page.locator('body')).not.toContainText('NaN');
     await expect(page.locator('body')).not.toContainText('undefined');

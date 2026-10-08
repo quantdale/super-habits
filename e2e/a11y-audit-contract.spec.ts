@@ -28,3 +28,37 @@ test('a low-contrast solid face still fails even over a contrasting canvas', asy
   expect(result.contrast).toHaveLength(1);
   expect(result.contrast[0]).toContain('Painted action 1.00:1 (needs 4.5)');
 });
+
+test('unpainted inactive content is excluded, but invisible focus traps remain audited', async ({
+  page,
+}) => {
+  await page.setContent(`
+    <body style="background:white">
+      <div aria-hidden="true" style="opacity:0">
+        <button aria-label="Hidden focus trap" style="color:white;background:white">Unpainted action</button>
+      </div>
+      <button style="color:white;background:white">Visible bad action</button>
+    </body>
+  `);
+  const result = await page.evaluate(auditPage);
+  expect(result.contrast).toHaveLength(1);
+  expect(result.contrast[0]).toContain('Visible bad action 1.00:1 (needs 4.5)');
+  expect(result.hiddenFocusable).toEqual(['BUTTON:Hidden focus trap']);
+});
+
+test('correctly inert inactive content creates neither painted contrast nor a focus trap', async ({
+  page,
+}) => {
+  await page.setContent(`
+    <body style="background:white">
+      <div inert aria-hidden="true" style="opacity:0">
+        <button style="color:white;background:white">Inactive action</button>
+      </div>
+      <button style="color:black;background:white">Visible action</button>
+    </body>
+  `);
+  const result = await page.evaluate(auditPage);
+  expect(result.contrast).toEqual([]);
+  expect(result.hiddenFocusable).toEqual([]);
+  expect(result.nameless).toEqual([]);
+});

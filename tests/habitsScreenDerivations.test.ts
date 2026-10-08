@@ -107,6 +107,30 @@ describe('summarizeHabitsToday', () => {
     expect(summary.todayProgress).toBeNull();
   });
 
+  it('excludes lifecycle-masked obligations and pre-creation legacy dates', () => {
+    const corpus = [
+      habit({ id: 'eligible' }),
+      habit({ id: 'later', created_at: '2026-03-10T00:00:00.000Z', rule_history: '[]' }),
+      habit({
+        id: 'masked',
+        lifecycle_history: JSON.stringify([
+          { status: 'archived', from_date_key: '2026-03-01', to_date_key: '2026-03-10' },
+        ]),
+      }),
+    ];
+    const summary = summarizeHabitsToday({
+      activeHabits: corpus,
+      ruleHistoryById: buildHabitRuleHistoryIndex(corpus),
+      countsByHabitDate: counts(
+        ['eligible', '2026-03-09', 1],
+        ['later', '2026-03-09', 99],
+        ['masked', '2026-03-09', 99],
+      ),
+      todayKey: '2026-03-09',
+    });
+    expect(summary).toEqual({ scheduledTodayCount: 1, completedTodayCount: 1, todayProgress: 100 });
+  });
+
   it('does not parse rule history at all when the index is prebuilt', () => {
     const parseSpy = vi.spyOn(habitsDomain, 'parseHabitRuleHistory');
 
@@ -187,6 +211,36 @@ describe('buildHabitDayStrip', () => {
     // no longer scheduled, and 03-08 counts as complete at 2.
     expect(strip[5]).toMatchObject({ dateKey: '2026-03-08', scheduledCount: 1, completedCount: 1 });
     expect(strip[6]).toMatchObject({ dateKey: '2026-03-09', scheduledCount: 0, completedCount: 0 });
+  });
+
+  it('masks old paused intervals and respects legacy creation without counting old off-date rows', () => {
+    const corpus = [
+      habit({ id: 'eligible' }),
+      habit({ id: 'later', created_at: '2026-03-08T00:00:00.000Z', rule_history: '[]' }),
+      habit({
+        id: 'masked',
+        lifecycle_history: JSON.stringify([
+          { status: 'paused', from_date_key: '2026-03-03', to_date_key: '2026-03-08' },
+        ]),
+      }),
+    ];
+    const strip = buildHabitDayStrip({
+      activeHabits: corpus,
+      ruleHistoryById: buildHabitRuleHistoryIndex(corpus),
+      countsByHabitDate: counts(
+        ['eligible', '2026-03-03', 1],
+        ['later', '2026-03-03', 99],
+        ['masked', '2026-03-03', 99],
+        ['eligible', '2026-03-08', 1],
+        ['later', '2026-03-08', 1],
+        ['masked', '2026-03-08', 1],
+      ),
+      today: TODAY,
+    });
+    expect(strip[0]).toMatchObject({ dateKey: '2026-03-03', scheduledCount: 1, completedCount: 1 });
+    // Lifecycle intervals are inclusive: the closing day remains masked.
+    expect(strip[5]).toMatchObject({ dateKey: '2026-03-08', scheduledCount: 2, completedCount: 2 });
+    expect(strip[6]).toMatchObject({ dateKey: '2026-03-09', scheduledCount: 3, completedCount: 0 });
   });
 
   it('performs no rule-history parse when the index is prebuilt', () => {

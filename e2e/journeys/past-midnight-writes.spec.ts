@@ -46,8 +46,8 @@ const START_EPOCH = Date.UTC(2026, 7, 3, 15, 55, 0, 0);
 /** The SMALL fixture's single habit (fixture builder names habit i=0 "Habit 1 — ☕"). */
 const HABIT_NAME = 'Habit 1 — ☕';
 
-/** Regex matching the habit ring's accessible name for a given today-count. */
-const ringLabel = (count: number) => new RegExp(`Habit 1 — ☕: ${count} of 1 today`);
+/** Quantitative add state: the fixture explicitly has target2, not check/undo. */
+const ringLabel = (count: number) => new RegExp(`${HABIT_NAME}: ${count} of 2 today`);
 
 // The `journeys` project (playwright.config.ts) runs one context per file with
 // `workers: 1`; a serial describe plus a single shared page keeps continuity —
@@ -81,6 +81,16 @@ test.describe
 
     await switchSection(page, 'habits');
     await expect(page.getByText(HABIT_NAME, { exact: true }).first()).toBeVisible();
+    // This journey requires TWO increments before midnight. Configure a
+    // quantitative target through the real editor; a target1 checkbox's
+    // second activation is correctly undo, not a second increment.
+    await page.getByRole('button', { name: `Open ${HABIT_NAME} details` }).click();
+    await page.getByRole('dialog').getByRole('tab', { name: 'Settings', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit habit', exact: true }).click();
+    await page.getByLabel('Target per day', { exact: true }).fill('2');
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await expect(page.getByText('Edit Habit', { exact: true })).toBeHidden();
+    await expect(page.getByRole('button', { name: ringLabel(0) })).toBeVisible();
 
     // Starting state: the seeded habit exists with NO completions yet, so the
     // boundary day is clean before the first tick.
@@ -97,7 +107,7 @@ test.describe
     // also renders the habit name, and the old preceding-sibling walk resolved
     // to that inert copy. The count-agnostic label survives re-resolution
     // between the two ticks.
-    const ring = page.getByRole('button', { name: new RegExp(`${HABIT_NAME}: \\d+ of 1 today`) });
+    const ring = page.getByRole('button', { name: new RegExp(`${HABIT_NAME}: \\d+ of 2 today`) });
 
     await ring.click();
     // The ring's accessible name reflects the fresh count — waiting on it
@@ -125,7 +135,7 @@ test.describe
     expect(localNow).toMatch(/^2026-08-04/);
 
     // NOTE: we deliberately do NOT assert what the ring shows here. Asserting
-    // the stale-boundary count ("2 of 1 today") is racy: the section's
+    // the stale-boundary count ("2 of 2 today") is racy: the section's
     // mount-refresh is async (`await listHabits()` then
     // `getHabitCountByDate(toDateKey())`), so it can read `toDateKey()` after
     // the clock advanced and resolve for the new day instead. Presentation
@@ -134,7 +144,7 @@ test.describe
     // which can only turn green once the NEW day's row exists.
 
     // Same role-scoped ring locator as step 2 (Overview preview copy is inert).
-    const ring = page.getByRole('button', { name: new RegExp(`${HABIT_NAME}: \\d+ of 1 today`) });
+    const ring = page.getByRole('button', { name: new RegExp(`${HABIT_NAME}: \\d+ of 2 today`) });
     await ring.click();
 
     // The label flips to the NEW day's count (1) after the write + refresh —

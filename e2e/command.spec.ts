@@ -103,7 +103,7 @@ test.describe('Command shell', () => {
     await expect(page.getByText('Habit saved.', { exact: true })).toBeVisible();
 
     await page.getByText('Go to Habits', { exact: true }).locator('..').click({ force: true });
-    await expect(page.getByLabel('Enter habit edit mode')).toBeVisible();
+    await expect(page.getByText('Daily check-in')).toBeVisible();
     await expect(page.getByText('drink water', { exact: true }).last()).toBeVisible();
   });
 

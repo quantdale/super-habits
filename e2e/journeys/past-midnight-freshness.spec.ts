@@ -29,8 +29,8 @@ const START_EPOCH = Date.UTC(2026, 7, 3, 15, 55, 0, 0);
 /** The SMALL fixture's single habit (fixture builder names habit i=0 "Habit 1 — ☕"). */
 const HABIT_NAME = 'Habit 1 — ☕';
 
-/** Regex matching the habit ring's accessible name for a given today-count. */
-const ringLabel = (count: number) => new RegExp(`Habit 1 — ☕: ${count} of 1 today`);
+/** Binary check-in state for a given today-count. */
+const checkInLabel = (count: number) => new RegExp(`${HABIT_NAME}: ${count} of 1 today`);
 
 test.describe('P1 — Maya, the Daily Driver — J2b past-midnight freshness: no mounted surface labels a stale day "Today" (CG-1 — fix-day-rollover-refresh) @p0', () => {
   let context: BrowserContext;
@@ -52,12 +52,10 @@ test.describe('P1 — Maya, the Daily Driver — J2b past-midnight freshness: no
 
     // Habits: tick the seeded habit once → "1 of 1 today" (boundary day).
     await switchSection(page, 'habits');
-    // Role-scoped: the mounted-but-inactive Overview preview card also renders
-    // the habit name, and the old preceding-sibling walk resolved to that
-    // inert copy. The ring is the only button labelled "<habit>: n of 1 today".
-    const ring = page.getByRole('button', { name: new RegExp(`${HABIT_NAME}: \\d+ of 1 today`) });
-    await ring.click();
-    await expect(page.getByRole('button', { name: ringLabel(1) })).toBeVisible();
+    // Role-scoped: the mounted-but-inactive Overview also renders the name.
+    // Target1 is a checkbox; one activation checks in, the next would undo.
+    await page.getByRole('checkbox', { name: checkInLabel(0) }).click();
+    await expect(page.getByRole('checkbox', { name: checkInLabel(1) })).toBeChecked();
 
     // Calories: log a 410-kcal meal on the boundary day
     // (30 g protein ×4 + 50 g carbs ×4 + 10 g fat ×9 = 410 kcal).
@@ -94,7 +92,8 @@ test.describe('P1 — Maya, the Daily Driver — J2b past-midnight freshness: no
     // boundary-day one (the writes themselves are correct — D9a — it is the
     // presentation that must not lie).
     await switchSection(page, 'habits');
-    await expect(page.getByRole('button', { name: ringLabel(0) })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: checkInLabel(0) })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: checkInLabel(0) })).not.toBeChecked();
     await expectRows(
       page,
       'SELECT date_key, count FROM habit_completions ORDER BY date_key',

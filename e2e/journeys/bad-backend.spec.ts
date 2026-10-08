@@ -103,9 +103,9 @@ async function addTodoViaUi(page: Page, title: string): Promise<void> {
 async function addHabitViaUi(page: Page, name: string): Promise<void> {
   await ensureAppContext(page);
   await switchSection(page, 'habits');
-  await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Daily check-in')).toBeVisible({ timeout: 15_000 });
   const nameField = page.getByLabel('Habit name');
-  await page.getByLabel('Habit groups').getByLabel('Add anytime habit').click({ force: true });
+  await page.getByLabel('Add habit').click({ force: true });
   await nameField.waitFor({ state: 'visible', timeout: 8_000 });
   await nameField.fill(name);
   await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
