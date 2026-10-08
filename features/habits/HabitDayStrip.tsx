@@ -1,9 +1,11 @@
+import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { Text } from '@/core/ui/Text';
-import { PillChip } from '@/core/ui/PillChip';
+import { readableSurface } from '@/core/theme/contrast';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { dateKeyToLocalDate } from '@/lib/time';
+import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 
 export type HabitDayStripDay = {
   dateKey: string;
@@ -34,23 +36,74 @@ function displayDateLabel(dateKey: string): string {
   });
 }
 
+function HabitDayButton({
+  label,
+  accessibilityLabel,
+  selected,
+  onPress,
+}: {
+  label: string;
+  accessibilityLabel: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const { tokens, sectionAccents } = useAppTheme();
+  const focus = useKeyboardFocusRing(sectionAccents.habits.text);
+  const activeFill = readableSurface(SECTION_COLORS.habits, tokens.onSolid);
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      aria-pressed={selected}
+      accessibilityState={{ selected }}
+      onFocus={focus.onFocus}
+      onBlur={focus.onBlur}
+      className="mb-2 mr-2 min-h-[44px] min-w-[44px] items-center justify-center rounded-full border px-3"
+      style={[
+        {
+          backgroundColor: selected ? activeFill : tokens.surface,
+          borderColor: selected ? activeFill : tokens.border,
+        },
+        focus.focusRingStyle,
+      ]}
+    >
+      <Text variant="label" style={{ color: selected ? tokens.onSolid : tokens.text }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 /**
- * Compact past-week selector for the habit grid (blueprint §3A): one row of
- * chunky day pills ending at today, which stays visually anchored and is the
+ * Compact past-week selector: quiet day pills ending at today,
+ * which stays visually anchored and is the
  * default selection. Each pill carries a shape-coded completion mark (check =
  * all scheduled complete, dot = some progress) so state never relies on color
  * alone; exact counts are exposed through the accessibility label.
  */
 export function HabitDayStrip({ days, selectedDateKey, todayKey, onSelect }: HabitDayStripProps) {
-  const { tokens } = useAppTheme();
-  const accent = SECTION_COLORS.habits;
+  const { tokens, sectionAccents } = useAppTheme();
+  const backFocus = useKeyboardFocusRing(sectionAccents.habits.text);
+  const stripRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    if (selectedDateKey === todayKey) stripRef.current?.scrollToEnd({ animated: false });
+  }, [selectedDateKey, todayKey]);
 
   return (
     <View>
       <ScrollView
+        ref={stripRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         accessibilityLabel="Check-in day picker"
+        onLayout={() => {
+          // A viewport resize changes the clipping window, not content size.
+          if (selectedDateKey === todayKey) stripRef.current?.scrollToEnd({ animated: false });
+        }}
+        onContentSizeChange={() => {
+          if (selectedDateKey === todayKey) stripRef.current?.scrollToEnd({ animated: false });
+        }}
       >
         {days.map((day) => {
           const isSelected = day.dateKey === selectedDateKey;
@@ -59,12 +112,11 @@ export function HabitDayStrip({ days, selectedDateKey, todayKey, onSelect }: Hab
           const someProgress = !allComplete && day.completedCount > 0;
           const completionMark = allComplete ? ' ✓' : someProgress ? ' •' : '';
           return (
-            <PillChip
+            <HabitDayButton
               key={day.dateKey}
               label={`${day.weekdayLabel} ${day.dayOfMonth}${completionMark}`}
               accessibilityLabel={`${fullWeekdayLabel(day.dateKey)}${isToday ? ', today' : ''}: ${day.completedCount} of ${day.scheduledCount === 0 ? '0' : day.scheduledCount} scheduled habits complete`}
-              active={isSelected}
-              color={accent}
+              selected={isSelected}
               onPress={() => onSelect(day.dateKey)}
             />
           );
@@ -79,6 +131,9 @@ export function HabitDayStrip({ days, selectedDateKey, todayKey, onSelect }: Hab
             onPress={() => onSelect(todayKey)}
             accessibilityRole="button"
             accessibilityLabel="Back to today"
+            onFocus={backFocus.onFocus}
+            onBlur={backFocus.onBlur}
+            style={backFocus.focusRingStyle}
             className="min-h-[44px] justify-center px-2"
           >
             <Text variant="label" style={{ color: tokens.text }}>

@@ -2,7 +2,8 @@ import type { Habit } from '@/features/habits/types';
 import type { HabitDayStripDay } from '@/features/habits/HabitDayStrip';
 import {
   getHabitTargetForDate,
-  isHabitScheduledOn,
+  isHabitActionableOn,
+  habitCreationDateKey,
   parseHabitRuleHistory,
   type HabitRule,
 } from '@/features/habits/habits.domain';
@@ -18,8 +19,9 @@ import { toDateKey } from '@/lib/time';
  * functions of the data, so they live here and are computed once per data change
  * by the screen's memos.
  *
- * No behaviour change: the scheduled/completed definitions, the 7-day window,
- * and the row ordering are exactly what the screen computed inline.
+ * The 7-day window and row ordering remain stable. Obligations now share the
+ * authoritative creation/lifecycle actionability gate with check-ins, so a
+ * stored off-date count never inflates the strip or summary.
  */
 
 const STRIP_WEEKDAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
@@ -67,10 +69,26 @@ export function summarizeHabitsToday(input: {
 
   for (const habit of input.activeHabits) {
     const history = input.ruleHistoryById.get(habit.id);
-    if (!isHabitScheduledOn(history, input.todayKey, habit.target_per_day)) continue;
+    const creationKey = habitCreationDateKey(habit.created_at);
+    if (
+      !isHabitActionableOn(
+        history,
+        input.todayKey,
+        habit.target_per_day,
+        creationKey,
+        habit.lifecycle_history,
+      )
+    )
+      continue;
     scheduledTodayCount += 1;
     const completed = input.countsByHabitDate[habit.id]?.[input.todayKey] ?? 0;
-    if (completed >= habit.target_per_day) completedTodayCount += 1;
+    const target = getHabitTargetForDate(
+      history,
+      input.todayKey,
+      habit.target_per_day,
+      creationKey,
+    );
+    if (completed >= target) completedTodayCount += 1;
   }
 
   return {
@@ -107,9 +125,19 @@ export function buildHabitDayStrip(input: {
 
     for (const habit of input.activeHabits) {
       const history = input.ruleHistoryById.get(habit.id);
-      if (!isHabitScheduledOn(history, dateKey, habit.target_per_day)) continue;
+      const creationKey = habitCreationDateKey(habit.created_at);
+      if (
+        !isHabitActionableOn(
+          history,
+          dateKey,
+          habit.target_per_day,
+          creationKey,
+          habit.lifecycle_history,
+        )
+      )
+        continue;
       scheduledCount += 1;
-      const target = getHabitTargetForDate(history, dateKey, habit.target_per_day);
+      const target = getHabitTargetForDate(history, dateKey, habit.target_per_day, creationKey);
       const completed = input.countsByHabitDate[habit.id]?.[dateKey] ?? 0;
       if (completed >= target) completedCount += 1;
     }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinkedActionsEditorSection } from '@/core/linked-actions/LinkedActionsEditorSection';
@@ -18,7 +19,6 @@ import { Text } from '@/core/ui/Text';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { IconButton } from '@/core/ui/IconButton';
 import { PageHeader } from '@/core/ui/PageHeader';
-import { ScreenSection } from '@/core/ui/ScreenSection';
 import { StatBlock } from '@/core/ui/StatBlock';
 import { TextField } from '@/core/ui/TextField';
 import { NumberStepperField } from '@/core/ui/NumberStepperField';
@@ -59,11 +59,9 @@ import {
   calculateCurrentStreak,
   calculateOverallConsistency,
   filterHabits,
-  formatHabitSchedule,
   getHabitRuleForDate,
   getHabitSchedulePreset,
   habitCreationDateKey,
-  isHabitActionableOn,
   normalizeHabitWeekdays,
   shouldAwardHabitFastPath,
   sortHabits,
@@ -74,16 +72,20 @@ import {
 } from '@/features/habits/habits.domain';
 import { migrateLegacyHabitLifecycle } from '@/features/habits/habitLifecycle.store';
 import type { HeatmapDay } from '@/features/shared/activityTypes';
-import { HabitCircle } from '@/features/habits/HabitCircle';
+import { HabitCheckInRow } from '@/features/habits/HabitCheckInRow';
+import { HabitEditorChoice } from '@/features/habits/HabitEditorChoice';
+import {
+  buildHabitCheckInRow,
+  groupHabitCheckInRows,
+  summarizeHabitsForDate,
+  type HabitCheckInRowModel,
+} from '@/features/habits/habitCheckIn.domain';
 import { HabitDayStrip, type HabitDayStripDay } from '@/features/habits/HabitDayStrip';
 import {
   buildHabitDayStrip,
   buildHabitRuleHistoryIndex,
-  summarizeHabitsToday,
 } from '@/features/habits/habitsScreen.derivations';
-import { ProgressRing } from '@/features/habits/ProgressRing';
 import { HabitsOverviewGrid } from '@/features/habits/HabitsOverviewGrid';
-import { HabitProgressInsightsModal } from '@/features/habits/HabitProgressInsightsModal';
 import { HabitDetailModal } from '@/features/habits/HabitDetailModal';
 import {
   DEFAULT_HABIT_COLOR,
@@ -92,7 +94,7 @@ import {
   HABIT_ICONS,
 } from '@/features/habits/habitPresets';
 import { SECTION_COLORS } from '@/constants/sectionColors';
-import { dateKeyToLocalDate, toDateKey } from '@/lib/time';
+import { toDateKey } from '@/lib/time';
 import { parseNumericInput } from '@/lib/numericInput';
 import { createSubmitGuard } from '@/lib/submitGuard';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
@@ -124,22 +126,6 @@ const TIME_GROUPS = [
   { key: 'evening' as const, label: 'Evening', icon: '🌙' },
 ] as const;
 
-/** Material group glyph per time of day (Pop group header band). */
-const GROUP_ICONS: Record<HabitCategory, keyof typeof MaterialIcons.glyphMap> = {
-  anytime: 'all-inclusive',
-  morning: 'wb-sunny',
-  afternoon: 'wb-twilight',
-  evening: 'nightlight-round',
-};
-
-function formatStripDateLabel(dateKey: string): string {
-  return dateKeyToLocalDate(dateKey).toLocaleDateString('en', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
 const COLOR = SECTION_COLORS.habits;
 const HABIT_LINKED_ACTION_SOURCE_KEY = 'habit-linked-actions-source';
 const HABIT_REMINDER_E2E_TEST = process.env.EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST === 'true';
@@ -160,13 +146,10 @@ const WEEKDAY_OPTIONS: { value: HabitWeekday; label: string; fullLabel: string }
 ];
 const DEFAULT_HABIT_REMINDER_TIME = '18:00';
 
-function heatmapDaysEqual(a: HeatmapDay[], b: HeatmapDay[]): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i].dateKey !== b[i].dateKey || a[i].value !== b[i].value) return false;
-  }
-  return true;
-}
+type CheckInListItem =
+  | { kind: 'header'; key: string; title: string }
+  | { kind: 'habit'; key: string; row: HabitCheckInRowModel };
+const EMPTY_COUNTS: Readonly<Record<string, number>> = {};
 
 export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
@@ -178,6 +161,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const { begin: beginRefresh } = useGuardedAsyncRefresh();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [habitsLoaded, setHabitsLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   // habitId → dateKey → count for every loaded completion row; today's and
   // past-day views (day strip) both read from this one map.
   const [countsByHabitDate, setCountsByHabitDate] = useState<
@@ -191,9 +175,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   }, [dayGeneration]);
   const [streakMap, setStreakMap] = useState<Record<string, number>>({});
   const [modalVisible, setModalVisible] = useState(false);
-  const [editMode, setEditMode] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
-  const [insightsHabit, setInsightsHabit] = useState<Habit | null>(null);
   const [name, setName] = useState('');
   const [target, setTarget] = useState('1');
   const [category, setCategory] = useState<HabitCategory>('anytime');
@@ -208,9 +190,6 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     useState<NotificationPermissionState>('not_determined');
   const [reminderPermissionBusy, setReminderPermissionBusy] = useState(false);
   const [reminderError, setReminderError] = useState<string | null>(null);
-  const [habitHeatmapDays, setHabitHeatmapDays] = useState<HeatmapDay[]>([]);
-  const [consistencyPct, setConsistencyPct] = useState(0);
-  const [overallStreak, setOverallStreak] = useState(0);
   const [habitError, setHabitError] = useState<string | null>(null);
   const [isSavingHabit, setIsSavingHabit] = useState(false);
   const habitSubmitGuard = useRef(createSubmitGuard());
@@ -219,7 +198,14 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const [linkedActionsLoading, setLinkedActionsLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<HabitStatusFilter>('active');
   const [sortMode, setSortMode] = useState<HabitSortMode>('default');
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [trendsOpen, setTrendsOpen] = useState(false);
+  const [checkInError, setCheckInError] = useState<string | null>(null);
   const [detailHabit, setDetailHabit] = useState<Habit | null>(null);
+  const [detailConfirmationOpen, setDetailConfirmationOpen] = useState(false);
+  const deletionPending = useRef(false);
+  const binaryWrites = useRef(new Set<string>());
+  const [busyHabitIds, setBusyHabitIds] = useState<ReadonlySet<string>>(new Set());
 
   const displayedHabits = useMemo(
     () => sortHabits(filterHabits(habits, { status: statusFilter }), sortMode, streakMap),
@@ -230,73 +216,48 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     // Rollover/foreground races: an older run must never overwrite newer
     // day-keyed state after a newer refresh started or the screen unmounted.
     const isCurrent = beginRefresh();
-    // One-time import of the pre-v20 AsyncStorage pause/archive sets.
-    await migrateLegacyHabitLifecycle();
-    const list = await listHabits();
-    if (!isCurrent()) return;
-    setHabits(list);
-    setHabitsLoaded(true);
-    const todayKey = toDateKey();
-    // F13: one full completion scan feeds the per-day counts, streaks (full
-    // history), and the 364-day grid slice — no second overlapping query.
-    const allHabitCompletions = await getAllHabitCompletions();
-    if (!isCurrent()) return;
-    const completionsByHabit = new Map<string, typeof allHabitCompletions>();
-    const nextCountsByHabitDate: Record<string, Record<string, number>> = {};
-    for (const completion of allHabitCompletions) {
-      const habitRows = completionsByHabit.get(completion.habit_id) ?? [];
-      habitRows.push(completion);
-      completionsByHabit.set(completion.habit_id, habitRows);
-      (nextCountsByHabitDate[completion.habit_id] ??= {})[completion.date_key] = completion.count;
+    try {
+      // One-time import of the pre-v20 AsyncStorage pause/archive sets.
+      await migrateLegacyHabitLifecycle();
+      const list = await listHabits();
+      if (!isCurrent()) return;
+      setHabits(list);
+      const todayKey = toDateKey();
+      // F13: one full completion scan feeds the per-day counts, streaks (full
+      // history), and the 364-day grid slice — no second overlapping query.
+      const allHabitCompletions = await getAllHabitCompletions();
+      if (!isCurrent()) return;
+      const completionsByHabit = new Map<string, typeof allHabitCompletions>();
+      const nextCountsByHabitDate: Record<string, Record<string, number>> = {};
+      for (const completion of allHabitCompletions) {
+        const habitRows = completionsByHabit.get(completion.habit_id) ?? [];
+        habitRows.push(completion);
+        completionsByHabit.set(completion.habit_id, habitRows);
+        (nextCountsByHabitDate[completion.habit_id] ??= {})[completion.date_key] = completion.count;
+      }
+      setCountsByHabitDate(nextCountsByHabitDate);
+
+      const streaks: Record<string, number> = {};
+      for (const habit of list) {
+        const completions = completionsByHabit.get(habit.id) ?? [];
+        const dayCompletions = buildDayCompletions(
+          completions,
+          habit.target_per_day,
+          undefined,
+          habit.rule_history,
+          habitCreationDateKey(habit.created_at),
+          todayKey,
+          habit.lifecycle_history,
+        );
+        streaks[habit.id] = calculateCurrentStreak(dayCompletions, todayKey);
+      }
+      setStreakMap(streaks);
+
+      setHabitsLoaded(true);
+      setLoadError(null);
+    } catch {
+      if (isCurrent()) setLoadError('Could not load habits. Try again.');
     }
-    setCountsByHabitDate(nextCountsByHabitDate);
-
-    const streaks: Record<string, number> = {};
-    for (const habit of list) {
-      const completions = completionsByHabit.get(habit.id) ?? [];
-      const dayCompletions = buildDayCompletions(
-        completions,
-        habit.target_per_day,
-        undefined,
-        habit.rule_history,
-        habitCreationDateKey(habit.created_at),
-        todayKey,
-        habit.lifecycle_history,
-      );
-      streaks[habit.id] = calculateCurrentStreak(dayCompletions, todayKey);
-    }
-    setStreakMap(streaks);
-
-    const start364 = new Date();
-    start364.setDate(start364.getDate() - 363);
-    const startKey = toDateKey(start364);
-
-    const gridCompletions = allHabitCompletions.filter(
-      (completion) => completion.date_key >= startKey,
-    );
-    const gridBuilt = buildHabitGrid(
-      list.map((h) => ({
-        id: h.id,
-        name: h.name,
-        color: h.color,
-        target_per_day: h.target_per_day,
-        rule_history: h.rule_history,
-        created_at: h.created_at,
-        lifecycle_history: h.lifecycle_history,
-      })),
-      gridCompletions,
-      364,
-      todayKey,
-    );
-    const pct = calculateOverallConsistency(gridBuilt);
-    const nextHeatmapDays = buildAggregatedHabitHeatmap(gridBuilt, 364);
-    setConsistencyPct((prev) => (prev === pct ? prev : pct));
-    setHabitHeatmapDays((prev) =>
-      heatmapDaysEqual(prev, nextHeatmapDays) ? prev : nextHeatmapDays,
-    );
-
-    const bestStreak = Math.max(0, ...Object.values(streaks));
-    setOverallStreak(bestStreak);
   }, [beginRefresh]);
 
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
@@ -614,47 +575,87 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   };
 
   const handleIncrement = useCallback(
-    async (habitId: string, dateKey: string) => {
-      const result = await incrementHabit(habitId, dateKey);
-      for (const notice of result.linkedActions.notices) {
-        showNotice(notice);
+    async (habitId: string, dateKey: string, binary = false) => {
+      if (binary && binaryWrites.current.has(habitId)) return;
+      if (binary) {
+        binaryWrites.current.add(habitId);
+        setBusyHabitIds(new Set(binaryWrites.current));
       }
-      // Fast path only for confirmed TODAY writes (idempotent per day+habit,
-      // so a replay can never double-award). Backdated day-strip check-ins
-      // and refused writes (count 0) degrade to reconcile backfill with the
-      // action-day key — a today-keyed award for either would mis-attribute.
-      if (shouldAwardHabitFastPath(dateKey, result.count, toDateKey())) {
-        recordAction('habit', habitId);
+      try {
+        const result = await incrementHabit(habitId, dateKey);
+        for (const notice of result.linkedActions.notices) {
+          showNotice(notice);
+        }
+        if (result.count <= 0) {
+          setCheckInError('Check-in did not save. Try again.');
+        } else {
+          setCheckInError(null);
+        }
+        // Fast path only for confirmed TODAY writes (idempotent per day+habit,
+        // so a replay can never double-award). Backdated day-strip check-ins
+        // and refused writes (count 0) degrade to reconcile backfill with the
+        // action-day key — a today-keyed award for either would mis-attribute.
+        if (shouldAwardHabitFastPath(dateKey, result.count, toDateKey())) {
+          recordAction('habit', habitId);
+        }
+        await refresh();
+      } catch {
+        setCheckInError('Check-in did not save. Try again.');
+      } finally {
+        binaryWrites.current.delete(habitId);
+        setBusyHabitIds(new Set(binaryWrites.current));
       }
-      void refresh();
     },
     [recordAction, refresh, showNotice],
   );
 
   const handleDecrement = useCallback(
-    async (habitId: string, dateKey: string) => {
-      await decrementHabit(habitId, dateKey);
-      void refresh();
+    async (habitId: string, dateKey: string, binary = false) => {
+      if (binary && binaryWrites.current.has(habitId)) return;
+      if (binary) {
+        binaryWrites.current.add(habitId);
+        setBusyHabitIds(new Set(binaryWrites.current));
+      }
+      try {
+        await decrementHabit(habitId, dateKey);
+        setCheckInError(null);
+        await refresh();
+      } catch {
+        setCheckInError('Could not remove that check-in. Try again.');
+      } finally {
+        binaryWrites.current.delete(habitId);
+        setBusyHabitIds(new Set(binaryWrites.current));
+      }
     },
     [refresh],
   );
 
-  const handleAddHabitToGroup = (timeOfDay: HabitCategory) => {
-    openAddModal(timeOfDay);
-  };
-
   const handleDeleteHabit = useCallback(
     async (habit: Habit) => {
-      const confirmed = await confirm({
-        title: 'Remove habit',
-        message: `Remove "${habit.name}"?`,
-        confirmLabel: 'Delete habit',
-        confirmVariant: 'danger',
-      });
-      if (!confirmed) return;
-
-      await deleteHabit(habit.id);
-      await refresh();
+      if (deletionPending.current) return;
+      deletionPending.current = true;
+      // RN Web portals mount in creation order. The newly opened detail can
+      // otherwise cover the older confirmation host even while it is visible.
+      // Preserve the detail's section state so Cancel returns to Settings.
+      setDetailConfirmationOpen(Platform.OS === 'web');
+      setCheckInError(null);
+      try {
+        const confirmed = await confirm({
+          title: 'Remove habit',
+          message: `Remove "${habit.name}"?`,
+          confirmLabel: 'Delete habit',
+          confirmVariant: 'danger',
+        });
+        if (!confirmed) return;
+        await deleteHabit(habit.id);
+        setDetailHabit((current) => (current?.id === habit.id ? null : current));
+        await refresh();
+      } catch {
+        setCheckInError('Could not delete this habit. Try again.');
+      } finally {
+        deletionPending.current = false;
+        setDetailConfirmationOpen(false);
+      }
     },
     [confirm, refresh],
   );
@@ -685,7 +686,6 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   };
 
   const todayKey = toDateKey();
-  const viewingPastDay = selectedDateKey !== todayKey;
   // Paused/archived habits carry no obligation today (F1): only durable-active
   // rows count toward the scheduled/completed denominators. Memoized on the
   // source list so a re-render with unchanged data recomputes nothing, and so
@@ -700,16 +700,31 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   // render, because `activeHabits` had a fresh identity each render.
   const ruleHistoryById = useMemo(() => buildHabitRuleHistoryIndex(activeHabits), [activeHabits]);
 
-  const { scheduledTodayCount, completedTodayCount, todayProgress } = useMemo(
+  const selectedSummary = useMemo(
     () =>
-      summarizeHabitsToday({
-        activeHabits,
-        ruleHistoryById,
+      summarizeHabitsForDate({
+        habits: activeHabits,
         countsByHabitDate,
+        dateKey: selectedDateKey,
         todayKey,
       }),
-    [activeHabits, ruleHistoryById, countsByHabitDate, todayKey],
+    [activeHabits, countsByHabitDate, selectedDateKey, todayKey],
   );
+  const checkInRows = useMemo(
+    () =>
+      displayedHabits.map((habit) =>
+        buildHabitCheckInRow({
+          habit,
+          dateKey: selectedDateKey,
+          todayKey,
+          count: countsByHabitDate[habit.id]?.[selectedDateKey] ?? 0,
+          currentStreak: streakMap[habit.id] ?? 0,
+        }),
+      ),
+    [countsByHabitDate, displayedHabits, selectedDateKey, streakMap, todayKey],
+  );
+  const checkInGroups = useMemo(() => groupHabitCheckInRows(checkInRows), [checkInRows]);
+  const habitsById = useMemo(() => new Map(habits.map((habit) => [habit.id, habit])), [habits]);
 
   // Last 7 days ending at today (today anchored last), with per-day
   // scheduled/completed aggregates over durable-active habits only.
@@ -719,29 +734,69 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     [activeHabits, ruleHistoryById, countsByHabitDate],
   );
 
-  const heroSubtitle =
-    todayProgress === null
-      ? 'Rest day · Track daily consistency.'
-      : `${completedTodayCount} of ${scheduledTodayCount} done today · Track daily consistency.`;
+  const listItems = useMemo<CheckInListItem[]>(
+    () =>
+      checkInGroups.flatMap((group) => [
+        { kind: 'header' as const, key: `group-${group.key}`, title: group.label },
+        ...group.rows.map((row) => ({ kind: 'habit' as const, key: row.habitId, row })),
+      ]),
+    [checkInGroups],
+  );
+  // Reflection is computed only when opened; no yearly heatmap on a normal check-in.
+  const trendsGrid = useMemo(() => {
+    if (!trendsOpen) return [];
+    const completions = Object.entries(countsByHabitDate).flatMap(([habit_id, counts]) =>
+      Object.entries(counts).map(([date_key, count]) => ({ habit_id, date_key, count })),
+    );
+    return buildHabitGrid(habits, completions, 364, todayKey);
+  }, [countsByHabitDate, habits, todayKey, trendsOpen]);
+  const consistencyPct = useMemo(() => calculateOverallConsistency(trendsGrid), [trendsGrid]);
+  const habitHeatmapDays = useMemo<HeatmapDay[]>(
+    () => (trendsOpen ? buildAggregatedHabitHeatmap(trendsGrid, 364) : []),
+    [trendsGrid, trendsOpen],
+  );
+  const overallStreak = Math.max(0, ...Object.values(streakMap));
+  const filterCount = (statusFilter === 'active' ? 0 : 1) + (sortMode === 'default' ? 0 : 1);
+  const currentDetailHabit = detailHabit ? (habitsById.get(detailHabit.id) ?? null) : null;
+  const detailRow = currentDetailHabit
+    ? buildHabitCheckInRow({
+        habit: currentDetailHabit,
+        dateKey: selectedDateKey,
+        todayKey,
+        count: countsByHabitDate[currentDetailHabit.id]?.[selectedDateKey] ?? 0,
+        currentStreak: streakMap[currentDetailHabit.id] ?? 0,
+      })
+    : null;
 
   return (
     <Screen
-      scroll
+      scroll={false}
       padded
+      contentMaxWidth={720}
       hero={
         <View className="gap-2">
           <PageHeader
-            eyebrow="TODAY"
+            eyebrow="Daily check-in"
             title="Habits"
-            subtitle={heroSubtitle}
+            subtitle={habitsLoaded ? selectedSummary.label : 'Loading check-ins…'}
             actions={
-              <IconButton
-                icon={editMode ? 'close' : 'edit'}
-                onPress={() => setEditMode((e) => !e)}
-                accessibilityLabel={editMode ? 'Exit habit edit mode' : 'Enter habit edit mode'}
-                selected={editMode}
-                accentColor={sectionAccents.habits.text}
-              />
+              <View className="flex-row items-center gap-2">
+                <IconButton
+                  icon="add"
+                  onPress={() => openAddModal('anytime')}
+                  accessibilityLabel="Add habit"
+                  accentColor={sectionAccents.habits.text}
+                />
+                <IconButton
+                  icon="tune"
+                  onPress={() => setFilterSheetOpen(true)}
+                  accessibilityLabel={
+                    filterCount > 0 ? `Filter and sort, ${filterCount} active` : 'Filter and sort'
+                  }
+                  selected={filterCount > 0}
+                  accentColor={sectionAccents.habits.text}
+                />
+              </View>
             }
           />
           {habitsLoaded ? (
@@ -754,10 +809,96 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
               />
             </View>
           ) : null}
+          {checkInError ? (
+            <Text accessibilityRole="alert" variant="caption" style={{ color: tokens.dangerText }}>
+              {checkInError}
+            </Text>
+          ) : null}
         </View>
       }
     >
-      <ScreenSection className="gap-2" accessibilityLabel="Habit list filters">
+      {loadError ? (
+        <View className="gap-3">
+          <Text accessibilityRole="alert" variant="bodyMd" style={{ color: tokens.dangerText }}>
+            {loadError}
+          </Text>
+          <Button label="Retry loading habits" variant="ghost" onPress={() => void refresh()} />
+        </View>
+      ) : !habitsLoaded ? (
+        <View className="gap-3" accessibilityLabel="Loading habits">
+          <SkeletonBlock height={56} radius={12} />
+          <SkeletonBlock height={56} radius={12} />
+          <SkeletonBlock height={56} radius={12} />
+        </View>
+      ) : habits.length === 0 ? (
+        <View>
+          <EmptyStateCard
+            accentColor={SECTION_COLORS.habits}
+            title="No habits yet"
+            description="Add a habit to start today's check-in."
+            illustration={<SparkIllustration color={SECTION_COLORS.habits} />}
+          >
+            <Button
+              label="Add a habit"
+              color={SECTION_COLORS.habits}
+              onPress={() => openAddModal('anytime')}
+            />
+          </EmptyStateCard>
+          <View className="pt-4">
+            <Button label="Trends" variant="ghost" onPress={() => setTrendsOpen(true)} />
+          </View>
+        </View>
+      ) : (
+        <FlashList
+          data={listItems}
+          keyExtractor={(item) => item.key}
+          getItemType={(item) => item.kind}
+          ListEmptyComponent={
+            <Text variant="bodyMd" tone="muted" className="py-6">
+              No habits in this view.
+            </Text>
+          }
+          renderItem={({ item }) => {
+            if (item.kind === 'header')
+              return (
+                <Text variant="label" tone="muted" className="pb-1 pt-4">
+                  {item.title}
+                </Text>
+              );
+            const habit = habitsById.get(item.row.habitId);
+            if (!habit) return null;
+            return (
+              <HabitCheckInRow
+                habit={habit}
+                row={item.row}
+                busy={busyHabitIds.has(habit.id)}
+                onIncrement={() => {
+                  void handleIncrement(habit.id, selectedDateKey, !item.row.quantitative);
+                }}
+                onDecrement={() => {
+                  void handleDecrement(habit.id, selectedDateKey, !item.row.quantitative);
+                }}
+                onOpen={() => setDetailHabit(habit)}
+              />
+            );
+          }}
+          ListFooterComponent={
+            <View className="pt-4">
+              <Button label="Trends" variant="ghost" onPress={() => setTrendsOpen(true)} />
+            </View>
+          }
+        />
+      )}
+
+      <Modal
+        visible={filterSheetOpen}
+        onClose={() => setFilterSheetOpen(false)}
+        title="Filter and sort"
+        modalLayout="bottom-sheet"
+      >
+        <Text variant="label" tone="muted" className="mb-2">
+          Status
+        </Text>
         <SegmentedControl
           options={(
             [
@@ -776,6 +917,9 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
           accentColor={COLOR}
           accessibilityLabel="Habit status filter"
         />
+        <Text variant="label" tone="muted" className="mb-2 mt-4">
+          Sort
+        </Text>
         <View className="flex-row flex-wrap">
           {(
             [
@@ -794,471 +938,48 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
             />
           ))}
         </View>
-      </ScreenSection>
+      </Modal>
 
-      <ScreenSection className="gap-4 pb-2" accessibilityLabel="Habit groups">
-        {!habitsLoaded ? (
-          // First-load placeholders in place of the grid (no premature
-          // "No habits yet" flash while SQLite is still opening).
-          <View className="gap-4" accessibilityLabel="Loading habits">
-            <SkeletonBlock height={64} radius={16} />
-            <SkeletonBlock height={260} radius={16} />
-            <SkeletonBlock height={200} radius={16} />
-          </View>
-        ) : habits.length === 0 ? (
-          <EmptyStateCard
+      <Modal visible={trendsOpen} onClose={() => setTrendsOpen(false)} title="Trends" scroll>
+        <Text variant="bodyMd" tone="muted" className="mb-3">
+          {habits.length} habits across your daily routine
+        </Text>
+        <View
+          accessible
+          accessibilityLabel={
+            selectedSummary.isToday
+              ? selectedSummary.scheduledCount === 0
+                ? 'No habits scheduled today.'
+                : `Today: ${selectedSummary.completedCount} of ${selectedSummary.scheduledCount} scheduled habits complete.`
+              : selectedSummary.accessibilityLabel
+          }
+        >
+          <Text variant="bodyLg">
+            {selectedSummary.scheduledCount === 0
+              ? 'Rest day'
+              : `${selectedSummary.completedCount} of ${selectedSummary.scheduledCount} scheduled`}
+          </Text>
+        </View>
+        <View className="mt-4 flex-row flex-wrap gap-3">
+          <StatBlock
             accentColor={SECTION_COLORS.habits}
-            title="No habits yet"
-            description="Pick a time of day and tap Add to create your first habit."
-            illustration={<SparkIllustration color={SECTION_COLORS.habits} />}
-          >
-            <Button
-              label="Add a habit"
-              color={SECTION_COLORS.habits}
-              onPress={() => openAddModal('anytime')}
-            />
-          </EmptyStateCard>
-        ) : null}
-
-        {habitsLoaded
-          ? TIME_GROUPS.map((group) => {
-              const groupHabits = displayedHabits.filter(
-                (h) => (h.category ?? 'anytime') === group.key,
-              );
-
-              return (
-                <Card
-                  key={group.key}
-                  accentColor={SECTION_COLORS.habits}
-                  variant="header"
-                  headerTitle={group.label}
-                  headerSubtitle={`${groupHabits.length} ${groupHabits.length === 1 ? 'habit' : 'habits'}`}
-                  headerRight={
-                    <MaterialIcons name={GROUP_ICONS[group.key]} size={24} color={tokens.onSolid} />
-                  }
-                >
-                  <View className="flex-row flex-wrap justify-center gap-x-4 gap-y-5">
-                    {editMode
-                      ? groupHabits.map((habit) => (
-                          <View
-                            key={habit.id}
-                            className="items-center"
-                            style={{ width: 104, alignItems: 'center' }}
-                          >
-                            <Card
-                              accentColor={habit.color ?? DEFAULT_HABIT_COLOR}
-                              className="mb-0 w-full"
-                              innerClassName="items-center px-3 py-4"
-                            >
-                              <View
-                                className="mb-3 h-14 w-14 items-center justify-center rounded-full"
-                                style={{
-                                  backgroundColor: `${habit.color ?? DEFAULT_HABIT_COLOR}18`,
-                                }}
-                              >
-                                <MaterialIcons
-                                  name={habit.icon ?? DEFAULT_HABIT_ICON}
-                                  size={24}
-                                  color={habit.color ?? DEFAULT_HABIT_COLOR}
-                                />
-                              </View>
-                              <Text
-                                variant="caption"
-                                style={{ color: tokens.text, textAlign: 'center' }}
-                                numberOfLines={2}
-                              >
-                                {habit.name}
-                              </Text>
-                              <View className="mt-3 w-full gap-1.5">
-                                <Pressable
-                                  onPress={() => {
-                                    void openEditModal(habit);
-                                  }}
-                                  accessibilityRole="button"
-                                  accessibilityLabel={`Edit ${habit.name}`}
-                                  className="min-h-[44px] w-full items-center justify-center rounded-full px-3"
-                                  style={{ backgroundColor: COLOR }}
-                                >
-                                  <Text variant="caption" style={{ color: tokens.textOnAccent }}>
-                                    Edit
-                                  </Text>
-                                </Pressable>
-                                <Pressable
-                                  onPress={() => {
-                                    void handleDeleteHabit(habit);
-                                  }}
-                                  accessibilityRole="button"
-                                  accessibilityLabel={`Delete ${habit.name}`}
-                                  className="min-h-[44px] w-full items-center justify-center rounded-full px-3"
-                                  style={{ backgroundColor: tokens.dangerSolid }}
-                                >
-                                  <Text variant="caption" style={{ color: tokens.textOnAccent }}>
-                                    Delete
-                                  </Text>
-                                </Pressable>
-                              </View>
-                            </Card>
-                          </View>
-                        ))
-                      : groupHabits.map((habit) => {
-                          // Grid reflects the selected check-in day (today by
-                          // default); writes go through the same data functions.
-                          const displayCount = countsByHabitDate[habit.id]?.[selectedDateKey] ?? 0;
-                          const streak = streakMap[habit.id] ?? 0;
-                          // Write gate mirrors the data layer: paused/
-                          // archived habits, lifecycle-masked dates, and
-                          // pre-creation dates accept no check-ins.
-                          const actionableOnSelected =
-                            (habit.status ?? 'active') === 'active' &&
-                            isHabitActionableOn(
-                              habit.rule_history,
-                              selectedDateKey,
-                              habit.target_per_day,
-                              habitCreationDateKey(habit.created_at),
-                              habit.lifecycle_history,
-                            );
-                          const currentRule = getHabitRuleForDate(
-                            habit.rule_history,
-                            selectedDateKey,
-                            habit.target_per_day,
-                          );
-                          const isQuantitative = habit.target_per_day > 1;
-                          return (
-                            <View
-                              key={habit.id}
-                              className="items-center justify-center"
-                              style={{ width: 92, alignItems: 'center' }}
-                            >
-                              <HabitCircle
-                                habit={habit}
-                                todayCount={displayCount}
-                                streak={streak}
-                                size={64}
-                                showName={false}
-                                showStreak={false}
-                                scheduledToday={actionableOnSelected}
-                                dayPhrase={
-                                  viewingPastDay
-                                    ? `on ${formatStripDateLabel(selectedDateKey)}`
-                                    : undefined
-                                }
-                                onIncrement={() => handleIncrement(habit.id, selectedDateKey)}
-                                onDecrement={() => handleDecrement(habit.id, selectedDateKey)}
-                              />
-                              {isQuantitative && actionableOnSelected ? (
-                                <>
-                                  <Text
-                                    variant="caption"
-                                    className="mt-1 w-[92px] text-center tabular-nums"
-                                    style={{ color: tokens.text, fontSize: 11 }}
-                                    accessibilityLabel={`${habit.name}: ${displayCount} of ${habit.target_per_day} done`}
-                                  >
-                                    {displayCount} / {habit.target_per_day}
-                                  </Text>
-                                  {/* Visible −/+ so decrement is not
-                                    long-press-only; hitSlop keeps the touch
-                                    target at 44pt inside the 84pt column. */}
-                                  <View className="mt-1 flex-row items-center gap-2">
-                                    <Pressable
-                                      onPress={() => handleDecrement(habit.id, selectedDateKey)}
-                                      disabled={displayCount <= 0}
-                                      hitSlop={8}
-                                      accessibilityRole="button"
-                                      accessibilityLabel={`Remove one ${habit.name}`}
-                                      accessibilityState={{ disabled: displayCount <= 0 }}
-                                      className="h-8 w-8 items-center justify-center rounded-full border"
-                                      style={{
-                                        borderColor: tokens.border,
-                                        backgroundColor: tokens.surfaceElevated,
-                                        opacity: displayCount <= 0 ? 0.4 : 1,
-                                      }}
-                                    >
-                                      <Text
-                                        variant="label"
-                                        style={{ color: tokens.text, fontSize: 18, lineHeight: 20 }}
-                                      >
-                                        −
-                                      </Text>
-                                    </Pressable>
-                                    <Pressable
-                                      onPress={() => handleIncrement(habit.id, selectedDateKey)}
-                                      hitSlop={8}
-                                      accessibilityRole="button"
-                                      accessibilityLabel={`Add one ${habit.name}`}
-                                      className="h-8 w-8 items-center justify-center rounded-full border"
-                                      style={{
-                                        borderColor: SECTION_COLORS.habits,
-                                        backgroundColor: `${SECTION_COLORS.habits}18`,
-                                      }}
-                                    >
-                                      <Text
-                                        variant="label"
-                                        style={{
-                                          color: sectionAccents.habits.text,
-                                          fontSize: 18,
-                                          lineHeight: 20,
-                                        }}
-                                      >
-                                        +
-                                      </Text>
-                                    </Pressable>
-                                  </View>
-                                </>
-                              ) : null}
-                              <Pressable
-                                accessibilityRole="button"
-                                accessibilityLabel={`Open ${habit.name} history`}
-                                className="mt-2 w-[92px] items-center"
-                                onPress={() => setDetailHabit(habit)}
-                              >
-                                <Text
-                                  variant="caption"
-                                  style={{
-                                    color: tokens.textMuted,
-                                    textAlign: 'center',
-                                    fontSize: 11,
-                                  }}
-                                  numberOfLines={2}
-                                >
-                                  {habit.name}
-                                </Text>
-                              </Pressable>
-                              <Text
-                                variant="caption"
-                                className="mt-0.5 w-[92px] text-center"
-                                style={{ color: tokens.textMuted, fontSize: 10, lineHeight: 16 }}
-                                numberOfLines={1}
-                              >
-                                {formatHabitSchedule(currentRule?.weekdays ?? ALL_HABIT_WEEKDAYS)}
-                              </Text>
-                              {parseHabitReminderTime(habit.reminder_time) ? (
-                                <View
-                                  className="mt-0.5 w-[92px] flex-row items-center justify-center gap-1"
-                                  accessible
-                                  accessibilityLabel={`Reminder ${formatHabitReminderTime(parseHabitReminderTime(habit.reminder_time)!)}`}
-                                >
-                                  <MaterialIcons
-                                    name="notifications-none"
-                                    size={11}
-                                    color={sectionAccents.habits.text}
-                                  />
-                                  <Text
-                                    variant="caption"
-                                    style={{
-                                      color: sectionAccents.habits.text,
-                                      fontSize: 10,
-                                      lineHeight: 16,
-                                    }}
-                                  >
-                                    {formatHabitReminderTime(
-                                      parseHabitReminderTime(habit.reminder_time)!,
-                                    )}
-                                  </Text>
-                                </View>
-                              ) : null}
-                              {streak > 0 ? (
-                                <View
-                                  className="mt-1 flex-row items-center gap-1 rounded-full px-2 py-1"
-                                  style={{ backgroundColor: sectionAccents.habits.tint }}
-                                >
-                                  <MaterialIcons
-                                    name={streak > 2 ? 'local-fire-department' : 'bolt'}
-                                    size={11}
-                                    color={sectionAccents.habits.text}
-                                  />
-                                  <Text
-                                    variant="caption"
-                                    style={{ color: sectionAccents.habits.text, fontSize: 10 }}
-                                  >
-                                    {streak}
-                                  </Text>
-                                </View>
-                              ) : null}
-                              <Pressable
-                                onPress={() => setInsightsHabit(habit)}
-                                accessibilityRole="button"
-                                accessibilityLabel={`View progress for ${habit.name}`}
-                                className="mt-1 min-h-[44px] w-[92px] items-center justify-center rounded-full border px-2 py-1"
-                                style={{
-                                  borderColor: SECTION_COLORS.habits,
-                                  backgroundColor: tokens.surfaceElevated,
-                                }}
-                              >
-                                <Text
-                                  variant="caption"
-                                  style={{ color: sectionAccents.habits.text, fontSize: 10 }}
-                                >
-                                  Progress
-                                </Text>
-                              </Pressable>
-                            </View>
-                          );
-                        })}
-
-                    <View className="items-center" style={{ width: editMode ? 104 : 92 }}>
-                      <Pressable
-                        onPress={() => handleAddHabitToGroup(group.key)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Add ${group.label.toLowerCase()} habit`}
-                        className="h-[72px] w-[72px] shrink-0 grow-0 items-center justify-center rounded-3xl border-2 border-dashed"
-                        style={{
-                          borderColor: SECTION_COLORS.habits + '66',
-                          backgroundColor: `${SECTION_COLORS.habits}14`,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 26,
-                            color: sectionAccents.habits.text,
-                            lineHeight: 30,
-                          }}
-                        >
-                          +
-                        </Text>
-                      </Pressable>
-                      <Text
-                        variant="caption"
-                        className="mt-2"
-                        style={{ color: sectionAccents.habits.text }}
-                      >
-                        Add
-                      </Text>
-                    </View>
-                  </View>
-                </Card>
-              );
-            })
-          : null}
-      </ScreenSection>
-
-      <ScreenSection>
-        <Card accentColor={SECTION_COLORS.habits} className="mb-0" innerClassName="p-0">
-          <View className="p-4">
-            <View className="flex-row items-start gap-3">
-              <View
-                className="h-11 w-11 items-center justify-center rounded-xl"
-                style={{ backgroundColor: `${SECTION_COLORS.habits}18` }}
-              >
-                <MaterialIcons name="track-changes" size={22} color={sectionAccents.habits.text} />
-              </View>
-              <View className="min-w-0 flex-1">
-                <Text variant="titleMd">Today&apos;s rhythm</Text>
-                <Text variant="bodyMd" tone="muted" className="mt-0.5">
-                  {habits.length} habits across your daily routine
-                </Text>
-              </View>
-            </View>
-
-            {/* Blueprint §3B: one calm completion summary — ring + caption.
-                Rest day renders a neutral empty ring with no fake percentage. */}
-            <View
-              className="mt-4 flex-row items-center gap-4"
-              accessible
-              accessibilityLabel={
-                todayProgress === null
-                  ? 'No habits scheduled today.'
-                  : `Today: ${completedTodayCount} of ${scheduledTodayCount} scheduled habits complete.`
-              }
-            >
-              <View
-                style={{
-                  width: 76,
-                  height: 76,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <ProgressRing
-                  size={76}
-                  strokeWidth={8}
-                  progress={todayProgress === null ? 0 : completedTodayCount / scheduledTodayCount}
-                  backgroundColor={tokens.border}
-                  progressColor={SECTION_COLORS.habits}
-                />
-                <View
-                  style={{
-                    position: 'absolute',
-                    left: 8,
-                    top: 8,
-                    width: 60,
-                    height: 60,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text
-                    variant="titleMd"
-                    className="tabular-nums"
-                    style={{ color: tokens.text }}
-                    importantForAccessibility="no"
-                  >
-                    {todayProgress === null ? '—' : `${todayProgress}%`}
-                  </Text>
-                </View>
-              </View>
-              <View className="min-w-0 flex-1">
-                <Text variant="bodyLg" style={{ color: tokens.text }}>
-                  {todayProgress === null
-                    ? 'Rest day'
-                    : `${completedTodayCount} of ${scheduledTodayCount} scheduled`}
-                </Text>
-                <Text variant="caption" tone="muted" className="mt-0.5">
-                  {todayProgress === null
-                    ? 'No habits due today.'
-                    : todayProgress >= 100
-                      ? 'All done for today.'
-                      : `${scheduledTodayCount - completedTodayCount} habit${
-                          scheduledTodayCount - completedTodayCount === 1 ? '' : 's'
-                        } left to check in.`}
-                </Text>
-              </View>
-            </View>
-
-            <View className="mt-4 flex-row flex-wrap gap-3">
-              <StatBlock
-                accentColor={SECTION_COLORS.habits}
-                className="min-w-[148px] flex-1"
-                icon={<MaterialIcons name="bolt" size={20} color={sectionAccents.habits.text} />}
-                value={overallStreak}
-                label="Best streak"
-                detail="days in a row"
-              />
-              <StatBlock
-                accentColor={SECTION_COLORS.habits}
-                className="min-w-[148px] flex-1"
-                icon={
-                  <MaterialIcons name="insights" size={20} color={sectionAccents.habits.text} />
-                }
-                value={`${consistencyPct}%`}
-                label="Consistency"
-                detail="over the last year"
-              />
-              <StatBlock
-                accentColor={SECTION_COLORS.habits}
-                className="min-w-[148px] flex-1"
-                icon={
-                  <MaterialIcons
-                    name="calendar-month"
-                    size={20}
-                    color={sectionAccents.habits.text}
-                  />
-                }
-                value={todayProgress === null ? 'Rest' : `${todayProgress}%`}
-                label="Today"
-                detail={
-                  todayProgress === null
-                    ? 'no habits scheduled'
-                    : `${completedTodayCount} of ${scheduledTodayCount} scheduled`
-                }
-              />
-            </View>
-          </View>
-        </Card>
-      </ScreenSection>
-
-      <ScreenSection className="mb-0 pt-1">
-        <HabitsOverviewGrid consistencyPercent={consistencyPct} heatmapDays={habitHeatmapDays} />
-      </ScreenSection>
+            className="min-w-[140px] flex-1"
+            value={overallStreak}
+            label="Highest current streak"
+            detail="scheduled occurrences"
+          />
+          <StatBlock
+            accentColor={SECTION_COLORS.habits}
+            className="min-w-[140px] flex-1"
+            value={`${consistencyPct}%`}
+            label="Consistency"
+            detail="over the last year"
+          />
+        </View>
+        <View className="mt-4">
+          <HabitsOverviewGrid consistencyPercent={consistencyPct} heatmapDays={habitHeatmapDays} />
+        </View>
+      </Modal>
 
       <Modal
         title={editingHabit ? 'Edit Habit' : 'New Habit'}
@@ -1315,11 +1036,11 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
             />
           </View>
           {schedulePreset === 'custom' ? (
-            <View className="mb-3 flex-row justify-between gap-2">
+            <View className="mb-3 flex-row flex-wrap gap-2">
               {WEEKDAY_OPTIONS.map((weekday) => {
                 const selected = weekdays.includes(weekday.value);
                 return (
-                  <Pressable
+                  <HabitEditorChoice
                     key={`${weekday.value}-${weekday.fullLabel}`}
                     onPress={() => {
                       setHabitError(null);
@@ -1332,22 +1053,17 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                         ),
                       );
                     }}
-                    accessibilityRole="checkbox"
-                    accessibilityLabel={`${weekday.fullLabel} scheduled`}
-                    accessibilityState={{ checked: selected }}
-                    className="h-11 min-w-[36px] flex-1 items-center justify-center rounded-xl border"
-                    style={{
-                      borderColor: selected ? COLOR : tokens.border,
-                      backgroundColor: selected ? COLOR : tokens.surfaceElevated,
-                    }}
+                    role="checkbox"
+                    label={`${weekday.fullLabel} scheduled`}
+                    selected={selected}
                   >
                     <Text
                       variant="caption"
-                      style={{ color: selected ? tokens.textOnAccent : tokens.textMuted }}
+                      style={{ color: selected ? tokens.onSolid : tokens.textMuted }}
                     >
                       {weekday.label}
                     </Text>
-                  </Pressable>
+                  </HabitEditorChoice>
                 );
               })}
             </View>
@@ -1371,6 +1087,8 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                 disabled={reminderPermissionBusy || Platform.OS === 'web'}
                 accessibilityRole="switch"
                 accessibilityLabel="Enable habit reminder"
+                aria-checked={reminderEnabled}
+                hitSlop={{ top: 8, bottom: 8, left: 0, right: 0 }}
                 accessibilityState={{ checked: reminderEnabled, disabled: Platform.OS === 'web' }}
                 className="h-8 w-14 justify-center rounded-full px-1"
                 style={{
@@ -1517,28 +1235,21 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
           </Text>
           <View className="mb-3 flex-row flex-wrap gap-2">
             {HABIT_ICONS.map((iconName) => (
-              <Pressable
+              <HabitEditorChoice
                 key={iconName}
                 onPress={() => {
                   setHabitError(null);
                   setIcon(iconName);
                 }}
-                accessibilityRole="button"
-                accessibilityLabel={`Select ${iconName.replace('-', ' ')} icon`}
-                accessibilityState={{ selected: icon === iconName }}
-                className="items-center justify-center rounded-lg p-2"
-                style={{
-                  width: 44,
-                  height: 44,
-                  backgroundColor: icon === iconName ? COLOR : tokens.surfaceElevated,
-                }}
+                label={`Select ${iconName.replace('-', ' ')} icon`}
+                selected={icon === iconName}
               >
                 <MaterialIcons
                   name={iconName}
                   size={24}
-                  color={icon === iconName ? tokens.textOnAccent : tokens.iconMuted}
+                  color={icon === iconName ? tokens.onSolid : tokens.iconMuted}
                 />
-              </Pressable>
+              </HabitEditorChoice>
             ))}
           </View>
           <Text variant="label" className="mb-1">
@@ -1546,23 +1257,15 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
           </Text>
           <View className="mb-3 flex-row flex-wrap gap-2">
             {HABIT_COLORS.map((c) => (
-              <Pressable
+              <HabitEditorChoice
                 key={c}
                 onPress={() => {
                   setHabitError(null);
                   setColor(c);
                 }}
-                accessibilityRole="button"
-                accessibilityLabel={`Select habit color ${c}`}
-                accessibilityState={{ selected: color === c }}
-                className="rounded-full"
-                style={{
-                  width: 36,
-                  height: 36,
-                  backgroundColor: c,
-                  borderWidth: color === c ? 2 : 0,
-                  borderColor: color === c ? tokens.textMuted : 'transparent',
-                }}
+                label={`Select habit color ${c}`}
+                selected={color === c}
+                swatch={c}
               />
             ))}
           </View>
@@ -1613,41 +1316,39 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
           </View>
         </Card>
       </Modal>
-      {insightsHabit ? (
-        <HabitProgressInsightsModal
-          visible
-          habit={insightsHabit}
-          onClose={() => setInsightsHabit(null)}
+      {currentDetailHabit && detailRow ? (
+        <HabitDetailModal
+          key={currentDetailHabit.id}
+          habit={currentDetailHabit}
+          row={detailRow}
+          countsByDate={countsByHabitDate[currentDetailHabit.id] ?? EMPTY_COUNTS}
+          selectedDateKey={selectedDateKey}
+          todayKey={todayKey}
+          busy={busyHabitIds.has(currentDetailHabit.id)}
+          visible={!detailConfirmationOpen}
+          checkInError={checkInError}
+          onClose={() => setDetailHabit(null)}
+          onIncrement={() =>
+            void handleIncrement(currentDetailHabit.id, selectedDateKey, !detailRow.quantitative)
+          }
+          onDecrement={() =>
+            void handleDecrement(currentDetailHabit.id, selectedDateKey, !detailRow.quantitative)
+          }
+          onDelete={() => void handleDeleteHabit(currentDetailHabit)}
+          onEdit={(habit) => {
+            setDetailHabit(null);
+            void openEditModal(habit);
+          }}
+          onTogglePause={() => {
+            void handleTogglePause(currentDetailHabit);
+            setDetailHabit(null);
+          }}
+          onToggleArchive={() => {
+            void handleToggleArchive(currentDetailHabit);
+            setDetailHabit(null);
+          }}
         />
       ) : null}
-      <HabitDetailModal
-        habit={detailHabit}
-        onClose={() => setDetailHabit(null)}
-        onOpenInsights={(habit) => {
-          setDetailHabit(null);
-          setInsightsHabit(habit);
-        }}
-        onEdit={(habit) => {
-          setDetailHabit(null);
-          void openEditModal(habit);
-        }}
-        onTogglePause={
-          detailHabit
-            ? () => {
-                void handleTogglePause(detailHabit);
-                setDetailHabit(null);
-              }
-            : undefined
-        }
-        onToggleArchive={
-          detailHabit
-            ? () => {
-                void handleToggleArchive(detailHabit);
-                setDetailHabit(null);
-              }
-            : undefined
-        }
-      />
       {confirmationDialog}
     </Screen>
   );
