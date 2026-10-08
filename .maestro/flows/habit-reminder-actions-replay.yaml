@@ -20,13 +20,13 @@ tags:
     childOf:
       text: 'Section tabs'
 - scrollUntilVisible:
-    element: 'Add anytime habit'
+    element: 'Add habit'
     direction: DOWN
     # Center the bottom-edge add tile: without this the tile settles under the
     # emulator taskbar and the tap lands on the launcher home button.
     centerElement: true
-- tapOn: 'Add anytime habit'
-# Index 1 targets the input: index 0 is the visible label (tapping it focuses nothing and drops typed text).
+- tapOn: 'Add habit'
+# Index 1 targets the input; index 0 is the label and drops typed text.
 - tapOn:
     text: 'Habit name'
     index: 1
@@ -57,13 +57,14 @@ tags:
     visible: 'Native replay action: 0 of 1 today.*'
     timeout: 5000
 - scrollUntilVisible:
-    element: 'Enter habit edit mode'
+    element: 'Open Native replay action details'
     direction: UP
-- tapOn: 'Enter habit edit mode'
+- tapOn: 'Open Native replay action details'
+- tapOn: 'Settings'
 - scrollUntilVisible:
-    element: 'Edit Native replay action'
+    element: 'Edit habit'
     direction: DOWN
-- tapOn: 'Edit Native replay action'
+- tapOn: 'Edit habit'
 - scrollUntilVisible:
     element: 'Inject Mark complete response'
     direction: DOWN
@@ -71,10 +72,6 @@ tags:
 # Header Close and footer Cancel both reset this edit sheet; Close remains
 # visible after scrolling to the injection controls.
 - tapOn: 'Close'
-- scrollUntilVisible:
-    element: 'Exit habit edit mode'
-    direction: UP
-- tapOn: 'Exit habit edit mode'
 - scrollUntilVisible:
     element: 'Native replay action: 1 of 1 today.*'
     direction: UP
@@ -101,22 +98,19 @@ tags:
     visibilityPercentage: 50
 - assertVisible: 'Native replay action: 1 of 1 today.*'
 - scrollUntilVisible:
-    element: 'Enter habit edit mode'
+    element: 'Open Native replay action details'
     direction: UP
-- tapOn: 'Enter habit edit mode'
+- tapOn: 'Open Native replay action details'
+- tapOn: 'Settings'
 - scrollUntilVisible:
-    element: 'Edit Native replay action'
+    element: 'Edit habit'
     direction: DOWN
-- tapOn: 'Edit Native replay action'
+- tapOn: 'Edit habit'
 - scrollUntilVisible:
     element: 'Inject Mark complete response'
     direction: DOWN
 - tapOn: 'Inject Mark complete response'
 - tapOn: 'Close'
-- scrollUntilVisible:
-    element: 'Exit habit edit mode'
-    direction: UP
-- tapOn: 'Exit habit edit mode'
 - scrollUntilVisible:
     element: 'Native replay action: 1 of 1 today.*'
     direction: DOWN

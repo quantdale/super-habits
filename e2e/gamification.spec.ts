@@ -15,10 +15,10 @@ const HABIT = 'Morning run';
 
 /** Opens the add-habit modal via the first group's add tile (a11y label contract). */
 async function openAddHabitModal(page: Page) {
-  await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Daily check-in')).toBeVisible({ timeout: 15_000 });
   const nameField = page.getByLabel('Habit name');
   for (let attempt = 0; attempt < 3; attempt++) {
-    await page.getByLabel('Habit groups').getByLabel('Add anytime habit').click({ force: true });
+    await page.getByLabel('Add habit').click({ force: true });
     try {
       await nameField.waitFor({ state: 'visible', timeout: 8_000 });
       return;

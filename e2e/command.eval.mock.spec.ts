@@ -436,7 +436,7 @@ test.describe('Command evaluation (mock/default path)', () => {
     await parseCommand(page, 'Create a habit to drink water every morning');
 
     await goToTab(page, 'habits');
-    await expect(page.getByLabel('Enter habit edit mode')).toBeVisible();
+    await expect(page.getByText('Daily check-in')).toBeVisible();
     await expect(page.getByText('drink water', { exact: true })).toHaveCount(0);
   });
 });

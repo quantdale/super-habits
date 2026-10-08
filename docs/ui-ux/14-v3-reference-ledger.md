@@ -52,10 +52,28 @@ List-first with Cards as optional.
 | Haptic (iOS)            | Monthly bar chart + 3×2 stats grid + journal card                                                                                    | Stats grid pattern for the analytics sheet                                                     | Analytics on the daily check-in screen |
 
 **Synthesis for Habits (W7):** daily screen = flat check-in list with
-unmistakable state; progress ring per habit (small, hue-coded); group headers
-quiet; analytics moved to a per-habit detail/progress sheet. The current
-"0/99 red circle" misuse (danger color on a neutral value) is corrected per
-§4.
+unmistakable state; group headers quiet; analytics moved to a per-habit
+detail surface and one Trends entry. The current "0/99 red circle" misuse
+(danger color on a neutral value) is corrected per §4.
+
+### W7 deepening (2026-10-08)
+
+Queried Refero for daily check-in lists, quantitative counters, and
+habit-detail flows. Did not copy a reference wholesale.
+
+| Reference                                                     | Evidence                                     | Adopt                                                            | Reject                                                   |
+| ------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------- |
+| Not Boring Habits `821de76f-6413-45a3-8484-6e652184c584`      | Flat rows: icon, name, count, one check      | List-first daily screen; one completion state                    | All-caps display type; hidden-section chrome             |
+| Joi flow 4383 / screen `8fc1f5ca-f78f-4d76-abb6-4b73bf319287` | Day strip plus one checkbox per habit        | Day selector secondary to the list; check is a state, not a card | Extra action sheet before a binary check-in              |
+| Atoms `13c9ac6e-6758-4629-b75d-c24bfbb48f6b`                  | Detail heatmap separated from the daily list | Heatmap and schedule live in details                             | Avatar header and motivational essay on the daily screen |
+| Roots `11f13654-1a1b-4250-b01b-b344a18947f8`                  | Streak milestone ladder                      | Streak number only, labeled as current                           | Milestone ladder on the daily check-in                   |
+| Haptic `0ba16b46-3e5d-4d55-8671-d0aeb67b8c3a`                 | Monthly chart and stats grid                 | Stats belong in Trends, not beside every row                     | Analytics wall on the check-in screen                    |
+| GO Club / Foodvisor water counters                            | Count plus one add action                    | Quantitative row shows `n of target` and a direct add            | Persistent full stepper on every untouched row           |
+
+Locked interaction: binary rows check in or undo through the existing
+increment/decrement API. Quantitative rows add from the row and expose
+remove when the count is above zero, plus an explained remove in details.
+Identity color does not paint a zero count.
 
 ## R4. Workout logging screens
 

@@ -42,6 +42,7 @@ function SegmentOptionButton<T extends string>({
       disabled={option.disabled}
       accessibilityRole="tab"
       accessibilityLabel={option.accessibilityLabel ?? option.label}
+      aria-selected={active}
       accessibilityState={{ selected: active, disabled: option.disabled ?? false }}
       onPress={() => {
         if (!option.disabled) onSelect(option.value);

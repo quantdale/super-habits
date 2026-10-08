@@ -354,7 +354,8 @@ export const j7FatFingers = defineScenario({
   risks: ['R5'],
   tags: ['journey', 'j7'],
   steps: [
-    habitStep('Double-tap habit', 1),
+    // A target >1 retains two increments; target1 now means check/undo.
+    habitStep('Double-tap habit', 2),
     {
       kind: 'tickHabit',
       name: 'Double-tap habit',

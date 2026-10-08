@@ -119,9 +119,7 @@ defineJourney({
       name: 'Tick two habits on Habits; row oracle + negative oracle + Overview unchanged',
       run: async ({ page }) => {
         await switchTab(page, 'habits');
-        await expect(
-          page.getByText('4 habits across your daily routine', { exact: true }),
-        ).toBeVisible();
+        await expect(page.getByRole('button', { name: /^Open Habit .* details$/ })).toHaveCount(4);
 
         // Tick two distinct habits (Habit 2: target 3, morning; Habit 5:
         // target 99, anytime). Each creates one habit_completions row today.
@@ -477,9 +475,7 @@ defineJourney({
           String(getActingStore<number>('weekFocusBase') + 1),
         );
         await switchTab(page, 'habits');
-        await expect(
-          page.getByText('4 habits across your daily routine', { exact: true }),
-        ).toBeVisible();
+        await expect(page.getByRole('button', { name: /^Open Habit .* details$/ })).toHaveCount(4);
         await switchTab(page, 'todos');
         // The todo we added is still pending and listed after the reload.
         await expect(page.getByText('Buy groceries', { exact: true }).first()).toBeVisible();
@@ -551,18 +547,20 @@ async function switchTab(page: Page, tab: keyof typeof TAB_LABELS): Promise<void
   await page.getByRole('button', { name: TAB_LABELS[tab], exact: true }).first().click();
 }
 
-/** Click a habit's ring (the HabitCircle wrapper is the sibling before its name). */
+/** Add one to a quantitative habit and await its committed, refreshed count. */
 async function tickHabit(page: Page, name: string): Promise<void> {
-  // Click the habit ring through its accessibility label (the label locator
-  // re-resolves to the live element across re-renders), then WAIT for the
-  // ring to reflect the increment: the click's async mutation chain runs
+  // The semantic add button re-resolves across re-renders. WAIT for it to
+  // reflect the increment: the click's async mutation chain runs
   // after the click resolves, and a SQL oracle navigates the page away —
   // which would abort an in-flight transaction on slower runners. The UI
   // label only updates after the mutation commits.
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const ring = page.getByLabel(new RegExp(`^${escapedName}: (\\d+) of \\d+ today\\.`)).first();
+  const ring = page.getByRole('button', {
+    name: new RegExp(`^${escapedName}: (\\d+) of \\d+ today\\. Add one\\.$`),
+  });
+  await expect(ring).toBeVisible();
   const before = Number((await ring.getAttribute('aria-label'))?.match(/(\d+) of/)?.[1] ?? 0);
-  await ring.click({ force: true });
+  await ring.click();
   await expect
     .poll(
       async () => Number((await ring.getAttribute('aria-label'))?.match(/(\d+) of/)?.[1] ?? 0),

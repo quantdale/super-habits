@@ -232,21 +232,14 @@ defineJourney({
 
         // habits: create then delete — must dedupe to one delete record.
         await switchSection(page, 'habits');
-        await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
-        await page
-          .getByLabel('Habit groups')
-          .getByLabel('Add anytime habit')
-          .click({ force: true });
+        await expect(page.getByText('Daily check-in')).toBeVisible({ timeout: 15_000 });
+        await page.getByLabel('Add habit').click({ force: true });
         await page.getByLabel('Habit name').fill('Stretch');
         await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
         await expect(page.getByText('Stretch').first()).toBeVisible();
-        await page.getByLabel('Enter habit edit mode').click({ force: true });
-        await expect(page.getByLabel('Exit habit edit mode')).toBeVisible();
-        // Scope to the habits grid: the Todos section was mounted earlier in
-        // this journey and its swipe-delete action also renders a "Delete"
-        // text earlier in the DOM (all sections stay mounted). The unscoped
-        // `.first()` would hit that off-viewport one.
-        await page.getByLabel('Habit groups').getByText('Delete', { exact: true }).first().click();
+        await page.getByRole('button', { name: 'Open Stretch details' }).click();
+        await page.getByRole('dialog').getByRole('tab', { name: 'Settings', exact: true }).click();
+        await page.getByRole('button', { name: 'Delete Stretch' }).click();
         await page.getByText('Delete habit', { exact: true }).last().click({ force: true });
         await expect(page.getByText('Stretch').first()).not.toBeVisible();
 

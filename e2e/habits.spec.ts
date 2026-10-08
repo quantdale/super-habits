@@ -4,15 +4,12 @@ import { clearDatabase } from './helpers/db';
 import { advanceToNextDay, installClock } from './helpers/clock';
 import { expectRows } from './helpers/oracles';
 
-/** Opens add-habit modal via the first group's add tile (a11y label contract). */
+/** Opens the add-habit modal from the header action. */
 async function openAddHabitModal(page: Page) {
-  await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Daily check-in')).toBeVisible({ timeout: 15_000 });
   const nameField = page.getByLabel('Habit name');
-  // The redesigned group tile exposes `Add {group} habit` as its accessible
-  // name (no visible 'Add' text since the Warm Momentum redesign).
   for (let attempt = 0; attempt < 3; attempt++) {
-    const firstAddTile = page.getByLabel('Habit groups').getByLabel('Add anytime habit');
-    await firstAddTile.click({ force: true });
+    await page.getByLabel('Add habit').click({ force: true });
     try {
       await nameField.waitFor({ state: 'visible', timeout: 8_000 });
       return;
@@ -23,27 +20,27 @@ async function openAddHabitModal(page: Page) {
   throw new Error('Add-habit modal did not open (Habit name field never visible)');
 }
 
+async function openHabitDetails(page: Page, name: string) {
+  await page.getByRole('button', { name: `Open ${name} details` }).click();
+}
+
 test.describe('Habits', () => {
   test.beforeEach(async ({ page }) => {
     await goToTab(page, 'habits');
     await clearDatabase(page);
     await goToTab(page, 'habits');
-    await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Daily check-in')).toBeVisible({ timeout: 15_000 });
   });
 
   test('shows empty state when no habits exist', async ({ page }) => {
-    await expect(
-      page.getByText(/Pick a time of day and tap Add to create your first habit/i),
-    ).toBeVisible();
-    await expect(page.getByText('ANYTIME')).toBeVisible();
+    await expect(page.getByText(/Add a habit to start today's check-in/i)).toBeVisible();
+    await expect(page.getByLabel('Add habit')).toBeVisible();
   });
 
   test('does not add habit with empty name', async ({ page }) => {
     await openAddHabitModal(page);
     await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
-    await expect(
-      page.getByText(/Pick a time of day and tap Add to create your first habit/i),
-    ).toBeVisible();
+    await expect(page.getByText(/Add a habit to start today's check-in/i)).toBeVisible();
   });
 
   test('adds a new habit', async ({ page }) => {
@@ -59,8 +56,8 @@ test.describe('Habits', () => {
     await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
     await expect(page.getByText('Read progress', { exact: true }).first()).toBeVisible();
 
-    await page.getByRole('button', { name: 'View progress for Read progress' }).click();
-    await expect(page.getByText('Read progress progress', { exact: true })).toBeVisible();
+    await openHabitDetails(page, 'Read progress');
+    await page.getByRole('dialog').getByRole('tab', { name: 'Progress', exact: true }).click();
     await expect(page.getByText('Scheduled completion rate', { exact: true })).toBeVisible();
     await expect(page.getByText('Recent target vs actual', { exact: true })).toBeVisible();
     await expect(page.getByLabel(/Current streak: 0 scheduled occurrences/i)).toBeVisible();
@@ -74,17 +71,12 @@ test.describe('Habits', () => {
     await page.getByLabel('Habit name').fill('Meditate');
     await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
     await expect(page.getByText('Meditate').first()).toBeVisible();
-    // Increment via the habit circle's accessible button (stable contract).
-    await page
-      .getByRole('button', { name: /Meditate: \d+ of \d+ today\. Tap to add one/ })
-      .first()
-      .click();
+    // Binary check-in is a semantic checkbox; quantitative add is a button.
+    await page.getByRole('checkbox', { name: /Meditate: 0 of 1 today\. Check in\./ }).click();
     await expect(
-      page
-        .getByRole('button', {
-          name: /Meditate: 1 of 1 today\. Tap to add one\. Long press to remove one\./,
-        })
-        .first(),
+      page.getByRole('checkbox', {
+        name: /Meditate: 1 of 1 today\. Complete\. Activate to undo\./,
+      }),
     ).toBeVisible({ timeout: 15_000 });
     // Persisted fact, not just UI chrome: the tap wrote exactly one
     // completion row (same oracle style as the sibling target-history test).
@@ -103,16 +95,27 @@ test.describe('Habits', () => {
     await expect(page.getByText('Drink water').first()).toBeVisible();
   });
 
-  test('deletes a habit in edit mode after web confirmation', async ({ page }) => {
+  test('deletes a habit from detail settings after web confirmation', async ({ page }) => {
     await openAddHabitModal(page);
     await page.getByLabel('Habit name').fill('Delete this habit');
     await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
     await expect(page.getByText('Delete this habit').first()).toBeVisible();
-    await page.getByLabel('Enter habit edit mode').click({ force: true });
-    await expect(page.getByLabel('Exit habit edit mode')).toBeVisible();
-    await page.getByText('Delete', { exact: true }).first().click();
-    await page.getByText('Delete habit', { exact: true }).last().click({ force: true });
+    await openHabitDetails(page, 'Delete this habit');
+    await page.getByRole('dialog').getByRole('tab', { name: 'Settings', exact: true }).click();
+    await page.getByRole('button', { name: 'Delete Delete this habit' }).click();
+    // Use the semantic Pressable and its stability checks, not a forced
+    // click on animated inner text that can land on the dismiss backdrop.
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Delete habit', exact: true })
+      .click();
     await expect(page.getByText('Delete this habit').first()).not.toBeVisible();
+    await expect(page.getByRole('dialog')).toBeHidden();
+    await expectRows(
+      page,
+      "SELECT deleted_at IS NOT NULL AS deleted FROM habits WHERE name = 'Delete this habit'",
+      [{ deleted: 1 }],
+    );
   });
 });
 
@@ -122,7 +125,7 @@ test.describe('Scheduled habits', () => {
     await goToTab(page, 'habits');
     await clearDatabase(page);
     await goToTab(page, 'habits');
-    await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Daily check-in')).toBeVisible({ timeout: 15_000 });
   });
 
   test('creates an M/W/F habit and treats off-days as neutral', async ({ page }) => {
@@ -136,26 +139,22 @@ test.describe('Scheduled habits', () => {
 
     await expect(page.getByText('Mon / Wed / Fri', { exact: true })).toBeVisible();
     await expect(
-      page.getByRole('button', {
-        name: 'Gym: 0 of 1 today. Tap to add one. Long press to remove one.',
-      }),
+      page.getByRole('checkbox', { name: 'Gym: 0 of 1 today. Check in.' }),
     ).toBeVisible();
 
     await advanceToNextDay(page);
     await expect(
-      page.getByRole('button', { name: 'Gym: not scheduled today. Rest day.' }),
+      page.getByRole('checkbox', { name: 'Gym: Not scheduled today. Rest day.' }),
     ).toBeVisible();
-    await expect(page.getByText('Rest', { exact: true })).toBeVisible();
+    await expect(page.getByText('Nothing scheduled today')).toBeVisible();
 
     await advanceToNextDay(page);
-    const gymButton = page.getByRole('button', {
-      name: 'Gym: 0 of 1 today. Tap to add one. Long press to remove one.',
-    });
+    const gymButton = page.getByRole('checkbox', { name: 'Gym: 0 of 1 today. Check in.' });
     await expect(gymButton).toBeVisible();
     await gymButton.click();
     await expect(
-      page.getByRole('button', {
-        name: 'Gym: 1 of 1 today. Tap to add one. Long press to remove one.',
+      page.getByRole('checkbox', {
+        name: 'Gym: 1 of 1 today. Complete. Activate to undo.',
       }),
     ).toBeVisible();
   });
@@ -166,29 +165,18 @@ test.describe('Scheduled habits', () => {
     await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
     await expect(page.getByText('Every day', { exact: true })).toBeVisible();
 
-    await expect(page.getByLabel('Enter habit edit mode')).toBeVisible();
-    await page.getByLabel('Enter habit edit mode').click();
-    await expect(page.getByLabel('Exit habit edit mode')).toBeVisible();
-    await page
-      .getByLabel('Habit groups')
-      .getByText('Edit', { exact: true })
-      .first()
-      .click({ force: true });
+    await openHabitDetails(page, 'Study weekdays');
+    await page.getByRole('dialog').getByRole('tab', { name: 'Settings', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit habit' }).click();
     await page.getByText('Weekdays', { exact: true }).click();
     await page.getByText('Save changes', { exact: true }).locator('..').click({ force: true });
-    await page.getByLabel('Exit habit edit mode').click();
-    // Scope to the Habit groups region: only one habit exists here, so the
-    // schedule label is unambiguous (card DOM nests name and schedule as
-    // siblings since the wave-v2 row redesign).
-    const groupsRegion = page.getByLabel('Habit groups');
-    await expect(groupsRegion.getByText('Weekdays', { exact: true })).toBeVisible();
+    await expect(page.getByText('Edit Habit', { exact: true })).toBeHidden({ timeout: 10_000 });
+    await expect(page.getByText('Weekdays', { exact: true })).toBeVisible();
 
     await page.reload();
     await page.waitForLoadState('load');
     await goToTab(page, 'habits');
-    await expect(
-      page.getByLabel('Habit groups').getByText('Weekdays', { exact: true }),
-    ).toBeVisible();
+    await expect(page.getByText('Weekdays', { exact: true })).toBeVisible();
   });
 
   test('reminder configuration persists and remains schedule-aware after reload', async ({
@@ -226,21 +214,18 @@ test.describe('Scheduled habits', () => {
     await expect(page.getByText('Read target history', { exact: true })).toBeVisible();
 
     await page
-      .getByRole('button', {
-        name: 'Read target history: 0 of 1 today. Tap to add one. Long press to remove one.',
-      })
+      .getByRole('checkbox', { name: 'Read target history: 0 of 1 today. Check in.' })
       .click();
     await expect(
-      page.getByRole('button', {
-        name: 'Read target history: 1 of 1 today. Tap to add one. Long press to remove one.',
+      page.getByRole('checkbox', {
+        name: 'Read target history: 1 of 1 today. Complete. Activate to undo.',
       }),
     ).toBeVisible();
 
     await advanceToNextDay(page);
-    await expect(page.getByLabel('Enter habit edit mode')).toBeVisible();
-    await page.getByLabel('Enter habit edit mode').click();
-    await expect(page.getByLabel('Exit habit edit mode')).toBeVisible();
-    await page.getByLabel('Habit groups').getByText('Edit', { exact: true }).first().click();
+    await openHabitDetails(page, 'Read target history');
+    await page.getByRole('dialog').getByRole('tab', { name: 'Settings', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit habit' }).click();
     await page.getByLabel('Target per day', { exact: true }).fill('2');
     await page.getByText('Save changes', { exact: true }).locator('..').click({ force: true });
     // Wait for the committed close, not for `Save changes` to hide: the label
@@ -255,9 +240,7 @@ test.describe('Scheduled habits', () => {
     });
     // Scope to the Habit groups region: the Overview habits card link shares
     // the same text and would trip strict mode.
-    await expect(
-      page.getByLabel('Habit groups').getByText('Read target history', { exact: true }),
-    ).toBeVisible();
+    await expect(page.getByText('Read target history', { exact: true }).first()).toBeVisible();
 
     await expectRows(page, "SELECT count FROM habit_completions WHERE date_key = '2026-08-10'", [
       { count: 1 },

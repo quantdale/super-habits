@@ -306,15 +306,10 @@ export async function actionCreateHabit(
 ): Promise<string> {
   await ensureApp(page);
   await switchSection(page, 'habits');
-  await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Daily check-in')).toBeVisible({ timeout: 15_000 });
   const nameField = page.getByLabel('Habit name');
   for (let attempt = 0; attempt < 3; attempt++) {
-    const tile = page
-      .getByLabel('Habit groups')
-      .getByText('Add', { exact: true })
-      .first()
-      .locator('xpath=preceding-sibling::*[1]');
-    await tile.click({ force: true });
+    await page.getByLabel('Add habit').click({ force: true });
     try {
       await nameField.waitFor({ state: 'visible', timeout: 8_000 });
       break;
@@ -350,9 +345,7 @@ export async function actionTickHabit(
   await switchSection(page, 'habits');
   const ring = page
     .locator(ACTIVE_SECTION_SELECTOR)
-    .getByRole('button', {
-      name: new RegExp(`^${escRegExp(step.name)}: \\d+ of \\d+ today`),
-    })
+    .getByLabel(new RegExp(`^${escRegExp(step.name)}: \\d+ of \\d+ today`))
     .first();
   await expect(ring).toBeVisible({ timeout: 15_000 });
   const times = step.times ?? 1;

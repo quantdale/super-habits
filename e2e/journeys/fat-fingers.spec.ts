@@ -43,12 +43,13 @@ import { swipeLeftToRevealRowActions, rapidPress } from '../helpers/gestures';
  */
 
 /** Open the add-habit modal and create a habit through the real UI. */
-async function createHabitViaUi(page: Page, name: string): Promise<void> {
-  await expect(page.getByText('ANYTIME').first()).toBeVisible({ timeout: 15_000 });
+async function createHabitViaUi(page: Page, name: string, target = 1): Promise<void> {
+  await expect(page.getByText('Daily check-in')).toBeVisible({ timeout: 15_000 });
   const nameField = page.getByLabel('Habit name');
-  await page.getByLabel('Habit groups').getByLabel('Add anytime habit').click({ force: true });
+  await page.getByLabel('Add habit').click({ force: true });
   await nameField.waitFor({ state: 'visible', timeout: 8_000 });
   await nameField.fill(name);
+  await page.getByLabel('Target per day', { exact: true }).fill(String(target));
   await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
   await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
 }
@@ -70,33 +71,29 @@ async function toggleTodoCompletion(page: Page, title: string): Promise<void> {
     .not.toBe(before);
 }
 
-/** Enter habit edit mode and click the Delete button for the named habit. */
+/** Open detail settings and delete the exact named habit. */
 async function enterHabitEditAndDelete(page: Page, habitName: string): Promise<void> {
-  await page.getByLabel('Enter habit edit mode').click({ force: true });
-  await expect(page.getByLabel('Exit habit edit mode')).toBeVisible();
-  // Scope to the ACTIVE section container: the mounted-but-inactive Overview
-  // dashboard also renders the habit name in its preview card, which made the
-  // unscoped ancestor walk resolve two Delete buttons (strict violation).
-  const card = page
+  await page
     .locator(ACTIVE_SECTION_SELECTOR)
-    .getByText(habitName, { exact: true })
-    .locator('xpath=ancestor::*[.//div[normalize-space(text())="Delete"]][1]');
-  await card.getByText('Delete', { exact: true }).click({ force: true });
+    .getByRole('button', { name: `Open ${habitName} details` })
+    .click();
+  await page.getByRole('dialog').getByRole('tab', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: `Delete ${habitName}` }).click();
 }
 
 /** Click the confirmation dialog's Cancel button (habits/workout). */
 async function cancelConfirmationDialog(page: Page): Promise<void> {
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await dialog.getByText('Cancel', { exact: true }).click({ force: true });
+  const cancel = page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true });
+  await expect(cancel).toBeVisible();
+  await cancel.click();
 }
 
 /** Click the confirmation dialog's confirm button (label e.g. 'Delete habit'). */
 async function confirmConfirmationDialog(page: Page, label: string): Promise<void> {
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await dialog.getByText(label, { exact: true }).click({ force: true });
-  await expect(dialog).not.toBeVisible({ timeout: 15_000 });
+  const confirm = page.getByRole('dialog').getByRole('button', { name: label, exact: true });
+  await expect(confirm).toBeVisible();
+  await confirm.click();
+  await expect(confirm).not.toBeVisible({ timeout: 15_000 });
 }
 
 /** Reveal a todo row's swipe actions and click the Edit action for that row. */
@@ -210,8 +207,10 @@ defineJourney({
       run: async ({ page }) => {
         await returnToApp(page);
         await switchSection(page, 'habits');
-        await createHabitViaUi(page, 'Double-tap habit');
-        // The ring is the Pressable that carries the habit's accessibility label.
+        // Quantitative taps deliberately increment twice. Binary check/undo
+        // is a different interaction and gets its own write-guard regression.
+        await createHabitViaUi(page, 'Double-tap habit', 2);
+        // The add Pressable carries the habit's accessibility label.
         const ring = page.getByLabel(/Double-tap habit: \d+ of \d+ today/);
         await ring.waitFor({ state: 'visible' });
         await rapidPress(ring, 2);
