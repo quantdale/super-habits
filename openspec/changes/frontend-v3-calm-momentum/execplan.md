@@ -62,54 +62,68 @@ historical evidence only.
 
 ## Current Checkpoint
 
-- Current milestone: W7 — Habits reconstruction. W6.5 is complete and merged.
-- Completed: W0–W6 unchanged; W6.5 closed and MERGED to main as merge
-  commit `f37539a969bdc7c3dc539c2d47db3f6580429c64` ([PR58](https://github.com/quantdale/super-habits/pull/58)
-  MERGED 2026-10-08). Final main SHA `d29c67b2894122d15a7d79d44e7bf18f6f8d1b24`.
-  Exact-head CI run [37717090214](https://github.com/quantdale/super-habits/actions/runs/37717090214)
-  passes through unit/integration and fails only the two known HIGH
-  advisories
-  (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv). Hosted E2E
-  skipped behind that gate, not passed. Stash, foreign iOS evidence, and
-  historical captures preserved. No overall certification.
-- In progress: W7 broad QA complete and reconciled on branch
-  `frontend-v3-w7-habits`; commit/PR/main publication and exact-head CI
-  verification remain. Slice `frontend-v3-w7-habits` still ACTIVE until the
-  publication lands; its slice plan owns current detail. Preserve W6 history
-  and domain semantics
-- Important modified files: Habits check-in/detail/editor/day/derivations,
-  habit E2E/Maestro/simulation selectors, SegmentedControl web selected state,
-  rendered-audit helper/contracts, reference/defect/evidence ledgers and plans.
-  No data-layer, dependency, or security-policy changes.
-- Last successful validation: Fresh supported-runtime W7 `qa:full` on
+- Current milestone: W7 complete and merged to main (`f679a26`, PR 59);
+  the campaign is ready for W8 Focus planning, which is not started here.
+- Completed: W0–W7 unchanged semantically; W6.5 closed and MERGED to main as
+  merge commit `f37539a969bdc7c3dc539c2d47db3f6580429c64` (PR58 MERGED
+  2026-10-08). W7 rebuilt Habits as a date-scoped, list-first daily check-in
+  and merged to main as merge commit
+  `f679a26a28a8abf3472b44e3b5fbdf229222b927` (PR 59,
+  https://github.com/quantdale/super-habits/pull/59, branch
+  `frontend-v3-w7-habits`) in three coherent commits `9bf4fda` (feature),
+  `0a8e86d` (regressions + rendered evidence) and `3086b27` (spec, ledgers,
+  plans). Exact-head CI run
+  [37822880601](https://github.com/quantdale/super-habits/actions/runs/37822880601)
+  succeeds on Typecheck, Lint, theme tokens, openspec contracts,
+  journey-label and quarantine-register parity, versioned ExecPlans and the
+  unit+integration test projects; it fails only the two pre-existing
+  undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge`
+  GHSA-86w9-cpqp-85rv), the identical set recorded at baseline `d29c67b`
+  (run 37717090214), so hosted `e2e`/`nightly` skip behind the quality gate
+  and are NOT passed. No dependency, lockfile or patch file changed in
+  `main..HEAD`. Stash, foreign iOS evidence and historical captures preserved.
+  No overall certification.
+- In progress: W8 Focus is next in the wave list and is NOT started; it
+  needs a new plan and fresh authorization. Slice
+  `frontend-v3-w7-habits` is COMPLETED and merged; its slice plan holds the
+  W7 detail. Preserve W6 history and domain semantics.
+- Important modified files: W7 touched `features/habits/` (check-in model,
+  check-in rows, editor choices, day strip, detail/progress consolidation,
+  derivations, web Space-key hook), `core/ui/SegmentedControl.tsx`, habit
+  E2E/Maestro/simulation selectors, the rendered-audit helper/contracts, the
+  new `e2e/habits-w7*` regressions and capture instrument, the reference and
+  defect ledgers, `docs/testing/known-gaps.md` and both plans, plus
+  `public/sw.js` v9 (deploy-generation literal only). No data-layer,
+  dependency or security-policy change.
+- Last successful validation: W7 fresh supported-runtime `qa:full` on
   isolated 8083 (`E2E_PORT=8083 TZ=Asia/Manila`, pinned node v22.23.2 /
   npm 10.9.8, exact-tree hashes in
-  `.cursor/playwright-output/w7-final-full-2/start.json`):
-  typecheck PASS; lint PASS; Vitest 2571 passed / 2 skipped (254 files);
+  `.cursor/playwright-output/w7-final-full-2/start.json`): typecheck PASS;
+  lint PASS; Vitest 2571 passed / 2 skipped (254 files);
   `openspec validate --all` 74/74; `e2e:full` hermetic export PASS with 253
   passed / 64 skipped / 2 unexpected; `qa:simulation --all --mode
-deterministic` 23/23. All eight failures of the earlier `w7-full` battery are
-  resolved on this tree. Earlier supported corrective checks, boundary3/3,
-  affected journeys23/23, Habits/audit contracts26/26 and deterministic J7 1/1
-  PASS; empty/dark instrument1/1; 46 inspected web images; 57px rows/48px
-  actions/44px choices; SUR-05/SYS-16/SYS-12 verified fixed. No W6.5 evidence
-  reused as W7 proof.
-- Current failures: Two unexpected D14 budgeted steps in the fresh
+deterministic` 23/23. Exact-head CI 37822880601 succeeded on every quality
+  step except the two pre-existing advisories. The eight failures of the
+  earlier `w7-full` battery are all resolved and none recur. 46 inspected web
+  images; 57px rows / 48px actions / 44pt editor choices; SUR-05, SYS-16 and
+  SYS-12 verified fixed. No W6.5 evidence reused as W7 proof.
+- Current failures: Two unexpected D14 budgeted steps in the local W7
   `e2e:full`, both `ENVIRONMENT` under foreign host load at ~95% CPU:
   `habits-w7.spec.ts:452` `checkInMs` 1045.08ms (battery) / 1049.79ms
-  (replay) vs the unchanged 800ms ceiling, and `three-months-in` headroom fails
-  at three different measurements on the identical tree (435/500ms diary
-  13.0%; `calories→todos` 854ms; worst-switch 683ms 14.6%). A second isolated
-  HEAVY replay PASSED in 7.2s at CPU avg 84.8%, and the same test passed in
-  5.7s in the 22:45 matrix on habits source last modified 22:30:59 — the
-  assertion flips on unchanged product code, so this is load sensitivity, not a
-  regression. Guard, ceiling, floor and all assertions unchanged; no retry,
-  skip or quarantine; original artifacts preserved under
+  (replay) vs the unchanged 800ms ceiling, and `three-months-in` headroom
+  fails at three different measurements on the identical tree (435/500ms
+  diary 13.0%; `calories→todos` 854ms; worst-switch 683ms 14.6%). A second
+  isolated HEAVY replay PASSED in 7.2s at CPU avg 84.8%, and the same test
+  passed in 5.7s in the 22:45 matrix on habits source last modified 22:30:59 —
+  the assertion flips on unchanged product code, so this is load sensitivity,
+  not a regression. Guard, ceiling, floor and all assertions unchanged; no
+  retry, skip or quarantine; original artifacts preserved under
   `w7-final-full-2/preserved/` and the numbers recorded as a W7 addendum on
-  `docs/testing/known-gaps.md` gap 15. A quiet-host or CI confirmation is the
-  honest residual. v9 cache-generation only; SW auxiliary notices remain
-  unchanged-baseline false positives. Hosted audit residuals stay out of scope;
-  skipped hosted E2E is not passed.
+  `docs/testing/known-gaps.md` gap 15. Exact-head CI fails only the two
+  pre-existing undocumented advisories with hosted e2e skipped behind that
+  gate, so hosted e2e is NOT passed. v9 cache-generation only; SW auxiliary
+  notices remain unchanged-baseline false positives. Hosted audit residuals
+  stay out of scope.
 - Relevant quarantines: existing internal/remote/visual opt-ins; W7 capture
   instrument shares VISUAL_AUDIT while its behavioral regressions always run.
 - Blockers: None for web continuation. Fresh Android smoke/persistence/
@@ -118,16 +132,19 @@ deterministic` 23/23. All eight failures of the earlier `w7-full` battery are
   Native largest-font/screen-reader qualification remains unverified; full
   Android W16, iOS owner-deferred. Use supported target plus clean same-commit
   checkout for qualification; never delete preserved foreign evidence.
-- Exact next action: Make the coherent W7 commit(s) from the reconciled
-  tree, push `frontend-v3-w7-habits`, open the PR and merge to main as with
-  W6.5, then verify exact-head CI and the advisory inventory plus final
-  hygiene. Preserve `.tmp-ios36423379932/`, `stash@{0}` and historical captures.
-  Do not advance to W8 until W7 is earned.
-- Remaining definition of done: W7 completion criteria in the wave brief
-  (list-first check-in, quantitative safety, schedule/lifecycle/past-day
-  correctness, collapsed filters, no false danger, analytics demoted,
-  rendered evidence, gates, publication). W8–W17 unchecked. Known audit
-  and native blockers stay explicit. No full application certification.
+- Exact next action: Author the W8 Focus wave plan under
+  `.agent/execplans/frontend-v3-w8-focus-v1.md` per `.agent/PLANS.md`
+  (`Plan-Version: 2`, `Status: BLOCKED` pending owner authorization of W8
+  scope), recording the W7 baseline `f679a26`, the focus-section brief, and
+  the two D14 `ENVIRONMENT` residuals plus the known braces/node-forge audit
+  blockers as known constraints. Do not implement any W8 change. Preserve
+  `.tmp-ios36423379932/`, `stash@{0}` and historical captures.
+- Remaining definition of done: W7 is done: list-first check-in, quantitative
+  safety, schedule/lifecycle/past-day correctness, collapsed filters, no false
+  danger, analytics demoted, rendered evidence, gates, and publication
+  (`f679a26` + exact-head CI 37822880601). W8–W17 unchecked. Known audit
+  (braces/node-forge) and native blockers stay explicit, as do the two D14
+  `ENVIRONMENT` residuals. No full application certification.
 
 ## Progress
 
@@ -152,7 +169,10 @@ deterministic` 23/23. All eight failures of the earlier `w7-full` battery are
 - [x] Owner-requested W6.5 main publication — deploy-generation bump,
       normal merge (PR58 MERGED, main=f37539a), exact-main CI
       (run37716057446, audit-only red) and full report (2026-10-08)
-- [ ] W7 — Habits
+- [x] W7 — Habits daily check-in (merge commit `f679a26`, PR 59,
+      exact-head CI 37822880601 green on every quality step except the two
+      pre-existing braces/node-forge advisories; two D14 timing steps recorded
+      as ENVIRONMENT host-load residuals on known-gap 15)
 - [ ] W8 — Focus
 - [ ] W9 — Workout
 - [ ] W10 — Calories / Health validation gate
@@ -251,6 +271,35 @@ deterministic` 23/23. All eight failures of the earlier `w7-full` battery are
   creates no bulk-performance acceptance threshold and no D14 ceiling.
 
 ## Validation Ledger
+
+- 2026-10-09 W7 publication closed: three coherent commits `9bf4fda`
+  (feature), `0a8e86d` (regressions + rendered evidence) and `3086b27`
+  (spec, ledgers, plans) on branch `frontend-v3-w7-habits`; PR 59 MERGED to
+  main as merge commit `f679a26`. Fresh supported-runtime W7
+  `E2E_PORT=8083 TZ=Asia/Manila npm run qa:full` (pinned node v22.23.2 /
+  npm 10.9.8; exact-tree hashes in
+  `.cursor/playwright-output/w7-final-full-2/start.json`): typecheck PASS,
+  lint PASS, Vitest 2571 passed / 2 skipped (254 files),
+  `openspec validate --all` 74/74, `e2e:full` hermetic export PASS with 253
+  passed / 64 skipped / 2 unexpected, `qa:simulation --all --mode
+deterministic` 23/23. Exact-head CI run 37822880601 succeeds every quality
+  step (typecheck, lint, theme tokens, openspec contracts, journey-label and
+  quarantine parity, versioned ExecPlans, unit+integration tests) and fails
+  only the two pre-existing undocumented `braces`/`node-forge` advisories —
+  identical set to baseline d29c67b run 37717090214; no package.json,
+  lockfile or patches file changed, so the advisory inventory is provably
+  unchanged. Hosted e2e/nightly skip behind that gate and are NOT passed.
+  The two local unexpected results are D14 budgeted steps classified
+  `ENVIRONMENT` under ~95% foreign host load: `habits-w7.spec.ts:452`
+  1045.08/1049.79ms vs the unchanged 800ms ceiling, and `three-months-in`
+  failing at three different measurements on the same tree (435/500ms diary
+  13.0%; calories→todos 854ms; worst-switch 683ms 14.6%); a second isolated
+  HEAVY replay PASSED in 7.2s at CPU avg 84.8% and the earlier 22:45 matrix
+  passed it in 5.7s on habits source last modified 22:30:59. Guard, ceiling,
+  floor and all assertions unchanged; artifacts preserved in
+  `w7-final-full-2/preserved/`; numbers recorded as a W7 addendum on
+  `docs/testing/known-gaps.md` gap 15. Final `npm run web:hygiene` PASS.
+  Stash `stash@{0}` and foreign `.tmp-ios36423379932/` preserved untouched.
 
 - 2026-10-08 W7 exact reviewer convergence: workflow39dce9ca complete;
   Standards f59a093e and Spec fb0ea7fe reports both read, OK with notes /
@@ -500,6 +549,39 @@ W6.5 delivered areas (Git history establishes changes; closure diff is docs only
   modal scope/stability and semantic todo controls, unchanged strict oracles.
 - `public/sw.js`, `CLAUDE.md`, `.cursor/commands/pre-pr.md` — main-deploy
   cache-generation bump and its existing source-truth guidance pins only.
+
+W7 delivered areas (merged as `f679a26`):
+
+- `features/habits/habitCheckIn.domain.ts` — pure selected-date check-in
+  view-model and semantic tone mapping; no DB, no React.
+- `features/habits/HabitCheckInRow.tsx`, `HabitDayStrip.tsx`,
+  `HabitsScreen.tsx`, `habitsScreen.derivations.ts` — flat check-in rows,
+  secondary day strip, one filter sheet, date-scoped summary.
+- `features/habits/HabitEditorChoice.tsx` — accessible 44pt editor choices;
+  global edit mode removed.
+- `features/habits/HabitDetailModal.tsx`,
+  `HabitProgressInsightsModal.tsx` — detail consolidation; progress insights
+  folded in, rhythm analytics behind one Trends entry.
+- `features/habits/useHabitCheckboxKeyboard.ts` — web-only Space key.
+- `core/ui/SegmentedControl.tsx` — explicit web selected state for detail
+  tabs.
+- `e2e/habits-w7.spec.ts`, `e2e/habits-w7-audit.spec.ts`,
+  `e2e/helpers/habitsW7.ts`, `e2e/helpers/a11yAudit.ts`,
+  `e2e/a11y-audit-contract.spec.ts` — real-DB regressions and the opt-in
+  rendered-truth instrument; strengthened contrast oracles.
+- `tests/habitCheckIn.domain.test.ts`,
+  `tests/habitsScreenDerivations.test.ts` — check-in and derivation units.
+- `e2e/`, `.maestro/flows/`, `simulation/` — semantic-selector and
+  quantitative-fixture retargets; no persistence, schedule, XP,
+  linked-action or timing oracle weakened.
+- `docs/ui-ux/v3-audit/w7/`, `docs/ui-ux/14-v3-reference-ledger.md`,
+  `docs/ui-ux/15-v3-defect-ledger.md` — 46 inspected images, W7 research and
+  defect dispositions.
+- `docs/testing/known-gaps.md` — W7 host-load addendum on gap 15.
+- `openspec/changes/frontend-v3-w7-habits/` — W7 spec slice (all 27 tasks
+  checked).
+- `public/sw.js` — v9 deploy-generation literal only; cache strategy
+  unchanged.
 - `docs/ui-ux/15-v3-defect-ledger.md` — bounded convergence verification note.
 - `openspec/changes/frontend-v3-calm-momentum/tasks.md`,
   `openspec/changes/frontend-v3-calm-momentum/execplan.md` — living scope,
