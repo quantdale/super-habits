@@ -67,8 +67,8 @@ safety pass on the session-claim boundary, not a redesign of Focus.
 
 ## Current Checkpoint
 
-- Current milestone: W8.5 is complete. Starting main
-  `c32685364cbe9c6d34a512c3b2bcef9b3a432e0b`; ending main is the W8.5 merge.
+- Current milestone: W8.5 is complete and MERGED to main. Starting main was `c32685364cbe9c6d34a512c3b2bcef9b3a432e0b`; ending main is merge commit `aa5835e9fe8ecaa43b55b805d866232503b28c77` (PR 63, branch `frontend-v3-w85-focus-startup`) in two coherent commits `be6db92` (source fix) and `ca169f5` (regressions, rendered evidence, plan reconciliation).
+- Hosted CI on the exact head: run [37942994150](https://github.com/quantdale/super-habits/actions/runs/37942994150) (push) and [37942146908](https://github.com/quantdale/super-habits/actions/runs/37942146908) (pull request) both pass every frontend gate — Typecheck, the Supabase edge-function type-check, Lint, theme tokens, openspec contracts, journey-label and quarantine-register parity, versioned ExecPlans, and the unit+integration test projects — and both fail only `Audit runtime dependencies (gates on new high/critical)` on exactly the two pre-existing undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm at `node_modules/braces`, `node-forge` GHSA-86w9-cpqp-85rv at `node_modules/node-forge`). Hosted `e2e`/`nightly` skip behind that gate and are NOT passed. No new hosted failure was introduced and no security-gate waiver was added.
 - Completed: source fix, deterministic race regression coverage, durable-intent
   integration coverage, Focus E2E additions, and the W8.5 rendered audit.
 - In progress: none.
