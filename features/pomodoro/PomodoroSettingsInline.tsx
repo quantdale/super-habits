@@ -44,7 +44,7 @@ export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
         Timer durations
       </Text>
       <Text className="mb-4 mt-1 text-sm" style={{ color: tokens.textMuted }}>
-        Changes apply immediately and reset the current timer state.
+        Saved durations apply to your next timer.
       </Text>
 
       {[

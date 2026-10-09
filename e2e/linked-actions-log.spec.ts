@@ -59,7 +59,9 @@ test.describe('Linked Actions log targets', () => {
     await returnToApp(page);
 
     // The produced session is visible product surface, not just a row.
+    // Recent sessions live behind the secondary History entry (W8).
     await goToTab(page, 'pomodoro');
+    await page.getByRole('button', { name: 'History', exact: true }).click();
     await expect(page.getByText('30m', { exact: true }).first()).toBeVisible({ timeout: 20_000 });
   });
 

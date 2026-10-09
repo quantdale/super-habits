@@ -1,6 +1,6 @@
 import { Text } from '@/core/ui/Text';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Pressable } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, View } from 'react-native';
 import { Screen } from '@/core/ui/Screen';
 import { Card } from '@/core/ui/Card';
 import { Button } from '@/core/ui/Button';
@@ -8,6 +8,7 @@ import { FeatureStatCard } from '@/core/ui/FeatureStatCard';
 import { PageHeader } from '@/core/ui/PageHeader';
 import { SegmentedControl } from '@/core/ui/SegmentedControl';
 import { ScreenSection } from '@/core/ui/ScreenSection';
+import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { typography } from '@/core/theme/designTokens';
@@ -42,31 +43,26 @@ import { cancelScheduledNotification, scheduleTimerEndNotification } from '@/lib
 import {
   buildPomodoroHeatmapDays,
   applySettingsToTimerState,
-  calculateGrowthProgress,
   computeFocusStats,
   computePomodoroStreakFromHeatmapDays,
+  describeCyclePosition,
   DEFAULT_SETTINGS,
   BUILT_IN_PRESETS,
   findPresetById,
-  getAbandonNotice,
   getModeColor,
   getModeDuration,
   getModeLabel,
   getNextMode,
-  getPlantStage,
   matchPresetBySettings,
   planActiveTimerReconcile,
   planSessionCompletion,
   resolveActivePreset,
-  type AbandonNotice,
   type CompletedFocusLogPlan,
   type PomodoroMode,
   type PomodoroPreset,
   type PomodoroSettings,
 } from './pomodoro.domain';
-import type { HeatmapDay } from '@/features/shared/activityTypes';
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
-import { FocusSprout } from './FocusSprout';
 import { GardenGrid } from './GardenGrid';
 import { BackgroundWarning } from './BackgroundWarning';
 import { PomodoroSettingsInline } from './PomodoroSettingsInline';
@@ -83,6 +79,11 @@ import {
 
 const COLOR = SECTION_COLORS[POMODORO_SECTION_KEY];
 
+/** Accessible name of the timer region; stable across all six timer states. */
+const TIMER_REGION_LABEL = 'Focus timer';
+
+type TimerNotice = { title: string; body: string };
+
 function notifyCopy(mode: PomodoroMode): { title: string; body: string } {
   switch (mode) {
     case 'focus':
@@ -98,6 +99,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
   const { register: registerCommandTimer } = usePomodoroCommandBridge();
   const { recordAction } = useGamification();
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const dayGeneration = useDayRolloverGeneration();
   const { begin: beginRefresh } = useGuardedAsyncRefresh();
   const textColor = sectionAccents[POMODORO_SECTION_KEY].text;
@@ -111,7 +113,6 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const [isPaused, setIsPaused] = useState(false);
   const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
-  const [pomodoroHeatmapDays, setPomodoroHeatmapDays] = useState<HeatmapDay[]>([]);
   const [showWarning, setShowWarning] = useState(false);
   const [presets, setPresets] = useState<PomodoroPreset[]>(BUILT_IN_PRESETS);
   const [storedActivePresetId, setStoredActivePresetIdState] = useState<string | null>(null);
@@ -128,8 +129,16 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const [showLinkTodo, setShowLinkTodo] = useState(false);
   const [presetManagerVisible, setPresetManagerVisible] = useState(false);
   const [metaEditSession, setMetaEditSession] = useState<PomodoroSession | null>(null);
-  const [interruptedNotice, setInterruptedNotice] = useState<AbandonNotice | null>(null);
+  const [interruptedNotice, setInterruptedNotice] = useState<TimerNotice | null>(null);
+  /** A completed session recovered from a durable intent after a reload. */
+  const [recoveredNotice, setRecoveredNotice] = useState<TimerNotice | null>(null);
   const [logSaveFailed, setLogSaveFailed] = useState(false);
+  /** Native end-notification scheduling failed. Web null is not a failure. */
+  const [notificationScheduleFailed, setNotificationScheduleFailed] = useState(false);
+  /** Secondary disclosure for history, garden, heatmap, and detailed stats. */
+  const [showHistory, setShowHistory] = useState(false);
+  /** Polite status line: updated on phase changes only, never per second. */
+  const [phaseAnnouncement, setPhaseAnnouncement] = useState<string | null>(null);
   const notificationIdRef = useRef<string | null>(null);
   const lastTickTime = useRef<number | null>(null);
   const startInFlightRef = useRef(false);
@@ -148,6 +157,10 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const startedAtRef = useRef<Date | null>(null);
   const activePresetRef = useRef<PomodoroPreset>(BUILT_IN_PRESETS[0]);
   const pendingAssociationRef = useRef<SessionAssociation | null>(null);
+  /** Live in-flight flag for async callbacks: a closure `isRunning` goes stale
+   *  across an await, and a preset or settings write resolved mid-start must
+   *  never rewrite the clock of the session that just began. */
+  const sessionActiveRef = useRef(false);
   const startRef = useRef<((minutes?: number) => Promise<PomodoroCommandStartResult>) | null>(null);
 
   useEffect(() => {
@@ -157,6 +170,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     totalSecondsRef.current = totalSeconds;
     startedAtRef.current = startedAt;
     pendingAssociationRef.current = pendingAssociation;
+    sessionActiveRef.current = startInFlightRef.current || isRunning || isPaused;
   });
   useCommandLauncherSuppressed('pomodoro-active-session', isRunning || isPaused);
 
@@ -177,21 +191,24 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       const current = isCurrent ?? beginRefresh();
       const nextSettings = await getPomodoroSettings();
       if (!current()) return;
+      // Read the live timer state through refs: this loader is recreated
+      // rarely, and a session started during the read must keep its clock.
+      const sessionActive = sessionActiveRef.current;
       const nextTimer = applySettingsToTimerState(nextSettings, {
-        currentMode,
-        isRunning,
-        isPaused,
-        totalSeconds,
-        remaining,
+        currentMode: currentModeRef.current,
+        isRunning: sessionActive,
+        isPaused: sessionActive,
+        totalSeconds: totalSecondsRef.current,
+        remaining: remainingRef.current,
       });
       setSettings(nextTimer.settings);
-      if (!isRunning && !isPaused) {
+      if (!sessionActive) {
         setTotalSeconds(nextTimer.totalSeconds);
         applyRemaining(nextTimer.remaining);
         totalSecondsRef.current = nextTimer.totalSeconds;
       }
     },
-    [applyRemaining, beginRefresh, currentMode, isPaused, isRunning, remaining, totalSeconds],
+    [applyRemaining, beginRefresh],
   );
 
   const loadHistory = useCallback(
@@ -206,7 +223,6 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       // Break rows never reach the focus surfaces (count card, garden, heatmap).
       const focusOnly = rows.filter((row) => row.session_type === 'focus');
       setSessions(focusOnly);
-      setPomodoroHeatmapDays(buildPomodoroHeatmapDays(focusOnly, 364));
     },
     [beginRefresh],
   );
@@ -286,6 +302,10 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
           const endedAtIso = new Date(
             new Date(intent.startedAtIso).getTime() + intent.totalSeconds * 1000,
           ).toISOString();
+          setRecoveredNotice({
+            title: 'Session recovered',
+            body: 'Your focus session finished while the app was closed, so it has been logged for you.',
+          });
           try {
             const result = await recordCompletedPomodoroSession({
               startedAtIso: intent.startedAtIso,
@@ -418,6 +438,10 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
         startedAtIso: plan.log.startedAtIso,
         linkedTodoTitle: pendingAssociationRef.current?.todoTitle ?? null,
       });
+      setPhaseAnnouncement('Focus session complete');
+    } else {
+      // Breaks are never logged; the acknowledgement names the break only.
+      setPhaseAnnouncement('Break complete');
     }
 
     // Preset-driven auto-start: begin the suggested next mode after a short
@@ -442,7 +466,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       lastTickTime.current = now;
 
       // Pure remaining-math only. React may replay state updaters, so all
-      // completion side effects live in the ref-guarded callback below.
+      // completion side effects live in the ref-guarded callback above.
       const nextRemaining = remainingRef.current - deltaSeconds;
       if (nextRemaining > 0) {
         remainingRef.current = nextRemaining;
@@ -456,6 +480,9 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       setRemaining(0);
       setIsRunning(false);
       setIsPaused(false);
+      // Drop the in-flight claim before completion side effects. A confirm
+      // opened against this session must not discard whatever starts next.
+      sessionActiveRef.current = false;
       void cancelScheduledNotification(notificationIdRef.current);
       notificationIdRef.current = null;
       runCompletionEffects();
@@ -475,27 +502,23 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     // follows the actual durations instead of a stale selection.
     setStoredActivePresetIdState(null);
     void clearActivePresetId().catch(() => undefined);
-    // Saving durations mid-session abandons that session (running or paused):
-    // it is never logged, so cancel its OS notification and durable intent
-    // before resetting the timer, otherwise a reload would reconcile a ghost.
-    void cancelScheduledNotification(notificationIdRef.current);
-    notificationIdRef.current = null;
-    void clearPomodoroActiveTimer().catch(() => undefined);
-    setStartedAt(null);
-    startedAtRef.current = null;
+    if (sessionActiveRef.current) {
+      // Duration editing is unreachable while a session is in flight; even if
+      // reached, saved defaults never move or abandon that session — they
+      // apply to the next idle timer.
+      return;
+    }
     const duration = getModeDuration(currentMode, newSettings);
     setTotalSeconds(duration);
     totalSecondsRef.current = duration;
     applyRemaining(duration);
     lastTickTime.current = null;
-    setIsRunning(false);
-    setIsPaused(false);
     setShowSettings(false);
   };
 
   const start = useCallback(
     async (requestedDurationMinutes?: number): Promise<PomodoroCommandStartResult> => {
-      if (startInFlightRef.current || isRunning || isPaused) {
+      if (startInFlightRef.current || sessionActiveRef.current) {
         return {
           outcome: 'conflict',
           message: 'A focus session is already running or paused.',
@@ -503,13 +526,21 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       }
 
       startInFlightRef.current = true;
+      // Claim the clock before the notification await so a preset or settings
+      // write resolving mid-start cannot rewrite this session. The render
+      // effect keeps the claim while startInFlightRef is set.
+      sessionActiveRef.current = true;
       clearAutoStartTimer();
+      let committed = false;
 
       try {
-        const mode = requestedDurationMinutes === undefined ? currentMode : 'focus';
+        // Read the live timer configuration through refs: a preset or
+        // settings write that resolved while this press was in flight must
+        // still be the configuration the new session starts from.
+        const mode = requestedDurationMinutes === undefined ? currentModeRef.current : 'focus';
         const duration =
           requestedDurationMinutes === undefined
-            ? getModeDuration(currentMode, settings)
+            ? getModeDuration(mode, settingsRef.current)
             : requestedDurationMinutes * 60;
         if (requestedDurationMinutes !== undefined) {
           setCurrentMode('focus');
@@ -527,12 +558,23 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
         const { title, body } = notifyCopy(mode);
         const id = await scheduleTimerEndNotification(duration, title, body);
         notificationIdRef.current = id;
+        if (Platform.OS !== 'web' && id == null) {
+          setNotificationScheduleFailed(true);
+        }
         lastTickTime.current = Date.now();
         completionDoneRef.current = false;
         setIsRunning(true);
         setIsPaused(false);
+        sessionActiveRef.current = true;
+        committed = true;
         setShowSettings(false);
         setCompletionSummary(null);
+        setShowHistory(false);
+        setInterruptedNotice(null);
+        setRecoveredNotice(null);
+        setPhaseAnnouncement(
+          `${getModeLabel(mode)} started — ${Math.round(duration / 60)} minutes`,
+        );
         // Durable intent: a crash/reload mid-session is reconciled on the
         // next launch instead of vanishing behind an orphan notification.
         void savePomodoroActiveTimer({
@@ -543,11 +585,14 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
           notificationId: id,
         }).catch(() => undefined);
         return { outcome: 'started' };
+      } catch (err) {
+        if (!committed) sessionActiveRef.current = false;
+        throw err;
       } finally {
         startInFlightRef.current = false;
       }
     },
-    [applyRemaining, clearAutoStartTimer, currentMode, isPaused, isRunning, settings],
+    [applyRemaining, clearAutoStartTimer],
   );
 
   const startFocusSession = useCallback(
@@ -564,35 +609,36 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       activePresetRef.current = preset;
       setStoredActivePresetIdState(preset.id);
       setCompletionSummary(null);
-      await setActivePresetId(preset.id).catch(() => undefined);
-      // Applying a preset rewrites the timer settings; a running or paused
-      // session keeps its current duration and the preset applies next round.
-      if (isRunning || isPaused) return;
-      await savePomodoroSettings({
+      void setActivePresetId(preset.id).catch(() => undefined);
+      const nextSettings = {
         focusMinutes: preset.focusMinutes,
         shortBreakMinutes: preset.shortBreakMinutes,
         longBreakMinutes: preset.longBreakMinutes,
         sessionsBeforeLongBreak: preset.sessionsBeforeLongBreak,
-      });
-      setSettings((prev) => ({
-        ...prev,
-        focusMinutes: preset.focusMinutes,
-        shortBreakMinutes: preset.shortBreakMinutes,
-        longBreakMinutes: preset.longBreakMinutes,
-        sessionsBeforeLongBreak: preset.sessionsBeforeLongBreak,
-      }));
-      const duration = getModeDuration(currentModeRef.current, {
-        focusMinutes: preset.focusMinutes,
-        shortBreakMinutes: preset.shortBreakMinutes,
-        longBreakMinutes: preset.longBreakMinutes,
-        sessionsBeforeLongBreak: preset.sessionsBeforeLongBreak,
-      });
+      };
+      // A session that began while the selection was persisting must keep its
+      // clock: the preset applies to the next idle timer, never to an
+      // in-flight one. The live ref — not the render-time closure — decides.
+      if (sessionActiveRef.current) return;
+      // Apply to the timer synchronously: the selection is a local
+      // interaction, so the next Start must read the new durations even
+      // while the durable write is still in flight.
+      settingsRef.current = { ...settingsRef.current, ...nextSettings };
+      setSettings((prev) => ({ ...prev, ...nextSettings }));
+      const duration = getModeDuration(currentModeRef.current, nextSettings);
       setTotalSeconds(duration);
       totalSecondsRef.current = duration;
       applyRemaining(duration);
       lastTickTime.current = null;
+      try {
+        await savePomodoroSettings(nextSettings);
+      } catch {
+        // The durable write failed: reconcile the timer back to the stored
+        // settings on the next load instead of showing an unsaved preset.
+        void loadSettings();
+      }
     },
-    [applyRemaining, isPaused, isRunning],
+    [applyRemaining, loadSettings],
   );
 
   useEffect(
@@ -612,6 +658,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     setIsRunning(false);
     setIsPaused(true);
     setShowWarning(false);
+    setPhaseAnnouncement(`Paused — ${formatClock(remaining)} left`);
     // Persist the frozen countdown into the durable intent so a crash while
     // paused reconciles as interrupted instead of phantom-logging a session
     // whose clock never ran past its nominal deadline.
@@ -631,9 +678,13 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     const { title, body } = notifyCopy(currentMode);
     const id = await scheduleTimerEndNotification(remaining, title, body);
     notificationIdRef.current = id;
+    if (Platform.OS !== 'web' && id == null) {
+      setNotificationScheduleFailed(true);
+    }
     lastTickTime.current = Date.now();
     setIsRunning(true);
     setIsPaused(false);
+    setPhaseAnnouncement('Resumed');
     if (startedAtRef.current) {
       // Keep the durable intent's notification id current across pauses and
       // clear the paused marker so reconciliation trusts the deadline again.
@@ -648,7 +699,9 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     }
   };
 
-  const reset = () => {
+  /** Discard an in-flight session. Only ever called after confirmation. */
+  const discardActiveSession = useCallback(() => {
+    sessionActiveRef.current = false;
     clearAutoStartTimer();
     void cancelScheduledNotification(notificationIdRef.current);
     notificationIdRef.current = null;
@@ -662,10 +715,40 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     setStartedAt(null);
     startedAtRef.current = null;
     setShowWarning(false);
+    setCompletionSummary(null);
     completionDoneRef.current = false;
     // Abandoned sessions are never logged; drop the durable intent too.
     void clearPomodoroActiveTimer().catch(() => undefined);
-  };
+    setPhaseAnnouncement('Session ended — nothing logged');
+  }, [applyRemaining, clearAutoStartTimer, currentMode, settings]);
+
+  /**
+   * End an in-flight focus or break session. Ending is the only discard, so
+   * it always confirms first; cancelling or dismissing keeps the clock, the
+   * scheduled notification, and the durable intent exactly as they were.
+   */
+  const requestEndSession = useCallback(async () => {
+    const targetStartedAtIso = startedAtRef.current?.toISOString() ?? null;
+    if (!sessionActiveRef.current || targetStartedAtIso === null) return;
+    const isBreak = currentModeRef.current !== 'focus';
+    const confirmed = await confirm({
+      title: isBreak ? 'End this break?' : 'End this focus session?',
+      message: isBreak
+        ? "This unfinished break won't be logged."
+        : "This unfinished session won't be logged.",
+      confirmLabel: isBreak ? 'End break' : 'End session',
+      cancelLabel: isBreak ? 'Keep break' : 'Keep focusing',
+      confirmVariant: 'danger',
+    });
+    if (!confirmed) return;
+    // The dialog can outlive the session it opened against. Natural
+    // completion logs that session; auto-start may already have begun the
+    // next one. Confirming then must not discard either outcome.
+    const stillThatSession =
+      sessionActiveRef.current && startedAtRef.current?.toISOString() === targetStartedAtIso;
+    if (!stillThatSession) return;
+    discardActiveSession();
+  }, [confirm, discardActiveSession]);
 
   const dismissCompletionSummary = () => setCompletionSummary(null);
 
@@ -696,53 +779,76 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   );
   const upNextMinutes = Math.round(getModeDuration(upNextMode, settings) / 60);
 
-  const pomodoroStreak = computePomodoroStreakFromHeatmapDays(pomodoroHeatmapDays);
-  const focusStats = computeFocusStats(sessions, new Date());
-  const elapsedSeconds = totalSeconds - remaining;
-  const abandonNotice = getAbandonNotice({
+  const cycleSentence = describeCyclePosition({
     mode: currentMode,
-    phase: isRunning ? 'running' : isPaused ? 'paused' : 'idle',
-    remaining,
-    totalSeconds,
+    completedFocus,
+    settings,
   });
-  const abandonLabel = currentMode === 'focus' && elapsedSeconds >= 60 ? 'Abandon' : 'Reset';
-
-  const modeColors = getModeColor(currentMode);
-  const growthProgress = calculateGrowthProgress(remaining, totalSeconds);
-  const plantStage = getPlantStage(growthProgress);
-  const showSprout = currentMode === 'focus' && (isRunning || remaining < totalSeconds);
 
   // Reduced-chrome active sessions and the completion-summary overlay.
   const activeSession = isRunning || isPaused;
   const summaryVisible = completionSummary !== null && !activeSession;
+  const showConfiguration = !activeSession && !summaryVisible;
+  const idleUntouched = !activeSession && !summaryVisible && remaining === totalSeconds;
+
+  // Historical models are derived only when the History disclosure is open;
+  // the one-second tick must never recompute or mount them.
+  const todayKey = toDateKey(new Date());
+  const focusStats = useMemo(
+    () => (showHistory ? computeFocusStats(sessions, new Date()) : null),
+    [showHistory, sessions],
+  );
+  const pomodoroHeatmapDays = useMemo(
+    () => (showHistory ? buildPomodoroHeatmapDays(sessions, 364) : []),
+    [showHistory, sessions],
+  );
+  const pomodoroStreak = useMemo(
+    () => (showHistory ? computePomodoroStreakFromHeatmapDays(pomodoroHeatmapDays) : 0),
+    [showHistory, pomodoroHeatmapDays],
+  );
   // Today's total including the just-finished session even before the history
   // reload lands (exact started_at match against the loaded rows).
-  const summarySessionLogged =
-    completionSummary !== null &&
-    sessions.some((session) => session.started_at === completionSummary.startedAtIso);
-  const summaryTodayMinutes =
-    completionSummary !== null
-      ? focusStats.todayMinutes + (summarySessionLogged ? 0 : completionSummary.minutes)
-      : 0;
+  const summaryTodayMinutes = useMemo(() => {
+    if (completionSummary === null) return 0;
+    let todayMinutes = 0;
+    for (const session of sessions) {
+      if (
+        session.session_type === 'focus' &&
+        toDateKey(new Date(session.started_at)) === todayKey
+      ) {
+        todayMinutes += Math.max(0, Math.round(session.duration_seconds / 60));
+      }
+    }
+    const alreadyCounted = sessions.some(
+      (session) => session.started_at === completionSummary.startedAtIso,
+    );
+    return todayMinutes + (alreadyCounted ? 0 : completionSummary.minutes);
+  }, [completionSummary, sessions, todayKey]);
 
   const minutes = String(Math.floor(remaining / 60)).padStart(2, '0');
   const seconds = String(remaining % 60).padStart(2, '0');
-
+  const modeColors = getModeColor(currentMode);
   const startLabel =
     currentMode === 'focus' ? 'Start focus' : `Start ${getModeLabel(currentMode).toLowerCase()}`;
+
+  /** On-request timer status: phase plus remaining time, never per-second. */
+  const timerStatus = isRunning
+    ? `${getModeLabel(currentMode)} running, ${minutes}:${seconds} remaining`
+    : isPaused
+      ? `Paused, ${minutes}:${seconds} remaining`
+      : summaryVisible && completionSummary
+        ? `Completed, ${completionSummary.minutes} minutes focused`
+        : `Ready, ${minutes}:${seconds} selected`;
 
   return (
     <Screen scroll>
       <ScreenSection>
-        <PageHeader
-          title="Pomodoro"
-          subtitle="Classic sequence: focus → short breaks → long break — durations saved on device."
-        />
+        <PageHeader title="Focus" />
       </ScreenSection>
 
       <BackgroundWarning visible={showWarning} onDismiss={() => setShowWarning(false)} />
 
-      {interruptedNotice || logSaveFailed ? (
+      {interruptedNotice || recoveredNotice || logSaveFailed || notificationScheduleFailed ? (
         <ScreenSection>
           {interruptedNotice ? (
             <View
@@ -760,6 +866,49 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                   label="Dismiss"
                   variant="ghost"
                   onPress={() => setInterruptedNotice(null)}
+                />
+              </View>
+            </View>
+          ) : null}
+          {recoveredNotice ? (
+            <View
+              className="mb-3 rounded-2xl border px-3 py-2"
+              style={{
+                borderColor: tokens.successBorder,
+                backgroundColor: tokens.successBackground,
+              }}
+            >
+              <Text className="text-sm font-medium" style={{ color: tokens.successText }}>
+                {recoveredNotice.title}
+              </Text>
+              <Text className="mt-0.5 text-xs" style={{ color: tokens.successText }}>
+                {recoveredNotice.body}
+              </Text>
+              <View className="mt-2 self-start">
+                <Button label="Dismiss" variant="ghost" onPress={() => setRecoveredNotice(null)} />
+              </View>
+            </View>
+          ) : null}
+          {notificationScheduleFailed ? (
+            <View
+              className="mb-3 rounded-2xl border px-3 py-2"
+              style={{
+                borderColor: tokens.warningBorder,
+                backgroundColor: tokens.warningBackground,
+              }}
+            >
+              <Text className="text-sm font-medium" style={{ color: tokens.warningText }}>
+                End notification was not scheduled
+              </Text>
+              <Text className="mt-0.5 text-xs" style={{ color: tokens.warningText }}>
+                The countdown is still running. Notification permission or scheduling failed, so you
+                may not be alerted when it ends.
+              </Text>
+              <View className="mt-2 self-start">
+                <Button
+                  label="Dismiss"
+                  variant="ghost"
+                  onPress={() => setNotificationScheduleFailed(false)}
                 />
               </View>
             </View>
@@ -782,129 +931,92 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       ) : null}
 
       <ScreenSection>
-        <Card
-          variant="header"
-          accentColor={COLOR}
-          headerTitle="Timer"
-          headerSubtitle="Classic focus and break sequence with live progress."
-          className="mb-0"
-        >
-          <View className="mb-4">
-            <SegmentedControl
-              options={(['focus', 'short_break', 'long_break'] as PomodoroMode[]).map((mode) => ({
-                value: mode,
-                label: getModeLabel(mode),
-              }))}
-              value={currentMode}
-              onChange={(mode) => {
-                if (isRunning) return;
-                clearAutoStartTimer();
-                // Switching modes abandons any paused session: per contract
-                // it is never logged, so drop its durable intent and cancel
-                // any surviving OS notification with it.
-                void cancelScheduledNotification(notificationIdRef.current);
-                notificationIdRef.current = null;
-                void clearPomodoroActiveTimer().catch(() => undefined);
-                setCompletionSummary(null);
-                setIsPaused(false);
-                setCurrentMode(mode);
-                currentModeRef.current = mode;
-                const d = getModeDuration(mode, settings);
-                setTotalSeconds(d);
-                totalSecondsRef.current = d;
-                applyRemaining(d);
-                setStartedAt(null);
-                startedAtRef.current = null;
-              }}
-              accentColor={COLOR}
-              accessibilityLabel="Focus timer mode"
-            />
-          </View>
-
-          <View className="w-full items-center justify-center py-2">
-            {showSprout ? (
-              <FocusSprout
-                progress={growthProgress}
-                stage={plantStage}
-                size={160}
-                accentColor={COLOR}
-              />
-            ) : null}
-            <Pressable
-              className={showSprout ? 'mt-2 w-full items-center' : 'w-full items-center'}
-              onPress={() => !isRunning && setShowSettings((v) => !v)}
-              disabled={isRunning}
-              accessibilityRole="button"
-              accessibilityLabel={isRunning ? 'Timer running' : 'Edit timer duration'}
-            >
-              <Text className={`text-center text-5xl font-semibold ${modeColors.text}`}>
-                {minutes}:{seconds}
-              </Text>
-              {!isRunning ? (
-                <Text className="mt-0.5 text-center text-xs" style={{ color: tokens.textMuted }}>
-                  tap to edit
-                </Text>
-              ) : null}
-            </Pressable>
-          </View>
-
-          <View className="my-3 flex-row justify-center gap-1.5">
-            {Array.from({ length: settings.sessionsBeforeLongBreak }).map((_, i) => (
-              <View
-                key={i}
-                className={`h-2 w-2 rounded-full ${i < completedFocus % settings.sessionsBeforeLongBreak ? 'bg-focus' : ''}`}
-                style={
-                  i < completedFocus % settings.sessionsBeforeLongBreak
-                    ? undefined
-                    : { backgroundColor: tokens.border }
-                }
-              />
-            ))}
-          </View>
-
-          {activeSession && pendingAssociation ? (
+        <Card variant="standard" accentColor={COLOR} className="mb-0">
+          <View
+            accessibilityRole="timer"
+            accessibilityLabel={TIMER_REGION_LABEL}
+            className="w-full items-center"
+          >
             <Text
-              className="mt-3 text-center text-xs"
+              className="text-xs font-medium uppercase tracking-wide"
               style={{ color: tokens.textMuted }}
-              numberOfLines={1}
             >
-              Focusing on “{pendingAssociation.todoTitle}”
+              {summaryVisible
+                ? 'Session complete'
+                : isPaused
+                  ? `Paused · ${getModeLabel(currentMode)}`
+                  : getModeLabel(currentMode)}
             </Text>
-          ) : null}
-
-          <View className="mt-4 gap-3">
-            {abandonNotice ? (
-              <Text className="text-center text-xs" style={{ color: tokens.textMuted }}>
-                {abandonNotice.title} {abandonNotice.body}
-              </Text>
-            ) : null}
 
             {summaryVisible && completionSummary ? (
-              <View className="gap-3">
-                <View className="items-center">
+              <>
+                <Text
+                  className="mt-2 text-center"
+                  style={{
+                    fontSize: typography.metric.fontSize,
+                    fontWeight: typography.metric.fontWeight,
+                    color: tokens.text,
+                  }}
+                  accessibilityLabel={timerStatus}
+                >
+                  Focused {completionSummary.minutes} min
+                </Text>
+                {completionSummary.linkedTodoTitle ? (
                   <Text
-                    className="text-center"
-                    style={{
-                      fontSize: typography.metric.fontSize,
-                      fontWeight: typography.metric.fontWeight,
-                      color: tokens.text,
-                    }}
+                    className="mt-1 text-center text-sm"
+                    style={{ color: tokens.textMuted }}
+                    numberOfLines={1}
                   >
-                    Focused {completionSummary.minutes} min
+                    {completionSummary.linkedTodoTitle}
                   </Text>
-                  {completionSummary.linkedTodoTitle ? (
-                    <Text
-                      className="mt-1 text-center text-sm"
-                      style={{ color: tokens.textMuted }}
-                      numberOfLines={1}
-                    >
-                      {completionSummary.linkedTodoTitle}
-                    </Text>
-                  ) : null}
-                  <Text className="mt-1 text-center text-xs" style={{ color: tokens.textMuted }}>
-                    {summaryTodayMinutes} min focused today
-                  </Text>
-                </View>
+                ) : null}
+                <Text className="mt-1 text-center text-xs" style={{ color: tokens.textMuted }}>
+                  {summaryTodayMinutes} min focused today
+                </Text>
+              </>
+            ) : (
+              <Text
+                className={`mt-2 text-center text-5xl font-semibold ${modeColors.text}`}
+                accessibilityLabel={timerStatus}
+              >
+                {minutes}:{seconds}
+              </Text>
+            )}
+
+            {cycleSentence ? (
+              <Text
+                className="mt-2 text-center text-xs"
+                style={{ color: tokens.textMuted }}
+                accessibilityRole="text"
+              >
+                {cycleSentence}
+              </Text>
+            ) : null}
+
+            {activeSession && pendingAssociation ? (
+              <Text
+                className="mt-2 text-center text-xs"
+                style={{ color: tokens.textMuted }}
+                numberOfLines={1}
+              >
+                Focusing on “{pendingAssociation.todoTitle}”
+              </Text>
+            ) : null}
+
+            {phaseAnnouncement ? (
+              <Text
+                accessibilityLiveRegion="polite"
+                className="mt-1 text-center text-xs"
+                style={{ color: tokens.textMuted }}
+              >
+                {phaseAnnouncement}
+              </Text>
+            ) : null}
+          </View>
+
+          <View className="mt-4 gap-3">
+            {summaryVisible && completionSummary ? (
+              <>
                 {notePromptSessionId ? (
                   <SessionNotePrompt
                     sessionId={notePromptSessionId}
@@ -915,223 +1027,140 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                     onDismiss={() => setNotePromptSessionId(null)}
                   />
                 ) : null}
-                <View className="flex-row gap-3">
-                  <View className="flex-1">
+                <View className="flex-row flex-wrap gap-3">
+                  <View className="min-w-[8rem] flex-1">
                     <Button
-                      label={`Start ${getModeLabel(currentMode).toLowerCase()}`}
+                      label={startLabel}
                       onPress={startBreakFromSummary}
                       color={COLOR}
+                      fullWidth
                     />
                   </View>
-                  <View className="flex-1">
-                    <Button label="Done" variant="ghost" onPress={dismissCompletionSummary} />
+                  <View className="min-w-[8rem] flex-1">
+                    <Button
+                      label="Done"
+                      variant="ghost"
+                      onPress={dismissCompletionSummary}
+                      fullWidth
+                    />
                   </View>
                 </View>
-              </View>
-            ) : (
-              <>
-                {!isRunning && !isPaused && remaining === totalSeconds ? (
-                  <Button label={startLabel} onPress={() => void start()} color={COLOR} />
-                ) : null}
-
-                {isRunning ? (
-                  <View className="flex-row gap-3">
-                    <View className="flex-1">
-                      <Button label="Pause" variant="ghost" onPress={pause} />
-                    </View>
-                    <View className="flex-1">
-                      <Button
-                        label={`${abandonLabel} (not logged)`}
-                        variant="ghost"
-                        onPress={reset}
-                      />
-                    </View>
-                  </View>
-                ) : null}
-
-                {isPaused && !isRunning ? (
-                  <View className="flex-row gap-3">
-                    <View className="flex-1">
-                      <Button label="Resume" onPress={resume} color={COLOR} />
-                    </View>
-                    <View className="flex-1">
-                      <Button
-                        label={`${abandonLabel} (not logged)`}
-                        variant="ghost"
-                        onPress={reset}
-                      />
-                    </View>
-                  </View>
-                ) : null}
-
-                {remaining === 0 && !isRunning && !isPaused ? (
-                  <Button label={startLabel} onPress={() => void start()} color={COLOR} />
-                ) : null}
               </>
-            )}
-          </View>
+            ) : null}
 
-          {!summaryVisible &&
-          !isRunning &&
-          !isPaused &&
-          remaining === getModeDuration(currentMode, settings) ? (
-            <Text className="mt-3 text-center text-xs" style={{ color: tokens.textMuted }}>
-              Up next: {getModeLabel(upNextMode)} ({upNextMinutes} min)
-            </Text>
-          ) : null}
+            {idleUntouched ? (
+              <Button label={startLabel} onPress={() => void start()} color={COLOR} fullWidth />
+            ) : null}
+
+            {isRunning ? (
+              <View className="flex-row flex-wrap gap-3">
+                <View className="min-w-[6rem] flex-1">
+                  <Button label="Pause" variant="ghost" onPress={pause} fullWidth />
+                </View>
+                <View className="min-w-[6rem] flex-1">
+                  <Button
+                    label="End"
+                    variant="ghost"
+                    onPress={() => void requestEndSession()}
+                    fullWidth
+                  />
+                </View>
+              </View>
+            ) : null}
+
+            {isPaused ? (
+              <View className="flex-row flex-wrap gap-3">
+                <View className="min-w-[6rem] flex-1">
+                  <Button label="Resume" onPress={() => void resume()} color={COLOR} fullWidth />
+                </View>
+                <View className="min-w-[6rem] flex-1">
+                  <Button
+                    label="End"
+                    variant="ghost"
+                    onPress={() => void requestEndSession()}
+                    fullWidth
+                  />
+                </View>
+              </View>
+            ) : null}
+
+            {showConfiguration ? (
+              <Text className="text-center text-xs" style={{ color: tokens.textMuted }}>
+                Up next: {getModeLabel(upNextMode)} ({upNextMinutes} min)
+              </Text>
+            ) : null}
+          </View>
         </Card>
       </ScreenSection>
-      {!activeSession ? (
-        <ScreenSection>
-          <View className="flex-row flex-wrap gap-3">
-            <View className="min-w-[200px] flex-1">
-              <FeatureStatCard
-                accentColor={COLOR}
-                textColor={textColor}
-                icon="timer"
-                title="Focus sessions"
-                value={sessions.length}
-                subtitle="Last 52 weeks"
-                note={sessions.length > 0 ? 'Completed focus sessions' : 'No sessions logged yet'}
-              />
-            </View>
-            <View className="min-w-[200px] flex-1">
-              <FeatureStatCard
-                accentColor={COLOR}
-                textColor={textColor}
-                icon="local-fire-department"
-                title="Current streak"
-                value={pomodoroStreak}
-                subtitle="Consecutive focus days"
-                note={
-                  pomodoroStreak > 0
-                    ? 'Keep the streak alive'
-                    : 'Your next session starts the streak'
-                }
-              />
-            </View>
-          </View>
-          <View className="mt-3 flex-row flex-wrap gap-3">
-            <View className="min-w-[110px] flex-1">
-              <FeatureStatCard
-                accentColor={COLOR}
-                textColor={textColor}
-                icon="today"
-                title="Today"
-                value={`${focusStats.todayMinutes}m`}
-                subtitle={`${focusStats.todaySessions} session${focusStats.todaySessions === 1 ? '' : 's'}`}
-                note={focusStats.todayMinutes > 0 ? 'Focused today' : 'No focus yet today'}
-              />
-            </View>
-            <View className="min-w-[110px] flex-1">
-              <FeatureStatCard
-                accentColor={COLOR}
-                textColor={textColor}
-                icon="date-range"
-                title="This week"
-                value={`${focusStats.weekMinutes}m`}
-                subtitle={`${focusStats.weekSessions} session${focusStats.weekSessions === 1 ? '' : 's'}`}
-                note="Last 7 days"
-              />
-            </View>
-            <View className="min-w-[110px] flex-1">
-              <FeatureStatCard
-                accentColor={COLOR}
-                textColor={textColor}
-                icon="insights"
-                title="30 days"
-                value={`${focusStats.thirtyDayMinutes}m`}
-                subtitle={
-                  focusStats.bestDay
-                    ? `Best day ${focusStats.bestDay.minutes}m`
-                    : `${focusStats.thirtyDaySessions} sessions`
-                }
-                note={focusStats.bestDay ? `Best on ${focusStats.bestDay.dateKey}` : 'No data yet'}
-              />
-            </View>
-          </View>
-        </ScreenSection>
-      ) : null}
 
-      {notePromptSessionId && !activeSession && !summaryVisible ? (
+      {notePromptSessionId && showConfiguration ? (
         <ScreenSection>
-          <Card
-            variant="header"
-            accentColor={COLOR}
-            headerTitle="Session complete"
-            headerSubtitle="Add an optional note to remember what this session was for."
-            className="mb-0"
-          >
-            <SessionNotePrompt
-              sessionId={notePromptSessionId}
-              onSaved={() => {
-                setNotePromptSessionId(null);
-                void loadHistory();
-              }}
-              onDismiss={() => setNotePromptSessionId(null)}
-            />
+          <Card variant="standard" accentColor={COLOR} className="mb-0">
+            <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+              Session complete
+            </Text>
+            <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+              Add an optional note to remember what this session was for.
+            </Text>
+            <View className="mt-3">
+              <SessionNotePrompt
+                sessionId={notePromptSessionId}
+                onSaved={() => {
+                  setNotePromptSessionId(null);
+                  void loadHistory();
+                }}
+                onDismiss={() => setNotePromptSessionId(null)}
+              />
+            </View>
           </Card>
         </ScreenSection>
       ) : null}
 
-      {!activeSession && currentMode === 'focus' ? (
+      {showConfiguration ? (
         <ScreenSection>
-          <Card
-            variant="header"
-            accentColor={COLOR}
-            headerTitle="Link a todo"
-            headerSubtitle={
-              pendingAssociation
-                ? `Next focus will be linked to “${pendingAssociation.todoTitle}”.`
-                : 'Optionally attach an open todo to your next focus session.'
-            }
-            className="mb-0"
-          >
-            {showLinkTodo ? (
-              <View className="gap-3">
-                <TodoAssociationPicker
-                  todos={todos}
-                  selected={pendingAssociation}
-                  onSelect={setPendingAssociation}
-                  onRetryLoad={() => void loadTodos()}
-                  loading={todosLoading}
-                />
-                <View className="self-start">
-                  <Button label="Done" variant="ghost" onPress={() => setShowLinkTodo(false)} />
-                </View>
-              </View>
-            ) : (
-              <View className="self-start">
-                <Button
-                  label={pendingAssociation ? 'Change linked todo' : 'Choose a todo'}
-                  variant="ghost"
-                  onPress={() => {
-                    setShowLinkTodo(true);
-                    if (todos.length === 0) void loadTodos();
-                  }}
-                />
-              </View>
-            )}
-          </Card>
-        </ScreenSection>
-      ) : null}
-
-      {!activeSession ? (
-        <ScreenSection>
-          <Card
-            variant="header"
-            accentColor={COLOR}
-            headerTitle="Presets"
-            headerSubtitle="Switch the rhythm; tap the timer to edit exact durations."
-            className="mb-0"
-          >
-            <PomodoroPresetSelector
-              presets={presets}
-              activePresetId={highlightedPresetId}
-              onSelect={(p) => void handleSelectPreset(p)}
-              disabled={isRunning || isPaused}
-            />
-            <View className="mt-2 self-start">
+          <Card variant="standard" accentColor={COLOR} className="mb-0">
+            <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+              Session length
+            </Text>
+            <View className="mt-3">
+              <SegmentedControl
+                options={(['focus', 'short_break', 'long_break'] as PomodoroMode[]).map((mode) => ({
+                  value: mode,
+                  label: getModeLabel(mode),
+                }))}
+                value={currentMode}
+                onChange={(mode) => {
+                  clearAutoStartTimer();
+                  // Idle-only control: configuration never discards a session,
+                  // so switching here just selects the next timer to run.
+                  setCompletionSummary(null);
+                  setCurrentMode(mode);
+                  currentModeRef.current = mode;
+                  const d = getModeDuration(mode, settings);
+                  setTotalSeconds(d);
+                  totalSecondsRef.current = d;
+                  applyRemaining(d);
+                  lastTickTime.current = null;
+                  setStartedAt(null);
+                  startedAtRef.current = null;
+                }}
+                accentColor={COLOR}
+                accessibilityLabel="Focus timer mode"
+              />
+            </View>
+            <View className="mt-4">
+              <PomodoroPresetSelector
+                presets={presets}
+                activePresetId={highlightedPresetId}
+                onSelect={(p) => void handleSelectPreset(p)}
+              />
+            </View>
+            <View className="mt-3 flex-row flex-wrap gap-2">
+              <Button
+                label="Edit durations"
+                variant="ghost"
+                onPress={() => setShowSettings((v) => !v)}
+              />
               <Button
                 label="Manage presets"
                 accessibilityLabel="Manage presets"
@@ -1153,22 +1182,147 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
         </ScreenSection>
       ) : null}
 
-      {!activeSession ? (
-        <ScreenSection className="mb-0">
-          <Card
-            variant="header"
-            accentColor={COLOR}
-            headerTitle="Focus history"
-            headerSubtitle="Recent sessions, garden view, and the last 52 weeks of activity."
-            className="mb-0"
-          >
-            <RecentSessionsList
-              sessions={sessions}
-              onEdit={(session) => {
-                setMetaEditSession(session);
-                if (todos.length === 0) void loadTodos();
-              }}
+      {showConfiguration && currentMode === 'focus' ? (
+        <ScreenSection>
+          <Card variant="standard" accentColor={COLOR} className="mb-0">
+            <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+              Link a todo
+            </Text>
+            <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+              {pendingAssociation
+                ? `Next focus will be linked to “${pendingAssociation.todoTitle}”.`
+                : 'Optionally attach an open todo to your next focus session.'}
+            </Text>
+            {showLinkTodo ? (
+              <View className="mt-3 gap-3">
+                <TodoAssociationPicker
+                  todos={todos}
+                  selected={pendingAssociation}
+                  onSelect={setPendingAssociation}
+                  onRetryLoad={() => void loadTodos()}
+                  loading={todosLoading}
+                />
+                <View className="self-start">
+                  <Button label="Done" variant="ghost" onPress={() => setShowLinkTodo(false)} />
+                </View>
+              </View>
+            ) : (
+              <View className="mt-3 self-start">
+                <Button
+                  label={pendingAssociation ? 'Change linked todo' : 'Choose a todo'}
+                  variant="ghost"
+                  onPress={() => {
+                    setShowLinkTodo(true);
+                    if (todos.length === 0) void loadTodos();
+                  }}
+                />
+              </View>
+            )}
+          </Card>
+        </ScreenSection>
+      ) : null}
+
+      {showConfiguration ? (
+        <ScreenSection>
+          <View className="self-start">
+            <Button
+              label={showHistory ? 'Hide history' : 'History'}
+              variant="ghost"
+              onPress={() => setShowHistory((v) => !v)}
             />
+          </View>
+        </ScreenSection>
+      ) : null}
+
+      {showConfiguration && showHistory ? (
+        <ScreenSection className="mb-0">
+          <Card variant="standard" accentColor={COLOR} className="mb-0">
+            <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+              Focus history
+            </Text>
+            <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+              Recent sessions, garden, and the last 52 weeks of activity.
+            </Text>
+            <View className="mt-3 flex-row flex-wrap gap-3">
+              <View className="min-w-[200px] flex-1">
+                <FeatureStatCard
+                  accentColor={COLOR}
+                  textColor={textColor}
+                  icon="timer"
+                  title="Focus sessions"
+                  value={sessions.length}
+                  subtitle="Last 52 weeks"
+                  note={sessions.length > 0 ? 'Completed focus sessions' : 'No sessions logged yet'}
+                />
+              </View>
+              <View className="min-w-[200px] flex-1">
+                <FeatureStatCard
+                  accentColor={COLOR}
+                  textColor={textColor}
+                  icon="local-fire-department"
+                  title="Current streak"
+                  value={pomodoroStreak}
+                  subtitle="Consecutive focus days"
+                  note={
+                    pomodoroStreak > 0
+                      ? 'Keep the streak alive'
+                      : 'Your next session starts the streak'
+                  }
+                />
+              </View>
+            </View>
+            {focusStats ? (
+              <View className="mt-3 flex-row flex-wrap gap-3">
+                <View className="min-w-[110px] flex-1">
+                  <FeatureStatCard
+                    accentColor={COLOR}
+                    textColor={textColor}
+                    icon="today"
+                    title="Today"
+                    value={`${focusStats.todayMinutes}m`}
+                    subtitle={`${focusStats.todaySessions} session${focusStats.todaySessions === 1 ? '' : 's'}`}
+                    note={focusStats.todayMinutes > 0 ? 'Focused today' : 'No focus yet today'}
+                  />
+                </View>
+                <View className="min-w-[110px] flex-1">
+                  <FeatureStatCard
+                    accentColor={COLOR}
+                    textColor={textColor}
+                    icon="date-range"
+                    title="This week"
+                    value={`${focusStats.weekMinutes}m`}
+                    subtitle={`${focusStats.weekSessions} session${focusStats.weekSessions === 1 ? '' : 's'}`}
+                    note="Last 7 days"
+                  />
+                </View>
+                <View className="min-w-[110px] flex-1">
+                  <FeatureStatCard
+                    accentColor={COLOR}
+                    textColor={textColor}
+                    icon="insights"
+                    title="30 days"
+                    value={`${focusStats.thirtyDayMinutes}m`}
+                    subtitle={
+                      focusStats.bestDay
+                        ? `Best day ${focusStats.bestDay.minutes}m`
+                        : `${focusStats.thirtyDaySessions} sessions`
+                    }
+                    note={
+                      focusStats.bestDay ? `Best on ${focusStats.bestDay.dateKey}` : 'No data yet'
+                    }
+                  />
+                </View>
+              </View>
+            ) : null}
+            <View className="mt-4">
+              <RecentSessionsList
+                sessions={sessions}
+                onEdit={(session) => {
+                  setMetaEditSession(session);
+                  if (todos.length === 0) void loadTodos();
+                }}
+              />
+            </View>
             <View className="mt-4">
               <GardenGrid sessions={sessions} />
             </View>
@@ -1197,6 +1351,14 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
           void refresh();
         }}
       />
+      {confirmationDialog}
     </Screen>
   );
+}
+
+/** MM:SS for a remaining-seconds value, used in status announcements. */
+function formatClock(totalSeconds: number): string {
+  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  return `${minutes}:${seconds}`;
 }

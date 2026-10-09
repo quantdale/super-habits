@@ -313,10 +313,11 @@ defineJourney({
         await expect(page.getByText('Pause', { exact: true })).toBeVisible();
         await expect.poll(() => timerText.textContent(), { timeout: 5_000 }).not.toBe(pausedText);
 
-        // End the session with Reset (no focus session completes). The control
-        // is labelled "Reset (not logged)" — or "Abandon (not logged)" once a
-        // focus session has ≥60s elapsed.
-        await page.getByRole('button', { name: /^(?:Reset|Abandon) \(not logged\)$/ }).click();
+        // End the session through the confirmation dialog (no focus session
+        // completes — an abandoned session is never logged).
+        await page.getByRole('button', { name: 'End', exact: true }).click();
+        await page.getByRole('dialog').getByRole('button', { name: 'End session' }).click();
+        await expect(page.getByRole('dialog')).toHaveCount(0);
 
         // Live-section contract: after the paused session is reset, the
         // already-mounted idle timer must use the newly saved default before

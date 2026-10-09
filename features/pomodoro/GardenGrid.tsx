@@ -19,8 +19,8 @@ type Props = {
 };
 
 /**
- * Small plant icon for the garden grid.
- * Simplified version of FocusSprout at 32×32.
+ * Small plant icon for the garden grid at 32×32. Static by design: the
+ * garden lives on the history path and never animates with the countdown.
  */
 function MiniPlant({ color = SECTION_COLORS[POMODORO_SECTION_KEY] }: { color?: string }) {
   return (

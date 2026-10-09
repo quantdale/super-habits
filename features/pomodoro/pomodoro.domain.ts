@@ -631,6 +631,32 @@ export function computeFocusStats(sessions: PomodoroSession[], today: Date): Foc
   };
 }
 
+/**
+ * One sentence describing where the current or next session sits in the
+ * Pomodoro cycle, returned only when the position changes what the user does
+ * next. Returns null at a cycle start (nothing completed yet) and for a break
+ * that begins a fresh cycle, so the surface never shows a decorative
+ * placeholder row.
+ */
+export function describeCyclePosition(input: {
+  mode: PomodoroMode;
+  completedFocus: number;
+  settings: PomodoroSettings;
+}): string | null {
+  const perCycle = input.settings.sessionsBeforeLongBreak;
+  const completedInCycle = input.completedFocus % perCycle;
+  if (input.mode === 'focus') {
+    const sessionNumber = completedInCycle + 1;
+    if (sessionNumber === 1) return null;
+    if (sessionNumber === perCycle) return 'Long break after this one';
+    return `Session ${sessionNumber} of ${perCycle}`;
+  }
+  // A break always leads back to focus; the position only matters once the
+  // cycle has started (a long break just reset it).
+  if (completedInCycle === 0) return null;
+  return `Session ${completedInCycle + 1} of ${perCycle} next`;
+}
+
 // ---------------------------------------------------------------------------
 // Interruption / abandon copy
 // ---------------------------------------------------------------------------

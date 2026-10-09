@@ -69,7 +69,9 @@ test.describe('Command shell', () => {
     await expect(addLauncher).toBeVisible();
     await expect(commandLauncher).toHaveCount(0);
 
-    await page.getByRole('button', { name: /^Reset \(not logged\)$/ }).click({ force: true });
+    // Ending is the only discard and always confirms first (W8 Focus).
+    await page.getByRole('button', { name: 'End', exact: true }).click({ force: true });
+    await page.getByRole('dialog').getByRole('button', { name: 'End session' }).click();
     await expect(page.getByText('Start focus', { exact: true })).toBeVisible();
     await expect(addLauncher).toBeVisible();
   });

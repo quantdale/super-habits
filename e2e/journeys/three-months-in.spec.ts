@@ -555,7 +555,10 @@ const SECTION_MARKERS: Record<SectionName, string> = {
   overview: 'Plan today',
   todos: 'TO DO',
   habits: 'Daily check-in',
-  pomodoro: 'Classic sequence: focus → short breaks → long break — durations saved on device.',
+  // The Focus section identifies itself through the accessible timer region
+  // ("Focus timer"), present in every timer state — the W8 rebuild removed the
+  // documentation subtitle that used to serve as the marker.
+  pomodoro: 'Focus timer',
   workout:
     'Plan your week, build prescriptions, train with guidance, and review progress in one place.',
   calories: 'Switch between manual entry and a diary grouped by meal.',
@@ -734,9 +737,12 @@ async function scrollTodosListUntilVisible(page: Page, targetText: string): Prom
 
 /**
  * A section switch is "complete" when its SectionContainer (the first
- * position:absolute ancestor of the section's marker text) reaches opacity 1 —
- * inactive sections stay in the DOM at opacity 0, so a plain toBeVisible would
- * never distinguish them.
+ * position:absolute ancestor of the section's marker identity) reaches opacity
+ * 1 — inactive sections stay in the DOM at opacity 0, so a plain toBeVisible
+ * would never distinguish them. A section's identity is either a childless
+ * text leaf matching the marker or the element whose accessible name
+ * (aria-label) is the marker — the Focus timer region identifies itself by
+ * accessible name instead of documentation copy.
  */
 async function measureSwitch(page: Page, tab: SectionName, marker: string): Promise<number> {
   const t0 = await page.evaluate(() => performance.now());
@@ -745,7 +751,9 @@ async function measureSwitch(page: Page, tab: SectionName, marker: string): Prom
     (markerText) => {
       const all = Array.from(document.querySelectorAll<HTMLElement>('*'));
       const leaf = all.find(
-        (el) => el.children.length === 0 && el.textContent?.trim() === markerText,
+        (el) =>
+          (el.children.length === 0 && el.textContent?.trim() === markerText) ||
+          el.getAttribute('aria-label') === markerText,
       );
       if (!leaf) return false;
       let current: HTMLElement | null = leaf;
@@ -793,7 +801,11 @@ async function waitForSectionTransitionsSettled(page: Page): Promise<void> {
     (markers) => {
       for (const m of markers) {
         const all = Array.from(document.querySelectorAll<HTMLElement>('*'));
-        const leaf = all.find((el) => el.children.length === 0 && el.textContent?.trim() === m);
+        const leaf = all.find(
+          (el) =>
+            (el.children.length === 0 && el.textContent?.trim() === m) ||
+            el.getAttribute('aria-label') === m,
+        );
         if (!leaf) return false;
         let current: HTMLElement | null = leaf;
         let found = false;
@@ -818,7 +830,11 @@ async function waitForSectionTransitionsSettled(page: Page): Promise<void> {
 async function sectionOpacity(page: Page, markerText: string): Promise<number> {
   return page.evaluate((m) => {
     const all = Array.from(document.querySelectorAll<HTMLElement>('*'));
-    const leaf = all.find((el) => el.children.length === 0 && el.textContent?.trim() === m);
+    const leaf = all.find(
+      (el) =>
+        (el.children.length === 0 && el.textContent?.trim() === m) ||
+        el.getAttribute('aria-label') === m,
+    );
     if (!leaf) return 0;
     let cur: HTMLElement | null = leaf;
     while (cur && cur !== document.body) {

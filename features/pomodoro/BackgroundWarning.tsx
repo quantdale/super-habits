@@ -21,10 +21,10 @@ export function BackgroundWarning({ visible, onDismiss }: Props) {
       <View className="flex-row items-start justify-between">
         <View className="flex-1">
           <Text className="text-sm font-semibold" style={{ color: tokens.warningText }}>
-            🍃 You left during a session
+            Session kept running
           </Text>
           <Text className="mt-1 text-sm" style={{ color: tokens.warningText }}>
-            Stay in the app to keep your plant alive.
+            You left the app during a session. The countdown kept running while you were away.
           </Text>
         </View>
         <Pressable onPress={onDismiss} hitSlop={8}>
