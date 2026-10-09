@@ -51,6 +51,7 @@ Every entry below is either a contract gap or a capability gap. If a new uncover
 - **Resolution (closed 2026-08-10, `close-cg4-cg5-performance-gaps`):** the mounted section now suppresses inactive content from the accessibility tree without changing its visual mounted layout, and the task list keeps stable key/render/drag callbacks across section activation. With the unchanged HEAVY J8 fixture, thresholds, timing, and assertion, an initial focused strict batch measured overview→Todos at 573–644ms (median 608.5ms, p90 642ms), and the final accepted-source full continuity batch measured 733–761ms (median 755ms, p90 757ms, max 761ms) in 10/10 runs with CG-5 still quarantined. Recurrence expansion, idempotency, list ordering, and the full J8 row-level oracle remained green.
 - **Tests:** `e2e/journeys/three-months-in.spec.ts` step 3 now runs unquarantined with the strict `≤ 800ms` assertion.
 - **2026-09-04 Wave-8 note (certification infrastructure v2, host variance):** six consecutive file-level runs on the same HEAVY fixture measured worst-switch 745 / 781 / 774 / 751 / **910 (workout→calories, hard-ceiling breach)** / 775ms with the slowest switch varying by run — ceiling held 5/6, the WM2.4 15% diagnostic headroom floor missed 5/5. No product-code change in the switch path; the WM2.4 floor is miscalibrated for cold-emulator/host-jitter conditions on this host. The strict assertion is deliberately NOT weakened or quarantined (it caught the real 910 excursion). Tracked as a P2 perf-hardening follow-up in `.agent/execplans/certification-infrastructure-v2.md` (Finding W8-1); evidence under `.cursor/playwright-output/e2e-failures/three-months-in-*`.
+- **2026-10-09 W8.5 note (Focus timer-start safety, host variance, baseline-controlled):** the diary-search diagnostic headroom floor (unchanged 500ms ceiling / 15% floor) missed at 434ms (13.2% headroom), 451ms (9.8%) and 453ms (9.4%) on the W8.5 tree, with the 500ms ceiling holding on every run. Under full-battery CPU load the section-switch `maxSwitch` (unchanged 800ms ceiling / 15% floor) measured 702ms (12.3% headroom), with the 800ms ceiling holding; the section-switch step PASSES on an isolated run. The same diary command on the unmodified baseline tree at `c32685364cbe9c6d34a512c3b2bcef9b3a432e0b` (changes stashed, `dist/` rebuilt hermetically) reproduced the identical miss at 439ms (12.2% headroom), so the assertion flips on unchanged product code and on the baseline itself — the recorded host-load class, not a W8.5 regression. No product-code change was made in the Calories/diary or in the section-switch path. No ceiling, floor, assertion, or quarantine was changed by this wave. Recorded in `openspec/changes/frontend-v3-w85-focus-startup/execplan.md` (Validation).
 
 ### CG-5 — HEAVY diary saved-meal search exceeds the D14 ceiling — CLOSED
 
@@ -582,6 +583,7 @@ in `.agent/execplans/integration-tinypool-ipc-channel-closed-v1.md`.
 **Gate site:** `e2e/visual-audit.spec.ts`
 **Gate site:** `e2e/habits-w7-audit.spec.ts`
 **Gate site:** `e2e/pomodoro-w8-audit.spec.ts`
+**Gate site:** `e2e/pomodoro-w85-audit.spec.ts`
 
 **Reason:** the campaign's visual-audit harness seeds TYPICAL fixtures and
 captures ~47 screenshots per run (`docs/ui-ux/v3-audit/`). It is gated with
@@ -593,6 +595,11 @@ images in `docs/ui-ux/v3-audit/w7/`. Its behavioral twin
 `e2e/habits-w7.spec.ts` runs unconditionally in the standard Chromium battery.
 The W8 Focus instrument uses the same opt-in gate for `docs/ui-ux/v3-audit/w8/`;
 its behavioral twin `e2e/pomodoro.spec.ts` runs unconditionally.
+The W8.5 Focus instrument uses the same opt-in gate for
+`docs/ui-ux/v3-audit/w8.5/` (13 inspected captures) and additionally asserts the
+startup surface contract — exactly one primary action, configuration fully
+withdrawn — at every captured state; its behavioral twin is the same
+`e2e/pomodoro.spec.ts`.
 No failed behavioral test is quarantined by this evidence-only gate.
 
 **Closing path:** opt in on demand — `VISUAL_AUDIT=1 npx playwright test

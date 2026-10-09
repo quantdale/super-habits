@@ -73,14 +73,22 @@ duration_seconds`, breaks are not logged, and `planActiveTimerReconcile()`
 
 ## Current Checkpoint
 
-- Current milestone: complete. W8 is on main at `ce00e37`.
+- Current milestone: complete. W8 is on main at `c326853` (the W8 closure merge,
+  PR 62). The earlier checkpoint named `ce00e37` (PR 61, the visual-audit
+  register fix) as the then-current tip; the later W8 closure commit `9009c17`
+  and merge `c32685364cbe9c6d34a512c3b2bcef9b3a432e0b` are the final published
+  baseline for this slice.
 - Completed: tasks 1.1–7.3. Six hierarchies, confirmed End, cycle sentence,
   sprout off the clock, History disclosure, 14 captures, SYS-08/SYS-09/SUR-09
   verified from those renders. Prior local gates are in the Validation ledger
   (Focus E2E 12/12 before the two new stale-confirm tests; chromium+journeys
   254/65/0; D14 clean-run maxSwitch 611/800ms, plus an earlier same-tree floor
   miss recorded as ENVIRONMENT). Shell cache bumped to v10 for this deploy.
+  Subsequent bounded convergence work is recorded separately in
+  `../frontend-v3-w85-focus-startup/execplan.md`; no W8 task was reopened for
+  it and no W8 test result was rewritten.
 - In progress: none.
+
 - Important modified files: `features/pomodoro/PomodoroScreen.tsx` (six
   hierarchies, confirmed End, History disclosure, timer region identity),
   `features/pomodoro/pomodoro.domain.ts` (`describeCyclePosition`),
@@ -106,7 +114,9 @@ duration_seconds`, breaks are not logged, and `planActiveTimerReconcile()`
   `core.autocrlf=true` converts `docs/testing/known-gaps.md` to CRLF on this
   Windows host so the register parser sees zero entries; passes in CI where
   the blob stays LF — and `tests/qaNativeProvision.test.ts` — a 5s git-fixture
-  timeout under full-suite CPU load; passes 5/5 in isolation).
+  timeout under full-suite CPU load; passes 5/5 in isolation). These are W8
+  host-environment results, not a claim that the whole local Windows Vitest
+  battery passed.
 - Current failures: none attributable to this slice. The two environmental
   failures above are recorded, not caused by W8.
 - Relevant quarantines: none added; existing internal/remote/visual opt-ins
@@ -114,7 +124,9 @@ duration_seconds`, breaks are not logged, and `planActiveTimerReconcile()`
 - Blockers: None for web continuation. Native W16 and full certification stay
   blocked/deferred as before; iOS stays owner-deferred.
 - Exact next action: None — task complete. Parent wave continues at W9
-  planning only; do not implement W9 from this plan.
+  planning only; do not implement W9 from this plan. The parent checkpoint
+  points at `../frontend-v3-w85-focus-startup/execplan.md` for the subsequent
+  bounded convergence work.
 - Remaining definition of done: all 23 tasks in `tasks.md` complete with
   rendered evidence under `docs/ui-ux/v3-audit/w8/`, SYS-08/SYS-09/SUR-09
   verified-fixed from those renders only, and the full gate ladder green

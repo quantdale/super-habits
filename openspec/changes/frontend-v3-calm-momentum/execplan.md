@@ -62,74 +62,16 @@ historical evidence only.
 
 ## Current Checkpoint
 
-- Current milestone: W8 Focus is published. W9 Workout is next and is not started.
-- Completed: W0–W7 unchanged semantically; W6.5 closed and MERGED to main as
-  merge commit `f37539a969bdc7c3dc539c2d47db3f6580429c64` (PR58 MERGED
-  2026-10-08). W7 rebuilt Habits as a date-scoped, list-first daily check-in
-  and merged to main as merge commit
-  `f679a26a28a8abf3472b44e3b5fbdf229222b927` (PR 59,
-  https://github.com/quantdale/super-habits/pull/59, branch
-  `frontend-v3-w7-habits`) in three coherent commits `9bf4fda` (feature),
-  `0a8e86d` (regressions + rendered evidence) and `3086b27` (spec, ledgers,
-  plans). Exact-head CI run
-  [37822880601](https://github.com/quantdale/super-habits/actions/runs/37822880601)
-  succeeds on Typecheck, Lint, theme tokens, openspec contracts,
-  journey-label and quarantine-register parity, versioned ExecPlans and the
-  unit+integration test projects; it fails only the two pre-existing
-  undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge`
-  GHSA-86w9-cpqp-85rv), the identical set recorded at baseline `d29c67b`
-  (run 37717090214), so hosted `e2e`/`nightly` skip behind the quality gate
-  and are NOT passed. No dependency, lockfile or patch file changed in
-  `main..HEAD`. Stash, foreign iOS evidence and historical captures preserved.
-  No overall certification.
-- In progress: W8 Focus implementation is complete and gated under the slice plan at `frontend-v3-w8-focus/execplan.md` (the only living W8 plan; this checkpoint points there instead of `.agent/execplans/frontend-v3-w8-focus-v1.md`). All 23 W8 tasks are checked: six timer hierarchies, confirmed-End session safety, no silent discards, cycle sentence, sprout off the clock, truthful recovery copy, phase-only announcements, one History disclosure, and selector updates across E2E/Maestro/simulation oracles. Evidence: 12/12 Focus E2E, 14 inspected captures under `docs/ui-ux/v3-audit/w8/`, SYS-08/SYS-09/SUR-09 VERIFIED-FIXED, typecheck/lint/theme/OpenSpec/ExecPlan validation green, Vitest 2558 passed (two environmental host failures, green in isolation), and the full chromium+journeys battery 254 passed / 65 skipped / 0 failed with D14 maxSwitch 611/800ms (23.6% headroom). W8 is ready for its own commit(s) and PR when the owner authorizes publication; the parent wave list still shows W8 unchecked until that merge lands. Parent tasks 7.1–7.3 are checked: the merged W7 slice (`f679a26`, PR 59), the W7 rendered-audit README (SUR-05/SYS-16/SYS-12 VERIFIED-FIXED) and the Habits source support them; W7 Habits behavior is not reopened. Exact-head CI for the W7 closure commit `4d7167c` is run [37825722260](https://github.com/quantdale/super-habits/actions/runs/37825722260), with the follow-up scheduled run [37848841434](https://github.com/quantdale/super-habits/actions/runs/37848841434) recorded as well; both are recorded as reference ids only — hosted `e2e`/`nightly` skip behind the two pre-existing braces/node-forge advisory failures and are NOT passed. Slice `frontend-v3-w7-habits` remains COMPLETED and merged; its slice plan holds the W7 detail.
-- Important modified files: W7 touched `features/habits/` (check-in model,
-  check-in rows, editor choices, day strip, detail/progress consolidation,
-  derivations, web Space-key hook), `core/ui/SegmentedControl.tsx`, habit
-  E2E/Maestro/simulation selectors, the rendered-audit helper/contracts, the
-  new `e2e/habits-w7*` regressions and capture instrument, the reference and
-  defect ledgers, `docs/testing/known-gaps.md` and both plans, plus
-  `public/sw.js` v9 (deploy-generation literal only). No data-layer,
-  dependency or security-policy change.
-- Last successful validation: W7 fresh supported-runtime `qa:full` on
-  isolated 8083 (`E2E_PORT=8083 TZ=Asia/Manila`, pinned node v22.23.2 /
-  npm 10.9.8, exact-tree hashes in
-  `.cursor/playwright-output/w7-final-full-2/start.json`): typecheck PASS;
-  lint PASS; Vitest 2571 passed / 2 skipped (254 files);
-  `openspec validate --all` 74/74; `e2e:full` hermetic export PASS with 253
-  passed / 64 skipped / 2 unexpected; `qa:simulation --all --mode
-deterministic` 23/23. Exact-head CI 37822880601 succeeded on every quality
-  step except the two pre-existing advisories. The eight failures of the
-  earlier `w7-full` battery are all resolved and none recur. 46 inspected web
-  images; 57px rows / 48px actions / 44pt editor choices; SUR-05, SYS-16 and
-  SYS-12 verified fixed. No W6.5 evidence reused as W7 proof.
-- Current failures: Two unexpected D14 budgeted steps in the local W7
-  `e2e:full`, both `ENVIRONMENT` under foreign host load at ~95% CPU:
-  `habits-w7.spec.ts:452` `checkInMs` 1045.08ms (battery) / 1049.79ms
-  (replay) vs the unchanged 800ms ceiling, and `three-months-in` headroom
-  fails at three different measurements on the identical tree (435/500ms
-  diary 13.0%; `calories→todos` 854ms; worst-switch 683ms 14.6%). A second
-  isolated HEAVY replay PASSED in 7.2s at CPU avg 84.8%, and the same test
-  passed in 5.7s in the 22:45 matrix on habits source last modified 22:30:59 —
-  the assertion flips on unchanged product code, so this is load sensitivity,
-  not a regression. Guard, ceiling, floor and all assertions unchanged; no
-  retry, skip or quarantine; original artifacts preserved under
-  `w7-final-full-2/preserved/` and the numbers recorded as a W7 addendum on
-  `docs/testing/known-gaps.md` gap 15. Exact-head CI fails only the two
-  pre-existing undocumented advisories with hosted e2e skipped behind that
-  gate, so hosted e2e is NOT passed. v9 cache-generation only; SW auxiliary
-  notices remain unchanged-baseline false positives. Hosted audit residuals
-  stay out of scope.
-- Relevant quarantines: existing internal/remote/visual opt-ins; W7 capture
-  instrument shares VISUAL_AUDIT while its behavioral regressions always run.
-- Blockers: None for web continuation. Fresh Android smoke/persistence/
-  lifecycle preflight EXIT2 ENVIRONMENT: emulator-5554 API35/x86_64 versus
-  required36; expected2/11/6 flows NOT RUN, no provisioning/reset/mutation.
-  Native largest-font/screen-reader qualification remains unverified; full
-  Android W16, iOS owner-deferred. Use supported target plus clean same-commit
-  checkout for qualification; never delete preserved foreign evidence.
-- Exact next action: W9.1 — reconstruct Workout around quick-start routines, compact weekly planning, and session-first logging. Author that wave's own plan before any Workout edit. Do not start W9 implementation in a close-out commit. Preserve `.tmp-ios36423379932/`, `stash@{0}`, and historical captures. Audit red (braces GHSA-vfj7-8cjw-p6xm, node-forge GHSA-86w9-cpqp-85rv) and hosted-e2e skip remain. D14 ceilings are unchanged.
-- Remaining definition of done: W7 is done: list-first check-in, quantitative
+- Current milestone: W8.5 (bounded Focus timer-start safety convergence) is complete. W9 Workout is next and is not started.
+- Completed: W0–W7 unchanged semantically; W6.5 closed and MERGED to main as merge commit `f37539a969bdc7c3dc539c2d47db3f6580429c64` (PR58 MERGED 2026-10-08). W7 rebuilt Habits as a date-scoped, list-first daily check-in and merged to main as merge commit `f679a26a28a8abf3472b44e3b5fbdf229222b927` (PR 59) in three commits `9bf4fda`, `0a8e86d`, `3086b27`; its exact-head CI run is [37822880601](https://github.com/quantdale/super-habits/actions/runs/37822880601) with the follow-up scheduled run [37848841434](https://github.com/quantdale/super-habits/actions/runs/37848841434) recorded as reference ids only. W8 Focus was published in three merges: `b47179b` (PR 60, Focus reconstruction), `ce00e37` (PR 61, visual-audit registration), and the W8 closure `c32685364cbe9c6d34a512c3b2bcef9b3a432e0b` (PR 62, commits `3c4b96c`, `e4fd28f`, `9009c17`). The final W8 baseline is `c32685364cbe9c6d34a512c3b2bcef9b3a432e0b`, with exact-head CI run [37914856206](https://github.com/quantdale/super-habits/actions/runs/37914856206) succeeding on every frontend gate through unit/integration — 2,576 hosted tests passed / 3 skipped — and failing only the two pre-existing undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv), so hosted `e2e`/`nightly` skip behind that gate and are NOT passed. No dependency, lockfile, or patch file changed. Stash, foreign iOS evidence, and historical captures preserved. No overall certification. W8.5 then closed the Focus timer-start race under its own bounded slice plan (below).
+- In progress: none. W8 is complete and merged; its slice plan is `frontend-v3-w8-focus/execplan.md` (the only living W8 plan). W8.5 — the bounded Focus startup-safety convergence — is complete and merged; its slice plan is `frontend-v3-w85-focus-startup/execplan.md` (the only living W8.5 plan, and where this checkpoint currently points). W8.5 added the explicit `IDLE → STARTING → RUNNING → PAUSED` authority in `features/pomodoro/pomodoro.startup.ts`, guarded every configuration mutation path synchronously against the live claims, froze the governing preset with an accepted session, classified a missing notification id honestly (web-unsupported / permission-denied / scheduled), and recovered a rejected startup to idle with no phantom intent. Evidence: 33 new unit tests including the deferred-scheduling race and the reproduced pre-fix corruption, 4 new real-SQLite durable-intent integration tests, `e2e/pomodoro.spec.ts` 16/16, a new W8.5 rendered audit with 13 inspected captures under `docs/ui-ux/v3-audit/w8.5/`, and local gates green apart from the two residuals below. All 23 W8 tasks and all 8 W8.5 tasks are checked.
+- Important modified files: W8.5 touched `features/pomodoro/pomodoro.startup.ts` (new), `features/pomodoro/PomodoroScreen.tsx`, `features/pomodoro/pomodoro.domain.ts`, `features/pomodoro/pomodoroCommandBridgeContext.ts`, `features/pomodoro/pomodoroCommandBridge.tsx`, `features/command/command.executor.ts`, `tests/pomodoro.startup.test.ts` (new), `tests/integration/pomodoroStartupIntent.test.ts` (new), `e2e/pomodoro.spec.ts`, `e2e/pomodoro-w85-audit.spec.ts` (new), `docs/ui-ux/v3-audit/w8.5/`, and both plans. No data-layer, schema, dependency, or security-policy change; no migration was added.
+- Last successful validation: W8.5 on the verified baseline `c326853` with node v24.3.0 / npm 11.4.2: `npx tsc --noEmit` 0 errors; `npx eslint . --max-warnings 0` 0 errors / 0 warnings; `npm test` 2613 passed / 2 skipped with one pre-existing environmental failure (`tests/agentDocConsistency.test.ts` — git `core.autocrlf=true` checks `docs/testing/known-gaps.md` out as CRLF on this Windows host so the register parser sees zero entries; unaffected in CI's LF checkout). `e2e/pomodoro.spec.ts` 16/16; W8.5 rendered audit 2/2 with 13 inspected captures; affected chromium and journey specs (`boundary`, `gamification`, `command`, `todos`, `habits`, `settings-ripple`, `a-tuesday`, `fat-fingers`, `three-months-in`, `linked-actions-log`) pass except the pre-existing D14 diagnostic-floor miss below. W7's and W8's own validation records are preserved verbatim in their slice plans.
+- Current failures: two residuals, both pre-existing at the baseline and both reproduced there. (1) `tests/agentDocConsistency.test.ts` fails on this Windows host because the CRLF checkout of `docs/testing/known-gaps.md` yields zero parsed gap entries; it passes in CI's LF checkout and is recorded, not silenced. (2) The `three-months-in` D14 **diagnostic headroom floors** miss under load — diary search at 434ms / 451ms / 453ms against the 500ms ceiling and section-switch `maxSwitch` at 702ms against the 800ms ceiling — while both hard ceilings hold on every measurement. The unmodified baseline tree at `c32685364cbe9c6d34a512c3b2bcef9b3a432e0b` (changes stashed, `dist/` rebuilt) reproduces the identical diary miss at 439ms (12.2% headroom), so it is the recorded host-load class rather than a regression, and the section-switch step passes on an isolated run. No ceiling, floor, assertion, or quarantine was changed by W8.5. The W7 HEAVY-Habits D14 residual and the three-months-in host-load residual remain recorded in `docs/testing/known-gaps.md`; W8's Windows CRLF/test-fixture issues and its two-environmental-failure Vitest record remain recorded in the W8 slice plan.
+- Relevant quarantines: none added; existing internal/remote/visual opt-ins unchanged.
+- Blockers: None for web continuation. Native Android qualification remains environment-blocked (the required API36/x86_64 target was not previously available; Android W16 pending) and iOS remains owner-deferred, so no native timer or notification certification is claimed from browser tests. Full application certification is not claimed.
+- Exact next action: W9.1 — reconstruct Workout around quick-start routines, compact weekly planning, and session-first logging. Author that wave's own plan before any Workout edit. Do not start W9 implementation in a close-out commit. Preserve `.tmp-ios36423379932/`, `stash@{0}` (`pre-recovery-local-changes`), and the W1–W8 plus W8.5 historical captures. Audit red (braces GHSA-vfj7-8cjw-p6xm, node-forge GHSA-86w9-cpqp-85rv) and the hosted-e2e skip remain. D14 ceilings are unchanged.
+- Remaining definition of done: W7 and W8 are done and merged; W8.5's convergence definition-of-done is satisfied and evidenced in its slice plan. W9–W17 unchecked. Known audit (braces/node-forge), native blockers, and the two D14/CRLF environmental residuals stay explicit. No full application certification.
   safety, schedule/lifecycle/past-day correctness, collapsed filters, no false
   danger, analytics demoted, rendered evidence, gates, and publication
   (`f679a26` + exact-head CI 37822880601). W8–W17 unchecked. Known audit
@@ -164,8 +106,16 @@ deterministic` 23/23. Exact-head CI 37822880601 succeeded on every quality
       pre-existing braces/node-forge advisories; two D14 timing steps recorded
       as ENVIRONMENT host-load residuals on known-gap 15)
 - [x] W8 — Focus reconstruction (merge `b47179b`, PR 60; register fix
-      `ce00e37`, PR 61; exact-head CI 37914293799 green through unit/
-      integration, audit-only red on braces/node-forge; hosted e2e skipped)
+      `ce00e37`, PR 61; closure merge `c326853`, PR 62; exact-head CI
+      37914293799 and the final W8-baseline exact-head CI 37914856206 both
+      green through unit/integration — 2,576 hosted tests passed / 3 skipped —
+      audit-only red on braces/node-forge; hosted e2e skipped)
+- [x] W8.5 — bounded Focus timer-start safety convergence (explicit
+      IDLE → STARTING → RUNNING → PAUSED authority, synchronously guarded
+      configuration paths, frozen governing preset, honest notification
+      tri-state, and rejected-startup recovery; deterministic deferred-
+      scheduling race regression, real-SQLite durable-intent integration
+      coverage, 16/16 Focus E2E, and 13 inspected W8.5 rendered captures)
 - [ ] W9 — Workout
 - [ ] W10 — Calories / Health validation gate
 - [ ] W11 — Planning / Goals / Projects / Daily Plan
