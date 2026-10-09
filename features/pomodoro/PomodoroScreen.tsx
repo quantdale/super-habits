@@ -57,11 +57,24 @@ import {
   planActiveTimerReconcile,
   planSessionCompletion,
   resolveActivePreset,
+  timerEndNotificationCopy,
   type CompletedFocusLogPlan,
   type PomodoroMode,
   type PomodoroPreset,
   type PomodoroSettings,
 } from './pomodoro.domain';
+import {
+  isSessionActive,
+  mayMutateConfiguration,
+  mayOfferConfiguration,
+  planTimerStartup,
+  resolvePhaseAnnouncement,
+  resolvePhaseHeadline,
+  resolveTimerStatus,
+  runTimerStartup,
+  type RenderedTimerState,
+  type TimerStartupOutcome,
+} from './pomodoro.startup';
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
 import { GardenGrid } from './GardenGrid';
 import { BackgroundWarning } from './BackgroundWarning';
@@ -84,17 +97,6 @@ const TIMER_REGION_LABEL = 'Focus timer';
 
 type TimerNotice = { title: string; body: string };
 
-function notifyCopy(mode: PomodoroMode): { title: string; body: string } {
-  switch (mode) {
-    case 'focus':
-      return { title: 'Focus complete', body: 'Great work. Time for a short break.' };
-    case 'short_break':
-      return { title: 'Break complete', body: 'Ready for another focus session.' };
-    case 'long_break':
-      return { title: 'Long break complete', body: 'Start a new focus round when you are ready.' };
-  }
-}
-
 export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
   const { register: registerCommandTimer } = usePomodoroCommandBridge();
@@ -111,6 +113,13 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const [remaining, setRemaining] = useState(DEFAULT_SETTINGS.focusMinutes * 60);
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  /**
+   * Rendered mirror of `startInFlightRef`: a start has been accepted and its
+   * end-notification scheduling is still pending. Starting is a real session,
+   * so configuration is withdrawn and a second start conflicts from the very
+   * first render after the press — not from the await onward.
+   */
+  const [isStarting, setIsStarting] = useState(false);
   const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [sessions, setSessions] = useState<PomodoroSession[]>([]);
   const [showWarning, setShowWarning] = useState(false);
@@ -135,12 +144,18 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const [logSaveFailed, setLogSaveFailed] = useState(false);
   /** Native end-notification scheduling failed. Web null is not a failure. */
   const [notificationScheduleFailed, setNotificationScheduleFailed] = useState(false);
+  /** Startup was rejected: the timer never started and nothing was recorded. */
+  const [startFailedNotice, setStartFailedNotice] = useState(false);
   /** Secondary disclosure for history, garden, heatmap, and detailed stats. */
   const [showHistory, setShowHistory] = useState(false);
   /** Polite status line: updated on phase changes only, never per second. */
   const [phaseAnnouncement, setPhaseAnnouncement] = useState<string | null>(null);
   const notificationIdRef = useRef<string | null>(null);
   const lastTickTime = useRef<number | null>(null);
+  /**
+   * Synchronous "a start is in flight" claim. `start()` sets it before its
+   * first await so every callback racing the startup reads an active session.
+   */
   const startInFlightRef = useRef(false);
   /** Mirror of `remaining` so the interval does pure math outside setState. */
   const remainingRef = useRef(DEFAULT_SETTINGS.focusMinutes * 60);
@@ -157,11 +172,28 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const startedAtRef = useRef<Date | null>(null);
   const activePresetRef = useRef<PomodoroPreset>(BUILT_IN_PRESETS[0]);
   const pendingAssociationRef = useRef<SessionAssociation | null>(null);
-  /** Live in-flight flag for async callbacks: a closure `isRunning` goes stale
-   *  across an await, and a preset or settings write resolved mid-start must
-   *  never rewrite the clock of the session that just began. */
+  /**
+   * Live in-flight flag for async callbacks: a closure `isRunning` goes stale
+   * across an await, and a preset or settings write resolved mid-start must
+   * never rewrite the clock of the session that just began. It is the union
+   * authority (`starting || running || paused`) written wherever the phase
+   * changes; every configuration guard reads it through
+   * `mayMutateConfiguration` so the invariant has exactly one definition.
+   */
   const sessionActiveRef = useRef(false);
   const startRef = useRef<((minutes?: number) => Promise<PomodoroCommandStartResult>) | null>(null);
+
+  /**
+   * Synchronous claims read by every guard. Both are refs, so a stale render,
+   * a queued press, or a keyboard event cannot observe an idle timer while a
+   * session is actually claimed.
+   */
+  const sessionClaims = useCallback(
+    () => ({ starting: startInFlightRef.current, active: sessionActiveRef.current }),
+    [],
+  );
+  /** Rendered phase booleans used for copy; always fresh in the render closure. */
+  const renderedPhase: RenderedTimerState = { isStarting, isRunning, isPaused };
 
   useEffect(() => {
     currentModeRef.current = currentMode;
@@ -170,9 +202,13 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     totalSecondsRef.current = totalSeconds;
     startedAtRef.current = startedAt;
     pendingAssociationRef.current = pendingAssociation;
-    sessionActiveRef.current = startInFlightRef.current || isRunning || isPaused;
+    // Repair the union authority from the rendered phase. The synchronous
+    // write sites (start claim, natural completion, confirmed End) already own
+    // the truth; this only keeps a session that outlived a state update from
+    // being read back as idle.
+    if (!startInFlightRef.current && (isRunning || isPaused)) sessionActiveRef.current = true;
   });
-  useCommandLauncherSuppressed('pomodoro-active-session', isRunning || isPaused);
+  useCommandLauncherSuppressed('pomodoro-active-session', isStarting || isRunning || isPaused);
 
   const clearAutoStartTimer = useCallback(() => {
     if (autoStartTimerRef.current !== null) {
@@ -502,12 +538,12 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     // follows the actual durations instead of a stale selection.
     setStoredActivePresetIdState(null);
     void clearActivePresetId().catch(() => undefined);
-    if (sessionActiveRef.current) {
-      // Duration editing is unreachable while a session is in flight; even if
-      // reached, saved defaults never move or abandon that session — they
-      // apply to the next idle timer.
-      return;
-    }
+    // Re-read the live claims AFTER the durable write: a session accepted while
+    // this save was in flight must keep its clock, and the pre-await closure
+    // would have missed it. Duration editing is unreachable while a session is
+    // in flight; even if reached here, saved defaults never move or abandon
+    // that session — they apply to the next idle timer.
+    if (isSessionActive(sessionClaims())) return;
     const duration = getModeDuration(currentMode, newSettings);
     setTotalSeconds(duration);
     totalSecondsRef.current = duration;
@@ -518,81 +554,126 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
 
   const start = useCallback(
     async (requestedDurationMinutes?: number): Promise<PomodoroCommandStartResult> => {
-      if (startInFlightRef.current || sessionActiveRef.current) {
+      // Read the live session claims, never the render closure: a queued second
+      // press, a command request, or an automated action arriving while a start
+      // is in flight must conflict instead of claiming a second session.
+      if (!mayMutateConfiguration(sessionClaims())) {
         return {
           outcome: 'conflict',
           message: 'A focus session is already running or paused.',
         };
       }
 
+      // Claim the clock before the first await. This claim is the authority for
+      // the whole startup: every configuration callback, the command bridge,
+      // and a repeated press read it, and `isStarting` withdraws the
+      // configuration surfaces on the very next render.
       startInFlightRef.current = true;
-      // Claim the clock before the notification await so a preset or settings
-      // write resolving mid-start cannot rewrite this session. The render
-      // effect keeps the claim while startInFlightRef is set.
       sessionActiveRef.current = true;
+      setIsStarting(true);
       clearAutoStartTimer();
-      let committed = false;
-
+      // Duration editing is an idle surface: close the inline editor
+      // synchronously so it can neither stay visible nor save mid-startup.
+      setShowSettings(false);
       try {
-        // Read the live timer configuration through refs: a preset or
-        // settings write that resolved while this press was in flight must
-        // still be the configuration the new session starts from.
-        const mode = requestedDurationMinutes === undefined ? currentModeRef.current : 'focus';
-        const duration =
-          requestedDurationMinutes === undefined
-            ? getModeDuration(mode, settingsRef.current)
-            : requestedDurationMinutes * 60;
-        if (requestedDurationMinutes !== undefined) {
-          setCurrentMode('focus');
-          currentModeRef.current = 'focus';
-        }
-
-        void cancelScheduledNotification(notificationIdRef.current);
-        notificationIdRef.current = null;
-        const now = new Date();
-        setStartedAt(now);
-        startedAtRef.current = now;
-        applyRemaining(duration);
-        setTotalSeconds(duration);
-        totalSecondsRef.current = duration;
-        const { title, body } = notifyCopy(mode);
-        const id = await scheduleTimerEndNotification(duration, title, body);
-        notificationIdRef.current = id;
-        if (Platform.OS !== 'web' && id == null) {
-          setNotificationScheduleFailed(true);
-        }
-        lastTickTime.current = Date.now();
-        completionDoneRef.current = false;
-        setIsRunning(true);
-        setIsPaused(false);
-        sessionActiveRef.current = true;
-        committed = true;
-        setShowSettings(false);
+        // Read the live configuration through refs: a preset or settings write
+        // that resolved while this press was in flight must still be the
+        // configuration the new session starts from.
+        const plan = planTimerStartup(
+          { requestedDurationMinutes },
+          {
+            mode: currentModeRef.current,
+            settings: settingsRef.current,
+            completedFocus: completedFocusRef.current,
+          },
+          new Date(),
+        );
+        // Commit the clock from the plan, not from state, so the displayed
+        // duration, the notification, and the durable snapshot agree from the
+        // first startup render onward.
+        setCurrentMode(plan.mode);
+        currentModeRef.current = plan.mode;
+        setStartedAt(plan.startedAt);
+        startedAtRef.current = plan.startedAt;
+        applyRemaining(plan.durationSeconds);
+        setTotalSeconds(plan.durationSeconds);
+        totalSecondsRef.current = plan.durationSeconds;
         setCompletionSummary(null);
-        setShowHistory(false);
         setInterruptedNotice(null);
         setRecoveredNotice(null);
+        setNotificationScheduleFailed(false);
+        setShowHistory(false);
         setPhaseAnnouncement(
-          `${getModeLabel(mode)} started — ${Math.round(duration / 60)} minutes`,
+          resolvePhaseAnnouncement(
+            { isStarting: true, isRunning: false, isPaused: false },
+            plan.mode,
+            plan.durationSeconds,
+          ),
         );
-        // Durable intent: a crash/reload mid-session is reconciled on the
-        // next launch instead of vanishing behind an orphan notification.
-        void savePomodoroActiveTimer({
-          startedAtIso: now.toISOString(),
-          mode,
-          totalSeconds: duration,
-          completedFocus: completedFocusRef.current,
-          notificationId: id,
-        }).catch(() => undefined);
-        return { outcome: 'started' };
-      } catch (err) {
-        if (!committed) sessionActiveRef.current = false;
-        throw err;
+
+        const outcome: TimerStartupOutcome = await runTimerStartup(
+          plan,
+          {
+            scheduleTimerEndNotification,
+            platform: Platform.OS === 'web' ? 'web' : 'native',
+            cancelScheduledNotification,
+          },
+          {
+            cancelPreviousNotification: () => {
+              void cancelScheduledNotification(notificationIdRef.current);
+              notificationIdRef.current = null;
+            },
+            commit: ({ notificationId }) => {
+              notificationIdRef.current = notificationId;
+              // The tick baseline starts here, never at claim time: no tick may
+              // elapse while scheduling is still pending.
+              lastTickTime.current = Date.now();
+              completionDoneRef.current = false;
+              setIsRunning(true);
+              setIsPaused(false);
+              sessionActiveRef.current = true;
+              setPhaseAnnouncement(plan.announcement);
+              // Durable intent: a crash/reload mid-session is reconciled on the
+              // next launch instead of vanishing behind an orphan notification.
+              void savePomodoroActiveTimer({ ...plan.intent, notificationId }).catch(
+                () => undefined,
+              );
+            },
+            reportScheduleWarning: () => setNotificationScheduleFailed(true),
+            recover: () => {
+              // A rejected startup leaves no session, no durable intent, no
+              // orphan notification, and an idle, startable clock.
+              setStartFailedNotice(true);
+              setPhaseAnnouncement('Timer did not start');
+              notificationIdRef.current = null;
+              lastTickTime.current = null;
+              completionDoneRef.current = false;
+              setIsRunning(false);
+              setIsPaused(false);
+              setStartedAt(null);
+              startedAtRef.current = null;
+              const idle = getModeDuration(currentModeRef.current, settingsRef.current);
+              applyRemaining(idle);
+              setTotalSeconds(idle);
+              totalSecondsRef.current = idle;
+              void clearPomodoroActiveTimer().catch(() => undefined);
+              setPhaseAnnouncement(null);
+            },
+          },
+        );
+        // A failed startup surfaces as a screen state change (idle again) plus
+        // a truthful command result; it never throws into a press handler.
+        return outcome.outcome === 'failed'
+          ? { outcome: 'failed', message: outcome.message }
+          : { outcome: 'started' };
       } finally {
+        // The claim ends here whether the startup became a session or was
+        // recovered; `isStarting` is its rendered mirror.
         startInFlightRef.current = false;
+        setIsStarting(false);
       }
     },
-    [applyRemaining, clearAutoStartTimer],
+    [applyRemaining, clearAutoStartTimer, sessionClaims],
   );
 
   const startFocusSession = useCallback(
@@ -606,7 +687,18 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
 
   const handleSelectPreset = useCallback(
     async (preset: PomodoroPreset) => {
-      activePresetRef.current = preset;
+      // The live claims decide, never the render-time closure. Choosing a
+      // preset while a session is accepted — including a startup still
+      // awaiting its end notification — is a selection for the NEXT timer: the
+      // clock of the running session is untouched, and so is the preset that
+      // governs its auto-start, which is frozen with it at claim time.
+      const sessionActive = isSessionActive(sessionClaims());
+      if (!sessionActive) {
+        // Apply to the timer synchronously: the selection is a local
+        // interaction, so the next Start must read the new durations even
+        // while the durable write is still in flight.
+        activePresetRef.current = preset;
+      }
       setStoredActivePresetIdState(preset.id);
       setCompletionSummary(null);
       void setActivePresetId(preset.id).catch(() => undefined);
@@ -616,13 +708,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
         longBreakMinutes: preset.longBreakMinutes,
         sessionsBeforeLongBreak: preset.sessionsBeforeLongBreak,
       };
-      // A session that began while the selection was persisting must keep its
-      // clock: the preset applies to the next idle timer, never to an
-      // in-flight one. The live ref — not the render-time closure — decides.
-      if (sessionActiveRef.current) return;
-      // Apply to the timer synchronously: the selection is a local
-      // interaction, so the next Start must read the new durations even
-      // while the durable write is still in flight.
+      if (sessionActive) return;
       settingsRef.current = { ...settingsRef.current, ...nextSettings };
       setSettings((prev) => ({ ...prev, ...nextSettings }));
       const duration = getModeDuration(currentModeRef.current, nextSettings);
@@ -638,7 +724,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
         void loadSettings();
       }
     },
-    [applyRemaining, loadSettings],
+    [applyRemaining, loadSettings, sessionClaims],
   );
 
   useEffect(
@@ -647,8 +733,11 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
         startFocusSession,
         isRunning,
         isPaused,
+        // A startup still awaiting its notification is a session: a command
+        // start must conflict with it, not queue a second timer.
+        isStarting,
       }),
-    [isPaused, isRunning, registerCommandTimer, startFocusSession],
+    [isPaused, isRunning, isStarting, registerCommandTimer, startFocusSession],
   );
 
   const pause = () => {
@@ -675,7 +764,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   };
 
   const resume = async () => {
-    const { title, body } = notifyCopy(currentMode);
+    const { title, body } = timerEndNotificationCopy(currentMode);
     const id = await scheduleTimerEndNotification(remaining, title, body);
     notificationIdRef.current = id;
     if (Platform.OS !== 'web' && id == null) {
@@ -762,8 +851,14 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   // matching current durations, else Classic (never a silent default).
   const activePreset = resolveActivePreset(presets, storedActivePresetId, settings);
   useEffect(() => {
+    // The governing preset of an accepted session is frozen with it: a selection
+    // landing mid-session governs the NEXT timer, and the effect that would
+    // otherwise re-sync it must not reach back into the running session.
+    // Re-syncing on the transition out of a session keeps the idle timer
+    // following the stored selection again.
+    if (sessionActiveRef.current) return;
     activePresetRef.current = activePreset;
-  }, [activePreset]);
+  }, [activePreset, isStarting, isPaused, isRunning]);
 
   // Chip highlight: the stored selection while valid, else whichever preset
   // the current durations actually equal — manual edits move/clear it.
@@ -786,10 +881,15 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   });
 
   // Reduced-chrome active sessions and the completion-summary overlay.
-  const activeSession = isRunning || isPaused;
+  // `isStarting` is part of the active-session class: a session accepted for
+  // start withdraws configuration from the first render after the press.
+  const activeSession = isStarting || isRunning || isPaused;
   const summaryVisible = completionSummary !== null && !activeSession;
-  const showConfiguration = !activeSession && !summaryVisible;
-  const idleUntouched = !activeSession && !summaryVisible && remaining === totalSeconds;
+  const showConfiguration = mayOfferConfiguration(
+    { starting: isStarting, active: isRunning || isPaused },
+    summaryVisible,
+  );
+  const idleUntouched = showConfiguration && remaining === totalSeconds;
 
   // Historical models are derived only when the History disclosure is open;
   // the one-second tick must never recompute or mount them.
@@ -831,14 +931,15 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const startLabel =
     currentMode === 'focus' ? 'Start focus' : `Start ${getModeLabel(currentMode).toLowerCase()}`;
 
-  /** On-request timer status: phase plus remaining time, never per-second. */
-  const timerStatus = isRunning
-    ? `${getModeLabel(currentMode)} running, ${minutes}:${seconds} remaining`
-    : isPaused
-      ? `Paused, ${minutes}:${seconds} remaining`
-      : summaryVisible && completionSummary
-        ? `Completed, ${completionSummary.minutes} minutes focused`
-        : `Ready, ${minutes}:${seconds} selected`;
+  /**
+   * On-request timer status: phase plus remaining time, never per-second. The
+   * completion wording wins only when no session of any kind is in flight.
+   */
+  const phaseActive = isStarting || isRunning || isPaused;
+  const completedVisible = summaryVisible && completionSummary !== null && !phaseActive;
+  const timerStatus = completedVisible
+    ? `Completed, ${completionSummary?.minutes} minutes focused`
+    : resolveTimerStatus(renderedPhase, getModeLabel(currentMode), `${minutes}:${seconds}`);
 
   return (
     <Screen scroll>
@@ -848,7 +949,11 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
 
       <BackgroundWarning visible={showWarning} onDismiss={() => setShowWarning(false)} />
 
-      {interruptedNotice || recoveredNotice || logSaveFailed || notificationScheduleFailed ? (
+      {interruptedNotice ||
+      recoveredNotice ||
+      logSaveFailed ||
+      notificationScheduleFailed ||
+      startFailedNotice ? (
         <ScreenSection>
           {interruptedNotice ? (
             <View
@@ -927,6 +1032,30 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
               </View>
             </View>
           ) : null}
+          {startFailedNotice ? (
+            <View
+              className="mt-3 rounded-2xl border px-3 py-2"
+              style={{
+                borderColor: tokens.warningBorder,
+                backgroundColor: tokens.warningBackground,
+              }}
+            >
+              <Text className="text-sm font-medium" style={{ color: tokens.warningText }}>
+                The timer did not start
+              </Text>
+              <Text className="mt-0.5 text-xs" style={{ color: tokens.warningText }}>
+                The countdown could not be scheduled, so nothing was recorded. Try starting the
+                timer again.
+              </Text>
+              <View className="mt-2 self-start">
+                <Button
+                  label="Dismiss"
+                  variant="ghost"
+                  onPress={() => setStartFailedNotice(false)}
+                />
+              </View>
+            </View>
+          ) : null}
         </ScreenSection>
       ) : null}
 
@@ -943,9 +1072,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
             >
               {summaryVisible
                 ? 'Session complete'
-                : isPaused
-                  ? `Paused · ${getModeLabel(currentMode)}`
-                  : getModeLabel(currentMode)}
+                : resolvePhaseHeadline(renderedPhase, getModeLabel(currentMode))}
             </Text>
 
             {summaryVisible && completionSummary ? (
@@ -1052,6 +1179,22 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
               <Button label={startLabel} onPress={() => void start()} color={COLOR} fullWidth />
             ) : null}
 
+            {/* Exactly one startup action: the press is accepted and its
+                end-notification scheduling is pending, so Start is shown once,
+                disabled, and labelled. No second Start button exists in this
+                phase, and the clock above is the selected duration, not a
+                countdown that already started. */}
+            {isStarting ? (
+              <Button
+                label="Starting…"
+                accessibilityLabel={`${startLabel} — starting`}
+                variant="ghost"
+                disabled
+                onPress={() => {}}
+                fullWidth
+              />
+            ) : null}
+
             {isRunning ? (
               <View className="flex-row flex-wrap gap-3">
                 <View className="min-w-[6rem] flex-1">
@@ -1130,6 +1273,13 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                 }))}
                 value={currentMode}
                 onChange={(mode) => {
+                  // The guard is synchronous and reads the live claims, so it
+                  // holds for a stale render, a queued press, a keyboard arrow,
+                  // and a callback captured before Start. A mode switch resets
+                  // timer references, so it may never run against a session
+                  // that is already claimed — including one whose notification
+                  // is still being scheduled.
+                  if (!mayMutateConfiguration(sessionClaims())) return;
                   clearAutoStartTimer();
                   // Idle-only control: configuration never discards a session,
                   // so switching here just selects the next timer to run.

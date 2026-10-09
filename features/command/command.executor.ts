@@ -28,7 +28,10 @@ import type {
 } from './types';
 
 export type FocusStartResult =
-  { outcome: 'started' | 'queued' } | { outcome: 'conflict'; message: string };
+  | { outcome: 'started' | 'queued' }
+  | { outcome: 'conflict'; message: string }
+  /** Startup was rejected (for example end-notification scheduling threw). */
+  | { outcome: 'failed'; message: string };
 
 export type CommandExecutionOptions = {
   resolvedEntityId?: string | null;
@@ -324,6 +327,9 @@ async function executeStartFocus(
   const result = await options.startFocusSession(draft.fields.durationMinutes);
   if (result.outcome === 'conflict') {
     return { outcome: 'conflict', message: result.message };
+  }
+  if (result.outcome === 'failed') {
+    return { outcome: 'error', message: result.message };
   }
   return {
     outcome: 'success',

@@ -335,6 +335,42 @@ test.describe('Pomodoro', () => {
     expect(Number(rows[0]?.n ?? 0)).toBe(1);
   });
 
+  test('a repeated start press starts only one session', async ({ page }) => {
+    const start = page.getByText('Start focus', { exact: true });
+    // Two presses landing in one interaction. Whichever one wins, exactly one
+    // session may exist and the configuration may never come back.
+    await Promise.all([start.click({ force: true }), start.click({ force: true })]);
+    await expect(page.getByText('Pause', { exact: true })).toBeEnabled({ timeout: 3_000 });
+
+    await expect(page.locator('.text-5xl').getByText(/^\d{2}:\d{2}$/)).toHaveCount(1);
+    await expect(page.getByText('Start focus', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Manage presets' })).toHaveCount(0);
+    await expect(page.getByRole('tablist', { name: 'Focus timer mode' })).toHaveCount(0);
+    await expect(page.getByText('Link a todo')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'End', exact: true }).click({ force: true });
+    await page.getByRole('dialog').getByRole('button', { name: 'End session' }).click();
+    const rows = await queryRows(page, 'SELECT COUNT(*) AS n FROM pomodoro_sessions');
+    expect(Number(rows[0]?.n ?? 0)).toBe(0);
+  });
+
+  test('selecting a mode before a start still starts the selected mode', async ({ page }) => {
+    // Guard regression: the synchronous mode-selector guard must not swallow an
+    // ordinary idle selection. A mode chosen while nothing is claimed still
+    // governs the next start.
+    await page.getByRole('tab', { name: 'Short Break', exact: true }).click();
+    await expect(page.getByText('05:00')).toBeVisible();
+
+    await page.getByText('Start short break', { exact: true }).click();
+    await expect(page.getByText('Pause', { exact: true })).toBeEnabled({ timeout: 3_000 });
+    await expect(page.getByLabel(/^Short Break running, \d{2}:\d{2} remaining$/)).toBeVisible();
+
+    await page.getByRole('button', { name: 'End', exact: true }).click({ force: true });
+    await page.getByRole('dialog').getByRole('button', { name: 'End break' }).click();
+    const rows = await queryRows(page, 'SELECT COUNT(*) AS n FROM pomodoro_sessions');
+    expect(Number(rows[0]?.n ?? 0)).toBe(0);
+  });
+
   test('a stale end confirmation does not discard the auto-started next session', async ({
     page,
   }) => {

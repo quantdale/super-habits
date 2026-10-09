@@ -32,7 +32,10 @@ export function PomodoroCommandBridgeProvider({ children }: PropsWithChildren) {
   const requestFocusSession = useCallback((durationMinutes: number) => {
     const registration = registrationRef.current;
     if (registration) {
-      if (registration.isRunning || registration.isPaused) {
+      // A startup counts as an active session: the timer owns its clock from
+      // the moment the press is accepted, before its end notification has
+      // finished scheduling.
+      if (registration.isRunning || registration.isPaused || registration.isStarting) {
         return Promise.resolve({
           outcome: 'conflict',
           message: 'A focus session is already running or paused.',
