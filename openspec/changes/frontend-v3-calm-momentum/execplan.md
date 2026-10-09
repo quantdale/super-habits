@@ -62,7 +62,7 @@ historical evidence only.
 
 ## Current Checkpoint
 
-- Current milestone: W7 complete and merged to main (`f679a26`, PR 59) and closed on `main` at `4d7167c`; W8 Focus implementation is authorized and in progress under the slice plan `frontend-v3-w8-focus/execplan.md`.
+- Current milestone: W8 Focus is published. W9 Workout is next and is not started.
 - Completed: W0–W7 unchanged semantically; W6.5 closed and MERGED to main as
   merge commit `f37539a969bdc7c3dc539c2d47db3f6580429c64` (PR58 MERGED
   2026-10-08). W7 rebuilt Habits as a date-scoped, list-first daily check-in
@@ -128,7 +128,7 @@ deterministic` 23/23. Exact-head CI 37822880601 succeeded on every quality
   Native largest-font/screen-reader qualification remains unverified; full
   Android W16, iOS owner-deferred. Use supported target plus clean same-commit
   checkout for qualification; never delete preserved foreign evidence.
-- Exact next action: commit the W8 slice in coherent commits (feature, regressions + rendered evidence, spec/ledgers/plans) and open its PR when the owner authorizes publication; per-wave publication uses normal hooks with an exact-head CI inspection (do not substitute product-head evidence). Until the merge lands, the parent wave list below keeps W8 unchecked. Then plan W9 Workout as its own slice with fresh authorization. Preserve `.tmp-ios36423379932/`, `stash@{0}` and historical captures.
+- Exact next action: W9.1 — reconstruct Workout around quick-start routines, compact weekly planning, and session-first logging. Author that wave's own plan before any Workout edit. Do not start W9 implementation in a close-out commit. Preserve `.tmp-ios36423379932/`, `stash@{0}`, and historical captures. Audit red (braces GHSA-vfj7-8cjw-p6xm, node-forge GHSA-86w9-cpqp-85rv) and hosted-e2e skip remain. D14 ceilings are unchanged.
 - Remaining definition of done: W7 is done: list-first check-in, quantitative
   safety, schedule/lifecycle/past-day correctness, collapsed filters, no false
   danger, analytics demoted, rendered evidence, gates, and publication
@@ -163,7 +163,9 @@ deterministic` 23/23. Exact-head CI 37822880601 succeeded on every quality
       exact-head CI 37822880601 green on every quality step except the two
       pre-existing braces/node-forge advisories; two D14 timing steps recorded
       as ENVIRONMENT host-load residuals on known-gap 15)
-- [ ] W8 — Focus
+- [x] W8 — Focus reconstruction (merge `b47179b`, PR 60; register fix
+      `ce00e37`, PR 61; exact-head CI 37914293799 green through unit/
+      integration, audit-only red on braces/node-forge; hosted e2e skipped)
 - [ ] W9 — Workout
 - [ ] W10 — Calories / Health validation gate
 - [ ] W11 — Planning / Goals / Projects / Daily Plan

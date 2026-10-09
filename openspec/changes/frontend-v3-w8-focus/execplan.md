@@ -1,7 +1,7 @@
 # ExecPlan: Frontend V3 — W8 Focus wave
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -73,19 +73,14 @@ duration_seconds`, breaks are not logged, and `planActiveTimerReconcile()`
 
 ## Current Checkpoint
 
-- Current milestone: W8 Focus — publication. The review hole is fixed:
-  a confirm opened against a session cannot discard that session after it
-  completes, and cannot discard an auto-started successor.
+- Current milestone: complete. W8 is on main at `ce00e37`.
 - Completed: tasks 1.1–7.3. Six hierarchies, confirmed End, cycle sentence,
   sprout off the clock, History disclosure, 14 captures, SYS-08/SYS-09/SUR-09
   verified from those renders. Prior local gates are in the Validation ledger
   (Focus E2E 12/12 before the two new stale-confirm tests; chromium+journeys
   254/65/0; D14 clean-run maxSwitch 611/800ms, plus an earlier same-tree floor
   miss recorded as ENVIRONMENT). Shell cache bumped to v10 for this deploy.
-- In progress: publish through a normal PR onto main, then inspect
-  exact-head CI. Focus E2E including the two stale-confirm tests passed
-  14/14 on the hermetic export (node v24.3.0; Node 22.23.2 was not installed
-  on this host).
+- In progress: none.
 - Important modified files: `features/pomodoro/PomodoroScreen.tsx` (six
   hierarchies, confirmed End, History disclosure, timer region identity),
   `features/pomodoro/pomodoro.domain.ts` (`describeCyclePosition`),
@@ -118,11 +113,8 @@ duration_seconds`, breaks are not logged, and `planActiveTimerReconcile()`
   unchanged.
 - Blockers: None for web continuation. Native W16 and full certification stay
   blocked/deferred as before; iOS stays owner-deferred.
-- Exact next action: the merge SHA `b47179b` CI run 37913952841 failed at
-  quarantine-register parity because `e2e/pomodoro-w8-audit.spec.ts` had no
-  `**Gate site:**` entry. Register it beside the other VISUAL_AUDIT instruments,
-  merge that fix, and inspect the new exact-head CI. Do not check parent 8.1
-  or 8.2 until that run is recorded. Do not start W9.
+- Exact next action: None — task complete. Parent wave continues at W9
+  planning only; do not implement W9 from this plan.
 - Remaining definition of done: all 23 tasks in `tasks.md` complete with
   rendered evidence under `docs/ui-ux/v3-audit/w8/`, SYS-08/SYS-09/SUR-09
   verified-fixed from those renders only, and the full gate ladder green

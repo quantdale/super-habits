@@ -62,8 +62,8 @@
 
 ## 8. W8 — Focus
 
-- [ ] 8.1 Running state: timer-first, minimal chrome (SYS-08); one-line abandon confirm; fix Reset clip (SYS-09)
-- [ ] 8.2 Static/decor growth only on events; dots contextual (SUR-09)
+- [x] 8.1 Running state: timer-first, minimal chrome (SYS-08); one-line abandon confirm; fix Reset clip (SYS-09)
+- [x] 8.2 Static/decor growth only on events; dots contextual (SUR-09)
 
 ## 9. W9 — Workout
 
