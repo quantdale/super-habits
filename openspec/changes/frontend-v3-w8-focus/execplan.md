@@ -118,9 +118,11 @@ duration_seconds`, breaks are not logged, and `planActiveTimerReconcile()`
   unchanged.
 - Blockers: None for web continuation. Native W16 and full certification stay
   blocked/deferred as before; iOS stays owner-deferred.
-- Exact next action: commit the W8 slice, open the PR, merge to main, and
-  inspect exact-head CI. Do not check parent 8.1 or 8.2 until that CI is
-  recorded. Do not start W9.
+- Exact next action: the merge SHA `b47179b` CI run 37913952841 failed at
+  quarantine-register parity because `e2e/pomodoro-w8-audit.spec.ts` had no
+  `**Gate site:**` entry. Register it beside the other VISUAL_AUDIT instruments,
+  merge that fix, and inspect the new exact-head CI. Do not check parent 8.1
+  or 8.2 until that run is recorded. Do not start W9.
 - Remaining definition of done: all 23 tasks in `tasks.md` complete with
   rendered evidence under `docs/ui-ux/v3-audit/w8/`, SYS-08/SYS-09/SUR-09
   verified-fixed from those renders only, and the full gate ladder green

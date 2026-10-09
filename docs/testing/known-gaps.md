@@ -581,6 +581,7 @@ in `.agent/execplans/integration-tinypool-ipc-channel-closed-v1.md`.
 
 **Gate site:** `e2e/visual-audit.spec.ts`
 **Gate site:** `e2e/habits-w7-audit.spec.ts`
+**Gate site:** `e2e/pomodoro-w8-audit.spec.ts`
 
 **Reason:** the campaign's visual-audit harness seeds TYPICAL fixtures and
 captures ~47 screenshots per run (`docs/ui-ux/v3-audit/`). It is gated with
@@ -589,8 +590,10 @@ run it: a full pass takes minutes and writes evidence artifacts that belong to
 the campaign ledger, not to a gating suite. The W7-specific instrument uses
 real-OPFS habit scenes and the same opt-in gate to capture 43 responsive/state
 images in `docs/ui-ux/v3-audit/w7/`. Its behavioral twin
-`e2e/habits-w7.spec.ts` runs unconditionally in the standard Chromium battery;
-no failed behavioral test is quarantined by this evidence-only gate.
+`e2e/habits-w7.spec.ts` runs unconditionally in the standard Chromium battery.
+The W8 Focus instrument uses the same opt-in gate for `docs/ui-ux/v3-audit/w8/`;
+its behavioral twin `e2e/pomodoro.spec.ts` runs unconditionally.
+No failed behavioral test is quarantined by this evidence-only gate.
 
 **Closing path:** opt in on demand — `VISUAL_AUDIT=1 npx playwright test
 e2e/visual-audit.spec.ts`. Screenshots land in `docs/ui-ux/v3-audit/` and are
