@@ -89,6 +89,24 @@ export function getModeDuration(mode: PomodoroMode, settings: PomodoroSettings):
 }
 
 /**
+ * Copy for the end-of-countdown notification of one mode. Pure so the
+ * start sequence and the resume path schedule identical wording.
+ */
+export function timerEndNotificationCopy(mode: PomodoroMode): {
+  title: string;
+  body: string;
+} {
+  switch (mode) {
+    case 'focus':
+      return { title: 'Focus complete', body: 'Great work. Time for a short break.' };
+    case 'short_break':
+      return { title: 'Break complete', body: 'Ready for another focus session.' };
+    case 'long_break':
+      return { title: 'Long break complete', body: 'Start a new focus round when you are ready.' };
+  }
+}
+
+/**
  * Get the next mode in the classic Pomodoro sequence.
  *
  * completedFocusSessions: how many focus sessions have been
