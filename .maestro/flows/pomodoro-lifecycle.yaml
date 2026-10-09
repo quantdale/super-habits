@@ -30,7 +30,9 @@ tags:
     start: '50%, 66%'
     end: '50%, 40%'
     duration: 350
-# The short native run remains below the 60-second abandon threshold, so the
-# current user-visible reset action is deterministic.
-- tapOn: 'Reset (not logged)'
+# Ending an in-flight session goes through the end confirmation; the
+# destructive action there is labelled "End session".
+- tapOn: 'End'
+- assertVisible: 'End this focus session?'
+- tapOn: 'End session'
 - assertVisible: 'Start focus'

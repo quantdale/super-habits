@@ -110,8 +110,10 @@ defineJourney({
 
         // Second, independent surface: the Focus section's own stat card. The
         // reworked Pomodoro screen counts only session_type='focus' — TYPICAL
-        // seeds 3 focus rows (i=0,3,6 of the 8 sessions).
+        // seeds 3 focus rows (i=0,3,6 of the 8 sessions). Detailed stats live
+        // behind the secondary History entry (W8), so open it first.
         await switchTab(page, 'pomodoro');
+        await page.getByRole('button', { name: 'History', exact: true }).click();
         await expectFocusStat(page, 'Focus sessions', '3');
       },
     },
@@ -468,7 +470,9 @@ defineJourney({
 
         // Second surfaces after reload. The Focus stat counts focus-type
         // sessions only: the week base plus the session completed in-journey.
+        // Detailed stats live behind the secondary History entry (W8).
         await switchTab(page, 'pomodoro');
+        await page.getByRole('button', { name: 'History', exact: true }).click();
         await expectFocusStat(
           page,
           'Focus sessions',

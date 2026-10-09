@@ -56,9 +56,9 @@
 
 ## 7. W7 — Habits
 
-- [ ] 7.1 Daily check-in list: one row anatomy (check ring, name, streak); kill 5-treatment state pile (SUR-05)
-- [ ] 7.2 Quiet group headers; collapse filter stack (SYS-16)
-- [ ] 7.3 Fix neutral-progress red misuse (SYS-12); analytics → per-habit progress sheet
+- [x] 7.1 Daily check-in list: one row anatomy (check ring, name, streak); kill 5-treatment state pile (SUR-05)
+- [x] 7.2 Quiet group headers; collapse filter stack (SYS-16)
+- [x] 7.3 Fix neutral-progress red misuse (SYS-12); analytics → per-habit progress sheet
 
 ## 8. W8 — Focus
 

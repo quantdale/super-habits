@@ -15,6 +15,7 @@ import {
   buildPomodoroHeatmapDays,
   applySettingsToTimerState,
   computePomodoroStreakFromHeatmapDays,
+  describeCyclePosition,
   matchPresetBySettings,
   planActiveTimerReconcile,
   planSessionCompletion,
@@ -454,6 +455,63 @@ describe('planActiveTimerReconcile', () => {
   it('treats an unpaused legacy intent (no paused field) as before', () => {
     // Legacy intents persisted without the marker keep running-deadline logic.
     expect(planActiveTimerReconcile({ ...intent }, false, endMs).kind).toBe('complete-unlogged');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cycle position copy (W8: one meaningful sentence, never placeholder dots)
+// ---------------------------------------------------------------------------
+
+describe('describeCyclePosition', () => {
+  const settings = DEFAULT_SETTINGS; // 4 focus sessions before a long break
+
+  it('says nothing at a cycle start (nothing completed yet)', () => {
+    expect(describeCyclePosition({ mode: 'focus', completedFocus: 0, settings })).toBeNull();
+    expect(describeCyclePosition({ mode: 'short_break', completedFocus: 4, settings })).toBeNull();
+    expect(describeCyclePosition({ mode: 'long_break', completedFocus: 4, settings })).toBeNull();
+  });
+
+  it('names the position of an in-cycle focus session', () => {
+    expect(describeCyclePosition({ mode: 'focus', completedFocus: 1, settings })).toBe(
+      'Session 2 of 4',
+    );
+    expect(describeCyclePosition({ mode: 'focus', completedFocus: 2, settings })).toBe(
+      'Session 3 of 4',
+    );
+  });
+
+  it('announces the long break on the last focus of a cycle', () => {
+    expect(describeCyclePosition({ mode: 'focus', completedFocus: 3, settings })).toBe(
+      'Long break after this one',
+    );
+  });
+
+  it('tells a break which focus session comes next', () => {
+    expect(describeCyclePosition({ mode: 'short_break', completedFocus: 1, settings })).toBe(
+      'Session 2 of 4 next',
+    );
+    expect(describeCyclePosition({ mode: 'short_break', completedFocus: 3, settings })).toBe(
+      'Session 4 of 4 next',
+    );
+  });
+
+  it('wraps around to a fresh cycle after the long break', () => {
+    // completedFocus keeps counting past the cycle length; position wraps.
+    expect(describeCyclePosition({ mode: 'focus', completedFocus: 4, settings })).toBeNull();
+    expect(describeCyclePosition({ mode: 'focus', completedFocus: 5, settings })).toBe(
+      'Session 2 of 4',
+    );
+  });
+
+  it('respects a custom sessionsBeforeLongBreak', () => {
+    const two = { ...DEFAULT_SETTINGS, sessionsBeforeLongBreak: 2 };
+    expect(describeCyclePosition({ mode: 'focus', completedFocus: 0, settings: two })).toBeNull();
+    expect(describeCyclePosition({ mode: 'focus', completedFocus: 1, settings: two })).toBe(
+      'Long break after this one',
+    );
+    expect(describeCyclePosition({ mode: 'short_break', completedFocus: 1, settings: two })).toBe(
+      'Session 2 of 2 next',
+    );
   });
 });
 

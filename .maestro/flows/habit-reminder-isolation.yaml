@@ -129,6 +129,10 @@ tags:
 - launchApp:
     stopApp: false
 - assertVisible: 'Pause'
-# Elapsed focus time varies with emulator speed; accept either label.
-- tapOn: 'Reset (not logged)'
+# Ending is the only discard and always confirms first; cancelling would keep
+# the session running. The confirmation's destructive action carries the
+# explicit "End session" wording.
+- tapOn: 'End'
+- assertVisible: 'End this focus session?'
+- tapOn: 'End session'
 - assertVisible: 'Start focus'

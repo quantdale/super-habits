@@ -62,8 +62,7 @@ historical evidence only.
 
 ## Current Checkpoint
 
-- Current milestone: W7 complete and merged to main (`f679a26`, PR 59);
-  the campaign is ready for W8 Focus planning, which is not started here.
+- Current milestone: W7 complete and merged to main (`f679a26`, PR 59) and closed on `main` at `4d7167c`; W8 Focus implementation is authorized and in progress under the slice plan `frontend-v3-w8-focus/execplan.md`.
 - Completed: W0–W7 unchanged semantically; W6.5 closed and MERGED to main as
   merge commit `f37539a969bdc7c3dc539c2d47db3f6580429c64` (PR58 MERGED
   2026-10-08). W7 rebuilt Habits as a date-scoped, list-first daily check-in
@@ -83,10 +82,7 @@ historical evidence only.
   and are NOT passed. No dependency, lockfile or patch file changed in
   `main..HEAD`. Stash, foreign iOS evidence and historical captures preserved.
   No overall certification.
-- In progress: W8 Focus is next in the wave list and is NOT started; it
-  needs a new plan and fresh authorization. Slice
-  `frontend-v3-w7-habits` is COMPLETED and merged; its slice plan holds the
-  W7 detail. Preserve W6 history and domain semantics.
+- In progress: W8 Focus implementation is complete and gated under the slice plan at `frontend-v3-w8-focus/execplan.md` (the only living W8 plan; this checkpoint points there instead of `.agent/execplans/frontend-v3-w8-focus-v1.md`). All 23 W8 tasks are checked: six timer hierarchies, confirmed-End session safety, no silent discards, cycle sentence, sprout off the clock, truthful recovery copy, phase-only announcements, one History disclosure, and selector updates across E2E/Maestro/simulation oracles. Evidence: 12/12 Focus E2E, 14 inspected captures under `docs/ui-ux/v3-audit/w8/`, SYS-08/SYS-09/SUR-09 VERIFIED-FIXED, typecheck/lint/theme/OpenSpec/ExecPlan validation green, Vitest 2558 passed (two environmental host failures, green in isolation), and the full chromium+journeys battery 254 passed / 65 skipped / 0 failed with D14 maxSwitch 611/800ms (23.6% headroom). W8 is ready for its own commit(s) and PR when the owner authorizes publication; the parent wave list still shows W8 unchecked until that merge lands. Parent tasks 7.1–7.3 are checked: the merged W7 slice (`f679a26`, PR 59), the W7 rendered-audit README (SUR-05/SYS-16/SYS-12 VERIFIED-FIXED) and the Habits source support them; W7 Habits behavior is not reopened. Exact-head CI for the W7 closure commit `4d7167c` is run [37825722260](https://github.com/quantdale/super-habits/actions/runs/37825722260), with the follow-up scheduled run [37848841434](https://github.com/quantdale/super-habits/actions/runs/37848841434) recorded as well; both are recorded as reference ids only — hosted `e2e`/`nightly` skip behind the two pre-existing braces/node-forge advisory failures and are NOT passed. Slice `frontend-v3-w7-habits` remains COMPLETED and merged; its slice plan holds the W7 detail.
 - Important modified files: W7 touched `features/habits/` (check-in model,
   check-in rows, editor choices, day strip, detail/progress consolidation,
   derivations, web Space-key hook), `core/ui/SegmentedControl.tsx`, habit
@@ -132,13 +128,7 @@ deterministic` 23/23. Exact-head CI 37822880601 succeeded on every quality
   Native largest-font/screen-reader qualification remains unverified; full
   Android W16, iOS owner-deferred. Use supported target plus clean same-commit
   checkout for qualification; never delete preserved foreign evidence.
-- Exact next action: Author the W8 Focus wave plan under
-  `.agent/execplans/frontend-v3-w8-focus-v1.md` per `.agent/PLANS.md`
-  (`Plan-Version: 2`, `Status: BLOCKED` pending owner authorization of W8
-  scope), recording the W7 baseline `f679a26`, the focus-section brief, and
-  the two D14 `ENVIRONMENT` residuals plus the known braces/node-forge audit
-  blockers as known constraints. Do not implement any W8 change. Preserve
-  `.tmp-ios36423379932/`, `stash@{0}` and historical captures.
+- Exact next action: commit the W8 slice in coherent commits (feature, regressions + rendered evidence, spec/ledgers/plans) and open its PR when the owner authorizes publication; per-wave publication uses normal hooks with an exact-head CI inspection (do not substitute product-head evidence). Until the merge lands, the parent wave list below keeps W8 unchecked. Then plan W9 Workout as its own slice with fresh authorization. Preserve `.tmp-ios36423379932/`, `stash@{0}` and historical captures.
 - Remaining definition of done: W7 is done: list-first check-in, quantitative
   safety, schedule/lifecycle/past-day correctness, collapsed filters, no false
   danger, analytics demoted, rendered evidence, gates, and publication
@@ -609,9 +599,11 @@ npx playwright test e2e/visual-audit.spec.ts`. Inspect port owners first;
   Exact-main CI capture for the merge commit and the final documentation
   head lives at `w65-main/final-ci*.json`/`final-ci*-failed.log`; compare
   each `headSha` with Git before relying on it.
-- Resume point: W7 broad QA/publication. Read
-  `frontend-v3-w7-habits/execplan.md` for the live implementation checkpoint;
-  parent tracks wave closure, with W8 untouched.
+- Resume point: W8 Focus implementation. Read
+  `frontend-v3-w8-focus/execplan.md` for the live implementation checkpoint;
+  parent tracks wave closure. W5 tasks (5.1–5.3) and W7 tasks (7.1–7.3) are
+  verified and checked in `tasks.md`; do not reopen them without contrary
+  evidence.
 
 ## Outcomes & Retrospective
 

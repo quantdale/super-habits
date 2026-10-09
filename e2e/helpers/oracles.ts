@@ -15,8 +15,10 @@ const SECTION_HEADINGS: Record<keyof typeof TAB_LABELS, string> = {
   overview: 'Plan today',
   todos: 'Todos',
   habits: 'Habits',
-  // The redesigned Pomodoro hero keeps the product name as its title.
-  pomodoro: 'Pomodoro',
+  // The W8-rebuilt Focus section identifies itself by its compact "Focus"
+  // heading and the "Focus timer" region — the documentation subtitle and
+  // product-name hero were removed with the timer rebuild.
+  pomodoro: 'Focus',
   workout: 'Workout',
   // The redesigned Calories hero leads with the kcal-remaining number, so the
   // section's stable identity string is the preserved hero subtitle.

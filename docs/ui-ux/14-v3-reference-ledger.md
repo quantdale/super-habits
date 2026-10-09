@@ -189,6 +189,30 @@ changed presentation, query chrome, and sheet composition.
 
 ---
 
+## R11. Focus timer states (W8, fresh research)
+
+**Queried:** "pomodoro focus timer countdown session end" (iOS screens),
+"completing focus session" / "stopping session timer" (flows). Did not copy
+one app wholesale.
+
+| Reference (product / interaction)                                                         | Pattern studied                                                                                               | Adopt                                                                                                              | Reject / why it does not fit SuperHabits                                                                                            |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| FocusPomo `385a83c4-f4a6-4a84-977b-eef7ce9c6899` / `3068001d-01be-425f-bb70-cc574a44cf95` | One giant countdown owns the running screen (04:58); everything else is a quiet icon or thin progress bar     | The countdown as the single dominant element while a session runs; thin non-tinted progress cue                    | Full-bleed peach gradient (SYS slab risk); "Hold To Stop Focus" as the only discard control (hidden, accidential, unrecoverable)    |
+| Mindllama `72bbacbd-3bc7-4b61-a616-f264e3cdcf88`                                          | Active session + explicit confirmation modal asking to end the session, with resume as the paired action      | End through an explicit confirmation with the safe action first; resume remains the dominant action                | Confirmation copy that does not state the unfinished session is not logged                                                          |
+| Mindllama `b8759bce-152b-4967-a117-32c03248500a`                                          | Minimal monochrome screen: remaining time, one large "Focus" phase label, bottom progress bar                 | Phase as one quiet label; identity without documentation narration                                                 | Full dark marketing chrome                                                                                                          |
+| TIDE `2e1f9722-e0e7-4226-b5a7-03a8ec9ec7fe` + flow 6752                                   | Configure duration → immerse (one countdown + session label + circular progress) → summary beat on completion | Configure-then-immerse-then-summary sequence: idle configuration, immersive countdown, restrained completion frame | Pastel smoky gradient field; soundscape gallery (Endel `102194a4-1cc3-4e11-a3a7-5d0e486fb352` — loop graphic + audio player chrome) |
+
+**Synthesis for Focus (W8):** idle configures (duration, preset, optional
+linked task, one start action); running/paused immerse (countdown first,
+pause/resume/end only); completion acknowledges the finished duration once,
+then advances on the existing auto-start beat or a user action. History,
+garden, heatmap, and detailed stats move behind one secondary History entry.
+Announcements follow phase changes, never the ticking second. Locked
+interaction: ending an unfinished session is confirmed and never logged;
+cancelling preserves the clock, notification, and durable intent exactly.
+
+---
+
 ## Reference lock (campaign §11)
 
 **Primary:** calm, information-first productivity UI (R1 synthesis).
