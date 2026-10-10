@@ -40,5 +40,5 @@
 
 - [x] 6.1 Capture and inspect W9 rendered evidence under `docs/ui-ux/v3-audit/w9/` (populated, rest, scheduled, resume, empty, quick start, week, editor, detail, strength, bodyweight, cardio, completed, skipped, rest dock, zero rest, long name, PR, finish, history, dark, large text, HEAVY, 360/390/768/1280)
 - [x] 6.2 Defect ledger: SYS-20 and SUR-06 dispositions; audit SYS-01/02/07/17 posture
-- [ ] 6.3 Validation ladder: diff --check, typecheck, lint, themes, openspec, plans, unit+integration, workout/boundary/a11y/fat-fingers/navigation/theming/command journeys, deterministic simulation, qa:affected/qa:fast (qa:full per policy), D14 baseline comparison without threshold changes
-- [ ] 6.4 Publish via branch/PR; verify exact-head hosted CI; record advisory inventory and hosted-E2E skip honestly
+- [x] 6.3 Validation ladder: diff --check, typecheck, lint, themes, openspec, plans, unit+integration, workout/boundary/a11y/fat-fingers/navigation/theming/command journeys, deterministic simulation, qa:affected/qa:fast (qa:full per policy), D14 baseline comparison without threshold changes
+- [x] 6.4 Publish via branch/PR; verify exact-head hosted CI; record advisory inventory and hosted-E2E skip honestly
