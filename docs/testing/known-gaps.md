@@ -584,6 +584,7 @@ in `.agent/execplans/integration-tinypool-ipc-channel-closed-v1.md`.
 **Gate site:** `e2e/habits-w7-audit.spec.ts`
 **Gate site:** `e2e/pomodoro-w8-audit.spec.ts`
 **Gate site:** `e2e/pomodoro-w85-audit.spec.ts`
+**Gate site:** `e2e/workout-w9-audit.spec.ts`
 
 **Reason:** the campaign's visual-audit harness seeds TYPICAL fixtures and
 captures ~47 screenshots per run (`docs/ui-ux/v3-audit/`). It is gated with
