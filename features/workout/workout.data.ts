@@ -1679,6 +1679,8 @@ export type WorkoutSessionDraft = {
   >;
   /** Seconds left on the phase at `phaseIndex` when the draft was written. */
   remainingSeconds?: number;
+  /** Session-local added sets by stringified engine exercise index. */
+  addedSets?: Record<string, number>;
 };
 
 type PhaseDispositionValue = 'completed' | 'skipped';
@@ -1742,6 +1744,19 @@ function normalizeEnteredSetMap(value: unknown):
   return any ? out : undefined;
 }
 
+function normalizeAddedSetMap(value: unknown): Record<string, number> | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const out: Record<string, number> = {};
+  let any = false;
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (key.length > 0 && typeof raw === 'number' && Number.isInteger(raw) && raw > 0) {
+      out[key] = Math.min(50, raw);
+      any = true;
+    }
+  }
+  return any ? out : undefined;
+}
+
 function normalizeWorkoutSessionDraft(value: unknown): WorkoutSessionDraft | null {
   if (typeof value !== 'object' || value === null) return null;
   const candidate = value as Record<string, unknown>;
@@ -1759,6 +1774,7 @@ function normalizeWorkoutSessionDraft(value: unknown): WorkoutSessionDraft | nul
   const dispositions = normalizeDispositionMap(candidate.dispositions);
   const enteredSets = normalizeEnteredSetMap(candidate.enteredSets);
   const remainingSeconds = candidate.remainingSeconds;
+  const addedSets = normalizeAddedSetMap(candidate.addedSets);
   return {
     routineId: candidate.routineId,
     startedAtIso: candidate.startedAtIso,
@@ -1773,6 +1789,7 @@ function normalizeWorkoutSessionDraft(value: unknown): WorkoutSessionDraft | nul
     remainingSeconds >= 0
       ? { remainingSeconds: Math.round(remainingSeconds) }
       : {}),
+    ...(addedSets ? { addedSets } : {}),
   };
 }
 
@@ -1811,6 +1828,36 @@ export async function getLastPerformedByRoutine(): Promise<Map<string, string>> 
     'SELECT routine_id, MAX(completed_at) AS last_at FROM workout_logs GROUP BY routine_id',
   );
   return new Map(rows.map((row) => [row.routine_id, row.last_at]));
+}
+
+export type RoutineCounts = { routineId: string; exerciseCount: number; setCount: number };
+
+/**
+ * Prescribed exercise and set counts per routine for quick-start rows. Reads
+ * only the routine structure; no session or log semantics involved.
+ */
+export async function listRoutineCounts(): Promise<RoutineCounts[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{
+    routine_id: string;
+    exercise_count: number;
+    set_count: number;
+  }>(
+    `SELECT r.id AS routine_id,
+       (SELECT COUNT(*) FROM routine_exercises e
+          WHERE e.routine_id = r.id AND e.deleted_at IS NULL) AS exercise_count,
+       (SELECT COUNT(*) FROM routine_exercise_sets s
+          JOIN routine_exercises e2 ON e2.id = s.exercise_id
+          WHERE e2.routine_id = r.id AND e2.deleted_at IS NULL
+            AND s.deleted_at IS NULL) AS set_count
+      FROM workout_routines r
+      WHERE r.deleted_at IS NULL`,
+  );
+  return rows.map((row) => ({
+    routineId: row.routine_id,
+    exerciseCount: Number(row.exercise_count ?? 0),
+    setCount: Number(row.set_count ?? 0),
+  }));
 }
 
 // ---------------------------------------------------------------------------

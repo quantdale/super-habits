@@ -1,0 +1,165 @@
+# ExecPlan: Frontend V3 — W9 Workout wave
+
+Plan-Version: 2
+Status: ACTIVE
+
+## Purpose / User Outcome
+
+Workout answers "what am I training and logging right now?" instead of
+presenting a planning dashboard. Implements the
+[frontend-v3-w9-workout OpenSpec change](proposal.md) inside the
+[frontend-v3-calm-momentum campaign](../frontend-v3-calm-momentum/execplan.md):
+a quick-start-first landing with one resume authority and a compact readable
+weekly strip (SYS-20, SUR-06), a set-logging-first live session with a
+nonblocking rest dock, a real session-local Add set, and truthful
+finish/PR/cancel behavior — all on the unchanged workout engine, with
+rendered-truth evidence and green gates before any closure claim.
+
+## Context
+
+- Baseline HEAD `1502ad3f6b188b5c4bc6548f4bed00261e0e9664` (= `origin/main`;
+  W8.5 merged via PRs #63/#64; exact-head hosted CI `37944813818` green through
+  unit/integration at 2,613 passed / 3 skipped, audit-only red on the two known
+  undocumented HIGHs). Stash `pre-recovery-local-changes` and untracked
+  `.tmp-ios36423379932/` preserved untouched. Clean working tree at start.
+- Engine authority: `buildTimerSequence()` (sequential active/rest phases,
+  zero-rest omission, superset adjacency), disposition rules (timeout =
+  completed, Skip = skipped), draft serialization in `app_meta
+.workout.active_session_draft`, `collectSessionSetRecords` →
+  `groupSessionExercises` → `logWorkoutSession`, `findNewPersonalRecords`,
+  XP-after-durable-commit. None of these are redesigned.
+- Current landing (`WorkoutScreen.tsx`, ~1,150 lines) order: subtitle header →
+  Today hero → Week card → Start/Resume card → two stat cards → empty state →
+  add-routine → routine library → history/analytics. Current session
+  (`WorkoutSessionScreen.tsx`, ~1,350 lines) is a phase-timer first: giant
+  countdown + progress track + ACTIVE/REST badge + inputs + rest adjusts.
+- Refero research recorded as R12 in `docs/ui-ux/14-v3-reference-ledger.md`.
+- Design authority: `docs/ui-ux/13-calm-momentum-design-system.md`;
+  requirements in the three delta specs (`workout-landing-experience`,
+  `workout-live-session`, `ui-ux-interaction-density-a11y`,
+  `ui-ux-visual-coherence`).
+- Blockers inherited (not W9's): braces `GHSA-vfj7-8cjw-p6xm` and node-forge
+  `GHSA-86w9-cpqp-85rv` audit reds (no waiver authorized); Android API36
+  qualification pending (W16); iOS owner-deferred; D14 headroom floor and the
+  Windows CRLF doc-consistency failures are recorded ENVIRONMENT residuals;
+  the Focus `planTimerStartup()` notification-scheduling timestamp residual
+  stays a separate Focus/native-lifecycle follow-up — untouched by W9.
+
+## Scope
+
+- `features/workout/WorkoutScreen.tsx` rebuilt landing: training-state header,
+  quick-start rows, weekly strip + assignment sheet, history disclosure with
+  gated analytics, preserved routine management and modals.
+- New pure view models: `features/workout/workoutLanding.ts`,
+  `features/workout/workoutSessionView.ts` (+ unit tests).
+- `features/workout/WorkoutSessionScreen.tsx` rebuilt session anatomy:
+  session top bar, exercise set-table, rest dock, Add set, truthful finish/PR/
+  cancel, accurate progress labels.
+- `features/workout/workout.data.ts`: additive optional `addedSets` draft field
+  (normalize-only); no schema/migration/sync change.
+- New presentational helpers under `features/workout/` as needed
+  (`WorkoutWeekStrip`, session set-row components) — no cross-feature edits.
+- Specs/tests/docs: new tests (`tests/workoutLanding.test.ts`,
+  `tests/workoutSessionView.test.ts`, add-set integration), updated
+  `e2e/workout.spec.ts` + `e2e/workout-gym-v2.spec.ts` selectors to the new
+  anatomy with unchanged oracles, new `e2e/workout-w9-audit.spec.ts`,
+  `docs/ui-ux/v3-audit/w9/`, ledger updates, parent tasks/execplan checkpoints.
+
+## Non-Goals
+
+- No workout-engine rewrite: no change to `buildTimerSequence`, dispositions,
+  per-set rest semantics, sync/outbox, backup scope, routine-template writes,
+  linked actions, reminders, gamification, or PR math.
+- No random-access set editing (the cursor stays strictly sequential), no
+  second draft authority, no schema migration.
+- No W10+ work; no dependency/security waiver; no Android/iOS certification;
+- no threshold, floor, or quarantine relaxation to force green.
+
+## Current Checkpoint
+
+- Current milestone: W9 implementation COMPLETE (code, tests, evidence, gates); publication via branch/PR in progress.
+- Completed: preflight (baseline `1502ad3f6b188b5c4bc6548f4bed00261e0e9664` verified = origin/main; stash, `.tmp-ios36423379932/`, W1–W8.5 captures, single worktree intact); source audit; fresh Refero research (R12); W9 OpenSpec change (proposal, design, tasks, four spec deltas — `openspec validate` PASS); `workoutLanding.ts` + `workoutSessionView.ts` pure view models (35 unit tests); `listRoutineCounts()` additive data read; draft `addedSets` field (normalize-tested); landing rebuilt (training state, quick-start rows, collapsed week strip + assignment sheet, new-routine form, History & insights disclosure gating all heavy analytics); session rebuilt (session bar with accurate progress, exercise set table with previous context and modality-correct inputs, dominant DONE per actionable set, Skip set, session-local Add set with phase-index remap through draft/resume/log, docked rest panel, truthful finish error+retry, draft-preserving leave via the shared web-safe confirmation); e2e: workout.spec 14/14, workout-gym-v2 7/7, workout-w9 6/6 (quick-start hierarchy, week-strip template/override SQL oracles, set-table logging, add-set log numbering, draft-preserving leave, nonblocking rest dock), boundary 22/22, a11y 10/10 (one W9-introduced contrast defect found and re-inked to AA), command/theming green, fat-fingers 13/13, a-tuesday 8/8, three-months-in D14 7/7 (maxSwitch 538/800ms, 32.8% headroom), sim model 23/23; W9 rendered evidence 22 captures under `docs/ui-ux/v3-audit/w9/`, all manually inspected; defect ledger SYS-20 + SUR-06 VERIFIED-FIXED with Workout portions of SYS-01/02/07/17 noted; parent tasks 9.1–9.3 checked; known-gaps W9 addendum recorded.
+- In progress: publication (branch commit → push → PR → merge) and exact-head CI verification; full e2e:full battery running for the record.
+- Important modified files: `features/workout/WorkoutScreen.tsx` (landing rebuild), `features/workout/WorkoutSessionScreen.tsx` (session rebuild + web-safe leave + finish retry), `features/workout/workoutLanding.ts` (new), `features/workout/workoutSessionView.ts` (new), `features/workout/workout.data.ts` (`listRoutineCounts`, draft `addedSets`), `e2e/workout.spec.ts`, `e2e/workout-gym-v2.spec.ts`, `e2e/workout-w9.spec.ts` (new), `e2e/workout-w9-audit.spec.ts` (new), `e2e/journeys/three-months-in.spec.ts` (workout section marker), `tests/workoutLanding.test.ts` (new), `tests/workoutSessionView.test.ts` (new), `tests/workout.draft.test.ts`, `tests/integration/workoutQueries.data.test.ts`, `docs/ui-ux/v3-audit/w9/` (22 captures), `docs/ui-ux/14-v3-reference-ledger.md` (R12), `docs/ui-ux/15-v3-defect-ledger.md`, `docs/testing/known-gaps.md`, parent execplan/tasks, this change.
+- Last successful validation: `npx tsc --noEmit` 0 errors; `npx eslint .`-scope workout+tests 0 errors/0 warnings; `npm run validate:themes` 140/140; `openspec validate --all` 77/77; `agent:plan:validate:all` PASS; `npm test` 2640 passed / 2 skipped with the single pre-existing Windows-CRLF `tests/agentDocConsistency.test.ts` ENVIRONMENT failure (register parser sees zero entries under `core.autocrlf=true`; passes in CI's LF checkout — identical at the W8.5 baseline).
+- Current failures: none attributable to W9. Hosted audit red (braces GHSA-vfj7-8cjw-p6xm, node-forge GHSA-86w9-cpqp-85rv) and hosted e2e/nightly skip remain inherited; Android API36/x86_64 qualification pending (W16); iOS owner-deferred; Focus `planTimerStartup()` notification-scheduling timestamp residual remains a separate Focus/native-lifecycle follow-up.
+- Relevant quarantines: none added.
+- Blockers: None for web continuation.
+- Condition required to unblock: None.
+- Exact resume action after unblock: None.
+- Exact next action: commit the W9 slice on branch `frontend-v3-w9-workout`, push, open the PR, merge, then verify exact-head hosted CI and record the advisory inventory + hosted-E2E skip.
+- Remaining definition of done: publication merged; exact-head CI inspected (frontend gates pass, first failure = the two known audit advisories, hosted e2e skipped); parent plan Progress checkbox for W9; final report with verdict.
+
+## Progress
+
+- [x] Preflight + preservation audit (baseline, stash, iOS dir, captures)
+- [x] Source + test-suite audit of the Workout system
+- [x] Fresh Refero research + R12 ledger entry
+- [x] W9 OpenSpec change (proposal/design/tasks/specs + this plan)
+- [x] W9.1 landing: training state, quick start, single resume, week strip,
+      history disclosure, preserved routine management
+- [x] W9.2 live session: session bar, set table, modality inputs, rest dock,
+      Add set, performance posture
+- [x] W9.3: truthful finish/PR/cancel, accurate progress labels
+- [x] Regression suites: unit, integration, e2e updates + new coverage
+- [ ] Rendered evidence `docs/ui-ux/v3-audit/w9/` inspected manually
+- [x] Validation ladder + defect ledger + parent reconciliation
+- [ ] Publication + exact-head CI verification + final report
+
+## Surprises & Discoveries
+
+- Baseline verified exactly at `1502ad3f6b188b5c4bc6548f4bed00261e0e9664` =
+  `origin/main`; the W8.5 closure commit `7075f2d` (CI record) is already in
+  this baseline, so no reconciliation was needed.
+- The live session already has the right primitives for a set table:
+  `enteredSets` is keyed by sequence index and the seeding effect fills
+  previous-performance values; the table is a presentation over that state,
+  not an engine change.
+- `advanceFromCurrent` skips zero-duration rest phases defensively, which
+  keeps the dock's Skip behavior correct for legacy sequences.
+
+## Decision Log
+
+- D1 (W9): landing analytics computations move behind the open History
+  disclosure instead of running on every render — satisfies the hierarchy
+  requirement and the performance audit in one move.
+- D2 (W9): Add set is session-local with a pure `withAddedSet` transform plus
+  index remap, persisted through an additive draft field; the routine template
+  is never written mid-session. Random-access set editing is explicitly out.
+- D3 (W9): cancel becomes draft-preserving (leave keeps the draft, landing
+  shows Resume); discard remains the separate confirmed destructive path, so
+  the copy matches persistence truth.
+- D4 (W9): rest dock is laid out in flow (content padding above it), never an
+  overlay, satisfying "never blocks set inputs" on web and native alike.
+
+## Validation Ledger
+
+- 2026-10-10 — W9 change authored — NOT RUN (no code yet).
+- 2026-10-10 — preflight (`git fetch --all --prune`, status, worktree,
+  stash list) — PASS — baseline `1502ad3f` verified, tree clean, stash
+  `stash@{0}` and `.tmp-ios36423379932/` intact, no extra worktrees.
+
+## Changed Files / Areas
+
+- `openspec/changes/frontend-v3-w9-workout/` — proposal, design, tasks, four
+  spec deltas, this plan.
+
+## Recovery / Resume Instructions
+
+1. Read `AGENTS.md`, this plan, `proposal.md`, and `design.md`.
+2. `git status --short` and `git log --oneline -5`; reconcile with the
+   checkpoint above (Git wins).
+3. Continue from "Exact next action": the landing view model
+   `features/workout/workoutLanding.ts` with `tests/workoutLanding.test.ts`,
+   then the `WorkoutScreen.tsx` rebuild.
+4. Validation: `npm run typecheck`, `npm run lint`, `npx vitest run
+tests/workoutLanding.test.ts tests/workoutSessionView.test.ts`, then the
+   workout e2e suites after `npm run build:e2e` with
+   `E2E_PORT=8083` (inspect port owners first; never kill unrelated
+   processes).
+5. If hosted CI fails at "Validate versioned ExecPlans": run
+   `npm run agent:plan:validate:all` and fix the named sections.
+
+## Outcomes & Retrospective
+
+- Status: Active. No W9 code merged yet.

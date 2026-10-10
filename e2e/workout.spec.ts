@@ -1,13 +1,20 @@
-import { test, expect } from './fixtures';
+import { test, expect, type Page } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
 import { queryRows, returnToApp } from './helpers/dbHarness';
 import { fillRoutineName } from './helpers/forms';
+import { ACTIVE_SECTION_SELECTOR } from './helpers/oracles';
 import {
   clickSwipeDeleteAction,
   rapidPress,
   swipeLeftRevealWorkoutRoutineRow,
 } from './helpers/gestures';
+
+/** W9.1: history and insights sit behind one collapsed disclosure. */
+async function openWorkoutHistory(page: Page) {
+  await page.getByRole('button', { name: 'History and insights' }).click();
+  await expect(page.getByText('Recent sessions')).toBeVisible();
+}
 
 test.describe('Workout', () => {
   test.beforeEach(async ({ page }) => {
@@ -17,8 +24,14 @@ test.describe('Workout', () => {
   });
 
   test('shows empty state when no routines exist', async ({ page }) => {
+    // W9.1 hierarchy: training actions lead; history is one collapsed
+    // disclosure below routine management.
     await expect(page.getByText('Add routine', { exact: true })).toBeVisible();
-    await expect(page.getByText('Workout history')).toBeVisible();
+    const section = page.locator(ACTIVE_SECTION_SELECTOR);
+    await expect(section.getByText('Quick start')).toBeVisible();
+    await expect(section.getByText('This week')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'History and insights' })).toBeVisible();
+    await expect(page.getByText('Workout history')).toHaveCount(0);
   });
 
   test('does not add routine with empty name', async ({ page }) => {
@@ -37,9 +50,10 @@ test.describe('Workout', () => {
     await page.getByText('Add routine', { exact: true }).click();
     await expect(page.getByText('Pull day')).toBeVisible();
     await page.getByText('Complete workout', { exact: true }).first().click();
-    await expect(page.getByText('Workout history')).toBeVisible();
     // The session card only renders after the log write has refreshed state,
     // so the SQLite read below can never race the transaction commit.
+    // so the SQLite read below can never race the transaction commit.
+    await openWorkoutHistory(page);
     await expect(page.getByLabel(/Open session from/).first()).toBeVisible();
     // Real completion oracle, not just a heading that is always visible.
     const rows = await queryRows(
@@ -49,6 +63,7 @@ test.describe('Workout', () => {
     expect(Number(rows[0]?.n)).toBe(1);
     await returnToApp(page);
     await goToTab(page, 'workout');
+    await openWorkoutHistory(page);
     await expect(page.getByLabel(/Open session from/).first()).toBeVisible();
   });
 
@@ -94,7 +109,7 @@ test.describe('Workout', () => {
 
     // Run the single active phase: enter what was lifted while it runs, then
     // let it time out naturally (Skip would mark the set skipped).
-    await expect(page.getByText('Log this set (optional)')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Complete set 1' })).toBeVisible();
     await page.getByText('Start', { exact: true }).first().click();
     await page.getByRole('textbox', { name: 'Weight' }).fill('80');
     await page.getByRole('textbox', { name: 'Reps' }).fill('8');
@@ -109,6 +124,7 @@ test.describe('Workout', () => {
     await page.getByText('Done', { exact: true }).click();
 
     // History detail shows the real per-set provenance and PR math.
+    await openWorkoutHistory(page);
     await page
       .getByLabel(/Open session from/)
       .first()
@@ -143,7 +159,7 @@ test.describe('Workout', () => {
 
     await dialog.getByText('Start workout', { exact: true }).click({ force: true });
 
-    await expect(page.getByText('Log this set (optional)')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Complete set 1' })).toBeVisible();
     await page.getByText('Start', { exact: true }).first().click();
     await page.getByRole('textbox', { name: 'Weight' }).fill('80');
     await page.getByRole('textbox', { name: 'Reps' }).fill('8');
@@ -177,6 +193,7 @@ test.describe('Workout', () => {
 
     // The session card only renders after the log write has refreshed state,
     // so the SQLite read below can never race the transaction commit.
+    await openWorkoutHistory(page);
     await expect(page.getByLabel(/Open session from/).first()).toBeVisible();
     // Strict one-row contract: a double-tap is ONE workout, never two.
     const rows = await queryRows(
@@ -226,6 +243,7 @@ test.describe('Workout', () => {
     await page.getByText('Complete workout', { exact: true }).first().click();
 
     // The quick log is the only (and therefore newest) session.
+    await openWorkoutHistory(page);
     await page
       .getByLabel(/Open session from/)
       .first()
@@ -239,6 +257,7 @@ test.describe('Workout', () => {
     await page.getByText('Add routine', { exact: true }).click();
     await expect(page.getByText('Draft name')).toBeVisible();
     await page.getByText('Complete workout', { exact: true }).first().click();
+    await openWorkoutHistory(page);
     await expect(page.getByLabel(/Open session from/).first()).toBeVisible();
 
     await page.getByText('Draft name', { exact: true }).first().click();
@@ -267,6 +286,7 @@ test.describe('Workout', () => {
     await page.getByText('Add routine', { exact: true }).click();
     await expect(page.getByText('Oops quick log')).toBeVisible();
     await page.getByText('Complete workout', { exact: true }).first().click();
+    await openWorkoutHistory(page);
     await expect(page.getByLabel(/Open session from/).first()).toBeVisible();
 
     const countAfterComplete = await queryRows(page, 'SELECT COUNT(*) AS n FROM workout_logs');
@@ -274,6 +294,7 @@ test.describe('Workout', () => {
     await returnToApp(page);
     await goToTab(page, 'workout');
 
+    await openWorkoutHistory(page);
     await page
       .getByLabel(/Open session from/)
       .first()

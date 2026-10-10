@@ -559,8 +559,9 @@ const SECTION_MARKERS: Record<SectionName, string> = {
   // ("Focus timer"), present in every timer state — the W8 rebuild removed the
   // documentation subtitle that used to serve as the marker.
   pomodoro: 'Focus timer',
-  workout:
-    'Plan your week, build prescriptions, train with guidance, and review progress in one place.',
+  // W9: the landing is training-first — the quick-start section is the
+  // always-rendered marker for the Workout section.
+  workout: 'Quick start',
   calories: 'Switch between manual entry and a diary grouped by meal.',
 };
 

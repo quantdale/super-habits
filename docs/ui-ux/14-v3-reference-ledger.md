@@ -213,6 +213,37 @@ cancelling preserves the clock, notification, and durable intent exactly.
 
 ---
 
+## R12. Workout logging reconstruction (W9, fresh research)
+
+**Queried:** "workout log exercise sets reps weight table" (iOS screens),
+"rest timer active workout bottom bar", "weekly workout schedule plan",
+"workout templates library list", "personal record achievement feedback",
+plus flows: Train Fitness "Starting and completing workout session"
+(7147), "Adding additional workout set" (7151), "Deleting set from workout
+session" (7149), "In-Session Exercise Suggestion" (7150), Dropset "Add &
+configure exercises" (6533), "Completing exercise" (6521), Alive program
+schedule screens. Did not copy one app wholesale.
+
+| Reference (product / interaction)                                                              | Pattern studied                                                                                                                                                            | Adopt                                                                                                                                                   | Reject / why it does not fit SuperHabits                                                               |
+| ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Train Fitness set-logging screens (`6c5ad841`, `580c43a9`, `64814577`, `29c3c752`, `f60d7d3f`) | Fixed top timer/progress bar over an exercise card with a compact set table (set / effort / reps / weight / done checkmarks), an add-set row, and completion state on rows | Persistent compact timer above the content; flat set-table anatomy with per-row completion; add-set as a table affordance; completed rows stay readable | Floating social/action buttons; AI suggestion chrome; effort-first column when the effort scale is off |
+| Train Fitness landing (`15ffeabf`)                                                             | Weekly date selector, quiet stats card, horizontally scrollable template cards with duration/muscle detail                                                                 | Date/week context at top of the landing; quick-start rows carrying exercise/set counts and last-performed                                               | Template marketplace, badges, social counters                                                          |
+| Dropset rest phase (`475f4542`) + completing-exercise flow 6521                                | Rest as a large centered countdown with a fixed rounded bottom control bar (pause/stop) and round progress                                                                 | Rest collapsed into a docked control panel (remaining, skip, adjust) that never owns the screen and never overlays set inputs                           | Rest as the hero; a full dark sheet per exercise                                                       |
+| Alive rest + upcoming list (`d3301c12`, `3d1f0558`)                                            | Bottom pill with rest timer, pause, and Next over a scrollable upcoming-exercise list                                                                                      | "Next up" context line in the dock; upcoming exercises stay a quiet context, not a second list mode                                                     | Guided video/photo chrome                                                                              |
+| Alive program schedule (`a3e26f39`, `8debe201`)                                                | Collapsible week sections expanding into day cards with workout name/duration or rest                                                                                      | Collapsed weekly strip with readable day assignments; rest distinct; edit behind a sheet                                                                | Multi-week programs, thumbnails, tab-bar duplication                                                   |
+| Dropset add-exercise-to-active-workout flow (6533)                                             | Library multi-select with confirm, returning to the updated workout                                                                                                        | Narrow in-session Add set scoped to the current exercise                                                                                                | Library re-entry mid-set; live prescription editing                                                    |
+| Nike Training Club / The Body Coach PR celebrations (`61ae0fd3`, `9805ce6c`, `07a3d12c`)       | Full-screen badge/celebration for milestones                                                                                                                               | Brief inline PR notice tied to the exercise; full celebration reserved for the gamification layer                                                       | Full-screen takeover mid-session; share chrome                                                         |
+
+**Synthesis for Workout (W9):** the landing trains — compact training state,
+quick-start rows, collapsed readable week, management and history demoted
+behind disclosure. The live session logs — routine + set progress header,
+current exercise with a flat set table (set / previous / modality inputs /
+done), an honest session-local add set, and a rest dock that keeps the timer
+contextual. PR feedback is one quiet line. Analytics never enter the
+session path.
+
+---
+
 ## Reference lock (campaign §11)
 
 **Primary:** calm, information-first productivity UI (R1 synthesis).
