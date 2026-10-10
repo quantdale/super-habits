@@ -1,6 +1,6 @@
 import { Text } from '@/core/ui/Text';
-import { useCallback, useRef, useState } from 'react';
-import { Alert, View, useWindowDimensions } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { Alert, Pressable, View, useWindowDimensions } from 'react-native';
 import { layout, spacing } from '@/core/theme/designTokens';
 import { MaterialIcons } from '@expo/vector-icons';
 import { RectButton } from 'react-native-gesture-handler';
@@ -12,9 +12,9 @@ import { PageHeader } from '@/core/ui/PageHeader';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { ScreenSection } from '@/core/ui/ScreenSection';
+import { SectionLabel } from '@/core/ui/SectionLabel';
 import { TextField } from '@/core/ui/TextField';
 import { Button } from '@/core/ui/Button';
-import { FeatureStatCard } from '@/core/ui/FeatureStatCard';
 import { MenuSheet } from '@/core/ui/MenuSheet';
 import { Modal } from '@/core/ui/Modal';
 import { PillChip } from '@/core/ui/PillChip';
@@ -28,6 +28,7 @@ import {
   getWorkoutSessionDraft,
   getLastPerformedByRoutine,
   listRoutines,
+  listRoutineCounts,
   listSessionTotalsForRange,
   listWorkoutLogsForRange,
   duplicateRoutine,
@@ -54,7 +55,6 @@ import {
   buildWorkoutActivityDays,
   buildWorkoutHeatmapDays,
   computeWorkoutStreakFromHeatmapDays,
-  formatLastPerformedLabel,
   computePersonalRecords,
   computeTrainingTotals,
   computeBodyAreaDistribution,
@@ -63,6 +63,14 @@ import {
   type PhaseDisposition,
   type ScheduleResolution,
 } from '@/features/workout/workout.domain';
+import {
+  buildQuickStartRows,
+  buildTrainingState,
+  buildWeekStrip,
+  weekdayLabel,
+  type QuickStartRow,
+  type WeekStripCell,
+} from '@/features/workout/workoutLanding';
 import type {
   BodyWeightEntry,
   CustomExercise,
@@ -88,13 +96,7 @@ import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { useGamification } from '@/features/gamification/gamificationContext';
 import { validateRoutineName } from '@/lib/validation';
 import { createSubmitGuard } from '@/lib/submitGuard';
-import {
-  BodyWeightCard,
-  WorkoutProgressCard,
-  WorkoutTodayCard,
-  WorkoutTotalsCard,
-  WorkoutWeekCard,
-} from './WorkoutGymPanels';
+import { BodyWeightCard, WorkoutProgressCard, WorkoutTotalsCard } from './WorkoutGymPanels';
 import { BUILT_IN_EXERCISES } from './exerciseCatalog';
 
 const COLOR = SECTION_COLORS.workout;
@@ -104,24 +106,35 @@ type ViewState =
 
 type RoutineModalState = { routineId: string; routineName: string };
 
-function RoutineSwipeRow({
-  routine,
+/**
+ * W9.1 quick-start row: one routine per flat row — identity, the facts needed
+ * to choose (exercise/set counts, last performed), the schedule marker, and
+ * one obvious Start. Row press opens the routine detail; the swipe actions
+ * keep edit/delete. "Complete workout" stays as the quick-log action.
+ */
+function QuickStartRoutineRow({
+  row,
   onOpenDetail,
+  onStart,
   onCompleteWorkout,
   onRequestDelete,
   accentColor,
-  lastPerformedAt,
 }: {
-  routine: WorkoutRoutine;
+  row: QuickStartRow;
   onOpenDetail: () => void;
-  onCompleteWorkout: () => void;
+  onStart: () => void;
+  onCompleteWorkout: () => void | Promise<void>;
   onRequestDelete: () => void | Promise<void>;
   accentColor: string;
-  /** ISO completed_at of the routine's most recent session, if any. */
-  lastPerformedAt: string | null;
 }) {
   const { tokens } = useAppTheme();
-  const lastPerformedLabel = lastPerformedAt ? formatLastPerformedLabel(lastPerformedAt) : null;
+  const meta = [
+    `${row.exerciseCount} exercise${row.exerciseCount === 1 ? '' : 's'}`,
+    `${row.setCount} set${row.setCount === 1 ? '' : 's'}`,
+    row.lastPerformedLabel ? `Last: ${row.lastPerformedLabel}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   return (
     <SwipeableCard
       accentColor={accentColor}
@@ -129,30 +142,152 @@ function RoutineSwipeRow({
       onEdit={onOpenDetail}
       onDelete={onRequestDelete}
     >
-      <RectButton
-        onPress={onOpenDetail}
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${routine.name} routine`}
-        style={{ backgroundColor: 'transparent' }}
-      >
-        <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-          {routine.name}
-        </Text>
-        {routine.description ? (
+      <View className="flex-row items-center gap-3">
+        <RectButton
+          onPress={onOpenDetail}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${row.name} routine`}
+          style={{ flex: 1, minWidth: 0, backgroundColor: 'transparent' }}
+        >
+          <View className="flex-row items-center gap-2">
+            <Text
+              className="text-base font-semibold"
+              style={{ color: tokens.text, flexShrink: 1 }}
+              numberOfLines={2}
+            >
+              {row.name}
+            </Text>
+            {row.isScheduledToday ? (
+              <View
+                className="rounded-full px-2 py-0.5"
+                style={{ backgroundColor: `${accentColor}22` }}
+              >
+                <Text className="text-[11px] font-semibold" style={{ color: accentColor }}>
+                  Today
+                </Text>
+              </View>
+            ) : null}
+          </View>
           <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-            {routine.description}
+            {meta}
           </Text>
-        ) : null}
-        {lastPerformedLabel ? (
-          <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
-            Last: {lastPerformedLabel}
-          </Text>
-        ) : null}
-      </RectButton>
-      <View className="mt-4">
-        <Button label="Complete workout" onPress={onCompleteWorkout} color={accentColor} />
+        </RectButton>
+        <Button
+          label="Start"
+          size="sm"
+          color={accentColor}
+          accessibilityLabel={`Start ${row.name}`}
+          onPress={onStart}
+        />
       </View>
+      <RectButton
+        onPress={onCompleteWorkout}
+        accessibilityRole="button"
+        accessibilityLabel={`Complete workout ${row.name}`}
+        hitSlop={4}
+        style={{ alignSelf: 'flex-start', backgroundColor: 'transparent', paddingVertical: 6 }}
+      >
+        <Text className="text-xs font-semibold" style={{ color: tokens.textMuted }}>
+          Complete workout
+        </Text>
+      </RectButton>
     </SwipeableCard>
+  );
+}
+
+/**
+ * One day of the collapsed weekly strip (SUR-06): readable assignment, explicit
+ * Rest distinct from unplanned, today marked, and direct Rest/assign controls
+ * that keep 44pt targets without repeating a row of pills per day.
+ */
+function WeekStripRow({
+  cell,
+  onRest,
+  onAssign,
+}: {
+  cell: WeekStripCell;
+  onRest: () => void;
+  onAssign: () => void;
+}) {
+  const { tokens } = useAppTheme();
+  const assignment = cell.routineName ?? (cell.state === 'rest' ? 'Rest' : 'Not planned');
+  return (
+    <View
+      className="flex-row items-center gap-2 px-1 py-1"
+      style={{
+        borderTopWidth: cell.weekday === 1 ? 0 : 1,
+        borderTopColor: tokens.border,
+      }}
+    >
+      <Text
+        className="w-9 text-sm font-semibold"
+        style={{ color: cell.isToday ? tokens.text : tokens.textMuted }}
+      >
+        {cell.dayLabel}
+      </Text>
+      <View className="min-w-0 flex-1 flex-row items-center gap-2">
+        <Text
+          className="text-sm"
+          style={{
+            color: cell.state === 'workout' ? tokens.text : tokens.textMuted,
+            flexShrink: 1,
+          }}
+          numberOfLines={2}
+        >
+          {assignment}
+        </Text>
+        {cell.isToday ? (
+          <Text className="text-[10px] font-semibold uppercase" style={{ color: tokens.text }}>
+            Today
+          </Text>
+        ) : null}
+        {cell.isOverride ? (
+          <Text className="text-[10px] font-semibold uppercase" style={{ color: tokens.textMuted }}>
+            Override
+          </Text>
+        ) : null}
+      </View>
+      <Pressable
+        onPress={onRest}
+        accessibilityRole="button"
+        accessibilityLabel={`${weekdayLabel(cell.weekday)} rest`}
+        accessibilityState={{ selected: cell.state === 'rest' }}
+        className="items-center justify-center rounded-lg"
+        style={{
+          minWidth: 44,
+          minHeight: 44,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: cell.state === 'rest' ? `${COLOR}22` : tokens.surfaceElevated,
+        }}
+      >
+        <Text
+          className="text-[11px] font-semibold"
+          style={{ color: cell.state === 'rest' ? tokens.text : tokens.textMuted }}
+        >
+          Rest
+        </Text>
+      </Pressable>
+      <Pressable
+        onPress={onAssign}
+        accessibilityRole="button"
+        accessibilityLabel={`${weekdayLabel(cell.weekday)} assign routine`}
+        className="items-center justify-center rounded-lg"
+        style={{
+          minWidth: 44,
+          minHeight: 44,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: tokens.surfaceElevated,
+        }}
+      >
+        <MaterialIcons
+          name={cell.state === 'workout' ? 'swap-horiz' : 'add'}
+          size={16}
+          color={tokens.textMuted}
+        />
+      </Pressable>
+    </View>
   );
 }
 
@@ -196,7 +331,19 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const [customExercises, setCustomExercises] = useState<CustomExercise[]>([]);
   const [selectedProgressExercise, setSelectedProgressExercise] = useState<string | null>(null);
   const [weekEditorVisible, setWeekEditorVisible] = useState(false);
-  const [todayOverrideVisible, setTodayOverrideVisible] = useState(false);
+  // W9.1: the focused per-day assignment sheet replaces the old "Change
+  // today" modal. `scope` is explicit so a one-day override can never be
+  // confused with the recurring weekly template.
+  const [daySheet, setDaySheet] = useState<{
+    weekday: number;
+    scope: 'today' | 'weekly';
+  } | null>(null);
+  // History & insights disclosure: collapsed by default so training actions
+  // lead, and the heavy history derivations below only run while it is open.
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [routineCounts, setRoutineCounts] = useState<
+    { routineId: string; exerciseCount: number; setCount: number }[]
+  >([]);
   const [rescheduleVisible, setRescheduleVisible] = useState(false);
   const [rescheduleDateInput, setRescheduleDateInput] = useState('');
   const [bodyWeightModalVisible, setBodyWeightModalVisible] = useState(false);
@@ -238,6 +385,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       sessionExerciseCountsLoaded,
       customExercisesLoaded,
       preferences,
+      routineCountsLoaded,
     ] = await Promise.all([
       listRoutines(),
       listWorkoutLogsForRange(startKey, todayKey),
@@ -251,6 +399,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       listWorkoutSessionExerciseCounts(),
       listCustomExercises(),
       getWorkoutPreferences(),
+      listRoutineCounts(),
     ]);
     if (!isCurrent()) return;
 
@@ -269,6 +418,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     setSessionExerciseCounts(sessionExerciseCountsLoaded);
     setCustomExercises(customExercisesLoaded);
     setWorkoutPreferences(preferences);
+    setRoutineCounts(routineCountsLoaded);
     setBodyWeightGoalValue(preferences.goalWeight ? String(preferences.goalWeight.value) : '');
     if (preferences.goalWeight) setBodyWeightUnit(preferences.goalWeight.unit);
     if (resolved.routineId) {
@@ -375,6 +525,15 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         ...(typeof draft.remainingSeconds === 'number'
           ? { remainingSeconds: draft.remainingSeconds }
           : {}),
+        ...(draft.addedSets
+          ? {
+              addedSets: Object.fromEntries(
+                Object.entries(draft.addedSets)
+                  .map(([index, count]) => [Number.parseInt(index, 10), count] as const)
+                  .filter(([index]) => Number.isInteger(index) && index >= 0),
+              ),
+            }
+          : {}),
       },
     });
   }, [draft]);
@@ -395,56 +554,163 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     ? (routines.find((r) => r.id === draft.routineId)?.name ?? 'Workout')
     : null;
   const todayKey = toDateKey(new Date());
+  const todayWeekdayNum = ((new Date().getDay() + 6) % 7) + 1;
   const completedWorkoutToday = allLogs.some(
     (log) => toDateKey(new Date(log.completed_at)) === todayKey,
   );
 
+  // W9.1 landing view models. The training state decides the single dominant
+  // action (resume > scheduled > quick-start chooser); rest context is compact
+  // and never a hero (SYS-20).
+  const trainingState = buildTrainingState({
+    schedule: todaySchedule
+      ? { planKind: todaySchedule.planKind, routineId: todaySchedule.routineId }
+      : null,
+    scheduledRoutine: todayRoutine
+      ? {
+          id: todayRoutine.id,
+          name: todayRoutine.name,
+          exerciseCount: todayRoutine.exercises.length,
+          setCount: todayRoutine.exercises.reduce((total, ex) => total + ex.sets.length, 0),
+        }
+      : null,
+    completedToday: completedWorkoutToday,
+    draftRoutineName,
+    hasDraft: draft !== null,
+    routineCount: routines.length,
+  });
+
+  const quickStartRows = useMemo(
+    () =>
+      buildQuickStartRows(routines, routineCounts, lastPerformed, todaySchedule?.routineId ?? null),
+    [routines, routineCounts, lastPerformed, todaySchedule?.routineId],
+  );
+
+  const weekStrip = useMemo(
+    () =>
+      buildWeekStrip({
+        weeklyPlan,
+        routines,
+        todayWeekday: todayWeekdayNum,
+        todayResolution: todaySchedule
+          ? {
+              planKind: todaySchedule.planKind,
+              routineId: todaySchedule.routineId,
+              isOverride: todaySchedule.source === 'override',
+            }
+          : undefined,
+      }),
+    [weeklyPlan, routines, todayWeekdayNum, todaySchedule],
+  );
+
+  // Heavy history derivations (records, totals, body-area split) run only
+  // while the History & insights disclosure is open — the training path never
+  // pays for them, and a collapsed landing does not re-render them on ticks.
+  const landingAnalytics = useMemo(() => {
+    if (!historyOpen) return null;
+    const records = computePersonalRecords(
+      performanceRows
+        .filter((row) => row.completed === 1)
+        .map((row) => ({
+          exerciseName: row.exerciseName,
+          catalogExerciseId: row.catalogExerciseId,
+          modality: row.modality ?? undefined,
+          weight: row.weight,
+          reps: row.reps,
+          durationSeconds: row.durationSeconds,
+          distance: row.distance,
+        })),
+    );
+    const performanceByLog = new Map<string, WorkoutPerformanceRow[]>();
+    for (const row of performanceRows) {
+      const bucket = performanceByLog.get(row.logId) ?? [];
+      bucket.push(row);
+      performanceByLog.set(row.logId, bucket);
+    }
+    const totals = computeTrainingTotals(
+      allLogs.map((log) => ({
+        completedAt: log.completed_at,
+        durationSeconds: log.duration_seconds,
+        sets: (performanceByLog.get(log.id) ?? []).map((row) => ({
+          completed: row.completed === 1,
+          weight: row.weight,
+          reps: row.reps,
+          modality: row.modality ?? undefined,
+        })),
+      })),
+    );
+    const catalogAreaById = new Map<string, string>([
+      ...BUILT_IN_EXERCISES.map((exercise) => [exercise.id, exercise.primaryArea] as const),
+      ...customExercises.map((exercise) => [exercise.id, exercise.primary_area] as const),
+    ]);
+    const bodyAreas = computeBodyAreaDistribution(
+      performanceRows
+        .filter((row) => row.completed === 1 && row.catalogExerciseId)
+        .map((row) => ({
+          primaryArea: catalogAreaById.get(row.catalogExerciseId ?? '') ?? '',
+          setsCompleted: 1,
+        })),
+    );
+    return { records, totals, bodyAreas };
+  }, [historyOpen, performanceRows, allLogs, customExercises]);
+  const personalRecords = landingAnalytics?.records ?? [];
+  const trainingTotals = landingAnalytics?.totals ?? null;
+  const bodyAreaDistribution = landingAnalytics?.bodyAreas ?? [];
+
+  // Cheap per-render facts used by the history disclosure header.
   const workoutStripHasActivity = workoutActivityDays.some((d) => d.active);
   const workoutStreak = computeWorkoutStreakFromHeatmapDays(workoutHeatmapDays);
   const workoutDaysCount = workoutActivityDays.filter((d) => d.active).length;
-  const personalRecords = computePersonalRecords(
-    performanceRows
-      .filter((row) => row.completed === 1)
-      .map((row) => ({
-        exerciseName: row.exerciseName,
-        catalogExerciseId: row.catalogExerciseId,
-        modality: row.modality ?? undefined,
-        weight: row.weight,
-        reps: row.reps,
-        durationSeconds: row.durationSeconds,
-        distance: row.distance,
-      })),
+
+  /**
+   * Assign a day from the focused assignment sheet. `scope` is explicit:
+   * 'today' writes a one-day override, 'weekly' edits the recurring template.
+   * A one-day override can never silently rewrite the weekly plan.
+   */
+  const assignWeekday = useCallback(
+    async (weekday: number, routineId: string | null, scope: 'today' | 'weekly') => {
+      if (scope === 'today') {
+        await setWorkoutScheduleOverride({
+          dateKey: todayKey,
+          overrideKind: routineId ? 'workout' : 'rest',
+          ...(routineId ? { routineId } : {}),
+        });
+      } else {
+        await upsertWeeklyPlanEntry({
+          weekday,
+          planKind: routineId ? 'workout' : 'rest',
+          routineId,
+        });
+      }
+      setDaySheet(null);
+      await refresh();
+    },
+    [refresh, todayKey],
   );
-  const performanceByLog = new Map<string, WorkoutPerformanceRow[]>();
-  for (const row of performanceRows) {
-    const bucket = performanceByLog.get(row.logId) ?? [];
-    bucket.push(row);
-    performanceByLog.set(row.logId, bucket);
-  }
-  const trainingTotals = computeTrainingTotals(
-    allLogs.map((log) => ({
-      completedAt: log.completed_at,
-      durationSeconds: log.duration_seconds,
-      sets: (performanceByLog.get(log.id) ?? []).map((row) => ({
-        completed: row.completed === 1,
-        weight: row.weight,
-        reps: row.reps,
-        modality: row.modality ?? undefined,
-      })),
-    })),
-  );
-  const catalogAreaById = new Map<string, string>([
-    ...BUILT_IN_EXERCISES.map((exercise) => [exercise.id, exercise.primaryArea] as const),
-    ...customExercises.map((exercise) => [exercise.id, exercise.primary_area] as const),
+
+  /** The landing's single dominant training action. */
+  const handlePrimaryAction = useCallback(() => {
+    switch (trainingState.primaryAction) {
+      case 'resume':
+        void handleResumeDraft();
+        break;
+      case 'start-scheduled':
+        if (trainingState.primaryRoutineId) {
+          void startRoutineById(trainingState.primaryRoutineId);
+        }
+        break;
+      case 'choose-routine':
+        setChooserVisible(true);
+        break;
+      default:
+        break;
+    }
+  }, [
+    trainingState.primaryAction,
+    trainingState.primaryRoutineId,
+    handleResumeDraft,
+    startRoutineById,
   ]);
-  const bodyAreaDistribution = computeBodyAreaDistribution(
-    performanceRows
-      .filter((row) => row.completed === 1 && row.catalogExerciseId)
-      .map((row) => ({
-        primaryArea: catalogAreaById.get(row.catalogExerciseId ?? '') ?? '',
-        setsCompleted: 1,
-      })),
-  );
 
   const openBodyWeightModal = (entry?: BodyWeightEntry) => {
     setEditingBodyWeight(entry ?? null);
@@ -538,7 +804,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       </ScreenSection>
     ) : null;
 
-  const analyticsCardSection = (
+  // Rendered only while the History & insights disclosure is open; the
+  // totals themselves are gated on `historyOpen` above.
+  const analyticsCardSection = trainingTotals ? (
     <ScreenSection>
       <WorkoutTotalsCard
         sessions={trainingTotals.sessions}
@@ -562,7 +830,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         onDelete={(entry) => void handleDeleteBodyWeight(entry)}
       />
     </ScreenSection>
-  );
+  ) : null;
 
   const volumeSection = (
     <ScreenSection className="mb-0">
@@ -683,50 +951,76 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         </View>
       </Modal>
       <Modal
-        visible={todayOverrideVisible}
-        onClose={() => setTodayOverrideVisible(false)}
-        title="Change today"
+        visible={daySheet !== null}
+        onClose={() => setDaySheet(null)}
+        title={
+          daySheet === null
+            ? ''
+            : daySheet.weekday === todayWeekdayNum
+              ? 'Plan today'
+              : `Plan ${weekdayLabel(daySheet.weekday)}`
+        }
         scroll
       >
-        <Text className="mb-3 text-sm" style={{ color: tokens.textMuted }}>
-          Choose a one-day override for {toDateKey(new Date())}. Your normal week remains unchanged.
-        </Text>
-        <View className="flex-row flex-wrap">
-          <PillChip
-            label="Rest today"
-            active={todaySchedule?.source === 'override' && todaySchedule.planKind === 'rest'}
-            color={COLOR}
-            onPress={() =>
-              void setWorkoutScheduleOverride({
-                dateKey: toDateKey(new Date()),
-                overrideKind: 'rest',
-              }).then(async () => {
-                setTodayOverrideVisible(false);
-                await refresh();
-              })
-            }
-          />
-          {routines.map((routine) => (
-            <PillChip
-              key={routine.id}
-              label={routine.name}
-              active={
-                todaySchedule?.source === 'override' && todaySchedule.routineId === routine.id
-              }
-              color={COLOR}
-              onPress={() =>
-                void setWorkoutScheduleOverride({
-                  dateKey: toDateKey(new Date()),
-                  overrideKind: 'workout',
-                  routineId: routine.id,
-                }).then(async () => {
-                  setTodayOverrideVisible(false);
-                  await refresh();
-                })
-              }
-            />
-          ))}
-        </View>
+        {daySheet !== null ? (
+          <>
+            {daySheet.weekday === todayWeekdayNum ? (
+              <View className="mb-3 flex-row gap-2">
+                <PillChip
+                  label="Just today"
+                  active={daySheet.scope === 'today'}
+                  color={COLOR}
+                  accessibilityLabel="Just today"
+                  onPress={() =>
+                    setDaySheet((current) => (current ? { ...current, scope: 'today' } : current))
+                  }
+                />
+                <PillChip
+                  label={`Every ${weekdayLabel(daySheet.weekday)}`}
+                  active={daySheet.scope === 'weekly'}
+                  color={COLOR}
+                  accessibilityLabel={`Every ${weekdayLabel(daySheet.weekday)}`}
+                  onPress={() =>
+                    setDaySheet((current) => (current ? { ...current, scope: 'weekly' } : current))
+                  }
+                />
+              </View>
+            ) : null}
+            <Text className="mb-3 text-sm" style={{ color: tokens.textMuted }}>
+              {daySheet.scope === 'today'
+                ? `Choose a one-day override for ${todayKey}. Your weekly plan stays unchanged.`
+                : `Assign ${weekdayLabel(daySheet.weekday)} in your recurring weekly plan.`}
+            </Text>
+            <View className="flex-row flex-wrap">
+              <PillChip
+                label={daySheet.scope === 'today' ? 'Rest today' : 'Rest'}
+                active={
+                  daySheet.scope === 'today'
+                    ? todaySchedule?.source === 'override' && todaySchedule.planKind === 'rest'
+                    : weeklyPlan.find((entry) => entry.weekday === daySheet.weekday)?.plan_kind ===
+                      'rest'
+                }
+                color={COLOR}
+                onPress={() => void assignWeekday(daySheet.weekday, null, daySheet.scope)}
+              />
+              {routines.map((routine) => (
+                <PillChip
+                  key={routine.id}
+                  label={routine.name}
+                  active={
+                    daySheet.scope === 'today'
+                      ? todaySchedule?.source === 'override' &&
+                        todaySchedule.routineId === routine.id
+                      : weeklyPlan.find((entry) => entry.weekday === daySheet.weekday)
+                          ?.routine_id === routine.id
+                  }
+                  color={COLOR}
+                  onPress={() => void assignWeekday(daySheet.weekday, routine.id, daySheet.scope)}
+                />
+              ))}
+            </View>
+          </>
+        ) : null}
       </Modal>
       <Modal
         visible={rescheduleVisible}
@@ -905,238 +1199,227 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       />
       {confirmationDialog}
       <Screen scroll>
-        <ScreenSection>
-          <PageHeader
-            title="Workout"
-            subtitle={
-              workoutStripHasActivity
-                ? 'Plan your week, build prescriptions, train with guidance, and review progress in one place.'
-                : 'Build a training plan, start a guided workout, and track your progress.'
-            }
-          />
-        </ScreenSection>
-
-        <ScreenSection>
-          <WorkoutTodayCard
-            schedule={todaySchedule}
-            routine={todayRoutine}
-            lastPerformedAt={todayRoutine ? (lastPerformed.get(todayRoutine.id) ?? null) : null}
-            completedToday={completedWorkoutToday}
-            draftRoutineName={draftRoutineName}
-            isResumable={draft !== null}
-            exerciseCount={todayRoutine?.exercises.length ?? 0}
-            setCount={
-              todayRoutine?.exercises.reduce(
-                (total, exercise) => total + exercise.sets.length,
-                0,
-              ) ?? 0
-            }
-            onStart={() => {
-              if (draft) void handleResumeDraft();
-              else if (todayRoutine) void startRoutineById(todayRoutine.id);
-              else setChooserVisible(true);
-            }}
-            onPlanWeek={() => setWeekEditorVisible(true)}
-            onChangeToday={() => setTodayOverrideVisible(true)}
-            onReschedule={() => {
-              const next = new Date();
-              next.setDate(next.getDate() + 1);
-              setRescheduleDateInput(toDateKey(next));
-              setRescheduleVisible(true);
-            }}
-          />
-        </ScreenSection>
-
-        <ScreenSection>
-          <WorkoutWeekCard
-            entries={weeklyPlan}
-            routines={routines}
-            onSelect={(weekday, routineId) => {
-              void upsertWeeklyPlanEntry({
-                weekday,
-                planKind: routineId ? 'workout' : 'rest',
-                routineId,
-              }).then(refresh);
-            }}
-          />
-        </ScreenSection>
-
-        <ScreenSection>
-          <Card accentColor={COLOR} className="mb-0">
-            {draft && draftRoutineName ? (
-              <>
-                <Text
-                  className="text-xs font-semibold uppercase"
-                  style={{ color: tokens.textMuted }}
-                >
-                  Session in progress
-                </Text>
-                <Text className="mt-1 text-base font-semibold" style={{ color: tokens.text }}>
-                  {draftRoutineName}
-                </Text>
-                <View className="mt-4 gap-3">
-                  <Button
-                    label={`Resume workout · ${draftRoutineName}`}
-                    onPress={() => void handleResumeDraft()}
-                    color={COLOR}
-                  />
-                  <Button
-                    label="Discard"
-                    variant="ghost"
-                    onPress={() => void handleDiscardDraft()}
-                  />
-                </View>
-              </>
-            ) : (
-              <>
-                <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-                  Ready to train?
-                </Text>
-                <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-                  Pick a routine and the guided timer walks you through every set.
-                </Text>
-                <View className="mt-4">
-                  <Button
-                    label="Start workout"
-                    onPress={() => {
-                      if (routines.length === 0) {
-                        Alert.alert(
-                          'No routines yet',
-                          'Create a routine first, then start your workout.',
-                        );
-                        return;
-                      }
-                      setChooserVisible(true);
-                    }}
-                    color={COLOR}
-                  />
-                </View>
-              </>
-            )}
-          </Card>
-        </ScreenSection>
-
-        <ScreenSection>
-          <View className="flex-row flex-wrap gap-3">
-            <View className="min-w-[160px] flex-1">
-              <FeatureStatCard
-                accentColor={COLOR}
-                textColor={colorText}
-                icon="fitness-center"
-                title="Workout days"
-                value={workoutDaysCount}
-                subtitle="Last 52 weeks"
-                note={
-                  workoutStripHasActivity ? 'Sessions logged this year' : 'No sessions logged yet'
-                }
-              />
-            </View>
-            <View className="min-w-[160px] flex-1">
-              <FeatureStatCard
-                accentColor={COLOR}
-                textColor={colorText}
-                icon="calendar-today"
-                title="Current streak"
-                value={workoutStreak}
-                subtitle="Back-to-back workout days"
-                note={
-                  workoutStreak > 0
-                    ? 'Keep the run alive today'
-                    : 'Your next session starts the streak'
-                }
-              />
-            </View>
-          </View>
-        </ScreenSection>
-
-        {!workoutStripHasActivity ? (
+        <Screen scroll>
           <ScreenSection>
-            <EmptyStateCard
-              accentColor={COLOR}
-              className="mb-0"
-              title="Complete a workout to start tracking"
-              description="Your routine history and yearly intensity map will appear here once you log a session."
-              icon={<MaterialIcons name="self-improvement" size={26} color={colorText} />}
-            />
-          </ScreenSection>
-        ) : null}
-        <ScreenSection>
-          <Card
-            variant="header"
-            accentColor={COLOR}
-            headerTitle="Add new routine"
-            headerSubtitle="Keep names short and descriptions specific so routines stay scannable."
-            headerRight={<MaterialIcons name="add" size={22} color={tokens.textOnAccent} />}
-            className="mb-0"
-          >
-            <TextField
-              label="Routine name"
-              accessibilityLabel="New routine name"
-              value={name}
-              onChangeText={(t) => {
-                setWorkoutError(null);
-                setName(t);
-              }}
-              placeholder="Push Day"
-            />
-            <TextField
-              label="Description"
-              accessibilityLabel="New routine description"
-              value={description}
-              onChangeText={(t) => {
-                setWorkoutError(null);
-                setDescription(t);
-              }}
-              placeholder="Bench + accessories"
-            />
-            <ValidationError message={workoutError} />
-            <Button label="Add routine" onPress={onCreate} color={COLOR} />
-          </Card>
-        </ScreenSection>
-
-        {routines.length > 0 ? (
-          <ScreenSection>
-            <View className="mb-4 mt-1">
-              <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-                Your routines
+            <PageHeader title="Workout" />
+            <View className="mt-1 flex-row items-center gap-2">
+              <MaterialIcons name="today" size={14} color={tokens.textMuted} />
+              <Text className="min-w-0 flex-1 text-sm" style={{ color: tokens.textMuted }}>
+                {trainingState.contextLine}
+              </Text>
+              {trainingState.completedToday ? (
+                <Text className="text-xs font-semibold" style={{ color: tokens.successText }}>
+                  Logged
+                </Text>
+              ) : null}
+            </View>
+            <Card accentColor={COLOR} className="mt-3">
+              <Text className="text-lg font-semibold" style={{ color: tokens.text }}>
+                {trainingState.headline}
               </Text>
               <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-                Swipe to edit or delete. Open a routine to manage exercises and sets.
+                {trainingState.detail}
               </Text>
-            </View>
-
-            {routines.map((routine) => (
-              <RoutineSwipeRow
-                key={routine.id}
-                routine={routine}
-                accentColor={COLOR}
-                lastPerformedAt={lastPerformed.get(routine.id) ?? null}
-                onOpenDetail={() => openRoutineModal(routine.id, routine.name)}
-                onCompleteWorkout={() => {
-                  if (!quickCompleteGuardRef.current.tryStart()) return;
-                  void (async () => {
-                    try {
-                      const result = await completeRoutine(routine.id);
-                      // Attribute the award to the log just written; a skipped
-                      // write (missing routine) earns no XP.
-                      if (result.status === 'applied' && result.logId) {
-                        recordAction('workout', result.logId);
-                      }
-                      void refresh();
-                    } finally {
-                      quickCompleteGuardRef.current.finish();
+              {trainingState.primaryLabel ? (
+                <View className="mt-4">
+                  <Button
+                    label={trainingState.primaryLabel}
+                    accessibilityLabel={
+                      trainingState.kind === 'resume' && draftRoutineName
+                        ? `Resume workout · ${draftRoutineName}`
+                        : undefined
                     }
-                  })();
-                }}
-                onRequestDelete={async () => {
-                  await handleDeleteRoutine(routine);
-                }}
-              />
-            ))}
+                    onPress={handlePrimaryAction}
+                    color={COLOR}
+                    fullWidth
+                  />
+                </View>
+              ) : null}
+              {trainingState.kind === 'resume' ? (
+                <View className="mt-2">
+                  <Button
+                    label="Discard workout"
+                    variant="ghost"
+                    onPress={() => void handleDiscardDraft()}
+                    fullWidth
+                  />
+                </View>
+              ) : null}
+              {trainingState.kind !== 'resume' ? (
+                <View className="mt-3 flex-row flex-wrap gap-2">
+                  <View className="min-w-[140px] flex-1">
+                    <Button
+                      label="Change today"
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => setDaySheet({ weekday: todayWeekdayNum, scope: 'today' })}
+                    />
+                  </View>
+                  {trainingState.kind === 'scheduled' ? (
+                    <View className="min-w-[140px] flex-1">
+                      <Button
+                        label="Move workout to another day"
+                        variant="ghost"
+                        size="sm"
+                        onPress={() => {
+                          const next = new Date();
+                          next.setDate(next.getDate() + 1);
+                          setRescheduleDateInput(toDateKey(next));
+                          setRescheduleVisible(true);
+                        }}
+                      />
+                    </View>
+                  ) : (
+                    <View className="min-w-[140px] flex-1">
+                      <Button
+                        label="Plan week"
+                        variant="ghost"
+                        size="sm"
+                        onPress={() => setWeekEditorVisible(true)}
+                      />
+                    </View>
+                  )}
+                </View>
+              ) : null}
+            </Card>
           </ScreenSection>
-        ) : null}
 
-        {historyAnalyticsComposition}
+          <ScreenSection>
+            <SectionLabel>Quick start</SectionLabel>
+            {routines.length === 0 ? (
+              <EmptyStateCard
+                accentColor={COLOR}
+                className="mb-0"
+                title="No routines yet"
+                description="Add a routine below — every routine starts a guided session with set logging and rest."
+                icon={<MaterialIcons name="fitness-center" size={26} color={colorText} />}
+              />
+            ) : (
+              quickStartRows.map((row) => (
+                <QuickStartRoutineRow
+                  key={row.routineId}
+                  row={row}
+                  accentColor={COLOR}
+                  onOpenDetail={() => openRoutineModal(row.routineId, row.name)}
+                  onStart={() => void startRoutineById(row.routineId)}
+                  onCompleteWorkout={() => {
+                    if (!quickCompleteGuardRef.current.tryStart()) return;
+                    void (async () => {
+                      try {
+                        const result = await completeRoutine(row.routineId);
+                        // Attribute the award to the log just written; a skipped
+                        // write (missing routine) earns no XP.
+                        if (result.status === 'applied' && result.logId) {
+                          recordAction('workout', result.logId);
+                        }
+                        void refresh();
+                      } finally {
+                        quickCompleteGuardRef.current.finish();
+                      }
+                    })();
+                  }}
+                  onRequestDelete={async () => {
+                    const routine = routines.find((item) => item.id === row.routineId);
+                    if (routine) await handleDeleteRoutine(routine);
+                  }}
+                />
+              ))
+            )}
+          </ScreenSection>
+
+          <ScreenSection>
+            <View className="mb-2 flex-row items-center justify-between">
+              <SectionLabel className="mb-0">This week</SectionLabel>
+              <Button
+                label="Edit plan"
+                variant="ghost"
+                size="sm"
+                accessibilityLabel="Edit weekly plan"
+                onPress={() => setWeekEditorVisible(true)}
+              />
+            </View>
+            <Card accentColor={COLOR} className="mb-0">
+              {weekStrip.map((cell) => (
+                <WeekStripRow
+                  key={cell.weekday}
+                  cell={cell}
+                  onRest={() =>
+                    void assignWeekday(cell.weekday, null, cell.isToday ? 'today' : 'weekly')
+                  }
+                  onAssign={() =>
+                    setDaySheet({ weekday: cell.weekday, scope: cell.isToday ? 'today' : 'weekly' })
+                  }
+                />
+              ))}
+            </Card>
+          </ScreenSection>
+
+          <ScreenSection>
+            <SectionLabel>New routine</SectionLabel>
+            <Card accentColor={COLOR} className="mb-0">
+              <TextField
+                label="Routine name"
+                accessibilityLabel="New routine name"
+                value={name}
+                onChangeText={(t) => {
+                  setWorkoutError(null);
+                  setName(t);
+                }}
+                placeholder="Push Day"
+              />
+              <TextField
+                label="Description"
+                accessibilityLabel="New routine description"
+                value={description}
+                onChangeText={(t) => {
+                  setWorkoutError(null);
+                  setDescription(t);
+                }}
+                placeholder="Bench + accessories"
+              />
+              <ValidationError message={workoutError} />
+              <Button label="Add routine" onPress={onCreate} color={COLOR} />
+            </Card>
+          </ScreenSection>
+
+          <ScreenSection className="mb-0">
+            <Pressable
+              onPress={() => setHistoryOpen((open) => !open)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: historyOpen }}
+              accessibilityLabel="History and insights"
+              className="flex-row items-center justify-between py-2"
+            >
+              <View className="min-w-0 flex-1">
+                <SectionLabel className="mb-0">History &amp; insights</SectionLabel>
+                <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                  {workoutStripHasActivity
+                    ? `${workoutDaysCount} workout days · streak ${workoutStreak} · last 52 weeks`
+                    : 'Sessions, personal records, body weight, volume, and your training heatmap.'}
+                </Text>
+              </View>
+              <MaterialIcons
+                name={historyOpen ? 'expand-less' : 'expand-more'}
+                size={22}
+                color={tokens.iconMuted}
+              />
+            </Pressable>
+            {historyOpen ? (
+              <View className="mt-2">
+                {!workoutStripHasActivity ? (
+                  <EmptyStateCard
+                    accentColor={COLOR}
+                    className="mb-4"
+                    title="Complete a workout to start tracking"
+                    description="Your routine history and yearly intensity map will appear here once you log a session."
+                    icon={<MaterialIcons name="self-improvement" size={26} color={colorText} />}
+                  />
+                ) : null}
+                {historyAnalyticsComposition}
+              </View>
+            ) : null}
+          </ScreenSection>
+        </Screen>
       </Screen>
     </>
   );

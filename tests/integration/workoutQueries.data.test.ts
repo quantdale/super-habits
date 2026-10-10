@@ -162,6 +162,117 @@ describe('workout Gym V2 queries (real SQLite)', () => {
     expect(performance.filter((row) => row.exerciseName === 'Row')).toHaveLength(2);
   });
 
+  it('logs a session-local added set through the real pipeline without touching the routine', async () => {
+    db = await freshDatabase();
+    const workout = await import('@/features/workout/workout.data');
+    const domain = await import('@/features/workout/workout.domain');
+    const sessionView = await import('@/features/workout/workoutSessionView');
+
+    await workout.addRoutine('Add Set Day', 'session-local add set');
+    const routineId = (await db.getFirstAsync<{ id: string }>(
+      `SELECT id FROM workout_routines WHERE name = 'Add Set Day' AND deleted_at IS NULL`,
+    ))!.id;
+    const exerciseId = await workout.addExercise({ routineId, name: 'Curl', sortOrder: 1 });
+    await workout.addSet({ exerciseId, setNumber: 1, activeSeconds: 40, restSeconds: 60 });
+    await workout.addSet({ exerciseId, setNumber: 2, activeSeconds: 40, restSeconds: 60 });
+
+    const full = (await workout.getRoutineWithExercises(routineId))!;
+    const base = full.exercises.map((ex) => {
+      // Mirror the session screen: a legacy free-text exercise (no catalog
+      // identity) stays modality-less so it uses the weight/reps path.
+      const isLegacyFreeText = !ex.catalog_exercise_id;
+      return {
+        name: ex.name,
+        ...(isLegacyFreeText ? {} : { catalog_exercise_id: ex.catalog_exercise_id }),
+        ...(isLegacyFreeText ? {} : { modality: ex.modality ?? 'timed' }),
+        ...(isLegacyFreeText ? {} : { unilateral: ex.unilateral === 1 }),
+        ...(isLegacyFreeText
+          ? {}
+          : {
+              supports_external_load:
+                ex.supports_external_load === undefined
+                  ? ex.modality === 'weighted_strength'
+                  : ex.supports_external_load === 1,
+            }),
+        ...(ex.superset_group !== undefined ? { superset_group: ex.superset_group } : {}),
+        sets: ex.sets.map((s) => ({
+          set_number: s.set_number,
+          active_seconds: s.active_seconds,
+          rest_seconds: s.rest_seconds,
+          target_reps_min: s.target_reps_min,
+          target_reps_max: s.target_reps_max,
+          target_load: s.target_load,
+          target_duration_seconds: s.target_duration_seconds,
+          target_distance: s.target_distance,
+          target_pace: s.target_pace,
+        })),
+      };
+    });
+
+    // One session-local added set, then the full engine + logging pipeline.
+    const sequence = domain.buildTimerSequence(sessionView.appendAddedSets(base, { 0: 1 }));
+    const dispositions: Record<number, 'completed' | 'skipped'> = {};
+    const entered: Record<number, { weight: string; reps: string }> = {
+      0: { weight: '20', reps: '10' },
+      2: { weight: '20', reps: '9' },
+    };
+    const lastIndex = sequence.length - 1;
+    dispositions[lastIndex] = 'completed';
+    const records = domain.collectSessionSetRecords(sequence, lastIndex, dispositions, entered);
+    const summary = domain.summarizeCompletedSets(sequence, lastIndex, dispositions);
+    const grouped = domain.groupSessionExercises(summary, records);
+    const result = await workout.logWorkoutSession({
+      routineId,
+      exercises: grouped.map((group) => ({
+        exerciseName: group.exerciseName,
+        setsCompleted: group.setsCompleted,
+        catalogExerciseId: null,
+        modality: 'weighted_strength',
+        unilateral: false,
+        supportsExternalLoad: true,
+        sets: group.sets.map((record) => ({
+          setNumber: record.setNumber,
+          weight: record.weight,
+          reps: record.reps,
+          completed: record.completed,
+          weightUnit: 'kg' as const,
+          durationSeconds: record.durationSeconds,
+          distance: record.distance,
+          pace: record.pace,
+          effortValue: record.effortValue,
+          effortScale: record.effortScale,
+        })),
+      })),
+      startedAt: '2026-10-10T09:00:00.000Z',
+      endedAt: '2026-10-10T09:30:00.000Z',
+    });
+    expect(result.status).toBe('applied');
+
+    const rows = await db.getAllAsync<{
+      set_number: number;
+      weight: number | null;
+      reps: number | null;
+      completed: number;
+    }>(
+      `SELECT s.set_number, s.weight, s.reps, s.completed
+         FROM workout_session_sets s
+         JOIN workout_session_exercises e ON e.id = s.session_exercise_id
+         ORDER BY s.set_number ASC`,
+    );
+    // Prescribed 1-2 plus the session-local set 3, with its entered values.
+    expect(rows).toEqual([
+      { set_number: 1, weight: 20, reps: 10, completed: 1 },
+      { set_number: 2, weight: 20, reps: 9, completed: 1 },
+      { set_number: 3, weight: null, reps: null, completed: 1 },
+    ]);
+    // The routine template is untouched: still exactly two prescribed sets.
+    const prescribed = await db.getAllAsync<{ set_number: number }>(
+      `SELECT set_number FROM routine_exercise_sets WHERE exercise_id = ? AND deleted_at IS NULL ORDER BY set_number`,
+      [exerciseId],
+    );
+    expect(prescribed.map((row) => row.set_number)).toEqual([1, 2]);
+  });
+
   it('persists a fully-skipped exercise with setsCompleted 0 and completed=0 rows', async () => {
     db = await freshDatabase();
     const workout = await import('@/features/workout/workout.data');

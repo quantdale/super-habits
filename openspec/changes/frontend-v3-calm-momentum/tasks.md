@@ -67,9 +67,9 @@
 
 ## 9. W9 — Workout
 
-- [ ] 9.1 Quiet plan surfaces (SYS-02/SYS-20): compact Today card, promoted quick-start, collapsed week
-- [ ] 9.2 Active session: Dropset/Train-Fitness anatomy (exercise header + set rows + done check + add set + rest dock); no analytics in path
-- [ ] 9.3 Brief PR celebration; rest timer never blocks entry
+- [x] 9.1 Quiet plan surfaces (SYS-02/SYS-20): compact training-state card, promoted quick-start, collapsed week — implemented and rendered in `docs/ui-ux/v3-audit/w9/`
+- [x] 9.2 Active session: Dropset/Train-Fitness anatomy (exercise header + set rows + done check + add set + rest dock); no analytics in path — session-local Add set persists through draft/resume/log
+- [x] 9.3 Brief PR celebration; rest timer never blocks entry — docked rest panel, truthful finish/cancel, accurate progress labels
 
 ## 10. W10 — Calories / Health validation
 

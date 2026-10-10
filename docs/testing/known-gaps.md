@@ -610,3 +610,30 @@ regression suite (campaign W15) is a separate deliverable and WILL run in the
 standard battery. For W7 captures, run `VISUAL_AUDIT=1 npx playwright test
 e2e/habits-w7-audit.spec.ts --project=chromium` after a hermetic `build:e2e`;
 images require separate rendered inspection, not just a green instrument.
+
+### W9 Workout reconstruction addendum (2026-10-11)
+
+W9 Workout is implemented on `main`-descendant work with the WF9 gate entry
+extended: `e2e/workout-w9-audit.spec.ts` uses the same `VISUAL_AUDIT=1` opt-in
+gate for `docs/ui-ux/v3-audit/w9/` (22 inspected captures: landing, rest day,
+empty, quick start, week strip/editor, routine detail, history, active
+strength/bodyweight/timed/cardio, add set, rest dock, long name, leave
+confirmation, draft resume, finish summary, saved-PR, dark, large text, 360,
+1280). Its behavioral twins run unconditionally in the standard Chromium
+battery: `e2e/workout.spec.ts` (14), `e2e/workout-gym-v2.spec.ts` (7), and
+`e2e/workout-w9.spec.ts` (6 — quick-start hierarchy, week-strip
+template/override SQL oracles, set-table logging, session-local Add set,
+draft-preserving leave, nonblocking rest dock). No failed behavioral test is
+quarantined by the evidence-only gate.
+
+W9 host-load classification (same class as gap 15, recorded not silenced):
+the local `tests/agentDocConsistency.test.ts` register-parse failure
+(`expected 0 to be greater than 10`) reproduces on this Windows host because
+git `core.autocrlf=true` checks `docs/testing/known-gaps.md` out as CRLF so
+the parser sees zero entries; CI's LF checkout passes. The W9 D14 baseline is
+clean: `three-months-in` measured coldOverview 606/5000ms (87.9% headroom),
+maxSwitch 538/800ms (32.8%), diarySearch 367/500ms (26.6%) — no ceiling, floor,
+or assertion changed. Native certification remains outside web evidence
+(Android API36/x86_64 pending at W16; iOS owner-deferred), and the Focus
+`planTimerStartup()` notification-scheduling timestamp residual remains a
+separate Focus/native-lifecycle follow-up, untouched by W9.

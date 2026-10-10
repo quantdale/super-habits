@@ -155,7 +155,7 @@ test.describe('Workout Gym V2', () => {
     // Scope to the Workout schedule panel — on days with no habits the
     // (hidden) Overview habits card can also render the phrase 'Rest day'.
     const restPanel = page.getByText(
-      'Recover, or choose a different routine for today without changing your weekly template.',
+      'Recover, or start any routine below — your weekly plan stays unchanged.',
     );
     await expect(restPanel).toBeVisible();
     await expect(restPanel.locator('xpath=..')).toContainText('Rest day');
@@ -215,7 +215,7 @@ test.describe('Workout Gym V2', () => {
     );
     await persistedBuilder.getByText('Start workout', { exact: true }).click();
 
-    await expect(page.getByText('Log this set (optional)')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Complete set 1' })).toBeVisible();
     await expect(page.getByText('Progression guidance', { exact: true })).toBeVisible();
     const strengthWeight = page.getByRole('textbox', { name: 'Weight' });
     await strengthWeight.fill('75');
@@ -223,7 +223,7 @@ test.describe('Workout Gym V2', () => {
     await expect(strengthWeight).toHaveValue('80');
     await page.getByRole('textbox', { name: 'Reps' }).fill('8');
     await page.getByText('Start', { exact: true }).first().click();
-    await page.getByText('Complete set now', { exact: true }).click();
+    await page.getByRole('button', { name: 'Complete set 1' }).click();
     await expect(page.getByText('Workout complete!')).toBeVisible({ timeout: 15_000 });
     await page.getByLabel('Notes (optional)').fill('Gym V2 strength session');
     await page.getByText('Save and finish', { exact: true }).click();
@@ -231,6 +231,8 @@ test.describe('Workout Gym V2', () => {
     await expect(page.getByText('New personal records')).toBeVisible();
     await page.getByText('Done', { exact: true }).click();
 
+    await page.getByRole('button', { name: 'History and insights' }).click();
+    await expect(page.getByText('Recent sessions')).toBeVisible();
     await page
       .getByLabel(/Open session from/)
       .first()
@@ -243,7 +245,7 @@ test.describe('Workout Gym V2', () => {
     await page.reload();
     await page.waitForLoadState('load');
     await goToTab(page, 'workout');
-    await expect(page.getByLabel(/Open session from/).first()).toBeVisible();
+    await page.getByRole('button', { name: 'History and insights' }).click();
 
     // Row oracle: exactly one completed log persisted with the guided set.
     const logs = await queryRows(page, `SELECT COUNT(*) AS count FROM workout_logs`);
@@ -279,11 +281,11 @@ test.describe('Workout Gym V2', () => {
 
     await page.getByText('Draft Resume', { exact: true }).first().click();
     await page.getByRole('dialog').getByText('Start workout', { exact: true }).click();
-    await expect(page.getByText('Log this set (optional)')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Complete set 1' })).toBeVisible();
     await page.getByRole('textbox', { name: 'Weight' }).fill('70');
     await page.getByRole('textbox', { name: 'Reps' }).fill('8');
     await page.getByText('Start', { exact: true }).first().click();
-    await expect(page.getByText('Skip', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Skip set' })).toBeVisible();
 
     await page.reload();
     await page.waitForLoadState('load');
@@ -292,7 +294,7 @@ test.describe('Workout Gym V2', () => {
     await page.getByRole('button', { name: 'Resume workout · Draft Resume' }).click();
     await expect(page.getByRole('textbox', { name: 'Weight' })).toHaveValue('70');
     await expect(page.getByRole('textbox', { name: 'Reps' })).toHaveValue('8');
-    await page.getByText('Skip', { exact: true }).click();
+    await page.getByRole('button', { name: 'Skip set' }).click();
     await expect(page.getByText('Workout complete!')).toBeVisible();
     await page.getByText('Save and finish', { exact: true }).click();
     await expect(page.getByText('Workout saved')).toBeVisible({ timeout: 10_000 });
@@ -340,7 +342,7 @@ test.describe('Workout Gym V2', () => {
     await page.getByText('Start', { exact: true }).first().click();
     // Typed bodyweight sets are manual events: the active timer is only a
     // pacing aid and stops without fabricating completion.
-    await page.getByText('Complete set now', { exact: true }).click();
+    await page.getByRole('button', { name: 'Complete set 1' }).click();
 
     await expect(page.getByText('Plank', { exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/timed · target/)).toBeVisible();
@@ -355,6 +357,8 @@ test.describe('Workout Gym V2', () => {
     await expect(page.getByText('Workout saved')).toBeVisible({ timeout: 10_000 });
     await page.getByText('Done', { exact: true }).click();
 
+    await page.getByRole('button', { name: 'History and insights' }).click();
+    await expect(page.getByText('Recent sessions')).toBeVisible();
     await page
       .getByLabel(/Open session from/)
       .first()
@@ -368,6 +372,9 @@ test.describe('Workout Gym V2', () => {
   });
 
   test('tracks body weight and an optional goal locally', async ({ page }) => {
+    // Body weight lives inside the History & insights disclosure (W9.1).
+    await page.getByRole('button', { name: 'History and insights' }).click();
+    await expect(page.getByText('Log weight', { exact: true })).toBeVisible();
     await page.getByText('Log weight', { exact: true }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('textbox', { name: 'Weight', exact: true }).fill('80');
@@ -397,6 +404,8 @@ test.describe('Workout Gym V2', () => {
     await page.reload();
     await page.waitForLoadState('load');
     await goToTab(page, 'workout');
+    // The disclosure is collapsed again after reload; the goal persists.
+    await page.getByRole('button', { name: 'History and insights' }).click();
     await expect(page.getByText('Goal · 75 kg', { exact: true })).toBeVisible();
 
     // Row oracles: the entry is soft-deleted and the goal weight persisted in

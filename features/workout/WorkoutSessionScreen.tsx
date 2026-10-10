@@ -1,6 +1,6 @@
 import { Text } from '@/core/ui/Text';
 import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
-import { Alert, Animated, Pressable, TextInput, View } from 'react-native';
+import { Animated, Pressable, TextInput, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useAppTheme } from '@/core/providers/themeContext';
@@ -12,6 +12,7 @@ import { ScreenSection } from '@/core/ui/ScreenSection';
 import { TextField } from '@/core/ui/TextField';
 import { NumberStepperField } from '@/core/ui/NumberStepperField';
 import { useMotionDuration } from '@/core/theme/motion';
+import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { useGamification } from '@/features/gamification/gamificationContext';
 import {
   buildPreviousSetLookup,
@@ -33,6 +34,16 @@ import {
   type PreviousSetLookup,
   type TimerPhase,
 } from './workout.domain';
+import {
+  appendAddedSets,
+  buildExerciseSetRows,
+  buildSessionProgress,
+  canAddSetToExercise,
+  remapCurrentIndex,
+  remapPhaseIndices,
+  remapSessionMaps,
+  type SetRow,
+} from './workoutSessionView';
 import {
   clearWorkoutSessionDraft,
   listLoggedSetsForExerciseNames,
@@ -86,6 +97,8 @@ export type SessionResume = {
   enteredSets?: Record<number, EnteredSetValues>;
   /** Seconds left on the resumed phase when the draft was written. */
   remainingSeconds?: number;
+  /** Session-local added sets by engine exercise index, replayed on resume. */
+  addedSets?: Record<number, number>;
 };
 
 type Props = {
@@ -98,6 +111,7 @@ type Props = {
 
 export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Props) {
   const { tokens } = useAppTheme();
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const { recordAction } = useGamification();
   // Rest policy (Option A): stored `rest_seconds === 0` is intentional no
   // rest and runs back-to-back. The preference below only seeds sets created
@@ -106,43 +120,54 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   const [restDefault, setRestDefault] = useState<number | null>(null);
   const [persistedRestDefault, setPersistedRestDefault] = useState<number | null>(null);
   const [effortScale, setEffortScale] = useState<WorkoutEffortScale>('off');
-  const sequence = useMemo(
+  // The engine exercises, mapped once. The live sequence composes these
+  // with any session-local added sets — the routine template is never written.
+  const baseExercises = useMemo(
     () =>
-      buildTimerSequence(
-        routine.exercises.map((ex) => {
-          const isLegacyFreeText = !ex.catalog_exercise_id;
-          return {
-            name: ex.name,
-            // Keep the old missing-catalog path modality-less so historic
-            // free-text exercises continue to offer weight/reps and PRs.
-            ...(isLegacyFreeText ? {} : { catalog_exercise_id: ex.catalog_exercise_id }),
-            ...(isLegacyFreeText ? {} : { modality: ex.modality ?? 'timed' }),
-            ...(isLegacyFreeText ? {} : { unilateral: ex.unilateral === 1 }),
-            ...(isLegacyFreeText
-              ? {}
-              : {
-                  supports_external_load:
-                    ex.supports_external_load === undefined
-                      ? ex.modality === 'weighted_strength'
-                      : ex.supports_external_load === 1,
-                }),
-            ...(ex.superset_group !== undefined ? { superset_group: ex.superset_group } : {}),
-            sets: ex.sets.map((s) => ({
-              set_number: s.set_number,
-              active_seconds: s.active_seconds,
-              rest_seconds: s.rest_seconds,
-              target_reps_min: s.target_reps_min,
-              target_reps_max: s.target_reps_max,
-              target_load: s.target_load,
-              target_duration_seconds: s.target_duration_seconds,
-              target_distance: s.target_distance,
-              target_pace: s.target_pace,
-            })),
-          };
-        }),
-      ),
+      routine.exercises.map((ex) => {
+        const isLegacyFreeText = !ex.catalog_exercise_id;
+        return {
+          name: ex.name,
+          // Keep the old missing-catalog path modality-less so historic
+          // free-text exercises continue to offer weight/reps and PRs.
+          ...(isLegacyFreeText ? {} : { catalog_exercise_id: ex.catalog_exercise_id }),
+          ...(isLegacyFreeText ? {} : { modality: ex.modality ?? 'timed' }),
+          ...(isLegacyFreeText ? {} : { unilateral: ex.unilateral === 1 }),
+          ...(isLegacyFreeText
+            ? {}
+            : {
+                supports_external_load:
+                  ex.supports_external_load === undefined
+                    ? ex.modality === 'weighted_strength'
+                    : ex.supports_external_load === 1,
+              }),
+          ...(ex.superset_group !== undefined ? { superset_group: ex.superset_group } : {}),
+          sets: ex.sets.map((s) => ({
+            set_number: s.set_number,
+            active_seconds: s.active_seconds,
+            rest_seconds: s.rest_seconds,
+            target_reps_min: s.target_reps_min,
+            target_reps_max: s.target_reps_max,
+            target_load: s.target_load,
+            target_duration_seconds: s.target_duration_seconds,
+            target_distance: s.target_distance,
+            target_pace: s.target_pace,
+          })),
+        };
+      }),
     [routine.exercises],
   );
+
+  // Session-local added sets, keyed by engine exercise index. Persisted with
+  // the draft so a resumed session reconstructs the identical sequence.
+  const [addedSets, setAddedSets] = useState<Record<number, number>>(() => ({
+    ...(resume?.addedSets ?? {}),
+  }));
+  const effectiveExercises = useMemo(
+    () => appendAddedSets(baseExercises, addedSets),
+    [baseExercises, addedSets],
+  );
+  const sequence = useMemo(() => buildTimerSequence(effectiveExercises), [effectiveExercises]);
 
   useEffect(() => {
     let cancelled = false;
@@ -222,6 +247,8 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   // and drops the second press before any write begins.
   const finishGuardRef = useRef(createSubmitGuard());
   const [savedOutcome, setSavedOutcome] = useState<{ newRecords: string[] } | null>(null);
+  // Truthful finish: a failed save keeps the session and offers a retry.
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [previousLookup, setPreviousLookup] = useState<PreviousSetLookup | null>(null);
   const [recentSetOutcomes, setRecentSetOutcomes] = useState<
     Awaited<ReturnType<typeof listRecentWorkoutSetOutcomes>>
@@ -232,6 +259,40 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   const startedAtMsRef = useRef<number | null>(resume?.startedAtMs ?? null);
 
   const currentPhase: TimerPhase | undefined = sequence[currentIndex];
+
+  // An in-session Add set grows the sequence: remap the index-keyed session
+  // maps (dispositions, entered values, cursor) so every recorded phase keeps
+  // pointing at the same set.
+  const previousSequenceRef = useRef(sequence);
+  useEffect(() => {
+    const before = previousSequenceRef.current;
+    if (before === sequence || before.length === 0) {
+      previousSequenceRef.current = sequence;
+      return;
+    }
+    const remap = remapPhaseIndices(before, sequence);
+    if (remap.size > 0) {
+      setDispositions((prev) => remapSessionMaps(prev, remap));
+      setEnteredSets((prev) => remapSessionMaps(prev, remap));
+      setCurrentIndex((prev) => {
+        const next = remapCurrentIndex(prev, remap);
+        currentIndexRef.current = next;
+        return next;
+      });
+    }
+    previousSequenceRef.current = sequence;
+  }, [sequence]);
+
+  /** Session-local Add set for the exercise at the cursor. */
+  const handleAddSet = useCallback(() => {
+    const exerciseIndex = currentPhase?.exerciseIndex;
+    if (exerciseIndex === undefined) return;
+    if (!canAddSetToExercise(baseExercises, exerciseIndex)) return;
+    setAddedSets((prev) => ({ ...prev, [exerciseIndex]: (prev[exerciseIndex] ?? 0) + 1 }));
+  }, [baseExercises, currentPhase?.exerciseIndex]);
+  const canAddSet =
+    currentPhase?.phase === 'active' &&
+    canAddSetToExercise(baseExercises, currentPhase.exerciseIndex);
 
   const progressionRecommendation = useMemo(() => {
     if (!currentPhase || currentPhase.phase !== 'active') return null;
@@ -369,6 +430,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       const draftEnteredSets = Object.fromEntries(
         Object.entries(enteredSetsRef.current).map(([index, values]) => [String(index), values]),
       );
+      const draftAddedSets = Object.fromEntries(
+        Object.entries(addedSets).map(([index, count]) => [String(index), count]),
+      );
       void saveWorkoutSessionDraft({
         routineId: routine.id,
         startedAtIso: new Date(startedAtMs).toISOString(),
@@ -377,11 +441,12 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         ...(Object.keys(draftDispositions).length > 0 ? { dispositions: draftDispositions } : {}),
         ...(Object.keys(draftEnteredSets).length > 0 ? { enteredSets: draftEnteredSets } : {}),
         remainingSeconds: remainingRef.current,
+        ...(Object.keys(draftAddedSets).length > 0 ? { addedSets: draftAddedSets } : {}),
       }).catch(() => {
         // Best-effort: the live session never depends on the draft.
       });
     },
-    [routine.id],
+    [routine.id, addedSets],
   );
 
   const clearDraft = useCallback(() => {
@@ -754,7 +819,12 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       if (logResult.status === 'applied' && logResult.logId) {
         recordAction('workout', logResult.logId);
       }
+      setSaveError(null);
       setSavedOutcome({ newRecords });
+    } catch {
+      // Truthful failure: the session stays, the draft stays, and the user
+      // can retry. No success summary, no XP, no cleared draft.
+      setSaveError('This workout could not be saved. Your progress is still here — try again.');
     } finally {
       finishGuardRef.current.finish();
       setIsSaving(false);
@@ -765,20 +835,26 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     setRemaining((prev) => Math.max(1, prev + delta));
   };
 
-  const handleCancel = () => {
-    Alert.alert('End workout?', 'Progress will not be saved.', [
-      { text: 'Keep going', style: 'cancel' },
-      {
-        text: 'End',
-        style: 'destructive',
-        onPress: () => {
-          setIsRunning(false);
-          clearDraft();
-          onCancel();
-        },
-      },
-    ]);
+  const handleCancel = async () => {
+    // Leaving keeps the draft: the landing offers a dominant Resume. Nothing
+    // is logged, and discarding is the landing's separate confirmed path.
+    // The shared confirmation primitive renders real buttons on web and
+    // native, so the paired actions always exist.
+    const leave = await confirm({
+      title: 'Leave workout?',
+      message:
+        'Your entered sets are saved as a draft you can resume from the Workout tab. Nothing is logged until you finish.',
+      confirmLabel: 'Leave',
+      cancelLabel: 'Keep going',
+    });
+    if (!leave) return;
+    setIsRunning(false);
+    persistDraft(currentIndexRef.current);
+    onCancel();
   };
+
+  const finishProgress = buildSessionProgress(sequence, dispositions, currentIndex);
+  const skippedCount = finishProgress.skippedSets;
 
   if (isComplete && savedOutcome) {
     const summary = summarizeCompletedSets(sequence, currentIndex, dispositions);
@@ -832,6 +908,12 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                   </Text>
                 </View>
               </View>
+              {finishProgress.skippedSets > 0 ? (
+                <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                  {finishProgress.skippedSets} set{finishProgress.skippedSets === 1 ? '' : 's'}{' '}
+                  skipped
+                </Text>
+              ) : null}
               {savedOutcome.newRecords.length > 0 ? (
                 <View
                   className="w-full rounded-2xl border px-4 py-3"
@@ -912,6 +994,28 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                   </Text>
                 </View>
               </View>
+              {skippedCount > 0 ? (
+                <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                  {skippedCount} set{skippedCount === 1 ? '' : 's'} skipped
+                </Text>
+              ) : null}
+              {saveError ? (
+                <View
+                  className="w-full rounded-2xl border px-4 py-3"
+                  style={{
+                    borderColor: `${tokens.dangerSolid}55`,
+                    backgroundColor: `${tokens.dangerSolid}12`,
+                  }}
+                  accessibilityLiveRegion="polite"
+                >
+                  <Text className="text-sm font-semibold" style={{ color: tokens.dangerText }}>
+                    Not saved
+                  </Text>
+                  <Text className="mt-1 text-sm" style={{ color: tokens.text }}>
+                    {saveError}
+                  </Text>
+                </View>
+              ) : null}
               <View className="w-full">
                 <TextField
                   label="Notes (optional)"
@@ -922,8 +1026,11 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
               </View>
               <View className="w-full">
                 <Button
-                  label={isSaving ? 'Saving…' : 'Save and finish'}
-                  onPress={handleFinish}
+                  label={isSaving ? 'Saving…' : saveError ? 'Try saving again' : 'Save and finish'}
+                  onPress={() => {
+                    setSaveError(null);
+                    void handleFinish();
+                  }}
                   color={WORKOUT_COLOR}
                   loading={isSaving}
                 />
@@ -954,52 +1061,61 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   }
 
   const isActive = currentPhase.phase === 'active';
-  const isLegacyFreeText = currentPhase.modality === undefined;
+  // The set-logging-first view model: accurate progress plus one row per
+  // prescribed set of the current exercise. The engine cursor still decides
+  // which row is actionable — completed and skipped rows are read-only.
+  const sessionProgress = buildSessionProgress(sequence, dispositions, currentIndex);
+  const setRows = buildExerciseSetRows(
+    sequence,
+    currentPhase.exerciseIndex,
+    dispositions,
+    enteredSets,
+    currentIndex,
+    previousLookup,
+  );
+  const actionableRow = setRows.find((row) => row.state === 'current') ?? null;
+  const nextActivePhase = sequence
+    .slice(currentIndex + 1)
+    .find((phase) => phase.phase === 'active');
+  const previousRestPhase = sequence
+    .slice(0, currentIndex)
+    .reverse()
+    .find((phase) => phase.phase === 'rest');
+  void previousRestPhase;
+
+  // The modality readouts below describe the actionable set while one exists,
+  // and the upcoming set while resting, so the table never shows stale context.
+  const descriptorPhase = actionableRow?.phase ?? nextActivePhase ?? currentPhase;
+  const isLegacyFreeText = descriptorPhase.modality === undefined;
   const isLoadBased =
     isLegacyFreeText ||
-    currentPhase.modality === 'weighted_strength' ||
-    currentPhase.modality === 'bodyweight';
-  const isBodyweight = currentPhase.modality === 'bodyweight';
-  const isCardio = currentPhase.modality === 'cardio';
-  const allowsExternalLoad = currentPhase.supportsExternalLoad !== false;
-  const denom = currentPhase.durationSeconds > 0 ? currentPhase.durationSeconds : 1;
-  const progress = 1 - remaining / denom;
-  // Visible previous performance at the point of entry; the same values
-  // silently pre-seed the inputs below.
-  const previousForCurrentSet = isActive
-    ? lookupPreviousSet(
-        previousLookup,
-        currentPhase.exerciseName,
-        currentPhase.setNumber,
-        currentPhase.catalogExerciseId,
-      )
-    : null;
-  const previousText = previousForCurrentSet
-    ? allowsExternalLoad
-      ? `Previous: ${previousForCurrentSet.weight}×${previousForCurrentSet.reps}`
-      : `Previous: ${previousForCurrentSet.reps} reps`
-    : 'Previous: —';
+    descriptorPhase.modality === 'weighted_strength' ||
+    descriptorPhase.modality === 'bodyweight';
+  const isCardio = descriptorPhase.modality === 'cardio';
+  const allowsExternalLoad = descriptorPhase.supportsExternalLoad !== false;
   const targetText = isLoadBased
     ? [
-        currentPhase.targetLoad != null ? `target ${currentPhase.targetLoad} kg` : null,
-        currentPhase.targetRepsMin != null || currentPhase.targetRepsMax != null
-          ? `${currentPhase.targetRepsMin ?? currentPhase.targetRepsMax}–${currentPhase.targetRepsMax ?? currentPhase.targetRepsMin} reps`
+        descriptorPhase.targetLoad != null ? `target ${descriptorPhase.targetLoad} kg` : null,
+        descriptorPhase.targetRepsMin != null || descriptorPhase.targetRepsMax != null
+          ? `${descriptorPhase.targetRepsMin ?? descriptorPhase.targetRepsMax}–${descriptorPhase.targetRepsMax ?? descriptorPhase.targetRepsMin} reps`
           : null,
       ]
         .filter(Boolean)
         .join(' · ')
     : isCardio
       ? [
-          `target ${formatWorkoutTime(currentPhase.durationSeconds)}`,
-          currentPhase.targetDistance != null ? `${currentPhase.targetDistance} distance` : null,
-          currentPhase.targetPace != null ? `${currentPhase.targetPace} pace` : null,
+          `target ${formatWorkoutTime(descriptorPhase.durationSeconds)}`,
+          descriptorPhase.targetDistance != null
+            ? `${descriptorPhase.targetDistance} distance`
+            : null,
+          descriptorPhase.targetPace != null ? `${descriptorPhase.targetPace} pace` : null,
         ]
           .filter(Boolean)
           .join(' · ')
-      : `target ${formatWorkoutTime(currentPhase.durationSeconds)}`;
+      : `target ${formatWorkoutTime(descriptorPhase.durationSeconds)}`;
   const progressionGuidance = progressionRecommendation ? (
     <View
-      className="mt-2 rounded-xl border px-3 py-2"
+      className="mt-3 rounded-xl border px-3 py-2"
       style={{
         borderColor: `${WORKOUT_COLOR}55`,
         backgroundColor: `${WORKOUT_COLOR}12`,
@@ -1014,23 +1130,190 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     </View>
   ) : null;
 
+  /** Per-modality inputs for the actionable set row. */
+  const renderSetInputs = (row: SetRow) => {
+    const phase = row.phase;
+    const rowIsBodyweight = phase.modality === 'bodyweight';
+    const rowAllowsExternalLoad = phase.supportsExternalLoad !== false;
+    const rowIsLoadBased =
+      phase.modality === undefined ||
+      phase.modality === 'weighted_strength' ||
+      phase.modality === 'bodyweight';
+    const rowIsCardio = phase.modality === 'cardio';
+    if (rowIsLoadBased) {
+      return (
+        <View className="min-w-0 flex-1 flex-row items-end gap-2">
+          {rowAllowsExternalLoad ? (
+            <View className="min-w-0 flex-1">
+              <Text className="mb-1 text-[11px] font-medium" style={{ color: tokens.textMuted }}>
+                {rowIsBodyweight ? 'Added load' : 'Weight'}
+              </Text>
+              <TextInput
+                accessibilityLabel={rowIsBodyweight ? 'Additional load input' : 'Weight'}
+                className="rounded-xl border px-3 py-2 text-center text-base"
+                style={{
+                  height: 48,
+                  borderColor: tokens.border,
+                  backgroundColor: tokens.surfaceElevated,
+                  color: tokens.text,
+                }}
+                value={row.entered.weight}
+                onChangeText={(t) =>
+                  updateEnteredValues(row.phaseIndex, {
+                    weight: sanitizeNumericInput(t, { allowDecimal: true }),
+                  })
+                }
+                placeholder={rowIsBodyweight ? 'optional' : 'e.g. 60'}
+                placeholderTextColor={tokens.textMuted}
+                keyboardType="decimal-pad"
+              />
+            </View>
+          ) : null}
+          <View className={rowAllowsExternalLoad ? 'min-w-0 flex-1' : 'min-w-0 w-full'}>
+            <NumberStepperField
+              label={phase.unilateral ? 'Reps / side' : 'Reps'}
+              inputAccessibilityLabel={phase.unilateral ? 'Reps / side input' : 'Reps'}
+              value={row.entered.reps}
+              onChange={(v) => updateEnteredValues(row.phaseIndex, { reps: v })}
+              min={1}
+              max={200}
+              placeholder="—"
+            />
+          </View>
+        </View>
+      );
+    }
+    if (rowIsCardio) {
+      return (
+        <View className="min-w-0 flex-1 gap-2">
+          <NumberStepperField
+            label="Duration (seconds)"
+            value={row.entered.duration ?? ''}
+            onChange={(value) => updateEnteredValues(row.phaseIndex, { duration: value })}
+            min={1}
+            max={86400}
+            placeholder={String(Math.round(phase.durationSeconds))}
+          />
+          <View className="flex-row gap-2">
+            <View className="min-w-0 flex-1">
+              <TextInput
+                accessibilityLabel="Distance"
+                className="rounded-xl border px-3 py-2 text-base"
+                style={{
+                  height: 48,
+                  borderColor: tokens.border,
+                  backgroundColor: tokens.surfaceElevated,
+                  color: tokens.text,
+                }}
+                value={row.entered.distance ?? ''}
+                onChangeText={(value) =>
+                  updateEnteredValues(row.phaseIndex, {
+                    distance: sanitizeNumericInput(value, { allowDecimal: true }),
+                  })
+                }
+                placeholder="Distance"
+                placeholderTextColor={tokens.textMuted}
+                keyboardType="decimal-pad"
+              />
+            </View>
+            <View className="min-w-0 flex-1">
+              <TextInput
+                accessibilityLabel="Pace"
+                className="rounded-xl border px-3 py-2 text-base"
+                style={{
+                  height: 48,
+                  borderColor: tokens.border,
+                  backgroundColor: tokens.surfaceElevated,
+                  color: tokens.text,
+                }}
+                value={row.entered.pace ?? ''}
+                onChangeText={(value) =>
+                  updateEnteredValues(row.phaseIndex, {
+                    pace: sanitizeNumericInput(value, { allowDecimal: true }),
+                  })
+                }
+                placeholder="Pace / speed"
+                placeholderTextColor={tokens.textMuted}
+                keyboardType="decimal-pad"
+              />
+            </View>
+          </View>
+        </View>
+      );
+    }
+    return (
+      <View className="min-w-0 flex-1">
+        <NumberStepperField
+          label="Duration (seconds)"
+          value={row.entered.duration ?? ''}
+          onChange={(value) => updateEnteredValues(row.phaseIndex, { duration: value })}
+          min={1}
+          max={86400}
+          placeholder={String(Math.round(phase.durationSeconds))}
+        />
+      </View>
+    );
+  };
+
+  /** Read-only display of a recorded set row. */
+  const renderRecordedSet = (row: SetRow) => {
+    const parts: string[] = [];
+    if (row.entered.weight) parts.push(`${row.entered.weight} kg`);
+    if (row.entered.reps)
+      parts.push(`${row.entered.reps}${row.phase.unilateral ? '/side' : ''} reps`);
+    if (row.entered.duration) parts.push(`${row.entered.duration}s`);
+    if (row.entered.distance) parts.push(`${row.entered.distance} dist`);
+    if (row.entered.pace) parts.push(`${row.entered.pace} pace`);
+    return (
+      <Text className="min-w-0 flex-1 text-sm" style={{ color: tokens.text }} numberOfLines={2}>
+        {parts.length > 0 ? parts.join(' · ') : '—'}
+      </Text>
+    );
+  };
+
+  const previousText = (row: SetRow) =>
+    row.previous
+      ? allowsExternalLoad
+        ? `${row.previous.weight}×${row.previous.reps}`
+        : `${row.previous.reps} reps`
+      : '—';
+
+  const progressLabel = `${sessionProgress.completedSets}/${sessionProgress.totalPrescribedSets} sets`;
+  const skippedLabel =
+    sessionProgress.skippedSets > 0 ? ` · ${sessionProgress.skippedSets} skipped` : '';
+
   return (
     <Screen>
-      <View className="mb-4 flex-row items-center justify-between">
+      {confirmationDialog}
+      <View className="mb-3 flex-row items-center justify-between gap-2">
         <Pressable
           onPress={handleCancel}
           accessibilityRole="button"
           accessibilityLabel="End workout"
+          hitSlop={8}
         >
           <Text className="text-sm" style={{ color: tokens.textMuted }}>
             End
           </Text>
         </Pressable>
-        <Text className="text-sm" style={{ color: tokens.textMuted }}>
+        <Text
+          className="min-w-0 flex-1 text-center text-sm"
+          style={{ color: tokens.textMuted }}
+          numberOfLines={1}
+        >
           {routine.name}
         </Text>
         <Text className="text-xs" style={{ color: tokens.iconMuted }}>
-          {currentIndex + 1}/{sequence.length}
+          {formatWorkoutTime(elapsedSeconds)}
+        </Text>
+      </View>
+
+      <View className="mb-3 flex-row items-center justify-center gap-2">
+        <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+          {progressLabel}
+        </Text>
+        <Text className="text-xs" style={{ color: tokens.textMuted }}>
+          {skippedLabel}
         </Text>
       </View>
 
@@ -1068,284 +1351,300 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       ) : null}
 
       <Card accentColor={WORKOUT_COLOR}>
-        <View
-          className={`self-center rounded-full px-3 py-1 ${isActive ? 'bg-workout' : ''}`}
-          style={isActive ? undefined : { backgroundColor: tokens.warningText }}
-        >
-          <Text className="text-xs font-medium" style={{ color: tokens.textOnAccent }}>
-            {isActive ? 'ACTIVE' : 'REST'}
+        <View className="flex-row items-center justify-between gap-2">
+          <Text
+            className="min-w-0 flex-1 text-lg font-semibold"
+            style={{ color: tokens.text }}
+            numberOfLines={2}
+          >
+            {descriptorPhase.exerciseName}
           </Text>
+          {descriptorPhase.totalSets > 0 ? (
+            <Text className="text-xs" style={{ color: tokens.textMuted }}>
+              {`Set ${descriptorPhase.setNumber} of ${descriptorPhase.totalSets}`}
+            </Text>
+          ) : null}
         </View>
-
-        <Text className="mt-4 text-center text-2xl font-semibold" style={{ color: tokens.text }}>
-          {currentPhase.exerciseName}
+        <Text className="mt-1 text-xs" style={{ color: WORKOUT_COLOR }}>
+          {isLegacyFreeText ? 'Legacy strength entry' : descriptorPhase.modality?.replace('_', ' ')}{' '}
+          · {targetText}
         </Text>
-        <Text className="mt-1 text-center text-sm" style={{ color: tokens.textMuted }}>
-          Set {currentPhase.setNumber} of {currentPhase.totalSets}
-        </Text>
-        <Text className="mt-2 text-center text-xs" style={{ color: WORKOUT_COLOR }}>
-          {isLegacyFreeText ? 'Legacy strength entry' : currentPhase.modality?.replace('_', ' ')} ·{' '}
-          {targetText}
+        <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+          {descriptorPhase.unilateral ? 'Reps are recorded per side' : 'Previous set shown per row'}
         </Text>
 
-        <Text className="my-8 text-center text-7xl font-semibold" style={{ color: tokens.text }}>
-          {formatWorkoutTime(remaining)}
-        </Text>
-
-        <View
-          className="mb-8 h-2 overflow-hidden rounded-full"
-          style={{ backgroundColor: tokens.border }}
-        >
-          <View
-            className={`h-full rounded-full ${isActive ? 'bg-workout' : ''}`}
-            style={[
-              {
-                width: `${Math.round(Math.min(1, Math.max(0, progress)) * 100)}%`,
-              },
-              !isActive ? { backgroundColor: tokens.warningText } : undefined,
-            ]}
-          />
-        </View>
-
-        {isActive ? (
-          <View className="mb-5">
-            {progressionGuidance}
-            {isLoadBased ? (
-              <>
-                <Text className="text-xs font-medium" style={{ color: tokens.textMuted }}>
-                  Log this set (optional)
+        <View className="mt-3">
+          <View className="flex-row items-center gap-2 pb-1">
+            <Text
+              className="text-[11px] font-semibold uppercase"
+              style={{ color: tokens.textMuted, width: 32 }}
+            >
+              Set
+            </Text>
+            <Text
+              className="min-w-0 flex-1 text-[11px] font-semibold uppercase"
+              style={{ color: tokens.textMuted }}
+            >
+              {isLoadBased
+                ? 'Previous · Log this set'
+                : isCardio
+                  ? 'Previous · Duration · Distance'
+                  : 'Previous · Duration'}
+            </Text>
+            <Text
+              className="w-11 text-center text-[11px] font-semibold uppercase"
+              style={{ color: tokens.textMuted }}
+            >
+              Done
+            </Text>
+          </View>
+          {setRows.map((row) => {
+            const isCurrent = row.state === 'current';
+            return (
+              <View
+                key={row.phaseIndex}
+                className="flex-row items-center gap-2 border-t py-2"
+                style={{
+                  borderTopColor: tokens.border,
+                  backgroundColor: isCurrent ? `${WORKOUT_COLOR}0D` : 'transparent',
+                  borderRadius: isCurrent ? 12 : 0,
+                }}
+              >
+                <Text
+                  className="text-sm font-semibold"
+                  style={{
+                    width: 32,
+                    color:
+                      row.state === 'skipped' || row.state === 'upcoming'
+                        ? tokens.textMuted
+                        : tokens.text,
+                  }}
+                >
+                  {row.setNumber}
                 </Text>
-                <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
-                  {previousText}
-                  {isBodyweight ? ' · bodyweight is the movement basis' : ''}
-                  {currentPhase.unilateral ? ' · reps are recorded per side' : ''}
-                </Text>
-                <View className="mt-2 flex-row items-end gap-3">
-                  {allowsExternalLoad ? (
-                    <View className="min-w-0 flex-1">
-                      <Text
-                        className="mb-1.5 text-sm font-medium"
-                        style={{ color: tokens.textMuted }}
-                      >
-                        {isBodyweight ? 'Additional load' : 'Weight'}
-                      </Text>
-                      <TextInput
-                        accessibilityLabel={isBodyweight ? 'Additional load input' : 'Weight input'}
-                        className="rounded-xl border px-3 py-2 text-center text-base"
-                        style={{
-                          height: 48,
-                          borderColor: tokens.border,
-                          backgroundColor: tokens.surfaceElevated,
-                          color: tokens.text,
-                        }}
-                        value={enteredSets[currentIndex]?.weight ?? ''}
-                        onChangeText={(t) =>
-                          updateEnteredValues(currentIndex, {
-                            weight: sanitizeNumericInput(t, { allowDecimal: true }),
-                          })
-                        }
-                        placeholder={isBodyweight ? 'optional' : 'e.g. 60'}
-                        placeholderTextColor={tokens.textMuted}
-                        keyboardType="decimal-pad"
-                      />
-                    </View>
-                  ) : null}
-                  <View className={allowsExternalLoad ? 'min-w-0 flex-1' : 'min-w-0 w-full'}>
-                    <NumberStepperField
-                      label={currentPhase.unilateral ? 'Reps / side' : 'Reps'}
-                      inputAccessibilityLabel={
-                        currentPhase.unilateral ? 'Reps / side input' : 'Reps input'
-                      }
-                      value={enteredSets[currentIndex]?.reps ?? ''}
-                      onChange={(v) => updateEnteredValues(currentIndex, { reps: v })}
-                      min={1}
-                      max={200}
-                      placeholder="—"
+                <View className="min-w-0 flex-1">
+                  <Text className="text-[11px]" style={{ color: tokens.textMuted }}>
+                    {previousText(row)}
+                  </Text>
+                  {row.state === 'upcoming' ? (
+                    <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                      —
+                    </Text>
+                  ) : row.state === 'current' ? (
+                    renderSetInputs(row)
+                  ) : (
+                    renderRecordedSet(row)
+                  )}
+                </View>
+                {row.state === 'completed' ? (
+                  <View className="w-11 items-center">
+                    <MaterialIcons name="check-circle" size={22} color={tokens.successText} />
+                    <Text
+                      className="text-[9px] font-semibold uppercase"
+                      style={{ color: tokens.successText }}
+                    >
+                      Done
+                    </Text>
+                  </View>
+                ) : row.state === 'skipped' ? (
+                  <View className="w-11 items-center">
+                    <MaterialIcons
+                      name="remove-circle-outline"
+                      size={22}
+                      color={tokens.textMuted}
+                    />
+                    <Text
+                      className="text-[9px] font-semibold uppercase"
+                      style={{ color: tokens.textMuted }}
+                    >
+                      Skip
+                    </Text>
+                  </View>
+                ) : row.state === 'current' ? (
+                  <Pressable
+                    onPress={handleCompleteSet}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Complete set ${row.setNumber}`}
+                    className="items-center justify-center rounded-full"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: WORKOUT_COLOR,
+                    }}
+                  >
+                    <MaterialIcons name="check" size={22} color={tokens.textOnAccent} />
+                  </Pressable>
+                ) : (
+                  <View className="w-11 items-center">
+                    <View
+                      className="rounded-full border"
+                      style={{ width: 22, height: 22, borderColor: tokens.border }}
                     />
                   </View>
-                </View>
-              </>
-            ) : isCardio ? (
-              <>
-                <Text className="text-xs font-medium" style={{ color: tokens.textMuted }}>
-                  Cardio result (optional)
-                </Text>
-                <NumberStepperField
-                  label="Duration (seconds)"
-                  value={enteredSets[currentIndex]?.duration ?? ''}
-                  onChange={(value) => updateEnteredValues(currentIndex, { duration: value })}
-                  min={1}
-                  max={86400}
-                  placeholder={String(Math.round(currentPhase.durationSeconds))}
-                />
-                <TextInput
-                  accessibilityLabel="Distance"
-                  className="mt-2 rounded-xl border px-3 py-2 text-base"
-                  style={{
-                    height: 48,
-                    borderColor: tokens.border,
-                    backgroundColor: tokens.surfaceElevated,
-                    color: tokens.text,
-                  }}
-                  value={enteredSets[currentIndex]?.distance ?? ''}
-                  onChangeText={(value) =>
-                    updateEnteredValues(currentIndex, {
-                      distance: sanitizeNumericInput(value, { allowDecimal: true }),
-                    })
-                  }
-                  placeholder="Distance"
-                  placeholderTextColor={tokens.textMuted}
-                  keyboardType="decimal-pad"
-                />
-                <TextInput
-                  accessibilityLabel="Pace"
-                  className="mt-2 rounded-xl border px-3 py-2 text-base"
-                  style={{
-                    height: 48,
-                    borderColor: tokens.border,
-                    backgroundColor: tokens.surfaceElevated,
-                    color: tokens.text,
-                  }}
-                  value={enteredSets[currentIndex]?.pace ?? ''}
-                  onChangeText={(value) =>
-                    updateEnteredValues(currentIndex, {
-                      pace: sanitizeNumericInput(value, { allowDecimal: true }),
-                    })
-                  }
-                  placeholder="Pace / speed"
-                  placeholderTextColor={tokens.textMuted}
-                  keyboardType="decimal-pad"
-                />
-              </>
-            ) : (
-              <>
-                <Text className="text-xs" style={{ color: tokens.textMuted }}>
-                  The work timer records the completed duration for this set.
-                </Text>
-                <NumberStepperField
-                  label="Duration (seconds)"
-                  value={enteredSets[currentIndex]?.duration ?? ''}
-                  onChange={(value) => updateEnteredValues(currentIndex, { duration: value })}
-                  min={1}
-                  max={86400}
-                  placeholder={String(Math.round(currentPhase.durationSeconds))}
-                />
-              </>
-            )}
-            {effortScale !== 'off' ? (
-              <View className="mt-3">
-                <NumberStepperField
-                  label={effortScale === 'rir' ? 'RIR (reps in reserve)' : 'RPE (1–10)'}
-                  value={enteredSets[currentIndex]?.effort ?? ''}
-                  onChange={(value) => updateEnteredValues(currentIndex, { effort: value })}
-                  min={effortScale === 'rir' ? 0 : 1}
-                  max={10}
-                  placeholder="—"
-                />
+                )}
               </View>
-            ) : null}
+            );
+          })}
+        </View>
+
+        {effortScale !== 'off' && actionableRow ? (
+          <View className="mt-3">
+            <NumberStepperField
+              label={effortScale === 'rir' ? 'RIR (reps in reserve)' : 'RPE (1–10)'}
+              value={actionableRow.entered.effort ?? ''}
+              onChange={(value) => updateEnteredValues(actionableRow.phaseIndex, { effort: value })}
+              min={effortScale === 'rir' ? 0 : 1}
+              max={10}
+              placeholder="—"
+            />
           </View>
         ) : null}
 
-        <View className="gap-3">
-          {!isRunning ? (
-            <Button label="Start" onPress={handleStart} color={WORKOUT_COLOR} />
-          ) : (
-            <Button
-              label={isActive ? 'Complete set' : 'Skip'}
-              variant={isActive ? 'primary' : 'ghost'}
-              onPress={isActive ? handleCompleteSet : handleSkip}
-              color={isActive ? WORKOUT_COLOR : undefined}
-            />
-          )}
+        {progressionGuidance}
+
+        <View className="mt-4 flex-row flex-wrap items-center gap-2">
+          {!isRunning ? <Button label="Start" onPress={handleStart} color={WORKOUT_COLOR} /> : null}
           {isActive ? (
-            <>
-              {!isRunning ? (
-                <Button label="Complete set now" variant="ghost" onPress={handleCompleteSet} />
-              ) : null}
-              <Button label="Skip" variant="ghost" onPress={handleSkip} />
-            </>
+            <Button
+              label="Skip set"
+              variant="ghost"
+              onPress={handleSkip}
+              accessibilityLabel="Skip set"
+            />
           ) : null}
-          {!isActive ? (
-            <View className="flex-row items-center justify-center gap-6">
+          {canAddSet ? (
+            <Button
+              label="Add set"
+              variant="ghost"
+              onPress={handleAddSet}
+              accessibilityLabel="Add set"
+            />
+          ) : null}
+        </View>
+
+        {isRunning && isActive && actionableRow ? (
+          <Text className="mt-3 text-center text-xs" style={{ color: tokens.textMuted }}>
+            {phaseRunsOnTimer(actionableRow.phase)
+              ? `Work timer ${formatWorkoutTime(remaining)}`
+              : `Work timer ${formatWorkoutTime(remaining)} · pacing aid — complete the set when done`}
+          </Text>
+        ) : null}
+      </Card>
+
+      {!isActive ? (
+        <View
+          className="mt-3 rounded-2xl border px-4 py-3"
+          style={{
+            borderColor: `${WORKOUT_COLOR}55`,
+            backgroundColor: tokens.surfaceElevated,
+          }}
+          accessibilityLiveRegion="polite"
+        >
+          <View className="flex-row items-center justify-between gap-3">
+            <View className="min-w-0 flex-1">
+              <Text className="text-xs font-semibold uppercase" style={{ color: WORKOUT_COLOR }}>
+                Rest
+              </Text>
+              <Text className="mt-0.5 text-2xl font-semibold" style={{ color: tokens.text }}>
+                {formatWorkoutTime(remaining)}
+              </Text>
+              <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
+                {nextActivePhase
+                  ? `Next: ${nextActivePhase.exerciseName} — Set ${nextActivePhase.setNumber} of ${nextActivePhase.totalSets}`
+                  : 'Next: finish'}
+              </Text>
+            </View>
+            <View className="flex-row items-center gap-2">
               <Pressable
                 onPress={() => handleAdjustRemaining(-REST_SECONDS_STEP)}
                 accessibilityRole="button"
                 accessibilityLabel={`Reduce rest by ${REST_SECONDS_STEP} seconds`}
-                className="rounded-full px-4 py-2"
-                style={{ backgroundColor: tokens.surfaceElevated }}
+                className="items-center justify-center rounded-full"
+                style={{
+                  width: 44,
+                  height: 44,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: tokens.surface,
+                  borderWidth: 1,
+                  borderColor: tokens.border,
+                }}
               >
                 <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
                   −{REST_SECONDS_STEP}s
                 </Text>
               </Pressable>
-              <Text className="text-xs" style={{ color: tokens.textMuted }}>
-                Rest adjust
-              </Text>
               <Pressable
                 onPress={() => handleAdjustRemaining(REST_SECONDS_STEP)}
                 accessibilityRole="button"
                 accessibilityLabel={`Add ${REST_SECONDS_STEP} seconds of rest`}
-                className="rounded-full px-4 py-2"
-                style={{ backgroundColor: tokens.surfaceElevated }}
+                className="items-center justify-center rounded-full"
+                style={{
+                  width: 44,
+                  height: 44,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: tokens.surface,
+                  borderWidth: 1,
+                  borderColor: tokens.border,
+                }}
               >
                 <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
                   +{REST_SECONDS_STEP}s
                 </Text>
               </Pressable>
+              <Button
+                label="Skip rest"
+                variant="ghost"
+                onPress={handleSkip}
+                accessibilityLabel="Skip rest"
+              />
             </View>
-          ) : null}
+          </View>
         </View>
+      ) : null}
 
-        <View className="mt-5 flex-row items-center justify-center gap-3">
-          <Text className="text-xs" style={{ color: tokens.textMuted }}>
-            Default for new sets: {restDefault === null ? '…' : `${restDefault}s`}
-          </Text>
-          <Pressable
-            onPress={() => handleAdjustRestDefault(-REST_SECONDS_STEP)}
-            accessibilityRole="button"
-            accessibilityLabel={`Decrease default rest to at least ${REST_SECONDS_MIN} seconds`}
-            hitSlop={8}
-          >
-            <Text className="text-sm font-semibold text-workout">−</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => handleAdjustRestDefault(REST_SECONDS_STEP)}
-            accessibilityRole="button"
-            accessibilityLabel={`Increase default rest up to ${REST_SECONDS_MAX} seconds`}
-            hitSlop={8}
-          >
-            <Text className="text-sm font-semibold text-workout">+</Text>
-          </Pressable>
-        </View>
-        {restDefault !== null &&
-        persistedRestDefault !== null &&
-        restDefault !== persistedRestDefault ? (
-          <Pressable
-            onPress={handlePersistRestDefault}
-            accessibilityRole="button"
-            accessibilityLabel="Save default rest for future workouts"
-            className="self-center"
-            hitSlop={8}
-          >
-            <Text className="mt-2 text-xs font-semibold text-workout">
-              Save as default for future workouts
-            </Text>
-          </Pressable>
-        ) : null}
-        <Text className="mt-2 text-center text-xs" style={{ color: tokens.textMuted }}>
-          Sets at 0s skip rest and run back-to-back.
+      <View className="mt-3 flex-row items-center justify-center gap-3">
+        <Text className="text-xs" style={{ color: tokens.textMuted }}>
+          Default for new sets: {restDefault === null ? '…' : `${restDefault}s`}
         </Text>
-
-        {currentIndex + 1 < sequence.length ? (
-          <Text className="mt-6 text-center text-xs" style={{ color: tokens.textMuted }}>
-            Next:{' '}
-            {sequence[currentIndex + 1].phase === 'rest'
-              ? `Rest ${formatWorkoutTime(sequence[currentIndex + 1].durationSeconds)}`
-              : `${sequence[currentIndex + 1].exerciseName} — Set ${sequence[currentIndex + 1].setNumber}`}
+        <Pressable
+          onPress={() => handleAdjustRestDefault(-REST_SECONDS_STEP)}
+          accessibilityRole="button"
+          accessibilityLabel={`Decrease default rest to at least ${REST_SECONDS_MIN} seconds`}
+          hitSlop={8}
+        >
+          <Text className="text-sm font-semibold text-workout">−</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => handleAdjustRestDefault(REST_SECONDS_STEP)}
+          accessibilityRole="button"
+          accessibilityLabel={`Increase default rest up to ${REST_SECONDS_MAX} seconds`}
+          hitSlop={8}
+        >
+          <Text className="text-sm font-semibold text-workout">+</Text>
+        </Pressable>
+      </View>
+      {restDefault !== null &&
+      persistedRestDefault !== null &&
+      restDefault !== persistedRestDefault ? (
+        <Pressable
+          onPress={handlePersistRestDefault}
+          accessibilityRole="button"
+          accessibilityLabel="Save default rest for future workouts"
+          className="self-center"
+          hitSlop={8}
+        >
+          <Text className="mt-2 text-xs font-semibold text-workout">
+            Save as default for future workouts
           </Text>
-        ) : null}
-      </Card>
+        </Pressable>
+      ) : null}
+      <Text className="mt-2 text-center text-xs" style={{ color: tokens.textMuted }}>
+        Sets at 0s skip rest and run back-to-back.
+      </Text>
     </Screen>
   );
 }

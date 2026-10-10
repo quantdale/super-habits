@@ -116,6 +116,33 @@ describe('workout session draft persistence', () => {
     });
   });
 
+  it('round-trips session-local added sets and drops malformed entries', async () => {
+    const db = makeDb(null);
+    getDatabase.mockResolvedValue(db);
+
+    await saveWorkoutSessionDraft({
+      routineId: 'routine_1',
+      startedAtIso: '2026-08-21T10:00:00.000Z',
+      phaseIndex: 4,
+      addedSets: { 0: 2 },
+    });
+    expect(db.runAsync).toHaveBeenCalled();
+    const saved = JSON.parse(String(db.runAsync.mock.calls[0][1][1]));
+    expect(saved.addedSets).toEqual({ 0: 2 });
+
+    const messyDb = makeDb(
+      JSON.stringify({
+        routineId: 'routine_1',
+        startedAtIso: '2026-08-21T10:00:00.000Z',
+        phaseIndex: 4,
+        addedSets: { 0: 1, 1: -3, 2: 'lots', 3: 500 },
+      }),
+    );
+    getDatabase.mockResolvedValue(messyDb);
+    const draft = await getWorkoutSessionDraft();
+    expect(draft?.addedSets).toEqual({ 0: 1, 3: 50 });
+  });
+
   it('rejects a malformed draft entirely', async () => {
     const db = makeDb(JSON.stringify({ routineId: '', startedAtIso: 'nope', phaseIndex: -1 }));
     getDatabase.mockResolvedValue(db);
