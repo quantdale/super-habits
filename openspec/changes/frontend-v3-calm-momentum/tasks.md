@@ -76,8 +76,8 @@
 - [x] 9.5.1 Skipped-write handling: `handleFinish()` success requires `applied` AND a log id; a `skipped` result never clears the draft, earns XP, or shows "Workout saved" (reproduced pre-fix; `tests/workoutSessionSave.test.ts` + `tests/integration/workoutSaveIntegrity.data.test.ts`)
 - [x] 9.5.2 Post-commit correctness: durable commit decides saved-vs-not-saved; draft cleanup/reward attribution are isolated bookkeeping that cannot rewrite a committed save or invite a duplicate insert; double Finish stays idempotent
 - [x] 9.5.3 Draft retention and recovery: no clear on the error path; the debounced write/clear race is closed by a clear generation; unresumable deleted-routine limitation stated truthfully in the message
-- [ ] 9.5.4 Single Workout scroll authority: nested scroll-enabled `Screen` removed (exactly one page-level scroll container; 360/390/412/768/1280 scroll + keyboard verified in `e2e/workout-w95.spec.ts`; 9 inspected captures in `docs/ui-ux/v3-audit/w9.5/`)
-- [ ] 9.5.5 Full validation ladder, publication through the normal workflow, and exact-head hosted CI verification (audit may remain red only on the two pre-existing braces/node-forge advisories; hosted e2e/nightly skipped)
+- [x] 9.5.4 Single Workout scroll authority: nested scroll-enabled `Screen` removed (exactly one page-level scroll container; 360/390/412/768/1280 scroll + keyboard verified in `e2e/workout-w95.spec.ts`; 9 inspected captures in `docs/ui-ux/v3-audit/w9.5/`)
+- [x] 9.5.5 Full validation ladder, publication through the normal workflow, and exact-head hosted CI verification (PR #67 merged as `24b01b5`; exact-head run `38162706650` green through unit/integration at 2,665 passed / 3 skipped; audit red only on the two pre-existing braces/node-forge advisories; hosted e2e/nightly skipped)
 
 ## 10. W10 — Calories / Health validation
 
