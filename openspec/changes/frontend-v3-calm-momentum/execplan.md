@@ -224,6 +224,7 @@ historical evidence only.
   same SHA. Stash `stash@{0}`, foreign `.tmp-ios36423379932/`, and all
   historical captures preserved; no security-policy, dependency, schema, or
   migration change.
+- 2026-10-11 W9.5 final exact-head run at the closure commit `94be24db3e2b22e9328ab6e40368edc4af71af0a`: [38167261836](https://github.com/quantdale/super-habits/actions/runs/38167261836) succeeds every frontend gate (typecheck, Supabase edge-function type-check, lint, themes, openspec contracts, journey-label + quarantine-register parity, versioned ExecPlans, unit+integration 260 files passed / 1 skipped, 2,665 tests passed / 3 skipped) and fails only the same two undocumented `braces`/`node-forge` advisories; hosted e2e/nightly skip behind that gate. Vercel production deployment succeeded at the same SHA.
 - 2026-10-11 W9.5 opened and implemented (baseline `8cdee8e` verified =
   origin/main; stash `pre-recovery-local-changes`, foreign
   `.tmp-ios36423379932/`, and W1–W9 captures preserved; single worktree):
