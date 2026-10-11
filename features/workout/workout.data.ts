@@ -990,6 +990,9 @@ export type LogWorkoutSessionResult = {
   status: 'applied' | 'skipped';
   /** The workout_logs row id when applied; null when skipped (no row written). */
   logId: string | null;
+  /** Why the write was skipped, when it was (e.g. 'target_missing' = the
+   *  routine is gone). Additive: callers may ignore it. */
+  reason?: string | null;
 };
 
 export async function logWorkoutSession(input: {
@@ -1044,7 +1047,11 @@ export async function logWorkoutSession(input: {
       if (record.status !== 'applied')
         return {
           changed: false,
-          value: { status: record.status, logId: null } satisfies LogWorkoutSessionResult,
+          value: {
+            status: record.status,
+            logId: null,
+            reason: record.reason,
+          } satisfies LogWorkoutSessionResult,
         };
 
       for (const ex of input.exercises) {
