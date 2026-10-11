@@ -1,7 +1,7 @@
 # ExecPlan: Frontend V3 — W9.5 Workout convergence
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -82,9 +82,9 @@ exactly one page-level scroll authority; W9/W9.5/W10 records are coherent.
 
 ## Current Checkpoint
 
-- Current milestone: W9.5 implementation, regression evidence, and the full validation ladder complete; publication and exact-head hosted CI verification remaining.
+- Current milestone: W9.5 COMPLETE and merged to main (`24b01b5d47bdc9088428fe1df3e549d318e98109`, PR #67, commits `3bee453` + `e40ef87`); exact-head CI verified.
 - Completed: preflight (baseline `8cdee8e` verified = origin/main; stash, `.tmp-ios36423379932/`, W1–W9 captures, single worktree intact); source audit of the finish path, draft functions, and landing shell; root-cause confirmation of both defects; OpenSpec change authored (validated 78/78 with `openspec validate --all`; this plan validated by `agent:plan:validate`); **pre-fix reproduction executed** (a routine soft-deleted mid-session makes `logWorkoutSession()` return `skipped` with no thrown error and zero durable rows while the pre-fix handler entered the saved state, cleared the draft, and surfaced no error — fixture output preserved, fixture removed after capture); durable-success guard implemented (`resolveSessionSave` in `workoutSessionView.ts`; success requires `applied` AND a log id; post-commit bookkeeping isolation; accurate routine-unavailable message; draft clear-generation race closure; additive `reason` propagation in `workout.data.ts`); nested scroll-enabled `Screen` removed from `WorkoutScreen.tsx`; regressions authored and passing (`tests/workoutSessionSave.test.ts` 8/8; `tests/integration/workoutSaveIntegrity.data.test.ts` 7/7 real-SQLite oracles; `e2e/workout-w95.spec.ts` 6/6 rendered); W9.5 rendered audit 2/2 with 9 inspected captures under `docs/ui-ux/v3-audit/w9.5/` (the skipped-save rendered state is not stageable in-browser — entering the DB harness destroys the live session and resume re-validates the routine — so it is covered by the integration oracles, as the W9.5 task plan records); parent + W9 records reconciled (control characters removed, remaining-work corrected, W7 fragment removed, W9.5 represented with W10 next).
-- In progress: full validation ladder (lint, themes, `npm test`, workout/boundary/a11y/keyboard/theming/gamification/draft/linked-actions/deterministic-simulation lanes, existing workout e2e suites), then publication and exact-head CI verification.
+- In progress: none. W9.5 is closed; W10 (Calories / Health) is the parent campaign's next wave and is not started.
 - Important modified files: `features/workout/WorkoutSessionScreen.tsx` (durable-success guard, post-commit bookkeeping isolation, draft write/clear race), `features/workout/workout.data.ts` (additive skip-reason propagation), `features/workout/workoutSessionView.ts` (new `resolveSessionSave`), `features/workout/WorkoutScreen.tsx` (nested `Screen` removed), `tests/workoutSessionSave.test.ts` (new), `tests/integration/workoutSaveIntegrity.data.test.ts` (new), `e2e/workout-w95.spec.ts` (new), `e2e/workout-w95-audit.spec.ts` (new), `docs/ui-ux/v3-audit/w9.5/` (9 captures), `openspec/changes/frontend-v3-w95-workout-convergence/`, parent execplan/tasks, W9 execplan.
 - Last successful validation: `npx tsc --noEmit` 0 errors; `npx openspec validate --all` 78/78; `npm run agent:plan:validate:all` PASS; `npm run lint` 0 errors / 0 warnings; `npm run validate:themes` 140/140; `tests/workoutSessionSave.test.ts` 8/8; `tests/integration/workoutSaveIntegrity.data.test.ts` 7/7; `npm test` 2,664 passed / 2 skipped with the single pre-existing Windows-CRLF `tests/agentDocConsistency.test.ts` ENVIRONMENT failure (register parse sees zero entries on this host's CRLF checkout; passes in CI's LF checkout — identical at the W9 baseline); `E2E_PORT=8083 npx playwright test e2e/workout-w95.spec.ts` 10/10 twice; `e2e/workout.spec.ts` + `e2e/workout-gym-v2.spec.ts` 21/21; `e2e/workout-w9.spec.ts` + `e2e/boundary.spec.ts` 28/28; a11y + a11y-audit-contract + theming + gamification + linked-actions-log 23/23; journeys fat-fingers + a-tuesday 21/21; simulation project 3/3 + `sim:validate` 23/23; full deterministic simulation library 23/23 scenarios; W9.5 rendered audit 2/2 with 9 inspected captures.
 - Current failures: none attributable to W9.5. Inherited residuals remain recorded (audit red on the two known advisories; hosted e2e/nightly skip; native qualification pending; D14 host-load residuals; the Windows-CRLF register-parse failure; the pre-existing mid-transition capture frame visible in landing captures, identical to the accepted W9 baseline).
@@ -92,8 +92,8 @@ exactly one page-level scroll authority; W9/W9.5/W10 records are coherent.
 - Blockers: None for web continuation.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: commit the two focused changes through the normal workflow, publish the branch/PR, merge, and verify exact-head hosted CI (all frontend gates green; the only permitted red is the same two pre-existing undocumented audit advisories with hosted e2e/nightly skipped).
-- Remaining definition of done: all tasks.md items except publication + exact-head verification; the W9.5 acceptance checklist (skipped never reports success / clears draft / awards XP; accurate message; entered values intact; durable draft verified; valid applied succeeds; missing log id fails closed; exceptions recoverable; post-commit failure does not mislead; double Finish idempotent; SQLite oracles exact; one scroll-enabled Screen; mobile+desktop scrolling and keyboard verified at 360/390/412/768/1280; rendered evidence inspected; plans reconciled; merged; exact-head hosted gates green).
+- Exact next action: None — W9.5 is complete and merged (`24b01b5`, PR #67) with exact-head hosted CI verified (run `38162706650` at the merge commit: every frontend gate PASS — typecheck, Supabase edge-function type-check, lint, themes, openspec contracts, journey-label + quarantine-register parity, versioned ExecPlans, unit+integration 2,665 passed / 3 skipped; first failure `Audit runtime dependencies` on exactly the two pre-existing undocumented HIGH advisories; hosted `e2e`/`nightly` SKIPPED; Vercel production deployment success). W10 begins per the parent campaign plan.
+- Remaining definition of done: All W9.5 tasks complete and validated, and the full acceptance checklist is satisfied: `skipped` can never enter success, clear the draft, or award XP; the user receives accurate routine-unavailable guidance; in-memory entered values remain intact; durable draft behavior is verified (no clear on the error path plus the write/clear race closure); valid `applied` still succeeds; a missing log id fails closed; database exceptions remain recoverable; post-commit bookkeeping failure cannot trigger misleading duplicate-save behavior; double Finish remains idempotent; SQLite oracles confirm exactly what was persisted; the Workout landing has exactly one scroll-enabled Screen with no nested page-level scroll shell; mobile and desktop scrolling and keyboard interactions are verified at 360/390/412/768/1280; rendered evidence is inspected; W9 and parent records are reconciled with control characters removed and correct remaining-work text; the wave is merged through the normal workflow with exact-head hosted frontend gates passing; and the known audit/native/performance limitations remain documented.
 
 ## Progress
 
@@ -108,7 +108,7 @@ exactly one page-level scroll authority; W9/W9.5/W10 records are coherent.
 - [x] Reconcile W9 execplan, parent execplan, parent tasks
 - [x] Full validation ladder (typecheck, lint, themes, openspec, plans,
       vitest, workout + collateral e2e, deterministic simulation 23/23)
-- [ ] Publication + exact-head CI verification
+- [x] Publication (PR #67 merged as `24b01b5`) + exact-head CI verification (run `38162706650` at the merge commit: all frontend gates pass, 2,665 passed / 3 skipped; audit-only red on braces/node-forge; hosted e2e/nightly skipped; Vercel deploy success)
 
 ## Surprises & Discoveries
 
@@ -185,6 +185,8 @@ exactly one page-level scroll authority; W9/W9.5/W10 records are coherent.
   design, tasks, two spec deltas, this plan (authored first; source files
   follow).
 
+- 2026-10-11 — publication: branch `frontend-v3-w95-workout-convergence`, PR #67 MERGED as merge commit `24b01b5d47bdc9088428fe1df3e549d318e98109` (commits `3bee453` source fix + `e40ef87` tests/evidence/records). Exact-head run `38162706650` at the merge commit: every frontend gate PASS (typecheck, Supabase edge-function type-check, lint, themes, openspec contracts, journey-label + quarantine-register parity, versioned ExecPlans, unit+integration 260 files passed / 1 skipped, 2,665 tests passed / 3 skipped); first failing step `Audit runtime dependencies` on exactly the two pre-existing undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv); hosted `e2e`/`nightly` SKIPPED behind the quality gate (not passed, not claimed); Vercel production deployment success at the same SHA.
+
 ## Recovery / Resume Instructions
 
 1. Read `AGENTS.md`, `.agent/PLANS.md`, this plan, `proposal.md`,
@@ -202,6 +204,6 @@ tests/integration/workoutSaveIntegrity.data.test.ts`, then the workout
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: W9.5 correction opened; defects root-caused; plan authored.
-- Follow-up: implementation, evidence, reconciliation, publication.
+- Status: COMPLETE. W9.5 merged to main as `24b01b5d47bdc9088428fe1df3e549d318e98109` (PR #67); exact-head hosted run `38162706650` passed every frontend gate through unit+integration (2,665 passed / 3 skipped), the only red is the two pre-existing undocumented audit advisories, hosted e2e/nightly skipped, Vercel deploy success.
+- Summary: a workout can no longer be reported as saved unless its durable log was committed — `skipped` (and any result without a log id) fails closed with an accurate routine-unavailable message, keeps entered sets and the durable draft, and earns no XP; the durable commit is separated from post-commit bookkeeping so a committed save is never rewritten into a false failure or a duplicate insert; the debounced draft write/clear race is closed; and the Workout landing keeps exactly one page-level scroll-enabled `Screen` (verified at 360/390/412/768/1280 with the desktop 760 cap and keyboard usability). W9's design, the engine, persistence, sync, and backup contracts are untouched.
+- Follow-up: W10 (Calories / Health) per the parent campaign plan; native Android API36/x86_64 qualification (W16) and iOS (owner-deferred) remain; the Focus `planTimerStartup()` notification-scheduling timestamp residual, the W7 HEAVY-Habits and three-months-in D14 host-load residuals, the Windows-CRLF register-parse residual, and the two undocumented audit advisories remain recorded.
