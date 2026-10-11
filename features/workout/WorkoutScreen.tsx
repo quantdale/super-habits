@@ -1198,228 +1198,230 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         }))}
       />
       {confirmationDialog}
+      {/* Exactly one page-level scroll authority: a single scroll-enabled
+          `Screen` owns the landing. A nested scroll-enabled Screen would
+          duplicate the safe-area shell, scroll containers, responsive
+          gutters, bottom-navigation clearance, and keyboard behavior. */}
       <Screen scroll>
-        <Screen scroll>
-          <ScreenSection>
-            <PageHeader title="Workout" />
-            <View className="mt-1 flex-row items-center gap-2">
-              <MaterialIcons name="today" size={14} color={tokens.textMuted} />
-              <Text className="min-w-0 flex-1 text-sm" style={{ color: tokens.textMuted }}>
-                {trainingState.contextLine}
+        <ScreenSection>
+          <PageHeader title="Workout" />
+          <View className="mt-1 flex-row items-center gap-2">
+            <MaterialIcons name="today" size={14} color={tokens.textMuted} />
+            <Text className="min-w-0 flex-1 text-sm" style={{ color: tokens.textMuted }}>
+              {trainingState.contextLine}
+            </Text>
+            {trainingState.completedToday ? (
+              <Text className="text-xs font-semibold" style={{ color: tokens.successText }}>
+                Logged
               </Text>
-              {trainingState.completedToday ? (
-                <Text className="text-xs font-semibold" style={{ color: tokens.successText }}>
-                  Logged
-                </Text>
-              ) : null}
-            </View>
-            <Card accentColor={COLOR} className="mt-3">
-              <Text className="text-lg font-semibold" style={{ color: tokens.text }}>
-                {trainingState.headline}
-              </Text>
-              <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-                {trainingState.detail}
-              </Text>
-              {trainingState.primaryLabel ? (
-                <View className="mt-4">
-                  <Button
-                    label={trainingState.primaryLabel}
-                    accessibilityLabel={
-                      trainingState.kind === 'resume' && draftRoutineName
-                        ? `Resume workout · ${draftRoutineName}`
-                        : undefined
-                    }
-                    onPress={handlePrimaryAction}
-                    color={COLOR}
-                    fullWidth
-                  />
-                </View>
-              ) : null}
-              {trainingState.kind === 'resume' ? (
-                <View className="mt-2">
-                  <Button
-                    label="Discard workout"
-                    variant="ghost"
-                    onPress={() => void handleDiscardDraft()}
-                    fullWidth
-                  />
-                </View>
-              ) : null}
-              {trainingState.kind !== 'resume' ? (
-                <View className="mt-3 flex-row flex-wrap gap-2">
-                  <View className="min-w-[140px] flex-1">
-                    <Button
-                      label="Change today"
-                      variant="ghost"
-                      size="sm"
-                      onPress={() => setDaySheet({ weekday: todayWeekdayNum, scope: 'today' })}
-                    />
-                  </View>
-                  {trainingState.kind === 'scheduled' ? (
-                    <View className="min-w-[140px] flex-1">
-                      <Button
-                        label="Move workout to another day"
-                        variant="ghost"
-                        size="sm"
-                        onPress={() => {
-                          const next = new Date();
-                          next.setDate(next.getDate() + 1);
-                          setRescheduleDateInput(toDateKey(next));
-                          setRescheduleVisible(true);
-                        }}
-                      />
-                    </View>
-                  ) : (
-                    <View className="min-w-[140px] flex-1">
-                      <Button
-                        label="Plan week"
-                        variant="ghost"
-                        size="sm"
-                        onPress={() => setWeekEditorVisible(true)}
-                      />
-                    </View>
-                  )}
-                </View>
-              ) : null}
-            </Card>
-          </ScreenSection>
-
-          <ScreenSection>
-            <SectionLabel>Quick start</SectionLabel>
-            {routines.length === 0 ? (
-              <EmptyStateCard
-                accentColor={COLOR}
-                className="mb-0"
-                title="No routines yet"
-                description="Add a routine below — every routine starts a guided session with set logging and rest."
-                icon={<MaterialIcons name="fitness-center" size={26} color={colorText} />}
-              />
-            ) : (
-              quickStartRows.map((row) => (
-                <QuickStartRoutineRow
-                  key={row.routineId}
-                  row={row}
-                  accentColor={COLOR}
-                  onOpenDetail={() => openRoutineModal(row.routineId, row.name)}
-                  onStart={() => void startRoutineById(row.routineId)}
-                  onCompleteWorkout={() => {
-                    if (!quickCompleteGuardRef.current.tryStart()) return;
-                    void (async () => {
-                      try {
-                        const result = await completeRoutine(row.routineId);
-                        // Attribute the award to the log just written; a skipped
-                        // write (missing routine) earns no XP.
-                        if (result.status === 'applied' && result.logId) {
-                          recordAction('workout', result.logId);
-                        }
-                        void refresh();
-                      } finally {
-                        quickCompleteGuardRef.current.finish();
-                      }
-                    })();
-                  }}
-                  onRequestDelete={async () => {
-                    const routine = routines.find((item) => item.id === row.routineId);
-                    if (routine) await handleDeleteRoutine(routine);
-                  }}
-                />
-              ))
-            )}
-          </ScreenSection>
-
-          <ScreenSection>
-            <View className="mb-2 flex-row items-center justify-between">
-              <SectionLabel className="mb-0">This week</SectionLabel>
-              <Button
-                label="Edit plan"
-                variant="ghost"
-                size="sm"
-                accessibilityLabel="Edit weekly plan"
-                onPress={() => setWeekEditorVisible(true)}
-              />
-            </View>
-            <Card accentColor={COLOR} className="mb-0">
-              {weekStrip.map((cell) => (
-                <WeekStripRow
-                  key={cell.weekday}
-                  cell={cell}
-                  onRest={() =>
-                    void assignWeekday(cell.weekday, null, cell.isToday ? 'today' : 'weekly')
+            ) : null}
+          </View>
+          <Card accentColor={COLOR} className="mt-3">
+            <Text className="text-lg font-semibold" style={{ color: tokens.text }}>
+              {trainingState.headline}
+            </Text>
+            <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+              {trainingState.detail}
+            </Text>
+            {trainingState.primaryLabel ? (
+              <View className="mt-4">
+                <Button
+                  label={trainingState.primaryLabel}
+                  accessibilityLabel={
+                    trainingState.kind === 'resume' && draftRoutineName
+                      ? `Resume workout · ${draftRoutineName}`
+                      : undefined
                   }
-                  onAssign={() =>
-                    setDaySheet({ weekday: cell.weekday, scope: cell.isToday ? 'today' : 'weekly' })
-                  }
+                  onPress={handlePrimaryAction}
+                  color={COLOR}
+                  fullWidth
                 />
-              ))}
-            </Card>
-          </ScreenSection>
-
-          <ScreenSection>
-            <SectionLabel>New routine</SectionLabel>
-            <Card accentColor={COLOR} className="mb-0">
-              <TextField
-                label="Routine name"
-                accessibilityLabel="New routine name"
-                value={name}
-                onChangeText={(t) => {
-                  setWorkoutError(null);
-                  setName(t);
-                }}
-                placeholder="Push Day"
-              />
-              <TextField
-                label="Description"
-                accessibilityLabel="New routine description"
-                value={description}
-                onChangeText={(t) => {
-                  setWorkoutError(null);
-                  setDescription(t);
-                }}
-                placeholder="Bench + accessories"
-              />
-              <ValidationError message={workoutError} />
-              <Button label="Add routine" onPress={onCreate} color={COLOR} />
-            </Card>
-          </ScreenSection>
-
-          <ScreenSection className="mb-0">
-            <Pressable
-              onPress={() => setHistoryOpen((open) => !open)}
-              accessibilityRole="button"
-              accessibilityState={{ expanded: historyOpen }}
-              accessibilityLabel="History and insights"
-              className="flex-row items-center justify-between py-2"
-            >
-              <View className="min-w-0 flex-1">
-                <SectionLabel className="mb-0">History &amp; insights</SectionLabel>
-                <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-                  {workoutStripHasActivity
-                    ? `${workoutDaysCount} workout days · streak ${workoutStreak} · last 52 weeks`
-                    : 'Sessions, personal records, body weight, volume, and your training heatmap.'}
-                </Text>
-              </View>
-              <MaterialIcons
-                name={historyOpen ? 'expand-less' : 'expand-more'}
-                size={22}
-                color={tokens.iconMuted}
-              />
-            </Pressable>
-            {historyOpen ? (
-              <View className="mt-2">
-                {!workoutStripHasActivity ? (
-                  <EmptyStateCard
-                    accentColor={COLOR}
-                    className="mb-4"
-                    title="Complete a workout to start tracking"
-                    description="Your routine history and yearly intensity map will appear here once you log a session."
-                    icon={<MaterialIcons name="self-improvement" size={26} color={colorText} />}
-                  />
-                ) : null}
-                {historyAnalyticsComposition}
               </View>
             ) : null}
-          </ScreenSection>
-        </Screen>
+            {trainingState.kind === 'resume' ? (
+              <View className="mt-2">
+                <Button
+                  label="Discard workout"
+                  variant="ghost"
+                  onPress={() => void handleDiscardDraft()}
+                  fullWidth
+                />
+              </View>
+            ) : null}
+            {trainingState.kind !== 'resume' ? (
+              <View className="mt-3 flex-row flex-wrap gap-2">
+                <View className="min-w-[140px] flex-1">
+                  <Button
+                    label="Change today"
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => setDaySheet({ weekday: todayWeekdayNum, scope: 'today' })}
+                  />
+                </View>
+                {trainingState.kind === 'scheduled' ? (
+                  <View className="min-w-[140px] flex-1">
+                    <Button
+                      label="Move workout to another day"
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => {
+                        const next = new Date();
+                        next.setDate(next.getDate() + 1);
+                        setRescheduleDateInput(toDateKey(next));
+                        setRescheduleVisible(true);
+                      }}
+                    />
+                  </View>
+                ) : (
+                  <View className="min-w-[140px] flex-1">
+                    <Button
+                      label="Plan week"
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => setWeekEditorVisible(true)}
+                    />
+                  </View>
+                )}
+              </View>
+            ) : null}
+          </Card>
+        </ScreenSection>
+
+        <ScreenSection>
+          <SectionLabel>Quick start</SectionLabel>
+          {routines.length === 0 ? (
+            <EmptyStateCard
+              accentColor={COLOR}
+              className="mb-0"
+              title="No routines yet"
+              description="Add a routine below — every routine starts a guided session with set logging and rest."
+              icon={<MaterialIcons name="fitness-center" size={26} color={colorText} />}
+            />
+          ) : (
+            quickStartRows.map((row) => (
+              <QuickStartRoutineRow
+                key={row.routineId}
+                row={row}
+                accentColor={COLOR}
+                onOpenDetail={() => openRoutineModal(row.routineId, row.name)}
+                onStart={() => void startRoutineById(row.routineId)}
+                onCompleteWorkout={() => {
+                  if (!quickCompleteGuardRef.current.tryStart()) return;
+                  void (async () => {
+                    try {
+                      const result = await completeRoutine(row.routineId);
+                      // Attribute the award to the log just written; a skipped
+                      // write (missing routine) earns no XP.
+                      if (result.status === 'applied' && result.logId) {
+                        recordAction('workout', result.logId);
+                      }
+                      void refresh();
+                    } finally {
+                      quickCompleteGuardRef.current.finish();
+                    }
+                  })();
+                }}
+                onRequestDelete={async () => {
+                  const routine = routines.find((item) => item.id === row.routineId);
+                  if (routine) await handleDeleteRoutine(routine);
+                }}
+              />
+            ))
+          )}
+        </ScreenSection>
+
+        <ScreenSection>
+          <View className="mb-2 flex-row items-center justify-between">
+            <SectionLabel className="mb-0">This week</SectionLabel>
+            <Button
+              label="Edit plan"
+              variant="ghost"
+              size="sm"
+              accessibilityLabel="Edit weekly plan"
+              onPress={() => setWeekEditorVisible(true)}
+            />
+          </View>
+          <Card accentColor={COLOR} className="mb-0">
+            {weekStrip.map((cell) => (
+              <WeekStripRow
+                key={cell.weekday}
+                cell={cell}
+                onRest={() =>
+                  void assignWeekday(cell.weekday, null, cell.isToday ? 'today' : 'weekly')
+                }
+                onAssign={() =>
+                  setDaySheet({ weekday: cell.weekday, scope: cell.isToday ? 'today' : 'weekly' })
+                }
+              />
+            ))}
+          </Card>
+        </ScreenSection>
+
+        <ScreenSection>
+          <SectionLabel>New routine</SectionLabel>
+          <Card accentColor={COLOR} className="mb-0">
+            <TextField
+              label="Routine name"
+              accessibilityLabel="New routine name"
+              value={name}
+              onChangeText={(t) => {
+                setWorkoutError(null);
+                setName(t);
+              }}
+              placeholder="Push Day"
+            />
+            <TextField
+              label="Description"
+              accessibilityLabel="New routine description"
+              value={description}
+              onChangeText={(t) => {
+                setWorkoutError(null);
+                setDescription(t);
+              }}
+              placeholder="Bench + accessories"
+            />
+            <ValidationError message={workoutError} />
+            <Button label="Add routine" onPress={onCreate} color={COLOR} />
+          </Card>
+        </ScreenSection>
+
+        <ScreenSection className="mb-0">
+          <Pressable
+            onPress={() => setHistoryOpen((open) => !open)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: historyOpen }}
+            accessibilityLabel="History and insights"
+            className="flex-row items-center justify-between py-2"
+          >
+            <View className="min-w-0 flex-1">
+              <SectionLabel className="mb-0">History &amp; insights</SectionLabel>
+              <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                {workoutStripHasActivity
+                  ? `${workoutDaysCount} workout days · streak ${workoutStreak} · last 52 weeks`
+                  : 'Sessions, personal records, body weight, volume, and your training heatmap.'}
+              </Text>
+            </View>
+            <MaterialIcons
+              name={historyOpen ? 'expand-less' : 'expand-more'}
+              size={22}
+              color={tokens.iconMuted}
+            />
+          </Pressable>
+          {historyOpen ? (
+            <View className="mt-2">
+              {!workoutStripHasActivity ? (
+                <EmptyStateCard
+                  accentColor={COLOR}
+                  className="mb-4"
+                  title="Complete a workout to start tracking"
+                  description="Your routine history and yearly intensity map will appear here once you log a session."
+                  icon={<MaterialIcons name="self-improvement" size={26} color={colorText} />}
+                />
+              ) : null}
+              {historyAnalyticsComposition}
+            </View>
+          ) : null}
+        </ScreenSection>
       </Screen>
     </>
   );

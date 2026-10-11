@@ -254,3 +254,55 @@ export function remapCurrentIndex(
   }
   return best ?? currentIndex;
 }
+
+// ---------------------------------------------------------------------------
+// Finish truth (W9.5): the durable-success contract. A workout is saved only
+// when its log row was actually committed. `logWorkoutSession()` can return
+// `skipped` without throwing (e.g. its routine was soft-deleted mid-session),
+// and an applied result without a log id is treated the same way — fail
+// closed. The database commit decides saved-vs-not-saved; draft cleanup and
+// reward attribution are secondary bookkeeping that must never rewrite a
+// committed save into a false failure. No DB, no React.
+// ---------------------------------------------------------------------------
+
+/** The data-layer finish result shape this module reasons about. */
+export type SessionSaveResult = {
+  status: 'applied' | 'skipped';
+  logId: string | null;
+  reason?: string | null;
+};
+
+export type SessionSaveDecision = {
+  /** True only when a durable workout log row was committed. */
+  saved: boolean;
+  /** The committed log id when saved; null otherwise. */
+  logId: string | null;
+  /** Accurate, user-facing explanation when not saved; null when saved. */
+  message: string | null;
+};
+
+const ROUTINE_UNAVAILABLE_MESSAGE =
+  "This workout wasn't saved because its routine is no longer available. Your entered sets are still here, but this session can't be saved to a routine that no longer exists.";
+
+const GENERIC_NOT_SAVED_MESSAGE =
+  "This workout wasn't saved — the save didn't complete. Your entered sets are still here; try again.";
+
+/**
+ * Decide the truthful outcome of a finish from the data-layer result alone.
+ * Success requires BOTH `status === 'applied'` and a non-empty log id, so a
+ * skipped write — or an inconsistent result missing its id — can never enter
+ * the saved state, clear the draft, or earn XP. The message names the actual
+ * cause instead of promising that retrying the same unavailable routine will
+ * succeed.
+ */
+export function resolveSessionSave(result: SessionSaveResult): SessionSaveDecision {
+  if (result.status === 'applied' && typeof result.logId === 'string' && result.logId.length > 0) {
+    return { saved: true, logId: result.logId, message: null };
+  }
+  return {
+    saved: false,
+    logId: null,
+    message:
+      result.reason === 'target_missing' ? ROUTINE_UNAVAILABLE_MESSAGE : GENERIC_NOT_SAVED_MESSAGE,
+  };
+}

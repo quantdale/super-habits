@@ -42,6 +42,7 @@ import {
   remapCurrentIndex,
   remapPhaseIndices,
   remapSessionMaps,
+  resolveSessionSave,
   type SetRow,
 } from './workoutSessionView';
 import {
@@ -246,7 +247,12 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   // check and log two workouts (CG-3 defect class). tryStart() is synchronous
   // and drops the second press before any write begins.
   const finishGuardRef = useRef(createSubmitGuard());
-  const [savedOutcome, setSavedOutcome] = useState<{ newRecords: string[] } | null>(null);
+  const [savedOutcome, setSavedOutcome] = useState<{
+    newRecords: string[];
+    /** True when the log committed but secondary post-commit bookkeeping
+     *  (draft cleanup, reward attribution) failed — the save is still real. */
+    bookkeepingFailed?: boolean;
+  } | null>(null);
   // Truthful finish: a failed save keeps the session and offers a retry.
   const [saveError, setSaveError] = useState<string | null>(null);
   const [previousLookup, setPreviousLookup] = useState<PreviousSetLookup | null>(null);
@@ -416,10 +422,15 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   // Draft persistence: written on Start, measurement edits, and every phase
   // transition so an app restart can offer to resume; cleared on
   // finish/abandon/discard. Timer ticks do not write a row every second.
+  // Writes are async and best-effort, so a clear generation counter keeps a
+  // late-resolving write from resurrecting a draft that was cleared while
+  // that write was in flight.
+  const draftClearGenerationRef = useRef(0);
   const persistDraft = useCallback(
     (phaseIndex: number) => {
       const startedAtMs = startedAtMsRef.current;
       if (startedAtMs === null) return;
+      const clearGenerationAtWrite = draftClearGenerationRef.current;
       // JSON keys are strings; the normalizer keeps only valid entries.
       const draftDispositions = Object.fromEntries(
         Object.entries(dispositionsRef.current).map(([index, disposition]) => [
@@ -442,14 +453,27 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         ...(Object.keys(draftEnteredSets).length > 0 ? { enteredSets: draftEnteredSets } : {}),
         remainingSeconds: remainingRef.current,
         ...(Object.keys(draftAddedSets).length > 0 ? { addedSets: draftAddedSets } : {}),
-      }).catch(() => {
-        // Best-effort: the live session never depends on the draft.
-      });
+      })
+        .catch(() => {
+          // Best-effort: the live session never depends on the draft.
+        })
+        .then(() => {
+          // A clear happened while this write was in flight: the clear is
+          // the newer act, so re-assert it instead of leaving a resurrected
+          // draft behind.
+          if (draftClearGenerationRef.current !== clearGenerationAtWrite) {
+            void clearWorkoutSessionDraft().catch(() => {});
+          }
+        });
     },
     [routine.id, addedSets],
   );
 
   const clearDraft = useCallback(() => {
+    // Bump the clear generation so a draft write already in flight cannot
+    // resurrect the draft after this clear lands (the write re-asserts the
+    // delete below).
+    draftClearGenerationRef.current += 1;
     void clearWorkoutSessionDraft().catch(() => {
       // A stale draft only offers a resume that re-validates the routine.
     });
@@ -813,14 +837,35 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         // original start and the restart must not count as workout minutes.
         ...(resume ? { activeDurationSeconds: Math.max(0, elapsedSecondsRef.current) } : {}),
       });
-      clearDraft();
-      // Reward after the log is durable, attributed to THIS log id: without
-      // it the award would fall back to the oldest unrewarded log instead.
-      if (logResult.status === 'applied' && logResult.logId) {
-        recordAction('workout', logResult.logId);
+
+      // The durable commit decides saved-vs-not-saved: `logWorkoutSession`
+      // can return `skipped` WITHOUT throwing (e.g. its routine was
+      // soft-deleted mid-session), so success requires BOTH an applied
+      // status and the committed log id. Anything else fails closed.
+      const save = resolveSessionSave(logResult);
+      if (save.saved && save.logId) {
+        // Post-commit bookkeeping is secondary: the workout is already
+        // durable, so a failure here must not rewrite a committed save into
+        // a false "not saved" and must never invite a second insert.
+        let bookkeepingFailed = false;
+        try {
+          clearDraft();
+          // Reward after the log is durable, attributed to THIS log id:
+          // without it the award would fall back to the oldest unrewarded
+          // log instead.
+          recordAction('workout', save.logId);
+        } catch {
+          bookkeepingFailed = true;
+        }
+        setSaveError(null);
+        setSavedOutcome({ newRecords, bookkeepingFailed });
+      } else {
+        // Not saved: the session, its draft, and every entered value stay
+        // exactly as they are, and the message names the actual cause
+        // instead of promising a retry of the same dead routine.
+        setSavedOutcome(null);
+        setSaveError(save.message);
       }
-      setSaveError(null);
-      setSavedOutcome({ newRecords });
     } catch {
       // Truthful failure: the session stays, the draft stays, and the user
       // can retry. No success summary, no XP, no cleared draft.
@@ -912,6 +957,19 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                 <Text className="text-sm" style={{ color: tokens.textMuted }}>
                   {finishProgress.skippedSets} set{finishProgress.skippedSets === 1 ? '' : 's'}{' '}
                   skipped
+                </Text>
+              ) : null}
+              {savedOutcome.bookkeepingFailed ? (
+                // Honest secondary note: the log is durable; only the
+                // post-commit bookkeeping did not finish. The user is never
+                // invited to insert a second workout.
+                <Text
+                  className="text-sm"
+                  style={{ color: tokens.textMuted }}
+                  accessibilityLiveRegion="polite"
+                >
+                  Your workout is saved. Some cleanup after saving didn&apos;t finish — nothing more
+                  is needed.
                 </Text>
               ) : null}
               {savedOutcome.newRecords.length > 0 ? (
