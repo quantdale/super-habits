@@ -77,9 +77,9 @@ rendered-truth evidence and green gates before any closure claim.
 
 ## Current Checkpoint
 
-- Current milestone: W9 implementation COMPLETE (code, tests, evidence, gates); publication via branch/PR in progress.
+- Current milestone: W9 COMPLETE and merged to main. W9.5 — the bounded workout convergence correction (save integrity + single scroll authority) — is tracked separately in `../frontend-v3-w95-workout-convergence/execplan.md` and is the only active workout work.
 - Completed: preflight (baseline `1502ad3f6b188b5c4bc6548f4bed00261e0e9664` verified = origin/main; stash, `.tmp-ios36423379932/`, W1–W8.5 captures, single worktree intact); source audit; fresh Refero research (R12); W9 OpenSpec change (proposal, design, tasks, four spec deltas — `openspec validate` PASS); `workoutLanding.ts` + `workoutSessionView.ts` pure view models (35 unit tests); `listRoutineCounts()` additive data read; draft `addedSets` field (normalize-tested); landing rebuilt (training state, quick-start rows, collapsed week strip + assignment sheet, new-routine form, History & insights disclosure gating all heavy analytics); session rebuilt (session bar with accurate progress, exercise set table with previous context and modality-correct inputs, dominant DONE per actionable set, Skip set, session-local Add set with phase-index remap through draft/resume/log, docked rest panel, truthful finish error+retry, draft-preserving leave via the shared web-safe confirmation); e2e: workout.spec 14/14, workout-gym-v2 7/7, workout-w9 6/6 (quick-start hierarchy, week-strip template/override SQL oracles, set-table logging, add-set log numbering, draft-preserving leave, nonblocking rest dock), boundary 22/22, a11y 10/10 (one W9-introduced contrast defect found and re-inked to AA), command/theming green, fat-fingers 13/13, a-tuesday 8/8, three-months-in D14 7/7 (maxSwitch 538/800ms, 32.8% headroom), sim model 23/23; W9 rendered evidence 22 captures under `docs/ui-ux/v3-audit/w9/`, all manually inspected; defect ledger SYS-20 + SUR-06 VERIFIED-FIXED with Workout portions of SYS-01/02/07/17 noted; parent tasks 9.1–9.3 checked; known-gaps W9 addendum recorded.
-- In progress: publication (branch commit → push → PR → merge) and exact-head CI verification; full e2e:full battery running for the record.
+- In progress: none for W9. W9 closed to main in two merges: PR #65 (`55f8532`, Workout reconstruction) and PR #66 (`a8d1c3b` + closure `8cdee8e717ac36dbe4eafbc25099ac0eeeb786a4`, W9 closure + W10 handoff). W9.5 corrections are owned by their own plan and do not reopen W9 tasks.
 - Important modified files: `features/workout/WorkoutScreen.tsx` (landing rebuild), `features/workout/WorkoutSessionScreen.tsx` (session rebuild + web-safe leave + finish retry), `features/workout/workoutLanding.ts` (new), `features/workout/workoutSessionView.ts` (new), `features/workout/workout.data.ts` (`listRoutineCounts`, draft `addedSets`), `e2e/workout.spec.ts`, `e2e/workout-gym-v2.spec.ts`, `e2e/workout-w9.spec.ts` (new), `e2e/workout-w9-audit.spec.ts` (new), `e2e/journeys/three-months-in.spec.ts` (workout section marker), `tests/workoutLanding.test.ts` (new), `tests/workoutSessionView.test.ts` (new), `tests/workout.draft.test.ts`, `tests/integration/workoutQueries.data.test.ts`, `docs/ui-ux/v3-audit/w9/` (22 captures), `docs/ui-ux/14-v3-reference-ledger.md` (R12), `docs/ui-ux/15-v3-defect-ledger.md`, `docs/testing/known-gaps.md`, parent execplan/tasks, this change.
 - Last successful validation: `npx tsc --noEmit` 0 errors; `npx eslint .`-scope workout+tests 0 errors/0 warnings; `npm run validate:themes` 140/140; `openspec validate --all` 77/77; `agent:plan:validate:all` PASS; `npm test` 2640 passed / 2 skipped with the single pre-existing Windows-CRLF `tests/agentDocConsistency.test.ts` ENVIRONMENT failure (register parser sees zero entries under `core.autocrlf=true`; passes in CI's LF checkout — identical at the W8.5 baseline).
 - Current failures: none attributable to W9. Hosted audit red (braces GHSA-vfj7-8cjw-p6xm, node-forge GHSA-86w9-cpqp-85rv) and hosted e2e/nightly skip remain inherited; Android API36/x86_64 qualification pending (W16); iOS owner-deferred; Focus `planTimerStartup()` notification-scheduling timestamp residual remains a separate Focus/native-lifecycle follow-up.
@@ -87,8 +87,8 @@ rendered-truth evidence and green gates before any closure claim.
 - Blockers: None for web continuation.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: None — W9 complete and merged to main 55f8532 (PR 65); begin W10 per the parent campaign plan.
-- Remaining definition of done: All W9.1–W9.3 tasks complete and evidenced; validation ladder green (typecheck, lint, themes 140/140, openspec 77/77, plans, Vitest, e2e:full 271 passed, journeys + D14, sim 23/23); 22 W9 captures inspected; defect ledger and parent plan reconciled; W9 merged with exact-head hosted frontend gates passing (2650 tests passed / 3 skipped) and only the two pre-existing undocumented audit advisories red with hosted e2e/nightly skipped.
+- Exact next action: None — W9 is complete and merged (PR #65 merge `55f8532`; PR #66 closure merge `8cdee8e717ac36dbe4eafbc25099ac0eeeb786a4`). Active workout work continues in `../frontend-v3-w95-workout-convergence/execplan.md`; W10 begins only after W9.5 closes.
+- Remaining definition of done: All W9.1–W9.3 tasks complete and evidenced; validation ladder green (typecheck, lint, themes 140/140, openspec 77/77, plans, Vitest, e2e:full 271 passed, journeys + D14, sim 23/23); 22 W9 captures inspected; defect ledger and parent plan reconciled; W9 merged with exact-head hosted frontend gates passing (2650 tests passed / 3 skipped at final main `8cdee8e` via runs `38083748134` and the PR #66 runs) and only the two pre-existing undocumented audit advisories red with hosted e2e/nightly skipped. Remaining campaign work lives in the parent plan and the W9.5 correction plan; nothing in W9 is left open.
 
 ## Progress
 
@@ -104,7 +104,8 @@ rendered-truth evidence and green gates before any closure claim.
 - [x] Regression suites: unit, integration, e2e updates + new coverage
 - [x] Rendered evidence docs/ui-ux/v3-audit/w9/ inspected manually (22 captures)
 - [x] Validation ladder + defect ledger + parent reconciliation
-- [x] Publication + exact-head CI verification (PR 65 merged at 55f8532; exact-main run 38079997882: all frontend gates pass, audit-only red on braces/node-forge, hosted e2e/nightly skipped)
+- [x] Publication + exact-head CI verification (PR 65 merged at 55f8532; PR 66 closure merged at 8cdee8e; exact-main run 38083748134: every frontend gate passes — typecheck, Supabase edge-function type-check, lint, themes, openspec contracts, journey-label + quarantine-register parity, versioned ExecPlans, unit+integration 2,650 passed / 3 skipped; first failing step `Audit runtime dependencies` on exactly the two pre-existing undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv); hosted `e2e`/`nightly` SKIPPED behind the quality gate — not passed, not claimed)
+- [x] W9 closed; W9.5 bounded corrections handed to `../frontend-v3-w95-workout-convergence/execplan.md` (W9 tasks are not reopened)
 
 ## Surprises & Discoveries
 
@@ -168,12 +169,11 @@ rendered-truth evidence and green gates before any closure claim.
 1. Read `AGENTS.md`, this plan, `proposal.md`, and `design.md`.
 2. `git status --short` and `git log --oneline -5`; reconcile with the
    checkpoint above (Git wins).
-3. Continue from "Exact next action": the landing view model
-   `features/workout/workoutLanding.ts` with `tests/workoutLanding.test.ts`,
-   then the `WorkoutScreen.tsx` rebuild.
-4. Validation: `npm run typecheck`, `npm run lint`, `npx vitest run
-tests/workoutLanding.test.ts tests/workoutSessionView.test.ts`, then the
-   workout e2e suites after `npm run build:e2e` with
+3. W9 itself is complete: do not redo W9 work. Active workout corrections
+   resume from `../frontend-v3-w95-workout-convergence/execplan.md`
+   (its "Exact next action").
+4. Validation for any further workout work: `npm run typecheck`,
+   `npm run lint`, then the workout suites after `npm run build:e2e` with
    `E2E_PORT=8083` (inspect port owners first; never kill unrelated
    processes).
 5. If hosted CI fails at "Validate versioned ExecPlans": run
@@ -181,6 +181,6 @@ tests/workoutLanding.test.ts tests/workoutSessionView.test.ts`, then the
 
 ## Outcomes & Retrospective
 
-- Status: COMPLETE. W9 merged to main at `55f8532` (PR 65); exact-head hosted frontend gates pass through unit/integration (2650 passed / 3 skipped), first failure is the two pre-existing undocumented audit advisories, hosted e2e/nightly skipped.
+- Status: COMPLETE. W9 merged to main through PR #65 (`55f8532`, Workout reconstruction) and PR #66 (closure `8cdee8e717ac36dbe4eafbc25099ac0eeeb786a4`). Exact-head hosted frontend gates pass through unit/integration (2,650 passed / 3 skipped at run `38083748134`); the only red is the two pre-existing undocumented audit advisories (`braces`, `node-forge`), with hosted e2e/nightly skipped. W9.5 corrections (skipped-save false success, nested Screen scroll) are tracked in their own plan and do not reopen any W9 task.
 - Summary: Workout now trains-first — a quick-start landing with one resume authority and a readable collapsed week (SYS-20, SUR-06 verified-fixed), a set-logging-first live session with a docked nonblocking rest panel and a real persisted session-local Add set, and truthful finish/PR/cancel behavior — all on the untouched workout engine, with 22 inspected captures and a clean D14 baseline.
 - Follow-up: W10 (Calories/Health) per the parent campaign; native Android API36/x86_64 qualification (W16) and iOS (owner-deferred) remain; the Focus `planTimerStartup()` notification-scheduling timestamp residual remains a separate Focus/native-lifecycle follow-up.

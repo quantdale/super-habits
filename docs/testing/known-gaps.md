@@ -585,6 +585,7 @@ in `.agent/execplans/integration-tinypool-ipc-channel-closed-v1.md`.
 **Gate site:** `e2e/pomodoro-w8-audit.spec.ts`
 **Gate site:** `e2e/pomodoro-w85-audit.spec.ts`
 **Gate site:** `e2e/workout-w9-audit.spec.ts`
+**Gate site:** `e2e/workout-w95-audit.spec.ts`
 
 **Reason:** the campaign's visual-audit harness seeds TYPICAL fixtures and
 captures ~47 screenshots per run (`docs/ui-ux/v3-audit/`). It is gated with
@@ -638,3 +639,28 @@ or assertion changed. Native certification remains outside web evidence
 (Android API36/x86_64 pending at W16; iOS owner-deferred), and the Focus
 `planTimerStartup()` notification-scheduling timestamp residual remains a
 separate Focus/native-lifecycle follow-up, untouched by W9.
+
+### W9.5 workout convergence addendum (2026-10-11)
+
+W9.5 closes two independently verified source-level defects at the W9
+baseline without redesigning Workout. (1) `handleFinish()` treated a
+`skipped` `logWorkoutSession()` result as success: `clearDraft()` and
+`setSavedOutcome()` ran unconditionally, so a workout whose routine was
+soft-deleted mid-session showed "Workout saved" with no durable row. Success
+now requires `applied` AND a log id (`resolveSessionSave`, exercised by
+`tests/workoutSessionSave.test.ts` and real-SQLite oracles in
+`tests/integration/workoutSaveIntegrity.data.test.ts`), the failure names the
+routine-unavailable cause, post-commit bookkeeping is isolated, and the
+debounced draft write/clear race is closed by a clear generation. (2) The
+Workout landing rendered one scroll-enabled `Screen` inside another; exactly
+one page-level scroll authority remains (`e2e/workout-w95.spec.ts` proves the
+single scroll container, desktop 760 cap, and keyboard usability).
+
+`e2e/workout-w95-audit.spec.ts` uses the same `VISUAL_AUDIT=1` opt-in gate
+for `docs/ui-ux/v3-audit/w9.5/` (9 inspected captures: empty, populated,
+routine creation, history expanded, dark, 360/768/1280, save success). The
+skipped-save rendered state is not stageable in-browser — entering the DB
+harness destroys the live session's React state and resume re-validates the
+routine — so it is covered by the deterministic integration oracles above.
+W9.5's behavioral twin `e2e/workout-w95.spec.ts` (6) runs unconditionally.
+No failed behavioral test is quarantined by the evidence-only gate.
