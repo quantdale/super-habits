@@ -46,36 +46,40 @@ export function PlanningSummaryRow({
           className="min-h-12 min-w-0 flex-1 justify-center py-1"
           onPress={onPress}
         >
-          <Text
-            className="text-base font-semibold"
-            style={{ color: tokens.text }}
-            numberOfLines={2}
+          <View className="flex-row items-center gap-2">
+            <View className="min-w-0 flex-1">
+              <Text
+                className="text-base font-semibold"
+                style={{ color: tokens.text }}
+                numberOfLines={2}
+              >
+                {title}
+              </Text>
+              <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }} numberOfLines={2}>
+                {status}
+                {context ? ` · ${context}` : ''}
+                {targetDate ? ` · Due ${targetDate}` : ''}
+              </Text>
+            </View>
+            <Text
+              className="text-sm font-semibold"
+              style={{ color: tokens.text }}
+              accessibilityLabel={`${percent} percent progress`}
+            >
+              {percent}%
+            </Text>
+          </View>
+          <View
+            className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full"
+            style={{ backgroundColor: tokens.surfaceSunken }}
           >
-            {title}
-          </Text>
-          <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }} numberOfLines={2}>
-            {status}
-            {context ? ` · ${context}` : ''}
-            {targetDate ? ` · Due ${targetDate}` : ''}
-          </Text>
+            <View
+              className="h-1.5 rounded-full"
+              style={{ width: `${percent}%`, backgroundColor: accentColor }}
+            />
+          </View>
         </Pressable>
-        <Text
-          className="text-sm font-semibold"
-          style={{ color: tokens.text }}
-          accessibilityLabel={`${percent} percent progress`}
-        >
-          {percent}%
-        </Text>
         {actions}
-      </View>
-      <View
-        className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full"
-        style={{ backgroundColor: tokens.surfaceSunken }}
-      >
-        <View
-          className="h-1.5 rounded-full"
-          style={{ width: `${percent}%`, backgroundColor: accentColor }}
-        />
       </View>
     </View>
   );

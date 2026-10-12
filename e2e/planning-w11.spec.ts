@@ -35,6 +35,12 @@ test.describe('W11 Planning disclosure hierarchy', () => {
     await expect(
       page.getByRole('button', { name: /^W11 Project, Active, 0 percent progress/ }),
     ).toBeVisible();
+    // The percentage belongs to the card's main press target, not an inert
+    // sibling; reorder arrows remain independent buttons.
+    await page.getByText('0%', { exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Back to projects' })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to projects' }).click();
+
     const filters = page.getByRole('button', { name: 'Projects filters and sort' });
     await expect(filters).toHaveAttribute('aria-expanded', 'false');
     await expect(page.getByRole('button', { name: 'Filter projects by Completed' })).toHaveCount(0);
@@ -75,6 +81,10 @@ test.describe('W11 Planning disclosure hierarchy', () => {
     await expect(page.getByPlaceholder('Optional')).toHaveCount(2);
     await page.getByRole('button', { name: 'Create Goal' }).click();
     await expect(page.getByRole('button', { name: /^W11 Run, Active, 10 percent/ })).toBeVisible();
+    await page.getByText('10%', { exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Back to goals' })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to goals' }).click();
+
     const filters = page.getByRole('button', { name: 'Goals filters and sort' });
     await expect(filters).toHaveAttribute('aria-expanded', 'false');
     await filters.click();
