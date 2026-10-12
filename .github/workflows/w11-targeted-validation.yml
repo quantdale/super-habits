@@ -1,0 +1,29 @@
+name: W11 Targeted Planning Browser Validation (temporary)
+on:
+  push:
+    branches: [frontend-v3-w11-planning]
+jobs:
+  w11-planning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Build app for browser verification
+        run: npm run build:e2e
+      - name: Verify W11 and existing Planning Hub journeys
+        run: npx playwright test e2e/planning-w11.spec.ts e2e/planning-hub.spec.ts --project=chromium
+        env:
+          TZ: Asia/Manila
+      - name: Retain failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w11-playwright-failures
+          path: .cursor/playwright-output/
+          retention-days: 7
