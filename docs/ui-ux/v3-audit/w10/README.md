@@ -109,3 +109,21 @@ through Health, and `tests/healthNavigationW10.test.ts` pins the structure.
 - The seeded audit day (5 entries, realistic macros) is deterministic; the
   fixture's own 9999-kcal stress entry is intentionally excluded so the hero
   and bars stay legible.
+
+## W10.5 — D3 measurement provenance clarification
+
+The original D3 JSON records above are preserved unchanged. Their `commit`
+field was captured with `git rev-parse --short HEAD`: it identifies the
+checked-out parent commit, **not** a complete source-tree or generated bundle
+fingerprint. The six-tab measurement was recorded after implementation edits
+on top of `21a598b` but before those edits were committed; its displayed
+`commit: "21a598b"` does **not** mean the five-destination code was measured
+twice. The shipped six-tab source was subsequently merged in PR #70 at
+`f7d313b`.
+
+The historical six-tab dirty diff and exact build hash were not captured.
+W10.5 adds `sourceProvenance` to the D3 instrument for future runs:
+`headCommit`, `headTree`, `trackedDiffSha256`, `dirty`, and
+`untrackedFileCount`. This improves future provenance, but does not
+retroactively fingerprint either original build, nor cover the generated
+`dist/` bytes. Future head-to-head studies should use clean, pinned builds.

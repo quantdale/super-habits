@@ -53,7 +53,7 @@ export function CaloriesDailyHero({
           style={{ backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border }}
         >
           <Text variant="label" style={{ color: tokens.text }}>
-            Goal {formatKcal(goal)}
+            Edit goal
           </Text>
         </Pressable>
       </View>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
@@ -10,7 +10,7 @@ import type { MacroTargets } from './calories.domain';
 type Props = {
   visible: boolean;
   currentTargets: MacroTargets;
-  onSave: (targets: MacroTargets) => void;
+  onSave: (targets: MacroTargets) => Promise<void>;
   onClose: () => void;
 };
 
@@ -34,6 +34,9 @@ export function MacroTargetsModal({ visible, currentTargets, onSave, onClose }: 
     fats: String(currentTargets.fats),
   });
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  // Synchronous guard prevents a second press before React re-renders.
+  const savingRef = useRef(false);
 
   // Reset the draft when the modal opens, without an effect:
   // https://react.dev/reference/react/useState#storing-information-from-previous-renders
@@ -50,7 +53,8 @@ export function MacroTargetsModal({ visible, currentTargets, onSave, onClose }: 
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (savingRef.current) return;
     // Empty is invalid, not zero: `Number('') === 0` would otherwise pass the
     // non-negative check below, silently save 0, and hide that macro bar.
     if (FIELDS.some(({ key }) => values[key].trim() === '')) {
@@ -66,17 +70,29 @@ export function MacroTargetsModal({ visible, currentTargets, onSave, onClose }: 
       setError('Macro grams must be 999 or less.');
       return;
     }
-    onSave({
-      calories: currentTargets.calories,
-      protein: Math.round(parsed[0].value),
-      carbs: Math.round(parsed[1].value),
-      fats: Math.round(parsed[2].value),
-    });
-    onClose();
+    savingRef.current = true;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave({
+        calories: currentTargets.calories,
+        protein: Math.round(parsed[0].value),
+        carbs: Math.round(parsed[1].value),
+        fats: Math.round(parsed[2].value),
+      });
+      onClose();
+    } catch {
+      // A failure may occur after the local write, in backup bookkeeping.
+      // Never claim that the target definitely was or was not committed.
+      setError('Could not finish saving targets. Please try again.');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   };
 
   return (
-    <Modal title="Daily targets" visible={visible} onClose={onClose}>
+    <Modal title="Daily targets" visible={visible} onClose={saving ? () => undefined : onClose}>
       <Text className="mb-3 text-xs" style={{ color: tokens.textMuted }}>
         Optional per-day protein/carb/fat targets for the macro bars. Informational only.
       </Text>
@@ -101,10 +117,10 @@ export function MacroTargetsModal({ visible, currentTargets, onSave, onClose }: 
       ) : null}
       <View className="mt-4 flex-row gap-2">
         <View className="flex-1">
-          <Button label="Cancel" variant="ghost" onPress={onClose} />
+          <Button label="Cancel" variant="ghost" disabled={saving} onPress={onClose} />
         </View>
         <View className="flex-1">
-          <Button label="Save targets" onPress={handleSave} />
+          <Button label="Save targets" loading={saving} onPress={() => void handleSave()} />
         </View>
       </View>
     </Modal>

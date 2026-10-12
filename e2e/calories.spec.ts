@@ -2,6 +2,7 @@ import { test, expect } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
 import { queryRows } from './helpers/dbHarness';
+import { seedSql } from './helpers/seed';
 import { clickCaloriesAddEntry, fillCalorieMacrosOnly, fillCaloriesMacros } from './helpers/forms';
 import { rapidPress } from './helpers/gestures';
 
@@ -139,6 +140,62 @@ test.describe('Calories', () => {
     });
   });
 
+  test('failed macro-target write preserves editor and does not update displayed targets', async ({
+    page,
+  }) => {
+    // Real SQLite trigger rejects the write. DB harness navigation destroys
+    // React state, so seed before opening the modal and query rows last.
+    await seedSql(
+      page,
+      `CREATE TRIGGER reject_macro_target_write
+         BEFORE INSERT ON app_meta
+         WHEN NEW.key = 'calorie_targets'
+         BEGIN SELECT RAISE(ABORT, 'target-write-blocked'); END;`,
+    );
+    await goToTab(page, 'calories');
+    await page.getByLabel('Edit daily macro targets').click();
+    await page.getByLabel('Protein (g)').fill('180');
+    await page.getByRole('button', { name: 'Save targets' }).click();
+
+    await expect(
+      page.getByText('Could not finish saving targets. Please try again.'),
+    ).toBeVisible();
+    await expect(page.getByLabel('Protein (g)')).toHaveValue('180');
+    await expect(page.getByText('0g / 150g', { exact: true })).toBeVisible();
+
+    const rows = await queryRows(page, "SELECT value FROM app_meta WHERE key = 'calorie_targets'");
+    expect(rows).toHaveLength(0);
+  });
+
+  test('partial backup-intent failure keeps the committed local target visible', async ({
+    page,
+  }) => {
+    // app_meta commits, then the separate backup settings outbox transaction
+    // rejects. UI must reconcile the persisted target instead of showing stale
+    // macro bars or an inaccurate total failure.
+    await seedSql(
+      page,
+      `CREATE TRIGGER reject_backup_settings_intent
+         BEFORE INSERT ON sync_outbox
+         WHEN NEW.entity = 'user_backup_settings'
+         BEGIN SELECT RAISE(ABORT, 'backup-outbox-blocked'); END;`,
+    );
+    await goToTab(page, 'calories');
+    await page.getByLabel('Edit daily macro targets').click();
+    await page.getByLabel('Protein (g)').fill('180');
+    await page.getByRole('button', { name: 'Save targets' }).click();
+
+    await expect(
+      page.getByText('Targets saved locally. Backup update could not be confirmed.'),
+    ).toBeVisible();
+    await expect(page.getByLabel('Protein (g)')).not.toBeVisible();
+    await expect(page.getByText('0g / 180g', { exact: true })).toBeVisible();
+
+    const rows = await queryRows(page, "SELECT value FROM app_meta WHERE key = 'calorie_targets'");
+    expect(rows).toHaveLength(1);
+    expect(JSON.parse(String(rows[0]?.value))).toMatchObject({ protein: 180 });
+  });
+
   test('macro targets modal rejects grams over 999', async ({ page }) => {
     await page.getByLabel('Edit daily macro targets').click();
     await page.getByLabel('Protein (g)').fill('1000');
@@ -194,7 +251,12 @@ test.describe('Calories', () => {
     await page.getByRole('textbox', { name: 'Calories (kcal)' }).fill('1500');
     await page.getByText('Save goals', { exact: true }).click();
 
-    await expect(page.getByText('Goal 1,500')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Today · 0 of 1,500 kcal logged')).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole('button', { name: 'Edit daily calorie goal' })).toContainText(
+      'Edit goal',
+    );
     await expect(page.getByText('1,500 kcal left')).toBeVisible();
 
     const rows = await queryRows(page, `SELECT value FROM app_meta WHERE key = 'calorie_goal'`);

@@ -168,6 +168,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const viewPreferenceGuard = useMemo(() => createPreferencePrecedenceGuard(), []);
   const [collapsedMeals, setCollapsedMeals] = useState<Partial<Record<MealType, boolean>>>({});
   const [macroTargets, setMacroTargets] = useState<MacroTargets | null>(null);
+  const [macroSaveNote, setMacroSaveNote] = useState<string | null>(null);
   const [targetsSheetVisible, setTargetsSheetVisible] = useState(false);
   // Diary day selection (findings 1/6): defaults to today; the diary
   // navigator moves it and every entry read follows it.
@@ -698,6 +699,11 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
             accentColor={COLOR}
             onEditTargets={() => setTargetsSheetVisible(true)}
           />
+          {macroSaveNote ? (
+            <Text variant="caption" tone="warning" accessibilityLabel="Macro targets backup status">
+              {macroSaveNote}
+            </Text>
+          ) : null}
         </View>
       </View>
 
@@ -802,9 +808,29 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       <MacroTargetsModal
         visible={targetsSheetVisible}
         currentTargets={effectiveTargets}
-        onSave={(next) => {
-          setMacroTargets(next);
-          void saveMacroTargets(next).catch(() => undefined);
+        onSave={async (next) => {
+          try {
+            await saveMacroTargets(next);
+            setMacroTargets(next);
+            setMacroSaveNote(null);
+          } catch (error) {
+            // The local app_meta write may have committed before backup-intent
+            // bookkeeping failed. Re-read local truth rather than leave stale
+            // macro bars on screen until the next app mount.
+            const stored = await loadMacroTargets().catch(() => null);
+            if (stored) setMacroTargets(stored);
+            if (
+              stored &&
+              stored.calories === next.calories &&
+              stored.protein === next.protein &&
+              stored.carbs === next.carbs &&
+              stored.fats === next.fats
+            ) {
+              setMacroSaveNote('Targets saved locally. Backup update could not be confirmed.');
+              return; // Local save is real; modal may close truthfully.
+            }
+            throw error; // No confirmed local commit: keep the editor open.
+          }
         }}
         onClose={() => setTargetsSheetVisible(false)}
       />
