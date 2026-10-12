@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { test, type Page } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { resetAll } from './helpers/reset';
@@ -41,6 +42,14 @@ type FlowRecord = {
 };
 
 type Measurement = {
+  /** Commit alone cannot identify a dirty source working tree. */
+  sourceProvenance: {
+    headCommit: string | null;
+    headTree: string | null;
+    trackedDiffSha256: string | null;
+    dirty: boolean | null;
+    untrackedFileCount: number | null;
+  };
   model: 'five-destination' | 'six-tab';
   commit: string | null;
   capturedAt: string;
@@ -76,6 +85,31 @@ function shortCommit(): string | null {
     return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim();
   } catch {
     return null;
+  }
+}
+
+/** Fingerprints tracked source edits; untracked source contents and generated
+ * dist bundles are not included, and must be certified independently. */
+function sourceProvenance(): Measurement['sourceProvenance'] {
+  try {
+    const git = (...args: string[]) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+    const status = git('status', '--porcelain=v1', '--untracked-files=all');
+    const diff = execFileSync('git', ['diff', '--binary', 'HEAD'], { encoding: 'utf8' });
+    return {
+      headCommit: git('rev-parse', 'HEAD'),
+      headTree: git('rev-parse', 'HEAD^{tree}'),
+      trackedDiffSha256: createHash('sha256').update(diff).digest('hex'),
+      dirty: status.length > 0,
+      untrackedFileCount: status.split('\n').filter((line) => line.startsWith('??')).length,
+    };
+  } catch {
+    return {
+      headCommit: shortCommit(),
+      headTree: null,
+      trackedDiffSha256: null,
+      dirty: null,
+      untrackedFileCount: null,
+    };
   }
 }
 
@@ -132,6 +166,7 @@ async function openSectionFromBar(page: Page, section: 'Workout' | 'Calories'): 
 
 test('D3 measurement: five-destination vs six-tab', async ({ page }) => {
   const record: Measurement = {
+    sourceProvenance: sourceProvenance(),
     model: 'five-destination',
     commit: shortCommit(),
     capturedAt: new Date().toISOString(),
