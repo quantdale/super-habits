@@ -5,6 +5,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { IconButton } from '@/core/ui/IconButton';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { SECTION_COLORS } from '@/constants/sectionColors';
+import { PlanningSummaryRow } from '@/features/planning-hub/PlanningSummaryRow';
 import {
   listProjects,
   listProjectRollups,
@@ -46,6 +47,7 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<ProjectStatusFilter>('all');
   const [sortKey, setSortKey] = useState<ProjectSortKey>('manual');
+  const [showFilters, setShowFilters] = useState(false);
 
   const loadSeq = useRef(0);
   const loadProjects = useCallback(async () => {
@@ -110,6 +112,21 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
 
       {!isLoading && rows.length > 0 ? (
         <View className="gap-2">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Projects filters and sort"
+            accessibilityState={{ expanded: showFilters }}
+            aria-expanded={showFilters}
+            className="min-h-11 self-start justify-center rounded-xl border px-3"
+            style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+            onPress={() => setShowFilters((open) => !open)}
+          >
+            <Text className="text-sm" style={{ color: tokens.text }}>
+              Filters & sort{statusFilter !== 'all' || sortKey !== 'manual' ? ' · Active' : ''} {showFilters ? '−' : '+'}
+            </Text>
+          </Pressable>
+          {showFilters ? (
+            <View className="gap-2">
           <View className="flex-row flex-wrap gap-2">
             {STATUS_FILTERS.map((f) => (
               <Pressable
@@ -159,6 +176,7 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
               </Pressable>
             ))}
           </View>
+          </View>
         </View>
       ) : null}
 
@@ -177,70 +195,37 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
       ) : (
         visible.map((row, index) => {
           const { project, progressPercent, linkedCounts } = row;
+          const count = linkedCounts.todos + linkedCounts.habits + linkedCounts.goals;
           return (
-            <Pressable
+            <PlanningSummaryRow
               key={project.id}
-              accessibilityRole="button"
+              title={project.name}
+              status={PROJECT_STATUS_LABELS[project.status]}
+              context={count > 0
+                ? `${linkedCounts.todos} tasks · ${linkedCounts.habits} habits · ${linkedCounts.goals} goals`
+                : 'No linked work yet'}
+              targetDate={project.target_date}
+              progressPercent={progressPercent}
+              accentColor={project.color || SECTION_COLORS.todos}
               accessibilityLabel={`${project.name}, ${PROJECT_STATUS_LABELS[project.status]}, ${progressPercent} percent progress`}
-              className="rounded-2xl border p-3"
-              style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
               onPress={() => onOpenProject(project.id)}
-            >
-              <View className="flex-row items-center gap-3">
-                <View
-                  className="h-10 w-10 items-center justify-center rounded-xl"
-                  style={{ backgroundColor: `${project.color}22` }}
-                >
-                  <Text style={{ fontSize: 18 }}>•</Text>
+              actions={manualOrderActive ? (
+                <View className="flex-row gap-1">
+                  <IconButton
+                    icon="arrow-upward"
+                    size={18}
+                    onPress={() => void moveProject(index, -1)}
+                    accessibilityLabel={`Move ${project.name} up`}
+                  />
+                  <IconButton
+                    icon="arrow-downward"
+                    size={18}
+                    onPress={() => void moveProject(index, 1)}
+                    accessibilityLabel={`Move ${project.name} down`}
+                  />
                 </View>
-                <View className="min-w-0 flex-1">
-                  <Text
-                    className="text-base font-semibold"
-                    style={{ color: tokens.text }}
-                    numberOfLines={1}
-                  >
-                    {project.name}
-                  </Text>
-                  <Text className="text-sm" style={{ color: tokens.textMuted }} numberOfLines={1}>
-                    {PROJECT_STATUS_LABELS[project.status]}
-                    {linkedCounts.todos + linkedCounts.habits + linkedCounts.goals > 0
-                      ? ` · ${linkedCounts.todos} tasks, ${linkedCounts.habits} habits, ${linkedCounts.goals} goals`
-                      : ' · nothing linked yet'}
-                  </Text>
-                </View>
-                <Text className="text-sm font-bold" style={{ color: tokens.text }}>
-                  {progressPercent}%
-                </Text>
-                {manualOrderActive ? (
-                  <View className="flex-row gap-1">
-                    <IconButton
-                      icon="arrow-upward"
-                      size={18}
-                      onPress={() => void moveProject(index, -1)}
-                      accessibilityLabel={`Move ${project.name} up`}
-                    />
-                    <IconButton
-                      icon="arrow-downward"
-                      size={18}
-                      onPress={() => void moveProject(index, 1)}
-                      accessibilityLabel={`Move ${project.name} down`}
-                    />
-                  </View>
-                ) : null}
-              </View>
-              <View
-                className="mt-2 h-2 w-full overflow-hidden rounded-full"
-                style={{ backgroundColor: tokens.surfaceElevated }}
-              >
-                <View
-                  className="h-2 rounded-full"
-                  style={{
-                    width: `${progressPercent}%`,
-                    backgroundColor: project.color || SECTION_COLORS.todos,
-                  }}
-                />
-              </View>
-            </Pressable>
+              ) : undefined}
+            />
           );
         })
       )}
