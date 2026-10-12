@@ -85,7 +85,7 @@ export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
               onPress={() => setShowBriefing((open) => !open)}
             >
               <Text className="text-sm" style={{ color: tokens.text }}>
-                Today's briefing {showBriefing ? '−' : '+'}
+                Today&apos;s briefing {showBriefing ? '−' : '+'}
               </Text>
             </Pressable>
             {showBriefing ? (
