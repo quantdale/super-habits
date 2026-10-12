@@ -1,7 +1,7 @@
 # ExecPlan: W10.5 — Calories closure, truthful saves, and records
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -29,25 +29,25 @@ Close bounded findings from W10 review without reopening the nutrition redesign:
 
 ## Current Checkpoint
 
-- Current milestone: M3 — implementation and provenance committed on isolated W10.5 branch; PR and hosted verification next.
-- Completed: plan-first branch setup; no duplicated goal in the hero action; macro-target modal waits for persistence, guards double submit and keeps draft on failure; regression coverage added; D3 source fingerprint and W10 document reconciliations authored.
-- In progress: PR creation, CI validation and review.
+- Current milestone: M4 — W10.5 code changes COMPLETE and MERGED through PR #71 at `10cff42707a223bf12f59515d57beefe848c50b6` (2026-10-13 Manila). This docs-only closure record finalizes the task; W11 is the next unstarted wave.
+- Completed: plan-first branch setup; duplicated goal edit text removed; macro-target modal awaits local persistence and guards double submit, keeps the draft on rejected writes; partial local-write/backup-outbox failure re-reads SQLite and displays a truthful warning; regression coverage added; D3 source fingerprints and W10 completion records reconciled; temporary standalone E2E workflow created, verified and removed before merge; PR #71 merged, both Codex P2 review threads on that PR replied/resolved; original PR #70 duplicate-goal thread replied/resolved.
+- In progress: None; W11 is a separate future campaign.
 - Important modified files: `features/calories/CaloriesDailyHero.tsx`, `MacroTargetsModal.tsx`, `CaloriesScreen.tsx`; `e2e/calories-w10.spec.ts`, `e2e/calories.spec.ts`; D3 measurement harness and README; W10 tasks, parent campaign ExecPlan; this plan.
-- Last successful validation: historical W10 latest exact-main CI `38264376415`: typecheck, lint, Deno, themes, OpenSpec, plans, unit/integration 2,676 passed / 3 skipped; security audit failed on two inherited advisories.
-- Current failures: inherited security audit red; Windows CRLF environment residual and other existing known gaps.
+- Last successful validation: W10.5 branch exact-source hosted CI `38277711157` at `15b859a`: TypeScript, Deno/Supabase, lint, theme tokens, OpenSpec, versioned ExecPlans and parity checks PASS; unit/integration 2,676 passed / 3 skipped (262 files passed / 1 skipped); first failing step remains inherited production audit (`braces`, `node-forge`), so standard hosted E2E/nightly SKIPPED. Independent dedicated Chromium workflow run `38277711149` at the same source SHA: 26/26 targeted Calories tests PASS, including real-SQLite hard-write and partial backup-intent failures. Earlier independent run `38277398558` at `d7814cc` also 26/26 PASS. Temporary workflow file removed before final code merge; only its run evidence remains. W10.5 merged PR #71 as `10cff427`.
+- Current failures: No new W10.5 regression observed in verified targeted scope. Inherited `braces` GHSA-vfj7-8cjw-p6xm and `node-forge` GHSA-86w9-cpqp-85rv keep standard CI red; hosted E2E/nightly skipped behind audit. Historical Windows CRLF, D14/Focus timestamp, Android API36 (W16) and owner-deferred iOS residuals remain.
 - Relevant quarantines: None new.
-- Blockers: Unable to run a full local repository checkout in the current environment; use hosted PR checks for typecheck and unit/integration. E2E remains blocked by inherited audit.
-- Condition required to unblock: A test environment capable of running the Playwright E2E suite independent of the security gate.
-- Exact resume action after unblock: Run targeted Calories W10/W10.5 browser regressions and inspect screenshots before marking any unverified gates complete.
-- Exact next action: open W10.5 PR, review targeted source and hosted CI, correct any new failures, then publish only if validation supports it.
-- Remaining definition of done: review findings fixed and tests strengthened; code committed on isolated branch; hosted typecheck/lint/unit/integration verified; plan/provenance/checklist reconciled; PR reviewed and merged only if verification supports it.
+- Blockers: None for scoped W10.5 closure. Full standard hosted E2E and native release certification remain unavailable due to inherited audit and deferred native lanes; independent browser coverage is explicitly bounded.
+- Condition required to unblock: For global release certification, remediate the inherited audit advisories and separately qualify native targets; not a W10.5 blocker.
+- Exact resume action after unblock: For full product certification, rerun the standard E2E/nightly lanes after the security gate is fixed. No W10.5 implementation resume remains.
+- Exact next action: None — W10.5 task complete. W11 requires a new OpenSpec slice and plan.
+- Remaining definition of done: None — review findings corrected, targeted SQLite-failure browser tests 26/26, hosted frontend gates through unit/integration passed, documentation reconciled, and code merged via PR #71. The inherited audit and native certification are separately documented residuals.
 
 ## Progress
 
 - [x] M1 — preflight and plan
-- [x] M2 — source correction and regression tests committed, execution pending
+- [x] M2 — source correction, double-submit guard, partial-save reconciliation and SQLite failure-injection regressions verified (26/26)
 - [x] M3 — provenance and historical completion records reconciled
-- [ ] M4 — hosted validation, review, and publication
+- [x] M4 — hosted validation through 2,676 unit/integration tests, independent browser 26/26, reviews resolved, temporary test workflow removed, PR #71 merged
 
 ## Surprises & Discoveries
 
@@ -64,6 +64,9 @@ Close bounded findings from W10 review without reopening the nutrition redesign:
 
 - 2026-10-13 — Source/static inspection via connected GitHub — PASS for issue reproduction, NOT a runtime test.
 - 2026-10-13 — Local tests — NOT RUN (complete repo checkout unavailable).
+- 2026-10-13 — `CI` run `38277711157` — PASS through 2,676 unit/integration tests / 3 skipped, typecheck/lint/OpenSpec/plan/parity/theme/Deno gates PASS; dependency audit FAILED on two inherited HIGH advisories; standard hosted E2E/nightly SKIPPED.
+- 2026-10-13 — `W10.5 Targeted Browser Validation` run `38277711149` — PASS: independent Playwright Chromium 26/26, zero retry dependency; standalone workflow removed from branch before merge.
+- 2026-10-13 — PR #71 — MERGED at `10cff427`, including replies/resolutions for both new Codex P2 threads; W10 PR #70 P2 duplicate-goal thread also resolved.
 
 ## Changed Files / Areas
 
@@ -80,6 +83,6 @@ Close bounded findings from W10 review without reopening the nutrition redesign:
 
 ## Outcomes & Retrospective
 
-- Status: ACTIVE.
-- Summary: in progress.
-- Follow-up: W11 after bounded closure and recorded residuals.
+- Status: COMPLETED — code merged via PR #71 (`10cff427`), final record filed as post-merge documentation.
+- Summary: Removed duplicate daily-goal copy, restored truthful durable/partial nutrition-target save messaging, guarded repeat submits, strengthened real-SQLite error-path tests, retained original D3 measurement records with accurate provenance caveat, and reconciled W10 completion truth. Independent Chromium 26/26 PASS; hosted unit/integration 2,676/3 skipped PASS prior to unchanged inherited audit failure; no data/schema/dependency/security-policy changes. Archived temporary E2E run evidence without leaving a permanent workflow.
+- Follow-up: W11 Planning / Goals / Projects / Daily Plan in its own OpenSpec slice. Existing audit and native residuals remain separately owned.
