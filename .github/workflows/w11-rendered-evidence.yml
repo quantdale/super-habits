@@ -17,7 +17,7 @@ jobs:
       - name: Check existing W11 evidence
         id: evidence
         run: |
-          if [ -f docs/ui-ux/v3-audit/w11/before/390-projects-populated.png ]; then
+          if [ -f docs/ui-ux/v3-audit/w11/.final-after-captured ]; then
             echo 'skip=true' >> "$GITHUB_OUTPUT"
           else
             echo 'skip=false' >> "$GITHUB_OUTPUT"
@@ -34,7 +34,7 @@ jobs:
         if: steps.evidence.outputs.skip == 'false'
         run: npx playwright install --with-deps chromium
       - name: Capture W11 baseline with unchanged planning source
-        if: steps.evidence.outputs.skip == 'false'
+        if: steps.evidence.outputs.skip == 'false' && hashFiles('docs/ui-ux/v3-audit/w11/before/390-projects-populated.png') == ''
         run: |
           git restore --source=6e5fc86496a0f657549104a227a46200d4fdf472 --staged --worktree -- \
             features/goals/GoalListView.tsx features/goals/GoalDetailView.tsx \
@@ -64,8 +64,9 @@ jobs:
         run: |
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
+          touch docs/ui-ux/v3-audit/w11/.final-after-captured
           git add docs/ui-ux/v3-audit/w11
-          git commit -m "test(w11): capture original and reconstructed Planning UI"
+          git commit -m "test(w11): recapture final Planning UI across widths and themes"
           git push origin HEAD:frontend-v3-w11-planning
       - name: Upload failure evidence
         if: failure()
