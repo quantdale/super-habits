@@ -192,7 +192,8 @@ export function GoalListView({ onOpenGoal }: GoalListViewProps) {
               </Pressable>
             ))}
           </View>
-          </View>
+            </View>
+          ) : null}
         </View>
       ) : null}
 

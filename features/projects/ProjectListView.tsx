@@ -176,7 +176,8 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
               </Pressable>
             ))}
           </View>
-          </View>
+            </View>
+          ) : null}
         </View>
       ) : null}
 
