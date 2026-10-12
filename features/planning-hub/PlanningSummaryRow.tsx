@@ -55,7 +55,11 @@ export function PlanningSummaryRow({
               >
                 {title}
               </Text>
-              <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }} numberOfLines={2}>
+              <Text
+                className="mt-0.5 text-xs"
+                style={{ color: tokens.textMuted }}
+                numberOfLines={2}
+              >
                 {status}
                 {context ? ` · ${context}` : ''}
                 {targetDate ? ` · Due ${targetDate}` : ''}
