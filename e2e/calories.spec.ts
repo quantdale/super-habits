@@ -2,6 +2,7 @@ import { test, expect } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
 import { queryRows } from './helpers/dbHarness';
+import { seedSql } from './helpers/seed';
 import { clickCaloriesAddEntry, fillCalorieMacrosOnly, fillCaloriesMacros } from './helpers/forms';
 import { rapidPress } from './helpers/gestures';
 
