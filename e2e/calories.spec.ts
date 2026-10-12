@@ -251,7 +251,12 @@ test.describe('Calories', () => {
     await page.getByRole('textbox', { name: 'Calories (kcal)' }).fill('1500');
     await page.getByText('Save goals', { exact: true }).click();
 
-    await expect(page.getByText('Goal 1,500')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Today · 0 of 1,500 kcal logged')).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByRole('button', { name: 'Edit daily calorie goal' })).toContainText(
+      'Edit goal',
+    );
     await expect(page.getByText('1,500 kcal left')).toBeVisible();
 
     const rows = await queryRows(page, `SELECT value FROM app_meta WHERE key = 'calorie_goal'`);
