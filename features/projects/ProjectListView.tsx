@@ -122,60 +122,69 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
             onPress={() => setShowFilters((open) => !open)}
           >
             <Text className="text-sm" style={{ color: tokens.text }}>
-              Filters & sort{statusFilter !== 'all' || sortKey !== 'manual' ? ' · Active' : ''} {showFilters ? '−' : '+'}
+              Filters & sort{statusFilter !== 'all' || sortKey !== 'manual' ? ' · Active' : ''}{' '}
+              {showFilters ? '−' : '+'}
             </Text>
           </Pressable>
           {showFilters ? (
             <View className="gap-2">
-          <View className="flex-row flex-wrap gap-2">
-            {STATUS_FILTERS.map((f) => (
-              <Pressable
-                key={f.key}
-                accessibilityRole="button"
-                accessibilityLabel={`Filter projects by ${f.label}`}
-                className="rounded-full border px-3 py-1.5"
-                style={
-                  statusFilter === f.key
-                    ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
-                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
-                }
-                onPress={() => setStatusFilter(f.key)}
-              >
-                <Text
-                  className="text-xs"
-                  style={{ color: statusFilter === f.key ? tokens.textOnAccent : tokens.textMuted }}
-                >
-                  {f.label}
+              <View className="flex-row flex-wrap gap-2">
+                {STATUS_FILTERS.map((f) => (
+                  <Pressable
+                    key={f.key}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Filter projects by ${f.label}`}
+                    className="rounded-full border px-3 py-1.5"
+                    style={
+                      statusFilter === f.key
+                        ? {
+                            backgroundColor: SECTION_COLORS.todos,
+                            borderColor: SECTION_COLORS.todos,
+                          }
+                        : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
+                    }
+                    onPress={() => setStatusFilter(f.key)}
+                  >
+                    <Text
+                      className="text-xs"
+                      style={{
+                        color: statusFilter === f.key ? tokens.textOnAccent : tokens.textMuted,
+                      }}
+                    >
+                      {f.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View className="flex-row flex-wrap items-center gap-x-2 gap-y-2">
+                <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                  Sort
                 </Text>
-              </Pressable>
-            ))}
-          </View>
-          <View className="flex-row flex-wrap items-center gap-x-2 gap-y-2">
-            <Text className="text-xs" style={{ color: tokens.textMuted }}>
-              Sort
-            </Text>
-            {SORT_OPTIONS.map((o) => (
-              <Pressable
-                key={o.key}
-                accessibilityRole="button"
-                accessibilityLabel={`Sort by ${o.label}`}
-                className="rounded-full border px-3 py-1.5"
-                style={
-                  sortKey === o.key
-                    ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
-                    : { borderColor: tokens.border }
-                }
-                onPress={() => setSortKey(o.key)}
-              >
-                <Text
-                  className="text-xs"
-                  style={{ color: sortKey === o.key ? tokens.textOnAccent : tokens.textMuted }}
-                >
-                  {o.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+                {SORT_OPTIONS.map((o) => (
+                  <Pressable
+                    key={o.key}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Sort by ${o.label}`}
+                    className="rounded-full border px-3 py-1.5"
+                    style={
+                      sortKey === o.key
+                        ? {
+                            backgroundColor: SECTION_COLORS.todos,
+                            borderColor: SECTION_COLORS.todos,
+                          }
+                        : { borderColor: tokens.border }
+                    }
+                    onPress={() => setSortKey(o.key)}
+                  >
+                    <Text
+                      className="text-xs"
+                      style={{ color: sortKey === o.key ? tokens.textOnAccent : tokens.textMuted }}
+                    >
+                      {o.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
           ) : null}
         </View>
@@ -202,30 +211,34 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
               key={project.id}
               title={project.name}
               status={PROJECT_STATUS_LABELS[project.status]}
-              context={count > 0
-                ? `${linkedCounts.todos} tasks · ${linkedCounts.habits} habits · ${linkedCounts.goals} goals`
-                : 'No linked work yet'}
+              context={
+                count > 0
+                  ? `${linkedCounts.todos} tasks · ${linkedCounts.habits} habits · ${linkedCounts.goals} goals`
+                  : 'No linked work yet'
+              }
               targetDate={project.target_date}
               progressPercent={progressPercent}
               accentColor={project.color || SECTION_COLORS.todos}
               accessibilityLabel={`${project.name}, ${PROJECT_STATUS_LABELS[project.status]}, ${progressPercent} percent progress`}
               onPress={() => onOpenProject(project.id)}
-              actions={manualOrderActive ? (
-                <View className="flex-row gap-1">
-                  <IconButton
-                    icon="arrow-upward"
-                    size={18}
-                    onPress={() => void moveProject(index, -1)}
-                    accessibilityLabel={`Move ${project.name} up`}
-                  />
-                  <IconButton
-                    icon="arrow-downward"
-                    size={18}
-                    onPress={() => void moveProject(index, 1)}
-                    accessibilityLabel={`Move ${project.name} down`}
-                  />
-                </View>
-              ) : undefined}
+              actions={
+                manualOrderActive ? (
+                  <View className="flex-row gap-1">
+                    <IconButton
+                      icon="arrow-upward"
+                      size={18}
+                      onPress={() => void moveProject(index, -1)}
+                      accessibilityLabel={`Move ${project.name} up`}
+                    />
+                    <IconButton
+                      icon="arrow-downward"
+                      size={18}
+                      onPress={() => void moveProject(index, 1)}
+                      accessibilityLabel={`Move ${project.name} down`}
+                    />
+                  </View>
+                ) : undefined
+              }
             />
           );
         })

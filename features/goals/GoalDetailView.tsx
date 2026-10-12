@@ -273,71 +273,70 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
       </Pressable>
       {showMoreOptions ? (
         <View className="gap-3">
-      <TextField
-        label="Description"
-        value={description}
-        onChangeText={setDescription}
-        placeholder="Optional"
-        accessibilityLabel={`Goal description, up to ${GOAL_DESCRIPTION_MAX} chars`}
-      />
-      <TextField
-        label="Target date (YYYY-MM-DD)"
-        value={targetDate}
-        onChangeText={setTargetDate}
-        placeholder="Optional"
-      />
+          <TextField
+            label="Description"
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Optional"
+            accessibilityLabel={`Goal description, up to ${GOAL_DESCRIPTION_MAX} chars`}
+          />
+          <TextField
+            label="Target date (YYYY-MM-DD)"
+            value={targetDate}
+            onChangeText={setTargetDate}
+            placeholder="Optional"
+          />
 
-      <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
-        Horizon
-      </Text>
-      <View className="flex-row flex-wrap gap-2">
-        {GOAL_HORIZON_VALUES.map((h) => (
-          <Pressable
-            key={h}
-            accessibilityRole="button"
-            accessibilityLabel={GOAL_HORIZON_LABELS[h]}
-            className="rounded-full border px-4 py-2"
-            style={
-              horizon === h
-                ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
-                : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
-            }
-            onPress={() => setHorizon(h)}
-          >
-            <Text style={{ color: horizon === h ? tokens.textOnAccent : tokens.textMuted }}>
-              {GOAL_HORIZON_LABELS[h]}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-      <Text className="mt-2 text-xs" style={{ color: tokens.textMuted }}>
-        {describeGoalHorizon(horizon).cadenceHint}
-      </Text>
+          <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
+            Horizon
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {GOAL_HORIZON_VALUES.map((h) => (
+              <Pressable
+                key={h}
+                accessibilityRole="button"
+                accessibilityLabel={GOAL_HORIZON_LABELS[h]}
+                className="rounded-full border px-4 py-2"
+                style={
+                  horizon === h
+                    ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
+                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
+                }
+                onPress={() => setHorizon(h)}
+              >
+                <Text style={{ color: horizon === h ? tokens.textOnAccent : tokens.textMuted }}>
+                  {GOAL_HORIZON_LABELS[h]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text className="mt-2 text-xs" style={{ color: tokens.textMuted }}>
+            {describeGoalHorizon(horizon).cadenceHint}
+          </Text>
 
-      <Text className="mb-1.5 mt-2 text-sm font-medium" style={{ color: tokens.textMuted }}>
-        Status
-      </Text>
-      <View className="flex-row flex-wrap gap-2">
-        {GOAL_STATUS_VALUES.map((s) => (
-          <Pressable
-            key={s}
-            accessibilityRole="button"
-            accessibilityLabel={GOAL_STATUS_LABELS[s]}
-            className="rounded-full border px-4 py-2"
-            style={
-              status === s
-                ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
-                : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
-            }
-            onPress={() => setStatus(s)}
-          >
-            <Text style={{ color: status === s ? tokens.textOnAccent : tokens.textMuted }}>
-              {GOAL_STATUS_LABELS[s]}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
+          <Text className="mb-1.5 mt-2 text-sm font-medium" style={{ color: tokens.textMuted }}>
+            Status
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {GOAL_STATUS_VALUES.map((s) => (
+              <Pressable
+                key={s}
+                accessibilityRole="button"
+                accessibilityLabel={GOAL_STATUS_LABELS[s]}
+                className="rounded-full border px-4 py-2"
+                style={
+                  status === s
+                    ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
+                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
+                }
+                onPress={() => setStatus(s)}
+              >
+                <Text style={{ color: status === s ? tokens.textOnAccent : tokens.textMuted }}>
+                  {GOAL_STATUS_LABELS[s]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
       ) : null}
 
@@ -458,54 +457,53 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
       ) : null}
       {showLinkedTasks ? (
         <>
-      {!isCreate && goalId ? (
-        <View className="mt-2">
-          <Text className="mb-2 text-sm font-semibold" style={{ color: tokens.text }}>
-            Linked Tasks
-          </Text>
-          {linkedTodos.map((t) => (
-            <View
-              key={t.id}
-              className="mb-2 flex-row items-center justify-between rounded-xl border p-2"
-              style={{ borderColor: tokens.border }}
-            >
-              <Text className="flex-1 text-sm" style={{ color: tokens.text }} numberOfLines={1}>
-                {t.title}
+          {!isCreate && goalId ? (
+            <View className="mt-2">
+              <Text className="mb-2 text-sm font-semibold" style={{ color: tokens.text }}>
+                Linked Tasks
               </Text>
-              <IconButton
-                icon="link-off"
-                onPress={async () => {
-                  await setTodoProjectGoal(t.id, { goalId: null });
-                  await reloadLinks();
-                }}
-                accessibilityLabel={`Unlink ${t.title}`}
-              />
+              {linkedTodos.map((t) => (
+                <View
+                  key={t.id}
+                  className="mb-2 flex-row items-center justify-between rounded-xl border p-2"
+                  style={{ borderColor: tokens.border }}
+                >
+                  <Text className="flex-1 text-sm" style={{ color: tokens.text }} numberOfLines={1}>
+                    {t.title}
+                  </Text>
+                  <IconButton
+                    icon="link-off"
+                    onPress={async () => {
+                      await setTodoProjectGoal(t.id, { goalId: null });
+                      await reloadLinks();
+                    }}
+                    accessibilityLabel={`Unlink ${t.title}`}
+                  />
+                </View>
+              ))}
+              {candidateTodos.map((t) => (
+                <Pressable
+                  key={t.id}
+                  accessibilityRole="button"
+                  className="mb-2 flex-row items-center gap-2 rounded-xl border p-2"
+                  style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+                  onPress={async () => {
+                    await setTodoProjectGoal(t.id, { goalId });
+                    await reloadLinks();
+                  }}
+                >
+                  <MaterialIcons name="add" size={18} color={tokens.iconMuted} />
+                  <Text
+                    className="flex-1 text-sm"
+                    style={{ color: tokens.textMuted }}
+                    numberOfLines={1}
+                  >
+                    {t.title}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
-          ))}
-          {candidateTodos.map((t) => (
-            <Pressable
-              key={t.id}
-              accessibilityRole="button"
-              className="mb-2 flex-row items-center gap-2 rounded-xl border p-2"
-              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-              onPress={async () => {
-                await setTodoProjectGoal(t.id, { goalId });
-                await reloadLinks();
-              }}
-            >
-              <MaterialIcons name="add" size={18} color={tokens.iconMuted} />
-              <Text
-                className="flex-1 text-sm"
-                style={{ color: tokens.textMuted }}
-                numberOfLines={1}
-              >
-                {t.title}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
-
+          ) : null}
         </>
       ) : null}
 

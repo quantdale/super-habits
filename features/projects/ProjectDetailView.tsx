@@ -198,64 +198,63 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
       </Pressable>
       {showMoreOptions ? (
         <View className="gap-3">
-      <TextField
-        label="Description"
-        value={description}
-        onChangeText={setDescription}
-        placeholder="Optional"
-        accessibilityLabel={`Project description, up to ${PROJECT_DESCRIPTION_MAX} chars`}
-      />
-      <TextField
-        label="Target date (YYYY-MM-DD)"
-        value={targetDate}
-        onChangeText={setTargetDate}
-        placeholder="Optional"
-      />
-
-      <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
-        Color
-      </Text>
-      <View className="flex-row flex-wrap gap-2">
-        {PROJECT_COLORS.map((c) => (
-          <Pressable
-            key={c}
-            accessibilityRole="button"
-            accessibilityLabel={`Color ${c}`}
-            className="h-9 w-9 rounded-full"
-            style={{
-              backgroundColor: c,
-              borderWidth: color === c ? 3 : 0,
-              borderColor: tokens.text,
-            }}
-            onPress={() => setColor(c)}
+          <TextField
+            label="Description"
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Optional"
+            accessibilityLabel={`Project description, up to ${PROJECT_DESCRIPTION_MAX} chars`}
           />
-        ))}
-      </View>
+          <TextField
+            label="Target date (YYYY-MM-DD)"
+            value={targetDate}
+            onChangeText={setTargetDate}
+            placeholder="Optional"
+          />
 
-      <Text className="mb-1.5 mt-2 text-sm font-medium" style={{ color: tokens.textMuted }}>
-        Status
-      </Text>
-      <View className="flex-row flex-wrap gap-2">
-        {PROJECT_STATUS_VALUES.map((s) => (
-          <Pressable
-            key={s}
-            accessibilityRole="button"
-            accessibilityLabel={PROJECT_STATUS_LABELS[s]}
-            className="rounded-full border px-4 py-2"
-            style={
-              status === s
-                ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
-                : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
-            }
-            onPress={() => setStatus(s)}
-          >
-            <Text style={{ color: status === s ? tokens.textOnAccent : tokens.textMuted }}>
-              {PROJECT_STATUS_LABELS[s]}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+          <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
+            Color
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {PROJECT_COLORS.map((c) => (
+              <Pressable
+                key={c}
+                accessibilityRole="button"
+                accessibilityLabel={`Color ${c}`}
+                className="h-9 w-9 rounded-full"
+                style={{
+                  backgroundColor: c,
+                  borderWidth: color === c ? 3 : 0,
+                  borderColor: tokens.text,
+                }}
+                onPress={() => setColor(c)}
+              />
+            ))}
+          </View>
 
+          <Text className="mb-1.5 mt-2 text-sm font-medium" style={{ color: tokens.textMuted }}>
+            Status
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {PROJECT_STATUS_VALUES.map((s) => (
+              <Pressable
+                key={s}
+                accessibilityRole="button"
+                accessibilityLabel={PROJECT_STATUS_LABELS[s]}
+                className="rounded-full border px-4 py-2"
+                style={
+                  status === s
+                    ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
+                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
+                }
+                onPress={() => setStatus(s)}
+              >
+                <Text style={{ color: status === s ? tokens.textOnAccent : tokens.textMuted }}>
+                  {PROJECT_STATUS_LABELS[s]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
       ) : null}
 
@@ -271,8 +270,6 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
         disabled={saving}
         color={SECTION_COLORS.todos}
       />
-
-
 
       {!isCreate && projectId ? (
         <ProjectLifecycleActions
@@ -309,36 +306,36 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
           onPress={() => setShowRelatedWork((open) => !open)}
         >
           <Text className="text-sm" style={{ color: tokens.text }}>
-            Related habits & goals ({linkedHabits.length + linkedGoals.length}) {showRelatedWork ? '−' : '+'}
+            Related habits & goals ({linkedHabits.length + linkedGoals.length}){' '}
+            {showRelatedWork ? '−' : '+'}
           </Text>
         </Pressable>
       ) : null}
       {showRelatedWork ? (
         <>
-      {!isCreate && projectId ? (
-        <AssociationSection
-          title="Linked Habits"
-          linked={linkedHabits}
-          candidates={candidateHabits}
-          labelOf={(i) => i.name ?? ''}
-          onLink={(id) => setHabitProjectGoal(id, { projectId })}
-          onUnlink={(id) => setHabitProjectGoal(id, { projectId: null })}
-          onChanged={reloadLinks}
-        />
-      ) : null}
+          {!isCreate && projectId ? (
+            <AssociationSection
+              title="Linked Habits"
+              linked={linkedHabits}
+              candidates={candidateHabits}
+              labelOf={(i) => i.name ?? ''}
+              onLink={(id) => setHabitProjectGoal(id, { projectId })}
+              onUnlink={(id) => setHabitProjectGoal(id, { projectId: null })}
+              onChanged={reloadLinks}
+            />
+          ) : null}
 
-      {!isCreate && projectId ? (
-        <AssociationSection
-          title="Linked Goals"
-          linked={linkedGoals}
-          candidates={candidateGoals}
-          labelOf={(i) => i.title ?? ''}
-          onLink={(id) => updateGoal(id, { projectId })}
-          onUnlink={(id) => updateGoal(id, { projectId: null })}
-          onChanged={reloadLinks}
-        />
-      ) : null}
-
+          {!isCreate && projectId ? (
+            <AssociationSection
+              title="Linked Goals"
+              linked={linkedGoals}
+              candidates={candidateGoals}
+              labelOf={(i) => i.title ?? ''}
+              onLink={(id) => updateGoal(id, { projectId })}
+              onUnlink={(id) => updateGoal(id, { projectId: null })}
+              onChanged={reloadLinks}
+            />
+          ) : null}
         </>
       ) : null}
 

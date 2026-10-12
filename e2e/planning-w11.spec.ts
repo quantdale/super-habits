@@ -47,9 +47,14 @@ test.describe('W11 Planning disclosure hierarchy', () => {
     await expect(page.getByText('No matching projects')).toBeVisible();
     await filters.click();
     await page.getByRole('button', { name: 'Filter projects by All' }).click();
-    await expect(page.getByRole('button', { name: /^W11 Project, Active, 0 percent progress/ })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /^W11 Project, Active, 0 percent progress/ }),
+    ).toBeVisible();
 
-    const rows = await queryRows(page, "SELECT name, status FROM projects WHERE deleted_at IS NULL");
+    const rows = await queryRows(
+      page,
+      'SELECT name, status FROM projects WHERE deleted_at IS NULL',
+    );
     expect(rows).toEqual([{ name: 'W11 Project', status: 'active' }]);
   });
 
@@ -80,12 +85,14 @@ test.describe('W11 Planning disclosure hierarchy', () => {
 
     const rows = await queryRows(
       page,
-      "SELECT title, status, progress_percent FROM goals WHERE deleted_at IS NULL",
+      'SELECT title, status, progress_percent FROM goals WHERE deleted_at IS NULL',
     );
     expect(rows).toEqual([{ title: 'W11 Run', status: 'active', progress_percent: 10 }]);
   });
 
-  test('Daily Plan hides optional fields, retains drafts, commits and completes', async ({ page }) => {
+  test('Daily Plan hides optional fields, retains drafts, commits and completes', async ({
+    page,
+  }) => {
     await openPlanning(page);
     await expect(page.getByText(/Plan for 20\d\d-/)).toBeVisible();
     const picker = page.getByRole('button', { name: 'Add priority' });
@@ -102,9 +109,9 @@ test.describe('W11 Planning disclosure hierarchy', () => {
     await page.getByRole('textbox', { name: 'Notes' }).fill('Keep it calm');
     await page.getByRole('textbox', { name: 'Focus target (minutes)' }).fill('30');
     await options.click();
-    await page.getByPlaceholder('What is the one thing that matters most today?').fill(
-      'Ship W11 work',
-    );
+    await page
+      .getByPlaceholder('What is the one thing that matters most today?')
+      .fill('Ship W11 work');
     await page.getByRole('button', { name: 'Save Plan' }).click();
     await expect(page.getByText('Committed', { exact: true })).toBeVisible();
 
@@ -118,15 +125,17 @@ test.describe('W11 Planning disclosure hierarchy', () => {
 
     const rows = await queryRows(
       page,
-      "SELECT intention, notes, reflection, focus_target_minutes, energy_score, status FROM daily_plans WHERE deleted_at IS NULL",
+      'SELECT intention, notes, reflection, focus_target_minutes, energy_score, status FROM daily_plans WHERE deleted_at IS NULL',
     );
-    expect(rows).toEqual([{
-      intention: 'Ship W11 work',
-      notes: 'Keep it calm',
-      reflection: 'Made solid progress',
-      focus_target_minutes: 30,
-      energy_score: 4,
-      status: 'completed',
-    }]);
+    expect(rows).toEqual([
+      {
+        intention: 'Ship W11 work',
+        notes: 'Keep it calm',
+        reflection: 'Made solid progress',
+        focus_target_minutes: 30,
+        energy_score: 4,
+        status: 'completed',
+      },
+    ]);
   });
 });
