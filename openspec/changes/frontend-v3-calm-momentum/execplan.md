@@ -70,7 +70,7 @@ historical evidence only.
 - Current failures: Inherited high advisories `braces` GHSA-vfj7-8cjw-p6xm and `node-forge` GHSA-86w9-cpqp-85rv block hosted E2E/nightly; Windows-CRLF register parsing, D14 host-load headroom, and Focus notification-timestamp issues remain recorded; no new W10 product regression proven.
 - Relevant quarantines: none added; existing internal/remote/visual opt-ins unchanged.
 - Blockers: None for web continuation. Native Android qualification remains environment-blocked (the required API36/x86_64 target was not previously available; Android W16 pending) and iOS remains owner-deferred, so no native timer or notification certification is claimed from browser tests. Full application certification is not claimed.
-- Exact next action: Complete and verify W10.5 using `.agent/execplans/frontend-v3-w105-closure.md`, then open the separate W11 Planning / Goals / Projects / Daily Plan slice before W11 implementation.
+- Exact next action: Implement and verify the remaining W10.5 closure checks using `.agent/execplans/frontend-v3-w105-closure.md`, then open the separate W11 Planning / Goals / Projects / Daily Plan slice before W11 implementation.
 - Remaining definition of done: Overall Frontend V3 campaign remains ACTIVE. W0–W10 are merged; W10.5 bounded closure under verification; W11–W17 pending. Android API36 W16, iOS owner-deferred, Focus timestamp, D14/CRLF residuals and unresolved audit advisories prevent overall application certification.
 
 ## Progress
