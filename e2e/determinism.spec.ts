@@ -46,16 +46,21 @@ test.describe('WM2.3 data-entry determinism', () => {
     await expect(page.getByText('Guarded oats', { exact: true })).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page.getByText('Today: 235 kcal')).toBeVisible({ timeout: 15_000 });
+    // W10 hero: 2000 − 235 = 1,765 kcal left, and the day-log row shows the
+    // entry's computed kcal.
+    await expect(page.getByText('1,765 kcal left')).toBeVisible({ timeout: 15_000 });
 
-    // Exactly one row: the food name and its kcal appear exactly once in the
-    // Form view's daily log; a duplicate entry would render a second
-    // "Guarded oats" row and "Today: 470 kcal".
+    // Exactly one row: the food name appears exactly once in the
+    // meal-grouped day log (a duplicate entry would render a second
+    // "Guarded oats" row), and the hero states the single-entry total
+    // (2000 − 235 = 1,765 left; a duplicate would read 1,530 left).
     await expect(page.getByText('Guarded oats', { exact: true })).toHaveCount(1, {
       timeout: 15_000,
     });
-    await expect(page.getByText('235 kcal', { exact: true })).toHaveCount(1, { timeout: 15_000 });
-    await expect(page.getByText('Today: 470 kcal')).toHaveCount(0);
+    await expect(page.getByText('1,765 kcal left', { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByText('1,530 kcal left', { exact: true })).toHaveCount(0);
   });
 
   test('quick-capture → command swap leaves exactly one interactive layer', async ({ page }) => {

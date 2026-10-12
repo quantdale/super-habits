@@ -238,8 +238,10 @@ defineJourney({
       run: async ({ page }) => {
         await switchTab(page, 'calories');
         // Form view is the default after reset. Select the Breakfast meal type
-        // explicitly, then fill macros. 12/1/8/0 → 124 kcal.
-        await page.getByText('Breakfast', { exact: true }).click();
+        // explicitly, then fill macros. 12/1/8/0 → 124 kcal. The meal-type chip
+        // is the form's control; the day-log meal group carries its own
+        // accessible name ("Breakfast meals"), so the chip is selected by role.
+        await page.getByRole('button', { name: 'Breakfast', exact: true }).click();
         await fillCaloriesMacros(page, 'Scrambled eggs 🍳', '12', '1', '8', '0');
         // RN Web fields are controlled inputs. Wait for both the input value and
         // the derived kcal value before pressing the async submit action; this
@@ -286,12 +288,13 @@ defineJourney({
           expect(Number(rows[0]?.n)).toBe(getActingStore<number>('pomodoroBase')),
         );
 
-        // Immediate UI: the entry appears in "Logged today" and the daily total.
+        // Immediate UI: the entry appears in the meal-grouped day log and the
+        // hero reflects the new total (724 of the 2,000 kcal goal).
         await returnToApp(page);
         await switchTab(page, 'calories');
         await expect(page.getByText('Scrambled eggs 🍳', { exact: true }).first()).toBeVisible();
         await expect(page.locator('body')).toContainText('124 kcal');
-        await expect(page.getByText('Today: 724 kcal', { exact: true })).toBeVisible();
+        await expect(page.getByText(/724 of 2,000 kcal logged/)).toBeVisible();
 
         // Second surface: Overview daily total = seeded + 124 logged. The
         // redesigned Calories card renders the consumed number and the

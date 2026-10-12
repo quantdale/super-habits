@@ -72,6 +72,21 @@ test.describe('W9 Workout', () => {
     await page.getByText('Add routine', { exact: true }).click();
     await expect(page.getByText('Pull Day')).toBeVisible();
 
+    // Calendar-independent weekday resolution (the strip always renders all
+    // seven days; today's own weekday is the one whose assign control opens a
+    // scoped sheet).
+    const weekdayNames = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ];
+    const todayName = weekdayNames[new Date().getDay()];
+    const todayWeekdayNum = ((new Date().getDay() + 6) % 7) + 1; // Monday = 1
+
     const section = page.locator(ACTIVE_SECTION_SELECTOR);
     // The strip exposes a per-day rest control and an assign control at 44pt.
     const mondayRest = section.getByRole('button', { name: 'Monday rest', exact: true });
@@ -80,15 +95,17 @@ test.describe('W9 Workout', () => {
     expect(box?.width ?? 0).toBeGreaterThanOrEqual(40);
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(40);
 
-    // Assign Monday in the recurring template via the focused sheet.
-    await section.getByRole('button', { name: 'Monday assign routine' }).click();
+    // Assign TODAY's weekday in the recurring template: the sheet opens on the
+    // "Just today" scope, so the "Every <weekday>" chip is chosen explicitly.
+    await section.getByRole('button', { name: `${todayName} assign routine` }).click();
     const sheet = page.getByRole('dialog');
+    await sheet.getByRole('button', { name: `Every ${todayName}` }).click();
     await sheet.getByText('Push Day', { exact: true }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(section.getByText('Push Day').first()).toBeVisible();
 
     // A one-day override for today assigns a different routine without
-    // touching the recurring Monday row.
+    // touching the recurring row for the SAME weekday.
     await page.getByText('Change today', { exact: true }).click();
     const todaySheet = page.getByRole('dialog');
     await expect(todaySheet.getByText('Choose a one-day override for')).toBeVisible();
@@ -100,7 +117,7 @@ test.describe('W9 Workout', () => {
       `SELECT weekday, plan_kind, routine_id FROM workout_weekly_plan WHERE deleted_at IS NULL ORDER BY weekday`,
     );
     expect(planRows).toHaveLength(1);
-    expect(planRows[0]).toMatchObject({ weekday: 1, plan_kind: 'workout' });
+    expect(planRows[0]).toMatchObject({ weekday: todayWeekdayNum, plan_kind: 'workout' });
     const planRoutine = await queryRows(
       page,
       `SELECT r.name AS name FROM workout_routines r

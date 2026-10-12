@@ -192,8 +192,10 @@ test.describe('Calories — boundary inputs', () => {
         timeout: 15_000,
       });
     }
-    await page.getByText(/Today:/).scrollIntoViewIfNeeded();
-    await expect(page.locator('body')).toContainText('Today: 2000 kcal', { timeout: 20_000 });
+    // W10 hero: the screen title states the remaining kcal (2,000 logged
+    // against the 2,000 goal) and the summary repeats the consumed total.
+    await expect(page.getByText('0 kcal left')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/2,000 of 2,000 kcal logged/)).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('body')).not.toContainText('NaN');
     await expect(page.locator('body')).not.toContainText('Error');
   });

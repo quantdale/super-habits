@@ -586,6 +586,8 @@ in `.agent/execplans/integration-tinypool-ipc-channel-closed-v1.md`.
 **Gate site:** `e2e/pomodoro-w85-audit.spec.ts`
 **Gate site:** `e2e/workout-w9-audit.spec.ts`
 **Gate site:** `e2e/workout-w95-audit.spec.ts`
+**Gate site:** `e2e/calories-w10-audit.spec.ts`
+**Gate site:** `e2e/health-nav-w10-measure.spec.ts`
 
 **Reason:** the campaign's visual-audit harness seeds TYPICAL fixtures and
 captures ~47 screenshots per run (`docs/ui-ux/v3-audit/`). It is gated with
@@ -603,6 +605,18 @@ startup surface contract — exactly one primary action, configuration fully
 withdrawn — at every captured state; its behavioral twin is the same
 `e2e/pomodoro.spec.ts`.
 No failed behavioral test is quarantined by this evidence-only gate.
+
+**W10 instruments (2026-10-12):** `e2e/calories-w10-audit.spec.ts` captures the
+W10 before/after Calories matrices (`docs/ui-ux/v3-audit/w10/`, 17 + 20
+inspected captures) under the same `VISUAL_AUDIT=1` gate.
+`e2e/health-nav-w10-measure.spec.ts` is the D3 navigation measurement
+instrument: it is gated on `D3_MEASURE=1` (not a gate the standard battery
+runs) because it writes campaign evidence JSON
+(`docs/ui-ux/v3-audit/w10/d3-*.json`) and is intentionally model-aware so the
+five-destination and six-tab builds are measured by the same probe. Its
+shipped-model behavioral twin is `e2e/health-nav-w10.spec.ts`, which runs
+unconditionally in the standard Chromium battery (6/6). No failed behavioral
+test is quarantined by either W10 evidence gate.
 
 **Closing path:** opt in on demand — `VISUAL_AUDIT=1 npx playwright test
 e2e/visual-audit.spec.ts`. Screenshots land in `docs/ui-ux/v3-audit/` and are
@@ -664,3 +678,37 @@ harness destroys the live session's React state and resume re-validates the
 routine — so it is covered by the deterministic integration oracles above.
 W9.5's behavioral twin `e2e/workout-w95.spec.ts` (6) runs unconditionally.
 No failed behavioral test is quarantined by the evidence-only gate.
+
+### W10 Calories / Health addendum (2026-10-12)
+
+**Opt-in evidence lanes:** `e2e/calories-w10-audit.spec.ts` (`VISUAL_AUDIT=1`,
+20 inspected captures in `docs/ui-ux/v3-audit/w10/`) and
+`e2e/health-nav-w10-measure.spec.ts` (`D3_MEASURE=1`, tap-depth evidence JSON).
+Both are evidence instruments; their behavioral twins
+(`e2e/calories-w10.spec.ts` 14/14, `e2e/health-nav-w10.spec.ts` 6/6) run
+unconditionally in the standard battery.
+
+**W9 lane TEST_BUG corrected during W10 validation (pre-existing, not a W10
+regression):** `e2e/workout-w9.spec.ts` "week strip shows readable assignments
+and today, and a just-today override leaves the template intact" asserted a
+weekly-plan row for a HARDCODED Monday. The week strip's assign control opens a
+same-day (today-scoped) sheet when the weekday is today, so on Mondays the flow
+wrote a one-day override and the plan-row oracle read 0 rows. Reproduced on the
+unmodified W9.5 baseline (`21a598ba`, separate worktree, own build) and proved
+to be a test bug, not a product bug: assigning a non-today weekday persists
+correctly (real-SQLite read before/after reload). The W10 pass rewrote the
+test to assign TODAY's weekday through the explicit "Every <weekday>" scope and
+assert the same-weekday template row plus the just-today override — the
+stronger contract, now calendar-independent. No assertion was weakened.
+
+**FLAKY_TEST (pre-existing, load class CG-9):** `tests/qaNativeProvision.test.ts`
+and `e2e/habits-w7.spec.ts` (44pt editor-target measurement) each failed once
+under full-battery CPU load and pass in isolation/re-runs. The habits
+assertion is now point-tolerant (`Math.round(bounds.width) >= 44`), which keeps
+the 44pt contract while tolerating sub-pixel layout rounding (43.999).
+
+**Inherited residuals unchanged by W10:** braces/node-forge audit reds;
+Windows-CRLF `agentDocConsistency` ENVIRONMENT failure; D14 host-load headroom
+residuals; Focus notification-timestamp residual; Android API36 pending W16;
+iOS owner-deferred; `npm run format:check` reports 134 pre-existing files
+(not a CI quality gate).

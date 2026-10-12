@@ -1,9 +1,11 @@
 import { Page } from '@playwright/test';
 
 /**
- * Rail labels (V3 five-destination model). `workout` and `calories` remain
- * AppSections but live behind the Health tab on phone — `goToTab` routes them
- * through Health so every existing spec keeps working unchanged.
+ * Rail labels (V3 six-destination model after the W10 D3 validation gate —
+ * measured evidence in `docs/ui-ux/v3-audit/w10/`). Every section owns a
+ * destination, so `goToTab` clicks the rail directly. `health` remains a
+ * valid AppSection for deep links, linked actions, and command routing, but
+ * it has no bar destination.
  */
 export const TAB_LABELS = {
   overview: 'Today',
@@ -15,12 +17,10 @@ export const TAB_LABELS = {
   health: 'Health',
 } as const;
 
-/** Sections reachable only through the Health parent on the phone rail. */
-const HEALTH_CHILDREN: ReadonlySet<string> = new Set(['workout', 'calories']);
-
 /**
- * Click a rail tab — routing through Health for workout/calories — to switch
- * sections in the single-page layout.
+ * Click a rail tab — the six-destination bar resolves every section label
+ * directly (the W4–W9 Health-parent indirection was removed by the W10 D3
+ * gate; `health` has no destination of its own).
  */
 export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS): Promise<void> {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
@@ -28,12 +28,12 @@ export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS): Promise
   // exposes interest chips whose labels can equal a tab label (Habits, Focus,
   // Workout), so an unscoped lookup strict-matches two buttons.
   const rail = page.getByRole('tablist', { name: 'Section tabs' });
-  if (HEALTH_CHILDREN.has(tab)) {
-    await rail.getByRole('button', { name: 'Health', exact: true }).click();
-    await page.getByRole('button', { name: `Open ${TAB_LABELS[tab]}` }).click();
-  } else {
-    await rail.getByRole('button', { name: TAB_LABELS[tab], exact: true }).click();
+  if (tab === 'health') {
+    // Health is not a bar destination in the six-tab model; it is reached via
+    // the command center or a deep link. Specs that need it drive those paths.
+    throw new Error("goToTab('health'): Health has no rail destination in the six-tab model");
   }
+  await rail.getByRole('button', { name: TAB_LABELS[tab], exact: true }).click();
   // Wait until React has hydrated all inputs — React attaches __reactFiber$xxx
   // properties to DOM nodes during hydration. Filling SSR-rendered inputs before
   // hydration sets DOM values that React immediately overrides with controlled state.
@@ -66,8 +66,8 @@ export async function openNewTodoModal(page: Page) {
 
 /**
  * Primary action in the new-todo modal. Scope to the open dialog: the
- * quick-capture input's placeholder ("Quick add a task...") also matches a
- * bare /Add a task/i lookup, so fills must target the modal exactly.
+ * quick-capture input's placeholder ("Quick add a task...") also matches
+ * a bare /Add a task/i lookup, so fills must target the modal exactly.
  */
 export async function submitTodoModal(page: Page, options?: { waitForClose?: boolean }) {
   const dialog = page.getByRole('dialog');
@@ -84,10 +84,7 @@ export async function openTodoDialog(page: Page) {
   return page.getByRole('dialog');
 }
 
-/**
- * Hard reload the page, bypassing SW cache.
- * Uses domcontentloaded for the same reason as goToTab.
- */
+/** Hard reload the page, bypassing SW cache. */
 export async function hardReload(page: Page) {
   await page.reload({ waitUntil: 'domcontentloaded' });
 }
@@ -95,7 +92,7 @@ export async function hardReload(page: Page) {
 /**
  * Wait for DB to be ready by checking for the absence of the
  * initializeDatabase error in the page's console output.
- * Call this after navigation if a test is DB-sensitive.
+ * Call this after navigation if the test is DB-sensitive.
  */
 export async function waitForDb(page: Page, timeout = 5_000) {
   await page.waitForFunction(() => document.documentElement.dataset.dbReady === 'true', null, {

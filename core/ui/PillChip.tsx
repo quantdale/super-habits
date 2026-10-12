@@ -2,24 +2,29 @@ import { useState } from 'react';
 import { Animated, Pressable } from 'react-native';
 import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { useReducedMotion } from '@/core/theme/motion';
 import { radius, spacing, springs, typography } from '@/core/theme/designTokens';
 import { readableSurface } from '@/core/theme/contrast';
+import { useReducedMotion } from '@/core/theme/motion';
 
 type Props = {
   label: string;
   accessibilityLabel?: string;
   active: boolean;
-  color: string; // section accent color
+  color: string;
   onPress: () => void;
   icon?: string; // optional emoji or text prefix
 };
 
 /**
  * Chip: a compact pill that fills with its accent when selected and settles
- * quickly under the finger. Used for filters, time-of-day pickers, and quick
- * presets. V3 quiets the inactive state (neutral surface, hairline border,
- * muted ink) so a row of inactive chips stops competing with content.
+ * quickly under the finger. Used for filters, time-of-day pickers, quick
+ * presets, and food quick-log chips. V3 quiets the inactive state (neutral
+ * surface, hairline border, muted ink) so a row of inactive chips stops
+ * competing with content.
+ *
+ * Chips hug their content and never exceed their container width: inside a
+ * wrapping row a long label wraps instead of overflowing or truncating
+ * (SYS-18), and inside a horizontal scroller the natural width is preserved.
  */
 export function PillChip({ label, accessibilityLabel, active, color, onPress, icon }: Props) {
   const { tokens } = useAppTheme();
@@ -36,7 +41,12 @@ export function PillChip({ label, accessibilityLabel, active, color, onPress, ic
 
   return (
     <Animated.View
-      style={{ transform: [{ scale }], marginRight: spacing.sm, marginBottom: spacing.sm }}
+      style={{
+        transform: [{ scale }],
+        marginRight: spacing.sm,
+        marginBottom: spacing.sm,
+        maxWidth: '100%',
+      }}
     >
       <Pressable
         onPress={onPress}
@@ -52,6 +62,7 @@ export function PillChip({ label, accessibilityLabel, active, color, onPress, ic
           paddingHorizontal: spacing.md + 2,
           paddingVertical: spacing.xs + 2,
           minHeight: 40,
+          maxWidth: '100%',
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',

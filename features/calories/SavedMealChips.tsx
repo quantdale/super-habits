@@ -1,8 +1,7 @@
-import { Text } from '@/core/ui/Text';
-import React from 'react';
-import { View, ScrollView } from 'react-native';
+import { View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { PillChip } from '@/core/ui/PillChip';
+import { SectionLabel } from '@/core/ui/SectionLabel';
 import type { FrequentFood } from './calories.domain';
 import type { SavedMeal } from './types';
 
@@ -12,6 +11,12 @@ type Props = {
   color?: string;
 };
 
+/**
+ * Recent saved-meal chips (V3 W10, SYS-18): content-hugging chips that WRAP
+ * into rows. The old fixed-width horizontal scroller truncated long food
+ * names ("Chicken b…") with no affordance cue; a wrapping row keeps every
+ * label fully readable at 360px and never hides content behind a scroll.
+ */
 export function SavedMealChips({ meals, onSelect, color }: Props) {
   const { sectionAccents } = useAppTheme();
   const accent = color ?? sectionAccents.calories.fill;
@@ -20,26 +25,19 @@ export function SavedMealChips({ meals, onSelect, color }: Props) {
 
   return (
     <View className="mb-3">
-      <Text
-        className="mb-1.5 text-xs font-semibold uppercase tracking-[0.8px]"
-        style={{ color: sectionAccents.calories.text }}
-      >
-        Recent foods
-      </Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-        <View className="flex-row items-center pr-1 pt-1">
-          {meals.map((meal) => (
-            <PillChip
-              key={meal.id}
-              label={`${meal.food_name} · ${meal.calories} kcal`}
-              accessibilityLabel={`Log ${meal.food_name}, ${meal.calories} kcal`}
-              active={false}
-              color={accent}
-              onPress={() => onSelect(meal)}
-            />
-          ))}
-        </View>
-      </ScrollView>
+      <SectionLabel>Recent foods</SectionLabel>
+      <View className="flex-row flex-wrap">
+        {meals.map((meal) => (
+          <PillChip
+            key={meal.id}
+            label={`${meal.food_name} · ${meal.calories} kcal`}
+            accessibilityLabel={`Log ${meal.food_name}, ${meal.calories} kcal`}
+            active={false}
+            color={accent}
+            onPress={() => onSelect(meal)}
+          />
+        ))}
+      </View>
     </View>
   );
 }
@@ -62,26 +60,19 @@ export function FrequentFoodChips({ foods, onSelect, color }: FrequentProps) {
 
   return (
     <View className="mb-3">
-      <Text
-        className="mb-1.5 text-xs font-semibold uppercase tracking-[0.8px]"
-        style={{ color: sectionAccents.calories.text }}
-      >
-        Frequent foods
-      </Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-        <View className="flex-row items-center pr-1 pt-1">
-          {foods.map((food) => (
-            <PillChip
-              key={food.foodName.toLowerCase()}
-              label={`${food.foodName} · ${food.logCount}×`}
-              accessibilityLabel={`Log ${food.foodName}, logged ${food.logCount} times recently`}
-              active={false}
-              color={accent}
-              onPress={() => onSelect(food)}
-            />
-          ))}
-        </View>
-      </ScrollView>
+      <SectionLabel>Frequent foods</SectionLabel>
+      <View className="flex-row flex-wrap">
+        {foods.map((food) => (
+          <PillChip
+            key={food.foodName.toLowerCase()}
+            label={`${food.foodName} · ${food.logCount}×`}
+            accessibilityLabel={`Log ${food.foodName}, logged ${food.logCount} times recently`}
+            active={false}
+            color={accent}
+            onPress={() => onSelect(food)}
+          />
+        ))}
+      </View>
     </View>
   );
 }

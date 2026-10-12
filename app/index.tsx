@@ -40,48 +40,46 @@ type NavItem = {
 };
 
 /**
- * Five phone destinations (V3 five-destination model — docs/ui-ux/13 §9):
- * Health parents Workout + Calories; the bar's center slot is quick capture.
- * Labels are part of the test/observability contract (`journey-label-parity`),
- * so they stay verbatim while the rail they render into is free to change
- * shape. `workout`/`calories` remain first-class AppSections — deep links,
- * linked actions, and the command executor keep working; on phone they render
- * with the Health tab highlighted (see navActiveSection).
+ * Minimum width of a phone-bar destination. V3 §9/§13 require >=44pt touch
+ * targets and >=11px labels; six destinations plus the capture slot still fit
+ * a 360px viewport when each destination keeps this floor.
+ */
+const BAR_TAB_MIN_WIDTH = 44;
+
+/**
+ * Six phone destinations (D3 validation gate, W10 — measured evidence in
+ * `docs/ui-ux/v3-audit/w10/`): Today, To Do, Habits, Focus, Workout,
+ * Calories, plus the capture slot. The five-destination Health-parent model
+ * added a tap to starting a workout and logging a meal, so the six-tab
+ * fallback shipped with the V3 visual restyle. `health` remains a valid
+ * AppSection (deep links, linked-action targets, command executor) without a
+ * bar destination.
+ * Labels are part of the test/observability contract
+ * (`journey-label-parity`), so any label change updates the parity guard's
+ * consumers in the same commit.
  */
 const NAV_ITEMS: NavItem[] = [
   { name: 'overview', label: 'Today', icon: 'today' },
   { name: 'todos', label: 'To Do', icon: 'checklist', sectionKey: 'todos' },
   { name: 'habits', label: 'Habits', icon: 'auto-awesome', sectionKey: 'habits' },
   { name: 'pomodoro', label: 'Focus', icon: 'timer', sectionKey: POMODORO_SECTION_KEY },
-  { name: 'health', label: 'Health', icon: 'favorite', sectionKey: 'health' },
+  { name: 'workout', label: 'Workout', icon: 'fitness-center', sectionKey: 'workout' },
+  { name: 'calories', label: 'Calories', icon: 'restaurant', sectionKey: 'calories' },
 ];
 
 const NAV_TAB_COUNT = NAV_ITEMS.length;
 const LAST_TAB_INDEX = NAV_TAB_COUNT - 1;
 
 /**
- * Desktop-rail extension (W4.5 Fix C): on >=900px layouts the rail exposes
- * direct Workout/Calories destinations under a Health group label. Phone keeps
- * the five-destination + capture-slot model (compression is a phone-width
- * problem; campaign §9 — "do not force phone and desktop to use identical
- * navigation density"). Rail items highlight exactly (no parent-covering),
- * because every child is directly reachable here.
+ * Wide-rail destinations: the same six sections (every destination is
+ * directly reachable on desktop, so rail items highlight exactly). The W4.5
+ * Health group label is gone with the six-tab model.
  */
-const RAIL_PRIMARY_ITEMS: NavItem[] = NAV_ITEMS.filter((item) => item.name !== 'health');
-const RAIL_HEALTH_ITEMS: NavItem[] = [
-  { name: 'health', label: 'Health', icon: 'favorite', sectionKey: 'health' },
-  { name: 'workout', label: 'Workout', icon: 'fitness-center', sectionKey: 'workout' },
-  { name: 'calories', label: 'Calories', icon: 'restaurant', sectionKey: 'calories' },
-];
+const RAIL_ITEMS: NavItem[] = NAV_ITEMS;
 
 /** Rail index a given section reports for swipe/highlight purposes. */
 function railIndexFor(section: AppSection): number {
-  const direct = NAV_ITEMS.findIndex((item) => item.name === section);
-  if (direct >= 0) return direct;
-  if (section === 'workout' || section === 'calories') {
-    return NAV_ITEMS.findIndex((item) => item.name === 'health');
-  }
-  return -1;
+  return NAV_ITEMS.findIndex((item) => item.name === section);
 }
 
 const SECTION_SCREENS: Record<AppSection, React.ComponentType<{ isActive: boolean }>> = {
@@ -98,8 +96,10 @@ const SECTION_SCREENS: Record<AppSection, React.ComponentType<{ isActive: boolea
   health: memo(HealthScreen),
 };
 
-/** Sections that highlight the Health tab instead of their own (absent) tab. */
-const HEALTH_CHILD_SECTIONS: ReadonlySet<AppSection> = new Set(['workout', 'calories']);
+/** Sections reachable only through the Health parent on the phone rail. */
+// The six-tab model (W10 D3) gives Workout and Calories their own
+// destinations; `health` is still a valid section for deep links, linked
+// actions and command routing, but it is not a bar destination.
 
 type TabButtonProps = {
   item: NavItem;
@@ -136,14 +136,22 @@ function TabButton({
       onBlur={() => setKeyboardFocused(false)}
       style={[
         {
-          flex: isRail ? undefined : 1,
+          // Bar destinations hug their label and share the leftover width, so a
+          // six-destination bar never truncates a label at 360px (V3 §9: labels
+          // >= 11px, no truncated tabs). The explicit width floor keeps every
+          // destination at or above the 44pt touch-target minimum.
+          flexGrow: isRail ? undefined : 1,
+          flexShrink: isRail ? undefined : 1,
+          flexBasis: isRail ? undefined : 'auto',
+          // Rail items stretch; bar destinations keep a 44pt touch-target floor
+          // (the old `minWidth: 0` let six destinations shrink under it at 360).
+          minWidth: isRail ? undefined : BAR_TAB_MIN_WIDTH,
           width: isRail ? '100%' : undefined,
           alignItems: 'center',
           justifyContent: 'center',
           gap: 2,
-          minWidth: 0,
           paddingVertical: isRail ? spacing.sm : spacing.xs,
-          paddingHorizontal: isRail ? spacing.sm : 2,
+          paddingHorizontal: isRail ? spacing.sm : 0,
           minHeight: size.touchTargetMin,
           borderRadius: radius.md,
           backgroundColor: isFocused ? `${accent}1F` : 'transparent',
@@ -162,7 +170,7 @@ function TabButton({
         variant="caption"
         style={{
           color: isFocused ? ink : tokens.textMuted,
-          fontSize: isRail ? 12 : 10.5,
+          fontSize: isRail ? 12 : 11,
           letterSpacing: 0.1,
         }}
         numberOfLines={1}
@@ -291,11 +299,9 @@ export default function Index() {
   const overviewColor = resolvedTheme === 'dark' ? tokens.text : tokens.textMuted;
   const useSideRail = screenWidth >= layout.railBreakpoint;
 
-  // The tab a rail item highlights for the current section: Health covers its
-  // workout/calories children on phone.
-  const navActiveSection: AppSection = HEALTH_CHILD_SECTIONS.has(activeSection)
-    ? 'health'
-    : activeSection;
+  // The highlighted bar destination: with the six-tab model every section
+  // owns its destination, so the active section highlights exactly.
+  const navActiveSection: AppSection = activeSection;
 
   const currentIndex = useMemo(() => railIndexFor(activeSection), [activeSection]);
 
@@ -466,18 +472,7 @@ export default function Index() {
             </View>
             <CaptureButton onPress={openCapture} variant="rail" />
           </View>
-          {RAIL_PRIMARY_ITEMS.map(buildRailButton)}
-          <View style={{ marginTop: spacing.sm, marginBottom: -spacing.xs }}>
-            <Text
-              variant="caption"
-              tone="muted"
-              style={{ fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' }}
-              numberOfLines={1}
-            >
-              Health
-            </Text>
-          </View>
-          {RAIL_HEALTH_ITEMS.map(buildRailButton)}
+          {RAIL_ITEMS.map(buildRailButton)}
         </View>
       ) : null}
 
@@ -487,8 +482,8 @@ export default function Index() {
         <View
           style={{
             position: 'absolute',
-            left: spacing.md,
-            right: spacing.md,
+            left: spacing.sm,
+            right: spacing.sm,
             bottom: Math.max(safeAreaBottom, spacing.sm),
             zIndex: 20,
           }}
@@ -511,7 +506,7 @@ export default function Index() {
             }}
           >
             {navItems.slice(0, 3)}
-            <View style={{ width: 64, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 52, alignItems: 'center', justifyContent: 'center' }}>
               <CaptureButton onPress={openCapture} variant="bar" />
             </View>
             {navItems.slice(3)}

@@ -377,8 +377,10 @@ defineJourney({
         await goToSection(page, 'calories');
         await expectSectionActive(page, SECTION_MARKERS.calories);
         await page.getByLabel('Diary view').click();
-        await expect(page.getByText('Quick add', { exact: true })).toBeVisible();
-        await expect(page.getByText('Daily log', { exact: true })).toBeVisible();
+        // W10 diary: the quick-log card leads with the recent-food chips and
+        // the day log is the labeled "Daily log" region.
+        await expect(page.getByText('Recent foods', { exact: true })).toBeVisible();
+        await expect(page.getByLabel('Daily log')).toBeVisible();
 
         // Daily log groups today's rows by meal (Breakfast chip + item count).
         const MEAL_LABELS: Record<string, string> = {
@@ -411,7 +413,7 @@ defineJourney({
         // superhabits.calories.viewMode).
         await returnToApp(page);
         await goToSection(page, 'calories');
-        await expect(page.getByText('Quick add', { exact: true })).toBeVisible();
+        await expect(page.getByText('Recent foods', { exact: true })).toBeVisible();
 
         // Filter-input response (D14 ≤ 500ms): the diary "Search saved meals"
         // input. 'Dark chocolate' is a saved meal NOT in the recent-meal chips,
@@ -562,7 +564,10 @@ const SECTION_MARKERS: Record<SectionName, string> = {
   // W9: the landing is training-first — the quick-start section is the
   // always-rendered marker for the Workout section.
   workout: 'Quick start',
-  calories: 'Switch between manual entry and a diary grouped by meal.',
+  // W10: the macro summary's title is always rendered in both Calories
+  // modes (the SYS-06 doc subtitle it replaces was deleted with the
+  // reconstruction) and is unique to this section.
+  calories: 'Macros',
 };
 
 // ---------------------------------------------------------------------------
