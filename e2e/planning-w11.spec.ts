@@ -97,6 +97,13 @@ test.describe('W11 Planning disclosure hierarchy', () => {
     page,
   }) => {
     await openPlanning(page);
+    const briefing = page.getByRole('button', { name: 'Planning briefing' });
+    await expect(briefing).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByText('Yesterday focus', { exact: true })).toHaveCount(0);
+    await briefing.click();
+    await expect(page.getByText('Yesterday focus', { exact: true })).toBeVisible();
+    await briefing.click();
+    await expect(briefing).toHaveAttribute('aria-expanded', 'false');
     await expect(page.getByText(/Plan for 20\d\d-/)).toBeVisible();
     const picker = page.getByRole('button', { name: 'Add priority' });
     await expect(picker).toHaveAttribute('aria-expanded', 'false');
