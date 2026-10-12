@@ -215,12 +215,22 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
         <View className="mt-2 flex-row gap-2">
           <Button
             label="-10"
-            onPress={() => setProgress(Math.max(0, progress - 10))}
+            onPress={() => {
+              const next = Math.max(0, progress - 10);
+              setProgress(next);
+              setProgressText(String(next));
+              setProgressParseError(null);
+            }}
             variant="ghost"
           />
           <Button
             label="+10"
-            onPress={() => setProgress(Math.min(100, progress + 10))}
+            onPress={() => {
+              const next = Math.min(100, progress + 10);
+              setProgress(next);
+              setProgressText(String(next));
+              setProgressParseError(null);
+            }}
             variant="ghost"
           />
         </View>

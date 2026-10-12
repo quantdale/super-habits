@@ -68,6 +68,9 @@ test.describe('W11 Planning disclosure hierarchy', () => {
     );
     await page.getByPlaceholder('Goal title').fill('W11 Run');
     await page.getByRole('button', { name: '+10' }).click();
+    // W11 rendered-audit finding: the typed percentage and +/- controls
+    // must reflect the same editable value, never 10% above a stale "0".
+    await expect(page.getByRole('textbox', { name: 'Goal progress percent' })).toHaveValue('10');
     await page.getByRole('button', { name: 'Goal more options' }).click();
     await expect(page.getByPlaceholder('Optional')).toHaveCount(2);
     await page.getByRole('button', { name: 'Create Goal' }).click();
