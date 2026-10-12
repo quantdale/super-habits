@@ -1,0 +1,83 @@
+{
+  "model": "six-tab",
+  "commit": "21a598b",
+  "capturedAt": "2026-10-12T05:34:38.431Z",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "barLabels": ["Today", "To Do", "Habits", "Quick capture", "Focus", "Workout", "Calories"],
+  "flows": {
+    "startWorkout": {
+      "taps": 2,
+      "completed": true,
+      "detail": "active session reached"
+    },
+    "logMeal": {
+      "taps": 2,
+      "completed": true,
+      "detail": "quick-add 200 logged from Overview"
+    },
+    "viewRemainingCalories": {
+      "taps": 1,
+      "completed": true,
+      "detail": "remaining kcal read on the Calories hero"
+    }
+  },
+  "sectionSwitch": {
+    "perSection": [
+      {
+        "section": "todos",
+        "taps": 1,
+        "success": true
+      },
+      {
+        "section": "habits",
+        "taps": 1,
+        "success": true
+      },
+      {
+        "section": "pomodoro",
+        "taps": 1,
+        "success": true
+      },
+      {
+        "section": "workout",
+        "taps": 1,
+        "success": true
+      },
+      {
+        "section": "calories",
+        "taps": 1,
+        "success": true
+      }
+    ],
+    "activeSessionSurvivesSwitch": true
+  },
+  "accessibility": [
+    {
+      "width": 360,
+      "minTargetWidth": 44,
+      "minTargetHeight": 48,
+      "minLabelFontPx": 11,
+      "truncatedLabels": [],
+      "destinationCount": 7
+    },
+    {
+      "width": 390,
+      "minTargetWidth": 46.40625,
+      "minTargetHeight": 48,
+      "minLabelFontPx": 11,
+      "truncatedLabels": [],
+      "destinationCount": 7
+    },
+    {
+      "width": 412,
+      "minTargetWidth": 50.078125,
+      "minTargetHeight": 48,
+      "minLabelFontPx": 11,
+      "truncatedLabels": [],
+      "destinationCount": 7
+    }
+  ]
+}

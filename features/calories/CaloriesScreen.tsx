@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MaterialIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -7,20 +6,17 @@ import { SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { useGamification } from '@/features/gamification/gamificationContext';
+import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { Button } from '@/core/ui/Button';
-import { Card } from '@/core/ui/Card';
 import { Modal } from '@/core/ui/Modal';
 import { PageHeader } from '@/core/ui/PageHeader';
 import { Screen } from '@/core/ui/Screen';
-import { ScreenSection } from '@/core/ui/ScreenSection';
 import { SegmentedControl } from '@/core/ui/SegmentedControl';
-import { StatBlock } from '@/core/ui/StatBlock';
 import { Text } from '@/core/ui/Text';
 import { TextField } from '@/core/ui/TextField';
 import { createSubmitGuard } from '@/lib/submitGuard';
 import { createPreferencePrecedenceGuard } from '@/lib/preferencePrecedence';
 import { parseNumericInput } from '@/lib/numericInput';
-// import { spacing, radius } from '@/core/theme/designTokens';
 import {
   DEFAULT_GOAL,
   addCalorieEntry,
@@ -36,7 +32,6 @@ import {
   updateCalorieEntry,
 } from '@/features/calories/calories.data';
 import {
-  buildCalorieActivityDays,
   buildCalorieHeatmapDays,
   buildDailyTrend,
   buildFrequentFoods,
@@ -53,8 +48,6 @@ import type {
   SavedMeal,
 } from '@/features/calories/types';
 import type { FrequentFood, MacroTargets } from '@/features/calories/calories.domain';
-
-import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
 import { isValidDateKey, toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
@@ -65,15 +58,16 @@ import {
 } from '@/lib/validation';
 import { CalorieGoalModal } from './CalorieGoalModal';
 import { loadMacroTargets, saveMacroTargets } from './caloriesTargets';
+import { MacroTargetsModal } from './MacroTargetsModal';
+import { CaloriesDailyHero } from './CaloriesDailyHero';
 import { CaloriesDiaryView } from './CaloriesDiaryView';
-import type { MealSection } from './CaloriesDiaryView';
 import { CaloriesEntryFields } from './CaloriesEntryFields';
 import { CaloriesFormView } from './CaloriesFormView';
-import { DailyCalorieChart } from './DailyCalorieChart';
-import { MacroDonutChart } from './MacroDonutChart';
-import { MacroTargetsModal } from './MacroTargetsModal';
-import { MacroTrendChart } from './MacroTrendChart';
+import { CaloriesHistorySection } from './CaloriesHistorySection';
+import { CaloriesMacroSummary } from './CaloriesMacroSummary';
 import { SavedMealSearchModal } from './SavedMealSearchModal';
+import { formatDayContextLabel, formatKcal } from './caloriesFormat';
+import type { MealGroup } from './MealGroupedDayLog';
 
 const COLOR = SECTION_COLORS.calories;
 const CALORIES_VIEW_MODE_STORAGE_KEY = 'superhabits.calories.viewMode';
@@ -100,14 +94,6 @@ const VIEW_MODE_OPTIONS: readonly { value: CaloriesViewMode; label: string }[] =
   { value: 'diary', label: 'Diary' },
 ];
 
-function formatDayContext(dateKey: string) {
-  return new Date(`${dateKey}T12:00:00`).toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
-}
-
 function ViewModeSwitch({
   value,
   onChange,
@@ -132,12 +118,27 @@ function ViewModeSwitch({
   );
 }
 
+/**
+ * Calories (V3 W10 reconstruction, R5): one logging-first surface with two
+ * entry modes. The remaining-kcal number is the dominant daily indicator
+ * (screen title); a compact macro summary carries totals and targets; every
+ * fast entry path sits in one quick-log card; the day's entries are
+ * meal-grouped with immediately accessible edit/delete actions; and all
+ * historical trends live behind one collapsed disclosure so analytics never
+ * compete with logging. Doc-copy subtitles (SYS-06) are gone, food chips
+ * wrap instead of truncating (SYS-18), and no floating control overlaps the
+ * form (SUR-07).
+ *
+ * Persistence semantics are unchanged from the pre-W10 surface: the same
+ * data-layer write paths, sync/backup intents, saved-meal maintenance rules,
+ * goal/target persistence, and day-correction contract.
+ */
 export function CaloriesScreen({ isActive }: { isActive: boolean }) {
-  const { tokens, sectionAccents } = useAppTheme();
+  const { tokens } = useAppTheme();
   const { recordAction } = useGamification();
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const dayGeneration = useDayRolloverGeneration();
   const { begin: beginRefresh } = useGuardedAsyncRefresh();
-  const colorText = sectionAccents.calories.text;
   const [food, setFood] = useState('');
   const [protein, setProtein] = useState('');
   const [carbs, setCarbs] = useState('');
@@ -172,10 +173,13 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   // navigator moves it and every entry read follows it.
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey());
   /** True while the diary selection tracks the current local day. An explicit
-   * past-day navigation detaches it so a midnight tick never yanks the user
-   * away from the day they deliberately opened (decided contract D9b). */
+   *  past-day navigation detaches it so a midnight tick never yanks the user
+   *  away from the day they deliberately opened (decided contract D9b). */
   const [followsToday, setFollowsToday] = useState(true);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  /** History & insights disclosure (W10): collapsed by default so the logging
+   *  surface leads and the heavy rolling derivations only run while open. */
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     const isCurrent = beginRefresh();
@@ -260,24 +264,10 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     }),
     [entries],
   );
-  const todayKey = toDateKey();
-  // Goal-driven chart normalization recomputes with the goal (finding 8):
-  // deriving from summary364 + goal.calories keeps intensity buckets and
-  // heatmap caps correct immediately after a goal change, not just after the
-  // next refresh trigger.
-  const calorieActivityDays = useMemo(
-    () => buildCalorieActivityDays(summary364, goal.calories, 365),
-    [summary364, goal.calories],
-  );
-  const calorieHeatmapDays = useMemo(
-    () => buildCalorieHeatmapDays(summary364, goal.calories, 365),
-    [summary364, goal.calories],
-  );
-  const selectedDateLabel = useMemo(() => formatDayContext(selectedDateKey), [selectedDateKey]);
-  const dailyTrend = useMemo(() => buildDailyTrend(summary364), [summary364]);
+  const consumedKcal = useMemo(() => caloriesTotal(entries), [entries]);
   const goalProgress = useMemo(
-    () => calculateGoalProgress(caloriesTotal(entries), goal.calories),
-    [entries, goal.calories],
+    () => calculateGoalProgress(consumedKcal, goal.calories),
+    [consumedKcal, goal.calories],
   );
   const effectiveTargets: MacroTargets = macroTargets ?? goal;
   const macroTargetBars = useMemo(
@@ -298,16 +288,18 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           },
           { key: 'fats', label: 'Fats', actual: todayTotals.fats, target: effectiveTargets.fats },
         ] as const
-      ).map(({ key, label, actual, target }) => ({
-        key,
-        label,
-        actual,
-        target,
-        progress: buildTargetProgress(actual, target),
-      })),
+      )
+        .filter(({ target }) => target > 0)
+        .map(({ key, label, actual, target }) => ({
+          key,
+          label,
+          actual,
+          target,
+          progress: buildTargetProgress(actual, target),
+        })),
     [todayTotals, effectiveTargets],
   );
-  const groupedEntries = useMemo<MealSection[]>(
+  const groupedEntries = useMemo<MealGroup[]>(
     () =>
       MEAL_OPTIONS.map((option) => {
         const mealEntries = entries.filter((entry) => entry.meal_type === option.value);
@@ -320,10 +312,26 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       }).filter((section) => section.entries.length > 0),
     [entries],
   );
-  const hasCalorieStripActivity = calorieActivityDays.some((day) => day.active);
-  const consistencyText = hasCalorieStripActivity
-    ? `${goalProgress.percent}% of daily goal today`
-    : 'Log food to start tracking';
+  // History facts are cheap rollups over the already-loaded 365-day summary;
+  // the expensive chart/heatmap derivations only run while the disclosure is
+  // open, so the logging surface's refresh cost stays bounded.
+  const daysLogged = useMemo(
+    () => summary364.reduce((count, day) => (day.totalCalories > 0 ? count + 1 : count), 0),
+    [summary364],
+  );
+  const averageKcal = useMemo(() => {
+    if (daysLogged === 0) return 0;
+    const total = summary364.reduce((sum, day) => sum + day.totalCalories, 0);
+    return Math.round(total / daysLogged);
+  }, [summary364, daysLogged]);
+  const dailyTrend = useMemo(
+    () => (historyOpen ? buildDailyTrend(summary364) : null),
+    [historyOpen, summary364],
+  );
+  const calorieHeatmapDays = useMemo(
+    () => (historyOpen ? buildCalorieHeatmapDays(summary364, goal.calories, 365) : null),
+    [historyOpen, summary364, goal.calories],
+  );
   const computedKcal = useMemo(
     () =>
       kcalFromMacros(
@@ -348,69 +356,6 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   // render (cheap) so a midnight rollover can never leave a stale cap.
   const entryDateMax = new Date();
   entryDateMax.setHours(23, 59, 59, 999);
-  const macroDonut = useMemo(
-    () => (
-      <MacroDonutChart
-        totalKcal={caloriesTotal(entries)}
-        goalKcal={goal.calories}
-        protein={todayTotals.protein}
-        carbs={todayTotals.carbs}
-        fats={todayTotals.fats}
-        fiber={todayTotals.fiber}
-        sectionColor={COLOR}
-      />
-    ),
-    [entries, goal.calories, todayTotals],
-  );
-  const dailyCaloriesSection = useMemo(
-    () => (
-      <Card
-        variant="header"
-        accentColor={COLOR}
-        headerTitle="Daily calories"
-        headerSubtitle="Year trend with your current goal overlaid."
-        headerRight={<MaterialIcons name="bar-chart" size={22} color={tokens.textOnAccent} />}
-        className="mb-0"
-      >
-        <DailyCalorieChart data={dailyTrend} goalKcal={goal.calories} />
-      </Card>
-    ),
-    [dailyTrend, goal.calories, tokens.textOnAccent],
-  );
-  const macroTrendSection = useMemo(
-    () => (
-      <Card
-        variant="header"
-        accentColor={COLOR}
-        headerTitle="Macro trends"
-        headerSubtitle="Rolling 7/30-day intake averages. Informational only."
-        headerRight={
-          <MaterialIcons name="stacked-line-chart" size={22} color={tokens.textOnAccent} />
-        }
-        className="mb-0"
-      >
-        <MacroTrendChart summaries={summary364} />
-      </Card>
-    ),
-    [summary364, tokens.textOnAccent],
-  );
-  const calorieHistorySection = useMemo(
-    () => (
-      <Card
-        variant="header"
-        accentColor={COLOR}
-        headerTitle="Calories history"
-        headerSubtitle="Rolling 53-week activity."
-        headerRight={<MaterialIcons name="insights" size={22} color={tokens.textOnAccent} />}
-        className="mb-0"
-      >
-        <View className="w-full min-w-0 items-center justify-center">
-          <GitHubHeatmap days={calorieHeatmapDays} color={COLOR} weeks={53} />
-        </View>
-      </Card>
-    ),
-    [calorieHeatmapDays, tokens.textOnAccent],
-  );
 
   const resetCalorieForm = () => {
     setFood('');
@@ -466,8 +411,8 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   );
 
   const handleSelectFrequentFood = useCallback(
-    (food: FrequentFood) => {
-      applyMealToDraft(food.latestEntry);
+    (food_: FrequentFood) => {
+      applyMealToDraft(food_.latestEntry);
       if (viewMode === 'diary') {
         setEntryModalVisible(true);
       }
@@ -501,17 +446,25 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   };
 
   const handleDeleteEntry = useCallback(
-    (entry: CalorieEntry) => {
-      void (async () => {
-        await deleteCalorieEntry(entry.id);
-        if (editingEntryId === entry.id) {
-          setEntryModalVisible(false);
-          resetCalorieForm();
-        }
-        await refresh();
-      })();
+    async (entry: CalorieEntry) => {
+      // Entries are deleted from a visible row action, so the destructive step
+      // is confirmed explicitly (the retired swipe-to-reveal protected against
+      // stray taps by hiding the action).
+      const confirmed = await confirm({
+        title: 'Delete entry',
+        message: `Delete "${entry.food_name}" (${entry.calories} kcal)? This cannot be undone.`,
+        confirmLabel: 'Delete entry',
+        confirmVariant: 'danger',
+      });
+      if (!confirmed) return;
+      await deleteCalorieEntry(entry.id);
+      if (editingEntryId === entry.id) {
+        setEntryModalVisible(false);
+        resetCalorieForm();
+      }
+      await refresh();
     },
-    [editingEntryId, refresh],
+    [confirm, editingEntryId, refresh],
   );
 
   const toggleMealGroup = useCallback((meal: MealType) => {
@@ -540,7 +493,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           setCopyStatus(
             `Copied ${result.copiedCount} ${
               result.copiedCount === 1 ? 'entry' : 'entries'
-            } into ${formatDayContext(selectedDateKey)}.`,
+            } into ${formatDayContextLabel(selectedDateKey)}.`,
           );
         } else if (result.status === 'source-empty') {
           setCopyStatus('No entries were logged on that day.');
@@ -688,162 +641,64 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     </View>
   );
 
-  const dailySummaryCard = (
-    <Card
-      variant="header"
-      accentColor={COLOR}
-      headerTitle={
-        viewMode === 'diary' && selectedDateKey !== todayKey
-          ? formatDayContext(selectedDateKey)
-          : 'Today'
-      }
-      headerSubtitle={
-        viewMode === 'diary' ? selectedDateLabel : 'Live totals, goal progress, and macro split.'
-      }
-      headerRight={<MaterialIcons name="pie-chart" size={22} color={tokens.textOnAccent} />}
-      className="mb-0"
-    >
-      <View
-        className="mb-3 items-center rounded-2xl px-3 py-2"
-        style={{ backgroundColor: tokens.surfaceSunken }}
-      >
-        <Text variant="caption" tone="muted" className="text-center">
-          {consistencyText}
-        </Text>
-      </View>
-
-      <View className="mb-1 flex-row flex-wrap items-center justify-between gap-2">
-        <Text variant="bodyMd" tone="muted">
-          {selectedDateKey === todayKey ? 'Today' : formatDayContext(selectedDateKey)}:{' '}
-          {caloriesTotal(entries)} kcal
-        </Text>
-        <Pressable
-          onPress={() => setGoalSheetVisible(true)}
-          accessibilityRole="button"
-          className="rounded-full px-3 py-1.5"
-          style={{ backgroundColor: sectionAccents.calories.tint }}
-        >
-          <Text variant="label" style={{ color: colorText }}>
-            Goal: {goal.calories} kcal ✎
-          </Text>
-        </Pressable>
-      </View>
-
-      <View className="mb-3 flex-row gap-2">
-        <StatBlock
-          accentColor={COLOR}
-          value={caloriesTotal(entries)}
-          label="Consumed"
-          className="flex-1"
-        />
-        <StatBlock accentColor={COLOR} value={goal.calories} label="Goal" className="flex-1" />
-        <StatBlock
-          accentColor={COLOR}
-          value={
-            goalProgress.over ? caloriesTotal(entries) - goal.calories : goalProgress.remaining
-          }
-          label={goalProgress.over ? 'Over' : 'Remaining'}
-          className="flex-1"
-        />
-      </View>
-
-      <View className="mb-4">
-        <View
-          className="h-2.5 w-full overflow-hidden rounded-full"
-          style={{ backgroundColor: tokens.surfaceSunken }}
-        >
-          {/* Over-target stays informational (blueprint Gate F): accent fill,
-              factual caption in the neutral-caution tone — never danger red. */}
-          <View
-            className="h-full rounded-full"
-            style={{ width: `${goalProgress.percent}%`, backgroundColor: COLOR }}
-          />
-        </View>
-        {goalProgress.over ? (
-          <Text variant="caption" tone="warning" className="mt-1 text-center">
-            {caloriesTotal(entries) - goal.calories} kcal over goal
-          </Text>
-        ) : null}
-      </View>
-
-      <View className="mb-4 gap-3">
-        {macroTargetBars.map(({ key, label, actual, target, progress }) =>
-          target > 0 ? (
-            <View key={key}>
-              <View className="mb-1 flex-row items-center justify-between">
-                <Text variant="caption" tone="muted">
-                  {label} {actual}g / {target}g
-                </Text>
-                <Text variant="caption" tone="muted">
-                  {progress.over ? `${actual - target}g over` : `${progress.remaining}g left`}
-                </Text>
-              </View>
-              <View
-                className="h-2 w-full overflow-hidden rounded-full"
-                style={{ backgroundColor: tokens.surfaceSunken }}
-              >
-                {/* Macro over-target keeps the accent fill; the "n g over"
-                    caption beside the label already carries the fact. */}
-                <View
-                  className="h-full rounded-full"
-                  style={{ width: `${progress.percent}%`, backgroundColor: COLOR }}
-                />
-              </View>
-            </View>
-          ) : null,
-        )}
-        <Pressable
-          onPress={() => setTargetsSheetVisible(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Edit daily macro targets"
-          className="self-start"
-        >
-          <Text variant="label" style={{ color: colorText }}>
-            Edit daily targets ✎
-          </Text>
-        </Pressable>
-      </View>
-
-      {macroDonut}
-    </Card>
-  );
+  const overBy = goalProgress.over ? consumedKcal - goal.calories : 0;
+  const remainingLabel = goalProgress.over
+    ? `${formatKcal(overBy)} kcal over`
+    : `${formatKcal(goalProgress.remaining)} kcal left`;
 
   return (
     <Screen
       scroll
       hero={
         <View>
-          <PageHeader
-            eyebrow={
-              viewMode === 'diary' && selectedDateKey !== todayKey
-                ? formatDayContext(selectedDateKey)
-                : 'TODAY'
-            }
-            title={
-              goalProgress.over
-                ? `${caloriesTotal(entries) - goal.calories} kcal over`
-                : `${goalProgress.remaining} kcal left`
-            }
-            subtitle="Switch between manual entry and a diary grouped by meal."
-          />
+          <PageHeader eyebrow="Calories" title={remainingLabel} />
           <View className="mt-4">
             <ViewModeSwitch value={viewMode} onChange={setAndPersistViewMode} />
           </View>
         </View>
       }
     >
+      {/* One daily summary + one compact macro summary; at content-max widths
+          they compose side by side, on phones they stack (single responsive
+          tree — only one branch renders). */}
+      <View className="mb-6 flex-row flex-wrap" style={{ gap: 16 }}>
+        <View className="min-w-[280px] flex-1">
+          <CaloriesDailyHero
+            consumed={consumedKcal}
+            goal={goal.calories}
+            over={goalProgress.over}
+            overBy={overBy}
+            percent={goalProgress.percent}
+            dateKey={selectedDateKey}
+            accentColor={COLOR}
+            onEditGoal={() => setGoalSheetVisible(true)}
+          />
+        </View>
+        <View className="min-w-[280px] flex-1">
+          <CaloriesMacroSummary
+            rows={macroTargetBars.map(({ key, label, actual, target, progress }) => ({
+              key,
+              label,
+              actual,
+              target,
+              percent: progress.percent,
+              remaining: progress.remaining,
+              over: progress.over,
+            }))}
+            accentColor={COLOR}
+            onEditTargets={() => setTargetsSheetVisible(true)}
+          />
+        </View>
+      </View>
+
       {viewMode === 'form' ? (
         <CaloriesFormView
           accentColor={COLOR}
-          colorText={colorText}
-          calorieActivityDays={calorieActivityDays}
-          goalProgress={goalProgress}
-          hasCalorieStripActivity={hasCalorieStripActivity}
           recentMeals={recentMeals}
           frequentFoods={frequentFoods}
-          allSavedMeals={allSavedMeals}
-          entries={entries}
-          todayCard={dailySummaryCard}
+          savedMealCount={allSavedMeals.length}
+          groups={groupedEntries}
+          collapsedMeals={collapsedMeals}
           food={food}
           protein={protein}
           carbs={carbs}
@@ -882,18 +737,17 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
             setMealType(value);
           }}
           onAddEntry={handleSubmit}
+          onToggleGroup={toggleMealGroup}
           onEditEntry={openEntryEditModal}
           onDeleteEntry={handleDeleteEntry}
         />
       ) : (
         <CaloriesDiaryView
           accentColor={COLOR}
-          colorText={colorText}
-          todayCard={dailySummaryCard}
           recentMeals={recentMeals}
           frequentFoods={frequentFoods}
           allSavedMeals={allSavedMeals}
-          groupedEntries={groupedEntries}
+          groups={groupedEntries}
           collapsedMeals={collapsedMeals}
           selectedDateKey={selectedDateKey}
           summaries={summary364}
@@ -903,13 +757,25 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           onQuickAddKcal={handleQuickAddKcal}
           onBrowseSavedMeals={() => setSearchSheetVisible(true)}
           onManualAdd={openManualAddModal}
-          onToggleMealGroup={toggleMealGroup}
+          onToggleGroup={toggleMealGroup}
           onSelectDate={handleSelectDiaryDate}
           onCopyFromDay={handleCopyFromDay}
           onEditEntry={openEntryEditModal}
           onDeleteEntry={handleDeleteEntry}
         />
       )}
+
+      <CaloriesHistorySection
+        open={historyOpen}
+        onToggle={() => setHistoryOpen((open) => !open)}
+        accentColor={COLOR}
+        dailyTrend={dailyTrend}
+        summaries={summary364}
+        heatmapDays={calorieHeatmapDays}
+        goalKcal={goal.calories}
+        daysLogged={daysLogged}
+        averageKcal={averageKcal}
+      />
 
       <CalorieGoalModal
         visible={goalSheetVisible}
@@ -976,7 +842,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
                   className="py-2"
                 >
                   <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                    {formatDayContext(entryDateKey)}
+                    {formatDayContextLabel(entryDateKey)}
                   </Text>
                 </Pressable>
                 {showEntryDatePicker ? (
@@ -1043,9 +909,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         />
       </Modal>
 
-      <ScreenSection>{dailyCaloriesSection}</ScreenSection>
-      <ScreenSection>{macroTrendSection}</ScreenSection>
-      <ScreenSection className="mb-0">{calorieHistorySection}</ScreenSection>
+      {confirmationDialog}
     </Screen>
   );
 }

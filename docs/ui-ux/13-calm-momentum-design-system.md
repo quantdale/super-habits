@@ -151,15 +151,20 @@ Four semantic levels replace one loud default:
 
 ## 9. Navigation
 
-- **Phone (primary decision under test in W4/W10):** five destinations —
-  Today, To Do, Habits, Focus, Health — plus a **center capture slot** in the
-  bar. Health parents Workout + Calories. This must be validated against
-  frequency-of-access and not silently forced; the six-tab model is the
-  fallback.
+- **Phone — six destinations (shipped in W10):** Today, To Do, Habits, Focus,
+  Workout, Calories — plus a **center capture slot** in the bar. The
+  five-destination Health-parent model was measured against this six-tab model
+  in the W10 D3 gate (`docs/ui-ux/v3-audit/w10/d3-*.json`): the parent added a
+  tap to starting a workout (3→2) and logging a meal (3→2) and a tap to
+  Workout/Calories section switches (2→1), so the six-tab model shipped with
+  the visual restyle. `health` remains a valid section for deep links,
+  linked-action targets and command routing, but is not a bar destination.
 - Labels ≥ 11px, no truncated two-line tabs; active state = filled tonal
-  capsule + accent icon (no heavy outline ring).
+  capsule + accent icon (no heavy outline ring). Six destinations plus the
+  capture slot keep ≥44pt targets at 360px.
 - **Wide (≥900):** side rail may expose richer destinations (planning,
-  review) — phone and desktop are _not_ required to match density.
+  review) — phone and desktop are _not_ required to match density. The rail
+  lists the same six destinations and highlights them exactly.
 - All modals stay overlays (Settings, Planning Hub, Weekly Review,
   Achievements, Quick Capture, Command Center).
 

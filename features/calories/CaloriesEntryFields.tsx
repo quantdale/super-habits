@@ -125,9 +125,6 @@ export function CaloriesEntryFields({
             {computedKcal > 0 ? computedKcal : 0}
           </Text>
         </View>
-        <Text variant="caption" tone="muted" style={{ marginTop: spacing.xs }}>
-          Auto-calculated from protein, carbs, fat, and fiber.
-        </Text>
       </View>
       <Text className="mb-2 text-sm font-medium" style={{ color: tokens.textMuted }}>
         Meal
