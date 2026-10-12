@@ -81,9 +81,14 @@
 
 ## 10. W10 — Calories / Health validation
 
-- [ ] 10.1 Logging-first hierarchy: remaining hero → macro summary → meals → quick-add → history
-- [ ] 10.2 Remove doc-copy from form (SYS-06); FAB-free form (SUR-07); adaptive chips (SYS-18)
-- [ ] 10.3 Execute D3 validation gate: measure health flows tap-depth vs six-tab; record decision + evidence
+- [x] 10.1 Logging-first hierarchy: remaining hero → macro summary → meals → quick-add → history
+      (one remaining/consumed/goal fact each; shared meal-grouped log; collapsed
+      History & insights disclosure; SYS-06/SYS-18/SUR-07 verified fixed —
+      `docs/ui-ux/v3-audit/w10/`)
+- [x] 10.2 Remove doc-copy from form (SYS-06); FAB-free form (SUR-07); adaptive chips (SYS-18)
+- [x] 10.3 Execute D3 validation gate: measure health flows tap-depth vs six-tab; record decision + evidence
+      (five-destination 3/3/1 taps vs six-tab 2/2/1; six-tab shipped; `health` kept as a
+      valid non-bar section — `docs/ui-ux/v3-audit/w10/d3-*.json`, `tests/healthNavigationW10.test.ts`)
 
 ## 11. W11 — Planning / Goals / Projects / Daily Plan
 
