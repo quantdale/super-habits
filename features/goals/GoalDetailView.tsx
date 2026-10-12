@@ -55,6 +55,8 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
   const [projectId, setProjectId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [showLinkedTasks, setShowLinkedTasks] = useState(false);
 
   const [linkedTodos, setLinkedTodos] = useState<{ id: string; title: string; completed: 0 | 1 }[]>(
     [],
@@ -197,6 +199,80 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
         placeholder="Goal title"
         accessibilityLabel={`Goal title, up to ${GOAL_TITLE_MAX} chars`}
       />
+      <View className="mt-2">
+        <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
+          Progress: {progress}%
+        </Text>
+        <View
+          className="h-3 w-full overflow-hidden rounded-full"
+          style={{ backgroundColor: tokens.surfaceElevated }}
+        >
+          <View
+            className="h-3 rounded-full"
+            style={{ width: `${progress}%`, backgroundColor: SECTION_COLORS.todos }}
+          />
+        </View>
+        <View className="mt-2 flex-row gap-2">
+          <Button
+            label="-10"
+            onPress={() => setProgress(Math.max(0, progress - 10))}
+            variant="ghost"
+          />
+          <Button
+            label="+10"
+            onPress={() => setProgress(Math.min(100, progress + 10))}
+            variant="ghost"
+          />
+        </View>
+
+        {!isCreate && suggestedRollup && !suggestedRollup.isEmpty ? (
+          <Text
+            className="mt-2 text-xs"
+            style={{ color: tokens.textMuted }}
+            accessibilityLabel={`Suggested from linked work: ${suggestedRollup.suggestedPercent} percent`}
+          >
+            Suggested from linked work: {suggestedRollup.suggestedPercent}%
+          </Text>
+        ) : null}
+
+        <View className="mt-2 flex-row items-end gap-2">
+          <View className="flex-1">
+            <TextField
+              label="Or type progress (0–100)"
+              value={progressText}
+              onChangeText={(v) => {
+                setProgressText(v);
+                if (progressParseError) setProgressParseError(null);
+              }}
+              keyboardType="number-pad"
+              placeholder="e.g. 42%"
+              accessibilityLabel="Goal progress percent"
+            />
+          </View>
+          <Button label="Set" onPress={applyProgressText} variant="ghost" />
+        </View>
+        {progressParseError ? (
+          <Text className="mt-1 text-xs" style={{ color: tokens.dangerSolid }}>
+            {progressParseError}
+          </Text>
+        ) : null}
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Goal more options"
+        accessibilityState={{ expanded: showMoreOptions }}
+        aria-expanded={showMoreOptions}
+        className="min-h-11 self-start justify-center rounded-xl border px-3"
+        style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+        onPress={() => setShowMoreOptions((open) => !open)}
+      >
+        <Text className="text-sm" style={{ color: tokens.text }}>
+          {showMoreOptions ? 'Hide goal options' : 'More options'}
+        </Text>
+      </Pressable>
+      {showMoreOptions ? (
+        <View className="gap-3">
       <TextField
         label="Description"
         value={description}
@@ -262,64 +338,8 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
         ))}
       </View>
 
-      <View className="mt-2">
-        <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
-          Progress: {progress}%
-        </Text>
-        <View
-          className="h-3 w-full overflow-hidden rounded-full"
-          style={{ backgroundColor: tokens.surfaceElevated }}
-        >
-          <View
-            className="h-3 rounded-full"
-            style={{ width: `${progress}%`, backgroundColor: SECTION_COLORS.todos }}
-          />
         </View>
-        <View className="mt-2 flex-row gap-2">
-          <Button
-            label="-10"
-            onPress={() => setProgress(Math.max(0, progress - 10))}
-            variant="ghost"
-          />
-          <Button
-            label="+10"
-            onPress={() => setProgress(Math.min(100, progress + 10))}
-            variant="ghost"
-          />
-        </View>
-
-        {!isCreate && suggestedRollup && !suggestedRollup.isEmpty ? (
-          <Text
-            className="mt-2 text-xs"
-            style={{ color: tokens.textMuted }}
-            accessibilityLabel={`Suggested from linked work: ${suggestedRollup.suggestedPercent} percent`}
-          >
-            Suggested from linked work: {suggestedRollup.suggestedPercent}%
-          </Text>
-        ) : null}
-
-        <View className="mt-2 flex-row items-end gap-2">
-          <View className="flex-1">
-            <TextField
-              label="Or type progress (0–100)"
-              value={progressText}
-              onChangeText={(v) => {
-                setProgressText(v);
-                if (progressParseError) setProgressParseError(null);
-              }}
-              keyboardType="number-pad"
-              placeholder="e.g. 42%"
-              accessibilityLabel="Goal progress percent"
-            />
-          </View>
-          <Button label="Set" onPress={applyProgressText} variant="ghost" />
-        </View>
-        {progressParseError ? (
-          <Text className="mt-1 text-xs" style={{ color: tokens.dangerSolid }}>
-            {progressParseError}
-          </Text>
-        ) : null}
-      </View>
+      ) : null}
 
       {showNextActionCue ? (
         <View
@@ -422,6 +442,23 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
       />
 
       {!isCreate && goalId ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Manage linked goal tasks"
+          accessibilityState={{ expanded: showLinkedTasks }}
+          aria-expanded={showLinkedTasks}
+          className="min-h-11 self-start justify-center rounded-xl border px-3"
+          style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+          onPress={() => setShowLinkedTasks((open) => !open)}
+        >
+          <Text className="text-sm" style={{ color: tokens.text }}>
+            Linked tasks ({linkedTodos.length}) {showLinkedTasks ? '−' : '+'}
+          </Text>
+        </Pressable>
+      ) : null}
+      {showLinkedTasks ? (
+        <>
+      {!isCreate && goalId ? (
         <View className="mt-2">
           <Text className="mb-2 text-sm font-semibold" style={{ color: tokens.text }}>
             Linked Tasks
@@ -467,6 +504,9 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
             </Pressable>
           ))}
         </View>
+      ) : null}
+
+        </>
       ) : null}
 
       {!isCreate && goalId ? (

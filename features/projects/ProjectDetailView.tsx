@@ -54,6 +54,8 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
   const [targetDate, setTargetDate] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [showRelatedWork, setShowRelatedWork] = useState(false);
 
   const [linkedTodos, setLinkedTodos] = useState<{ id: string; title: string }[]>([]);
   const [linkedHabits, setLinkedHabits] = useState<{ id: string; name: string }[]>([]);
@@ -177,6 +179,25 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
         placeholder="Project name"
         accessibilityLabel={`Project name, up to ${PROJECT_NAME_MAX} chars`}
       />
+      {!isCreate && projectId ? (
+        <ProjectProgressPanel rollup={rollup} targetDate={targetDate || null} />
+      ) : null}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Project more options"
+        accessibilityState={{ expanded: showMoreOptions }}
+        aria-expanded={showMoreOptions}
+        className="min-h-11 self-start justify-center rounded-xl border px-3"
+        style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+        onPress={() => setShowMoreOptions((open) => !open)}
+      >
+        <Text className="text-sm" style={{ color: tokens.text }}>
+          {showMoreOptions ? 'Hide project options' : 'More options'}
+        </Text>
+      </Pressable>
+      {showMoreOptions ? (
+        <View className="gap-3">
       <TextField
         label="Description"
         value={description}
@@ -235,6 +256,9 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
         ))}
       </View>
 
+        </View>
+      ) : null}
+
       {error ? (
         <Text className="text-sm" style={{ color: tokens.dangerSolid }}>
           {error}
@@ -248,9 +272,7 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
         color={SECTION_COLORS.todos}
       />
 
-      {!isCreate && projectId ? (
-        <ProjectProgressPanel rollup={rollup} targetDate={targetDate || null} />
-      ) : null}
+
 
       {!isCreate && projectId ? (
         <ProjectLifecycleActions
@@ -277,6 +299,23 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
       ) : null}
 
       {!isCreate && projectId ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Manage project associations"
+          accessibilityState={{ expanded: showRelatedWork }}
+          aria-expanded={showRelatedWork}
+          className="min-h-11 self-start justify-center rounded-xl border px-3"
+          style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+          onPress={() => setShowRelatedWork((open) => !open)}
+        >
+          <Text className="text-sm" style={{ color: tokens.text }}>
+            Related habits & goals ({linkedHabits.length + linkedGoals.length}) {showRelatedWork ? '−' : '+'}
+          </Text>
+        </Pressable>
+      ) : null}
+      {showRelatedWork ? (
+        <>
+      {!isCreate && projectId ? (
         <AssociationSection
           title="Linked Habits"
           linked={linkedHabits}
@@ -298,6 +337,9 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
           onUnlink={(id) => updateGoal(id, { projectId: null })}
           onChanged={reloadLinks}
         />
+      ) : null}
+
+        </>
       ) : null}
 
       {!isCreate && projectId ? (
