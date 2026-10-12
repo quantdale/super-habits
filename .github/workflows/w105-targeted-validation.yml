@@ -1,0 +1,34 @@
+name: W10.5 Targeted Browser Validation
+
+on:
+  push:
+    branches:
+      - frontend-v3-w105-closure
+
+jobs:
+  calories-w105:
+    name: W10.5 targeted Calories UI
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build isolated web export
+        run: npm run build:e2e
+      - name: Verify W10/W10.5 targeted E2E
+        run: npx playwright test e2e/calories-w10.spec.ts e2e/calories.spec.ts --project=chromium
+        env:
+          TZ: Asia/Manila
+      - name: Check retry evidence
+        if: always()
+        run: |
+          if [ -f .cursor/playwright-output/report.json ]; then
+            node scripts/e2e-retry-report.mjs
+          fi
