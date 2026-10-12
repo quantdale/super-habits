@@ -30,6 +30,8 @@ export type CaloriesFormViewProps = SharedProps & {
   mealOptions: readonly { value: MealType; label: string }[];
   computedKcal: number;
   calorieError: string | null;
+  /** Day-log write failure (a failed delete must never look deleted). */
+  error?: string | null;
   onFoodChange: (value: string) => void;
   onProteinChange: (value: string) => void;
   onCarbsChange: (value: string) => void;
@@ -70,6 +72,7 @@ export function CaloriesFormView({
   mealOptions,
   computedKcal,
   calorieError,
+  error,
   onFoodChange,
   onProteinChange,
   onCarbsChange,
@@ -127,6 +130,7 @@ export function CaloriesFormView({
           groups={groups}
           collapsedMeals={collapsedMeals}
           accentColor={accentColor}
+          error={error}
           onToggleGroup={onToggleGroup}
           onEditEntry={onEditEntry}
           onDeleteEntry={onDeleteEntry}

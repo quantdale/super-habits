@@ -182,6 +182,7 @@ test.describe('W10 Calories logging-first surface', () => {
     // Collapsed by default: the caption reports the summary fact and no chart
     // renders on the surface.
     await expect(page.getByText(/days? logged ·/)).toBeVisible();
+    await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
 
     await disclosure.click();
     await expect(page.getByText('Year trend (daily)')).toBeVisible({ timeout: 15_000 });

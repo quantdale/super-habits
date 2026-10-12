@@ -24,6 +24,8 @@ type Props = {
   summaries: DailySummary[];
   /** Last copy-day outcome, surfaced as inline status text. */
   copyStatus: string | null;
+  /** Write failure surfaced beside the day log (never a silent failed delete). */
+  error?: string | null;
   onSelectSavedMeal: (meal: SavedMeal) => void;
   onSelectFrequentFood: (food: FrequentFood) => void;
   onQuickAddKcal: (kcal: number) => Promise<void>;
@@ -53,6 +55,7 @@ export function CaloriesDiaryView({
   selectedDateKey,
   summaries,
   copyStatus,
+  error,
   onSelectSavedMeal,
   onSelectFrequentFood,
   onQuickAddKcal,
@@ -110,6 +113,7 @@ export function CaloriesDiaryView({
           groups={groups}
           collapsedMeals={collapsedMeals}
           accentColor={accentColor}
+          error={error}
           emptyAction={
             <Button
               label="Add entry"

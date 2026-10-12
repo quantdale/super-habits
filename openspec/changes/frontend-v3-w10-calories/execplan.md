@@ -182,9 +182,30 @@ frontend-v3-w10-calories --strict` PASS; parent change valid; `e2e/calories.spec
 - 2026-10-12 — `e2e/a11y.spec.ts` + `a11y-audit-contract.spec.ts` + `theming.spec.ts` —
   PASS — 17/17.
 - 2026-10-12 — `playwright --project=journeys --grep @p0` — PASS — 25/25.
+- 2026-10-12 — `npx vitest run tests/healthNavigationW10.test.ts` —
+  PASS — 4/4.
 - 2026-10-12 — `npx vitest run tests/journeyLabelParity.test.ts` — PASS — 3/3.
 - 2026-10-12 — `npx vitest run tests/integration/caloriesW10LoggingIntegrity.test.ts` —
   PASS — 7/7.
+- 2026-10-12 — `npm run validate:themes` — PASS — 140/140.
+- 2026-10-12 — `npx openspec validate --all` — PASS — 79/79.
+- 2026-10-12 — `npm run agent:plan:validate:all` — PASS.
+- 2026-10-12 — `node scripts/journey-label-parity.mjs` — PASS.
+- 2026-10-12 — `node scripts/quarantine-register-parity.mjs` — PASS — 21 gate
+  files registered, none stale.
+- 2026-10-12 — `npm test` (unit + integration) — 2,666 passed / 2 skipped;
+  1 pre-existing Windows-CRLF `agentDocConsistency` ENVIRONMENT failure.
+- 2026-10-12 — `playwright --project=chromium` — 217 passed / 35 skipped,
+  1 W10 lane failure (shell-mount timing) fixed by waiting for the rail, then
+  218 passed on the re-run; final run in progress.
+- 2026-10-12 — `playwright --project=journeys` — 76 passed / 42 skipped
+  (a-tuesday, past-midnight-freshness, settings-ripple, three-months-in
+  all green after the W10 label updates).
+- 2026-10-12 — `playwright --project=simulation --project=pwa` — 8 passed.
+- 2026-10-12 — `npm run qa:simulation -- --all --mode deterministic` —
+  PASS — 23/23 scenarios; `sim:validate` 23/23.
+- 2026-10-12 — adversarial-review fixes: delete confirmation + delete-failure
+  surface, `aria-expanded` on both disclosures; W10 lanes re-run 30/30.
 
 ## Changed Files / Areas
 
@@ -231,6 +252,19 @@ frontend-v3-w10-calories --strict` PASS; parent change valid; `e2e/calories.spec
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: W10 slice authored; implementation pending.
-- Follow-up: W11 (Planning / Goals / Projects / Daily Plan).
+- Status: Active (publication in progress).
+- Summary: W10 shipped the logging-first Calories reconstruction and the
+  six-destination navigation decided by the D3 measurement gate. Evidence:
+  `docs/ui-ux/v3-audit/w10/` (17 before + 20 inspected after captures,
+  `d3-five-destination.json` vs `d3-six-tab.json`), `e2e/calories-w10.spec.ts`
+  14/14, `e2e/health-nav-w10.spec.ts` 6/6,
+  `tests/integration/caloriesW10LoggingIntegrity.test.ts` 7/7,
+  `tests/healthNavigationW10.test.ts` 4/4.
+- Two pre-existing defects were found and corrected during W10 validation
+  (the W9 date-dependent week-strip oracle; the sub-pixel 44pt measurement);
+  both reproduced on the untouched W9.5 baseline and neither was caused by
+  W10.
+- Follow-up: W11 (Planning / Goals / Projects / Daily Plan). Advertised
+  a11y follow-up: RN Web does not map `accessibilityState.expanded` for
+  role=button; W10 forwards `aria-expanded` on its two disclosures, and the
+  same correction is available for the W9 Workout disclosure.

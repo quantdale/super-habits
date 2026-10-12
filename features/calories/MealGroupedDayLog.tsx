@@ -6,6 +6,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { Card } from '@/core/ui/Card';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { Text } from '@/core/ui/Text';
+import { ValidationError } from '@/core/ui/ValidationError';
 import type { CalorieEntry, MealType } from './types';
 
 export type MealGroup = {
@@ -134,6 +135,9 @@ function MealGroupCard({
         accessibilityRole="button"
         accessibilityLabel={`${section.label} meals`}
         accessibilityState={{ expanded: !collapsed }}
+        // RN Web does not map accessibilityState.expanded for role=button, so
+        // the disclosure state is forwarded explicitly (screen readers need it).
+        aria-expanded={!collapsed}
         className="flex-row items-center gap-3 px-4 py-3"
       >
         <View
@@ -182,6 +186,8 @@ type Props = {
   groups: MealGroup[];
   collapsedMeals: Partial<Record<MealType, boolean>>;
   accentColor: string;
+  /** Write failure surfaced beside the log (never a silent failed delete). */
+  error?: string | null;
   /** Optional single action for the empty state (diary mode offers manual add). */
   emptyAction?: ReactNode;
   onToggleGroup: (mealType: MealType) => void;
@@ -200,6 +206,7 @@ export function MealGroupedDayLog({
   groups,
   collapsedMeals,
   accentColor,
+  error,
   emptyAction,
   onToggleGroup,
   onEditEntry,
@@ -207,6 +214,7 @@ export function MealGroupedDayLog({
 }: Props) {
   return (
     <>
+      <ValidationError message={error ?? null} />
       {groups.length === 0 ? (
         <EmptyStateCard
           accentColor={accentColor}

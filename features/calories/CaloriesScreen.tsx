@@ -177,6 +177,8 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
    *  away from the day they deliberately opened (decided contract D9b). */
   const [followsToday, setFollowsToday] = useState(true);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  /** Day-log write failure (a failed delete must never look deleted). */
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   /** History & insights disclosure (W10): collapsed by default so the logging
    *  surface leads and the heavy rolling derivations only run while open. */
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -457,7 +459,15 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         confirmVariant: 'danger',
       });
       if (!confirmed) return;
-      await deleteCalorieEntry(entry.id);
+      setDeleteError(null);
+      try {
+        await deleteCalorieEntry(entry.id);
+      } catch {
+        // A failed delete must never look like a deleted row: the entry stays
+        // in the log and the failure is surfaced next to it.
+        setDeleteError('Could not delete entry. Please try again.');
+        return;
+      }
       if (editingEntryId === entry.id) {
         setEntryModalVisible(false);
         resetCalorieForm();
@@ -740,6 +750,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           onToggleGroup={toggleMealGroup}
           onEditEntry={openEntryEditModal}
           onDeleteEntry={handleDeleteEntry}
+          error={deleteError}
         />
       ) : (
         <CaloriesDiaryView
@@ -752,6 +763,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           selectedDateKey={selectedDateKey}
           summaries={summary364}
           copyStatus={copyStatus}
+          error={deleteError}
           onSelectSavedMeal={handleSelectSavedMeal}
           onSelectFrequentFood={handleSelectFrequentFood}
           onQuickAddKcal={handleQuickAddKcal}

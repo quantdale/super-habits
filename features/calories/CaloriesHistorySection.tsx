@@ -52,6 +52,9 @@ export function CaloriesHistorySection({
         accessibilityRole="button"
         accessibilityLabel="History and insights"
         accessibilityState={{ expanded: open }}
+        // RN Web does not map accessibilityState.expanded for role=button, so
+        // the disclosure state is forwarded explicitly (screen readers need it).
+        aria-expanded={open}
         className="flex-row items-center justify-between gap-3 py-2"
       >
         <View className="min-w-0 flex-1">
