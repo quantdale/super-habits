@@ -111,6 +111,11 @@ test.describe('W10 Calories logging-first surface', () => {
     await expect(page.getByText('Consumed', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Remaining', { exact: true })).toHaveCount(0);
     await expect(page.getByText(/of daily goal today/)).toHaveCount(0);
+    // Goal is numeric only in the context line; edit action does not repeat it.
+    await expect(page.getByRole('button', { name: 'Edit daily calorie goal' })).toContainText(
+      'Edit goal',
+    );
+    await expect(page.getByText('Goal 2,000', { exact: true })).toHaveCount(0);
   });
 
   test('macro rows show totals and targets; over target is factual', async ({ page }) => {

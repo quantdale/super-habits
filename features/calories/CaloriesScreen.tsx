@@ -802,9 +802,10 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       <MacroTargetsModal
         visible={targetsSheetVisible}
         currentTargets={effectiveTargets}
-        onSave={(next) => {
+        onSave={async (next) => {
+          // Commit first; only reflect durable targets after persistence succeeds.
+          await saveMacroTargets(next);
           setMacroTargets(next);
-          void saveMacroTargets(next).catch(() => undefined);
         }}
         onClose={() => setTargetsSheetVisible(false)}
       />

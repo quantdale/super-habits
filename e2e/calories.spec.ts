@@ -139,6 +139,31 @@ test.describe('Calories', () => {
     });
   });
 
+  test('failed macro-target write preserves editor and does not update displayed targets', async ({
+    page,
+  }) => {
+    // Real SQLite trigger rejects the write. DB harness navigation destroys
+    // React state, so seed before opening the modal and query rows last.
+    await seedSql(
+      page,
+      `CREATE TRIGGER reject_macro_target_write
+         BEFORE INSERT ON app_meta
+         WHEN NEW.key = 'calorie_targets'
+         BEGIN SELECT RAISE(ABORT, 'target-write-blocked'); END;`,
+    );
+    await goToTab(page, 'calories');
+    await page.getByLabel('Edit daily macro targets').click();
+    await page.getByLabel('Protein (g)').fill('180');
+    await page.getByRole('button', { name: 'Save targets' }).click();
+
+    await expect(page.getByText('Could not finish saving targets. Please try again.')).toBeVisible();
+    await expect(page.getByLabel('Protein (g)')).toHaveValue('180');
+    await expect(page.getByText('0g / 150g', { exact: true })).toBeVisible();
+
+    const rows = await queryRows(page, "SELECT value FROM app_meta WHERE key = 'calorie_targets'");
+    expect(rows).toHaveLength(0);
+  });
+
   test('macro targets modal rejects grams over 999', async ({ page }) => {
     await page.getByLabel('Edit daily macro targets').click();
     await page.getByLabel('Protein (g)').fill('1000');
