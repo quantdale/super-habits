@@ -29,24 +29,24 @@ Close bounded findings from W10 review without reopening the nutrition redesign:
 
 ## Current Checkpoint
 
-- Current milestone: M1 — branch created from W10 final main; source and required repository instructions inspected.
-- Completed: GitHub source review, P2 review finding confirmed, persistence contract confirmed, branch `frontend-v3-w105-closure` created.
-- In progress: plan-first setup before source edits.
-- Important modified files: this plan only (at this checkpoint).
+- Current milestone: M3 — implementation and provenance committed on isolated W10.5 branch; PR and hosted verification next.
+- Completed: plan-first branch setup; no duplicated goal in the hero action; macro-target modal waits for persistence, guards double submit and keeps draft on failure; regression coverage added; D3 source fingerprint and W10 document reconciliations authored.
+- In progress: PR creation, CI validation and review.
+- Important modified files: `features/calories/CaloriesDailyHero.tsx`, `MacroTargetsModal.tsx`, `CaloriesScreen.tsx`; `e2e/calories-w10.spec.ts`, `e2e/calories.spec.ts`; D3 measurement harness and README; W10 tasks, parent campaign ExecPlan; this plan.
 - Last successful validation: historical W10 latest exact-main CI `38264376415`: typecheck, lint, Deno, themes, OpenSpec, plans, unit/integration 2,676 passed / 3 skipped; security audit failed on two inherited advisories.
 - Current failures: inherited security audit red; Windows CRLF environment residual and other existing known gaps.
 - Relevant quarantines: None new.
 - Blockers: Unable to run a full local repository checkout in the current environment; use hosted PR checks for typecheck and unit/integration. E2E remains blocked by inherited audit.
 - Condition required to unblock: A test environment capable of running the Playwright E2E suite independent of the security gate.
 - Exact resume action after unblock: Run targeted Calories W10/W10.5 browser regressions and inspect screenshots before marking any unverified gates complete.
-- Exact next action: implement W10.5 UI corrections with focused regression tests, reconcile provenance and records, then open PR and inspect hosted CI.
+- Exact next action: open W10.5 PR, review targeted source and hosted CI, correct any new failures, then publish only if validation supports it.
 - Remaining definition of done: review findings fixed and tests strengthened; code committed on isolated branch; hosted typecheck/lint/unit/integration verified; plan/provenance/checklist reconciled; PR reviewed and merged only if verification supports it.
 
 ## Progress
 
 - [x] M1 — preflight and plan
-- [ ] M2 — source correction and regressions
-- [ ] M3 — provenance and documentation
+- [x] M2 — source correction and regression tests committed, execution pending
+- [x] M3 — provenance and historical completion records reconciled
 - [ ] M4 — hosted validation, review, and publication
 
 ## Surprises & Discoveries
@@ -68,6 +68,9 @@ Close bounded findings from W10 review without reopening the nutrition redesign:
 ## Changed Files / Areas
 
 - `.agent/execplans/frontend-v3-w105-closure.md` — durable checkpoint.
+- W10 UI code and E2E specs — truthful goal/save behavior.
+- D3 instrument and W10 evidence README — provenance and limitations.
+- W10 tasks and parent ExecPlan — accurate closure/handoff checkpoint.
 
 ## Recovery / Resume Instructions
 

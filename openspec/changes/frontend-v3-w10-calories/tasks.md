@@ -82,12 +82,20 @@
 
 ## 8. Validation and publication
 
-- [ ] 8.1 Ladder: `git diff --check`, typecheck, lint, `validate:themes`,
+- [x] 8.1 Ladder: `git diff --check`, typecheck, lint, `validate:themes`,
       `openspec validate --all`, `agent:plan:validate:all`, `npm test`
       (unit + integration), affected e2e lanes, `sim:validate`
-- [ ] 8.2 Adversarial review: nutrition writes, dates, form state,
+- [x] 8.2 Adversarial review: nutrition writes, dates, form state,
       navigation, a11y, responsiveness, performance (D14 unchanged)
-- [ ] 8.3 Publish through the normal PR/merge workflow; verify exact-head
+- [x] 8.3 Publish through the normal PR/merge workflow; verify exact-head
       hosted CI (only the two pre-existing audit advisories may be red)
-- [ ] 8.4 Final records: defect-ledger W10 note, parent plan checkpoint,
+- [x] 8.4 Final records: defect-ledger W10 note, parent plan checkpoint,
       W11 handoff
+
+## Post-W10 follow-up
+
+W10.5 is a **separate** closure campaign (`.agent/execplans/frontend-v3-w105-closure.md`):
+duplicate goal edit label, macro-target persistence failure handling, D3 source
+provenance, and completion-record reconciliation. The W10 checklist above
+records already-performed W10 validations and publication, not a claim that
+W10.5 is complete or that hosted E2E passed.
