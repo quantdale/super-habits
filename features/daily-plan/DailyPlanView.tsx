@@ -59,6 +59,9 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
   const [adherence, setAdherence] = useState<AdherenceSummary | null>(null);
   const [carryingForward, setCarryingForward] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showPriorityPicker, setShowPriorityPicker] = useState(false);
+  const [showPlanningOptions, setShowPlanningOptions] = useState(false);
+  const [showReflection, setShowReflection] = useState(false);
 
   const loadPlanData = useCallback(
     () =>
@@ -199,9 +202,14 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
 
   return (
     <View className="gap-3">
-      <Text className="text-lg font-bold" style={{ color: tokens.text }}>
-        Plan for {today}
-      </Text>
+      <View className="gap-1">
+        <Text className="text-lg font-bold" style={{ color: tokens.text }}>
+          Plan for {today}
+        </Text>
+        <Text className="text-xs" style={{ color: tokens.textMuted }}>
+          {plan?.status === 'completed' ? 'Completed' : plan?.status === 'committed' ? 'Committed' : 'Not yet saved'}
+        </Text>
+      </View>
 
       {adherence ? (
         <Text className="text-sm" style={{ color: tokens.textMuted }}>
@@ -259,7 +267,22 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
           />
         </View>
       ))}
-      <TextField
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={showPriorityPicker ? 'Hide priority picker' : 'Add priority'}
+        accessibilityState={{ expanded: showPriorityPicker }}
+        aria-expanded={showPriorityPicker}
+        className="min-h-11 self-start justify-center rounded-xl border px-3"
+        style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+        onPress={() => setShowPriorityPicker((open) => !open)}
+      >
+        <Text className="text-sm" style={{ color: tokens.text }}>
+          {showPriorityPicker ? 'Done adding priorities' : 'Add priority'}
+        </Text>
+      </Pressable>
+      {showPriorityPicker ? (
+        <View className="gap-2">
+          <TextField
         label="Quick-add priority"
         value={searchQuery}
         onChangeText={setSearchQuery}
@@ -280,6 +303,38 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
         </Pressable>
       ))}
 
+        </View>
+      ) : null}
+
+      <Button
+        label="Save Plan"
+        onPress={() =>
+          persist({
+            status:
+              plan?.status === 'committed' || plan?.status === 'completed'
+                ? plan.status
+                : 'committed',
+          })
+        }
+        disabled={saving}
+        color={SECTION_COLORS.focus}
+      />
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="More planning options"
+        accessibilityState={{ expanded: showPlanningOptions }}
+        aria-expanded={showPlanningOptions}
+        className="min-h-11 self-start justify-center rounded-xl border px-3"
+        style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+        onPress={() => setShowPlanningOptions((open) => !open)}
+      >
+        <Text className="text-sm" style={{ color: tokens.text }}>
+          {showPlanningOptions ? 'Hide planning options' : 'More planning options'}
+        </Text>
+      </Pressable>
+      {showPlanningOptions ? (
+        <View className="gap-3">
       <View className="mt-2">
         <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
           Scheduled habits today
@@ -318,20 +373,24 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
         placeholder="Optional"
       />
 
-      <Button
-        label="Save Plan"
-        onPress={() =>
-          persist({
-            status:
-              plan?.status === 'committed' || plan?.status === 'completed'
-                ? plan.status
-                : 'committed',
-          })
-        }
-        disabled={saving}
-        color={SECTION_COLORS.focus}
-      />
+        </View>
+      ) : null}
 
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="End-of-day reflection"
+        accessibilityState={{ expanded: showReflection }}
+        aria-expanded={showReflection}
+        className="min-h-11 self-start justify-center rounded-xl border px-3"
+        style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+        onPress={() => setShowReflection((open) => !open)}
+      >
+        <Text className="text-sm" style={{ color: tokens.text }}>
+          End-of-day reflection {showReflection ? '−' : '+'}
+        </Text>
+      </Pressable>
+      {showReflection ? (
+        <View className="gap-3">
       <View className="mt-2">
         <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
           End-of-day reflection
@@ -385,6 +444,13 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
           Plan completed.
         </Text>
       )}
+        </View>
+      ) : null}
+      {isCompleted && !showReflection ? (
+        <Text className="text-sm font-semibold" style={{ color: sectionAccents.habits.text }}>
+          Plan completed.
+        </Text>
+      ) : null}
 
       <Pressable
         accessibilityRole="button"
