@@ -1,0 +1,37 @@
+name: W11 Branch Formatter (temporary)
+on:
+  push:
+    branches: [frontend-v3-w11-planning]
+permissions:
+  contents: write
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Format only W11 touched TypeScript
+        run: |
+          npx prettier --write \
+            features/planning-hub/PlanningSummaryRow.tsx \
+            features/goals/GoalListView.tsx \
+            features/goals/GoalDetailView.tsx \
+            features/projects/ProjectListView.tsx \
+            features/projects/ProjectDetailView.tsx \
+            features/daily-plan/DailyPlanView.tsx \
+            e2e/planning-w11.spec.ts
+      - name: Commit formatting on the isolated branch when needed
+        run: |
+          if ! git diff --quiet; then
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config user.name "github-actions[bot]"
+            git add features/planning-hub/PlanningSummaryRow.tsx features/goals/ features/projects/ features/daily-plan/DailyPlanView.tsx e2e/planning-w11.spec.ts
+            git commit -m "style(w11): format scoped planning files"
+            git push origin HEAD:frontend-v3-w11-planning
+          fi
