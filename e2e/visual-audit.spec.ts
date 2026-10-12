@@ -99,10 +99,14 @@ audit.describe('V3 current-state audit', () => {
     await goToTab(page, 'calories');
     await shot(page, '390-calories-populated');
 
-    // Health parent surface + child routing (V3 five-destination model).
-    await goToTab(page, 'health');
-    await shot(page, '390-health');
+    // Health parent surface + child routing (V3 five-destination model) —
+    // REMOVED by the W10 D3 gate: measured evidence showed the parent added a
+    // tap to start-workout and log-meal, so the six-tab fallback shipped and
+    // Workout/Calories own their destinations. The W1-era `390-health.png`
+    // capture remains on disk as historical evidence; this instrument now
+    // records the six-destination bar instead.
     await goToTab(page, 'workout');
+    await shot(page, '390-nav-six-tabs');
     await shot(page, '390-workout-via-health');
 
     // Secondary experiences.

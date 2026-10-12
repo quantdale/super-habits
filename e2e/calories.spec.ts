@@ -23,8 +23,12 @@ test.describe('Calories', () => {
     await goToTab(page, 'calories');
   });
 
-  test('shows empty state on first load', async ({ page }) => {
-    await expect(page.getByText('Today: 0 kcal')).toBeVisible();
+  test('shows the remaining-kcal hero on first load', async ({ page }) => {
+    // W10: the default goal is 2,000 kcal, so an empty day shows the whole
+    // goal remaining as the screen title (the daily summary repeats the
+    // consumed-of-goal context below it).
+    await expect(page.getByText('2,000 kcal left')).toBeVisible();
+    await expect(page.getByText(/0 of 2,000 kcal logged/)).toBeVisible();
   });
 
   test('does not add entry with empty food name', async ({ page }) => {
@@ -40,7 +44,8 @@ test.describe('Calories', () => {
     await clickCaloriesAddEntry(page);
     await expect(page.locator('body')).toContainText('Chicken breast', { timeout: 15_000 });
     await expect(page.locator('body')).toContainText('147 kcal', { timeout: 15_000 });
-    await expect(page.getByText('Today: 147 kcal')).toBeVisible();
+    await expect(page.getByText(/147 of 2,000 kcal logged/)).toBeVisible();
+    await expect(page.getByText('1,853 kcal left')).toBeVisible();
 
     // Row oracle: the entry persisted on today's date with the computed kcal.
     const rows = await queryRows(
@@ -69,20 +74,24 @@ test.describe('Calories', () => {
     await expect(page.locator('body')).toContainText('235 kcal', { timeout: 15_000 });
 
     await page.getByLabel('Diary view').click();
-    await expect(page.getByText('Quick add', { exact: true })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('Daily log', { exact: true })).toBeVisible({ timeout: 15_000 });
+    // W10 diary: the quick-log card's fast entry paths and the meal-grouped
+    // day log (labeled "Daily log") carry the entry; the Oats row sits in its
+    // Breakfast group with its computed kcal.
+    await expect(page.getByText('Recent foods', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByLabel('Daily log')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('body')).toContainText('Oats', { timeout: 15_000 });
     await expect(page.locator('body')).toContainText('235 kcal', { timeout: 15_000 });
-    await expect(page.locator('body')).toContainText('Logged', { timeout: 15_000 });
+    await expect(
+      page.getByLabel('Daily log').getByText('Breakfast', { exact: true }),
+    ).toBeVisible();
 
     await page.reload();
     await page.waitForLoadState('load');
     await goToTab(page, 'calories');
-    await expect(page.getByText('Quick add', { exact: true })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('Daily log', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Recent foods', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByLabel('Daily log')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('body')).toContainText('Oats', { timeout: 15_000 });
     await expect(page.locator('body')).toContainText('235 kcal', { timeout: 15_000 });
-    await expect(page.locator('body')).toContainText('Logged', { timeout: 15_000 });
 
     // Row oracle: exactly one live entry survived the reload.
     const rows = await queryRows(
@@ -107,14 +116,19 @@ test.describe('Calories', () => {
     await page.getByLabel('Fats (g)').fill('70');
     await page.getByText('Save targets', { exact: true }).click();
 
-    await expect(page.getByText('Protein 0g / 180g')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('Carbs 0g / 220g')).toBeVisible();
-    await expect(page.getByText('Fats 0g / 70g')).toBeVisible();
+    // W10 macro summary: one row per macro — label on the left, the
+    // logged/target pair on the right — with a slim progress bar beneath.
+    await expect(page.getByText('Protein', { exact: true }).first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByText('0g / 180g', { exact: true })).toBeVisible();
+    await expect(page.getByText('0g / 220g', { exact: true })).toBeVisible();
+    await expect(page.getByText('0g / 70g', { exact: true })).toBeVisible();
 
     // Targets persist across a full reload (app_meta calorie_targets).
     await page.reload({ waitUntil: 'load' });
     await goToTab(page, 'calories');
-    await expect(page.getByText('Protein 0g / 180g')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('0g / 180g', { exact: true })).toBeVisible({ timeout: 15_000 });
 
     const rows = await queryRows(page, `SELECT value FROM app_meta WHERE key = 'calorie_targets'`);
     expect(rows).toHaveLength(1);
@@ -143,9 +157,10 @@ test.describe('Calories', () => {
     // The hero total only re-renders after the entry write has refreshed
     // state, so the SQLite read below can never race the transaction commit
     // (reading rows destroys the app page — never query before this signal).
-    // Double 200-kcal presses move the total off zero on fixed and unfixed
-    // builds alike; the strict oracle below is what distinguishes them.
-    await expect(page.getByText('Today: 0 kcal')).not.toBeVisible();
+    // Double 200-kcal presses move the total off the full-goal title on fixed
+    // and unfixed builds alike; the strict oracle below is what distinguishes
+    // them.
+    await expect(page.getByText('2,000 kcal left')).not.toBeVisible();
     // Strict one-row contract: a double-press is ONE entry, never two.
     const rows = await queryRows(
       page,
@@ -174,12 +189,13 @@ test.describe('Calories', () => {
   });
 
   test('goal modal save updates the goal line and progress bar', async ({ page }) => {
-    await page.getByText('Goal: 2000 kcal ✎').click();
+    await page.getByRole('button', { name: 'Edit daily calorie goal' }).click();
     await expect(page.getByText('Daily goals', { exact: true })).toBeVisible();
     await page.getByRole('textbox', { name: 'Calories (kcal)' }).fill('1500');
     await page.getByText('Save goals', { exact: true }).click();
 
-    await expect(page.getByText('Goal: 1500 kcal ✎')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Goal 1,500')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('1,500 kcal left')).toBeVisible();
 
     const rows = await queryRows(page, `SELECT value FROM app_meta WHERE key = 'calorie_goal'`);
     expect(rows).toHaveLength(1);

@@ -62,7 +62,10 @@ test.describe('P1 — Maya, the Daily Driver — J2b past-midnight freshness: no
     await switchSection(page, 'calories');
     await fillCaloriesMacros(page, 'Oatmeal', '30', '50', '10', '0');
     await clickCaloriesAddEntry(page);
-    await expect(page.getByText('Today: 410 kcal')).toBeVisible();
+    // W10 hero: the remaining-kcal title and the consumed-of-goal caption
+    // (2,000 kcal goal, 410 logged).
+    await expect(page.getByText('1,590 kcal left')).toBeVisible();
+    await expect(page.getByText(/410 of 2,000 kcal logged/)).toBeVisible();
 
     // Both sections are now mounted; Calories is the active one.
   });
@@ -76,11 +79,11 @@ test.describe('P1 — Maya, the Daily Driver — J2b past-midnight freshness: no
   test('3. the ACTIVE mounted section presents the new day, not a stale "Today" @p0', async () => {
     // Decided contract (D9b): Calories is still the active, mounted section,
     // so a midnight tick must refresh its day-scoped data. Nothing has been
-    // logged on the NEW day yet, so the "Today" header must show 0 kcal and
-    // must NOT still show yesterday's 410 kcal. Today this fails: the active
-    // section renders yesterday's totals under the "Today" header.
-    await expect(page.getByText('Today: 0 kcal')).toBeVisible();
-    await expect(page.getByText('Today: 410 kcal')).not.toBeVisible();
+    // logged on the NEW day yet, so the hero must show the full goal left and
+    // must NOT still show yesterday's remaining 1,590. Today this fails: the
+    // active section renders yesterday's totals under the "Today" header.
+    await expect(page.getByText('2,000 kcal left')).toBeVisible();
+    await expect(page.getByText('1,590 kcal left')).not.toBeVisible();
   });
 
   test('4. an INACTIVE mounted section refreshes on activation instead of rendering held values @p0', async () => {

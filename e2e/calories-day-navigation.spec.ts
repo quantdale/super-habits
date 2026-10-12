@@ -61,7 +61,8 @@ test.describe('Calories diary day navigation', () => {
     // re-log chip outside it.
     await prev.click();
     await expect(page.getByText('Yesterday', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText(/300 kcal · P 10g · C 50g · F 6g/)).toBeVisible();
+    await expect(page.getByText('300 kcal', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(/P 10g · C 50g · F 6g/).first()).toBeVisible();
     await expect(page.getByLabel('Daily log').getByText('Yesterday oats')).toBeVisible();
     await expect(next).toBeEnabled();
 
@@ -177,7 +178,7 @@ test.describe('Calories diary day navigation', () => {
     // recomputed from macros on save — the shipped update contract).
     await page.getByRole('button', { name: 'Next day', exact: true }).click();
     await expect(page.getByLabel('Daily log').getByText('Misfiled ramen')).toBeVisible();
-    await expect(page.getByText(/kcal · P 10g · C 50g · F 6g/)).toBeVisible();
+    await expect(page.getByText(/P 10g · C 50g · F 6g/).first()).toBeVisible();
 
     // Identity survives a hard reload: exactly one row, now on today.
     await page.reload({ waitUntil: 'load' });

@@ -6,7 +6,10 @@ import { parseRailLabels } from '../scripts/journey-label-parity.mjs';
 const APP_INDEX = join(__dirname, '..', 'app', 'index.tsx');
 
 describe('journey-label-parity parser', () => {
-  it('parses the real app rail into five named labels', () => {
+  it('parses the real app rail into six named labels', () => {
+    // W10 D3 gate: the six-tab model shipped (the Health parent added a tap to
+    // start-workout and log-meal), so the rail carries Workout and Calories as
+    // their own destinations and no Health entry.
     const source = readFileSync(APP_INDEX, 'utf8');
     const labels = parseRailLabels(source);
     expect(labels).not.toBeNull();
@@ -15,7 +18,8 @@ describe('journey-label-parity parser', () => {
       ['todos', 'To Do'],
       ['habits', 'Habits'],
       ['pomodoro', 'Focus'],
-      ['health', 'Health'],
+      ['workout', 'Workout'],
+      ['calories', 'Calories'],
     ]);
   });
 

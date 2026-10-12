@@ -140,11 +140,15 @@ defineJourney({
 
         // --- Ripple: the Calories section shows the new goal. ---
         await switchSection(page, 'calories');
-        await expect(page.getByText(/Goal: 2400 kcal/).first()).toBeVisible({ timeout: 15_000 });
-        // With the default 2000 kcal goal the remaining would read 2000; the
+        // W10 hero: the goal lives in the daily summary's goal control and the
+        // remaining-kcal title; both read the saved goal.
+        await expect(page.getByText('Goal 2,400', { exact: true }).first()).toBeVisible({
+          timeout: 15_000,
+        });
+        // With the default 2000 kcal goal the remaining would read 2,000; the
         // new goal must drive the progress display.
-        await expect(page.getByText('2400 kcal remaining')).toBeVisible();
-        await expect(page.getByText('2000 kcal remaining')).toHaveCount(0);
+        await expect(page.getByText('2,400 kcal left')).toBeVisible();
+        await expect(page.getByText('2,000 kcal left')).toHaveCount(0);
 
         // --- Persisted row (app_meta.calorie_goal). ---
         await expectRows(page, "SELECT value FROM app_meta WHERE key = 'calorie_goal'", (rows) => {
@@ -160,7 +164,9 @@ defineJourney({
         // --- Survives a reload. ---
         await returnToApp(page);
         await switchSection(page, 'calories');
-        await expect(page.getByText(/Goal: 2400 kcal/).first()).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByText('Goal 2,400', { exact: true }).first()).toBeVisible({
+          timeout: 15_000,
+        });
 
         // --- Negative oracle: no calorie rows were created by the settings change. ---
         await expectRows(

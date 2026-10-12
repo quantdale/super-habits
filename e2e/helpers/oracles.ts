@@ -20,10 +20,12 @@ const SECTION_HEADINGS: Record<keyof typeof TAB_LABELS, string> = {
   // product-name hero were removed with the timer rebuild.
   pomodoro: 'Focus',
   workout: 'Workout',
-  // The redesigned Calories hero leads with the kcal-remaining number, so the
-  // section's stable identity string is the preserved hero subtitle.
-  calories: 'Switch between manual entry and a diary grouped by meal.',
-  // The V3 Health parent surface keeps a stable PageHeader title.
+  // The W10 Calories hero carries the section eyebrow "Calories" and the
+  // remaining-kcal title; the eyebrow is the stable identity string (the
+  // SYS-06 doc subtitle it replaced was deleted with the reconstruction).
+  calories: 'Calories',
+  // The W10 six-tab model retired the Health parent from the bar; the surface
+  // still exists for deep links/commands and keeps its PageHeader title.
   health: 'Health',
 };
 
