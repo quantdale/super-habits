@@ -1,7 +1,7 @@
 # ExecPlan: W10 — Calories / Health reconstruction + D3 navigation gate
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -61,8 +61,8 @@ nutrition-math change.
 
 ## Current Checkpoint
 
-- Current milestone: M7/M8 — implementation, D3 decision, rendered certification and regression
-  coverage are complete; the full E2E battery and the validation ladder are running.
+- Current milestone: M9 — W10 is COMPLETE and MERGED (PR #70, merge commit
+  `f7d313bdc9ae6b31c38ef0e738e58e965435f9f8`). M1–M8 are done.
 - Completed:
   - M1 preflight (HEAD `21a598ba…` = origin/main; stash + `.tmp-ios36423379932/` preserved;
     baseline typecheck/lint PASS) + W10 slice + this plan authored.
@@ -86,28 +86,39 @@ nutrition-math change.
   - M7 rendered certification: 20 after captures opened/inspected at 360/390/412/768/1280
     light + dark; `docs/ui-ux/v3-audit/w10/README.md` records the before/after findings and
     the D3 decision.
-- In progress: full E2E battery (`npm run e2e`) and the validation ladder.
+- In progress: none — final records only.
+- M8/M9 completed: full ladder green (see the Validation Ledger) and PR #70 merged as
+  `f7d313b` (6 commits). Exact-head hosted CI run 38259047679: quality green through
+  unit/integration (2,676 passed / 3 skipped; 262 files), openspec 79/79, plan validation
+  and parity guards PASS; the only red is `Audit runtime dependencies` on the two
+  pre-existing UNDOCUMENTED advisories (braces GHSA-vfj7-8cjw-p6xm, node-forge
+  GHSA-86w9-cpqp-85rv); hosted e2e/nightly SKIPPED behind that gate; Vercel production
+  deployment 7015956226 for the exact head succeeded.
 - Important modified files: `app/index.tsx`, `features/calories/*` (see Changed Files),
-  `core/ui/PillChip.tsx`, `e2e/**`, `tests/**`, `docs/ui-ux/15-v3-defect-ledger.md`,
-  `openspec/changes/frontend-v3-calm-momentum/{tasks,execplan}.md`,
+  `core/ui/PillChip.tsx`, `e2e/**`, `tests/**`, `docs/ui-ux/13…15`,
+  `docs/testing/known-gaps.md`, `openspec/changes/frontend-v3-calm-momentum/{tasks,execplan}.md`,
   `openspec/changes/frontend-v3-w10-calories/*`.
-- Last successful validation: typecheck PASS; lint PASS (0/0); `npx openspec validate
-frontend-v3-w10-calories --strict` PASS; parent change valid; `e2e/calories.spec.ts` 10/10;
-  `e2e/calories-day-navigation.spec.ts` + `e2e/boundary.spec.ts` green (26+1 reruns);
-  `e2e/a11y*` + `theming` 17/17; `journeys --grep @p0` 25/25; `tests/journeyLabelParity.test.ts`
-  3/3.
-- Current failures: None new. Inherited residuals only: braces/node-forge audit reds,
-  Windows-CRLF `agentDocConsistency` ENVIRONMENT failure, D14 host-load headroom residuals,
-  Focus notification timestamp, Android API36 pending W16, iOS owner-deferred.
+- Last successful validation: typecheck 0 errors; lint 0/0; themes 140/140; openspec
+  79/79; plan validation PASS; parity guards OK; `npm test` 2,666 passed / 2 skipped +
+  the inherited Windows-CRLF `agentDocConsistency` failure; chromium 218 passed / 35
+  skipped; journeys 76 passed / 42 skipped; simulation 8/8 + deterministic 23/23; pwa 5/5.
+- Current failures: None new. Inherited residuals only: braces/node-forge audit reds
+  (hosted `quality` step), Windows-CRLF `agentDocConsistency` ENVIRONMENT failure,
+  D14 host-load headroom residuals, Focus notification timestamp, Android API36
+  pending W16, iOS owner-deferred, `format:check` 134 pre-existing files.
 - Relevant quarantines: none added.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: finish the E2E battery + validation ladder, then run the adversarial
-  review pass and commit the coherent milestones for publication.
-- Remaining definition of done: full ladder green (except recorded inherited residuals);
-  adversarial review findings fixed or recorded; milestones committed; PR merged through the
-  normal workflow; exact-head hosted CI inspected; final records + W11 handoff.
+- Exact next action: None — W10 is complete; W11 (Planning / Goals / Projects / Daily
+  Plan) is the next wave and starts with its own OpenSpec slice.
+- Remaining definition of done: all satisfied — logging-first surface shipped and
+  inspected; SYS-06/SYS-18/SUR-07 verified fixed; D3 measured, decided and implemented;
+  data-integrity oracles green; full ladder green except the recorded inherited
+  residuals; published through the normal PR workflow with exact-head hosted CI
+  inspected. All conditions are satisfied; nothing remains.
+- Remaining definition of done (final): NONE — every item above is complete and
+  evidenced in the Validation Ledger.
 
 ## Progress
 
@@ -119,8 +130,8 @@ frontend-v3-w10-calories --strict` PASS; parent change valid; `e2e/calories.spec
 - [x] M5 — D3 implementation (six-tab) + parity-consumer updates
 - [x] M6 — data-integrity coverage (unit / real-SQLite / e2e)
 - [x] M7 — rendered certification + defect inspection + correction loop
-- [ ] M8 — full validation ladder + adversarial review
-- [ ] M9 — publication + exact-head hosted CI + final records
+- [x] M8 — full validation ladder + adversarial review
+- [x] M9 — publication + exact-head hosted CI + final records
 
 ## Surprises & Discoveries
 
@@ -206,6 +217,15 @@ frontend-v3-w10-calories --strict` PASS; parent change valid; `e2e/calories.spec
   PASS — 23/23 scenarios; `sim:validate` 23/23.
 - 2026-10-12 — adversarial-review fixes: delete confirmation + delete-failure
   surface, `aria-expanded` on both disclosures; W10 lanes re-run 30/30.
+- 2026-10-12 — `playwright --project=chromium` (final run) — PASS — 218
+  passed / 35 skipped (23.5m).
+- 2026-10-12 — hosted CI run 38259047679 at the exact merged head `f7d313b` —
+  quality green through unit/integration (2,676 passed / 3 skipped; 262 files),
+  openspec 79/79, plans, parity; red only on `Audit runtime dependencies`
+  (braces GHSA-vfj7-8cjw-p6xm, node-forge GHSA-86w9-cpqp-85rv — pre-existing,
+  UNDOCUMENTED at baseline); hosted e2e/nightly SKIPPED behind that gate.
+- 2026-10-12 — Vercel deployment 7015956226 (Production – superhabits) for
+  `f7d313b` — success.
 
 ## Changed Files / Areas
 
@@ -252,14 +272,20 @@ frontend-v3-w10-calories --strict` PASS; parent change valid; `e2e/calories.spec
 
 ## Outcomes & Retrospective
 
-- Status: Active (publication in progress).
+- Status: Complete (merged as `f7d313b`, PR #70).
 - Summary: W10 shipped the logging-first Calories reconstruction and the
   six-destination navigation decided by the D3 measurement gate. Evidence:
   `docs/ui-ux/v3-audit/w10/` (17 before + 20 inspected after captures,
   `d3-five-destination.json` vs `d3-six-tab.json`), `e2e/calories-w10.spec.ts`
   14/14, `e2e/health-nav-w10.spec.ts` 6/6,
   `tests/integration/caloriesW10LoggingIntegrity.test.ts` 7/7,
-  `tests/healthNavigationW10.test.ts` 4/4.
+  `tests/healthNavigationW10.test.ts` 4/4, plus the full local ladder
+  (chromium 218 passed / 35 skipped, journeys 76 / 42, simulation 8/8 and
+  23/23 deterministic, pwa 5/5, vitest 2,666 passed / 2 skipped with the
+  inherited CRLF failure) and the exact-head hosted run 38259047679 (quality
+  green through unit/integration at 2,676 passed / 3 skipped; audit-only red
+  on the two pre-existing braces/node-forge advisories; hosted e2e/nightly
+  skipped; Vercel production deployment 7015956226 success).
 - Two pre-existing defects were found and corrected during W10 validation
   (the W9 date-dependent week-strip oracle; the sub-pixel 44pt measurement);
   both reproduced on the untouched W9.5 baseline and neither was caused by
