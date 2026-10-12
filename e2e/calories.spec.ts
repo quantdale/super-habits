@@ -157,12 +157,43 @@ test.describe('Calories', () => {
     await page.getByLabel('Protein (g)').fill('180');
     await page.getByRole('button', { name: 'Save targets' }).click();
 
-    await expect(page.getByText('Could not finish saving targets. Please try again.')).toBeVisible();
+    await expect(
+      page.getByText('Could not finish saving targets. Please try again.'),
+    ).toBeVisible();
     await expect(page.getByLabel('Protein (g)')).toHaveValue('180');
     await expect(page.getByText('0g / 150g', { exact: true })).toBeVisible();
 
     const rows = await queryRows(page, "SELECT value FROM app_meta WHERE key = 'calorie_targets'");
     expect(rows).toHaveLength(0);
+  });
+
+  test('partial backup-intent failure keeps the committed local target visible', async ({
+    page,
+  }) => {
+    // app_meta commits, then the separate backup settings outbox transaction
+    // rejects. UI must reconcile the persisted target instead of showing stale
+    // macro bars or an inaccurate total failure.
+    await seedSql(
+      page,
+      `CREATE TRIGGER reject_backup_settings_intent
+         BEFORE INSERT ON sync_outbox
+         WHEN NEW.entity = 'user_backup_settings'
+         BEGIN SELECT RAISE(ABORT, 'backup-outbox-blocked'); END;`,
+    );
+    await goToTab(page, 'calories');
+    await page.getByLabel('Edit daily macro targets').click();
+    await page.getByLabel('Protein (g)').fill('180');
+    await page.getByRole('button', { name: 'Save targets' }).click();
+
+    await expect(
+      page.getByText('Targets saved locally. Backup update could not be confirmed.'),
+    ).toBeVisible();
+    await expect(page.getByLabel('Protein (g)')).not.toBeVisible();
+    await expect(page.getByText('0g / 180g', { exact: true })).toBeVisible();
+
+    const rows = await queryRows(page, "SELECT value FROM app_meta WHERE key = 'calorie_targets'");
+    expect(rows).toHaveLength(1);
+    expect(JSON.parse(String(rows[0]?.value))).toMatchObject({ protein: 180 });
   });
 
   test('macro targets modal rejects grams over 999', async ({ page }) => {

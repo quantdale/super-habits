@@ -92,11 +92,7 @@ export function MacroTargetsModal({ visible, currentTargets, onSave, onClose }: 
   };
 
   return (
-    <Modal
-      title="Daily targets"
-      visible={visible}
-      onClose={saving ? () => undefined : onClose}
-    >
+    <Modal title="Daily targets" visible={visible} onClose={saving ? () => undefined : onClose}>
       <Text className="mb-3 text-xs" style={{ color: tokens.textMuted }}>
         Optional per-day protein/carb/fat targets for the macro bars. Informational only.
       </Text>
