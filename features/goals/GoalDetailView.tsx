@@ -371,7 +371,7 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
         </View>
       ) : null}
 
-      {projects.length > 0 ? (
+      {showMoreOptions && projects.length > 0 ? (
         <View className="mt-2">
           <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
             Project
