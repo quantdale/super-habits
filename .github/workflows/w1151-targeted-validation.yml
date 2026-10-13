@@ -1,0 +1,29 @@
+name: W11.5.1 Targeted Timezone Browser Validation (temporary)
+on:
+  push:
+    branches: [frontend-v3-w1151-timezone-review-closure]
+jobs:
+  w1151-timezone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Build app for browser verification
+        run: npm run build:e2e
+      - name: Verify W11.5.1 timezone and planning write-failure journeys
+        run: npx playwright test e2e/planning-w1151-timezone.spec.ts e2e/planning-w115-reliability.spec.ts e2e/planning-w11.spec.ts e2e/planning-hub.spec.ts --project=chromium
+        env:
+          TZ: Asia/Manila
+      - name: Retain failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: w1151-playwright-failures
+          path: .cursor/playwright-output/
+          retention-days: 7
