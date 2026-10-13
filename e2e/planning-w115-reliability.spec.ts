@@ -1,6 +1,7 @@
 import { test, expect, type Page } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
+import { browserLocalTodayKey } from './helpers/browserDate';
 import { seedSql } from './helpers/seed';
 import { queryRows, returnToApp, runSql } from './helpers/dbHarness';
 
@@ -22,12 +23,13 @@ import { queryRows, returnToApp, runSql } from './helpers/dbHarness';
  * TRIGGER → retry), and never invalidates React state mid-interaction.
  */
 
-/** Browser-local `YYYY-MM-DD` "today" (matches the app's `toDateKey()`). */
-function localTodayKey(): string {
-  const date = new Date();
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
-}
+/**
+ * Browser-local `YYYY-MM-DD` "today" — mirrors the app's `toDateKey()`
+ * local-calendar contract (`lib/time.ts`). Defined in
+ * `./helpers/browserDate` and shared with the deterministic timezone
+ * boundary spec (`planning-w1151-timezone.spec.ts`) so the crossover
+ * regression exercises the exact helper the fixtures use.
+ */
 
 /** Fixed ids keep seed SQL, navigation labels and row oracles aligned. */
 const SEED = {
@@ -153,7 +155,11 @@ test.describe('W11.5 planning write-failure regressions', () => {
   test('rejected Daily Plan completion keeps the committed state, keeps edits, and retries', async ({
     page,
   }) => {
-    const today = localTodayKey();
+    // W11.5.1: derive the fixture date from the BROWSER context (Asia/Manila)
+    // before entering DB context — the app reads its own local-calendar
+    // toDateKey(), so a Node-host date would seed the wrong day on a UTC host
+    // inside the 16:00–24:00 UTC crossover window.
+    const today = await browserLocalTodayKey(page);
     await seedSql(
       page,
       `${seedCommittedPlanSql(today)};
@@ -163,6 +169,9 @@ test.describe('W11.5 planning write-failure regressions', () => {
          BEGIN SELECT RAISE(ABORT, 'plan-complete-blocked'); END;`,
     );
     await openPlanning(page);
+    // Fixture-selection proof: the app opened the seeded plan, i.e. the
+    // browser's daily-plan key equals the seeded date_key.
+    await expect(page.getByText(`Plan for ${today}`)).toBeVisible();
     await expect(page.getByRole('dialog').getByText('Committed', { exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: 'End-of-day reflection' }).click();
@@ -181,14 +190,19 @@ test.describe('W11.5 planning write-failure regressions', () => {
     await expect(page.getByText('Energy score (1–5): 4')).toBeVisible();
 
     // Durable truth: the prior committed state is untouched (no completion
-    // timestamp, no persisted reflection, no outbox intent).
+    // timestamp, no persisted reflection, no outbox intent) — and the row
+    // the UPDATE targeted is the seeded one for the browser-local date.
     const before = await queryRows(
       page,
-      'SELECT status, completed_at, reflection, energy_score FROM daily_plans',
+      `SELECT status, completed_at, reflection, energy_score FROM daily_plans WHERE date_key = '${today}'`,
     );
     expect(before).toEqual([
       { status: 'committed', completed_at: null, reflection: '', energy_score: null },
     ]);
+    // No second plan row exists for any date (W11.5.1: the date_key filter
+    // above proves the seeded row is the targeted one; this restores the
+    // table-wide exactly-one-row durable-truth property).
+    expect(await countRows(page, 'SELECT COUNT(*) AS n FROM daily_plans')).toBe(1);
     expect(
       await countRows(page, "SELECT COUNT(*) AS n FROM sync_outbox WHERE entity = 'daily_plans'"),
     ).toBe(0);
@@ -204,7 +218,7 @@ test.describe('W11.5 planning write-failure regressions', () => {
 
     const after = await queryRows(
       page,
-      'SELECT status, completed_at, reflection, energy_score FROM daily_plans',
+      `SELECT status, completed_at, reflection, energy_score FROM daily_plans WHERE date_key = '${today}'`,
     );
     expect(after).toHaveLength(1);
     expect(after[0]).toMatchObject({
@@ -213,6 +227,7 @@ test.describe('W11.5 planning write-failure regressions', () => {
       reflection: 'Retry reflection',
       energy_score: 4,
     });
+    expect(await countRows(page, 'SELECT COUNT(*) AS n FROM daily_plans')).toBe(1);
     expect(
       await countRows(page, "SELECT COUNT(*) AS n FROM sync_outbox WHERE entity = 'daily_plans'"),
     ).toBe(1);
