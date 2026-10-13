@@ -26,6 +26,7 @@ import { listHabits } from '@/features/habits/habits.data';
 import { toDateKey } from '@/lib/time';
 import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { createEditableFieldOwner } from '@/lib/editableDraft';
+import { describePlanningWriteError } from '@/features/planning-hub/planningWriteError';
 import type { DailyPlan } from '@/core/db/types';
 
 type DailyPlanViewProps = {
@@ -153,7 +154,9 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
     } catch (e) {
       // Surface the failure instead of leaking an unhandled rejection; the
       // plan draft stays untouched and the user can retry.
-      setCarryForwardError(e instanceof Error ? e.message : 'Could not carry forward.');
+      setCarryForwardError(
+        describePlanningWriteError(e, 'Could not carry forward. Please try again.'),
+      );
     } finally {
       setCarryingForward(false);
     }
@@ -184,7 +187,7 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
       } catch (e) {
         // Surface the rejected write instead of leaking an unhandled
         // rejection; the draft stays dirty so the user can retry.
-        setSaveError(e instanceof Error ? e.message : 'Could not save plan.');
+        setSaveError(describePlanningWriteError(e, 'Could not save the plan. Please try again.'));
       } finally {
         setSaving(false);
       }

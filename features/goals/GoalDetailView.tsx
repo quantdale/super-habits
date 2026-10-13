@@ -35,6 +35,7 @@ import { listTodos, setTodoProjectGoal } from '@/features/todos/todos.data';
 import { listHabits } from '@/features/habits/habits.data';
 import { listProjects } from '@/features/projects/projects.data';
 import type { GoalHorizon, GoalStatus } from '@/core/db/types';
+import { describePlanningWriteError } from '@/features/planning-hub/planningWriteError';
 
 type GoalDetailViewProps = {
   goalId: string | null;
@@ -143,7 +144,7 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
       }
       onBack();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save goal.');
+      setError(describePlanningWriteError(e, 'Could not save the goal. Please try again.'));
     } finally {
       setSaving(false);
     }
@@ -166,7 +167,7 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
       await softDeleteGoal(goalId);
       onBack();
     } catch (e) {
-      setDeleteError(e instanceof Error ? e.message : 'Could not delete goal.');
+      setDeleteError(describePlanningWriteError(e, 'Could not delete the goal. Please try again.'));
     }
   }, [isCreate, goalId, onBack]);
 

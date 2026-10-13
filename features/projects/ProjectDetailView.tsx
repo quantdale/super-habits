@@ -38,6 +38,7 @@ import type { ProjectStatus } from '@/core/db/types';
 
 import type { ProjectRollup } from '@/features/projects/projects.data';
 import { toDateKey } from '@/lib/time';
+import { describePlanningWriteError } from '@/features/planning-hub/planningWriteError';
 
 type ProjectDetailViewProps = {
   projectId: string | null;
@@ -152,7 +153,7 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
       }
       onBack();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save project.');
+      setError(describePlanningWriteError(e, 'Could not save the project. Please try again.'));
     } finally {
       setSaving(false);
     }
@@ -164,7 +165,9 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
       await softDeleteProject(projectId);
       onBack();
     } catch (e) {
-      setDeleteError(e instanceof Error ? e.message : 'Could not delete project.');
+      setDeleteError(
+        describePlanningWriteError(e, 'Could not delete the project. Please try again.'),
+      );
     }
   }, [isCreate, projectId, onBack]);
 
@@ -289,7 +292,12 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
               const refreshed = await getProject(projectId);
               if (refreshed) setStatus(refreshed.status);
             } catch (e) {
-              setStatusError(e instanceof Error ? e.message : 'Could not update project status.');
+              setStatusError(
+                describePlanningWriteError(
+                  e,
+                  'Could not update the project status. Please try again.',
+                ),
+              );
             }
           }}
         />
