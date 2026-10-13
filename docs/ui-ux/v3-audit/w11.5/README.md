@@ -41,9 +41,10 @@ W11 journeys (`projects show objective first…`, `goals share the row
 grammar…`), which pass 3/3 together with the four legacy
 `planning-hub.spec.ts` journeys.
 
-The thread was answered with this evidence and resolved via the GitHub
-API; the resolved state was read back from GraphQL after the mutation
-(see §6 for the exact reply and verification).
+The thread was answered with this evidence (review comment 4255394284)
+and resolved via the GitHub API; the resolved state was read back from
+GraphQL after the mutation (`PRRT_kwDORgzj086rkJjX` →
+`isResolved: true`, verified 2026-10-13).
 
 ## 2. Original W11 D10 claim and the reassessment
 
@@ -134,6 +135,11 @@ npx playwright test --project=chromium \
 - Hosted exact-head CI evidence is recorded in the ExecPlan's Validation
   Ledger and the closure commit (same inherited braces/node-forge
   audit-only red, hosted e2e/nightly skipped behind it — unchanged).
+  The targeted hosted Chromium planning lane ran independently through a
+  temporary branch-only workflow (run `38357160655`, SUCCESS) which was
+  removed before the merge; final-head standard CI runs `38365404337`
+  (push) and `38365411189` (PR) pass every quality step and fail only
+  the inherited audit gate.
 
 ## 7. Remaining gaps (accurately classified)
 

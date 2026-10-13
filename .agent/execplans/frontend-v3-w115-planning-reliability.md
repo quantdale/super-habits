@@ -1,7 +1,7 @@
 # ExecPlan: W11.5 — Planning Reliability & Regression Closure
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -78,91 +78,18 @@ evidence-backed closure that hands W12 off cleanly.
 
 ## Current Checkpoint
 
-- Current milestone: M6 publication — code, tests, fixes, review and
-  records are complete; the full Playwright battery is the last local gate
-  running before commit/PR.
-- Completed:
-  - M1 preflight; repository verified at `2cfe168`, PR #73 thread
-    confirmed unresolved.
-  - M2 feasibility probe — a real `RAISE(ABORT)` trigger on
-    `daily_plans` INSERT rejects a UI Save Plan with atomic rollback
-    (0 rows, 0 outbox intents, no backup marker) and a post-drop retry
-    persists exactly once. D10 objectively reassessed: browser
-    failed-write injection IS stageable for Planning mutations.
-  - M3 — `e2e/planning-w115-reliability.spec.ts` 8/8 PASS:
-    (A) rejected Daily Plan save — curated error, draft retained, 0 rows /
-    0 intents, retry persists exactly once, fresh-mount persistence;
-    (B) rejected Complete of a seeded committed plan — status /
-    `completed_at` / reflection unchanged, edits retained, retry
-    completes with timestamp + 1 intent;
-    (C) rejected goal create — editor + values retained, no phantom goal,
-    retry writes exactly one;
-    (F) rejected goal rename (`updateGoal` path) — prior title/progress
-    untouched, retry updates once;
-    (C2) rejected goal soft-delete — no tombstone, no partial child
-    unlink, retry reconciles once (2 coherent intents);
-    (D) rejected project lifecycle — no false status (row still reads
-    Active), durable status/`completed_at`/links unchanged, retry
-    completes;
-    (G) rejected backup intent only — goal row and intent roll back
-    atomically (0 rows AND 0 intents), retry produces 1 + 1;
-    (E) rejected project soft-delete — no tombstone, children intact,
-    retry reconciles once (tombstone + goals/todos/habits child intents).
-  - M4 — `features/planning-hub/planningWriteError.ts` (new, unit 3/3):
-    rejected writes leaked the raw engine message; the mapper keeps
-    user-facing validation copy and replaces engine/storage noise with
-    curated sentences, wired into Daily Plan save + carry-forward,
-    Guided Planning save + carry-forward, Goal save/delete, Project
-    save/delete/status.
-  - M5 — independent adversarial review (sub-agent) with findings
-    addressed: sibling-surface leaks (GuidedPlanningFlow, carry-forward)
-    fixed; SQLITE_FULL/CANTOPEN patterns added; test E child-intent
-    assertions completed; coordinate-based pins replaced with semantic
-    selectors; tests F + G added; fresh-mount persistence added; dialog
-    scoping for `Committed`. No blocker found; trigger correctness,
-    transaction atomicity, isolation and oracle sequencing verified.
-  - P2-thread executable evidence added to `e2e/planning-w11.spec.ts`
-    (title, context line, percentage, rendered 10% bar open detail;
-    reorder arrow does not navigate) — 3/3 PASS with
-    `e2e/planning-hub.spec.ts` 4/4.
-- In progress: full Playwright battery (`npm run e2e`, all projects) +
-  remaining impact-map gates; then commit, PR, thread reply + verified
-  resolution, exact-head CI, merge, closure records.
-- Important modified files: `features/planning-hub/planningWriteError.ts`
-  (new), `features/planning-hub/GuidedPlanningFlow.tsx`,
-  `features/daily-plan/DailyPlanView.tsx`,
-  `features/goals/GoalDetailView.tsx`,
-  `features/projects/ProjectDetailView.tsx`,
-  `tests/planningWriteError.test.ts` (new),
-  `e2e/planning-w115-reliability.spec.ts` (new),
-  `e2e/planning-w11.spec.ts` (press-target pin),
-  `docs/ui-ux/v3-audit/w11.5/README.md` (new),
-  `docs/ui-ux/v3-audit/w11/README.md` (addendum only),
-  `docs/testing/known-gaps.md` (status note),
-  `openspec/changes/frontend-v3-calm-momentum/execplan.md` (checkpoint),
-  this plan.
-- Last successful validation: after the M5 fixes — W11.5 reliability
-  spec 8/8; `planning-w11.spec.ts` 3/3 + `planning-hub.spec.ts` 4/4
-  (11/11 combined); `planningWriteError` unit 3/3; typecheck 0; lint
-  0/0; themes 140/140; OpenSpec 80/80; plans PASS; parity guards OK;
-  release-profile-guard OK; full Vitest 2,679 passed / 2 skipped /
-  1 failed (the documented Windows-CRLF `agentDocConsistency` residual —
-  identical failure on pristine `main` — ENVIRONMENT, not a W11.5
-  defect); `e2e:journeys:p0` 25/25; deterministic simulation PASS; full
-  Playwright battery in progress.
-- Current failures: None for the W11.5 scope (the single local Vitest
-  failure is the inherited Windows-CRLF residual).
+- Current milestone: M6 COMPLETE — W11.5 published through PR #74 (merge commit `d8bb43ab1193f3ec3c94597862c694fa343f1a12`, branch `frontend-v3-w115-planning-reliability`, final head `b3db181`), the PR #73 P2 thread resolved with executable evidence, and the parent campaign checkpoint updated with W12 as the next unstarted milestone.
+- Completed: M1 preflight. M2 feasibility probe — a real `RAISE(ABORT)` trigger on `daily_plans` INSERT rejects a UI Save Plan with atomic rollback (0 rows, 0 outbox intents, no backup marker) and a post-drop retry persists exactly once; D10 objectively reassessed: browser failed-write injection IS stageable for Planning mutations. M3 — `e2e/planning-w115-reliability.spec.ts` 8/8 PASS: (A) rejected Daily Plan save — curated error, draft retained, 0 rows / 0 intents, retry persists exactly once, fresh-mount persistence; (B) rejected Complete of a seeded committed plan — status / `completed_at` / reflection unchanged, edits retained, retry completes with timestamp + 1 intent; (C) rejected goal create — editor + values retained, no phantom goal, retry writes exactly one; (F) rejected goal rename (`updateGoal` path) — prior title/progress untouched, retry updates once; (C2) rejected goal soft-delete — no tombstone, no partial child unlink, retry reconciles once (2 coherent intents); (D) rejected project lifecycle — no false status (row still reads Active), durable status / `completed_at` / links unchanged, retry completes; (G) rejected backup intent only — goal row and intent roll back atomically (0 rows AND 0 intents), retry produces 1 + 1; (E) rejected project soft-delete — no tombstone, children intact, retry reconciles once (tombstone + goals/todos/habits child intents). M4 — `features/planning-hub/planningWriteError.ts` (new, unit 3/3) maps engine/storage noise to curated copy while passing user-facing validation messages through, wired into Daily Plan save + carry-forward, Guided Planning save + carry-forward, Goal save/delete and Project save/delete/status. M5 — independent adversarial review with findings addressed: sibling-surface leaks fixed (GuidedPlanningFlow, carry-forward), SQLITE_FULL/CANTOPEN patterns added, test E child-intent assertions completed, coordinate pins replaced with semantic selectors, tests F + G added, fresh-mount persistence added, dialog scoping for `Committed`; trigger correctness, transaction atomicity, isolation and oracle sequencing verified with no blocker. P2-thread executable evidence added to `e2e/planning-w11.spec.ts` (title, context line, percentage, rendered 10% bar each open detail; reorder arrow does not navigate) — 3/3 PASS with `e2e/planning-hub.spec.ts` 4/4.
+- In progress: None — campaign closed.
+- Important modified files: `features/planning-hub/planningWriteError.ts` (new), `features/planning-hub/GuidedPlanningFlow.tsx`, `features/daily-plan/DailyPlanView.tsx`, `features/goals/GoalDetailView.tsx`, `features/projects/ProjectDetailView.tsx`, `tests/planningWriteError.test.ts` (new), `e2e/planning-w115-reliability.spec.ts` (new), `e2e/planning-w11.spec.ts` (press-target pin), `docs/ui-ux/v3-audit/w11.5/README.md` (new), `docs/ui-ux/v3-audit/w11/README.md` (addendum only), `docs/testing/known-gaps.md` (status note), `openspec/changes/frontend-v3-calm-momentum/execplan.md` (checkpoint), this plan.
+- Last successful validation: local exact-head — W11.5 reliability spec 8/8; `planning-w11.spec.ts` 3/3 + `planning-hub.spec.ts` 4/4 (11/11 combined); `planningWriteError` unit 3/3; typecheck 0; lint 0/0; themes 140/140; OpenSpec 80/80; plans PASS; parity guards OK; release-profile-guard OK; full Vitest 2,679 passed / 2 skipped / 1 failed (the documented Windows-CRLF `agentDocConsistency` residual — identical failure on pristine `main` — ENVIRONMENT, not a W11.5 defect); `e2e:journeys:p0` 25/25; deterministic simulation PASS; full Playwright battery 309 passed / 2 failed / 78 skipped / 4 did not run (30.8 min) — both failures classified: `workout.spec.ts` custom-exercise manager passes standalone on both the baseline and this tree (battery-load flake), and `journeys/settings-ripple.spec.ts` Priya step 2 fails identically on pristine `2cfe168` standalone (pre-existing inherited failure, Calories goal-copy drift, outside W11.5 scope). Hosted exact-head: standard CI runs `38365404337` (push) and `38365411189` (PR) pass every quality step — Typecheck, Supabase/Deno, Lint, theme tokens, OpenSpec, journey-label + quarantine parity, versioned ExecPlans, unit + integration tests — and fail only the inherited `Audit runtime dependencies` step (braces GHSA-vfj7-8cjw-p6xm, node-forge GHSA-86w9-cpqp-85rv), with hosted e2e/nightly skipped behind it; the temporary branch-only targeted workflow `38357160655` executed the 11 planning journeys on hosted Chromium — SUCCESS — and was removed in the final commit.
+- Current failures: None for the W11.5 scope; the two full-battery failures are classified above (one battery-load flake, one pre-existing baseline failure) and are not W11.5 regressions; the single local Vitest failure is the inherited Windows-CRLF residual.
 - Relevant quarantines: None.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: finish the running full Playwright battery, record
-  the counts, commit the branch, open the PR, post the PR #73 thread
-  reply with the executable evidence and resolve it (verify the resolved
-  state via GraphQL), merge with exact-head CI evidence, then close this
-  plan and update the parent checkpoint.
-- Remaining definition of done: the publication sequence and the final
-  records listed above.
+- Exact next action: None — task complete.
+- Remaining definition of done: None — the PR #73 P2 thread is verified and resolved on GitHub (reply + `isResolved: true` read back), D10 is reassessed with executed evidence, the A–E + F/G failure matrix is green with row/outbox/retry oracles, W11 journeys remain green, the full impact-map gates ran with results classified, the focused PR is merged with exact-head CI evidence, and the parent campaign checkpoint names W12 as the next unstarted milestone.
 
 ## Progress
 
@@ -171,7 +98,7 @@ evidence-backed closure that hands W12 off cleanly.
 - [x] M4 — raw engine message fix: planningWriteError helper wired into the failure surfaces
 - [x] M3 — regression matrix implementation (A–E + F goal rename + G outbox-only) — 8/8 PASS
 - [x] M5 — adversarial validation of triggers, transactions, isolation; findings addressed and re-verified
-- [ ] M6 — publication: PR, hosted evidence, thread resolution, closure
+- [x] M6 — publication: PR #74 merged (`d8bb43a`), thread resolved (`isResolved: true` verified), closure records and parent checkpoint updated
 
 ## Surprises & Discoveries
 
@@ -222,8 +149,30 @@ evidence-backed closure that hands W12 off cleanly.
   `agentDocConsistency` residual that fails identically on pristine
   `main` — ENVIRONMENT, not a W11.5 defect.
 - 2026-10-13 — `e2e:journeys:p0` — 25/25 PASS. Deterministic simulation
-  — PASS. Full Playwright battery + deterministic library — counts
-  recorded at closure.
+  — PASS. Full Playwright battery (`npm run e2e`, all projects) — 309
+  passed / 2 failed / 78 skipped / 4 did not run (30.8 min); both
+  failures classified: workout custom-exercise manager passes
+  standalone on baseline and this tree (battery-load flake), Priya
+  settings-ripple step 2 fails identically on pristine `2cfe168`
+  standalone (pre-existing inherited failure).
+- 2026-10-13 — Hosted exact-head CI at final head `b3db181` — push run
+  [38365404337](https://github.com/quantdale/super-habits/actions/runs/38365404337)
+  and PR run
+  [38365411189](https://github.com/quantdale/super-habits/actions/runs/38365411189):
+  every quality step PASS (Typecheck, Supabase/Deno, Lint, themes,
+  OpenSpec, parity, ExecPlans, unit + integration tests); first failing
+  step the inherited `Audit runtime dependencies` gate on
+  `braces`/`node-forge`; hosted e2e/nightly skipped behind it. The
+  temporary branch-only targeted workflow
+  [38357160655](https://github.com/quantdale/super-habits/actions/runs/38357160655)
+  executed the 11 planning journeys on hosted Chromium — SUCCESS — and
+  was removed in the final commit.
+- 2026-10-13 — PR #73 P2 thread `PRRT_kwDORgzj086rkJjX` — reply posted
+  with implementation + executable evidence (comment 4255394284) and
+  the thread resolved; `isResolved: true` read back from GraphQL.
+- 2026-10-13 — PR #74 merged as `d8bb43ab1193f3ec3c94597862c694fa343f1a12`
+  (branch `frontend-v3-w115-planning-reliability`, final head
+  `b3db181`).
 
 ## Changed Files / Areas
 
@@ -260,4 +209,21 @@ evidence-backed closure that hands W12 off cleanly.
 
 ## Outcomes & Retrospective
 
-- Status: Active until the publication sequence and final records land.
+- Status: COMPLETED. W11.5 closed the two W11-era verification gaps with
+  executed evidence: the PR #73 P2 full-card press-target finding is
+  verified on live code and pinned by semantic browser assertions, and
+  the D10 "browser failed-write injection NOT STAGEABLE" limitation is
+  replaced by 8 real-SQLite trigger-injection regressions that prove
+  truthful UI failure states, atomic row/outbox rollback and working
+  retries across the Planning write paths. The raw engine-message leak
+  in the Planning failure surfaces is fixed with a shared, unit-tested
+  mapper. Published through PR #74 (`d8bb43a`) with exact-head CI
+  evidence; inherited security/audit and native-qualification residuals
+  remain visible and unwaived; W12 is the next wave.
+- Lessons: (1) the DB harness's trigger injection is a general browser
+  failure-path tool, not a Calories-only trick — D10-style "not
+  stageable" claims should be probed before being recorded; (2) engine
+  error strings must never reach users, which is itself a defect class
+  worth asserting; (3) value-keyed triggers plus DB-context-only-at-
+  boundaries keeps failure tests deterministic under the harness's
+  React-state rule.

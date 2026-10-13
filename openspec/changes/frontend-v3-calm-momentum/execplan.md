@@ -62,7 +62,7 @@ historical evidence only.
 
 ## Current Checkpoint
 
-- Current milestone: W11.5 Planning Reliability & Regression Closure COMPLETE (PR #74 on branch `frontend-v3-w115-planning-reliability`, final head recorded at closure): the outstanding PR #73 Codex P2 thread is verified on live code (full-card press target: title, context line, percentage and the rendered progress bar each open detail; reorder controls independent) with new executable assertions in `e2e/planning-w11.spec.ts`, and the W11-era "browser failed-write injection NOT STAGEABLE" limitation is closed — 8 real-SQLite `RAISE(ABORT)` regressions in `e2e/planning-w115-reliability.spec.ts` prove truthful UI failure states, atomic row/outbox rollback and working retries across Daily Plan save/complete, Goal create/rename/delete, Project lifecycle/delete and backup-intent-only rejection; the raw engine-message leak in the Planning failure surfaces is fixed via `features/planning-hub/planningWriteError.ts`. W11 milestone remains COMPLETE (merged `ffb02f2`); W12 Weekly Review / Progress / Activity remains the next unstarted milestone.
+- Current milestone: W11.5 Planning Reliability & Regression Closure COMPLETE and merged to main as `d8bb43ab1193f3ec3c94597862c694fa343f1a12` (PR #74, branch `frontend-v3-w115-planning-reliability`, final head `b3db181`): the outstanding PR #73 Codex P2 thread is verified on live code (full-card press target: title, context line, percentage and the rendered progress bar each open detail; reorder controls independent) with new executable assertions in `e2e/planning-w11.spec.ts`, and the W11-era "browser failed-write injection NOT STAGEABLE" limitation is closed — 8 real-SQLite `RAISE(ABORT)` regressions in `e2e/planning-w115-reliability.spec.ts` prove truthful UI failure states, atomic row/outbox rollback and working retries across Daily Plan save/complete, Goal create/rename/delete, Project lifecycle/delete and backup-intent-only rejection; the raw engine-message leak in the Planning failure surfaces is fixed via `features/planning-hub/planningWriteError.ts`. W11 milestone remains COMPLETE (merged `ffb02f2`); W12 Weekly Review / Progress / Activity remains the next unstarted milestone.
 - Completed: W0–W7 unchanged semantically; W6.5 closed and MERGED to main as merge commit `f37539a969bdc7c3dc539c2d47db3f6580429c64` (PR58 MERGED 2026-10-08). W7 rebuilt Habits as a date-scoped, list-first daily check-in and merged to main as merge commit `f679a26a28a8abf3472b44e3b5fbdf229222b927` (PR 59) in three commits `9bf4fda`, `0a8e86d`, `3086b27`; its exact-head CI run is [37822880601](https://github.com/quantdale/super-habits/actions/runs/37822880601) with the follow-up scheduled run [37848841434](https://github.com/quantdale/super-habits/actions/runs/37848841434) recorded as reference ids only. W8 Focus was published in three merges: `b47179b` (PR 60, Focus reconstruction), `ce00e37` (PR 61, visual-audit registration), and the W8 closure `c32685364cbe9c6d34a512c3b2bcef9b3a432e0b` (PR 62, commits `3c4b96c`, `e4fd28f`, `9009c17`). The final W8 baseline is `c32685364cbe9c6d34a512c3b2bcef9b3a432e0b`, with exact-head CI run [37914856206](https://github.com/quantdale/super-habits/actions/runs/37914856206) succeeding on every frontend gate through unit/integration — 2,576 hosted tests passed / 3 skipped — and failing only the two pre-existing undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv), so hosted `e2e`/`nightly` skip behind that gate and are NOT passed. W8.5 closed the Focus timer-start race and merged to main as merge commit `aa5835e9fe8ecaa43b55b805d866232503b28c77` (PR 63, branch `frontend-v3-w85-focus-startup`) in two coherent commits `be6db92` and `ca169f5`. Its exact-head CI runs are [37942994150](https://github.com/quantdale/super-habits/actions/runs/37942994150) (push) and [37942146908](https://github.com/quantdale/super-habits/actions/runs/37942146908) (pull request): every frontend gate passed — Typecheck, the Supabase edge-function type-check, Lint, theme tokens, openspec contracts, journey-label and quarantine-register parity, versioned ExecPlans, and the unit+integration test projects — and the first failing step was `Audit runtime dependencies (gates on new high/critical)`, failing on exactly the same two pre-existing undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm at `node_modules/braces`, `node-forge` GHSA-86w9-cpqp-85rv at `node_modules/node-forge`), so hosted `e2e`/`nightly` skipped behind that gate and are NOT passed. No dependency, lockfile, or patch file changed in either wave. No new hosted failure was introduced and no security-gate waiver was added. Stash, foreign iOS evidence, and historical captures preserved. No overall certification.
 - In progress: None in W11.5 after publication; its code, evidence and records close through PR #74. W12 has not begun. Existing security/native product-certification residuals remain tracked; W11.5 introduced no dependency, schema, migration or security-policy change.
 - Important modified files: W8.5 touched `features/pomodoro/pomodoro.startup.ts` (new), `features/pomodoro/PomodoroScreen.tsx`, `features/pomodoro/pomodoro.domain.ts`, `features/pomodoro/pomodoroCommandBridgeContext.ts`, `features/pomodoro/pomodoroCommandBridge.tsx`, `features/command/command.executor.ts`, `tests/pomodoro.startup.test.ts` (new), `tests/integration/pomodoroStartupIntent.test.ts` (new), `e2e/pomodoro.spec.ts`, `e2e/pomodoro-w85-audit.spec.ts` (new), `docs/ui-ux/v3-audit/w8.5/`, and both plans. No data-layer, schema, dependency, or security-policy change; no migration was added.
@@ -116,7 +116,7 @@ historical evidence only.
 - [x] W10 — Calories reconstruction + D3 navigation gate (slice `openspec/changes/frontend-v3-w10-calories/`; logging-first hierarchy with one remaining/consumed/goal fact each, shared meal-grouped day log with visible edit/delete, collapsed History & insights disclosure with disclosure-scoped derivations, SYS-06/SYS-18/SUR-07 verified fixed; D3 measured five-destination 3/3/1 taps vs six-tab 2/2/1 → six-tab shipped with 11px labels and >=44pt targets at 360; `health` kept as a valid non-bar section; evidence in `docs/ui-ux/v3-audit/w10/`, regressions in `e2e/calories-w10.spec.ts` 14/14 and `e2e/health-nav-w10.spec.ts` 6/6, real-SQLite oracles in `tests/integration/caloriesW10LoggingIntegrity.test.ts` 7/7; merged as `f7d313b` (PR #70, 6 commits) with exact-head CI run 38259047679 green on every frontend gate through unit/integration at 2,676 passed / 3 skipped, audit-only red on the same two braces/node-forge advisories, hosted e2e/nightly skipped, Vercel production deploy success)
 - [x] W10.5 — bounded Calories truth/reliability and record convergence; source merged PR #71 (`10cff427`), original W10 Codex duplicate-goal P2 review resolved, targeted Chromium E2E 26/26 PASS (`38277711149`), hosted TypeScript/lint/themes/OpenSpec/plans and 2,676 unit/integration PASS before inherited audit-only red (`38277711157`); source provenance clarified without rewriting original D3 captures; no schema/dependency/policy changes
 - [x] W11 — Planning / Goals / Projects / Daily Plan (slice `openspec/changes/frontend-v3-w11-planning/`; shared objective/status/context/progress row grammar, collapsed filter/sort disclosures with persisted state and active-filter signal, detail disclosures for secondary fields, Daily Plan intention/priority-first hierarchy with Save above optional sections, Today briefing disclosure; adversarial-review failure surfaces for rejected saves/deletes/lifecycle transitions; 82 inspected before/after captures in `docs/ui-ux/v3-audit/w11/`; planning E2E 7/7, journeys P0 25/25, integration 416 passed local exact-head; merged to main as `ffb02f2` (PR #73) with exact-head CI run 38343799936 green on every quality step through unit+integration, audit-only red on the two inherited advisories, hosted e2e/nightly skipped)
-- [x] W11.5 — Planning reliability & regression closure (branch `frontend-v3-w115-planning-reliability`, PR #74; PR #73 P2 full-card press-target thread verified and resolved with executable title/context/percent/bar clicks + reorder independence; 8 real-SQLite trigger-injection regressions close the W11 D10 not-stageable limitation with row/outbox/retry oracles; raw engine-message leak fixed via `planningWriteError.ts`; evidence in `docs/ui-ux/v3-audit/w11.5/`; ExecPlan `.agent/execplans/frontend-v3-w115-planning-reliability.md` COMPLETED; no schema/dependency/policy change)
+- [x] W11.5 — Planning reliability & regression closure (branch `frontend-v3-w115-planning-reliability`, merged to main as `d8bb43a`, PR #74; PR #73 P2 full-card press-target thread verified and resolved with executable title/context/percent/bar clicks + reorder independence; 8 real-SQLite trigger-injection regressions close the W11 D10 not-stageable limitation with row/outbox/retry oracles; raw engine-message leak fixed via `planningWriteError.ts`; evidence in `docs/ui-ux/v3-audit/w11.5/`; ExecPlan `.agent/execplans/frontend-v3-w115-planning-reliability.md` COMPLETED; no schema/dependency/policy change)
 - [ ] W12 — Weekly Review / Progress / Activity
 - [ ] W13 — Settings / secondary surfaces
 - [ ] W14 — full visual integrity sweep
@@ -212,6 +212,43 @@ historical evidence only.
 
 ## Validation Ledger
 
+- 2026-10-13 W11.5 MERGED and closed on main: PR #74 merged as
+  `d8bb43ab1193f3ec3c94597862c694fa343f1a12` (branch
+  `frontend-v3-w115-planning-reliability`, final head `b3db181`). PR #73
+  Codex P2 thread `PRRT_kwDORgzj086rkJjX` verified on live code — the
+  `Pressable` in `PlanningSummaryRow.tsx` already wraps title, context
+  line, percentage and progress bar with reorder controls independent —
+  pinned with new semantic assertions in `e2e/planning-w11.spec.ts`
+  (3/3) plus the untouched `e2e/planning-hub.spec.ts` (4/4); the thread
+  reply (comment 4255394284) was posted and the thread resolved
+  (`isResolved: true` read back from GraphQL). The W11 D10 limitation is
+  closed: `e2e/planning-w115-reliability.spec.ts` 8/8 PASS rejects real
+  writes with SQLite `RAISE(ABORT)` triggers through the DB harness
+  (Daily Plan save/complete, Goal create/rename/soft-delete, Project
+  lifecycle/soft-delete, backup-intent-only) and asserts UI failure
+  states, row/outbox atomicity and retry-success exactly-once behavior;
+  raw engine messages no longer leak (`planningWriteError.ts`, unit
+  3/3). Local gates: typecheck 0; lint 0/0; themes 140/140; OpenSpec
+  80/80; plans PASS; parity guards OK; Vitest 2,679 passed / 2 skipped /
+  1 failed (the documented Windows-CRLF residual, identical on pristine
+  main); `e2e:journeys:p0` 25/25; deterministic simulation PASS; full
+  Playwright battery 309 passed / 2 failed / 78 skipped / 4 did not run —
+  both failures classified (one battery-load flake passing standalone on
+  baseline and branch, one pre-existing baseline failure in
+  `settings-ripple.spec.ts` reproduced on pristine `2cfe168`). Hosted
+  exact-head CI: push run
+  [38365404337](https://github.com/quantdale/super-habits/actions/runs/38365404337)
+  and PR run
+  [38365411189](https://github.com/quantdale/super-habits/actions/runs/38365411189)
+  pass every quality step through unit+integration and fail only the
+  inherited `Audit runtime dependencies` gate on `braces`
+  GHSA-vfj7-8cjw-p6xm / `node-forge` GHSA-86w9-cpqp-85rv; hosted
+  e2e/nightly skipped. The temporary branch-only targeted workflow
+  [38357160655](https://github.com/quantdale/super-habits/actions/runs/38357160655)
+  ran the 11 planning journeys on hosted Chromium — SUCCESS — and was
+  removed before merge. No schema, migration, dependency or
+  security-policy change; W11's 82 captures preserved with an additive
+  W11.5 audit record; W11 ExecPlan's COMPLETED status untouched.
 - 2026-10-13 W11.5 closed (branch `frontend-v3-w115-planning-reliability`,
   PR #74, final head recorded at closure): PR #73 Codex P2 thread
   `PRRT_kwDORgzj086rkJjX` verified on live code — the `Pressable` in
