@@ -201,6 +201,32 @@ jobs:
         if: always() && steps.playwright-chromium.outcome != 'skipped'
         run: node scripts/e2e-retry-report.mjs
 
+      # W15 persistent visual regression (tasks 15.1/15.2). Runs on the PR lane
+      # as its own explicit step so it can never silently skip. The `visual`
+      # project carries `retries: 0`, so an unstable baseline fails rather than
+      # being papered over by a retry, and the retry-report gate below stays the
+      # invariant "every Playwright invocation is immediately gated". Baselines
+      # are only ever regenerated locally via `npm run visual:update`.
+      - name: Run visual regression baselines (lane visual@pr)
+        id: playwright-visual
+        if: github.event_name == 'pull_request'
+        run: npm run visual
+        env:
+          TZ: Asia/Manila
+
+      - name: Retry-report gate — visual baselines (strict assertions must not depend on a retry)
+        if: always() && steps.playwright-visual.outcome != 'skipped'
+        run: node scripts/e2e-retry-report.mjs
+
+      - name: Upload visual regression diffs on failure
+        if: failure() && steps.playwright-visual.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-diffs
+          path: .cursor/playwright-output/e2e-failures/**/*visual*
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Run P0 journey subset (lane journeys@pr — @p0, J1, J2a, J2b)
         id: playwright-p0
         if: github.event_name == 'pull_request'
@@ -216,8 +242,8 @@ jobs:
         if: github.event_name == 'pull_request'
         run: npm run sim:validate
 
-      # ---- main lane: full suite ----
-      - name: Run full E2E suite incl. full journeys + simulation self-test (lane journeys@main)
+      # ---- main lane: full suite (includes the W15 `visual` project) ----
+      - name: Run full E2E suite incl. full journeys + simulation self-test + visual baselines (lane journeys@main)
         id: playwright-main
         if: github.event_name != 'pull_request'
         run: |

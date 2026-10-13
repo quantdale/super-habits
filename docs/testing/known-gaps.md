@@ -713,6 +713,31 @@ residuals; Focus notification-timestamp residual; Android API36 pending W16;
 iOS owner-deferred; `npm run format:check` reports 134 pre-existing files
 (not a CI quality gate).
 
+### W15 persistent visual-regression baselines (2026-10-14)
+
+**Gate site:** `e2e/visual-regression.spec.ts`
+
+**Reason:** This lane stores PNG goldens, so it is deliberately **not**
+`test.skip`-gated: it runs as the registered `visual` Playwright project in both
+`npm run e2e` (main lane) and an explicit PR-lane CI step followed by its own
+retry-report gate. It carries `retries: 0`, so an unstable baseline fails rather
+than being papered over.
+
+Its only platform limitation is the renderer: the goldens are curated against
+the pinned Chromium served by `scripts/serve-e2e.js` on the repository's
+supported `ubuntu-latest` runners and the documented Windows dev host. A
+different OS/browser renderer (font rasterisation, sub-pixel layout) would
+produce diffs that are **not** absorbed by loosening a threshold — the
+comparison is `maxDiffPixels: 0` by design. Generating or updating baselines is
+a local, reviewed act (`npm run visual:update`, then the
+`docs/ui-ux/v3-audit/w15/golden-manifest.md` change log); CI has no path to
+write them.
+
+**Closing path:** if a supported runner's rendering ever diverges, pin the
+runner (or document the exclusion) rather than relaxing the comparison. Initial
+two-run stability and the negative-sensitivity proof are recorded in
+`docs/ui-ux/v3-audit/w15/README.md`.
+
 ### W13 secondary-surface rendered audit (2026-10-14)
 
 **Gate site:** `e2e/secondary-surface-w13-audit.spec.ts`
