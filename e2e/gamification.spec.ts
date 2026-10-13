@@ -107,7 +107,19 @@ test.describe('Gamification', () => {
     await expect(dialog.getByText('Level & Achievements')).toBeVisible();
     await expect(dialog.getByText("Today's quests")).toBeVisible();
     await expect(dialog.getByText('Streak protection')).toBeVisible();
-    // The badge board renders every family's first tier, earned or not.
+    // W13 (design D13.4, SUR-13): the badge board is no longer always-on.
+    // Earned tiers render inline and the full collection — every family's
+    // first tier, earned or not — is reached through one labelled disclosure
+    // whose expanded state is exposed. The badge contract is unchanged; only
+    // its prominence moved.
+    const allBadges = dialog.getByRole('button', { name: 'Show all badges' });
+    await expect(allBadges).toBeVisible();
+    await expect(allBadges).toHaveAttribute('aria-expanded', 'false');
+    await allBadges.click();
+    await expect(dialog.getByRole('button', { name: 'Hide all badges' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
     await expect(dialog.getByLabel(/Bronze Complete days/)).toBeVisible();
     // The quest board always rotates exactly three quests in.
     await expect(dialog.getByLabel(/Reward 15 XP\./)).toHaveCount(3);

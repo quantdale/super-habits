@@ -713,6 +713,26 @@ residuals; Focus notification-timestamp residual; Android API36 pending W16;
 iOS owner-deferred; `npm run format:check` reports 134 pre-existing files
 (not a CI quality gate).
 
+### W13 secondary-surface rendered audit (2026-10-14)
+
+**Gate site:** `e2e/secondary-surface-w13-audit.spec.ts`
+
+**Reason:** This before/after visual-evidence instrument is deliberately gated
+by `VISUAL_AUDIT=1` and writes deterministic light/dark/viewport captures for
+the W13 Settings / Command Center / Achievements reconstruction. It is not a
+behavioral regression test and is not supposed to run in every standard CI
+lane. Normal behavior is covered unconditionally by
+`e2e/secondary-surface-w13.spec.ts` (settings value authority, row detail
+disclosure, command input-first, preview-before-confirm), `e2e/settings.spec.ts`,
+`e2e/command.spec.ts`, `e2e/gamification.spec.ts` and `e2e/theming.spec.ts`. The
+opt-in instrument produced the before captures under
+`docs/ui-ux/v3-audit/w13/before/` and the after captures under
+`docs/ui-ux/v3-audit/w13/after/`. No behavioral assertion is skipped in the
+standard lane in reliance on those screenshots.
+
+**Closing path:** W13 evidence is archived. Rerun only after a secondary-surface
+visual change; W15 builds the persistent visual-regression authority.
+
 ### W12 reflection-surfaces rendered audit (2026-10-14)
 
 **Gate site:** `e2e/planning-w12-audit.spec.ts`

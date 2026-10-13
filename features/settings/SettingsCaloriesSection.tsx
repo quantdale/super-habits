@@ -35,15 +35,13 @@ export function SettingsCaloriesSection({
       <SettingsSectionHeading
         eyebrow="Nutrition defaults"
         title="Daily calorie and macro goals"
-        subtitle="Saved defaults for the Calories feature."
-        icon="local-dining"
         accentColor={SECTION_COLORS.calories}
       />
       <Card accentColor={SECTION_COLORS.calories} className="mb-0">
         <SettingsRow
           first
           label="Saved goal"
-          description={
+          value={
             calorieGoalLoading
               ? 'Loading saved calorie and macro goals...'
               : formatCalorieGoalSummary(calorieGoal)
@@ -54,7 +52,8 @@ export function SettingsCaloriesSection({
         />
         <SettingsRow
           label="Where it shows up"
-          description="The Calories screen uses this goal for daily progress and charts. Saved meals stay separate from the default goal."
+          value="The Calories screen uses this goal for daily progress and charts."
+          explanation="Saved meals stay separate from the default goal."
           statusLabel="Calories"
           last
         />

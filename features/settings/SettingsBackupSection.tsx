@@ -241,8 +241,6 @@ export function SettingsBackupSection({
       <SettingsSectionHeading
         eyebrow="Backup / Sync / Restore"
         title="Backup status and restore"
-        subtitle="Remote backup status and restore. This is backup sync, not full two-way sync."
-        icon="cloud-sync"
         accentColor={BACKUP_ACCENT}
       />
       <View className="gap-3">
@@ -259,14 +257,14 @@ export function SettingsBackupSection({
           <SettingsRow
             first
             label="Outbox sync"
-            description={outboxSummary.description}
+            value={outboxSummary.description}
             statusLabel={outboxSummary.statusLabel}
             statusTone={outboxSummary.statusTone}
             accentColor={BACKUP_ACCENT}
           />
           <SettingsRow
             label="Latest restorable backup"
-            description={
+            value={
               restoreLoading
                 ? 'Checking remote backup status...'
                 : formatBackupTime(restorePreview?.latestRestorableBackupAt ?? null)
@@ -277,7 +275,7 @@ export function SettingsBackupSection({
           />
           <SettingsRow
             label="Backup coverage"
-            description={
+            value={
               restoreLoading
                 ? 'Checking backup completeness...'
                 : describeBackupCoverage(restorePreview)
@@ -295,7 +293,7 @@ export function SettingsBackupSection({
           {!restoreLoading && (restorePreview?.recoverableAreas.length ?? 0) > 0 ? (
             <SettingsRow
               label="Recoverable areas"
-              description={(restorePreview?.recoverableAreas ?? []).join(' · ')}
+              value={(restorePreview?.recoverableAreas ?? []).join(' · ')}
               statusLabel="V2 scope"
               statusTone="neutral"
               accentColor={BACKUP_ACCENT}
@@ -303,7 +301,7 @@ export function SettingsBackupSection({
           ) : null}
           <SettingsRow
             label="Restore rule"
-            description={
+            value={
               restoreLoading
                 ? 'Checking whether this device is still eligible for restore.'
                 : (restorePreview?.eligibility.message ?? 'Backup status is not available yet.')
@@ -320,7 +318,8 @@ export function SettingsBackupSection({
           />
           <SettingsRow
             label="Current backup model"
-            description="Backups push synced rows to the remote account. Restore is cautious and empty-device only in this phase, so this page should not be read as full sync or merge support."
+            value="Backups push synced rows to the remote account."
+            explanation="Restore is cautious and empty-device only in this phase, so this page should not be read as full sync or merge support."
             statusLabel="Backup"
             last
           />
@@ -368,7 +367,7 @@ export function SettingsBackupSection({
                 first={index === 0}
                 last={index === RESTORE_ENTITY_ORDER.length - 1}
                 label={RESTORE_ENTITY_LABELS[entity]}
-                description={
+                value={
                   restoreLoading || !restorePreview
                     ? 'Checking backup coverage...'
                     : describeBackupEntity(restorePreview.entityStatuses[entity])

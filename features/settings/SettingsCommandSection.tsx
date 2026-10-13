@@ -19,22 +19,22 @@ export function SettingsCommandSection({ onOpenCommandCenter }: SettingsCommandS
       <SettingsSectionHeading
         eyebrow="Capture"
         title="Advanced capture"
-        subtitle="Describe what you want to add in plain language, then review the draft before saving."
-        icon="edit-note"
         accentColor={tokens.textMuted}
       />
       <Card accentColor={tokens.textMuted} className="mb-0">
         <SettingsRow
           first
           label="Describe it"
-          description="Write a task, habit, meal, workout, or focus action naturally. SuperHabits prepares a draft and waits for your review before anything is saved."
+          value="Write a task, habit, meal, workout, or focus action naturally."
+          explanation="SuperHabits prepares a draft and waits for your review before anything is saved."
           statusLabel="Optional"
           statusTone="accent"
           accentColor={tokens.textMuted}
         />
         <SettingsRow
           label="Default path"
-          description="Use the global Add button for ordinary capture. Choose Describe it inside Add when you want the advanced capture flow."
+          value="Use the global Add button for ordinary capture."
+          explanation="Choose Describe it inside Add when you want the advanced capture flow."
           statusLabel="Add"
           last
         />

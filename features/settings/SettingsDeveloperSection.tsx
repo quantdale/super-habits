@@ -31,8 +31,6 @@ export function SettingsDeveloperSection({
       <SettingsSectionHeading
         eyebrow="Developer / Internal"
         title="Rollout and diagnostics"
-        subtitle="Internal controls stay here so they do not compete with normal settings."
-        icon="build"
         accentColor={INTERNAL_ACCENT}
       />
       <Card accentColor={INTERNAL_ACCENT} className="mb-0">
@@ -59,24 +57,26 @@ export function SettingsDeveloperSection({
           <SettingsRow
             first
             label="Internal parser rollout"
-            description={
+            value={
               commandInternalRolloutAvailable
-                ? 'This build can test the model-backed parser with a device-local preference.'
-                : 'This build does not expose the internal model parser rollout controls.'
+                ? 'This build can test the model-backed parser.'
+                : 'This build does not expose the internal model parser rollout.'
             }
+            explanation="Internal controls are for rollout testing and product diagnostics, not everyday setup."
             statusLabel={commandInternalRolloutAvailable ? 'Available' : 'Unavailable'}
             statusTone={commandInternalRolloutAvailable ? 'accent' : 'warning'}
             accentColor={INTERNAL_ACCENT}
           />
           <SettingsRow
             label="Device preference"
-            description={
+            value={
               commandRolloutLoading
                 ? 'Loading the saved internal parser preference for this device...'
                 : commandRolloutEnabledOnDevice
-                  ? 'Model-backed parsing is enabled on this device. Turn it off here to return to the mock parser immediately.'
-                  : 'Model-backed parsing is disabled on this device. The command shell stays on the mock parser until you opt in here.'
+                  ? 'Model-backed parsing is enabled on this device.'
+                  : 'Model-backed parsing is disabled on this device; the command shell stays on the mock parser.'
             }
+            explanation="Turning it off returns to the mock parser immediately. These controls are device-local."
             statusLabel={
               commandRolloutLoading
                 ? 'Loading'
@@ -95,7 +95,8 @@ export function SettingsDeveloperSection({
           />
           <SettingsRow
             label="Linked Actions editor"
-            description="Create or edit a habit to manage linked rules. Applied rules still surface through the in-app notice banner."
+            value="Create or edit a habit to manage linked rules."
+            explanation="Applied rules still surface through the in-app notice banner."
             statusLabel="Habits"
             last
           />

@@ -1,8 +1,10 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 import { REWARD_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { radius, spacing, typography } from '@/core/theme/designTokens';
+import { Card } from '@/core/ui/Card';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { SkeletonBlock } from '@/core/ui/SkeletonBlock';
@@ -12,6 +14,7 @@ import { LevelHero } from './LevelHero';
 import { QuestRow } from './QuestRow';
 import { WeekStrip } from './WeekStrip';
 import { useGamification } from './gamificationContext';
+import { BADGE_TIER_LABELS, type BadgeState } from './gamification.types';
 
 function SectionHeading({ title, hint }: { title: string; hint?: string }) {
   const { tokens } = useAppTheme();
@@ -28,15 +31,49 @@ function SectionHeading({ title, hint }: { title: string; hint?: string }) {
 }
 
 /**
+ * Highest earned tier per family, most recently relevant first. `BadgeState`
+ * carries no earn timestamp, so "most advanced" is the honest ordering: the
+ * highest threshold the user has actually reached.
+ */
+function earnedMilestones(badges: readonly BadgeState[]): BadgeState[] {
+  const byFamily = new Map<string, BadgeState>();
+  for (const badge of badges) {
+    if (!badge.unlocked) continue;
+    const current = byFamily.get(badge.family);
+    if (!current || badge.threshold > current.threshold) byFamily.set(badge.family, badge);
+  }
+  return [...byFamily.values()].sort((a, b) => b.threshold - a.threshold);
+}
+
+/**
+ * The single nearest locked tier — the one real next milestone. Ordered by
+ * progress ratio descending, then by the smallest threshold so a fresh account
+ * sees the cheapest achievable goal rather than an alphabetical accident.
+ */
+function nextTarget(badges: readonly BadgeState[]): BadgeState | null {
+  const locked = badges
+    .filter((badge) => !badge.unlocked)
+    .sort((a, b) => b.ratio - a.ratio || a.threshold - b.threshold || a.id.localeCompare(b.id));
+  return locked[0] ?? null;
+}
+
+function tierLabel(badge: BadgeState): string {
+  return BADGE_TIER_LABELS[badge.tier - 1] ?? badge.label;
+}
+
+/**
  * Full reward surface behind the Today dashboard card (Refero: Duolingo
  * Quests/Badges tabs, Brilliant progress screen, Planny awards grid).
  *
- * It reads the shared gamification snapshot only — no queries of its own — so
- * it can never disagree with the card the user just tapped.
+ * W13 (design D13.4, defect SUR-13): an **earned milestone leads**, one
+ * believable next target follows, and earned tiers render inline while locked
+ * tiers move behind one disclosure. The ledger, thresholds and award
+ * idempotency are untouched — this reads the same shared snapshot only.
  */
 export function AchievementsScreen() {
   const { tokens } = useAppTheme();
   const { snapshot, isLoading } = useGamification();
+  const [showAllBadges, setShowAllBadges] = useState(false);
 
   if (isLoading && !snapshot) {
     return (
@@ -59,7 +96,11 @@ export function AchievementsScreen() {
     );
   }
 
-  const earnedBadges = snapshot.badges.filter((badge) => badge.unlocked).length;
+  const earned = snapshot.badges.filter((badge) => badge.unlocked);
+  const earnedBadgeCount = earned.length;
+  const milestones = earnedMilestones(snapshot.badges);
+  const next = nextTarget(snapshot.badges);
+  const topMilestone = milestones[0] ?? null;
 
   return (
     <View>
@@ -72,6 +113,99 @@ export function AchievementsScreen() {
         />
       </ScreenSection>
 
+      {/* W13: the earned milestone is the screen's primary content. */}
+      <ScreenSection>
+        <SectionHeading title="Latest milestone" />
+        {topMilestone ? (
+          <Card
+            accentColor={REWARD_COLORS.badge}
+            innerClassName="p-3"
+            className="mb-0"
+            style={{ borderColor: REWARD_COLORS.badge }}
+          >
+            <View className="flex-row items-center" style={{ gap: spacing.md }}>
+              <View
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: radius.lg,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: `${REWARD_COLORS.badge}22`,
+                }}
+              >
+                <MaterialIcons
+                  name={topMilestone.icon as keyof typeof MaterialIcons.glyphMap}
+                  size={26}
+                  color={REWARD_COLORS.badge}
+                />
+              </View>
+              <View className="min-w-0 flex-1">
+                <Text style={{ ...typography.titleMd, color: tokens.text }}>
+                  {topMilestone.label}
+                </Text>
+                <Text style={{ ...typography.caption, color: tokens.textMuted, marginTop: 2 }}>
+                  {tierLabel(topMilestone)} tier earned · {topMilestone.description}
+                </Text>
+              </View>
+              <Text style={{ ...typography.caption, color: REWARD_COLORS.badge }}>Earned</Text>
+            </View>
+            {earnedBadgeCount > 1 ? (
+              <Text
+                style={{ ...typography.caption, color: tokens.textMuted, marginTop: spacing.sm }}
+              >
+                {earnedBadgeCount} badges earned in total.
+              </Text>
+            ) : null}
+          </Card>
+        ) : (
+          <Card innerClassName="p-3" className="mb-0">
+            <Text style={{ ...typography.bodyMd, color: tokens.text }}>
+              No badges earned yet — the first one is one completed day away.
+            </Text>
+          </Card>
+        )}
+      </ScreenSection>
+
+      {/* One believable next target, derived from real ledger progress only. */}
+      {next ? (
+        <ScreenSection>
+          <SectionHeading title="Next target" />
+          <Card innerClassName="p-3" className="mb-0">
+            <View className="flex-row items-center justify-between" style={{ gap: spacing.md }}>
+              <View className="min-w-0 flex-1">
+                <Text style={{ ...typography.bodyMd, color: tokens.text }}>{next.label}</Text>
+                <Text style={{ ...typography.caption, color: tokens.textMuted, marginTop: 2 }}>
+                  {next.description}
+                </Text>
+              </View>
+              <Text
+                style={{ ...typography.label, color: tokens.text, fontVariant: ['tabular-nums'] }}
+              >
+                {Math.min(next.progress, next.threshold)}/{next.threshold}
+              </Text>
+            </View>
+            <View
+              style={{
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: tokens.surfaceSunken,
+                marginTop: spacing.sm,
+                overflow: 'hidden',
+              }}
+            >
+              <View
+                style={{
+                  width: `${Math.round(Math.min(1, next.ratio) * 100)}%`,
+                  height: '100%',
+                  backgroundColor: REWARD_COLORS.badge,
+                }}
+              />
+            </View>
+          </Card>
+        </ScreenSection>
+      ) : null}
+
       <ScreenSection>
         <View className="flex-row" style={{ gap: spacing.md }}>
           <StatBlock
@@ -82,15 +216,8 @@ export function AchievementsScreen() {
             className="flex-1"
           />
           <StatBlock
-            accentColor={REWARD_COLORS.streak}
-            value={snapshot.streak.longest}
-            label="Best streak"
-            detail={`${snapshot.streak.current} current`}
-            className="flex-1"
-          />
-          <StatBlock
             accentColor={REWARD_COLORS.badge}
-            value={`${earnedBadges}/${snapshot.badges.length}`}
+            value={`${earnedBadgeCount}/${snapshot.badges.length}`}
             label="Badges"
             className="flex-1"
           />
@@ -131,12 +258,37 @@ export function AchievementsScreen() {
         </View>
       </ScreenSection>
 
+      {earned.length > 0 ? (
+        <ScreenSection>
+          <SectionHeading title="Earned badges" />
+          <Card innerClassName="p-3" className="mb-0">
+            <BadgeGrid badges={earned} />
+          </Card>
+        </ScreenSection>
+      ) : null}
+
+      {/* Locked tiers are a collection, not the milestone. One disclosure keeps
+          them reachable without giving every unearned badge equal prominence
+          (SUR-13). The disclosure reports its expanded state. */}
       <ScreenSection>
-        <SectionHeading
-          title="Badges"
-          hint="Earned tiers are shown first; the next goal follows."
-        />
-        <BadgeGrid badges={snapshot.badges} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={showAllBadges ? 'Hide all badges' : 'Show all badges'}
+          accessibilityState={{ expanded: showAllBadges }}
+          aria-expanded={showAllBadges}
+          className="min-h-11 self-start justify-center rounded-xl border px-3"
+          style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+          onPress={() => setShowAllBadges((open) => !open)}
+        >
+          <Text style={{ ...typography.bodyMd, color: tokens.text }}>
+            All badges {showAllBadges ? '−' : '+'}
+          </Text>
+        </Pressable>
+        {showAllBadges ? (
+          <Card innerClassName="p-3" className="mt-3 mb-0">
+            <BadgeGrid badges={snapshot.badges} maxRows={snapshot.badges.length} />
+          </Card>
+        ) : null}
       </ScreenSection>
 
       <ScreenSection className="mb-0">
@@ -153,6 +305,11 @@ export function AchievementsScreen() {
         >
           <Text style={{ ...typography.bodyMd, color: tokens.text }}>
             {snapshot.freezes.banked} of {snapshot.freezes.earned} earned streak freezes available
+          </Text>
+          <Text style={{ ...typography.caption, color: tokens.textMuted }}>
+            Current streak: {snapshot.streak.current} day
+            {snapshot.streak.current === 1 ? '' : 's'} · best: {snapshot.streak.longest} day
+            {snapshot.streak.longest === 1 ? '' : 's'}.
           </Text>
           <Text style={{ ...typography.caption, color: tokens.textMuted }}>
             A freeze is earned at 7, 30, 100, and 365 day streaks and spends itself automatically on

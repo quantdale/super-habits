@@ -35,15 +35,13 @@ export function SettingsPomodoroSection({
       <SettingsSectionHeading
         eyebrow="Notifications / Timer defaults"
         title="Focus defaults"
-        subtitle="Save your timer defaults here. Notification behavior still lives with the Focus flow."
-        icon="timer"
         accentColor={SECTION_COLORS[POMODORO_SECTION_KEY]}
       />
       <Card accentColor={SECTION_COLORS[POMODORO_SECTION_KEY]} className="mb-0">
         <SettingsRow
           first
           label="Saved timer sequence"
-          description={
+          value={
             pomodoroLoading
               ? 'Loading saved timer defaults...'
               : formatPomodoroSummary(pomodoroSettings)
@@ -54,7 +52,8 @@ export function SettingsPomodoroSection({
         />
         <SettingsRow
           label="Notification behavior"
-          description="On iOS and Android, the Focus timer can request notification permission and schedule end-of-timer alerts. Web does not schedule native timer notifications."
+          value="Native apps can schedule end-of-timer alerts; web does not."
+          explanation="On iOS and Android the Focus timer can request notification permission and schedule end-of-timer alerts. Web does not schedule native timer notifications."
           statusLabel="Focus"
           last
         />

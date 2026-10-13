@@ -76,49 +76,47 @@ Authority: `D:\Downloads\SuperHabits_Frontend_V3_W12-W17_Unified_Campaign.md`
 
 ## Current Checkpoint
 
-- Current milestone: **C2 complete → C3 — W13 design lock + implementation**
-  (W12 implemented, tested, evidenced and reviewed; W13 not yet started).
+- Current milestone: **C4 complete → C5 — W14 whole-app integrity sweep**
+  (W12 and W13 implemented, tested, evidenced; W14 not yet started).
 - Completed:
-  - C0 recovery: HEAD/SHA, branch/worktree, `gh`, AVD/Maestro/Java/SDK
-    verified. Master ExecPlan + W12 slice created before production edits.
-  - C1 W12 design lock: live baseline audit + `baseline.md`, hermetic
-    `build:e2e`, design D12.1–D12.6.
-  - C2 W12 integration: Weekly Review rebuilt to `Review → Decide → Plan →
-Reflect → Confirm`; Progress rebuilt to narrative + headlines + one
-    disclosure; Activity rebuilt to one `Filters` disclosure + flat rows;
-    evaluative insight wording replaced by numeric facts. Regressions:
-    `e2e/planning-w12.spec.ts` 5/5, `e2e/weekly-review.spec.ts` 2/2,
-    `tests/integration/weeklyReviewW12Persistence.test.ts` 3/3, +7 domain
-    cases. 20 before + 20 after captures inspected; `SUR-12` marked
-    VERIFIED-FIXED.
-- In progress: committing W12, then starting W13.
-- Important modified files: `features/weekly-review/*`,
-  `features/progress/ProgressInsightsView.tsx`,
-  `features/activity/ActivityTimelineView.tsx`,
-  `features/planning-hub/PlanningHubScreen.tsx`, `e2e/planning-w12*.spec.ts`,
-  `e2e/weekly-review.spec.ts`, `e2e/planning-hub.spec.ts`,
+  - C0 recovery: HEAD/SHA, branch/worktree, `gh`, AVD/Maestro/Java/SDK verified.
+  - C1/C2 W12: design lock + narrative-first Weekly Review, Progress and
+    Activity; `SUR-12` VERIFIED-FIXED.
+  - C3/C4 W13: design lock + grouped Settings rows (one value authority,
+    optional disclosed explanation), input-first Command Center, milestone-first
+    Achievements; `SUR-08`, `SYS-14`, `SUR-11`, `SUR-13` VERIFIED-FIXED. Two
+    real defects were found and fixed during the wave: `PillChip` exposed no
+    selected state to web assistive tech (now `aria-pressed`), and a theme-chip
+    label rename broke `e2e/theming.spec.ts` (reverted).
+- In progress: W13 commit/publication, then W14.
+- Important modified files: W12 `features/weekly-review/*`,
+  `features/progress/*`, `features/activity/*`; W13 `features/settings/*`,
+  `features/command/{CommandInputCard,CommandPreview}.tsx`,
+  `features/gamification/AchievementsScreen.tsx`, `core/ui/PillChip.tsx`;
+  `e2e/planning-w12*.spec.ts`, `e2e/secondary-surface-w13*.spec.ts`,
   `tests/integration/weeklyReviewW12Persistence.test.ts`,
-  `docs/ui-ux/v3-audit/w12/**`, `docs/testing/known-gaps.md`,
+  `docs/ui-ux/v3-audit/{w12,w13}/**`, `docs/testing/known-gaps.md`,
   `docs/ui-ux/15-v3-defect-ledger.md`.
-- Last successful validation: see the W12 slice Validation Ledger (typecheck 0,
-  eslint 0/0, qa:fast 2,269 pass / 1 documented CRLF residual, integration 419
-  pass, timezones 105 pass, focused Chromium 30/30, P0 journeys 25/25, audit
-  6/6, OpenSpec 81/81, plans PASS).
+- Last successful validation: typecheck 0; eslint 0/0; `qa:integration` 419
+  pass / 2 skip; `qa:timezones` 105 pass; W12 specs 7/7; W13 specs 5/5; audits
+  6/6 (W12) and 10/10 (W13); gamification 4/4; theming 4/4; settings+command+
+  portable+habits-w7 28/28; P0 journeys 25/25; OpenSpec 81/81; parity OK.
+  `qa:fast` reports only the documented Windows-CRLF ENVIRONMENT residual.
 - Current failures: the inherited Windows-CRLF `agentDocConsistency`
-  ENVIRONMENT residual only (identical on pristine `HEAD`).
-- Relevant quarantines: none added; the new W12 audit spec is registered
-  alongside the existing VISUAL_AUDIT instrument.
-- Blockers: None for W12–W15 web work. W16 requires the API-36 emulator to boot
-  and a source-authenticated APK build; the AVD exists, so W16 is provisionally
-  feasible rather than presumed blocked.
+  ENVIRONMENT residual; the pre-existing `settings-ripple` Calories-ripple step
+  (reproduces on the W12 baseline with all W13 changes stashed).
+- Relevant quarantines: none added; W12/W13 audit specs registered alongside the
+  existing VISUAL_AUDIT instruments.
+- Blockers: None for W14/W15 web work. W16 requires the API-36 emulator to boot
+  and a source-authenticated APK build; the AVD exists.
 - Condition required to unblock: None currently.
 - Exact resume action after unblock: None currently.
-- Exact next action: Begin W13 — author
-  `openspec/changes/frontend-v3-w13-secondary-surfaces/` (proposal, design,
-  spec, tasks, ExecPlan), audit the live Settings/Command/Achievements
-  surfaces, then implement grouped Settings rows, the input-first Command
-  Center and milestone-first Achievements.
-- Remaining definition of done: W13–W17 each implemented, evidenced, tested and
+- Exact next action: Begin W14 — author
+  `openspec/changes/frontend-v3-w14-integrity-sweep/` and run the whole-app
+  rendered matrix (six primary sections + every secondary surface, 360/390/412/
+  768/1280, light/dark, FIRST_RUN/EMPTY/TYPICAL/HEAVY/LONG_TEXT/ERROR states)
+  on the integrated W12+W13 source, then register and fix reproduced defects.
+- Remaining definition of done: W14–W17 each implemented, evidenced, tested and
   published with truthful statuses; W15 suite stable across two runs and
   CI-integrated; W16 exact-source API-36 matrix or a precise `BLOCKED_EXTERNAL`
   package; W17 seven-lane verification matrix, RC verdict and correction
