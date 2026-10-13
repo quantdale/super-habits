@@ -34,8 +34,11 @@ tags:
     text: 'To Do'
     childOf:
       text: 'Section tabs'
+# W6 removed the Pop-era doc subtitle ('Offline-first task manager.'); the
+# To Do surface now identifies itself with its own section title, which is
+# always rendered (W6.5/W12 keep it).
 - extendedWaitUntil:
-    visible: 'Offline-first task manager.'
+    visible: 'Todos'
     timeout: 10000
 - waitForAnimationToEnd:
     timeout: 8000

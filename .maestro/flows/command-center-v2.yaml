@@ -48,7 +48,9 @@ tags:
     when:
       platform: Android
     commands:
-      - assertVisible: 'Command input'
+      # W13 removed the `Command input` card header (the input now leads the
+      # surface). The field's own label `Command` is the current marker.
+      - assertVisible: 'Command'
       - assertNotVisible: 'Ask'
       - assertNotVisible: 'Auto'
 - runFlow:
@@ -57,10 +59,10 @@ tags:
     commands:
       - tapOn: 'Create'
 - scrollUntilVisible:
-    element: 'Command input'
+    element: 'Command'
     direction: UP
 - extendedWaitUntil:
-    visible: 'Command input'
+    visible: 'Command'
     timeout: 10000
 - tapOn: 'Use example: Add a todo to call mom tomorrow'
 - scrollUntilVisible:
