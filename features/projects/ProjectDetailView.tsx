@@ -56,6 +56,8 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
   const [saving, setSaving] = useState(false);
   const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [showRelatedWork, setShowRelatedWork] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [linkedTodos, setLinkedTodos] = useState<{ id: string; title: string }[]>([]);
   const [linkedHabits, setLinkedHabits] = useState<{ id: string; name: string }[]>([]);
@@ -158,8 +160,12 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
 
   const handleDelete = useCallback(async () => {
     if (isCreate || !projectId) return;
-    await softDeleteProject(projectId);
-    onBack();
+    try {
+      await softDeleteProject(projectId);
+      onBack();
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Could not delete project.');
+    }
   }, [isCreate, projectId, onBack]);
 
   return (
@@ -275,12 +281,23 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
         <ProjectLifecycleActions
           status={status}
           onStatusChange={async (next) => {
-            setStatus(next);
-            await updateProject(projectId, { status: next });
-            const refreshed = await getProject(projectId);
-            if (refreshed) setStatus(refreshed.status);
+            // Persist first: a rejected transition must never leave an
+            // optimistic status on screen.
+            try {
+              setStatusError(null);
+              await updateProject(projectId, { status: next });
+              const refreshed = await getProject(projectId);
+              if (refreshed) setStatus(refreshed.status);
+            } catch (e) {
+              setStatusError(e instanceof Error ? e.message : 'Could not update project status.');
+            }
           }}
         />
+      ) : null}
+      {statusError ? (
+        <Text className="text-sm" style={{ color: tokens.dangerText }}>
+          {statusError}
+        </Text>
       ) : null}
 
       {!isCreate && projectId ? (
@@ -340,7 +357,19 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
       ) : null}
 
       {!isCreate && projectId ? (
-        <Button label="Delete Project" variant="danger" onPress={handleDelete} disabled={saving} />
+        <>
+          {deleteError ? (
+            <Text className="text-sm" style={{ color: tokens.dangerText }}>
+              {deleteError}
+            </Text>
+          ) : null}
+          <Button
+            label="Delete Project"
+            variant="danger"
+            onPress={handleDelete}
+            disabled={saving}
+          />
+        </>
       ) : null}
     </View>
   );

@@ -57,6 +57,7 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
   const [saving, setSaving] = useState(false);
   const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [showLinkedTasks, setShowLinkedTasks] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [linkedTodos, setLinkedTodos] = useState<{ id: string; title: string; completed: 0 | 1 }[]>(
     [],
@@ -161,8 +162,12 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
 
   const handleDelete = useCallback(async () => {
     if (isCreate || !goalId) return;
-    await softDeleteGoal(goalId);
-    onBack();
+    try {
+      await softDeleteGoal(goalId);
+      onBack();
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Could not delete goal.');
+    }
   }, [isCreate, goalId, onBack]);
 
   const applyProgressText = useCallback(() => {
@@ -518,7 +523,14 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
       ) : null}
 
       {!isCreate && goalId ? (
-        <Button label="Delete Goal" variant="danger" onPress={handleDelete} disabled={saving} />
+        <>
+          {deleteError ? (
+            <Text className="text-sm" style={{ color: tokens.dangerText }}>
+              {deleteError}
+            </Text>
+          ) : null}
+          <Button label="Delete Goal" variant="danger" onPress={handleDelete} disabled={saving} />
+        </>
       ) : null}
     </View>
   );

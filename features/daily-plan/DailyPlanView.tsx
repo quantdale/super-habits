@@ -142,6 +142,7 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
   );
 
   const [carryForwardError, setCarryForwardError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleCarryForward = useCallback(async () => {
     setCarryingForward(true);
@@ -167,6 +168,7 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
       } = {},
     ) => {
       setSaving(true);
+      setSaveError(null);
       try {
         const updated = await upsertDailyPlan(today, {
           intention,
@@ -179,6 +181,10 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
         });
         setPlan(updated);
         draft.clear();
+      } catch (e) {
+        // Surface the rejected write instead of leaking an unhandled
+        // rejection; the draft stays dirty so the user can retry.
+        setSaveError(e instanceof Error ? e.message : 'Could not save plan.');
       } finally {
         setSaving(false);
       }
@@ -224,6 +230,11 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
       {carryForwardError ? (
         <Text className="text-sm" style={{ color: tokens.dangerText }}>
           {carryForwardError}
+        </Text>
+      ) : null}
+      {saveError ? (
+        <Text className="text-sm" style={{ color: tokens.dangerText }}>
+          {saveError}
         </Text>
       ) : null}
 
