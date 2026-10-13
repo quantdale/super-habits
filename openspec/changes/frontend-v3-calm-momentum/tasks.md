@@ -92,8 +92,8 @@
 
 ## 11. W11 — Planning / Goals / Projects / Daily Plan
 
-- [ ] 11.1 Shared planning grammar (objective/status/next-action/date/progress rows)
-- [ ] 11.2 Reduce exposed fields; detail via disclosure
+- [x] 11.1 Shared planning grammar (objective/status/next-action/date/progress rows)
+- [x] 11.2 Reduce exposed fields; detail via disclosure
 
 ## 12. W12 — Weekly Review / Progress / Activity
 
