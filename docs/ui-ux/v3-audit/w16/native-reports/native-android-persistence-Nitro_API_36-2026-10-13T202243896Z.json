@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 2,
+  "status": "FAILED_NEEDS_TRIAGE",
+  "classification": "PRODUCT_BUG",
+  "failureClasses": [
+    "PRODUCT_BUG",
+    "TEST_BUG",
+    "FLAKY_TEST",
+    "ENVIRONMENT",
+    "EXPECTED_KNOWN_GAP",
+    "SPEC_AMBIGUITY"
+  ],
+  "platform": "android",
+  "appId": "com.dale16.superhabits",
+  "target": "android emulator-5594",
+  "targetLabel": "Nitro_API_36",
+  "avd": "Nitro_API_36",
+  "ownedEmulator": false,
+  "stateReset": false,
+  "provisioned": true,
+  "installedApkSha256": "D4D5B91ED81CB2AC77F3D6CF6A62023216C77B77812E9339CCCB01F7BA23974F",
+  "binaryNote": "Provisioned the current-source build; installed APK SHA-256 D4D5B91ED81CB2AC77F3D6CF6A62023216C77B77812E9339CCCB01F7BA23974F.",
+  "hermeticBuild": {
+    "envFileLoading": "blocked (EXPO_NO_DOTENV=1)",
+    "strippedAmbientEnv": [],
+    "remoteEnvRefused": []
+  },
+  "remoteConfiguration": {
+    "mode": "local-only",
+    "endpoint": null,
+    "anonKeyFingerprint": null,
+    "note": "no remote configured — the hermetic envelope blocked dotenv loading and stripped every ambient EXPO_PUBLIC_* value"
+  },
+  "bundleScan": {
+    "host": "supabase.co",
+    "scannedEntries": 1,
+    "matches": 0
+  },
+  "flowCoverage": {
+    "verdict": "MISMATCH",
+    "expected": [
+      "calories-persistence",
+      "habit-persistence",
+      "habit-reminder-disable",
+      "habit-reminder-isolation",
+      "habit-reminder-permission-denied",
+      "habit-reminder-persistence",
+      "habit-schedule-persistence",
+      "settings-persistence",
+      "todo-persistence",
+      "workout-gym-v2-persistence",
+      "workout-persistence"
+    ],
+    "executed": [
+      "calories-persistence",
+      "habit-persistence",
+      "habit-reminder-disable",
+      "habit-reminder-isolation",
+      "habit-reminder-permission-denied",
+      "habit-reminder-persistence",
+      "habit-schedule-persistence",
+      "settings-persistence",
+      "todo-persistence",
+      "workout-gym-v2-persistence",
+      "workout-persistence"
+    ],
+    "missing": [],
+    "unexpected": [],
+    "reason": "Maestro exited 1.",
+    "source": "D:\\Documents\\tryPython\\superhabits-w16-native\\simulation-output\\native\\debug-android-persistence-Nitro_API_36-2026-10-13T200924901Z\\.maestro\\tests\\2026-10-14_040926"
+  },
+  "mockState": null,
+  "targetIdentity": {
+    "serial": "emulator-5594",
+    "api": "36",
+    "abi": "x86_64",
+    "avd": "Nitro_API_36"
+  },
+  "packageIdentity": {
+    "appId": "com.dale16.superhabits",
+    "present": true,
+    "versionName": "1.0.0",
+    "versionCode": 1
+  },
+  "buildMetadata": {
+    "schemaVersion": 2,
+    "status": "PASS",
+    "classification": null,
+    "platform": "android",
+    "appId": "com.dale16.superhabits",
+    "buildKind": "canonical",
+    "mockAuthUrl": null,
+    "remoteConfiguration": {
+      "mode": "local-only",
+      "endpoint": null,
+      "anonKeyFingerprint": null,
+      "note": "no remote configured — the hermetic envelope blocked dotenv loading and stripped every ambient EXPO_PUBLIC_* value"
+    },
+    "hermeticBuild": {
+      "envFileLoading": "blocked (EXPO_NO_DOTENV=1)",
+      "strippedAmbientEnv": [],
+      "remoteEnvRefused": []
+    },
+    "bundleScan": {
+      "host": "supabase.co",
+      "scannedEntries": 1,
+      "matches": 0
+    },
+    "sourceSha": "0315a559ca64b76a3668745adb02be9880ef67e3",
+    "sourceTreeClean": true,
+    "sourceTreeStatus": [],
+    "apkSha256": "D4D5B91ED81CB2AC77F3D6CF6A62023216C77B77812E9339CCCB01F7BA23974F",
+    "apkPath": "android\\app\\build\\outputs\\apk\\release\\app-release.apk",
+    "versionName": "1.0.0",
+    "versionCode": 1,
+    "target": {
+      "serial": "emulator-5594",
+      "api": "36",
+      "abi": "x86_64",
+      "avd": "Nitro_API_36"
+    },
+    "e2eEnvironment": {
+      "EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST": "true"
+    },
+    "prebuildCommand": "npx expo prebuild --platform android --clean",
+    "buildCommand": "android\\gradlew.bat app:assembleRelease --no-daemon --no-build-cache -PreactNativeArchitectures=x86_64",
+    "installCommand": "adb -s emulator-5594 install -r -d -g <apk>",
+    "builtAt": "2026-10-13T20:08:53.117Z",
+    "installedAt": "2026-10-13T20:09:24.753Z",
+    "capturedAt": "2026-10-13T20:08:53.117Z"
+  },
+  "tag": "persistence",
+  "flow": ".maestro",
+  "debugOutputDir": "D:\\Documents\\tryPython\\superhabits-w16-native\\simulation-output\\native\\debug-android-persistence-Nitro_API_36-2026-10-13T200924901Z",
+  "gitSha": "0315a559ca64b76a3668745adb02be9880ef67e3",
+  "replayCommand": "node scripts/qa-native.mjs --platform android --tag persistence --serial emulator-5594",
+  "exitCode": 1,
+  "timedOut": false,
+  "error": null,
+  "stdout": "",
+  "stderr": "",
+  "capturedAt": "2026-10-13T20:22:43.895Z"
+}

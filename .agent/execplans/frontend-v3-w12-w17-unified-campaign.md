@@ -76,43 +76,40 @@ Authority: `D:\Downloads\SuperHabits_Frontend_V3_W12-W17_Unified_Campaign.md`
 
 ## Current Checkpoint
 
-- Current milestone: **C6 complete → C7 — W16 Android API-36 native
-  qualification** (W12–W15 done; W16 not yet started).
+- Current milestone: **C7 complete → C8 — W17 integrated release-candidate
+  verification** (W12–W16 done; W17 not yet started).
 - Completed:
-  - C0 recovery; C1/C2 W12; C3/C4 W13; C5 W14 whole-app sweep; C6 W15 visual
-    regression.
-  - W15: 30 curated `toHaveScreenshot` baselines with a deterministic capture
-    contract; two independent clean runs with an unchanged baseline hash
-    (`0676368d…`); a negative-sensitivity proof (perturb → 18 failures,
-    restore → 30/30); a `visual` Playwright project registered in `npm run e2e`
-    and an explicit CI PR-lane step with its own retry-report gate; one real
-    nondeterminism found and fixed at source (overlay background scroll).
-- In progress: W15 commit/publication, then W16.
-- Important modified files: `e2e/visual-regression.spec.ts`,
-  `e2e/__screenshots__/visual-regression.spec.ts/*.png`,
-  `playwright.config.ts`, `package.json`, `.github/workflows/ci.yml`,
-  `docs/ui-ux/v3-audit/w15/*`, `docs/testing/known-gaps.md`.
-- Last successful validation: typecheck 0; eslint 0/0; `npm run visual` 30/30
-  twice; sensitivity proof; `ciLaneIntegrity` 10/10; OpenSpec 84/84;
-  journey-label + quarantine parity OK; `web:hygiene` PASS; `qa:fast` 2,271
-  pass / 1 documented Windows-CRLF residual.
-- Current failures: the inherited Windows-CRLF ENVIRONMENT residual and the
-  pre-existing `settings-ripple` Calories-ripple step.
-- Relevant quarantines: none added; the W15 lane is deliberately not
-  `test.skip`-gated.
-- Blockers: None for W15. W16 requires the API-36 emulator to boot and a
-  source-authenticated APK build; the `Nitro_API_36` AVD, Android SDK, Java 17
-  and Maestro 2.9.0 are all present on this host.
-- Condition required to unblock: None currently.
+  - C0 recovery; C1/C2 W12; C3/C4 W13; C5 W14; C6 W15; **C7 W16 Android**.
+  - W16: exact-source `Nitro_API_36` (API 36 / x86_64) qualification at
+    `b50034d` from a clean detached worktree with a credential-free
+    `e2e-test`-equivalent APK (`AA89D9FE…`, 0 remote hosts). All six lanes
+    green: smoke 2/2, persistence 11/11, lifecycle 6/6, reward 1/1,
+    backup-v2 1/1, portable-backup 2/2. Two product defects fixed and
+    re-verified on a rebuilt APK (native nav-label truncation; weekly-plan
+    day/assignment a11y link) and nine stale/date-dependent flow markers
+    corrected without weakening any assertion. iOS remains owner-deferred.
+- In progress: W16 commit/publication and certification-worktree cleanup.
+- Important modified files: `app/index.tsx`,
+  `features/workout/WorkoutScreen.tsx`, `.maestro/flows/*` (9),
+  `docs/ui-ux/v3-audit/w16/**`,
+  `openspec/changes/frontend-v3-w16-android-qualification/*`.
+- Last successful validation: W16 native lanes above; typecheck 0; eslint 0/0;
+  W15 visual 30/30; W14 full Chromium 245/245; OpenSpec 84/84.
+- Current failures: the inherited Windows-CRLF `agentDocConsistency`
+  ENVIRONMENT residual and the pre-existing `settings-ripple` step.
+- Relevant quarantines: none added.
+- Blockers: None. iOS is owner-deferred and not claimed; EAS/cloud Maestro
+  access was not verified.
+- Condition required to unblock: None for Android/web.
 - Exact resume action after unblock: None currently.
-- Exact next action: Begin W16 — author
-  `openspec/changes/frontend-v3-w16-android-qualification/`, boot the
-  `Nitro_API_36` AVD, build the credential-free `e2e-test` equivalent APK from a
-  clean committed source state, record its provenance, and run the native
-  smoke/persistence/lifecycle lanes.
-- Remaining definition of done: W16 exact-source API-36 matrix or a precise
-  `BLOCKED_EXTERNAL` package; W17 seven-lane verification matrix, RC verdict and
-  correction handoff.
+- Exact next action: Begin W17 — reconcile the integrated source and exact RC
+  SHA, run the full seven-lane verification ladder (static, unit+integration,
+  Playwright/PWA, timezone, simulation/performance, visual/a11y, native +
+  security), fix bounded cross-wave defects, then write
+  `docs/ui-ux/v3-audit/w17/{README,rc-manifest,verification-matrix,defect-register,correction-handoff}.md`
+  and publish the campaign.
+- Remaining definition of done: W17 seven-lane verification matrix, RC verdict
+  and correction handoff; publication and review-thread reconciliation.
 
 ## Progress
 
@@ -129,7 +126,9 @@ Authority: `D:\Downloads\SuperHabits_Frontend_V3_W12-W17_Unified_Campaign.md`
 - [x] C5 — W14 whole-app matrix, defect ledger, bounded convergence fixes
 - [x] C6 — W15 curated baselines, two-run stability, CI integration
 - [x] W14 publication (commit `c6937b5`)
-- [ ] C7 — W16 exact-source Android API-36 qualification
+- [x] W15 publication (commit `42d1c20`)
+- [ ] W16 publication (commit)
+- [x] C7 — W16 exact-source Android API-36 qualification
 - [ ] C8 — W17 verification ladder, RC verdict, correction handoff
 - [ ] C9/C10 — publication, review threads, final source and records
 

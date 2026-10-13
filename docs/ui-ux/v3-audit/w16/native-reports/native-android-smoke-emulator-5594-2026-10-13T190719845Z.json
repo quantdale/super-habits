@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "status": "BLOCKED",
+  "classification": "ENVIRONMENT",
+  "failureClasses": [
+    "PRODUCT_BUG",
+    "TEST_BUG",
+    "FLAKY_TEST",
+    "ENVIRONMENT",
+    "EXPECTED_KNOWN_GAP",
+    "SPEC_AMBIGUITY"
+  ],
+  "platform": "android",
+  "appId": "com.dale16.superhabits",
+  "tag": "smoke",
+  "flow": ".maestro",
+  "gitSha": "e8ce067eb2929fb96b0d5463249456d666e21740",
+  "sourceSha": "e8ce067eb2929fb96b0d5463249456d666e21740",
+  "sourceTreeClean": false,
+  "sourceTreeStatus": [
+    "M .maestro/flows/command-center-v2.yaml",
+    " M .maestro/flows/native-smoke.yaml",
+    "?? docs/ui-ux/v3-audit/w16/native-01-launch-today.png",
+    "?? docs/ui-ux/v3-audit/w16/native-02-navbar-crop.png",
+    "?? docs/ui-ux/v3-audit/w16/native-03-todos-after-tap.png",
+    "?? docs/ui-ux/v3-audit/w16/native-04-navbar-fresh.png",
+    "?? docs/ui-ux/v3-audit/w16/native-05-todos-heading.png"
+  ],
+  "sourceShaError": null,
+  "sourceTreeStatusError": null,
+  "reason": "Android certification requires a clean Git working tree; changed entries: M .maestro/flows/command-center-v2.yaml,  M .maestro/flows/native-smoke.yaml, ?? docs/ui-ux/v3-audit/w16/native-01-launch-today.png, ?? docs/ui-ux/v3-audit/w16/native-02-navbar-crop.png, ?? docs/ui-ux/v3-audit/w16/native-03-todos-after-tap.png, ?? docs/ui-ux/v3-audit/w16/native-04-navbar-fresh.png, ?? docs/ui-ux/v3-audit/w16/native-05-todos-heading.png.",
+  "targetLabel": "emulator-5594",
+  "avd": null,
+  "ownedEmulator": false,
+  "mockState": null,
+  "details": {
+    "flow": ".maestro",
+    "avd": null,
+    "serial": "emulator-5594",
+    "ownedEmulator": false,
+    "remediation": "Commit, stash, or reconcile tracked and relevant untracked source changes before running native certification."
+  },
+  "replayCommand": "node scripts/qa-native.mjs --platform android --tag smoke --serial emulator-5594 --no-provision",
+  "capturedAt": "2026-10-13T19:07:19.841Z"
+}

@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 2,
+  "status": "FAILED_NEEDS_TRIAGE",
+  "classification": "PRODUCT_BUG",
+  "failureClasses": [
+    "PRODUCT_BUG",
+    "TEST_BUG",
+    "FLAKY_TEST",
+    "ENVIRONMENT",
+    "EXPECTED_KNOWN_GAP",
+    "SPEC_AMBIGUITY"
+  ],
+  "platform": "android",
+  "appId": "com.dale16.superhabits",
+  "target": "android emulator-5594",
+  "targetLabel": "Nitro_API_36",
+  "avd": "Nitro_API_36",
+  "ownedEmulator": false,
+  "stateReset": false,
+  "provisioned": false,
+  "installedApkSha256": "35A6C990492A927F8A9CB22941A6626CE8218A27B1CBEF82F8B63D4FA2B24DBC",
+  "binaryNote": "Ran on an UNVERIFIED INSTALLED BINARY (no provisioning in this run); installed APK SHA-256 35A6C990492A927F8A9CB22941A6626CE8218A27B1CBEF82F8B63D4FA2B24DBC. This run is not current-source evidence.",
+  "hermeticBuild": {
+    "envFileLoading": "blocked (EXPO_NO_DOTENV=1)",
+    "strippedAmbientEnv": [],
+    "remoteEnvRefused": []
+  },
+  "remoteConfiguration": {
+    "mode": "local-only",
+    "endpoint": null,
+    "anonKeyFingerprint": null,
+    "note": "no remote configured — the hermetic envelope blocked dotenv loading and stripped every ambient EXPO_PUBLIC_* value"
+  },
+  "bundleScan": {
+    "host": "supabase.co",
+    "scannedEntries": 1,
+    "matches": 0
+  },
+  "flowCoverage": {
+    "verdict": "MISMATCH",
+    "expected": ["command-center-v2", "native-smoke"],
+    "executed": ["command-center-v2", "native-smoke"],
+    "missing": [],
+    "unexpected": [],
+    "reason": "Maestro exited 1.",
+    "source": "D:\\Documents\\tryPython\\superhabits-w16-native\\simulation-output\\native\\debug-android-smoke-Nitro_API_36-2026-10-13T185536585Z\\.maestro\\tests\\2026-10-14_025538"
+  },
+  "mockState": null,
+  "targetIdentity": {
+    "serial": "emulator-5594",
+    "api": "36",
+    "abi": "x86_64",
+    "avd": "Nitro_API_36"
+  },
+  "packageIdentity": {
+    "appId": "com.dale16.superhabits",
+    "present": true,
+    "versionName": "1.0.0",
+    "versionCode": 1
+  },
+  "buildMetadata": {
+    "schemaVersion": 2,
+    "status": "PASS",
+    "classification": null,
+    "platform": "android",
+    "appId": "com.dale16.superhabits",
+    "buildKind": "canonical",
+    "mockAuthUrl": null,
+    "remoteConfiguration": {
+      "mode": "local-only",
+      "endpoint": null,
+      "anonKeyFingerprint": null,
+      "note": "no remote configured — the hermetic envelope blocked dotenv loading and stripped every ambient EXPO_PUBLIC_* value"
+    },
+    "hermeticBuild": {
+      "envFileLoading": "blocked (EXPO_NO_DOTENV=1)",
+      "strippedAmbientEnv": [],
+      "remoteEnvRefused": []
+    },
+    "bundleScan": {
+      "host": "supabase.co",
+      "scannedEntries": 1,
+      "matches": 0
+    },
+    "sourceSha": "e8ce067eb2929fb96b0d5463249456d666e21740",
+    "sourceTreeClean": true,
+    "sourceTreeStatus": [],
+    "apkSha256": "35A6C990492A927F8A9CB22941A6626CE8218A27B1CBEF82F8B63D4FA2B24DBC",
+    "apkPath": "android\\app\\build\\outputs\\apk\\release\\app-release.apk",
+    "versionName": "1.0.0",
+    "versionCode": 1,
+    "target": {
+      "serial": "emulator-5594",
+      "api": "36",
+      "abi": "x86_64",
+      "avd": "Nitro_API_36",
+      "bootCompleted": "1"
+    },
+    "e2eEnvironment": {
+      "EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST": "true"
+    },
+    "prebuildCommand": "npx expo prebuild --platform android --clean",
+    "buildCommand": "android\\gradlew.bat app:assembleRelease --no-daemon --no-build-cache -PreactNativeArchitectures=x86_64",
+    "installCommand": "adb -s emulator-5594 install -r -d -g <apk>",
+    "builtAt": "2026-10-13T18:55:13.714Z",
+    "installedAt": "2026-10-13T18:55:13.714Z",
+    "capturedAt": "2026-10-13T18:55:13.714Z"
+  },
+  "tag": "smoke",
+  "flow": ".maestro",
+  "debugOutputDir": "D:\\Documents\\tryPython\\superhabits-w16-native\\simulation-output\\native\\debug-android-smoke-Nitro_API_36-2026-10-13T185536585Z",
+  "gitSha": "e8ce067eb2929fb96b0d5463249456d666e21740",
+  "replayCommand": "node scripts/qa-native.mjs --platform android --tag smoke --serial emulator-5594 --no-provision",
+  "exitCode": 1,
+  "timedOut": false,
+  "error": null,
+  "stdout": "",
+  "stderr": "",
+  "capturedAt": "2026-10-13T18:56:57.004Z"
+}
