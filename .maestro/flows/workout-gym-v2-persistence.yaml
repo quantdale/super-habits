@@ -237,8 +237,8 @@ tags:
     visible: 'Assign Monday in your recurring weekly plan.'
     timeout: 10000
 - tapOn: 'Native Gym V2 typed routine'
+# Assigning closes the day sheet itself, so there is no Close to tap here.
 - assertVisible: 'Monday: Native Gym V2 typed routine'
-- tapOn: 'Close'
 - killApp
 - launchApp
 - extendedWaitUntil:
@@ -253,11 +253,13 @@ tags:
     childOf:
       text: 'Section tabs'
 - assertVisible: 'Monday: Native Gym V2 typed routine'
+# W9 renamed the routines section to 'Quick start'; 'Your routines' no longer
+# exists on the landing.
 - scrollUntilVisible:
-    element: 'Your routines'
+    element: 'QUICK START'
     direction: DOWN
     visibilityPercentage: 50
-- assertVisible: 'Your routines'
+- assertVisible: 'QUICK START'
 # The new routine is prepended to the routines list, which sits ABOVE the
 # 'New routine' form, so the row is reached by scrolling UP.
 - scrollUntilVisible:
