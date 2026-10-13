@@ -46,14 +46,11 @@ tags:
     text: 'Habits'
     childOf:
       text: 'Section tabs'
-# Small screens fit only down to the day strip; the groups render below it.
-- scrollUntilVisible:
-    element: 'Anytime'
-    direction: DOWN
+# W7 rebuilt Habits as a date-scoped daily check-in and removed the Pop-era
+# time-of-day groups ('Anytime', 'Morning', ...). The section's own eyebrow is
+# the current marker and matches the web journey's 'Daily check-in' entry.
 - extendedWaitUntil:
-    # The simplified Habits surface leads with time-of-day groups; the
-    # Today's rhythm summary remains below the check-in controls.
-    visible: 'Anytime'
+    visible: 'DAILY CHECK-IN'
     timeout: 10000
 - waitForAnimationToEnd:
     timeout: 8000
