@@ -785,7 +785,8 @@ function PlanStep({
                   aria-expanded={expanded}
                   className="justify-center rounded-lg border px-2"
                   style={{
-                    minHeight: 36,
+                    // 44pt touch contract (W14-01); the visible label stays small.
+                    minHeight: 44,
                     borderColor: tokens.border,
                     backgroundColor: tokens.surface,
                   }}
@@ -809,7 +810,7 @@ function PlanStep({
                       accessibilityLabel="Commitment due date"
                       className="flex-1 px-3 py-1 rounded text-xs"
                       style={{
-                        minHeight: 40,
+                        minHeight: 44,
                         backgroundColor: tokens.surface,
                         color: tokens.text,
                         borderWidth: 1,

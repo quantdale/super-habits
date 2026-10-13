@@ -78,3 +78,32 @@ describe('V3 compact control touch targets', () => {
     expect(source).toMatch(/h-11 w-11/);
   });
 });
+
+/**
+ * W14 (whole-app integrity sweep) — the campaign's new disclosure controls
+ * (Settings row `Details`, Weekly Review commitment `Options`) are interactive
+ * and must carry the same 44pt contract as the rest of the V3 control set.
+ * The sweep found them at 32/36/40pt, below the contract.
+ */
+describe('W14 disclosure controls keep the 44pt touch contract', () => {
+  const FEATURES = join(__dirname, '..', 'features');
+
+  function readFeature(file: string): string {
+    return readFileSync(join(FEATURES, file), 'utf8');
+  }
+
+  it('SettingsRow Details disclosure is at least 44pt tall', () => {
+    const source = readFeature(join('settings', 'SettingsSharedUi.tsx'));
+    expect(source).toMatch(/minHeight:\s*44/);
+    // The old 32pt value must be gone from this disclosure.
+    expect(source).not.toMatch(/minHeight:\s*32/);
+  });
+
+  it('Weekly Review commitment Options disclosure is at least 44pt tall', () => {
+    const source = readFeature(join('weekly-review', 'WeeklyReviewScreen.tsx'));
+    // Both the Options disclosure and the due-date field inside it.
+    expect(source).toMatch(/minHeight:\s*44/);
+    expect(source).not.toMatch(/minHeight:\s*36/);
+    expect(source).not.toMatch(/minHeight:\s*40/);
+  });
+});

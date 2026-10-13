@@ -76,47 +76,39 @@ Authority: `D:\Downloads\SuperHabits_Frontend_V3_W12-W17_Unified_Campaign.md`
 
 ## Current Checkpoint
 
-- Current milestone: **C4 complete → C5 — W14 whole-app integrity sweep**
-  (W12 and W13 implemented, tested, evidenced; W14 not yet started).
+- Current milestone: **C5 complete → C6 — W15 persistent visual regression**
+  (W12–W14 done; W15 not yet started).
 - Completed:
-  - C0 recovery: HEAD/SHA, branch/worktree, `gh`, AVD/Maestro/Java/SDK verified.
-  - C1/C2 W12: design lock + narrative-first Weekly Review, Progress and
-    Activity; `SUR-12` VERIFIED-FIXED.
-  - C3/C4 W13: design lock + grouped Settings rows (one value authority,
-    optional disclosed explanation), input-first Command Center, milestone-first
-    Achievements; `SUR-08`, `SYS-14`, `SUR-11`, `SUR-13` VERIFIED-FIXED. Two
-    real defects were found and fixed during the wave: `PillChip` exposed no
-    selected state to web assistive tech (now `aria-pressed`), and a theme-chip
-    label rename broke `e2e/theming.spec.ts` (reverted).
-- In progress: W13 commit/publication, then W14.
-- Important modified files: W12 `features/weekly-review/*`,
-  `features/progress/*`, `features/activity/*`; W13 `features/settings/*`,
-  `features/command/{CommandInputCard,CommandPreview}.tsx`,
-  `features/gamification/AchievementsScreen.tsx`, `core/ui/PillChip.tsx`;
-  `e2e/planning-w12*.spec.ts`, `e2e/secondary-surface-w13*.spec.ts`,
-  `tests/integration/weeklyReviewW12Persistence.test.ts`,
-  `docs/ui-ux/v3-audit/{w12,w13}/**`, `docs/testing/known-gaps.md`,
-  `docs/ui-ux/15-v3-defect-ledger.md`.
-- Last successful validation: typecheck 0; eslint 0/0; `qa:integration` 419
-  pass / 2 skip; `qa:timezones` 105 pass; W12 specs 7/7; W13 specs 5/5; audits
-  6/6 (W12) and 10/10 (W13); gamification 4/4; theming 4/4; settings+command+
-  portable+habits-w7 28/28; P0 journeys 25/25; OpenSpec 81/81; parity OK.
-  `qa:fast` reports only the documented Windows-CRLF ENVIRONMENT residual.
-- Current failures: the inherited Windows-CRLF `agentDocConsistency`
-  ENVIRONMENT residual; the pre-existing `settings-ripple` Calories-ripple step
-  (reproduces on the W12 baseline with all W13 changes stashed).
-- Relevant quarantines: none added; W12/W13 audit specs registered alongside the
-  existing VISUAL_AUDIT instruments.
-- Blockers: None for W14/W15 web work. W16 requires the API-36 emulator to boot
-  and a source-authenticated APK build; the AVD exists.
+  - C0 recovery; C1/C2 W12; C3/C4 W13; C5 W14 whole-app sweep.
+  - W14: 247-capture matrix across 7 widths, light/dark and
+    FIRST_RUN/EMPTY/SMALL/TYPICAL/HEAVY/LONG_TEXT; every per-wave audit re-run on
+    the integrated build; `e2e/a11y.spec.ts` 10/10; **full Chromium battery
+    245/245**; one real P1 reproduced and fixed (W14-01: the new Settings and
+    Weekly Review disclosure controls were 32/36/40pt, below the repo's 44pt
+    interactive contract) with a new source-contract regression; three further
+    candidates assessed as not-defects with evidence.
+- In progress: W14 commit/publication, then W15.
+- Important modified files: `features/settings/SettingsSharedUi.tsx`,
+  `features/weekly-review/WeeklyReviewScreen.tsx`,
+  `tests/uiTouchTargetContract.test.ts`, `docs/ui-ux/v3-audit/w14/**`.
+- Last successful validation: typecheck 0; eslint 0/0; touch-target contract
+  8/8; `qa:integration` 419 pass / 2 skip; `qa:fast` 2,271 pass / 1 documented
+  Windows-CRLF ENVIRONMENT residual; visual-audit 7/7; per-wave audits 21/21;
+  W12/W13 audits 8/8; a11y 10/10; full Chromium 245/245; P0 journeys 25/25.
+- Current failures: the inherited Windows-CRLF ENVIRONMENT residual and the
+  pre-existing `settings-ripple` Calories-ripple step (both reproduce on the
+  pre-W14 baseline).
+- Relevant quarantines: none added.
+- Blockers: None for W15 web work. W16 requires the API-36 emulator to boot and
+  a source-authenticated APK build; the AVD exists.
 - Condition required to unblock: None currently.
 - Exact resume action after unblock: None currently.
-- Exact next action: Begin W14 — author
-  `openspec/changes/frontend-v3-w14-integrity-sweep/` and run the whole-app
-  rendered matrix (six primary sections + every secondary surface, 360/390/412/
-  768/1280, light/dark, FIRST_RUN/EMPTY/TYPICAL/HEAVY/LONG_TEXT/ERROR states)
-  on the integrated W12+W13 source, then register and fix reproduced defects.
-- Remaining definition of done: W14–W17 each implemented, evidenced, tested and
+- Exact next action: Begin W15 — author
+  `openspec/changes/frontend-v3-w15-visual-regression/`, then build
+  `e2e/visual-regression.spec.ts` with curated deterministic
+  `toHaveScreenshot` baselines (fixed viewport, reduced motion, stable clock,
+  `document.fonts.ready`), and prove stability across two independent runs.
+- Remaining definition of done: W15–W17 each implemented, evidenced, tested and
   published with truthful statuses; W15 suite stable across two runs and
   CI-integrated; W16 exact-source API-36 matrix or a precise `BLOCKED_EXTERNAL`
   package; W17 seven-lane verification matrix, RC verdict and correction
@@ -134,8 +126,9 @@ Authority: `D:\Downloads\SuperHabits_Frontend_V3_W12-W17_Unified_Campaign.md`
 - [ ] W13 implementation: Settings grouped rows, Command input-first,
       Achievements milestone-first
 - [ ] W13 regressions + rendered evidence + adversarial review
-- [ ] C5 — W14 whole-app matrix, defect ledger, bounded convergence fixes
+- [x] C5 — W14 whole-app matrix, defect ledger, bounded convergence fixes
 - [ ] C6 — W15 curated baselines, two-run stability, CI integration
+- [ ] W14 publication (commit/PR)
 - [ ] C7 — W16 exact-source Android API-36 qualification
 - [ ] C8 — W17 verification ladder, RC verdict, correction handoff
 - [ ] C9/C10 — publication, review threads, final source and records

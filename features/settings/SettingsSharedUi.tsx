@@ -149,8 +149,10 @@ export function SettingsRow({
             aria-expanded={showExplanation}
             onFocus={ring.onFocus}
             onBlur={ring.onBlur}
-            className="mt-1 self-start"
-            style={[{ minHeight: 32 }, ring.focusRingStyle]}
+            className="mt-1 self-start justify-center"
+            // The disclosure is an interactive control, so it carries the 44pt
+            // touch contract even though its label is small (W14-01).
+            style={[{ minHeight: 44 }, ring.focusRingStyle]}
             onPress={() => setShowExplanation((open) => !open)}
           >
             <Text className="text-xs" style={{ color: tokens.textMuted }}>
