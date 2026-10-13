@@ -55,11 +55,12 @@ tags:
     element: 'Open Native disable reminder details'
     direction: UP
 - tapOn: 'Open Native disable reminder details'
+# The schedule/reminder block lives in the detail modal's Settings tab.
+- tapOn: 'Settings'
 - extendedWaitUntil:
     visible: 'Schedule & reminder'
     timeout: 10000
-- assertVisible: 'Reminder 18:00'
-- tapOn: 'Settings'
+- assertVisible: 'Current schedule · Reminder 18:00'
 - scrollUntilVisible:
     element: 'Edit habit'
     direction: DOWN
@@ -83,10 +84,12 @@ tags:
     visible: 'Native disable reminder'
     timeout: 5000
 - tapOn: 'Open Native disable reminder details'
+# The schedule/reminder block lives in the detail modal's Settings tab.
+- tapOn: 'Settings'
 - extendedWaitUntil:
     visible: 'Schedule & reminder'
     timeout: 10000
-- assertNotVisible: 'Reminder 18:00'
+- assertNotVisible: 'Current schedule · Reminder 18:00'
 - tapOn: 'Close'
 - killApp
 - launchApp
@@ -107,8 +110,10 @@ tags:
     visible: 'Native disable reminder'
     timeout: 15000
 - tapOn: 'Open Native disable reminder details'
+# The schedule/reminder block lives in the detail modal's Settings tab.
+- tapOn: 'Settings'
 - extendedWaitUntil:
     visible: 'Schedule & reminder'
     timeout: 10000
-- assertNotVisible: 'Reminder 18:00'
+- assertNotVisible: 'Current schedule · Reminder 18:00'
 - tapOn: 'Close'

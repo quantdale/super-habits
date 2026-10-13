@@ -61,11 +61,13 @@ tags:
 # (otherwise it shows the rest-day variant), so assert the durable facts in the
 # habit detail modal, which is date-independent.
 - tapOn: 'Open Native reminder M-W-F details'
+# The schedule/reminder block lives in the detail modal's Settings tab.
+- tapOn: 'Settings'
 - extendedWaitUntil:
     visible: 'Schedule & reminder'
     timeout: 10000
 - assertVisible: 'Mon / Wed / Fri'
-- assertVisible: 'Reminder 18:00'
+- assertVisible: 'Current schedule · Reminder 18:00'
 - tapOn: 'Close'
 - killApp
 - launchApp
@@ -83,6 +85,8 @@ tags:
     visible: 'Native reminder M-W-F'
     timeout: 15000
 - tapOn: 'Open Native reminder M-W-F details'
+# The schedule/reminder block lives in the detail modal's Settings tab.
+- tapOn: 'Settings'
 - extendedWaitUntil:
     visible: 'Schedule & reminder'
     timeout: 10000
@@ -90,6 +94,6 @@ tags:
     visible: 'Mon / Wed / Fri'
     timeout: 5000
 - extendedWaitUntil:
-    visible: 'Reminder 18:00'
+    visible: 'Current schedule · Reminder 18:00'
     timeout: 5000
 - tapOn: 'Close'

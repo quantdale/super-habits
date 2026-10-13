@@ -94,10 +94,12 @@ tags:
 - assertVisible: 'Native Gym reminder'
 # Date-independent: the list row shows the reminder only on a scheduled day.
 - tapOn: 'Open Native Gym reminder details'
+# The schedule/reminder block lives in the detail modal's Settings tab.
+- tapOn: 'Settings'
 - extendedWaitUntil:
     visible: 'Schedule & reminder'
     timeout: 10000
-- assertVisible: 'Reminder 18:00'
+- assertVisible: 'Current schedule · Reminder 18:00'
 - tapOn: 'Close'
 - scrollUntilVisible:
     element: 'Open Native Gym reminder details'
@@ -123,7 +125,7 @@ tags:
     visible: 'Native Read reminder'
     timeout: 5000
 - assertNotVisible: 'Native Gym reminder'
-- assertNotVisible: 'Reminder 18:00'
+- assertNotVisible: 'Current schedule · Reminder 18:00'
 - tapOn:
     text: 'Focus'
     # Scope to the section switcher (unscoped index-0 can hit inert content).

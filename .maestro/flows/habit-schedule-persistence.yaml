@@ -65,6 +65,8 @@ tags:
 # the durable fact in the habit detail modal, which renders the current
 # schedule (and reminder) for any date.
 - tapOn: 'Open Native M-W-F habit details'
+# The schedule/reminder block lives in the detail modal's Settings tab.
+- tapOn: 'Settings'
 - extendedWaitUntil:
     visible: 'Schedule & reminder'
     timeout: 10000
@@ -86,6 +88,8 @@ tags:
     visible: 'Native M-W-F habit'
     timeout: 15000
 - tapOn: 'Open Native M-W-F habit details'
+# The schedule/reminder block lives in the detail modal's Settings tab.
+- tapOn: 'Settings'
 - extendedWaitUntil:
     visible: 'Schedule & reminder'
     timeout: 10000
