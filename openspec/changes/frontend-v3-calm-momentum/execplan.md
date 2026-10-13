@@ -62,7 +62,7 @@ historical evidence only.
 
 ## Current Checkpoint
 
-- Current milestone: W11 Planning / Goals / Projects / Daily Plan COMPLETE and published through PR #73 (branch `frontend-v3-w11-planning`, final head `74d4aaf`): shared `PlanningSummaryRow` objective/status/context/progress grammar for Goals and Projects; one collapsed `Filters & sort` disclosure per list with persisted selection and an honest active-filter signal; detail editors foreground objective/progress with description/target date/horizon/status/color/associations behind labeled disclosures forwarding `accessibilityState.expanded` + `aria-expanded`; Daily Plan foregrounds date/status, intention, selected priorities and Save Plan with the candidate picker, planning options, reflection/energy and history behind disclosures; Today's briefing collapsed behind one disclosure; adversarial-review corrections added visible failure surfaces for rejected Daily Plan saves, Goal/Project deletes and Project lifecycle transitions (persist-before-refresh). No data-layer, schema, sync, domain, dependency or security-policy change. W12 Weekly Review / Progress / Activity is the next milestone.
+- Current milestone: W11 Planning / Goals / Projects / Daily Plan COMPLETE, merged to main as merge commit `ffb02f2f176f7794386f6ca96f7db5262b8ea04d` (PR #73, branch `frontend-v3-w11-planning`, final head `e669385`): shared `PlanningSummaryRow` objective/status/context/progress grammar for Goals and Projects; one collapsed `Filters & sort` disclosure per list with persisted selection and an honest active-filter signal; detail editors foreground objective/progress with description/target date/horizon/status/color/associations behind labeled disclosures forwarding `accessibilityState.expanded` + `aria-expanded`; Daily Plan foregrounds date/status, intention, selected priorities and Save Plan with the candidate picker, planning options, reflection/energy and history behind disclosures; Today's briefing collapsed behind one disclosure; adversarial-review corrections added visible failure surfaces for rejected Daily Plan saves, Goal/Project deletes and Project lifecycle transitions (persist-before-refresh). No data-layer, schema, sync, domain, dependency or security-policy change. W12 Weekly Review / Progress / Activity is the next milestone.
 - Completed: W0–W7 unchanged semantically; W6.5 closed and MERGED to main as merge commit `f37539a969bdc7c3dc539c2d47db3f6580429c64` (PR58 MERGED 2026-10-08). W7 rebuilt Habits as a date-scoped, list-first daily check-in and merged to main as merge commit `f679a26a28a8abf3472b44e3b5fbdf229222b927` (PR 59) in three commits `9bf4fda`, `0a8e86d`, `3086b27`; its exact-head CI run is [37822880601](https://github.com/quantdale/super-habits/actions/runs/37822880601) with the follow-up scheduled run [37848841434](https://github.com/quantdale/super-habits/actions/runs/37848841434) recorded as reference ids only. W8 Focus was published in three merges: `b47179b` (PR 60, Focus reconstruction), `ce00e37` (PR 61, visual-audit registration), and the W8 closure `c32685364cbe9c6d34a512c3b2bcef9b3a432e0b` (PR 62, commits `3c4b96c`, `e4fd28f`, `9009c17`). The final W8 baseline is `c32685364cbe9c6d34a512c3b2bcef9b3a432e0b`, with exact-head CI run [37914856206](https://github.com/quantdale/super-habits/actions/runs/37914856206) succeeding on every frontend gate through unit/integration — 2,576 hosted tests passed / 3 skipped — and failing only the two pre-existing undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv), so hosted `e2e`/`nightly` skip behind that gate and are NOT passed. W8.5 closed the Focus timer-start race and merged to main as merge commit `aa5835e9fe8ecaa43b55b805d866232503b28c77` (PR 63, branch `frontend-v3-w85-focus-startup`) in two coherent commits `be6db92` and `ca169f5`. Its exact-head CI runs are [37942994150](https://github.com/quantdale/super-habits/actions/runs/37942994150) (push) and [37942146908](https://github.com/quantdale/super-habits/actions/runs/37942146908) (pull request): every frontend gate passed — Typecheck, the Supabase edge-function type-check, Lint, theme tokens, openspec contracts, journey-label and quarantine-register parity, versioned ExecPlans, and the unit+integration test projects — and the first failing step was `Audit runtime dependencies (gates on new high/critical)`, failing on exactly the same two pre-existing undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm at `node_modules/braces`, `node-forge` GHSA-86w9-cpqp-85rv at `node_modules/node-forge`), so hosted `e2e`/`nightly` skipped behind that gate and are NOT passed. No dependency, lockfile, or patch file changed in either wave. No new hosted failure was introduced and no security-gate waiver was added. Stash, foreign iOS evidence, and historical captures preserved. No overall certification.
 - In progress: None in W11; its code is published and its slice plan is COMPLETED in `openspec/changes/frontend-v3-w11-planning/execplan.md`. Existing security/native product-certification residuals remain tracked; W12 has not begun.
 - Important modified files: W8.5 touched `features/pomodoro/pomodoro.startup.ts` (new), `features/pomodoro/PomodoroScreen.tsx`, `features/pomodoro/pomodoro.domain.ts`, `features/pomodoro/pomodoroCommandBridgeContext.ts`, `features/pomodoro/pomodoroCommandBridge.tsx`, `features/command/command.executor.ts`, `tests/pomodoro.startup.test.ts` (new), `tests/integration/pomodoroStartupIntent.test.ts` (new), `e2e/pomodoro.spec.ts`, `e2e/pomodoro-w85-audit.spec.ts` (new), `docs/ui-ux/v3-audit/w8.5/`, and both plans. No data-layer, schema, dependency, or security-policy change; no migration was added.
@@ -115,7 +115,7 @@ historical evidence only.
 - [x] W9.5 — bounded workout convergence: skipped-save false success closed (durable-success guard + accurate routine-unavailable message + post-commit bookkeeping isolation + draft write/clear race) and the landing reduced to exactly one page-level scroll-enabled `Screen`; evidence: unit decision contract, real-SQLite save-integrity oracles, 10/10 W9.5 e2e regressions, 9 inspected captures in `docs/ui-ux/v3-audit/w9.5/`; merged as `24b01b5` (PR #67) with exact-head CI `38162706650` green through unit/integration at 2,665 passed / 3 skipped, audit-only red on braces/node-forge, hosted e2e/nightly skipped
 - [x] W10 — Calories reconstruction + D3 navigation gate (slice `openspec/changes/frontend-v3-w10-calories/`; logging-first hierarchy with one remaining/consumed/goal fact each, shared meal-grouped day log with visible edit/delete, collapsed History & insights disclosure with disclosure-scoped derivations, SYS-06/SYS-18/SUR-07 verified fixed; D3 measured five-destination 3/3/1 taps vs six-tab 2/2/1 → six-tab shipped with 11px labels and >=44pt targets at 360; `health` kept as a valid non-bar section; evidence in `docs/ui-ux/v3-audit/w10/`, regressions in `e2e/calories-w10.spec.ts` 14/14 and `e2e/health-nav-w10.spec.ts` 6/6, real-SQLite oracles in `tests/integration/caloriesW10LoggingIntegrity.test.ts` 7/7; merged as `f7d313b` (PR #70, 6 commits) with exact-head CI run 38259047679 green on every frontend gate through unit/integration at 2,676 passed / 3 skipped, audit-only red on the same two braces/node-forge advisories, hosted e2e/nightly skipped, Vercel production deploy success)
 - [x] W10.5 — bounded Calories truth/reliability and record convergence; source merged PR #71 (`10cff427`), original W10 Codex duplicate-goal P2 review resolved, targeted Chromium E2E 26/26 PASS (`38277711149`), hosted TypeScript/lint/themes/OpenSpec/plans and 2,676 unit/integration PASS before inherited audit-only red (`38277711157`); source provenance clarified without rewriting original D3 captures; no schema/dependency/policy changes
-- [x] W11 — Planning / Goals / Projects / Daily Plan (slice `openspec/changes/frontend-v3-w11-planning/`; shared objective/status/context/progress row grammar, collapsed filter/sort disclosures with persisted state and active-filter signal, detail disclosures for secondary fields, Daily Plan intention/priority-first hierarchy with Save above optional sections, Today briefing disclosure; adversarial-review failure surfaces for rejected saves/deletes/lifecycle transitions; 82 inspected before/after captures in `docs/ui-ux/v3-audit/w11/`; planning E2E 7/7, journeys P0 25/25, integration 416 passed local exact-head; published through PR #73)
+- [x] W11 — Planning / Goals / Projects / Daily Plan (slice `openspec/changes/frontend-v3-w11-planning/`; shared objective/status/context/progress row grammar, collapsed filter/sort disclosures with persisted state and active-filter signal, detail disclosures for secondary fields, Daily Plan intention/priority-first hierarchy with Save above optional sections, Today briefing disclosure; adversarial-review failure surfaces for rejected saves/deletes/lifecycle transitions; 82 inspected before/after captures in `docs/ui-ux/v3-audit/w11/`; planning E2E 7/7, journeys P0 25/25, integration 416 passed local exact-head; merged to main as `ffb02f2` (PR #73) with exact-head CI run 38343799936 green on every quality step through unit+integration, audit-only red on the two inherited advisories, hosted e2e/nightly skipped)
 - [ ] W12 — Weekly Review / Progress / Activity
 - [ ] W13 — Settings / secondary surfaces
 - [ ] W14 — full visual integrity sweep
@@ -211,33 +211,33 @@ historical evidence only.
 
 ## Validation Ledger
 
-- 2026-10-13 W11 published (planning wave): slice `openspec/changes/frontend-v3-w11-planning/`
-  authored before implementation; shared planning rows, disclosure
-  hierarchy and Daily Plan priority-first reconstruction implemented on
-  branch `frontend-v3-w11-planning` and corrected by adversarial review
-  (visible failure surfaces for rejected Daily Plan saves, Goal/Project
-  deletes, and persist-before-refresh Project lifecycle transitions — no
-  data-layer/semantics change). Local exact-head gates at `74d4aaf`
-  (Windows, Node v24.3.0/npm 11.4.2): typecheck 0; lint 0 errors/0
-  warnings; Vitest 2,675 passed / 3 skipped — the single
-  `agentDocConsistency` register-label failure is the documented
-  Windows-CRLF residual and fails identically on pristine `main`
-  (`core.autocrlf=true`, no `.gitattributes`); integration project
-  separately 416 passed / 2 skipped on real better-sqlite3;
-  `validate:themes` 140/140; `openspec validate --all` 80/80;
-  `agent:plan:validate:all` PASS; journey-label-parity OK;
-  quarantine-register-parity OK; release-profile-guard OK; hermetic
-  `build:e2e` PASS (0 Supabase hosts in `dist/`);
-  `npx playwright test --project=chromium e2e/planning-w11.spec.ts
-e2e/planning-hub.spec.ts` 7/7 PASS; `e2e:journeys:p0` 25/25 PASS;
-  `qa:simulation` deterministic PASS. Hosted (prior W11 sessions):
-  independent Planning Chromium `38285465187` and `38287180079` 7/7 PASS
-  on real SQLite; visual recapture `38287180103` 82-image matrix;
-  push-run CI `38288163819`/`38288169951` passed every quality step and
-  failed first at `Audit runtime dependencies` on the same two inherited
-  advisories, with hosted e2e/nightly skipped. Native Android/iOS
-  certification NOT claimed (W16 / owner-deferred). Published through
-  PR #73.
+- 2026-10-13 W11 MERGED and closed on main: PR #73 merged as merge commit
+  `ffb02f2f176f7794386f6ca96f7db5262b8ea04d` (branch
+  `frontend-v3-w11-planning`, final head `e669385` = implementation
+  `74d4aaf` + this closure record). Exact-head CI at `e669385`: push run
+  [38343799936](https://github.com/quantdale/super-habits/actions/runs/38343799936)
+  and pull-request run
+  [38343804230](https://github.com/quantdale/super-habits/actions/runs/38343804230)
+  pass every quality step — Typecheck, Supabase/Deno edge-function
+  type-check, Lint, theme tokens, OpenSpec contracts, journey-label and
+  quarantine-register parity, versioned ExecPlans, and Test (unit +
+  integration projects) — and fail only the first inherited step
+  `Audit runtime dependencies (gates on new high/critical)` on
+  `braces` GHSA-vfj7-8cjw-p6xm and `node-forge` GHSA-86w9-cpqp-85rv;
+  hosted e2e/nightly skip behind that gate and are NOT passed. Local
+  exact-head gates at `74d4aaf`: typecheck 0; lint 0/0; Vitest 2,675
+  passed / 3 skipped with the single failure proven to be the documented
+  Windows-CRLF residual that fails identically on pristine main;
+  integration 416 passed / 2 skipped; themes 140/140; OpenSpec 80/80;
+  plans PASS; parity guards OK; hermetic export PASS; planning 7/7;
+  journeys P0 25/25; deterministic simulation PASS. Independent hosted
+  Planning Chromium lanes `38285465187` and `38287180079` 7/7 PASS on
+  real SQLite; visual recapture `38287180103`. Adversarial-review
+  correction `74d4aaf` added visible failure surfaces for rejected Daily
+  Plan saves, Goal/Project deletes, and persist-before-refresh Project
+  lifecycle transitions — no data-layer/semantics change. No dependency,
+  lockfile, patch, schema, migration, sync or security-policy change; no
+  new quarantine; native qualification NOT claimed.
 - 2026-10-11 W9.5 closed: PR #67 MERGED to main as merge commit
   `24b01b5d47bdc9088428fe1df3e549d318e98109` (branch
   `frontend-v3-w95-workout-convergence`; commits `3bee453` source fix +
@@ -553,8 +553,8 @@ W6.5 delivered areas (Git history establishes changes; closure diff is docs only
 - `public/sw.js`, `CLAUDE.md`, `.cursor/commands/pre-pr.md` — main-deploy
   cache-generation bump and its existing source-truth guidance pins only.
 
-W11 delivered areas (published through PR #73, branch
-`frontend-v3-w11-planning`):
+W11 delivered areas (merged to main as `ffb02f2`, PR #73, branch
+`frontend-v3-w11-planning`, final head `e669385`):
 
 - `features/planning-hub/PlanningSummaryRow.tsx` (new) — one
   objective/status/context/progress row grammar shared by Goals and
