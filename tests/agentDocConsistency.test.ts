@@ -24,7 +24,19 @@ import { BACKUP_ENTITIES } from '@/core/backup/backup.types';
  */
 
 const repositoryRoot = resolve(__dirname, '..');
-const read = (relative: string) => readFileSync(resolve(repositoryRoot, relative), 'utf8');
+/**
+ * Read a tracked text file with line endings normalized to LF.
+ *
+ * Several assertions below anchor line-oriented patterns with `$` (register
+ * headings, section detection). With `core.autocrlf=true` a Windows checkout
+ * materializes these files with CRLF, so `^##\s+(.+)$` never matched and the
+ * register-status check silently saw zero entries (W17: this was recorded as an
+ * "ENVIRONMENT residual" but is a test defect — the same file matches cleanly
+ * once normalized). Normalizing here keeps every assertion line-ending
+ * independent on all platforms without weakening any of them.
+ */
+const read = (relative: string) =>
+  readFileSync(resolve(repositoryRoot, relative), 'utf8').replace(/\r\n/g, '\n');
 
 function currentSchemaVersion(): number {
   const client = read('core/db/client.ts');

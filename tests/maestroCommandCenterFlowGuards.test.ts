@@ -33,7 +33,7 @@ const ANDROID_BLOCK = [
   '    when:',
   '      platform: Android',
   '    commands:',
-  "      - assertVisible: 'Command input'",
+  "      - assertVisible: 'Command'",
   "      - assertNotVisible: 'Ask'",
   "      - assertNotVisible: 'Auto'",
 ].join('\n');
@@ -64,7 +64,7 @@ function findCommandCenterFlowDefects(source: string): string[] {
   }
   if (!source.includes(ANDROID_BLOCK)) {
     defects.push(
-      'Android must assert the ordinary Create surface: Command input visible and Ask/Auto absent',
+      'Android must assert the ordinary Create surface: the Command field visible and Ask/Auto absent',
     );
   }
   if (!source.includes(IOS_BLOCK)) {
