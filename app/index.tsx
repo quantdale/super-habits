@@ -258,6 +258,9 @@ function SectionContainer({
   // the user cannot see.
   useEffect(() => {
     if (Platform.OS !== 'web') return;
+    // SAFETY: only web reaches here; on web the ref is attached to a View,
+    // which react-native-web renders as an HTMLElement. Type checks the RN
+    // ViewProps contract cannot express (a DOM node only exists on web).
     const node = containerRef.current as unknown as HTMLElement | null;
     if (!node || typeof node.setAttribute !== 'function') return;
     if (isActive) node.removeAttribute('inert');
