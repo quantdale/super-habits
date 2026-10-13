@@ -713,6 +713,26 @@ residuals; Focus notification-timestamp residual; Android API36 pending W16;
 iOS owner-deferred; `npm run format:check` reports 134 pre-existing files
 (not a CI quality gate).
 
+### W12 reflection-surfaces rendered audit (2026-10-14)
+
+**Gate site:** `e2e/planning-w12-audit.spec.ts`
+
+**Reason:** This before/after visual-evidence instrument is deliberately gated
+by `VISUAL_AUDIT=1` and writes deterministic light/dark/viewport captures for
+the W12 Weekly Review / Progress / Activity reconstruction. It is not a
+behavioral regression test and is not supposed to run in every standard CI
+lane. Normal behavior is covered unconditionally by
+`e2e/planning-w12.spec.ts` (Progress disclosure, zero-prior-window rule,
+Timeline filter persistence/reset, filtered-empty copy) and
+`e2e/weekly-review.spec.ts` (guided review flow with SQLite/outbox oracles and
+a rejected-write regression). The opt-in instrument produced the before
+captures under `docs/ui-ux/v3-audit/w12/before/` and the after captures under
+`docs/ui-ux/v3-audit/w12/after/`. No behavioral assertion is skipped in the
+standard lane in reliance on those screenshots.
+
+**Closing path:** W12 evidence is archived. Rerun only after a reflection-surface
+visual change; W15 builds the persistent visual-regression authority.
+
 ### W11 Planning rendered audit (2026-10-13)
 
 **Gate site:** `e2e/planning-w11-audit.spec.ts`

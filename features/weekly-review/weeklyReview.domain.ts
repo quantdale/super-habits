@@ -166,20 +166,36 @@ export function generateInsights(summary: WeeklyReviewSummaryV1): {
   }
 
   // Habits
+  //
+  // W12 (design D12.3): report the numeric fact only. The previous wording
+  // appended a verdict ("strong week" / "room to improve"), which grades a
+  // week the user may have deliberately rested, and it read `0%` for a week
+  // where nothing was scheduled. A week with nothing scheduled produces
+  // `consistencyPercent === null` and therefore no habit line at all.
   if (summary.habits.consistencyPercent !== null) {
+    const habitFact = `${summary.habits.consistencyPercent}% habit consistency`;
     if (summary.habits.consistencyPercent >= 80) {
-      wins.push({
-        kind: 'habit_consistency_high',
-        message: `${summary.habits.consistencyPercent}% habit consistency — strong week`,
-      });
+      wins.push({ kind: 'habit_consistency_high', message: habitFact });
     } else if (summary.habits.consistencyPercent < 50) {
-      attention.push({
-        kind: 'habit_consistency_low',
-        message: `${summary.habits.consistencyPercent}% habit consistency — room to improve`,
-      });
+      attention.push({ kind: 'habit_consistency_low', message: habitFact });
     }
   }
+  // One aggregated line instead of one row per habit: the baseline rendered
+  // five identical "<name>: No completions this week" rows for the same fact.
+  const habitsWithoutCompletions = summary.habits.attention.filter(
+    (item) => item.message === 'No completions this week',
+  );
+  if (habitsWithoutCompletions.length > 0) {
+    attention.push({
+      kind: 'habit_attention',
+      message:
+        habitsWithoutCompletions.length === 1
+          ? `${habitsWithoutCompletions[0].name} had no completions this week`
+          : `${habitsWithoutCompletions.length} habits had no completions this week`,
+    });
+  }
   for (const item of summary.habits.attention) {
+    if (item.message === 'No completions this week') continue;
     attention.push({ kind: 'habit_attention', message: `${item.name}: ${item.message}` });
   }
 
@@ -220,18 +236,18 @@ export function generateInsights(summary: WeeklyReviewSummaryV1): {
   }
 
   // Calories
+  //
+  // W12 (design D12.3): a large under-goal average is not automatically good —
+  // reduced intake can be a deliberate or an unintended change. Report the
+  // arithmetic fact under Attention on either side of the goal and stay silent
+  // inside the band, rather than awarding a "win" for eating less.
   if (summary.calories.loggedDays > 0 && summary.calories.averageCaloriesOnLoggedDays !== null) {
     if (summary.calories.configuredGoal !== null) {
       const diff = summary.calories.averageCaloriesOnLoggedDays - summary.calories.configuredGoal;
-      if (diff > 200) {
+      if (diff > 200 || diff < -200) {
         attention.push({
-          kind: 'calories_above_goal',
-          message: `Average ${Math.round(summary.calories.averageCaloriesOnLoggedDays)} kcal/day — above ${summary.calories.configuredGoal} kcal goal`,
-        });
-      } else if (diff < -200) {
-        wins.push({
-          kind: 'calories_below_goal',
-          message: `Average ${Math.round(summary.calories.averageCaloriesOnLoggedDays)} kcal/day — within range of ${summary.calories.configuredGoal} kcal goal`,
+          kind: 'calories_off_goal',
+          message: `Average ${Math.round(summary.calories.averageCaloriesOnLoggedDays)} kcal/day vs ${summary.calories.configuredGoal} kcal goal`,
         });
       }
     }

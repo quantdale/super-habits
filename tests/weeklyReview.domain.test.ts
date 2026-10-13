@@ -273,6 +273,156 @@ describe('generateInsights', () => {
   });
 });
 
+/**
+ * W12 design D12.3 — the narrative-first review must report facts, not
+ * verdicts. These are the regressions for the wording that the baseline
+ * review rendered (`0% habit consistency — room to improve`, an under-goal
+ * "win") and for the duplicate per-habit attention rows.
+ */
+describe('generateInsights W12 truthful wording', () => {
+  const baseSummary: WeeklyReviewSummaryV1 = {
+    version: 1,
+    week: {
+      weekKey: '2026-08-17',
+      startDateKey: '2026-08-17',
+      endDateKey: '2026-08-23',
+      nextWeekStartDateKey: '2026-08-24',
+      nextWeekEndDateKey: '2026-08-30',
+    },
+    todos: {
+      completedCount: 0,
+      incompleteCount: 0,
+      overdueCount: 0,
+      dueNextWeekCount: 0,
+      carryForwardCandidates: [],
+    },
+    habits: {
+      scheduledOccurrences: 0,
+      completedOccurrences: 0,
+      consistencyPercent: null,
+      attention: [],
+    },
+    focus: { sessions: 0, minutes: 0, priorWeekMinutes: null },
+    workouts: { sessions: 0, priorWeekSessions: null, routines: [] },
+    calories: {
+      loggedDays: 0,
+      averageCaloriesOnLoggedDays: null,
+      configuredGoal: null,
+    },
+    wins: [],
+    attention: [],
+  };
+
+  it('states habit consistency as a fact with no evaluative verdict', () => {
+    for (const consistencyPercent of [0, 30, 80, 100]) {
+      const summary = { ...baseSummary, habits: { ...baseSummary.habits, consistencyPercent } };
+      const { wins, attention } = generateInsights(summary);
+      const lines = [...wins, ...attention].map((i) => i.message);
+      const habitLine = lines.find((l) => l.includes('habit consistency'));
+      expect(habitLine).toBe(`${consistencyPercent}% habit consistency`);
+      for (const line of lines) {
+        expect(line).not.toMatch(/strong week|room to improve/i);
+      }
+    }
+  });
+
+  it('reports no habit line at all when nothing was scheduled', () => {
+    const summary = {
+      ...baseSummary,
+      habits: { ...baseSummary.habits, consistencyPercent: null },
+    };
+    const { wins, attention } = generateInsights(summary);
+    expect([...wins, ...attention].some((i) => i.message.includes('consistency'))).toBe(false);
+  });
+
+  it('aggregates per-habit no-completion attention into one line naming the count', () => {
+    const summary = {
+      ...baseSummary,
+      habits: {
+        ...baseSummary.habits,
+        scheduledOccurrences: 14,
+        consistencyPercent: 0,
+        attention: [
+          {
+            habitId: 'h1',
+            name: 'Habit 1',
+            kind: 'no_completions',
+            message: 'No completions this week',
+          },
+          {
+            habitId: 'h2',
+            name: 'Habit 2',
+            kind: 'no_completions',
+            message: 'No completions this week',
+          },
+          {
+            habitId: 'h3',
+            name: 'Habit 3',
+            kind: 'no_completions',
+            message: 'No completions this week',
+          },
+        ],
+      },
+    };
+    const { attention } = generateInsights(summary);
+    const noCompletionLines = attention.filter((a) => a.message.includes('no completions'));
+    expect(noCompletionLines).toHaveLength(1);
+    expect(noCompletionLines[0].message).toBe('3 habits had no completions this week');
+    expect(attention.some((a) => a.message.startsWith('Habit 1:'))).toBe(false);
+  });
+
+  it('names a single habit directly when only one had no completions', () => {
+    const summary = {
+      ...baseSummary,
+      habits: {
+        ...baseSummary.habits,
+        scheduledOccurrences: 7,
+        consistencyPercent: 0,
+        attention: [
+          {
+            habitId: 'h1',
+            name: 'Morning walk',
+            kind: 'no_completions',
+            message: 'No completions this week',
+          },
+        ],
+      },
+    };
+    const { attention } = generateInsights(summary);
+    const line = attention.find((a) => a.message.includes('no completions'));
+    expect(line?.message).toBe('Morning walk had no completions this week');
+  });
+
+  it('reports an off-goal calorie average on either side without calling it a win', () => {
+    for (const averageCaloriesOnLoggedDays of [3000, 900]) {
+      const summary = {
+        ...baseSummary,
+        calories: {
+          loggedDays: 5,
+          averageCaloriesOnLoggedDays,
+          configuredGoal: 2000,
+        },
+      };
+      const { wins, attention } = generateInsights(summary);
+      expect(wins.some((w) => w.kind === 'calories_off_goal')).toBe(false);
+      expect(wins.some((w) => w.message.includes('kcal/day'))).toBe(false);
+      const line = attention.find((a) => a.kind === 'calories_off_goal');
+      expect(line?.message).toBe(
+        `Average ${averageCaloriesOnLoggedDays} kcal/day vs 2000 kcal goal`,
+      );
+    }
+  });
+
+  it('stays silent when the calorie average is inside the goal band', () => {
+    const summary = {
+      ...baseSummary,
+      calories: { loggedDays: 5, averageCaloriesOnLoggedDays: 2100, configuredGoal: 2000 },
+    };
+    const { wins, attention } = generateInsights(summary);
+    expect([...wins, ...attention].some((i) => i.message.includes('kcal/day'))).toBe(false);
+  });
+});
+
 describe('listWeekDateKeys / shiftDateKeyByDays (F5 local-calendar arithmetic)', () => {
   it('lists seven consecutive local date keys starting at the week start', () => {
     expect(listWeekDateKeys('2026-08-17')).toEqual([

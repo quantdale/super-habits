@@ -99,20 +99,27 @@ export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
           <GoalListView onOpenGoal={(id) => setDetail({ kind: 'goal', id })} />
         ) : view === 'progress' ? (
           <View className="gap-3">
-            <Card
-              variant="header"
-              accentColor={SECTION_COLORS.todos}
-              headerTitle="Weekly Review"
-              headerSubtitle="Reflect on the finished week and carry priorities, todos, and goals into the next one."
-            >
-              <Button
-                label="Open weekly review"
-                accessibilityLabel="Open weekly review"
-                onPress={openWeeklyReview}
-              />
+            {/* W12 (design D12.4): Progress is the surface the user selected, so
+                its narrative leads. The Weekly Review entry and the decorative
+                Momentum Garden follow as supporting items instead of consuming
+                the first fold. */}
+            <ProgressInsightsView />
+            <Card innerClassName="p-3">
+              <View className="gap-2">
+                <Text variant="titleMd" style={{ color: tokens.text }}>
+                  Weekly Review
+                </Text>
+                <Text variant="caption" tone="muted">
+                  Carry this week&apos;s priorities and todos into the next one.
+                </Text>
+                <Button
+                  label="Open weekly review"
+                  accessibilityLabel="Open weekly review"
+                  onPress={openWeeklyReview}
+                />
+              </View>
             </Card>
             <MomentumDetailView />
-            <ProgressInsightsView />
           </View>
         ) : (
           <ActivityTimelineView />
