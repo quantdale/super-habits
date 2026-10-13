@@ -16,6 +16,7 @@ import { parseTopTodoIds, parseTopTodoTitles } from '@/features/daily-plan/daily
 import { MAX_TOP_PRIORITIES } from '@/features/daily-plan/dailyPlan.types';
 import { listTodos } from '@/features/todos/todos.data';
 import type { Todo } from '@/core/db/types';
+import { describePlanningWriteError } from '@/features/planning-hub/planningWriteError';
 import {
   isGuidedPlanningDismissed,
   setGuidedPlanningDismissed,
@@ -182,7 +183,7 @@ export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
       );
       setStep(1);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not carry forward.');
+      setError(describePlanningWriteError(e, 'Could not carry forward. Please try again.'));
     } finally {
       setCarryingForward(false);
     }
@@ -206,7 +207,7 @@ export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
       setSaved(true);
       onPlanSaved?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save the plan.');
+      setError(describePlanningWriteError(e, 'Could not save the plan. Please try again.'));
     } finally {
       setSaving(false);
     }

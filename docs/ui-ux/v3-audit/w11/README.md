@@ -96,6 +96,24 @@ recapture `38287180103`.
   mute or modify the security audit itself.
 - Native W16 Android and owner-deferred iOS testing remain outstanding.
 
+## W11.5 addendum (2026-10-13) — reliability closure, do not restate W11 limits
+
+W11.5 (`../w11.5/README.md`) reassessed two W11-era limitations with
+executed evidence, without changing any W11 capture above:
+
+- D10 ("browser failed-write injection NOT STAGEABLE") was too
+  pessimistic: real `RAISE(ABORT)` triggers through the existing DB
+  harness reject Planning writes in-browser. Eight regression cases
+  (Daily Plan save/complete, goal create/rename/delete, project
+  lifecycle/delete, backup-intent-only) now prove the UI failure states
+  and the durable row/outbox outcomes, plus retries.
+- The PR #73 P2 full-card press-target finding
+  (`PRRT_kwDORgzj086rkJjX`) is verified on live code with new
+  title/context-line/percentage/bar clicks and reorder independence in
+  `e2e/planning-w11.spec.ts`, and the thread is resolved.
+
+This addendum neither rewrites nor grades the original W11 records.
+
 ## Reproduction
 
 Run `VISUAL_AUDIT=1 VISUAL_AUDIT_OUTPUT_DIR=docs/ui-ux/v3-audit/w11

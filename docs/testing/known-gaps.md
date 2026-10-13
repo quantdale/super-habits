@@ -730,3 +730,12 @@ skipped in the standard lane in reliance on those screenshots.
 
 **Closing path:** W11 evidence is archived. Rerun only after a planning visual
 change; W15 will build the persistent visual-regression authority.
+
+**W11.5 update (2026-10-13):** the W11-era "browser failed-write injection not
+stageable" limitation no longer stands. The W11.5 reliability lane
+`e2e/planning-w115-reliability.spec.ts` runs unconditionally in the standard
+lane and rejects real Planning writes with the same SQLite `RAISE(ABORT)`
+trigger technique the W10 Calories suite uses, asserting the UI failure state
+and the durable row/outbox outcome (8/8 PASS at W11.5 closure; evidence in
+`docs/ui-ux/v3-audit/w11.5/`). The opt-in status of this visual instrument is
+unchanged.

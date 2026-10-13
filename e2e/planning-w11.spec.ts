@@ -35,11 +35,27 @@ test.describe('W11 Planning disclosure hierarchy', () => {
     await expect(
       page.getByRole('button', { name: /^W11 Project, Active, 0 percent progress/ }),
     ).toBeVisible();
+    // W11.5 — P2 review thread `PRRT_kwDORgzj086rkJjX` executable evidence:
+    // every visible portion of the non-action card surface opens the
+    // detail; only the reorder controls stay independent. Title first.
+    await page.getByText('W11 Project', { exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Back to projects' })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to projects' }).click();
+    // The quiet context line is part of the same press target too.
+    await page.getByText('Active · No linked work yet', { exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Back to projects' })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to projects' }).click();
     // The percentage belongs to the card's main press target, not an inert
-    // sibling; reorder arrows remain independent buttons.
+    // sibling.
     await page.getByText('0%', { exact: true }).click();
     await expect(page.getByRole('button', { name: 'Back to projects' })).toBeVisible();
     await page.getByRole('button', { name: 'Back to projects' }).click();
+    // The reorder control must NOT activate the card's detail target.
+    await page.getByRole('button', { name: 'Move W11 Project down' }).click();
+    await expect(page.getByRole('button', { name: 'Back to projects' })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: /^W11 Project, Active, 0 percent progress/ }),
+    ).toBeVisible();
 
     const filters = page.getByRole('button', { name: 'Projects filters and sort' });
     await expect(filters).toHaveAttribute('aria-expanded', 'false');
@@ -81,6 +97,16 @@ test.describe('W11 Planning disclosure hierarchy', () => {
     await expect(page.getByPlaceholder('Optional')).toHaveCount(2);
     await page.getByRole('button', { name: 'Create Goal' }).click();
     await expect(page.getByRole('button', { name: /^W11 Run, Active, 10 percent/ })).toBeVisible();
+    // W11.5 — P2 thread evidence on the Goal row: title, the real 10%
+    // progress bar and the percentage all open the detail.
+    await page.getByText('W11 Run', { exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Back to goals' })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to goals' }).click();
+    // The rendered bar itself (a width-styled child of the press target).
+    const goalCard = page.getByRole('button', { name: /^W11 Run, Active, 10 percent/ });
+    await goalCard.locator('div[style*="width: 10%"]').click();
+    await expect(page.getByRole('button', { name: 'Back to goals' })).toBeVisible();
+    await page.getByRole('button', { name: 'Back to goals' }).click();
     await page.getByText('10%', { exact: true }).click();
     await expect(page.getByRole('button', { name: 'Back to goals' })).toBeVisible();
     await page.getByRole('button', { name: 'Back to goals' }).click();
@@ -133,7 +159,7 @@ test.describe('W11 Planning disclosure hierarchy', () => {
       .getByPlaceholder('What is the one thing that matters most today?')
       .fill('Ship W11 work');
     await page.getByRole('button', { name: 'Save Plan' }).click();
-    await expect(page.getByText('Committed', { exact: true })).toBeVisible();
+    await expect(page.getByRole('dialog').getByText('Committed', { exact: true })).toBeVisible();
 
     const reflection = page.getByRole('button', { name: 'End-of-day reflection' });
     await expect(reflection).toHaveAttribute('aria-expanded', 'false');
