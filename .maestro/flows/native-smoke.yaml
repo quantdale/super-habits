@@ -72,10 +72,11 @@ tags:
     text: 'Workout'
     childOf:
       text: 'Section tabs'
-# Fresh device (clearState): the Workout subtitle's has-activity variant is
-# off, so the current Gym V2 onboarding copy renders.
+# Workout became a training-first workspace (W9/W9.5): the quick-start section
+# is the always-rendered marker and matches the web journey's 'Quick start'
+# SECTION_MARKERS entry. (The onboarding subtitle it replaces was W9 copy.)
 - extendedWaitUntil:
-    visible: 'Build a training plan, start a guided workout, and track your progress.'
+    visible: 'QUICK START'
     timeout: 10000
 - waitForAnimationToEnd:
     timeout: 8000
@@ -89,7 +90,7 @@ tags:
 # summary. The previous exact-SHA run passed this same assertion slowly; keep a
 # longer bounded wait for the initial render.
 - extendedWaitUntil:
-    visible: '2000 kcal left'
+    visible: '2,000 kcal left'
     timeout: 30000
 - waitForAnimationToEnd:
     timeout: 8000
