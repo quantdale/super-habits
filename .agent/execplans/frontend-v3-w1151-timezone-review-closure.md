@@ -1,7 +1,7 @@
 # ExecPlan: W11.5.1 — Timezone Determinism & Review Closure
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -62,18 +62,18 @@ minimal published PR — without reopening W11/W11.5 or starting W12.
 
 ## Current Checkpoint
 
-- Current milestone: M4 complete — fix implemented, all affected lanes validated, adversarial review addressed; M5 publication next.
-- Completed: M1 preflight (both PR #74 threads fetched; timezone root cause confirmed against the app's `toDateKey()` contract and the spec's Node-side date; W11.5 ExecPlan verified already COMPLETED on `main` `17553e6` — Status: COMPLETED, M6 checked, `Exact next action: None — task complete.`, validator PASS — so finding #2 needs no code change). M2 — `e2e/helpers/browserDate.ts` (new) derives the browser-local date key with the same local-calendar getters as `toDateKey()`; the completion test derives its fixture date via `page.evaluate` BEFORE any DB-context navigation and now asserts the app opened the seeded plan (`Plan for ${today}`) plus date_key row oracles; `e2e/planning-w1151-timezone.spec.ts` (new) proves the UTC→Manila crossover deterministically with the shared `installClock` helper at `2026-10-13T16:30:00.000Z` (UTC Oct 13 vs browser Oct 14), pins the browser TZ to Asia/Manila, and proves same-day agreement. M3 — lanes: default host (Asia/Manila) 18/18 (4 planning-hub + 3 W11 + 8 W11.5 reliability + 3 timezone); host-TZ independence 11/11 under `TZ=UTC` and 11/11 under `TZ=Pacific/Kiritimati`; P0 journeys 25/25 (one transient in-battery flake in `a-tuesday.spec.ts` did not reproduce standalone 8/8 or on the full-lane re-run — FLAKY_TEST, unrelated to the diff); deterministic simulation PASS; focused impact tests 35/35; typecheck 0; lint 0/0; themes 140/140; OpenSpec 80/80; plans PASS; parity + release-profile guards OK; full Vitest 2,679 passed / 2 skipped / 1 failed (the documented Windows-CRLF `agentDocConsistency` residual — identical on pristine main, ENVIRONMENT). Adversarial demonstration of the original defect: the pre-fix Node-local computation at the crossover instant yields `2026-10-13` on a UTC host and `2026-10-13` on an LA host (wrong day; browser is Oct 14) — so the fixed journey provably fails fast at the fixture-selection assertion under the original boundary. M4 — independent adversarial review (no blockers) addressed: the reviewer's should-fix on the date_key-filtered oracle narrowing is fixed (table-wide exactly-one-row count assertions restored around the before/after oracles); the clock spec now uses the shared `installClock` helper; sibling-spec Node-local date hazard (`planning-hub.spec.ts`, `calories*.spec.ts`) documented as a follow-up rather than broadly refactored, per the surgical scope.
-- In progress: review-thread replies and resolutions; PR publication and closure records.
-- Important modified files: `e2e/helpers/browserDate.ts` (new), `e2e/planning-w1151-timezone.spec.ts` (new), `e2e/planning-w115-reliability.spec.ts` (browser-timezone date derivation + date_key and total-row oracles), this plan.
-- Last successful validation: see M3 above — 18/18 focused lanes on the default host, 11/11 under UTC and +14 hosts, P0 25/25, simulation PASS, static gates all PASS, full Vitest with only the inherited CRLF residual.
+- Current milestone: M5 COMPLETE — W11.5.1 published through PR #75 (merge commit `ec53e1efcae8deb1531238409293d10b201170ec`, branch `frontend-v3-w1151-timezone-review-closure`, final head `8299339`); both PR #74 Codex P2 threads are resolved with verified `isResolved: true`; the parent campaign checkpoint names W12 as the next unstarted milestone.
+- Completed: M1 preflight. M2 — `e2e/helpers/browserDate.ts` (new) derives the browser-local date key with the same local-calendar getters as `toDateKey()`; the completion journey derives its fixture date before any DB-harness navigation and proves fixture selection (`Plan for ${today}` + `date_key` row oracles + preserved table-wide exactly-one-row oracle); `e2e/planning-w1151-timezone.spec.ts` (new) proves the UTC→Manila crossover deterministically via the shared `installClock` helper at `2026-10-13T16:30:00.000Z` (UTC Oct 13 vs browser Oct 14), pins the browser timezone, and proves same-day agreement. M3 — lanes: default host 18/18 (4 planning-hub + 3 W11 + 8 W11.5 + 3 timezone); host-TZ independence 11/11 under `TZ=UTC` and 11/11 under `TZ=Pacific/Kiritimati`; P0 journeys 25/25 (one transient `a-tuesday.spec.ts` flake did not reproduce standalone or on re-run — FLAKY_TEST); deterministic simulation PASS; focused impact tests 35/35; typecheck 0; lint 0/0; themes 140/140; OpenSpec 80/80; plans PASS; parity + release-profile guards OK; full Vitest 2,679 passed / 2 skipped / 1 failed (the documented Windows-CRLF residual, identical on pristine main — ENVIRONMENT). M4 — adversarial review (no blockers) addressed: the date_key-filtered oracle narrowing fixed with restored table-wide exactly-one-row assertions; clock spec aligned to the shared `installClock`; sibling-spec Node-local date hazard documented as a follow-up. M5 — published, both threads replied to with full evidence (comments 4257073023 and 4257188665) and resolved with `isResolved: true` read back.
+- In progress: None — campaign closed.
+- Important modified files: `e2e/helpers/browserDate.ts` (new), `e2e/planning-w1151-timezone.spec.ts` (new), `e2e/planning-w115-reliability.spec.ts` (browser-timezone date derivation + date_key and total-row oracles), `docs/ui-ux/v3-audit/w11.5.1/README.md` (new), this plan.
+- Last successful validation: see M3; hosted exact-head CI at final head `8299339` — push run [38379209565](https://github.com/quantdale/super-habits/actions/runs/38379209565) and PR run [38379215776](https://github.com/quantdale/super-habits/actions/runs/38379215776) pass every quality step (Typecheck, Supabase/Deno, Lint, themes, OpenSpec, parity, ExecPlans, unit + integration) and fail only the inherited `Audit runtime dependencies` gate (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv), hosted e2e/nightly skipped behind it; the temporary branch-only targeted workflow [38378633411](https://github.com/quantdale/super-habits/actions/runs/38378633411) executed the planning lanes on hosted Chromium — SUCCESS — and was removed before merge; closure-commit CI recorded on main.
 - Current failures: None for the W11.5.1 scope.
 - Relevant quarantines: None.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: re-run the focused lanes after the oracle/helper refinements, then commit, push, open the focused PR, reply to and resolve both PR #74 threads (`PRRT_kwDORgzj086rvEQW` timezone — after publication; `PRRT_kwDORgzj086rvEQc` ExecPlan — with the current-main verification evidence), verify `isResolved: true` for both, merge with exact-head CI, and close this plan.
-- Remaining definition of done: post-refinement lane re-run; thread replies + verified resolutions; PR merged with exact-head QA/CI; plan COMPLETED; parent checkpoint updated with W12 still next.
+- Exact next action: None — task complete.
+- Remaining definition of done: None — the timezone mismatch is corrected with deterministic crossover evidence, all focused and broader gates ran with results classified, both review threads are verified resolved, the focused PR is merged with exact-head CI evidence, and the parent campaign checkpoint preserves W12 as the next unstarted milestone.
 
 ## Progress
 
@@ -81,7 +81,7 @@ minimal published PR — without reopening W11/W11.5 or starting W12.
 - [x] M2 — browser-timezone fixture fix + deterministic crossover spec
 - [x] M3 — validation (focused lanes, host-TZ independence, static gates)
 - [x] M4 — adversarial review of the fix; findings addressed and re-verified
-- [ ] M5 — publication: PR, thread resolutions, closure
+- [x] M5 — publication: PR #75 merged (`ec53e1e`), both PR #74 threads resolved with verified `isResolved: true`, closure records and parent checkpoint updated
 
 ## Surprises & Discoveries
 
@@ -133,6 +133,18 @@ COMPLETED`, M6 checked, validator PASS on `main` `17553e6` (finding #2
   the oracle-narrowing should-fix fixed (table-wide exactly-one-row
   assertions restored), clock helper aligned with the shared
   `installClock`; sibling-spec date hazard recorded as a follow-up.
+- 2026-10-13 — Publication — PR #75 merged as
+  `ec53e1efcae8deb1531238409293d10b201170ec` (final head `8299339`).
+  Hosted exact-head CI: push run
+  [38379209565](https://github.com/quantdale/super-habits/actions/runs/38379209565)
+  and PR run
+  [38379215776](https://github.com/quantdale/super-habits/actions/runs/38379215776)
+  pass every quality step and fail only the inherited
+  `Audit runtime dependencies` gate; hosted e2e/nightly skipped. The
+  temporary branch-only targeted workflow
+  [38378633411](https://github.com/quantdale/super-habits/actions/runs/38378633411)
+  ran the planning lanes on hosted Chromium — SUCCESS — removed before
+  merge. Both PR #74 threads replied to (comments 4257073023, 4257188665) and resolved with `isResolved: true` verified.
 
 ## Changed Files / Areas
 
@@ -156,4 +168,20 @@ COMPLETED`, M6 checked, validator PASS on `main` `17553e6` (finding #2
 
 ## Outcomes & Retrospective
 
-- Status: Active.
+- Status: COMPLETED. W11.5.1 closed both PR #74 Codex P2 findings surgically:
+  the browser/Node timezone mismatch is fixed with a browser-context date
+  helper shared by the fixture and a deterministic clock-controlled
+  crossover spec (proven additionally under `TZ=UTC` and
+  `TZ=Pacific/Kiritimati` hosts), and the stale-ExecPlan finding was
+  verified as already corrected on `main` with validator evidence
+  instead of reopening the completed W11.5 plan. Both threads are
+  resolved with verified `isResolved: true`. Published through PR #75
+  (`ec53e1e`) with exact-head CI evidence; inherited security/audit and
+  native-qualification residuals remain visible and unwaived; W12 is the
+  next wave.
+- Lessons: date fixtures for browser-local daily state must be derived in
+  the browser context even when the harness pins a timezone — a matching
+  host TZ masks the defect locally, so a deterministic clock test plus
+  host-TZ matrix runs is the sound proof; sibling specs sharing the
+  Node-local pattern (`planning-hub`, `calories*`) are the known residual
+  with `e2e/helpers/browserDate.ts` as the drop-in follow-up.

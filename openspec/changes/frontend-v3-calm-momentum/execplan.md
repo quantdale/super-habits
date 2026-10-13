@@ -62,7 +62,7 @@ historical evidence only.
 
 ## Current Checkpoint
 
-- Current milestone: W11.5 Planning Reliability & Regression Closure COMPLETE and merged to main as `d8bb43ab1193f3ec3c94597862c694fa343f1a12` (PR #74, branch `frontend-v3-w115-planning-reliability`, final head `b3db181`): the outstanding PR #73 Codex P2 thread is verified on live code (full-card press target: title, context line, percentage and the rendered progress bar each open detail; reorder controls independent) with new executable assertions in `e2e/planning-w11.spec.ts`, and the W11-era "browser failed-write injection NOT STAGEABLE" limitation is closed — 8 real-SQLite `RAISE(ABORT)` regressions in `e2e/planning-w115-reliability.spec.ts` prove truthful UI failure states, atomic row/outbox rollback and working retries across Daily Plan save/complete, Goal create/rename/delete, Project lifecycle/delete and backup-intent-only rejection; the raw engine-message leak in the Planning failure surfaces is fixed via `features/planning-hub/planningWriteError.ts`. W11 milestone remains COMPLETE (merged `ffb02f2`); W12 Weekly Review / Progress / Activity remains the next unstarted milestone.
+- Current milestone: W11.5.1 Timezone Determinism & Review Closure COMPLETE and merged to main as `ec53e1efcae8deb1531238409293d10b201170ec` (PR #75, branch `frontend-v3-w1151-timezone-review-closure`, final head `8299339`): the W11.5 planning fixtures now derive their browser-local date inside the Chromium context (`e2e/helpers/browserDate.ts`, mirroring `toDateKey()`), the UTC→Manila crossover is proven deterministically with a clock-controlled regression (`e2e/planning-w1151-timezone.spec.ts`) plus host-TZ independence runs, both PR #74 Codex P2 threads are resolved with verified `isResolved: true` (timezone fixed with evidence; stale ExecPlan verified already corrected on `main` `17553e6`), and no production/schema/dependency/security change was made. W11.5 closure state preserved; W12 Weekly Review / Progress / Activity remains the next unstarted milestone.
 - Completed: W0–W7 unchanged semantically; W6.5 closed and MERGED to main as merge commit `f37539a969bdc7c3dc539c2d47db3f6580429c64` (PR58 MERGED 2026-10-08). W7 rebuilt Habits as a date-scoped, list-first daily check-in and merged to main as merge commit `f679a26a28a8abf3472b44e3b5fbdf229222b927` (PR 59) in three commits `9bf4fda`, `0a8e86d`, `3086b27`; its exact-head CI run is [37822880601](https://github.com/quantdale/super-habits/actions/runs/37822880601) with the follow-up scheduled run [37848841434](https://github.com/quantdale/super-habits/actions/runs/37848841434) recorded as reference ids only. W8 Focus was published in three merges: `b47179b` (PR 60, Focus reconstruction), `ce00e37` (PR 61, visual-audit registration), and the W8 closure `c32685364cbe9c6d34a512c3b2bcef9b3a432e0b` (PR 62, commits `3c4b96c`, `e4fd28f`, `9009c17`). The final W8 baseline is `c32685364cbe9c6d34a512c3b2bcef9b3a432e0b`, with exact-head CI run [37914856206](https://github.com/quantdale/super-habits/actions/runs/37914856206) succeeding on every frontend gate through unit/integration — 2,576 hosted tests passed / 3 skipped — and failing only the two pre-existing undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv), so hosted `e2e`/`nightly` skip behind that gate and are NOT passed. W8.5 closed the Focus timer-start race and merged to main as merge commit `aa5835e9fe8ecaa43b55b805d866232503b28c77` (PR 63, branch `frontend-v3-w85-focus-startup`) in two coherent commits `be6db92` and `ca169f5`. Its exact-head CI runs are [37942994150](https://github.com/quantdale/super-habits/actions/runs/37942994150) (push) and [37942146908](https://github.com/quantdale/super-habits/actions/runs/37942146908) (pull request): every frontend gate passed — Typecheck, the Supabase edge-function type-check, Lint, theme tokens, openspec contracts, journey-label and quarantine-register parity, versioned ExecPlans, and the unit+integration test projects — and the first failing step was `Audit runtime dependencies (gates on new high/critical)`, failing on exactly the same two pre-existing undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm at `node_modules/braces`, `node-forge` GHSA-86w9-cpqp-85rv at `node_modules/node-forge`), so hosted `e2e`/`nightly` skipped behind that gate and are NOT passed. No dependency, lockfile, or patch file changed in either wave. No new hosted failure was introduced and no security-gate waiver was added. Stash, foreign iOS evidence, and historical captures preserved. No overall certification.
 - In progress: None in W11.5 after publication; its code, evidence and records close through PR #74. W12 has not begun. Existing security/native product-certification residuals remain tracked; W11.5 introduced no dependency, schema, migration or security-policy change.
 - Important modified files: W8.5 touched `features/pomodoro/pomodoro.startup.ts` (new), `features/pomodoro/PomodoroScreen.tsx`, `features/pomodoro/pomodoro.domain.ts`, `features/pomodoro/pomodoroCommandBridgeContext.ts`, `features/pomodoro/pomodoroCommandBridge.tsx`, `features/command/command.executor.ts`, `tests/pomodoro.startup.test.ts` (new), `tests/integration/pomodoroStartupIntent.test.ts` (new), `e2e/pomodoro.spec.ts`, `e2e/pomodoro-w85-audit.spec.ts` (new), `docs/ui-ux/v3-audit/w8.5/`, and both plans. No data-layer, schema, dependency, or security-policy change; no migration was added.
@@ -117,6 +117,7 @@ historical evidence only.
 - [x] W10.5 — bounded Calories truth/reliability and record convergence; source merged PR #71 (`10cff427`), original W10 Codex duplicate-goal P2 review resolved, targeted Chromium E2E 26/26 PASS (`38277711149`), hosted TypeScript/lint/themes/OpenSpec/plans and 2,676 unit/integration PASS before inherited audit-only red (`38277711157`); source provenance clarified without rewriting original D3 captures; no schema/dependency/policy changes
 - [x] W11 — Planning / Goals / Projects / Daily Plan (slice `openspec/changes/frontend-v3-w11-planning/`; shared objective/status/context/progress row grammar, collapsed filter/sort disclosures with persisted state and active-filter signal, detail disclosures for secondary fields, Daily Plan intention/priority-first hierarchy with Save above optional sections, Today briefing disclosure; adversarial-review failure surfaces for rejected saves/deletes/lifecycle transitions; 82 inspected before/after captures in `docs/ui-ux/v3-audit/w11/`; planning E2E 7/7, journeys P0 25/25, integration 416 passed local exact-head; merged to main as `ffb02f2` (PR #73) with exact-head CI run 38343799936 green on every quality step through unit+integration, audit-only red on the two inherited advisories, hosted e2e/nightly skipped)
 - [x] W11.5 — Planning reliability & regression closure (branch `frontend-v3-w115-planning-reliability`, merged to main as `d8bb43a`, PR #74; PR #73 P2 full-card press-target thread verified and resolved with executable title/context/percent/bar clicks + reorder independence; 8 real-SQLite trigger-injection regressions close the W11 D10 not-stageable limitation with row/outbox/retry oracles; raw engine-message leak fixed via `planningWriteError.ts`; evidence in `docs/ui-ux/v3-audit/w11.5/`; ExecPlan `.agent/execplans/frontend-v3-w115-planning-reliability.md` COMPLETED; no schema/dependency/policy change)
+- [x] W11.5.1 — Timezone determinism & review closure (branch `frontend-v3-w1151-timezone-review-closure`, merged to main as `ec53e1e`, PR #75; W11.5 planning fixtures derive their browser-local date in Chromium via `e2e/helpers/browserDate.ts`, deterministic UTC→Manila crossover regression `e2e/planning-w1151-timezone.spec.ts` plus host-TZ independence runs under TZ=UTC / TZ=Pacific/Kiritimati; both PR #74 Codex P2 threads resolved with verified `isResolved: true`; no production/schema/dependency/security change; ExecPlan `.agent/execplans/frontend-v3-w1151-timezone-review-closure.md` COMPLETED)
 - [ ] W12 — Weekly Review / Progress / Activity
 - [ ] W13 — Settings / secondary surfaces
 - [ ] W14 — full visual integrity sweep
@@ -212,6 +213,43 @@ historical evidence only.
 
 ## Validation Ledger
 
+- 2026-10-13 W11.5.1 MERGED and closed on main: PR #75 merged as
+  `ec53e1efcae8deb1531238409293d10b201170ec` (branch
+  `frontend-v3-w1151-timezone-review-closure`, final head `8299339`).
+  The W11.5 completed-plan fixture previously derived its date in Node,
+  so on a host whose calendar date differed from Chromium's pinned
+  `Asia/Manila` (a UTC host between 16:00 and midnight UTC) the
+  rejected-Complete journey seeded the wrong `date_key` and failed
+  before exercising the intended SQLite UPDATE rejection; the defect
+  was locally masked because the workstation TZ is also Manila.
+  Correction: `e2e/helpers/browserDate.ts` derives the browser-local
+  date with the same local-calendar getters as `toDateKey()`, the
+  journey derives it before any DB-harness navigation with
+  fixture-selection oracles (`Plan for <date>` + `date_key` rows +
+  preserved table-wide exactly-one-row), and
+  `e2e/planning-w1151-timezone.spec.ts` proves the crossover
+  deterministically with the shared `installClock` helper at
+  `2026-10-13T16:30:00.000Z` (UTC Oct 13 vs browser Oct 14). Executed:
+  focused lanes 18/18 (Planning Hub 4/4, W11 3/3, W11.5 8/8, timezone
+  3/3); host-TZ independence 11/11 under `TZ=UTC` and 11/11 under
+  `TZ=Pacific/Kiritimati`; P0 journeys 25/25; deterministic simulation
+  PASS; focused impact tests 35/35; typecheck 0; lint 0/0; themes
+  140/140; OpenSpec 80/80; plans PASS; parity + release-profile guards
+  OK; full Vitest 2,679 passed / 2 skipped / 1 failed (the documented
+  Windows-CRLF residual, identical on pristine main). Hosted: final-head
+  CI [38379209565](https://github.com/quantdale/super-habits/actions/runs/38379209565)
+  / [38379215776](https://github.com/quantdale/super-habits/actions/runs/38379215776)
+  green on every quality step with only the inherited
+  braces/node-forge audit red (hosted e2e/nightly skipped); the
+  temporary branch-only targeted lane
+  [38378633411](https://github.com/quantdale/super-habits/actions/runs/38378633411)
+  ran the planning journeys on hosted Chromium — SUCCESS — removed
+  before merge. Both PR #74 threads replied to (4257073023, 4257188665) and resolved with `isResolved: true` verified. Known
+  residual documented in `docs/ui-ux/v3-audit/w11.5.1/`: sibling specs
+  (`planning-hub.spec.ts`, `calories*.spec.ts`) share the Node-local
+  date pattern; `e2e/helpers/browserDate.ts` is the follow-up drop-in.
+  No production, schema, migration, dependency or security-policy
+  change.
 - 2026-10-13 W11.5 MERGED and closed on main: PR #74 merged as
   `d8bb43ab1193f3ec3c94597862c694fa343f1a12` (branch
   `frontend-v3-w115-planning-reliability`, final head `b3db181`). PR #73
