@@ -712,3 +712,21 @@ Windows-CRLF `agentDocConsistency` ENVIRONMENT failure; D14 host-load headroom
 residuals; Focus notification-timestamp residual; Android API36 pending W16;
 iOS owner-deferred; `npm run format:check` reports 134 pre-existing files
 (not a CI quality gate).
+
+### W11 Planning rendered audit (2026-10-13)
+
+**Gate site:** `e2e/planning-w11-audit.spec.ts`
+
+**Reason:** This before/after visual-evidence instrument is deliberately gated
+by `VISUAL_AUDIT=1` and writes deterministic light/dark/viewport captures
+for the W11 Planning / Goals / Projects / Daily Plan reconstruction. It is
+not a behavioral regression test and is not supposed to run in every standard
+CI lane. Normal Planning Hub behavior is covered unconditionally by
+`e2e/planning-w11.spec.ts` and `e2e/planning-hub.spec.ts` (7/7 independent
+Chromium on the first W11 implementation). The opt-in instrument ran against
+W10.5 source and W11 source with shared fixtures and produced 82 checked-in
+captures under `docs/ui-ux/v3-audit/w11/`. No behavioral assertion is
+skipped in the standard lane in reliance on those screenshots.
+
+**Closing path:** W11 evidence is archived. Rerun only after a planning visual
+change; W15 will build the persistent visual-regression authority.

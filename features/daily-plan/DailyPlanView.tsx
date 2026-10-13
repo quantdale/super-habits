@@ -59,6 +59,9 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
   const [adherence, setAdherence] = useState<AdherenceSummary | null>(null);
   const [carryingForward, setCarryingForward] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showPriorityPicker, setShowPriorityPicker] = useState(false);
+  const [showPlanningOptions, setShowPlanningOptions] = useState(false);
+  const [showReflection, setShowReflection] = useState(false);
 
   const loadPlanData = useCallback(
     () =>
@@ -139,6 +142,7 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
   );
 
   const [carryForwardError, setCarryForwardError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleCarryForward = useCallback(async () => {
     setCarryingForward(true);
@@ -164,6 +168,7 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
       } = {},
     ) => {
       setSaving(true);
+      setSaveError(null);
       try {
         const updated = await upsertDailyPlan(today, {
           intention,
@@ -176,6 +181,10 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
         });
         setPlan(updated);
         draft.clear();
+      } catch (e) {
+        // Surface the rejected write instead of leaking an unhandled
+        // rejection; the draft stays dirty so the user can retry.
+        setSaveError(e instanceof Error ? e.message : 'Could not save plan.');
       } finally {
         setSaving(false);
       }
@@ -199,9 +208,18 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
 
   return (
     <View className="gap-3">
-      <Text className="text-lg font-bold" style={{ color: tokens.text }}>
-        Plan for {today}
-      </Text>
+      <View className="gap-1">
+        <Text className="text-lg font-bold" style={{ color: tokens.text }}>
+          Plan for {today}
+        </Text>
+        <Text className="text-xs" style={{ color: tokens.textMuted }}>
+          {plan?.status === 'completed'
+            ? 'Completed'
+            : plan?.status === 'committed'
+              ? 'Committed'
+              : 'Not yet saved'}
+        </Text>
+      </View>
 
       {adherence ? (
         <Text className="text-sm" style={{ color: tokens.textMuted }}>
@@ -212,6 +230,11 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
       {carryForwardError ? (
         <Text className="text-sm" style={{ color: tokens.dangerText }}>
           {carryForwardError}
+        </Text>
+      ) : null}
+      {saveError ? (
+        <Text className="text-sm" style={{ color: tokens.dangerText }}>
+          {saveError}
         </Text>
       ) : null}
 
@@ -259,64 +282,47 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
           />
         </View>
       ))}
-      <TextField
-        label="Quick-add priority"
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        placeholder="Search todos to add…"
-      />
-      {candidateTodos.slice(0, 12).map((t) => (
-        <Pressable
-          key={t.id}
-          accessibilityRole="button"
-          className="mb-2 flex-row items-center gap-2 rounded-xl border p-2"
-          style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-          onPress={() => toggleTodo(t.id)}
-        >
-          <Text style={{ fontSize: 18 }}>•</Text>
-          <Text className="flex-1 text-sm" style={{ color: tokens.textMuted }} numberOfLines={1}>
-            {t.title}
-          </Text>
-        </Pressable>
-      ))}
-
-      <View className="mt-2">
-        <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
-          Scheduled habits today
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={showPriorityPicker ? 'Hide priority picker' : 'Add priority'}
+        accessibilityState={{ expanded: showPriorityPicker }}
+        aria-expanded={showPriorityPicker}
+        className="min-h-11 self-start justify-center rounded-xl border px-3"
+        style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+        onPress={() => setShowPriorityPicker((open) => !open)}
+      >
+        <Text className="text-sm" style={{ color: tokens.text }}>
+          {showPriorityPicker ? 'Done adding priorities' : 'Add priority'}
         </Text>
-        {scheduledHabits.length === 0 ? (
-          <Text className="text-sm" style={{ color: tokens.textMuted }}>
-            Rest day
-          </Text>
-        ) : (
-          scheduledHabits.map((name) => (
-            <Text key={name} className="text-sm" style={{ color: tokens.text }} numberOfLines={1}>
-              • {name}
-            </Text>
-          ))
-        )}
-      </View>
-
-      <TextField
-        label="Focus target (minutes)"
-        value={String(focusTarget)}
-        onChangeText={(value) => {
-          draft.markDirty('focusTarget');
-          setFocusTarget(Number(value.replace(/\D/g, '')) || 0);
-        }}
-        keyboardType="number-pad"
-        placeholder="0"
-      />
-
-      <TextField
-        label="Notes"
-        value={notes}
-        onChangeText={(value) => {
-          draft.markDirty('notes');
-          setNotes(value);
-        }}
-        placeholder="Optional"
-      />
+      </Pressable>
+      {showPriorityPicker ? (
+        <View className="gap-2">
+          <TextField
+            label="Quick-add priority"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search todos to add…"
+          />
+          {candidateTodos.slice(0, 12).map((t) => (
+            <Pressable
+              key={t.id}
+              accessibilityRole="button"
+              className="mb-2 flex-row items-center gap-2 rounded-xl border p-2"
+              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+              onPress={() => toggleTodo(t.id)}
+            >
+              <Text style={{ fontSize: 18 }}>•</Text>
+              <Text
+                className="flex-1 text-sm"
+                style={{ color: tokens.textMuted }}
+                numberOfLines={1}
+              >
+                {t.title}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       <Button
         label="Save Plan"
@@ -332,59 +338,143 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
         color={SECTION_COLORS.focus}
       />
 
-      <View className="mt-2">
-        <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
-          End-of-day reflection
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="More planning options"
+        accessibilityState={{ expanded: showPlanningOptions }}
+        aria-expanded={showPlanningOptions}
+        className="min-h-11 self-start justify-center rounded-xl border px-3"
+        style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+        onPress={() => setShowPlanningOptions((open) => !open)}
+      >
+        <Text className="text-sm" style={{ color: tokens.text }}>
+          {showPlanningOptions ? 'Hide planning options' : 'More planning options'}
         </Text>
-        <TextField
-          label="Reflection"
-          value={reflection}
-          onChangeText={(value) => {
-            draft.markDirty('reflection');
-            setReflection(value);
-          }}
-          placeholder="How did today go?"
-        />
-        <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
-          Energy score (1–5): {energyScore ?? '—'}
-        </Text>
-        <View className="flex-row gap-2">
-          {[1, 2, 3, 4, 5].map((score) => (
-            <Pressable
-              key={score}
-              accessibilityRole="button"
-              accessibilityLabel={`Energy ${score}`}
-              className="h-10 w-10 items-center justify-center rounded-full border"
-              style={
-                energyScore === score
-                  ? { backgroundColor: SECTION_COLORS.focus, borderColor: SECTION_COLORS.focus }
-                  : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
-              }
-              onPress={() => {
-                draft.markDirty('energyScore');
-                setEnergyScore(normalizeEnergyScore(score));
-              }}
-            >
-              <Text style={{ color: energyScore === score ? tokens.textOnAccent : tokens.text }}>
-                {score}
+      </Pressable>
+      {showPlanningOptions ? (
+        <View className="gap-3">
+          <View className="mt-2">
+            <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
+              Scheduled habits today
+            </Text>
+            {scheduledHabits.length === 0 ? (
+              <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                Rest day
               </Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
+            ) : (
+              scheduledHabits.map((name) => (
+                <Text
+                  key={name}
+                  className="text-sm"
+                  style={{ color: tokens.text }}
+                  numberOfLines={1}
+                >
+                  • {name}
+                </Text>
+              ))
+            )}
+          </View>
 
-      {!isCompleted ? (
-        <Button
-          label="Complete Daily Plan"
-          onPress={() => persist({ status: 'completed' })}
-          disabled={saving}
-          color={SECTION_COLORS.habits}
-        />
-      ) : (
+          <TextField
+            label="Focus target (minutes)"
+            value={String(focusTarget)}
+            onChangeText={(value) => {
+              draft.markDirty('focusTarget');
+              setFocusTarget(Number(value.replace(/\D/g, '')) || 0);
+            }}
+            keyboardType="number-pad"
+            placeholder="0"
+          />
+
+          <TextField
+            label="Notes"
+            value={notes}
+            onChangeText={(value) => {
+              draft.markDirty('notes');
+              setNotes(value);
+            }}
+            placeholder="Optional"
+          />
+        </View>
+      ) : null}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="End-of-day reflection"
+        accessibilityState={{ expanded: showReflection }}
+        aria-expanded={showReflection}
+        className="min-h-11 self-start justify-center rounded-xl border px-3"
+        style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+        onPress={() => setShowReflection((open) => !open)}
+      >
+        <Text className="text-sm" style={{ color: tokens.text }}>
+          End-of-day reflection {showReflection ? '−' : '+'}
+        </Text>
+      </Pressable>
+      {showReflection ? (
+        <View className="gap-3">
+          <View className="mt-2">
+            <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
+              End-of-day reflection
+            </Text>
+            <TextField
+              label="Reflection"
+              value={reflection}
+              onChangeText={(value) => {
+                draft.markDirty('reflection');
+                setReflection(value);
+              }}
+              placeholder="How did today go?"
+            />
+            <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
+              Energy score (1–5): {energyScore ?? '—'}
+            </Text>
+            <View className="flex-row gap-2">
+              {[1, 2, 3, 4, 5].map((score) => (
+                <Pressable
+                  key={score}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Energy ${score}`}
+                  className="h-10 w-10 items-center justify-center rounded-full border"
+                  style={
+                    energyScore === score
+                      ? { backgroundColor: SECTION_COLORS.focus, borderColor: SECTION_COLORS.focus }
+                      : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
+                  }
+                  onPress={() => {
+                    draft.markDirty('energyScore');
+                    setEnergyScore(normalizeEnergyScore(score));
+                  }}
+                >
+                  <Text
+                    style={{ color: energyScore === score ? tokens.textOnAccent : tokens.text }}
+                  >
+                    {score}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          {!isCompleted ? (
+            <Button
+              label="Complete Daily Plan"
+              onPress={() => persist({ status: 'completed' })}
+              disabled={saving}
+              color={SECTION_COLORS.habits}
+            />
+          ) : (
+            <Text className="text-sm font-semibold" style={{ color: sectionAccents.habits.text }}>
+              Plan completed.
+            </Text>
+          )}
+        </View>
+      ) : null}
+      {isCompleted && !showReflection ? (
         <Text className="text-sm font-semibold" style={{ color: sectionAccents.habits.text }}>
           Plan completed.
         </Text>
-      )}
+      ) : null}
 
       <Pressable
         accessibilityRole="button"

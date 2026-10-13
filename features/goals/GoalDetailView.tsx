@@ -55,6 +55,9 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
   const [projectId, setProjectId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [showLinkedTasks, setShowLinkedTasks] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [linkedTodos, setLinkedTodos] = useState<{ id: string; title: string; completed: 0 | 1 }[]>(
     [],
@@ -159,8 +162,12 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
 
   const handleDelete = useCallback(async () => {
     if (isCreate || !goalId) return;
-    await softDeleteGoal(goalId);
-    onBack();
+    try {
+      await softDeleteGoal(goalId);
+      onBack();
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Could not delete goal.');
+    }
   }, [isCreate, goalId, onBack]);
 
   const applyProgressText = useCallback(() => {
@@ -197,71 +204,6 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
         placeholder="Goal title"
         accessibilityLabel={`Goal title, up to ${GOAL_TITLE_MAX} chars`}
       />
-      <TextField
-        label="Description"
-        value={description}
-        onChangeText={setDescription}
-        placeholder="Optional"
-        accessibilityLabel={`Goal description, up to ${GOAL_DESCRIPTION_MAX} chars`}
-      />
-      <TextField
-        label="Target date (YYYY-MM-DD)"
-        value={targetDate}
-        onChangeText={setTargetDate}
-        placeholder="Optional"
-      />
-
-      <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
-        Horizon
-      </Text>
-      <View className="flex-row flex-wrap gap-2">
-        {GOAL_HORIZON_VALUES.map((h) => (
-          <Pressable
-            key={h}
-            accessibilityRole="button"
-            accessibilityLabel={GOAL_HORIZON_LABELS[h]}
-            className="rounded-full border px-4 py-2"
-            style={
-              horizon === h
-                ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
-                : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
-            }
-            onPress={() => setHorizon(h)}
-          >
-            <Text style={{ color: horizon === h ? tokens.textOnAccent : tokens.textMuted }}>
-              {GOAL_HORIZON_LABELS[h]}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-      <Text className="mt-2 text-xs" style={{ color: tokens.textMuted }}>
-        {describeGoalHorizon(horizon).cadenceHint}
-      </Text>
-
-      <Text className="mb-1.5 mt-2 text-sm font-medium" style={{ color: tokens.textMuted }}>
-        Status
-      </Text>
-      <View className="flex-row flex-wrap gap-2">
-        {GOAL_STATUS_VALUES.map((s) => (
-          <Pressable
-            key={s}
-            accessibilityRole="button"
-            accessibilityLabel={GOAL_STATUS_LABELS[s]}
-            className="rounded-full border px-4 py-2"
-            style={
-              status === s
-                ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
-                : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
-            }
-            onPress={() => setStatus(s)}
-          >
-            <Text style={{ color: status === s ? tokens.textOnAccent : tokens.textMuted }}>
-              {GOAL_STATUS_LABELS[s]}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
       <View className="mt-2">
         <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
           Progress: {progress}%
@@ -278,12 +220,22 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
         <View className="mt-2 flex-row gap-2">
           <Button
             label="-10"
-            onPress={() => setProgress(Math.max(0, progress - 10))}
+            onPress={() => {
+              const next = Math.max(0, progress - 10);
+              setProgress(next);
+              setProgressText(String(next));
+              setProgressParseError(null);
+            }}
             variant="ghost"
           />
           <Button
             label="+10"
-            onPress={() => setProgress(Math.min(100, progress + 10))}
+            onPress={() => {
+              const next = Math.min(100, progress + 10);
+              setProgress(next);
+              setProgressText(String(next));
+              setProgressParseError(null);
+            }}
             variant="ghost"
           />
         </View>
@@ -321,6 +273,88 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
         ) : null}
       </View>
 
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Goal more options"
+        accessibilityState={{ expanded: showMoreOptions }}
+        aria-expanded={showMoreOptions}
+        className="min-h-11 self-start justify-center rounded-xl border px-3"
+        style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+        onPress={() => setShowMoreOptions((open) => !open)}
+      >
+        <Text className="text-sm" style={{ color: tokens.text }}>
+          {showMoreOptions ? 'Hide goal options' : 'More options'}
+        </Text>
+      </Pressable>
+      {showMoreOptions ? (
+        <View className="gap-3">
+          <TextField
+            label="Description"
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Optional"
+            accessibilityLabel={`Goal description, up to ${GOAL_DESCRIPTION_MAX} chars`}
+          />
+          <TextField
+            label="Target date (YYYY-MM-DD)"
+            value={targetDate}
+            onChangeText={setTargetDate}
+            placeholder="Optional"
+          />
+
+          <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
+            Horizon
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {GOAL_HORIZON_VALUES.map((h) => (
+              <Pressable
+                key={h}
+                accessibilityRole="button"
+                accessibilityLabel={GOAL_HORIZON_LABELS[h]}
+                className="rounded-full border px-4 py-2"
+                style={
+                  horizon === h
+                    ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
+                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
+                }
+                onPress={() => setHorizon(h)}
+              >
+                <Text style={{ color: horizon === h ? tokens.textOnAccent : tokens.textMuted }}>
+                  {GOAL_HORIZON_LABELS[h]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text className="mt-2 text-xs" style={{ color: tokens.textMuted }}>
+            {describeGoalHorizon(horizon).cadenceHint}
+          </Text>
+
+          <Text className="mb-1.5 mt-2 text-sm font-medium" style={{ color: tokens.textMuted }}>
+            Status
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {GOAL_STATUS_VALUES.map((s) => (
+              <Pressable
+                key={s}
+                accessibilityRole="button"
+                accessibilityLabel={GOAL_STATUS_LABELS[s]}
+                className="rounded-full border px-4 py-2"
+                style={
+                  status === s
+                    ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
+                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
+                }
+                onPress={() => setStatus(s)}
+              >
+                <Text style={{ color: status === s ? tokens.textOnAccent : tokens.textMuted }}>
+                  {GOAL_STATUS_LABELS[s]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
       {showNextActionCue ? (
         <View
           className="rounded-xl border p-3"
@@ -351,7 +385,7 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
         </View>
       ) : null}
 
-      {projects.length > 0 ? (
+      {showMoreOptions && projects.length > 0 ? (
         <View className="mt-2">
           <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
             Project
@@ -422,55 +456,81 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
       />
 
       {!isCreate && goalId ? (
-        <View className="mt-2">
-          <Text className="mb-2 text-sm font-semibold" style={{ color: tokens.text }}>
-            Linked Tasks
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Manage linked goal tasks"
+          accessibilityState={{ expanded: showLinkedTasks }}
+          aria-expanded={showLinkedTasks}
+          className="min-h-11 self-start justify-center rounded-xl border px-3"
+          style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+          onPress={() => setShowLinkedTasks((open) => !open)}
+        >
+          <Text className="text-sm" style={{ color: tokens.text }}>
+            Linked tasks ({linkedTodos.length}) {showLinkedTasks ? '−' : '+'}
           </Text>
-          {linkedTodos.map((t) => (
-            <View
-              key={t.id}
-              className="mb-2 flex-row items-center justify-between rounded-xl border p-2"
-              style={{ borderColor: tokens.border }}
-            >
-              <Text className="flex-1 text-sm" style={{ color: tokens.text }} numberOfLines={1}>
-                {t.title}
+        </Pressable>
+      ) : null}
+      {showLinkedTasks ? (
+        <>
+          {!isCreate && goalId ? (
+            <View className="mt-2">
+              <Text className="mb-2 text-sm font-semibold" style={{ color: tokens.text }}>
+                Linked Tasks
               </Text>
-              <IconButton
-                icon="link-off"
-                onPress={async () => {
-                  await setTodoProjectGoal(t.id, { goalId: null });
-                  await reloadLinks();
-                }}
-                accessibilityLabel={`Unlink ${t.title}`}
-              />
+              {linkedTodos.map((t) => (
+                <View
+                  key={t.id}
+                  className="mb-2 flex-row items-center justify-between rounded-xl border p-2"
+                  style={{ borderColor: tokens.border }}
+                >
+                  <Text className="flex-1 text-sm" style={{ color: tokens.text }} numberOfLines={1}>
+                    {t.title}
+                  </Text>
+                  <IconButton
+                    icon="link-off"
+                    onPress={async () => {
+                      await setTodoProjectGoal(t.id, { goalId: null });
+                      await reloadLinks();
+                    }}
+                    accessibilityLabel={`Unlink ${t.title}`}
+                  />
+                </View>
+              ))}
+              {candidateTodos.map((t) => (
+                <Pressable
+                  key={t.id}
+                  accessibilityRole="button"
+                  className="mb-2 flex-row items-center gap-2 rounded-xl border p-2"
+                  style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+                  onPress={async () => {
+                    await setTodoProjectGoal(t.id, { goalId });
+                    await reloadLinks();
+                  }}
+                >
+                  <MaterialIcons name="add" size={18} color={tokens.iconMuted} />
+                  <Text
+                    className="flex-1 text-sm"
+                    style={{ color: tokens.textMuted }}
+                    numberOfLines={1}
+                  >
+                    {t.title}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
-          ))}
-          {candidateTodos.map((t) => (
-            <Pressable
-              key={t.id}
-              accessibilityRole="button"
-              className="mb-2 flex-row items-center gap-2 rounded-xl border p-2"
-              style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-              onPress={async () => {
-                await setTodoProjectGoal(t.id, { goalId });
-                await reloadLinks();
-              }}
-            >
-              <MaterialIcons name="add" size={18} color={tokens.iconMuted} />
-              <Text
-                className="flex-1 text-sm"
-                style={{ color: tokens.textMuted }}
-                numberOfLines={1}
-              >
-                {t.title}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+          ) : null}
+        </>
       ) : null}
 
       {!isCreate && goalId ? (
-        <Button label="Delete Goal" variant="danger" onPress={handleDelete} disabled={saving} />
+        <>
+          {deleteError ? (
+            <Text className="text-sm" style={{ color: tokens.dangerText }}>
+              {deleteError}
+            </Text>
+          ) : null}
+          <Button label="Delete Goal" variant="danger" onPress={handleDelete} disabled={saving} />
+        </>
       ) : null}
     </View>
   );

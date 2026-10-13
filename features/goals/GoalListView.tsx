@@ -5,6 +5,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { IconButton } from '@/core/ui/IconButton';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { SECTION_COLORS } from '@/constants/sectionColors';
+import { PlanningSummaryRow } from '@/features/planning-hub/PlanningSummaryRow';
 import { listGoals } from '@/features/goals/goals.data';
 import { listProjects } from '@/features/projects/projects.data';
 import {
@@ -56,6 +57,7 @@ export function GoalListView({ onOpenGoal }: GoalListViewProps) {
   const [statusFilter, setStatusFilter] = useState<GoalStatusFilter>('all');
   const [horizonFilter, setHorizonFilter] = useState<GoalHorizonFilter>('all');
   const [sortKey, setSortKey] = useState<GoalSortKey>('created');
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -101,80 +103,112 @@ export function GoalListView({ onOpenGoal }: GoalListViewProps) {
 
       {!isLoading && rows.length > 0 ? (
         <View className="gap-2">
-          <View className="flex-row flex-wrap gap-2">
-            {STATUS_FILTERS.map((f) => (
-              <Pressable
-                key={f.key}
-                accessibilityRole="button"
-                accessibilityLabel={`Filter goals by ${f.label} status`}
-                className="rounded-full border px-3 py-1.5"
-                style={
-                  statusFilter === f.key
-                    ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
-                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
-                }
-                onPress={() => setStatusFilter(f.key)}
-              >
-                <Text
-                  className="text-xs"
-                  style={{ color: statusFilter === f.key ? tokens.textOnAccent : tokens.textMuted }}
-                >
-                  {f.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <View className="flex-row flex-wrap gap-2">
-            {HORIZON_FILTERS.map((f) => (
-              <Pressable
-                key={f.key}
-                accessibilityRole="button"
-                accessibilityLabel={`Filter goals by ${f.label} horizon`}
-                className="rounded-full border px-3 py-1.5"
-                style={
-                  horizonFilter === f.key
-                    ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
-                    : { borderColor: tokens.border }
-                }
-                onPress={() => setHorizonFilter(f.key)}
-              >
-                <Text
-                  className="text-xs"
-                  style={{
-                    color: horizonFilter === f.key ? tokens.textOnAccent : tokens.textMuted,
-                  }}
-                >
-                  {f.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <View className="flex-row flex-wrap items-center gap-x-2 gap-y-2">
-            <Text className="text-xs" style={{ color: tokens.textMuted }}>
-              Sort
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Goals filters and sort"
+            accessibilityState={{ expanded: showFilters }}
+            aria-expanded={showFilters}
+            className="min-h-11 self-start justify-center rounded-xl border px-3"
+            style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+            onPress={() => setShowFilters((open) => !open)}
+          >
+            <Text className="text-sm" style={{ color: tokens.text }}>
+              Filters & sort
+              {statusFilter !== 'all' || horizonFilter !== 'all' || sortKey !== 'created'
+                ? ' · Active'
+                : ''}{' '}
+              {showFilters ? '−' : '+'}
             </Text>
-            {SORT_OPTIONS.map((o) => (
-              <Pressable
-                key={o.key}
-                accessibilityRole="button"
-                accessibilityLabel={`Sort goals by ${o.label}`}
-                className="rounded-full border px-3 py-1.5"
-                style={
-                  sortKey === o.key
-                    ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
-                    : { borderColor: tokens.border }
-                }
-                onPress={() => setSortKey(o.key)}
-              >
-                <Text
-                  className="text-xs"
-                  style={{ color: sortKey === o.key ? tokens.textOnAccent : tokens.textMuted }}
-                >
-                  {o.label}
+          </Pressable>
+          {showFilters ? (
+            <View className="gap-2">
+              <View className="flex-row flex-wrap gap-2">
+                {STATUS_FILTERS.map((f) => (
+                  <Pressable
+                    key={f.key}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Filter goals by ${f.label} status`}
+                    className="rounded-full border px-3 py-1.5"
+                    style={
+                      statusFilter === f.key
+                        ? {
+                            backgroundColor: SECTION_COLORS.todos,
+                            borderColor: SECTION_COLORS.todos,
+                          }
+                        : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
+                    }
+                    onPress={() => setStatusFilter(f.key)}
+                  >
+                    <Text
+                      className="text-xs"
+                      style={{
+                        color: statusFilter === f.key ? tokens.textOnAccent : tokens.textMuted,
+                      }}
+                    >
+                      {f.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View className="flex-row flex-wrap gap-2">
+                {HORIZON_FILTERS.map((f) => (
+                  <Pressable
+                    key={f.key}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Filter goals by ${f.label} horizon`}
+                    className="rounded-full border px-3 py-1.5"
+                    style={
+                      horizonFilter === f.key
+                        ? {
+                            backgroundColor: SECTION_COLORS.todos,
+                            borderColor: SECTION_COLORS.todos,
+                          }
+                        : { borderColor: tokens.border }
+                    }
+                    onPress={() => setHorizonFilter(f.key)}
+                  >
+                    <Text
+                      className="text-xs"
+                      style={{
+                        color: horizonFilter === f.key ? tokens.textOnAccent : tokens.textMuted,
+                      }}
+                    >
+                      {f.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View className="flex-row flex-wrap items-center gap-x-2 gap-y-2">
+                <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                  Sort
                 </Text>
-              </Pressable>
-            ))}
-          </View>
+                {SORT_OPTIONS.map((o) => (
+                  <Pressable
+                    key={o.key}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Sort goals by ${o.label}`}
+                    className="rounded-full border px-3 py-1.5"
+                    style={
+                      sortKey === o.key
+                        ? {
+                            backgroundColor: SECTION_COLORS.todos,
+                            borderColor: SECTION_COLORS.todos,
+                          }
+                        : { borderColor: tokens.border }
+                    }
+                    onPress={() => setSortKey(o.key)}
+                  >
+                    <Text
+                      className="text-xs"
+                      style={{ color: sortKey === o.key ? tokens.textOnAccent : tokens.textMuted }}
+                    >
+                      {o.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -192,35 +226,17 @@ export function GoalListView({ onOpenGoal }: GoalListViewProps) {
         />
       ) : (
         visible.map(({ goal, projectName }) => (
-          <Pressable
+          <PlanningSummaryRow
             key={goal.id}
-            accessibilityRole="button"
+            title={goal.title}
+            status={GOAL_STATUS_LABELS[goal.status]}
+            context={[GOAL_HORIZON_LABELS[goal.horizon], projectName].filter(Boolean).join(' · ')}
+            targetDate={goal.target_date}
+            progressPercent={goal.progress_percent}
+            accentColor={SECTION_COLORS.todos}
             accessibilityLabel={`${goal.title}, ${GOAL_STATUS_LABELS[goal.status]}, ${goal.progress_percent} percent`}
-            className="flex-row items-center gap-3 rounded-2xl border p-3"
-            style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
             onPress={() => onOpenGoal(goal.id)}
-          >
-            <View
-              className="h-10 w-10 items-center justify-center rounded-xl"
-              style={{ backgroundColor: `${SECTION_COLORS.todos}22` }}
-            >
-              <Text style={{ fontSize: 18 }}>•</Text>
-            </View>
-            <View className="min-w-0 flex-1">
-              <Text
-                className="text-base font-semibold"
-                style={{ color: tokens.text }}
-                numberOfLines={1}
-              >
-                {goal.title}
-              </Text>
-              <Text className="text-sm" style={{ color: tokens.textMuted }} numberOfLines={1}>
-                {GOAL_STATUS_LABELS[goal.status]} · {GOAL_HORIZON_LABELS[goal.horizon]} ·{' '}
-                {goal.progress_percent}%{projectName ? ` · ${projectName}` : ''}
-              </Text>
-            </View>
-            <Text style={{ fontSize: 18 }}>•</Text>
-          </Pressable>
+          />
         ))
       )}
     </View>

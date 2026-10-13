@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { useAppTheme } from '@/core/providers/themeContext';
+import { Text } from '@/core/ui/Text';
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { SECTION_COLORS } from '@/constants/sectionColors';
@@ -35,6 +37,8 @@ const TABS: { key: PlanningHubView; label: string }[] = [
 
 export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
   const { openWeeklyReview } = useAppNavigation();
+  const { tokens } = useAppTheme();
+  const [showBriefing, setShowBriefing] = useState(false);
   const [view, setView] = useState<PlanningHubView>(initialView);
   const [detail, setDetail] = useState<Detail>(null);
   // Bumped after a guided-flow save so the briefing and the full editor
@@ -71,7 +75,22 @@ export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
         ) : view === 'today' ? (
           <View className="gap-3">
             <GuidedPlanningFlow onPlanSaved={() => setTodayVersion((v) => v + 1)} />
-            <TodayBriefingView key={`briefing-${todayVersion}-${dayGeneration}`} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Planning briefing"
+              accessibilityState={{ expanded: showBriefing }}
+              aria-expanded={showBriefing}
+              className="min-h-11 self-start justify-center rounded-xl border px-3"
+              style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+              onPress={() => setShowBriefing((open) => !open)}
+            >
+              <Text className="text-sm" style={{ color: tokens.text }}>
+                Today&apos;s briefing {showBriefing ? '−' : '+'}
+              </Text>
+            </Pressable>
+            {showBriefing ? (
+              <TodayBriefingView key={`briefing-${todayVersion}-${dayGeneration}`} />
+            ) : null}
             <DailyPlanView key={`plan-${todayVersion}-${dayGeneration}`} />
           </View>
         ) : view === 'projects' ? (

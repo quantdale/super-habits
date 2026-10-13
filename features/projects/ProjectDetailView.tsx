@@ -54,6 +54,10 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
   const [targetDate, setTargetDate] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [showRelatedWork, setShowRelatedWork] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [linkedTodos, setLinkedTodos] = useState<{ id: string; title: string }[]>([]);
   const [linkedHabits, setLinkedHabits] = useState<{ id: string; name: string }[]>([]);
@@ -156,8 +160,12 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
 
   const handleDelete = useCallback(async () => {
     if (isCreate || !projectId) return;
-    await softDeleteProject(projectId);
-    onBack();
+    try {
+      await softDeleteProject(projectId);
+      onBack();
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'Could not delete project.');
+    }
   }, [isCreate, projectId, onBack]);
 
   return (
@@ -177,63 +185,84 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
         placeholder="Project name"
         accessibilityLabel={`Project name, up to ${PROJECT_NAME_MAX} chars`}
       />
-      <TextField
-        label="Description"
-        value={description}
-        onChangeText={setDescription}
-        placeholder="Optional"
-        accessibilityLabel={`Project description, up to ${PROJECT_DESCRIPTION_MAX} chars`}
-      />
-      <TextField
-        label="Target date (YYYY-MM-DD)"
-        value={targetDate}
-        onChangeText={setTargetDate}
-        placeholder="Optional"
-      />
+      {!isCreate && projectId ? (
+        <ProjectProgressPanel rollup={rollup} targetDate={targetDate || null} />
+      ) : null}
 
-      <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
-        Color
-      </Text>
-      <View className="flex-row flex-wrap gap-2">
-        {PROJECT_COLORS.map((c) => (
-          <Pressable
-            key={c}
-            accessibilityRole="button"
-            accessibilityLabel={`Color ${c}`}
-            className="h-9 w-9 rounded-full"
-            style={{
-              backgroundColor: c,
-              borderWidth: color === c ? 3 : 0,
-              borderColor: tokens.text,
-            }}
-            onPress={() => setColor(c)}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Project more options"
+        accessibilityState={{ expanded: showMoreOptions }}
+        aria-expanded={showMoreOptions}
+        className="min-h-11 self-start justify-center rounded-xl border px-3"
+        style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+        onPress={() => setShowMoreOptions((open) => !open)}
+      >
+        <Text className="text-sm" style={{ color: tokens.text }}>
+          {showMoreOptions ? 'Hide project options' : 'More options'}
+        </Text>
+      </Pressable>
+      {showMoreOptions ? (
+        <View className="gap-3">
+          <TextField
+            label="Description"
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Optional"
+            accessibilityLabel={`Project description, up to ${PROJECT_DESCRIPTION_MAX} chars`}
           />
-        ))}
-      </View>
+          <TextField
+            label="Target date (YYYY-MM-DD)"
+            value={targetDate}
+            onChangeText={setTargetDate}
+            placeholder="Optional"
+          />
 
-      <Text className="mb-1.5 mt-2 text-sm font-medium" style={{ color: tokens.textMuted }}>
-        Status
-      </Text>
-      <View className="flex-row flex-wrap gap-2">
-        {PROJECT_STATUS_VALUES.map((s) => (
-          <Pressable
-            key={s}
-            accessibilityRole="button"
-            accessibilityLabel={PROJECT_STATUS_LABELS[s]}
-            className="rounded-full border px-4 py-2"
-            style={
-              status === s
-                ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
-                : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
-            }
-            onPress={() => setStatus(s)}
-          >
-            <Text style={{ color: status === s ? tokens.textOnAccent : tokens.textMuted }}>
-              {PROJECT_STATUS_LABELS[s]}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+          <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
+            Color
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {PROJECT_COLORS.map((c) => (
+              <Pressable
+                key={c}
+                accessibilityRole="button"
+                accessibilityLabel={`Color ${c}`}
+                className="h-9 w-9 rounded-full"
+                style={{
+                  backgroundColor: c,
+                  borderWidth: color === c ? 3 : 0,
+                  borderColor: tokens.text,
+                }}
+                onPress={() => setColor(c)}
+              />
+            ))}
+          </View>
+
+          <Text className="mb-1.5 mt-2 text-sm font-medium" style={{ color: tokens.textMuted }}>
+            Status
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {PROJECT_STATUS_VALUES.map((s) => (
+              <Pressable
+                key={s}
+                accessibilityRole="button"
+                accessibilityLabel={PROJECT_STATUS_LABELS[s]}
+                className="rounded-full border px-4 py-2"
+                style={
+                  status === s
+                    ? { backgroundColor: SECTION_COLORS.todos, borderColor: SECTION_COLORS.todos }
+                    : { borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }
+                }
+                onPress={() => setStatus(s)}
+              >
+                <Text style={{ color: status === s ? tokens.textOnAccent : tokens.textMuted }}>
+                  {PROJECT_STATUS_LABELS[s]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       {error ? (
         <Text className="text-sm" style={{ color: tokens.dangerSolid }}>
@@ -249,19 +278,26 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
       />
 
       {!isCreate && projectId ? (
-        <ProjectProgressPanel rollup={rollup} targetDate={targetDate || null} />
-      ) : null}
-
-      {!isCreate && projectId ? (
         <ProjectLifecycleActions
           status={status}
           onStatusChange={async (next) => {
-            setStatus(next);
-            await updateProject(projectId, { status: next });
-            const refreshed = await getProject(projectId);
-            if (refreshed) setStatus(refreshed.status);
+            // Persist first: a rejected transition must never leave an
+            // optimistic status on screen.
+            try {
+              setStatusError(null);
+              await updateProject(projectId, { status: next });
+              const refreshed = await getProject(projectId);
+              if (refreshed) setStatus(refreshed.status);
+            } catch (e) {
+              setStatusError(e instanceof Error ? e.message : 'Could not update project status.');
+            }
           }}
         />
+      ) : null}
+      {statusError ? (
+        <Text className="text-sm" style={{ color: tokens.dangerText }}>
+          {statusError}
+        </Text>
       ) : null}
 
       {!isCreate && projectId ? (
@@ -277,31 +313,63 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
       ) : null}
 
       {!isCreate && projectId ? (
-        <AssociationSection
-          title="Linked Habits"
-          linked={linkedHabits}
-          candidates={candidateHabits}
-          labelOf={(i) => i.name ?? ''}
-          onLink={(id) => setHabitProjectGoal(id, { projectId })}
-          onUnlink={(id) => setHabitProjectGoal(id, { projectId: null })}
-          onChanged={reloadLinks}
-        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Manage project associations"
+          accessibilityState={{ expanded: showRelatedWork }}
+          aria-expanded={showRelatedWork}
+          className="min-h-11 self-start justify-center rounded-xl border px-3"
+          style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+          onPress={() => setShowRelatedWork((open) => !open)}
+        >
+          <Text className="text-sm" style={{ color: tokens.text }}>
+            Related habits & goals ({linkedHabits.length + linkedGoals.length}){' '}
+            {showRelatedWork ? '−' : '+'}
+          </Text>
+        </Pressable>
+      ) : null}
+      {showRelatedWork ? (
+        <>
+          {!isCreate && projectId ? (
+            <AssociationSection
+              title="Linked Habits"
+              linked={linkedHabits}
+              candidates={candidateHabits}
+              labelOf={(i) => i.name ?? ''}
+              onLink={(id) => setHabitProjectGoal(id, { projectId })}
+              onUnlink={(id) => setHabitProjectGoal(id, { projectId: null })}
+              onChanged={reloadLinks}
+            />
+          ) : null}
+
+          {!isCreate && projectId ? (
+            <AssociationSection
+              title="Linked Goals"
+              linked={linkedGoals}
+              candidates={candidateGoals}
+              labelOf={(i) => i.title ?? ''}
+              onLink={(id) => updateGoal(id, { projectId })}
+              onUnlink={(id) => updateGoal(id, { projectId: null })}
+              onChanged={reloadLinks}
+            />
+          ) : null}
+        </>
       ) : null}
 
       {!isCreate && projectId ? (
-        <AssociationSection
-          title="Linked Goals"
-          linked={linkedGoals}
-          candidates={candidateGoals}
-          labelOf={(i) => i.title ?? ''}
-          onLink={(id) => updateGoal(id, { projectId })}
-          onUnlink={(id) => updateGoal(id, { projectId: null })}
-          onChanged={reloadLinks}
-        />
-      ) : null}
-
-      {!isCreate && projectId ? (
-        <Button label="Delete Project" variant="danger" onPress={handleDelete} disabled={saving} />
+        <>
+          {deleteError ? (
+            <Text className="text-sm" style={{ color: tokens.dangerText }}>
+              {deleteError}
+            </Text>
+          ) : null}
+          <Button
+            label="Delete Project"
+            variant="danger"
+            onPress={handleDelete}
+            disabled={saving}
+          />
+        </>
       ) : null}
     </View>
   );
