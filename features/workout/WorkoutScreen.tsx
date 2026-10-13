@@ -232,6 +232,10 @@ function WeekStripRow({
             color: cell.state === 'workout' ? tokens.text : tokens.textMuted,
             flexShrink: 1,
           }}
+          // W16: the day and its assignment are separate visual nodes, so
+          // assistive tech (and the native flows) had no way to relate the two.
+          // Naming the pair fixes that and makes the weekly plan assertable.
+          accessibilityLabel={`${weekdayLabel(cell.weekday)}: ${assignment}`}
           numberOfLines={2}
         >
           {assignment}

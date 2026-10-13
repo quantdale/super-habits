@@ -222,12 +222,23 @@ tags:
 - pressKey: enter
 - assertVisible: 'Target load'
 - pressKey: BACK
+# The weekly-plan section label is 'This week' (the uppercase rendering is a
+# CSS transform, not the text node), and Maestro matches the full text.
 - scrollUntilVisible:
-    element: 'Week'
+    element: 'This week'
     direction: UP
     visibilityPercentage: 50
-- assertVisible: 'Week'
-- tapOn: 'Monday Native Gym V2 typed routine'
+- assertVisible: 'This week'
+# Assigning a routine to a weekday goes through the day's assign sheet: the
+# cell opens it and the routine is one of its chips. (The previous flow tapped
+# a combined 'Monday <routine>' label that no longer exists.)
+- tapOn: 'Monday assign routine'
+- extendedWaitUntil:
+    visible: 'Assign Monday in your recurring weekly plan.'
+    timeout: 10000
+- tapOn: 'Native Gym V2 typed routine'
+- assertVisible: 'Monday: Native Gym V2 typed routine'
+- tapOn: 'Close'
 - killApp
 - launchApp
 - extendedWaitUntil:
@@ -241,7 +252,7 @@ tags:
     # "Workout" and an unscoped index-0 match can land on inert content.
     childOf:
       text: 'Section tabs'
-- assertVisible: 'Monday Native Gym V2 typed routine'
+- assertVisible: 'Monday: Native Gym V2 typed routine'
 - scrollUntilVisible:
     element: 'Your routines'
     direction: DOWN
