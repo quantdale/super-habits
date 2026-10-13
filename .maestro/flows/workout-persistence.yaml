@@ -50,9 +50,11 @@ tags:
 - waitForAnimationToEnd:
     timeout: 3000
 - tapOn: 'Add routine'
+# The new routine is prepended to the routines list, which sits ABOVE the
+# 'New routine' form, so the row is reached by scrolling UP.
 - scrollUntilVisible:
     element: 'Open Native strength routine routine'
-    direction: DOWN
+    direction: UP
     centerElement: true
 - waitForAnimationToEnd:
     timeout: 3000

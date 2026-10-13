@@ -49,14 +49,16 @@ tags:
 - extendedWaitUntil:
     visible: 'Native disable reminder'
     timeout: 5000
-- scrollUntilVisible:
-    element: 'Reminder 18:00'
-    direction: DOWN
-- assertVisible: 'Reminder 18:00'
+# The list row shows the reminder only on a scheduled weekday; the detail modal
+# renders it for any date, so that is the durable oracle here.
 - scrollUntilVisible:
     element: 'Open Native disable reminder details'
     direction: UP
 - tapOn: 'Open Native disable reminder details'
+- extendedWaitUntil:
+    visible: 'Schedule & reminder'
+    timeout: 10000
+- assertVisible: 'Reminder 18:00'
 - tapOn: 'Settings'
 - scrollUntilVisible:
     element: 'Edit habit'
@@ -80,7 +82,12 @@ tags:
 - extendedWaitUntil:
     visible: 'Native disable reminder'
     timeout: 5000
+- tapOn: 'Open Native disable reminder details'
+- extendedWaitUntil:
+    visible: 'Schedule & reminder'
+    timeout: 10000
 - assertNotVisible: 'Reminder 18:00'
+- tapOn: 'Close'
 - killApp
 - launchApp
 - extendedWaitUntil:
@@ -99,4 +106,9 @@ tags:
 - extendedWaitUntil:
     visible: 'Native disable reminder'
     timeout: 15000
+- tapOn: 'Open Native disable reminder details'
+- extendedWaitUntil:
+    visible: 'Schedule & reminder'
+    timeout: 10000
 - assertNotVisible: 'Reminder 18:00'
+- tapOn: 'Close'

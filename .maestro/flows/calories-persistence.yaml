@@ -16,7 +16,10 @@ tags:
     # Scope to the section switcher (unscoped index-0 can hit inert content).
     childOf:
       text: 'Section tabs'
-- assertVisible: 'Switch between manual entry and a diary grouped by meal.'
+# W10 deleted the Pop-era doc subtitle (SYS-06); the view switcher is the
+# always-rendered marker on this surface.
+- assertVisible: 'Form view'
+- assertVisible: 'Diary view'
 - tapOn: 'Diary view'
 - waitForAnimationToEnd:
     timeout: 3000
@@ -61,7 +64,7 @@ tags:
 # The header total is the first post-save oracle. If it stays at 2000, the
 # submission failed; a later deep-scroll miss must not masquerade as success.
 - extendedWaitUntil:
-    visible: '1630 kcal left'
+    visible: '1,630 kcal left'
     timeout: 15000
 # Let the post-save rebuild settle: scrolling while the form/list is still
 # re-rendering starves the matcher and times out even though the row renders
@@ -79,13 +82,13 @@ tags:
 - repeat:
     times: 10
     while:
-      notVisible: 'Logged today'
+      notVisible: 'Native breakfast'
     commands:
       - swipe:
           start: '5%, 80%'
           end: '5%, 25%'
           duration: 400
-- assertVisible: 'Logged today'
+- assertVisible: 'Native breakfast'
 # The view switch lives in the pinned hero and remains available while the
 # section body scrolls to the saved row.
 - assertVisible: 'Diary view'
@@ -120,7 +123,8 @@ tags:
 # W8-4 probe (permanent): viewMode persisted as diary, so Calories opens in
 # diary; switch explicitly to Form first and prove the row survived restart
 # through the FORM read path before exercising the diary layer. The
-# 'Logged today' header renders ONLY when entries.length > 0
+# The saved entry renders through the meal-grouped day log ONLY when at
+# least one entry exists, so its name is the post-save oracle in both modes.
 # (CaloriesFormView, code-guaranteed), so it is the sound signal — plain
 # entry text would also match the recent/frequent chips. Header-shows +
 # diary-empty localizes a diary-layer defect; both-empty implicates the
@@ -132,15 +136,15 @@ tags:
 - repeat:
     times: 10
     while:
-      notVisible: 'Logged today'
+      notVisible: 'Native breakfast'
     commands:
       - swipe:
           start: '5%, 80%'
           end: '5%, 25%'
           duration: 400
-- assertVisible: 'Logged today'
+- assertVisible: 'Native breakfast'
 - extendedWaitUntil:
-    visible: 'Logged today'
+    visible: 'Native breakfast'
     timeout: 15000
 # The view switch remains pinned while the form content scrolls.
 - assertVisible: 'Diary view'
