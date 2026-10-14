@@ -52,6 +52,13 @@ tags:
     direction: DOWN
     timeout: 10000
 - assertVisible: 'This file contains your Super Habits data. Store it somewhere you trust. The exported file is not encrypted — anyone with the file can read its contents.'
+# Export sits just below the disclosure paragraph but its visibility depends on
+# where the paragraph scroll landed — assert it only after bringing it into
+# view (same convention as Import data below; the assertion itself is kept).
+- scrollUntilVisible:
+    element: 'Export data'
+    direction: DOWN
+    timeout: 20000
 - assertVisible: 'Export data'
 # Import sits below the fold on this viewport; scroll to it rather than
 # asserting off-screen content.
