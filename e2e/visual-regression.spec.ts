@@ -58,6 +58,13 @@ const APP_FONT_FAMILIES = [
 ] as const;
 
 /**
+ * How long the cross-fade settle may wait before readiness fails closed.
+ * Bounded on purpose: long enough for the measured 200ms fade (completion
+ * ~260ms) plus layout slack, short enough to fail fast on a stuck section.
+ */
+const SETTLE_TIMEOUT_MS = 4000;
+
+/**
  * Settle after the semantic assertion. This is not a readiness substitute: the
  * assertion above it already proves the content is present.
  *
@@ -76,32 +83,104 @@ const APP_FONT_FAMILIES = [
  *    `unloaded`, so Chromium lazily loads `Nunito_400Regular` on first use.
  *    Load every app family explicitly.
  * 3. **Layout pass.** A bounded settle for the final one-frame layout commit.
+ *
+ * FAIL-CLOSED contract (spec `visual-capture-readiness`): readiness is proven,
+ * not assumed. If the bounded wait ends while an inactive hidden section is
+ * still not fully transparent, or a required font face rejects its load,
+ * `settle()` throws a named diagnostic and the capture never reaches
+ * `toHaveScreenshot`. A non-finite computed opacity counts as UNMET — it is a
+ * readiness failure, not a pass. The negative controls in the "capture
+ * readiness self-checks" describe block pin these branches.
  */
 async function settle(page: Page): Promise<void> {
-  await page.evaluate(async (families) => {
-    await Promise.all(
-      families.map((family) => document.fonts.load(`16px ${family}`).catch(() => undefined)),
-    );
-    await document.fonts.ready;
+  const diagnostics = await page.evaluate(
+    async ({ families, timeoutMs }: { families: readonly string[]; timeoutMs: number }) => {
+      const fontFailures: string[] = [];
+      await Promise.all(
+        families.map(async (family) => {
+          try {
+            await document.fonts.load(`16px ${family}`);
+          } catch (error) {
+            fontFailures.push(
+              `${family} (${error instanceof Error ? error.message : String(error)})`,
+            );
+          }
+        }),
+      );
+      // A rejected required face is a capture failure. Never swallow it and
+      // never continue toward a screenshot after it (spec
+      // `visual-capture-readiness`, "A failed required font load fails the
+      // capture").
+      if (fontFailures.length > 0) {
+        return { fontFailures, unmetSections: [] as string[] };
+      }
+      await document.fonts.ready;
 
-    // Wait for the section cross-fade to finish: every section container except
-    // the visible one must be fully transparent, otherwise it shows through.
-    const settled = () => {
-      const nodes = Array.from(
-        document.querySelectorAll<HTMLElement>('[aria-hidden="true"]'),
-      ).filter((el) => el.hasAttribute('inert'));
-      return nodes.every((el) => {
-        const opacity = Number.parseFloat(getComputedStyle(el).opacity || '0');
-        return !Number.isFinite(opacity) || opacity <= 0.001;
-      });
-    };
-    const deadline = Date.now() + 4000;
-    while (Date.now() < deadline && !settled()) {
-      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
-    }
-    await document.fonts.ready;
-  }, APP_FONT_FAMILIES);
+      const describeSection = (el: HTMLElement): string => {
+        const opacity = Number.parseFloat(getComputedStyle(el).opacity);
+        const id = el.id ? `#${el.id}` : '';
+        const classes =
+          typeof el.className === 'string' && el.className.trim().length > 0
+            ? `.${el.className.trim().split(/\s+/).slice(0, 3).join('.')}`
+            : '';
+        return `${el.tagName}${id}${classes} opacity=${Number.isFinite(opacity) ? opacity : 'non-finite'}`;
+      };
+
+      // Inactive sections hidden from assistive technology must be fully
+      // transparent before a golden comparison. A non-finite computed opacity is
+      // UNMET (fail closed), not a pass.
+      const unmetSections = () =>
+        Array.from(document.querySelectorAll<HTMLElement>('[aria-hidden="true"]')).filter((el) => {
+          if (!el.hasAttribute('inert')) return false;
+          const opacity = Number.parseFloat(getComputedStyle(el).opacity);
+          return !(Number.isFinite(opacity) && opacity <= 0.001);
+        });
+
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline && unmetSections().length > 0) {
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      }
+      await document.fonts.ready;
+      return {
+        fontFailures,
+        unmetSections: unmetSections().map(describeSection),
+      };
+    },
+    { families: APP_FONT_FAMILIES, timeoutMs: SETTLE_TIMEOUT_MS },
+  );
+
+  if (diagnostics.fontFailures.length > 0) {
+    throw new Error(
+      `visual settle: required font load failed — ${diagnostics.fontFailures.join('; ')}. ` +
+        'Capture refused before toHaveScreenshot.',
+    );
+  }
+  if (diagnostics.unmetSections.length > 0) {
+    throw new Error(
+      `visual settle: section readiness unmet after ${SETTLE_TIMEOUT_MS}ms — ` +
+        `${diagnostics.unmetSections.length} inactive hidden section(s) still not fully transparent: ` +
+        `${diagnostics.unmetSections.join('; ')}. Capture refused before toHaveScreenshot.`,
+    );
+  }
   await page.waitForTimeout(80);
+}
+
+/**
+ * Capture-time normalization shared by `capture()` and the strict-comparison
+ * self-check: reset every scrollable element, let the scroll land, then settle.
+ */
+async function prepareCapture(page: Page, scrollTop = 0): Promise<void> {
+  await page.evaluate((y) => {
+    const scrollables = Array.from(document.querySelectorAll<HTMLElement>('*')).filter((el) => {
+      const style = getComputedStyle(el);
+      return /(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 1;
+    });
+    for (const el of scrollables) el.scrollTop = y;
+    // Also normalize the window in case a layout uses document scrolling.
+    window.scrollTo(0, y);
+  }, scrollTop);
+  await page.waitForTimeout(100);
+  await settle(page);
 }
 
 async function capture(page: Page, name: string, opts: { scrollTop?: number } = {}): Promise<void> {
@@ -114,17 +193,7 @@ async function capture(page: Page, name: string, opts: { scrollTop?: number } = 
   // `overflow: auto` div; `window.scrollTo` is a no-op on it. Reset every
   // scrollable element in the document to the requested offset instead, so the
   // whole rendered tree is captured from a known position.
-  await page.evaluate((y) => {
-    const scrollables = Array.from(document.querySelectorAll<HTMLElement>('*')).filter((el) => {
-      const style = getComputedStyle(el);
-      return /(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight + 1;
-    });
-    for (const el of scrollables) el.scrollTop = y;
-    // Also normalize the window in case a layout uses document scrolling.
-    window.scrollTo(0, y);
-  }, opts.scrollTop ?? 0);
-  await page.waitForTimeout(100);
-  await settle(page);
+  await prepareCapture(page, opts.scrollTop ?? 0);
   await expect(page).toHaveScreenshot(`${name}.png`, {
     animations: 'disabled',
     caret: 'hide',
@@ -492,5 +561,137 @@ test.describe('W15 planning hub', () => {
     await projectsTab.click();
     await expect(projectsTab).toHaveAttribute('aria-selected', 'true');
     await capture(page, 'plan-hub-projects-768-light');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Capture readiness self-checks (negative controls, spec
+// `visual-capture-readiness`)
+//
+// These tests never create or compare a golden except the strict-comparison
+// control, which compares against an already-committed golden and refuses to
+// run under `--update-snapshots`. Each control stubs a readiness failure in
+// the page (via page.evaluate) and requires the capture path to FAIL with a
+// named diagnostic instead of silently comparing a screenshot. They pin the
+// fail-closed branches of `settle()`: a stuck opaque inactive hidden section,
+// a non-finite computed opacity, and a rejected required font face.
+// ---------------------------------------------------------------------------
+
+/**
+ * Run `settle()` and require it to fail with a diagnostic matching `diagnostic`.
+ * The capture contract is fail-closed: an unmet readiness condition must throw
+ * a named error BEFORE `toHaveScreenshot`, never resolve silently.
+ */
+async function expectSettleFailure(page: Page, diagnostic: RegExp): Promise<void> {
+  let failure: string | null = null;
+  try {
+    await settle(page);
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error);
+  }
+  if (failure === null) {
+    throw new Error('settle() unexpectedly succeeded — readiness must fail closed here');
+  }
+  expect(failure).toMatch(diagnostic);
+}
+
+test.describe('W15 capture readiness self-checks', () => {
+  test('an inactive hidden section stuck opaque fails the capture with a named readiness diagnostic', async ({
+    page,
+  }) => {
+    await openWithFixture(page, PHONE, null);
+    // A stubbed inactive hidden section that never fades: through the whole
+    // bounded settle wait it must keep the capture from comparing a golden.
+    await page.evaluate(() => {
+      const probe = document.createElement('div');
+      probe.className = 'readiness-probe-stuck';
+      probe.setAttribute('aria-hidden', 'true');
+      probe.setAttribute('inert', '');
+      probe.style.opacity = '1';
+      document.body.appendChild(probe);
+    });
+    await expectSettleFailure(page, /section readiness unmet[\s\S]*readiness-probe-stuck/);
+  });
+
+  test('a non-finite computed opacity is unmet readiness, not a pass', async ({ page }) => {
+    await openWithFixture(page, PHONE, null);
+    // Same stuck section, but its computed opacity reads as non-finite. The
+    // old helper treated non-finite as settled; readiness must fail closed.
+    await page.evaluate(() => {
+      const probe = document.createElement('div');
+      probe.className = 'readiness-probe-nonfinite';
+      probe.setAttribute('aria-hidden', 'true');
+      probe.setAttribute('inert', '');
+      document.body.appendChild(probe);
+      const originalGetComputedStyle = window.getComputedStyle.bind(window);
+      (
+        window as unknown as { getComputedStyle: typeof originalGetComputedStyle }
+      ).getComputedStyle = (element, pseudoElt) => {
+        const style = originalGetComputedStyle(element, pseudoElt);
+        if (element !== probe) return style;
+        return new Proxy(style, {
+          get: (target, property) =>
+            property === 'opacity' ? 'not-a-number' : Reflect.get(target, property),
+        });
+      };
+    });
+    await expectSettleFailure(page, /section readiness unmet[\s\S]*non-finite/);
+  });
+
+  test('a rejected required font load fails the capture naming the family', async ({ page }) => {
+    await openWithFixture(page, PHONE, null);
+    // Reject one required app family's explicit load. The old helper swallowed
+    // the rejection and captured anyway; the family must be named instead.
+    await page.evaluate(() => {
+      const original = document.fonts.load.bind(document.fonts);
+      document.fonts.load = (font: string, text?: string): Promise<FontFace[]> =>
+        font.includes('Nunito_700Bold')
+          ? Promise.reject(new Error('probe: required face rejected'))
+          : original(font, text);
+    });
+    await expectSettleFailure(page, /required font load failed[\s\S]*Nunito_700Bold/);
+  });
+
+  test('a settled capture still compares strictly: a deliberate pixel perturbation fails', async ({
+    page,
+  }) => {
+    // This control compares against a COMMITTED golden; under
+    // `--update-snapshots` it must never run (it would rewrite the golden it
+    // is supposed to protect).
+    const updateMode = test.info().config.updateSnapshots;
+    test.skip(
+      updateMode === 'all' || updateMode === 'changed',
+      'strict-comparison control only runs in comparison mode, never in --update-snapshots mode',
+    );
+    // Mirror the `shell-today-390-light` state exactly.
+    await openWithFixture(page, PHONE, 'TYPICAL');
+    await expect(page.getByText('Good evening')).toBeVisible();
+    await expect(page.getByText('UP NEXT')).toBeVisible();
+    await prepareCapture(page);
+    const strict = {
+      animations: 'disabled' as const,
+      caret: 'hide' as const,
+      maxDiffPixels: 0,
+    };
+    // The settled, unperturbed capture matches the committed golden at zero
+    // pixel tolerance ...
+    await expect(page).toHaveScreenshot('shell-today-390-light.png', strict);
+    // ... and a deliberate pixel perturbation still fails that comparison.
+    await page.evaluate(() => {
+      const marker = document.createElement('div');
+      marker.setAttribute('data-visual-perturbation', 'strict-comparison-control');
+      marker.style.cssText =
+        'position:fixed;top:0;right:0;width:16px;height:16px;background:#ff0000;z-index:2147483647;';
+      document.body.appendChild(marker);
+    });
+    let comparisonFailure: string | null = null;
+    try {
+      await expect(page).toHaveScreenshot('shell-today-390-light.png', strict);
+    } catch (error) {
+      comparisonFailure = error instanceof Error ? error.message : String(error);
+    }
+    if (comparisonFailure === null) {
+      throw new Error('the strict golden comparison accepted a perturbed capture');
+    }
   });
 });
