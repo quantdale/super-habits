@@ -144,12 +144,13 @@ face then loaded lazily on first use, so rasterisation could race the capture.
 
 ### Verification
 
-| Measurement                          | Result                                                     |
-| ------------------------------------ | ---------------------------------------------------------- |
-| Pre-fix, focused snapshot, 10 runs   | **5 pass / 5 fail** (ratios 0.01, 0.03, 0.05)              |
-| Pre-fix, full curated suite, 3 runs  | **0 pass / 3 fail**                                        |
-| Post-fix, focused snapshot, 10 runs  | **10 pass / 0 fail**                                       |
-| Post-fix, full curated suite, 3 runs | **3 pass / 0 fail**, baseline hash unchanged (`f19261d5…`) |
+| Measurement                                                  | Result                                                     |
+| ------------------------------------------------------------ | ---------------------------------------------------------- |
+| Pre-fix, focused snapshot, 10 runs                           | **5 pass / 5 fail** (ratios 0.01, 0.03, 0.05)              |
+| Pre-fix, full curated suite, 3 runs                          | **0 pass / 3 fail**                                        |
+| Post-fix, focused snapshot, 10 runs                          | **10 pass / 0 fail**                                       |
+| Post-fix, the three previously flaky snapshots, 15 more runs | **15 pass / 0 fail**                                       |
+| Post-fix, full curated suite, 3 runs                         | **3 pass / 0 fail**, baseline hash unchanged (`f19261d5…`) |
 
 Three goldens were regenerated under the W15 review process, each inspected
 side-by-side against its predecessor:
