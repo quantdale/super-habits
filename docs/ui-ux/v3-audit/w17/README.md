@@ -57,7 +57,7 @@ second guard broken by W13's legitimate change was repaired. Both are recorded
 as `TEST_BUG` with the misclassification preserved in the register so the
 history is not rewritten.
 
-## Verification summary (source `af8eeda`)
+## Verification summary (source `1177ac2`)
 
 | Lane                                                         | Result                                          |
 | ------------------------------------------------------------ | ----------------------------------------------- |

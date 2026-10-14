@@ -2,15 +2,17 @@
 
 ## Candidate identity
 
-| Field                  | Value                                                                                             |
-| ---------------------- | ------------------------------------------------------------------------------------------------- |
-| Branch                 | `frontend-v3-w12-w17-integration`                                                                 |
-| Pre-W17 integrated SHA | `d04793bd327a385396337e3a2ef353ad96c15b86` (W16 published)                                        |
-| W17 fix SHA            | `3aaca2a` (verified ladder run)                                                                   |
-| Base                   | `1f23da4defd7fa45c679261e0db5fade1374bbd5` = `origin/main` (W11.5.1)                              |
-| Tree state             | clean for tracked files; only the preserved foreign `.tmp-ios36423379932/` is untracked by policy |
-| Wave commits           | W12 `1d54b70`, W13 `b1569f0`, W14 `c6937b5`, W15 `42d1c20`, W16 `d04793b`, W17 `3aaca2a`          |
-| Pull request           | #76 (`W12–W13` title; body extended with W13) on the campaign branch                              |
+| Field                  | Value                                                                                              |
+| ---------------------- | -------------------------------------------------------------------------------------------------- |
+| Branch                 | `frontend-v3-w12-w17-integration`                                                                  |
+| Pre-W17 integrated SHA | `d04793bd327a385396337e3a2ef353ad96c15b86` (W16 published)                                         |
+| W17 fix SHAs           | `3aaca2a` → `af8eeda` → `b9e775f` → `1177ac2` (ladder run + Codex fixes + plan closure + docs)     |
+| Base                   | `1f23da4defd7fa45c679261e0db5fade1374bbd5` = `origin/main` (W11.5.1)                               |
+| Tree state             | clean for tracked files; only the preserved foreign `.tmp-ios36423379932/` is untracked by policy  |
+| Wave commits           | W12 `1d54b70`, W13 `b1569f0`, W14 `c6937b5`, W15 `42d1c20`, W16 `d04793b`, W17 `3aaca2a`…`1177ac2` |
+| Pull request           | #76 (`W12–W13` title; body extended with W13) on the campaign branch                               |
+
+**Published:** PR #76 merged to `main` as `3f2a847`; the W15 visual-lane closure (PR #77) merged as `b80233d`; the final documentation commit is `1177ac2`. `origin/main` = `1177ac2` at handoff, working tree clean (only the preserved foreign evidence directory remains untracked by policy).
 
 ## Build and artifacts
 
