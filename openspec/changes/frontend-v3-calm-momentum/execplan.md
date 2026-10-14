@@ -756,7 +756,10 @@ npx playwright test e2e/visual-audit.spec.ts`. Inspect port owners first;
 - Documentation publication uses normal hooks, then inspect
   `gh run list --commit $(git rev-parse HEAD) --workflow CI` and exact run
   metadata/logs; compare each `headSha` with Git before relying on it, and do
-  not substitute product-head evidence for a newer HEAD.
+  not substitute product-head evidence for a newer HEAD. The historical
+  exact-main CI capture for W6.5's merge commit and final documentation head
+  still lives at `w65-main/final-ci*.json`/`final-ci*-failed.log` (unchanged
+  location).
 - Wave rendered-evidence lanes: each wave owns its opt-in audit spec
   (`e2e/workout-w95-audit.spec.ts` writes `docs/ui-ux/v3-audit/w9.5/`);
   earlier waves' captures are preserved untouched.

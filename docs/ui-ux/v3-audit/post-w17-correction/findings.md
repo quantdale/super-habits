@@ -53,9 +53,20 @@ Result: **6/6 green** at port 8081 (recorded in the evidence index). Per the
 locked disposition, no `Goal 2,400` chip was added and no product code changed.
 
 Spec `calorie-goal-settings-propagation` scenario "Over-goal days do not invent
-a goal chip" is covered by the absence of any goal-chip surface in source and
-by `e2e/calories-w10.spec.ts` over-target assertions ("over target is
-factual").
+a goal chip": the prohibition is structurally enforced — no goal-chip surface
+exists anywhere in product source (the hero renders only the remaining/over
+fact, the consumed-of-goal context, and the edit-goal control; the over-goal
+branch is `features/calories/CaloriesScreen.tsx:657`) and the W10 suite pins
+the absence (`Goal 2,000` `toHaveCount(0)` at `e2e/calories-w10.spec.ts:118`)
+plus domain unit tests — but, as the independent review found, **no gated test
+exercises an over-goal DAY**: the `calories-w10.spec.ts` "over target is
+factual" test is an under-goal day (1,300/2,000 → `700 kcal left`; "over
+target" refers to macro targets), and the over-goal title clause is exercised
+only in opt-in lanes (`e2e/calories-w10-audit.spec.ts:139,148` behind
+`VISUAL_AUDIT=1`; a loose identity regex at
+`e2e/health-nav-w10-measure.spec.ts:286` behind `D3_MEASURE=1`). Recorded as
+a coverage gap (the scenario's positive THEN is opt-in-only), not claimed as
+covered.
 
 ## H04/H05 — visual capture readiness (`settle()`)
 
@@ -294,6 +305,14 @@ claim is made.
   247-capture W14 matrix was not regenerated.
 - No schema migration (`core/db/client.ts` still ends at `if (version < 25)`),
   no backup-scope, sync, dependency, or security-policy change.
-- No assertion was weakened; no quarantine, timeout raise, `data-testid`, or
-  retry-mask was added. Failures were fixed at their root layer or classified
-  and preserved.
+- No assertion was weakened; no quarantine, `data-testid`, or retry-mask was
+  added. (Precision note: the retargeted `2,400 kcal left` assertion carries
+  `{ timeout: 15_000 }`, mirroring the identical 15s envelope of the stale
+  `Goal 2,400` assertion it replaces — not a raise relative to what it
+  supersedes.) Failures were fixed at their root layer or classified and
+  preserved.
+- Residual (accepted, documented): the host-vs-browser calendar-boundary
+  proof for H08 is one-shot — the −24h host-shift shim is recorded above but
+  not shipped, so no committed regression re-runs the shifted-host condition;
+  `qa:timezones` varies the browser timezone, not the host/browser split. The
+  browser-evaluated helper contract is the standing guard.

@@ -34,16 +34,16 @@
 - [x] 5.2 Probe weekly-review commitment-create failure and decision-update throw behavior; add a regression only where the visible result or durable rows disagree with the existing partial-failure contract — PROBED: commitment failure → named partial-failure surface + saved review row (correct); decision-update throw → honest "The review was not saved", no review row, idempotent receipts (correct). No disagreement → no regression added (per locked H12)
 - [x] 5.3 Sample keyboard focus, 44pt targets, and one narrow/dark theme path on surfaces touched by any product fix; do not regenerate the 247-capture matrix unless a shared primitive changes — NOT APPLICABLE: this change touches zero product surfaces (no files under `features/`, `core/`, `app/`, `lib/` changed; verified via `git status`)
 - [x] 5.4 Run the dependency audit and record each high finding's chain, version, and fix availability without editing the allowlist — audit re-run: 2 UNDOCUMENTED highs (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv) at latest published versions, range `*`, no upstream fix → UNREMEDIATED — exposure limited; gate left red; no allowlist/script/lockfile edits
-- [ ] 5.5 If `Nitro_API_36` is available, qualify the correction SHA with the credential-free provisioner; otherwise record `BLOCKED_EXTERNAL` and the last valid APK SHA
+- [x] 5.5 If `Nitro_API_36` is available, qualify the correction SHA with the credential-free provisioner; otherwise record `BLOCKED_EXTERNAL` and the last valid APK SHA — PROVISIONED at exact source `52a10d0` (APK `65558DFE…`, 0 remote hosts); 23/23 flows across six tags with 2 recorded FLAKY_TEST incidents + 1 TEST_BUG flow fix; iOS NOT RUN
 
 ## 6. Validation and review
 
-- [ ] 6.1 Run typecheck, lint, theme validation, OpenSpec validation, plan validation, and `npm run qa:affected` for the files actually changed
-- [ ] 6.2 Run unit and integration tests, plus timezone and the corrected journey, at the correction SHA
-- [ ] 6.3 Have a reviewer who did not write the patch try the old failure, a sibling date boundary, and a double-submit or rejected-write case for every product fix
+- [x] 6.1 Run typecheck, lint, theme validation, OpenSpec validation, plan validation, and `npm run qa:affected` for the files actually changed
+- [x] 6.2 Run unit and integration tests, plus timezone and the corrected journey, at the correction SHA — 2,700 passed / 2 skipped / 0 failed; qa:timezones 111 (5 zones); settings-ripple 6/6; P0 25/25; counts recomputed via `npx vitest list` (2,700) and `npx playwright test --list` (501 tests / 56 files)
+- [x] 6.3 Have a reviewer who did not write the patch try the old failure, a sibling date boundary, and a double-submit or rejected-write case for every product fix — independent read-only review completed (run `62fbf05c`): VERDICT blocking-findings → 1 BLOCKING (findings.md over-goal coverage misgrounding) + 4 NITs, ALL integrated (coverage claim corrected with real citations + opt-in-only gap recorded; timeout note qualified; typo fixed; H08 one-shot residual documented; parent Recovery `w65-main/final-ci*` pointer restored). Probes: old failure COVERED; date boundary COVERED one-shot (residual documented); double-submit UNTRIGGERED (zero product fixes — verified by the reviewer)
 - [ ] 6.4 Publish through a normal pull request, then record the merged `origin/main` SHA separately from the pre-merge evidence
 
 ## 7. Evidence pack
 
-- [ ] 7.1 Write `docs/ui-ux/v3-audit/post-w17-correction/` with findings, evidence index, and release convergence, using the verdict taxonomy in `specs/post-w17-correction-evidence/spec.md`
+- [x] 7.1 Write `docs/ui-ux/v3-audit/post-w17-correction/` with findings, evidence index, and release convergence, using the verdict taxonomy in `specs/post-w17-correction-evidence/spec.md` — verdict: CONDITIONAL / NEAR-COMPLETE naming the audit (FAILED, UNREMEDIATED) and iOS (NOT RUN) as the unresolved lanes
 - [ ] 7.2 Fill the ExecPlan Outcomes section only after the verdict's unresolved lanes are named, and set its next action to a no-op only if no in-scope implementation remains
