@@ -32,16 +32,46 @@ tags:
           end: '5%, 25%'
           duration: 400
 - assertVisible: 'Routine name'
-# The field is visible after the bounded search; an extra swipe hides it.
+# Maestro treats a field as visible when its bounds intersect the screen, even
+# when those bounds sit under the floating tab bar (failure at source 52a10d0:
+# New routine name bounds y=2199 on a 2400px display, tap center landed on the
+# centered capture button / nav zone, then the following center-swipe opened
+# the Plan sheet and Add routine was gone). Lift the field with an edge swipe
+# — not scrollUntilVisible, whose gesture starts at screen center — then prove
+# the characters landed in the routine field before searching for Add routine.
+- swipe:
+    start: '90%, 78%'
+    end: '90%, 52%'
+    duration: 400
 - tapOn: 'New routine name'
 - inputText: 'Native Gym V2 typed routine'
 - pressKey: enter
-- scrollUntilVisible:
-    element: 'Add routine'
-    direction: DOWN
-    # Center it: the floating tab bar overlaps bottom-edge content, so
-    # a11y "visible" can still sit under the tab bar and the tap navigates.
-    centerElement: true
+- extendedWaitUntil:
+    visible: 'Native Gym V2 typed routine'
+    timeout: 8000
+- assertNotVisible: 'Save Plan'
+# Reveal Add routine from the screen edge so the swipe cannot start on the
+# capture button or a mid-screen planning control. The short follow-up swipe
+# always runs: the repeat stops as soon as the button intersects the screen,
+# which on this form is the bottom edge under the tab bar. 16% of the height
+# lifts that edge without carrying a mid-screen button off the top.
+- repeat:
+    times: 4
+    while:
+      notVisible: 'Add routine'
+    commands:
+      - swipe:
+          start: '90%, 72%'
+          end: '90%, 42%'
+          duration: 400
+- swipe:
+    start: '90%, 68%'
+    end: '90%, 52%'
+    duration: 300
+- extendedWaitUntil:
+    visible: 'Add routine'
+    timeout: 8000
+- assertNotVisible: 'Save Plan'
 # Settle before tapping: a tap aimed from a still-settling hierarchy can land
 # on stale coordinates (documented in native-smoke).
 - waitForAnimationToEnd:
@@ -129,7 +159,8 @@ tags:
 - assertVisible: 'Custom exercise instructions'
 - tapOn: 'Custom exercise instructions'
 - inputText: 'Brace and press with a controlled descent'
-# Blur the final text field so the submit tap is not competing with the iOS keyboard.
+# Blur the final text field so the submit tap is not competing
+# with the iOS keyboard.
 - pressKey: enter
 - waitForAnimationToEnd:
     timeout: 2000
@@ -170,7 +201,8 @@ tags:
 # omitted on purpose: the comment this block replaced recorded that a centered
 # scroll already escaped to the Workout screen, and Maestro's default swipe is
 # still centred. Treat this as a hypothesis for the next exact-SHA run.
-# Evidence: openspec/changes/final-certification-closure/ios-flow-classification.md
+# Evidence: openspec/changes/final-certification-closure/
+# ios-flow-classification.md
 - scrollUntilVisible:
     element: 'Native custom press progression increment'
     direction: DOWN
@@ -204,7 +236,8 @@ tags:
 - tapOn: 'Target reps max'
 - inputText: '8'
 - pressKey: enter
-# The reps inputs sit under Maestro's center-swipe origin, so scrollUntilVisible's
+# The reps inputs sit under Maestro's center-swipe origin, so
+# scrollUntilVisible's
 # own swipes are consumed by the focused EditText and the list never moves.
 # Cross the remaining form with an explicit side-margin swipe (same class as the
 # auth-session/backup-v2 flows) before the scoped scroll.

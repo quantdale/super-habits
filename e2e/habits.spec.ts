@@ -32,6 +32,23 @@ test.describe('Habits', () => {
     await expect(page.getByText('Daily check-in')).toBeVisible({ timeout: 15_000 });
   });
 
+  test('habit editor primary action stays inside the dialog viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openAddHabitModal(page);
+    const dialog = page.getByRole('dialog');
+    const create = dialog.getByRole('button', { name: 'Create habit', exact: true });
+    await expect(create).toBeVisible();
+    const box = await create.boundingBox();
+    const viewport = page.viewportSize();
+    expect(box, 'Create habit box').not.toBeNull();
+    expect(viewport, 'viewport').not.toBeNull();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(viewport!.height);
+    // The optional linked-actions copy can sit below the fold; the save action
+    // must not. Cancel stays with it in the dialog footer.
+    await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+  });
+
   test('shows empty state when no habits exist', async ({ page }) => {
     await expect(page.getByText(/Add a habit to start today's check-in/i)).toBeVisible();
     await expect(page.getByLabel('Add habit')).toBeVisible();

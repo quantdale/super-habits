@@ -69,12 +69,13 @@ tags:
     element: 'Enable habit reminder'
     direction: DOWN
 - tapOn: 'Enable habit reminder'
-- scrollUntilVisible:
-    element: 'Save changes'
-    direction: DOWN
+# Save changes is the modal footer, not content below Linked Actions.
+# The 2026-10-14 persistence failure scrolled for 24s inside the sheet and
+# never revealed the old in-content button (visibilityPercentage 100). The
+# footer is on screen without that scroll; still require the label before tap.
 - extendedWaitUntil:
     visible: 'Save changes'
-    timeout: 20000
+    timeout: 8000
 - tapOn: 'Save changes'
 - scrollUntilVisible:
     element: 'Native disable reminder'

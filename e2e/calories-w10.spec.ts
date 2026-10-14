@@ -316,6 +316,98 @@ test.describe('W10 Calories logging-first surface', () => {
     expect(Number(rows[0]?.n)).toBe(0);
   });
 
+  test('an over-goal day states the excess and survives reload', async ({ page }) => {
+    const todayKey = await browserLocalTodayKey(page);
+    await clearDatabase(page);
+    await seedSql(
+      page,
+      `INSERT OR REPLACE INTO app_meta (key, value) VALUES ('calorie_goal', '{"calories":2000,"protein":150,"carbs":200,"fats":65}');
+       INSERT INTO calorie_entries (id,food_name,calories,protein,carbs,fats,fiber,meal_type,consumed_on,created_at,updated_at,deleted_at) VALUES
+        ('cal_over_1','Over by one',2001,10,20,5,1,'snack','${todayKey}','2026-10-14T02:00:00.000Z','2026-10-14T02:00:00.000Z',null);`,
+    );
+    await goToTab(page, 'calories');
+
+    await expect(page.getByText('1 kcal over', { exact: true })).toBeVisible();
+    await expect(page.getByText('Today · 2,001 of 2,000 kcal logged')).toBeVisible();
+    await expect(page.getByText('1 kcal over goal', { exact: true })).toBeVisible();
+    await expect(page.getByText(/kcal left/)).toHaveCount(0);
+    await expect(page.getByText('Goal 2,000', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Edit daily calorie goal' })).toBeVisible();
+
+    await page.reload({ waitUntil: 'load' });
+    await goToTab(page, 'calories');
+    await expect(page.getByText('1 kcal over', { exact: true })).toBeVisible();
+    await expect(page.getByText('Today · 2,001 of 2,000 kcal logged')).toBeVisible();
+
+    const rows = await queryRows(
+      page,
+      `SELECT COALESCE(SUM(calories), 0) AS total, COUNT(*) AS n
+         FROM calorie_entries
+        WHERE deleted_at IS NULL AND consumed_on = '${todayKey}'`,
+    );
+    expect(Number(rows[0]?.n)).toBe(1);
+    expect(Number(rows[0]?.total)).toBe(2001);
+    const goal = await queryRows(page, "SELECT value FROM app_meta WHERE key = 'calorie_goal'");
+    expect(JSON.parse(String(goal[0]?.value)).calories).toBe(2000);
+  });
+
+  test('a realistic excess returns to kcal left when the crossing entry is deleted', async ({
+    page,
+  }) => {
+    const todayKey = await browserLocalTodayKey(page);
+    await clearDatabase(page);
+    await seedSql(
+      page,
+      `INSERT OR REPLACE INTO app_meta (key, value) VALUES ('calorie_goal', '{"calories":2000,"protein":150,"carbs":200,"fats":65}');
+       INSERT INTO calorie_entries (id,food_name,calories,protein,carbs,fats,fiber,meal_type,consumed_on,created_at,updated_at,deleted_at) VALUES
+        ('cal_over_base','Base day',1600,40,80,20,4,'lunch','${todayKey}','2026-10-14T02:00:00.000Z','2026-10-14T02:00:00.000Z',null),
+        ('cal_over_extra','Evening extra',800,20,40,15,2,'dinner','${todayKey}','2026-10-14T10:00:00.000Z','2026-10-14T10:00:00.000Z',null);`,
+    );
+    await goToTab(page, 'calories');
+
+    await expect(page.getByText('400 kcal over', { exact: true })).toBeVisible();
+    await expect(page.getByText('Today · 2,400 of 2,000 kcal logged')).toBeVisible();
+    await expect(page.getByText('400 kcal over goal', { exact: true })).toBeVisible();
+    await expect(page.getByText(/kcal left/)).toHaveCount(0);
+
+    const dayLog = page.getByLabel('Daily log');
+    await dayLog.getByRole('button', { name: 'Delete Evening extra' }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Delete entry', exact: true })
+      .click();
+    await expect(page.getByText('400 kcal left', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Today · 1,600 of 2,000 kcal logged')).toBeVisible();
+    await expect(page.getByText('400 kcal over', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('400 kcal over goal', { exact: true })).toHaveCount(0);
+
+    const rows = await queryRows(
+      page,
+      `SELECT COALESCE(SUM(calories), 0) AS total, COUNT(*) AS n
+         FROM calorie_entries
+        WHERE deleted_at IS NULL AND consumed_on = '${todayKey}'`,
+    );
+    expect(Number(rows[0]?.n)).toBe(1);
+    expect(Number(rows[0]?.total)).toBe(1600);
+  });
+
+  test('exactly at goal stays kcal left, not a zero over-goal caption', async ({ page }) => {
+    const todayKey = await browserLocalTodayKey(page);
+    await clearDatabase(page);
+    await seedSql(
+      page,
+      `INSERT OR REPLACE INTO app_meta (key, value) VALUES ('calorie_goal', '{"calories":2000,"protein":150,"carbs":200,"fats":65}');
+       INSERT INTO calorie_entries (id,food_name,calories,protein,carbs,fats,fiber,meal_type,consumed_on,created_at,updated_at,deleted_at) VALUES
+        ('cal_exact','Exact goal',2000,50,100,30,5,'dinner','${todayKey}','2026-10-14T02:00:00.000Z','2026-10-14T02:00:00.000Z',null);`,
+    );
+    await goToTab(page, 'calories');
+    await expect(page.getByText('0 kcal left', { exact: true })).toBeVisible();
+    await expect(page.getByText('Today · 2,000 of 2,000 kcal logged')).toBeVisible();
+    await expect(page.getByText('0 kcal over', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('0 kcal over goal', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Goal 2,000', { exact: true })).toHaveCount(0);
+  });
+
   test('diary mode groups entries and keeps the quick-log affordances', async ({ page }) => {
     await seedW10Day(page);
     await page.getByLabel('Diary view').click();

@@ -70,7 +70,7 @@ historical evidence only.
 
 - Current milestone: W12–W17 are PUBLISHED on `main` (PR #76 merged as `3f2a847`, PR #77 merged as `b80233d`, documentation head `1177ac2` then docs-only `bf09c0d`). The post-W17 correction merged as PR #78 `c8a7d0080a49306f7f6df34b979ed6d00152a426`. This parent plan stays `ACTIVE` because the dependency audit and iOS certification remain unearned.
 - Completed: W0–W11.5.1 exactly as recorded under Progress below. W12 Weekly Review / Progress / Activity, W13 Settings / Command / Achievements, W14 whole-app integrity sweep, W15 persistent visual regression (30 curated goldens), W16 Android API-36 qualification (23/23 flows), and W17 final regression / RC (verdict CONDITIONAL / NEAR-COMPLETE) are implemented, tested, and published on `main`; their evidence lives in `docs/ui-ux/v3-audit/w12` through `w17/`.
-- In progress: None. The post-W17 correction plan is COMPLETED. No wave is being restarted.
+- In progress: the post-W17 overnight successor (`openspec/changes/frontend-v3-post-w17-overnight-successor/execplan.md`) while that plan's Status is ACTIVE. The post-W17 correction plan is COMPLETED. No wave is being restarted.
 - Important modified files: none in this plan's own implementation scope after W17. The correction's edits live on `frontend-v3-post-w17-adversarial-correction` and are tracked by that change's ExecPlan.
 - Last successful validation: the W17 closure ladder at `1177ac2` (recorded per-lane in `docs/ui-ux/v3-audit/w17/verification-matrix.md`; counts stay attributed to the runs that produced them). The post-W17 correction re-validates at its own SHA and records it in `docs/ui-ux/v3-audit/post-w17-correction/`.
 - Current failures: `node scripts/audit-runtime-deps.mjs` remains RED on the two inherited undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv) — not waived, not allowlisted, not softened. Hosted `e2e`/`nightly` skip behind that gate and are NOT passed.
@@ -78,7 +78,7 @@ historical evidence only.
 - Blockers: iOS is owner-deferred (NOT RUN unless an authorized lane actually executes). Hosted `e2e`/`nightly` are gated behind the audit red. Android is qualified at exact source `52a10d0` (post-W17 correction: 23/23 flows across six tags on `Nitro_API_36`, APK SHA-256 `65558DFE…`) — its app source includes `af8eeda`'s `features/activity`/`features/weekly-review` edits; the older `b50034d` W16 APK remains valid for `b50034d` only.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Do not author or restart W12–W17. When an upstream patched release removes `braces` GHSA-vfj7-8cjw-p6xm or `node-forge` GHSA-86w9-cpqp-85rv, re-run `node scripts/audit-runtime-deps.mjs` without a waiver. iOS stays NOT RUN until an authorized simulator or cloud lane exists; then run `npm run qa:native:ios` at that exact source SHA.
+- Exact next action: Do not author or restart W12–W17, and do not resume `openspec/changes/frontend-v3-post-w17-correction/execplan.md` — that plan is COMPLETED and its Exact next action is None. If `openspec/changes/frontend-v3-post-w17-overnight-successor/execplan.md` is ACTIVE, resume that plan and continue only from its Exact next action. When an upstream patched release removes `braces` GHSA-vfj7-8cjw-p6xm or `node-forge` GHSA-86w9-cpqp-85rv, re-run `node scripts/audit-runtime-deps.mjs` without a waiver. iOS stays NOT RUN until an authorized simulator or cloud lane exists; then run `npm run qa:native:ios` at that exact source SHA.
 - Remaining definition of done: the dependency audit is clean without a waiver, and iOS is either exact-source qualified or still explicitly owner-deferred. Warning: W12–W17 slice `tasks.md` checkbox counts are NOT current authority — those slices show mostly unchecked boxes while their wave ExecPlans say `COMPLETED` and the waves are published on `main`; do not re-execute a wave or mass-check its boxes to "fix" the count. (The Progress list below is the parent's own milestone record and is reconciled with Git.)
 
 ## Progress
@@ -742,10 +742,8 @@ openspec/changes/frontend-v3-calm-momentum/execplan.md`, then
   checkbox counts are not current authority. W5 tasks (5.1–5.3), W7 tasks
   (7.1–7.3), W9 tasks (9.1–9.3) and W11 tasks (11.1–11.2) are verified and
   checked in `tasks.md`; do not reopen them without contrary evidence.
-- The active work is the post-W17 correction: resume
-  `openspec/changes/frontend-v3-post-w17-correction/execplan.md` and continue
-  only from ITS Exact next action. Current correction and release status lives
-  in `docs/ui-ux/v3-audit/post-w17-correction/`.
+- The post-W17 correction is published history (PR #78, plan Status COMPLETED, Exact next action None). Do not resume `openspec/changes/frontend-v3-post-w17-correction/execplan.md` to implement further work. Its evidence remains at `docs/ui-ux/v3-audit/post-w17-correction/`.
+- While `openspec/changes/frontend-v3-post-w17-overnight-successor/execplan.md` is ACTIVE, that plan is the living successor: resume it and continue only from its Exact next action. If that plan is COMPLETED, do not restart it; the parent's remaining external items are the unwaived dependency audit and owner-deferred iOS.
 - If hosted CI fails at "Validate versioned ExecPlans": run
   `npm run agent:plan:validate:all` locally, fix the named plan sections
   against `scripts/agent-execplan.mjs` aliases, re-run until PASS.
