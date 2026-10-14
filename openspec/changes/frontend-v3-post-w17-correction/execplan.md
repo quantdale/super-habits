@@ -35,12 +35,11 @@ conditional verdict rather than a false release-ready claim.
 
 ## Current Checkpoint
 
-- Current milestone: All implementation, validation, native qualification, evidence-pack, and review tasks are complete at `78adfb3` + review-2 fixes. PR #78 is open against `origin/main` (`bf09c0d`). The only remaining tail is the post-merge SHA record.
-- Completed: Tasks 1–7.1 and 6.3/6.4-publish. settings-ripple retargeted green 6/6 (SQL/reload/entry-count oracles intact). Visual capture fail-closed after red-first negative controls (30 goldens untouched, `maxDiffPixels: 0`, set hash `f19261d5…` vs historical `0676368d…`). H08 date keys reproduced (16/41 boundary red) and fixed browser-side (41/41 boundary + control; `calories-w10-audit.spec.ts` fixed in the second review pass). Parent checkpoint/recovery replaced in place (plan `ACTIVE`). W17 provenance annotated (counts unmoved, `b50034d` boundary stated). Audit UNREMEDIATED (gate red, nothing waived). Android exact-source qualified at `52a10d0` (23/23 flows; two FLAKY_TEST incidents preserved; one native TEST_BUG flow fixed). Independent reviews: review 1 (blocking-findings) integrated in `d064cd5`; review 2 of PR #78 integrated in the working tree (checkpoint truth, Android status convergence, capture-level control proof, perturbation-throw tightening, browserDate dedup, wrapper removal, audit-spec date key, 6.4 box honesty, per-SHA release-convergence rows).
-- In progress: None. Remaining tail is post-merge bookkeeping only.
-- Important modified files: All committed through `78adfb3` (branch `frontend-v3-post-w17-adversarial-correction`); the review-2 fixes are the pending commit on top. Nothing is left uncommitted beyond that commit's content.
-- Last successful validation: 2026-10-14 — strengthened visual readiness self-checks 4/4 (capture-level fail-closed proof + comparison-only perturbation check) on :8081; `npx tsc --noEmit` 0 errors and `npx eslint --max-warnings 0` clean on every file touched in review 2.
-- Last successful validation: 2026-10-14 — `NATIVE_ANDROID_SERIAL=emulator-5594 node scripts/qa-native.mjs --platform android --tag portable-backup` 2/2 post-fix; `npx prettier --check` + `npx eslint --max-warnings 0` clean at `16c5b2b`.
+- Current milestone: Review-2 landed as `95d5b23`. This commit corrects the snapshot that commit left behind (pending-commit wording, duplicate validation line, `review-2 tree` labels, and the W17 note that still said only `b50034d` was Android-certified). PR #78 is open against `origin/main` (`bf09c0d`). The only remaining implementation tail is the merge and the merged-SHA record.
+- Completed: Tasks 1–7.1 and 6.3. settings-ripple retargeted green 6/6 (SQL/reload/entry-count oracles intact). Visual capture fail-closed after red-first negative controls (30 goldens untouched, `maxDiffPixels: 0`, set hash `f19261d5…` vs historical `0676368d…`). H08 date keys reproduced (16/41 boundary red) and fixed browser-side, including `calories-w10-audit.spec.ts` at `95d5b23`. Parent checkpoint replaced in place (plan `ACTIVE`). Audit UNREMEDIATED (gate red, nothing waived). Android exact-source qualified at `52a10d0` (23/23 flows; two FLAKY_TEST incidents preserved; one native TEST_BUG flow fixed). Review 1 integrated in `d064cd5`. Review 2 integrated in `95d5b23`.
+- In progress: Merge PR #78, then record the merged `origin/main` SHA separately from pre-merge evidence.
+- Important modified files: All review-2 code and docs are committed as `95d5b23`. This commit is docs-only on top of that SHA. Nothing is uncommitted after it is committed.
+- Last successful validation: 2026-10-14 — visual readiness self-checks 4/4 at `95d5b23` (capture-level fail-closed proof plus comparison-only perturbation check). This commit does not change that helper, so those results stay attributed to `95d5b23`, not to this docs commit. Audit remains intentionally red.
 - Current failures: None open in gates. Audit remains intentionally red (UNREMEDIATED).
 - Relevant quarantines: None added.
 - Blockers: None. iOS NOT RUN (no authorized lane — external).
@@ -60,8 +59,8 @@ conditional verdict rather than a false release-ready claim.
 
 ## Surprises & Discoveries
 
-- `Goal 2,400` is not produced by Calories. The hero says `Edit goal`; the title is the remaining-kcal fact. SMALL seeds today at 0 kcal, so `2,400 kcal left` can be true. This is not yet a runtime pass.
-- `settle()` returns after its deadline, treats non-finite opacity as settled, and swallows font-load rejection. No negative control exists. Inactive sections use `pointerEvents: 'none'` immediately, so a full-fade hit-test hole is not supported by source.
+- `Goal 2,400` is not produced by Calories. The hero says `Edit goal`; the title is the remaining-kcal fact. SMALL seeds today at 0 kcal, so `2,400 kcal left` can be true. Runtime reproduction confirmed the stale selector; the journey was retargeted and is green.
+- The old `settle()` returned after its deadline, treated non-finite opacity as settled, and swallowed font-load rejection. Negative controls proved that fail-open, and the helper now throws named diagnostics before a golden comparison. Inactive sections use `pointerEvents: 'none'` immediately, so a full-fade hit-test hole was not supported by source.
 - `af8eeda` changed activity and weekly-review feature files after Android SHA `b50034d`. The test/docs-only Android inheritance claim is false after that commit.
 - W12–W17 slice ExecPlans say `COMPLETED` while their `tasks.md` boxes are mostly unchecked. Do not treat those checkbox counts as authority and do not re-execute the waves to check them.
 - `e2e` and `nightly` already need the quality job. The audit allowlist does not cover the two inherited highs.
@@ -98,7 +97,7 @@ conditional verdict rather than a false release-ready claim.
 - `openspec/changes/frontend-v3-post-w17-correction/design.md` — dispositions and approach.
 - `openspec/changes/frontend-v3-post-w17-correction/tasks.md` — implementation checklist.
 - `openspec/changes/frontend-v3-post-w17-correction/specs/` — four behavior deltas.
-- Important modified files (all committed on `frontend-v3-post-w17-adversarial-correction`): `openspec/changes/frontend-v3-post-w17-correction/` (this plan + tasks), `openspec/changes/frontend-v3-calm-momentum/execplan.md` (checkpoint/recovery replacement), `docs/ui-ux/v3-audit/w17/*.md` (provenance annotations), `docs/ui-ux/v3-audit/post-w17-correction/` (evidence pack), `.agent/execplans/frontend-v3-w12-w17-unified-campaign.md` (CRLF claim + C-3 pointer), `e2e/journeys/settings-ripple.spec.ts`, `e2e/visual-regression.spec.ts`, `e2e/helpers/browserDate.ts`, `e2e/{planning-hub,calories,calories-w10,calories-w10-audit,calories-day-navigation,workout-w9}.spec.ts`, `.maestro/flows/portable-backup.yaml`.
+- Important modified files (committed on `frontend-v3-post-w17-adversarial-correction` through `95d5b23`, plus this docs snapshot): `openspec/changes/frontend-v3-post-w17-correction/` (this plan + tasks), `openspec/changes/frontend-v3-calm-momentum/execplan.md`, `docs/ui-ux/v3-audit/w17/*.md`, `docs/ui-ux/v3-audit/post-w17-correction/`, `.agent/execplans/frontend-v3-w12-w17-unified-campaign.md`, `e2e/journeys/settings-ripple.spec.ts`, `e2e/visual-regression.spec.ts`, `e2e/helpers/browserDate.ts`, `e2e/{planning-hub,calories,calories-w10,calories-w10-audit,calories-day-navigation,workout-w9}.spec.ts`, `.maestro/flows/portable-backup.yaml`.
 
 ## Recovery / Resume Instructions
 

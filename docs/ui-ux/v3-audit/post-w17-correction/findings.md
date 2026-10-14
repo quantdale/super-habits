@@ -329,6 +329,11 @@ claim is made.
   7. Task 6.4's checkbox restored to unchecked until the merged `origin/main`
      SHA is actually recorded; release-convergence rows now name their
      producing revisions instead of "correction tree".
+- **Review 3** (`95d5b23` snapshot): that commit still said the review-2 fixes
+  were a pending commit, kept two validation lines, labeled two lanes
+  "review-2 tree", and left the W17 known-limit saying only `b50034d` was
+  Android-certified. Those record defects are corrected in the following
+  docs-only commit. The 4/4 visual proof stays attributed to `95d5b23`.
 
 ## Regression-impact notes
 

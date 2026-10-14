@@ -68,11 +68,14 @@ the full chain: the `b50034d`APK certification does not extend past`3aaca2a`and 
 ## Known limits of this candidate
 
 1. **Android certification is at `b50034d`, not the W17 SHA.** W17's diff is
-   test/docs only, but the strict claim is not re-earned at `3aaca2a`.
-   `[Post-W17 correction: “W17's diff is test/docs only” holds through
-`3aaca2a`only —`af8eeda`(later in the chain) changed user-facing`features/activity/_`and`features/weekly-review/_`. The strict claim is
-not re-earned at `3aaca2a`or any later revision; only`b50034d` is
-Android-certified.]`
+   test/docs only through `3aaca2a`, and that APK was not re-earned at `3aaca2a`.
+   Post-W17 correction: "test/docs only" holds through `3aaca2a` only.
+   `af8eeda` later changed `features/activity/*` and `features/weekly-review/*`,
+   so the `b50034d` APK does not cover `af8eeda` or later app source. That
+   historical limit is not a denial of the later correction qualification:
+   app source was re-qualified at exact source `52a10d0` (23/23). No `features/`,
+   `app/`, `core/`, or `lib/` file changed between `52a10d0` and `95d5b23`.
+   See `docs/ui-ux/v3-audit/post-w17-correction/release-convergence.md`.
 2. **iOS is owner-deferred** and unclaimed.
 3. **Two dependency advisories** remain (no upstream fix; build-time tooling
    only; absent from both bundles) — recorded, not waived.

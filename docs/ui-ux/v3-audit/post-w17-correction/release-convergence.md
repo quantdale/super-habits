@@ -30,9 +30,9 @@ Revision limits of each lane in this verdict:
 | ------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | Web unit + integration                            | PASS (2,700 / 2,702 executed, 0 failed)                       | produced on the tree committed as `52a10d0` (product unchanged through `78adfb3`)                             |
 | Web journeys (settings-ripple 6/6, P0 25/25)      | PASS                                                          | settings-ripple fixed at `2c1fe99`, re-run green at `52a10d0`; P0 at `52a10d0`                                |
-| Visual goldens + readiness self-checks (34/34 ×2) | PASS                                                          | runs at `b0d5d0c` tree; strengthened self-checks 4/4 at the review-2 tree; golden set `f19261d5…`             |
+| Visual goldens + readiness self-checks (34/34 ×2) | PASS                                                          | goldens at `b0d5d0c`; strengthened self-checks 4/4 at `95d5b23`; golden set `f19261d5…`                       |
 | Timezones (111, 5 zones)                          | PASS                                                          | `52a10d0`                                                                                                     |
-| Date-key boundary + control (41/41 ×2)            | PASS                                                          | fixed at `76f0fa6`; `calories-w10-audit.spec.ts` date key fixed in the review-2 tree                          |
+| Date-key boundary + control (41/41 ×2)            | PASS                                                          | fixed at `76f0fa6`; `calories-w10-audit.spec.ts` date key fixed at `95d5b23`                                  |
 | Android native (23/23, six tags)                  | PASS at exact source with two recorded `FLAKY_TEST` incidents | APK source `52a10d0` = this revision's app source (covers `af8eeda`; the `b50034d` APK covers `b50034d` only) |
 | Dependency audit                                  | **FAILED — UNREMEDIATED**                                     | re-run at `52a10d0` tree                                                                                      |
 | iOS                                               | **NOT RUN**                                                   | none                                                                                                          |
@@ -69,9 +69,10 @@ rewritten.
   that only `b50034d` was Android-certified for the revisions up to `bf09c0d`
   — the `b50034d` APK does not cover `af8eeda`'s feature edits. That is
   superseded for this branch by the correction's own exact-source
-  qualification: the APK built at `52a10d0` covers the app source of
-  `af8eeda` through `78adfb3` (23/23 flows). Revisions between `b50034d` and
-  `52a10d0` never had their own APK.
+  qualification: the APK built at `52a10d0` covers `af8eeda` and the app source
+  through `95d5b23` (no `features/`, `app/`, `core/`, or `lib/` change after
+  `52a10d0`; 23/23 flows). Revisions between `b50034d` and `52a10d0` never had
+  their own APK.
 
 - **Recovery does not restart finished waves** (spec scenario): the parent
   Calm Momentum plan's Current Checkpoint/Recovery were replaced in place; its
