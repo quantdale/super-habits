@@ -4,6 +4,7 @@ import { clearDatabase } from './helpers/db';
 import { queryRows, returnToApp } from './helpers/dbHarness';
 import { fillRoutineName } from './helpers/forms';
 import { ACTIVE_SECTION_SELECTOR } from './helpers/oracles';
+import { browserLocalWeekday } from './helpers/browserDate';
 
 /**
  * W9 Workout reconstruction regressions: the quick-start-first landing
@@ -74,7 +75,9 @@ test.describe('W9 Workout', () => {
 
     // Calendar-independent weekday resolution (the strip always renders all
     // seven days; today's own weekday is the one whose assign control opens a
-    // scoped sheet).
+    // scoped sheet). Browser-evaluated (post-W17 correction H08): a Node-side
+    // `new Date().getDay()` follows the HOST timezone and can name a different
+    // weekday than the app's pinned Asia/Manila day across a date boundary.
     const weekdayNames = [
       'Sunday',
       'Monday',
@@ -84,8 +87,9 @@ test.describe('W9 Workout', () => {
       'Friday',
       'Saturday',
     ];
-    const todayName = weekdayNames[new Date().getDay()];
-    const todayWeekdayNum = ((new Date().getDay() + 6) % 7) + 1; // Monday = 1
+    const todayWeekday = await browserLocalWeekday(page);
+    const todayName = weekdayNames[todayWeekday];
+    const todayWeekdayNum = ((todayWeekday + 6) % 7) + 1; // Monday = 1
 
     const section = page.locator(ACTIVE_SECTION_SELECTOR);
     // The strip exposes a per-day rest control and an assign control at 44pt.

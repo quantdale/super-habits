@@ -2,6 +2,7 @@ import { test, expect, type Page } from './fixtures';
 import { clearDatabase } from './helpers/db';
 import { goToTab } from './helpers/navigation';
 import { queryRows, returnToApp, runSql } from './helpers/dbHarness';
+import { browserLocalTodayKey } from './helpers/browserDate';
 
 /**
  * Wave 7 (Functional Completion V1): the Planning Hub (Today / Projects /
@@ -13,11 +14,10 @@ import { queryRows, returnToApp, runSql } from './helpers/dbHarness';
  * DB document, so all UI steps finish before oracles.
  */
 
-function localTodayKey(date = new Date()): string {
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${mm}-${dd}`;
-}
+// Date keys are browser-evaluated (post-W17 correction H08): the app's
+// `toDateKey()` reads the browser's pinned Asia/Manila clock, so a Node-side
+// `new Date()` would compare/seed the host's calendar day and break across a
+// UTC/Manila boundary. Use `browserLocalTodayKey(page)` at every use site.
 
 async function openPlanHub(page: Page) {
   await page.getByRole('button', { name: 'Plan today' }).click();
@@ -59,13 +59,14 @@ test.describe('Planning Hub', () => {
       page.getByPlaceholder('What is the one thing that matters most today?'),
     ).toHaveValue('Protect deep work', { timeout: 15_000 });
 
+    const oracleTodayKey = await browserLocalTodayKey(page);
     const rows = await queryRows(
       page,
       `SELECT date_key, intention, focus_target_minutes FROM daily_plans WHERE deleted_at IS NULL`,
     );
     expect(rows).toEqual([
       {
-        date_key: localTodayKey(),
+        date_key: oracleTodayKey,
         intention: 'Protect deep work',
         focus_target_minutes: 25,
       },
@@ -232,7 +233,7 @@ test.describe('Planning Hub', () => {
 
     // Seed the plan directly so the journey proves the delete contract without
     // depending on the guided-vs-editor create path (covered by test 1).
-    const dateKey = localTodayKey();
+    const dateKey = await browserLocalTodayKey(page);
     await runSql(
       page,
       `INSERT INTO daily_plans (id, date_key, intention, status, created_at, updated_at)

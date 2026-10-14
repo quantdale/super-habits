@@ -5,13 +5,7 @@ import { queryRows } from './helpers/dbHarness';
 import { seedSql } from './helpers/seed';
 import { clickCaloriesAddEntry, fillCalorieMacrosOnly, fillCaloriesMacros } from './helpers/forms';
 import { rapidPress } from './helpers/gestures';
-
-function localTodayKey(): string {
-  const date = new Date();
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${mm}-${dd}`;
-}
+import { browserLocalTodayKey } from './helpers/browserDate';
 
 test.describe('Calories', () => {
   test.beforeEach(async ({ page }) => {
@@ -49,12 +43,17 @@ test.describe('Calories', () => {
     await expect(page.getByText('1,853 kcal left')).toBeVisible();
 
     // Row oracle: the entry persisted on today's date with the computed kcal.
+    // The expected `consumed_on` is the BROWSER's local date key (the app's
+    // `toDateKey()` contract) — post-W17 correction H08: a host-side
+    // `new Date()` follows the host timezone and disagrees across the
+    // UTC/Manila calendar boundary.
+    const oracleTodayKey = await browserLocalTodayKey(page);
     const rows = await queryRows(
       page,
       `SELECT food_name, calories, consumed_on FROM calorie_entries WHERE deleted_at IS NULL`,
     );
     expect(rows).toEqual([
-      { food_name: 'Chicken breast', calories: 147, consumed_on: localTodayKey() },
+      { food_name: 'Chicken breast', calories: 147, consumed_on: oracleTodayKey },
     ]);
   });
 
