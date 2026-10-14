@@ -42,13 +42,66 @@ const TABLET = { width: 768, height: 1024 };
 const DESKTOP = { width: 1280, height: 800 };
 
 /**
+ * The Nunito families the app registers. `document.fonts.ready` is NOT
+ * sufficient: it resolves while some faces are still `unloaded`, so Chromium
+ * lazily loads `Nunito_400Regular` on first use and whether that completes
+ * before a capture is a race (measured: 2 of 6 runs produced a different
+ * rasterisation of the same screen, with `Nunito_400Regular` reported
+ * `unloaded` after `fonts.ready` had already resolved).
+ */
+const APP_FONT_FAMILIES = [
+  'Nunito_400Regular',
+  'Nunito_600SemiBold',
+  'Nunito_700Bold',
+  'Nunito_800ExtraBold',
+  'Nunito_900Black',
+] as const;
+
+/**
  * Settle after the semantic assertion. This is not a readiness substitute: the
- * assertion above it already proves the content is present. It only lets a
- * one-frame RN Web layout pass finish before the capture.
+ * assertion above it already proves the content is present.
+ *
+ * It waits on the THREE real sources of capture drift found by measurement:
+ *
+ * 1. **Section cross-fade.** `SectionContainer` in `app/index.tsx` animates the
+ *    outgoing section's opacity over 200ms (translate 240ms) with RN Web's
+ *    `Animated`, which drives inline styles from rAF — so Playwright's
+ *    `animations: 'disabled'` cannot neutralise it. Measured on the To Do
+ *    snapshot: the previous section sat at `opacity: 0.647` ~60ms after the
+ *    switch and reached 0 by ~260ms, so a capture at 150ms intermittently caught
+ *    it bleeding through the new section (50% of runs produced a visibly
+ *    different image). Wait for every other section container to reach opacity
+ *    0 before capturing.
+ * 2. **Font faces.** `document.fonts.ready` resolves while some faces are still
+ *    `unloaded`, so Chromium lazily loads `Nunito_400Regular` on first use.
+ *    Load every app family explicitly.
+ * 3. **Layout pass.** A bounded settle for the final one-frame layout commit.
  */
 async function settle(page: Page): Promise<void> {
-  await page.evaluate(() => document.fonts.ready);
-  await page.waitForTimeout(150);
+  await page.evaluate(async (families) => {
+    await Promise.all(
+      families.map((family) => document.fonts.load(`16px ${family}`).catch(() => undefined)),
+    );
+    await document.fonts.ready;
+
+    // Wait for the section cross-fade to finish: every section container except
+    // the visible one must be fully transparent, otherwise it shows through.
+    const settled = () => {
+      const nodes = Array.from(
+        document.querySelectorAll<HTMLElement>('[aria-hidden="true"]'),
+      ).filter((el) => el.hasAttribute('inert'));
+      return nodes.every((el) => {
+        const opacity = Number.parseFloat(getComputedStyle(el).opacity || '0');
+        return !Number.isFinite(opacity) || opacity <= 0.001;
+      });
+    };
+    const deadline = Date.now() + 4000;
+    while (Date.now() < deadline && !settled()) {
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    }
+    await document.fonts.ready;
+  }, APP_FONT_FAMILIES);
+  await page.waitForTimeout(80);
 }
 
 async function capture(page: Page, name: string, opts: { scrollTop?: number } = {}): Promise<void> {
