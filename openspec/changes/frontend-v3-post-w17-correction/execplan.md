@@ -1,7 +1,7 @@
 # ExecPlan: Frontend V3 post-W17 correction
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -35,16 +35,16 @@ conditional verdict rather than a false release-ready claim.
 
 ## Current Checkpoint
 
-- Current milestone: Review-2 landed as `95d5b23`. This commit corrects the snapshot that commit left behind (pending-commit wording, duplicate validation line, `review-2 tree` labels, and the W17 note that still said only `b50034d` was Android-certified). PR #78 is open against `origin/main` (`bf09c0d`). The only remaining implementation tail is the merge and the merged-SHA record.
-- Completed: Tasks 1–7.1 and 6.3. settings-ripple retargeted green 6/6 (SQL/reload/entry-count oracles intact). Visual capture fail-closed after red-first negative controls (30 goldens untouched, `maxDiffPixels: 0`, set hash `f19261d5…` vs historical `0676368d…`). H08 date keys reproduced (16/41 boundary red) and fixed browser-side, including `calories-w10-audit.spec.ts` at `95d5b23`. Parent checkpoint replaced in place (plan `ACTIVE`). Audit UNREMEDIATED (gate red, nothing waived). Android exact-source qualified at `52a10d0` (23/23 flows; two FLAKY_TEST incidents preserved; one native TEST_BUG flow fixed). Review 1 integrated in `d064cd5`. Review 2 integrated in `95d5b23`.
-- In progress: Merge PR #78, then record the merged `origin/main` SHA separately from pre-merge evidence.
-- Important modified files: All review-2 code and docs are committed as `95d5b23`. This commit is docs-only on top of that SHA. Nothing is uncommitted after it is committed.
-- Last successful validation: 2026-10-14 — visual readiness self-checks 4/4 at `95d5b23` (capture-level fail-closed proof plus comparison-only perturbation check). This commit does not change that helper, so those results stay attributed to `95d5b23`, not to this docs commit. Audit remains intentionally red.
-- Current failures: None open in gates. Audit remains intentionally red (UNREMEDIATED).
+- Current milestone: Complete. PR #78 merged to `main` as `c8a7d0080a49306f7f6df34b979ed6d00152a426`. This docs commit records that merge. It is not a retest.
+- Completed: Tasks 1.1–7.2. settings-ripple 6/6 with SQL, reload, and entry-count oracles. Visual capture fail-closed; goldens untouched (`f19261d5…` vs historical `0676368d…`). H08 date keys fixed browser-side. Android exact-source 23/23 at `52a10d0`. Audit left red and unwaived. iOS NOT RUN.
+- In progress: None.
+- Important modified files: The correction tree merged at `c8a7d00`. This commit only records that SHA in the plan, tasks, and evidence pack.
+- Last successful validation: 2026-10-14 — visual readiness self-checks 4/4 passed at `95d5b23`. Those results stay on `95d5b23`. `gh pr merge 78 --merge` published `c8a7d00`. Audit remains intentionally red.
+- Current failures: None in the correction gates. The dependency audit stays red (UNREMEDIATED) and is a parent-plan residual, not an open correction task.
 - Relevant quarantines: None added.
-- Blockers: None. iOS NOT RUN (no authorized lane — external).
-- Exact next action: After PR #78 (`frontend-v3-post-w17-adversarial-correction` → `main`) merges, record the merged `origin/main` SHA in the evidence pack separately from the pre-merge evidence (task 6.4 tail), then this plan's next action becomes `None — task complete.` No in-scope implementation remains.
-- Remaining definition of done: the post-merge SHA record only. All implementation, validation, review, evidence-pack, and publication tasks are complete.
+- Blockers: None for this change. iOS remains NOT RUN on the parent plan.
+- Exact next action: None — task complete.
+- Remaining definition of done: Complete. The merged SHA is recorded separately from pre-merge evidence.
 
 ## Progress
 
@@ -90,6 +90,7 @@ conditional verdict rather than a false release-ready claim.
 - 2026-10-14 — `npx playwright test --project=visual` (:8081, fresh) — 34/34 (3.0m). Golden-set hash before/after: `f19261d5d676ac1ef10cc526a4fb19d41e0edbf1a6e3ebd87fcb437c50dcdeaa` (unchanged; distinct from historical `0676368d…`).
 - 2026-10-14 — `npx playwright test --project=visual` (:8089, fresh) — 34/34 (3.1m). Hash `f19261d5…` stable across both runs; `git status -- e2e/__screenshots__/` empty (no golden rewritten).
 - 2026-10-14 — `npx prettier --write` + `npx eslint --max-warnings 0` on `e2e/visual-regression.spec.ts` and `e2e/journeys/settings-ripple.spec.ts` — LINT CLEAN.
+- 2026-10-14 — `gh pr merge 78 --merge` — PASS as publication. Merge commit `c8a7d0080a49306f7f6df34b979ed6d00152a426`. Hosted quality on the PR failed only the inherited audit step; `e2e` and `nightly` were skipped, not passed.
 
 ## Changed Files / Areas
 
@@ -114,8 +115,7 @@ npm run agent:resume -- --plan openspec/changes/frontend-v3-post-w17-correction/
 
 ## Outcomes & Retrospective
 
-- Status: Complete except post-merge bookkeeping (record the merged
-  `origin/main` SHA after PR #78 merges — the only remaining action).
+- Status: Complete. PR #78 merged as `c8a7d0080a49306f7f6df34b979ed6d00152a426`.
 - Summary: The post-W17 correction reproduced and fixed the carried
   settings-ripple red (stale selector, `TEST_BUG` — retargeted to the W10
   grammar with SQL/reload/entry-count oracles intact, 6/6), made curated
@@ -139,11 +139,10 @@ npm run agent:resume -- --plan openspec/changes/frontend-v3-post-w17-correction/
   dependency audit is failed-unremediated and iOS is not run; hosted
   `e2e`/`nightly` remain not-run behind the audit gate. Every unresolved
   lane and its revision limit is named in `release-convergence.md`.
-- Remaining work: (1) after PR #78 merges, record the merged `origin/main`
-  SHA separately from the pre-merge evidence (task 6.4 tail); (2) the
-  accepted residuals listed in `findings.md` (over-goal-day gated coverage,
-  one-shot H08 boundary proof, native lane flakes) are documented, not
-  scheduled.
+- Remaining work: None in this change. Accepted residuals in `findings.md`
+  (over-goal-day gated coverage, one-shot H08 boundary proof, native lane
+  flakes) stay documented. The dependency audit and iOS stay on the parent
+  plan. They are not unfinished correction tasks.
 - Lessons: negative controls must fail on the old behavior before the fix
   (the red run is the proof); probe boundary conditions with delta-preserving
   shims when platform TZ levers are broken (Node ignores `TZ` on Windows);

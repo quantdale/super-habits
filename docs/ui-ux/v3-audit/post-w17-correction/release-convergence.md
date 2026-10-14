@@ -63,6 +63,16 @@ updates the requirement sentence from 24/25 to **25/26** accordingly.
 Historical pre-migration-25 notes stay dated and historical — none were
 rewritten.
 
+## Publication
+
+PR #78 merged to `origin/main` as `c8a7d0080a49306f7f6df34b979ed6d00152a426`
+(`frontend-v3-post-w17-adversarial-correction` into `bf09c0d`). Pre-merge
+test, golden, and Android results stay on the revisions in the table above.
+This paragraph's commit is docs-only. It does not re-run those lanes and does
+not move them onto the merge commit. Hosted `quality` on the PR failed only
+`Audit runtime dependencies`. Hosted `e2e` and `nightly` were skipped, not
+passed.
+
 ## Inherited-campaign closure state
 
 - **Android status convergence.** The W17 document annotations correctly say
