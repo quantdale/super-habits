@@ -18,6 +18,7 @@ import {
   filterTimelineBySources,
   getTimelineDayKeys,
   groupTimelineByDay,
+  hasClockTime,
 } from '@/features/activity/activityTimeline.domain';
 import type {
   ActivityTimelineItem,
@@ -65,8 +66,17 @@ function formatDayLabel(dateKey: string): string {
   return dateKey;
 }
 
-/** Short local time for a row (`14:05`), from the event's local ISO instant. */
+/**
+ * Short local time for a row (`14:05`), from the event's local ISO instant.
+ *
+ * Returns null for a date-only `YYYY-MM-DD` occurrence (see
+ * `hasClockTime`): calorie rows carry a deterministic date-only sort key so the
+ * UI does not invent an event time. Formatting one would fabricate midnight and,
+ * west of UTC, could even render the previous evening while the row stays
+ * grouped under the consumed date. Only timestamp-backed sources get a clock.
+ */
 function formatTime(occurredAt: string): string | null {
+  if (!hasClockTime(occurredAt)) return null;
   const date = new Date(occurredAt);
   if (Number.isNaN(date.getTime())) return null;
   const pad = (n: number) => String(n).padStart(2, '0');

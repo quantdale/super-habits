@@ -20,6 +20,7 @@ import { executeWeeklyReview, type ExecutionResult } from './weeklyReview.execut
 import { applyNextWeekPlanSuggestions } from './weeklyReview.applyNextWeek';
 import { getWeeklyReviewByWeekKey } from './weeklyReview.data';
 import { ReviewHistoryView } from './ReviewHistoryView';
+import { weekHasAnyScheduledOrRecordedActivity } from './weeklyReviewScreenGuards';
 import type {
   WeeklyReviewSummaryV1,
   WeeklyReviewDraft,
@@ -152,10 +153,14 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
     void handleConfirm();
   }, [handleConfirm]);
 
-  const failedCommitmentCount = useMemo(
-    () => executionResult?.commitmentOutcomes.filter((o) => o.status === 'failed').length ?? 0,
+  // Codex P2 (PR #76): a partially-failed run must not read as a clean success.
+  // The executor deliberately resolves after saving the review row even when a
+  // commitment is rejected, so the surface has to name what did not persist.
+  const failedCommitments = useMemo(
+    () => executionResult?.commitmentOutcomes.filter((o) => o.status === 'failed') ?? [],
     [executionResult],
   );
+  const failedCommitmentCount = failedCommitments.length;
 
   const carryForwardTodoIds = useMemo(
     () =>
@@ -259,20 +264,42 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
             <ReviewHistoryView />
           </View>
         ) : null}
-        <Card accentColor={tokens.successText ?? '#16a34a'}>
+        <Card
+          accentColor={
+            failedCommitmentCount > 0
+              ? (tokens.warningText ?? '#d97706')
+              : (tokens.successText ?? '#16a34a')
+          }
+        >
           <View className="py-8 items-center">
+            {/* The review row IS saved in both cases; when a commitment was
+                rejected the heading and copy say so instead of celebrating. */}
             <Text variant="titleLg" className="mb-2" style={{ color: tokens.text }}>
-              Review saved
+              {failedCommitmentCount > 0 ? 'Review saved — some items need retry' : 'Review saved'}
             </Text>
             <Text className="text-base text-center mb-6" style={{ color: tokens.textMuted }}>
               Your weekly review for {week.startDateKey} – {week.endDateKey} is saved.
             </Text>
             {failedCommitmentCount > 0 ? (
-              <Text className="mb-4 text-center text-sm" style={{ color: tokens.dangerText }}>
-                {failedCommitmentCount} new commitment
-                {failedCommitmentCount === 1 ? '' : 's'} could not be created. Confirming again
-                retries only {failedCommitmentCount === 1 ? 'it' : 'them'}.
-              </Text>
+              <View className="mb-4 w-full items-center gap-1">
+                <Text className="text-center text-sm" style={{ color: tokens.dangerText }}>
+                  {failedCommitmentCount === 1
+                    ? 'One new commitment was not created:'
+                    : `${failedCommitmentCount} new commitments were not created:`}
+                </Text>
+                {failedCommitments.map((outcome) => (
+                  <Text
+                    key={outcome.commitmentId}
+                    className="text-center text-sm"
+                    style={{ color: tokens.dangerText }}
+                  >
+                    • {outcome.title || '(untitled)'}
+                  </Text>
+                ))}
+                <Text className="text-center text-xs" style={{ color: tokens.textMuted }}>
+                  Retrying creates only the missing items; ones already created are not duplicated.
+                </Text>
+              </View>
             ) : null}
             {failedCommitmentCount > 0 ? (
               <Button
@@ -422,9 +449,9 @@ function ReviewStep({
         {w.startDateKey} – {w.endDateKey}
       </Text>
       <Text className="text-sm mt-1 mb-3" style={{ color: tokens.textMuted }}>
-        {summary.habits.scheduledOccurrences === 0 && summary.todos.completedCount === 0
-          ? 'Nothing scheduled this week.'
-          : `Week ${w.weekKey}`}
+        {weekHasAnyScheduledOrRecordedActivity(summary)
+          ? `Week ${w.weekKey}`
+          : 'Nothing scheduled this week.'}
       </Text>
 
       {observations.length > 0 ? (

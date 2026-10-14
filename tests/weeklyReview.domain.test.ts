@@ -13,6 +13,7 @@ import {
   summarizeHabitWeekOccurrences,
   MAX_REFLECTION_LENGTH,
 } from '@/features/weekly-review/weeklyReview.domain';
+import { weekHasAnyScheduledOrRecordedActivity } from '@/features/weekly-review/weeklyReviewScreenGuards';
 import { createHabitRule } from '@/features/habits/habits.domain';
 import type {
   WeeklyReviewDraft,
@@ -847,5 +848,89 @@ describe('buildNextWeekPlanSuggestions', () => {
     expect(suggestions[0].dateKey).toBe('2026-08-30');
     expect(suggestions[1].dateKey).toBe('2026-08-31');
     expect(suggestions[2].dateKey).toBe('2026-09-01');
+  });
+});
+
+/**
+ * W17 (Codex P2, PR #76): the review step must not call a week empty when it
+ * held obligations. An unfinished todo in-window has `completedCount === 0`
+ * but `incompleteCount > 0`, and a planned workout week can have
+ * `scheduledSessions > 0` with no completed session; either would otherwise be
+ * described as "Nothing scheduled this week."
+ */
+describe('weekHasAnyScheduledOrRecordedActivity (W17 empty-week truth)', () => {
+  // Baseline: a week with genuinely nothing scheduled or recorded.
+  const emptyWeek: WeeklyReviewSummaryV1 = {
+    version: 1,
+    week: {
+      weekKey: '2026-10-12',
+      startDateKey: '2026-10-12',
+      endDateKey: '2026-10-18',
+      nextWeekStartDateKey: '2026-10-19',
+      nextWeekEndDateKey: '2026-10-25',
+    },
+    todos: {
+      completedCount: 0,
+      incompleteCount: 0,
+      overdueCount: 0,
+      dueNextWeekCount: 0,
+      carryForwardCandidates: [],
+    },
+    habits: {
+      scheduledOccurrences: 0,
+      completedOccurrences: 0,
+      consistencyPercent: null,
+      attention: [],
+    },
+    focus: { sessions: 0, minutes: 0, priorWeekMinutes: null },
+    workouts: { sessions: 0, priorWeekSessions: null, routines: [] },
+    calories: { loggedDays: 0, averageCaloriesOnLoggedDays: null, configuredGoal: null },
+    wins: [],
+    attention: [],
+  };
+
+  it('reports a genuinely empty week as empty', () => {
+    expect(weekHasAnyScheduledOrRecordedActivity(emptyWeek)).toBe(false);
+  });
+
+  it('does NOT call a week empty when an in-window todo is unfinished', () => {
+    const summary = {
+      ...emptyWeek,
+      todos: { ...emptyWeek.todos, incompleteCount: 3 },
+    };
+    expect(weekHasAnyScheduledOrRecordedActivity(summary)).toBe(true);
+  });
+
+  it('does NOT call a week empty when workouts were scheduled', () => {
+    const summary = {
+      ...emptyWeek,
+      workouts: { ...emptyWeek.workouts, scheduledSessions: 4 },
+    };
+    expect(weekHasAnyScheduledOrRecordedActivity(summary)).toBe(true);
+  });
+
+  it('does NOT call a week empty when habits were scheduled (even with zero completions)', () => {
+    const summary = {
+      ...emptyWeek,
+      habits: { ...emptyWeek.habits, scheduledOccurrences: 7, completedOccurrences: 0 },
+    };
+    expect(weekHasAnyScheduledOrRecordedActivity(summary)).toBe(true);
+  });
+
+  it('does NOT call a week empty when only an overdue todo exists', () => {
+    const summary = { ...emptyWeek, todos: { ...emptyWeek.todos, overdueCount: 2 } };
+    expect(weekHasAnyScheduledOrRecordedActivity(summary)).toBe(true);
+  });
+
+  it('recognises recorded activity in every domain', () => {
+    for (const patch of [
+      { todos: { ...emptyWeek.todos, completedCount: 1 } },
+      { habits: { ...emptyWeek.habits, completedOccurrences: 1 } },
+      { focus: { sessions: 1, minutes: 25, priorWeekMinutes: null } },
+      { workouts: { ...emptyWeek.workouts, sessions: 1 } },
+      { calories: { loggedDays: 1, averageCaloriesOnLoggedDays: 1800, configuredGoal: 2000 } },
+    ]) {
+      expect(weekHasAnyScheduledOrRecordedActivity({ ...emptyWeek, ...patch })).toBe(true);
+    }
   });
 });
