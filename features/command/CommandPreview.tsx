@@ -62,6 +62,14 @@ export function PreviewMissingField({ message }: { message: string }) {
   );
 }
 
+/**
+ * Launch context as one quiet caption (W13 / design D13.3, defect SUR-11).
+ *
+ * The previous design spent a full bordered card with an uppercase eyebrow and
+ * a title on restating the section the user just came from, which made it the
+ * largest element above the actual input. The section name is real context, so
+ * it stays — as one short line that the input follows immediately.
+ */
 export function LaunchContextCard({
   launchContext,
 }: {
@@ -73,20 +81,9 @@ export function LaunchContextCard({
   if (!contextCopy) return null;
 
   return (
-    <Card accentColor={contextCopy.accentColor} className="mb-0">
-      <Text
-        className="text-xs font-semibold uppercase tracking-[1px]"
-        style={{ color: tokens.textMuted }}
-      >
-        Current section
-      </Text>
-      <Text className="mt-1 text-base font-semibold" style={{ color: tokens.text }}>
-        {contextCopy.sectionLabel}
-      </Text>
-      <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-        {contextCopy.helperCopy}
-      </Text>
-    </Card>
+    <Text className="text-xs" style={{ color: tokens.textMuted }}>
+      From {contextCopy.sectionLabel} · {contextCopy.helperCopy}
+    </Text>
   );
 }
 

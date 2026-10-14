@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "status": "BLOCKED",
+  "classification": "ENVIRONMENT",
+  "failureClasses": [
+    "PRODUCT_BUG",
+    "TEST_BUG",
+    "FLAKY_TEST",
+    "ENVIRONMENT",
+    "EXPECTED_KNOWN_GAP",
+    "SPEC_AMBIGUITY"
+  ],
+  "platform": "android",
+  "appId": "com.dale16.superhabits",
+  "tag": "persistence",
+  "flow": ".maestro",
+  "gitSha": "18e9df64fa637f00f494e89ba5692eb674a01dcb",
+  "sourceSha": "18e9df64fa637f00f494e89ba5692eb674a01dcb",
+  "sourceTreeClean": false,
+  "sourceTreeStatus": [
+    "?? docs/ui-ux/v3-audit/w16/native-10-nav-fixed.png",
+    "?? docs/ui-ux/v3-audit/w16/native-11-nav-fixed-crop.png"
+  ],
+  "sourceShaError": null,
+  "sourceTreeStatusError": null,
+  "reason": "Android certification requires a clean Git working tree; changed entries: ?? docs/ui-ux/v3-audit/w16/native-10-nav-fixed.png, ?? docs/ui-ux/v3-audit/w16/native-11-nav-fixed-crop.png.",
+  "targetLabel": "emulator-5594",
+  "avd": null,
+  "ownedEmulator": false,
+  "mockState": null,
+  "details": {
+    "flow": ".maestro",
+    "avd": null,
+    "serial": "emulator-5594",
+    "ownedEmulator": false,
+    "remediation": "Commit, stash, or reconcile tracked and relevant untracked source changes before running native certification."
+  },
+  "replayCommand": "node scripts/qa-native.mjs --platform android --tag persistence --serial emulator-5594 --no-provision",
+  "capturedAt": "2026-10-13T19:39:01.560Z"
+}

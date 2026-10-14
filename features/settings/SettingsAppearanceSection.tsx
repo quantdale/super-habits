@@ -62,14 +62,13 @@ export function SettingsAppearanceSection({
 }: SettingsAppearanceSectionProps) {
   const { tokens } = useAppTheme();
   const appearanceCopy = getAppearanceSummary(mode, resolvedTheme);
+  const themeModeDescription = THEME_OPTIONS.find((option) => option.mode === mode)?.description;
 
   return (
     <ScreenSection>
       <SettingsSectionHeading
         eyebrow="Appearance"
         title="Theme and display"
-        subtitle="Visual preferences that apply across the app."
-        icon="palette"
         accentColor={tokens.textMuted}
       />
       <Card accentColor={tokens.textMuted} className="mb-0">
@@ -95,18 +94,17 @@ export function SettingsAppearanceSection({
             ))}
           </View>
 
+          {/* W13 (SUR-08): the theme value is stated by the pills' selected
+              state and this single line. The old `Current selection` and
+              `Current behavior` rows restated the same value twice more. */}
           <SettingsRow
             first
-            label="Current selection"
-            description={`${THEME_OPTIONS.find((option) => option.mode === mode)?.description} ${appearanceCopy.detail}`}
+            label="Current appearance"
+            value={`${appearanceCopy.summary} Active theme: ${THEME_REGISTRY[themeId]?.name ?? themeId}.`}
+            explanation={themeModeDescription}
             statusLabel={mode}
             statusTone="accent"
             accentColor={tokens.textMuted}
-          />
-          <SettingsRow
-            label="Current behavior"
-            description={`${appearanceCopy.summary} Active theme: ${THEME_REGISTRY[themeId]?.name ?? themeId}.`}
-            statusLabel={resolvedTheme}
             last
           />
         </View>
@@ -120,7 +118,6 @@ export function SettingsAppearanceSection({
             </Text>
             <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
               Used whenever the resolved appearance is light.
-              {mode === 'dark' ? ' Switch to System or Light mode to see it applied now.' : ''}
             </Text>
           </View>
           <View className="flex-row flex-wrap gap-2">
@@ -144,7 +141,6 @@ export function SettingsAppearanceSection({
             </Text>
             <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
               Used whenever the resolved appearance is dark.
-              {mode === 'light' ? ' Switch to System or Dark mode to see it applied now.' : ''}
             </Text>
           </View>
           <View className="flex-row flex-wrap gap-2">

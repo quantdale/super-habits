@@ -6,6 +6,7 @@ import {
   formatHabitTimelineTitle,
   getTimelineDayKeys,
   groupTimelineByDay,
+  hasClockTime,
 } from '@/features/activity/activityTimeline.domain';
 import type { ActivityTimelineItem } from '@/features/activity/activityTimeline.types';
 import { dateKeyToLocalDate } from '@/lib/time';
@@ -302,5 +303,31 @@ describe('formatHabitTimelineTitle', () => {
     const title = formatHabitTimelineTitle(long);
     expect(title).toBe(`Logged "${`${'n'.repeat(59)}…"`}`);
     expect(title.startsWith('Completed')).toBe(false);
+  });
+});
+
+/**
+ * W17 (Codex P2, PR #76): a date-only occurrence must not render as a clock
+ * time. Calorie rows use `occurredAt` as a deterministic `YYYY-MM-DD` sort key
+ * on purpose, so `hasClockTime` is the single authority the view consults before
+ * formatting an event time.
+ */
+describe('hasClockTime (W17 date-only guard)', () => {
+  it('rejects a date-only key so no clock time is fabricated', () => {
+    expect(hasClockTime('2026-10-13')).toBe(false);
+    expect(hasClockTime('')).toBe(false);
+    expect(hasClockTime('unknown')).toBe(false);
+  });
+
+  it('accepts a timestamp-backed instant', () => {
+    expect(hasClockTime('2026-10-13T10:00:00.000Z')).toBe(true);
+    expect(hasClockTime('2026-10-13T14:05:00')).toBe(true);
+  });
+
+  it('keeps every real timeline source that carries a time formattable', () => {
+    // The data layer supplies full instants for all timestamp sources, and a
+    // date-only key only for the calorie day aggregate.
+    expect(hasClockTime('2026-10-13T18:30:00.000Z')).toBe(true);
+    expect(hasClockTime('2026-10-13')).toBe(false);
   });
 });

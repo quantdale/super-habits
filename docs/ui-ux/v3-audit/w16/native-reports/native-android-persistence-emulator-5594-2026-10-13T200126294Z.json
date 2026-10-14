@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "status": "BLOCKED",
+  "classification": "ENVIRONMENT",
+  "failureClasses": [
+    "PRODUCT_BUG",
+    "TEST_BUG",
+    "FLAKY_TEST",
+    "ENVIRONMENT",
+    "EXPECTED_KNOWN_GAP",
+    "SPEC_AMBIGUITY"
+  ],
+  "platform": "android",
+  "appId": "com.dale16.superhabits",
+  "tag": "persistence",
+  "flow": ".maestro",
+  "gitSha": "0315a559ca64b76a3668745adb02be9880ef67e3",
+  "sourceSha": "0315a559ca64b76a3668745adb02be9880ef67e3",
+  "sourceTreeClean": true,
+  "sourceTreeStatus": [],
+  "sourceShaError": null,
+  "sourceTreeStatusError": null,
+  "reason": "Installed Android build identity does not match current source 0315a559ca64b76a3668745adb02be9880ef67e3.",
+  "targetLabel": "emulator-5594",
+  "avd": null,
+  "ownedEmulator": false,
+  "mockState": null,
+  "details": {
+    "flow": ".maestro",
+    "avd": null,
+    "serial": "emulator-5594",
+    "ownedEmulator": false,
+    "remediation": "Drop --no-provision so the lane provisions and hash-verifies the current-source APK, or run npm run qa:native:provision -- --serial <serial> first."
+  },
+  "replayCommand": "node scripts/qa-native.mjs --platform android --tag persistence --serial emulator-5594 --no-provision",
+  "capturedAt": "2026-10-13T20:01:26.287Z"
+}

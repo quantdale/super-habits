@@ -49,15 +49,18 @@ tags:
 - extendedWaitUntil:
     visible: 'Native disable reminder'
     timeout: 5000
-- scrollUntilVisible:
-    element: 'Reminder 18:00'
-    direction: DOWN
-- assertVisible: 'Reminder 18:00'
+# The list row shows the reminder only on a scheduled weekday; the detail modal
+# renders it for any date, so that is the durable oracle here.
 - scrollUntilVisible:
     element: 'Open Native disable reminder details'
     direction: UP
 - tapOn: 'Open Native disable reminder details'
+# The schedule/reminder block lives in the detail modal's Settings tab.
 - tapOn: 'Settings'
+- extendedWaitUntil:
+    visible: 'Schedule & reminder'
+    timeout: 10000
+- assertVisible: 'Current schedule · Reminder 18:00'
 - scrollUntilVisible:
     element: 'Edit habit'
     direction: DOWN
@@ -80,7 +83,14 @@ tags:
 - extendedWaitUntil:
     visible: 'Native disable reminder'
     timeout: 5000
-- assertNotVisible: 'Reminder 18:00'
+- tapOn: 'Open Native disable reminder details'
+# The schedule/reminder block lives in the detail modal's Settings tab.
+- tapOn: 'Settings'
+- extendedWaitUntil:
+    visible: 'Schedule & reminder'
+    timeout: 10000
+- assertNotVisible: 'Current schedule · Reminder 18:00'
+- tapOn: 'Close'
 - killApp
 - launchApp
 - extendedWaitUntil:
@@ -99,4 +109,11 @@ tags:
 - extendedWaitUntil:
     visible: 'Native disable reminder'
     timeout: 15000
-- assertNotVisible: 'Reminder 18:00'
+- tapOn: 'Open Native disable reminder details'
+# The schedule/reminder block lives in the detail modal's Settings tab.
+- tapOn: 'Settings'
+- extendedWaitUntil:
+    visible: 'Schedule & reminder'
+    timeout: 10000
+- assertNotVisible: 'Current schedule · Reminder 18:00'
+- tapOn: 'Close'

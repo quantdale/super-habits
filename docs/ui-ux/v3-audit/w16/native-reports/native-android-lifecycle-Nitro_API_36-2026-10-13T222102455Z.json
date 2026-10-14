@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 2,
+  "status": "FAILED_NEEDS_TRIAGE",
+  "classification": "PRODUCT_BUG",
+  "failureClasses": [
+    "PRODUCT_BUG",
+    "TEST_BUG",
+    "FLAKY_TEST",
+    "ENVIRONMENT",
+    "EXPECTED_KNOWN_GAP",
+    "SPEC_AMBIGUITY"
+  ],
+  "platform": "android",
+  "appId": "com.dale16.superhabits",
+  "target": "android emulator-5594",
+  "targetLabel": "Nitro_API_36",
+  "avd": "Nitro_API_36",
+  "ownedEmulator": false,
+  "stateReset": false,
+  "provisioned": true,
+  "installedApkSha256": "01078A8843B02F3A33E9A73491409E445C3D3A282026A415FE396A10984D3899",
+  "binaryNote": "Provisioned the current-source build; installed APK SHA-256 01078A8843B02F3A33E9A73491409E445C3D3A282026A415FE396A10984D3899.",
+  "hermeticBuild": {
+    "envFileLoading": "blocked (EXPO_NO_DOTENV=1)",
+    "strippedAmbientEnv": [],
+    "remoteEnvRefused": []
+  },
+  "remoteConfiguration": {
+    "mode": "local-only",
+    "endpoint": null,
+    "anonKeyFingerprint": null,
+    "note": "no remote configured — the hermetic envelope blocked dotenv loading and stripped every ambient EXPO_PUBLIC_* value"
+  },
+  "bundleScan": {
+    "host": "supabase.co",
+    "scannedEntries": 1,
+    "matches": 0
+  },
+  "flowCoverage": {
+    "verdict": "MISMATCH",
+    "expected": [
+      "habit-reminder-actions",
+      "habit-reminder-actions-replay",
+      "habit-reminder-delivery",
+      "pomodoro-lifecycle",
+      "pomodoro-notification-path",
+      "workout-gym-v2-session-lifecycle"
+    ],
+    "executed": [
+      "habit-reminder-actions",
+      "habit-reminder-actions-replay",
+      "habit-reminder-delivery",
+      "pomodoro-lifecycle",
+      "pomodoro-notification-path",
+      "workout-gym-v2-session-lifecycle"
+    ],
+    "missing": [],
+    "unexpected": [],
+    "reason": "Maestro exited 1.",
+    "source": "D:\\Documents\\tryPython\\superhabits-w16-native\\simulation-output\\native\\debug-android-lifecycle-Nitro_API_36-2026-10-13T221523612Z\\.maestro\\tests\\2026-10-14_061524"
+  },
+  "mockState": null,
+  "targetIdentity": {
+    "serial": "emulator-5594",
+    "api": "36",
+    "abi": "x86_64",
+    "avd": "Nitro_API_36"
+  },
+  "packageIdentity": {
+    "appId": "com.dale16.superhabits",
+    "present": true,
+    "versionName": "1.0.0",
+    "versionCode": 1
+  },
+  "buildMetadata": {
+    "schemaVersion": 2,
+    "status": "PASS",
+    "classification": null,
+    "platform": "android",
+    "appId": "com.dale16.superhabits",
+    "buildKind": "canonical",
+    "mockAuthUrl": null,
+    "remoteConfiguration": {
+      "mode": "local-only",
+      "endpoint": null,
+      "anonKeyFingerprint": null,
+      "note": "no remote configured — the hermetic envelope blocked dotenv loading and stripped every ambient EXPO_PUBLIC_* value"
+    },
+    "hermeticBuild": {
+      "envFileLoading": "blocked (EXPO_NO_DOTENV=1)",
+      "strippedAmbientEnv": [],
+      "remoteEnvRefused": []
+    },
+    "bundleScan": {
+      "host": "supabase.co",
+      "scannedEntries": 1,
+      "matches": 0
+    },
+    "sourceSha": "581cfebe456371c77ab4baa10b34127828ea578d",
+    "sourceTreeClean": true,
+    "sourceTreeStatus": [],
+    "apkSha256": "01078A8843B02F3A33E9A73491409E445C3D3A282026A415FE396A10984D3899",
+    "apkPath": "android\\app\\build\\outputs\\apk\\release\\app-release.apk",
+    "versionName": "1.0.0",
+    "versionCode": 1,
+    "target": {
+      "serial": "emulator-5594",
+      "api": "36",
+      "abi": "x86_64",
+      "avd": "Nitro_API_36"
+    },
+    "e2eEnvironment": {
+      "EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST": "true"
+    },
+    "prebuildCommand": "npx expo prebuild --platform android --clean",
+    "buildCommand": "android\\gradlew.bat app:assembleRelease --no-daemon --no-build-cache -PreactNativeArchitectures=x86_64",
+    "installCommand": "adb -s emulator-5594 install -r -d -g <apk>",
+    "builtAt": "2026-10-13T22:11:06.214Z",
+    "installedAt": "2026-10-13T22:15:23.064Z",
+    "capturedAt": "2026-10-13T22:11:06.214Z"
+  },
+  "tag": "lifecycle",
+  "flow": ".maestro",
+  "debugOutputDir": "D:\\Documents\\tryPython\\superhabits-w16-native\\simulation-output\\native\\debug-android-lifecycle-Nitro_API_36-2026-10-13T221523612Z",
+  "gitSha": "581cfebe456371c77ab4baa10b34127828ea578d",
+  "replayCommand": "node scripts/qa-native.mjs --platform android --tag lifecycle --serial emulator-5594",
+  "exitCode": 1,
+  "timedOut": false,
+  "error": null,
+  "stdout": "",
+  "stderr": "",
+  "capturedAt": "2026-10-13T22:21:02.455Z"
+}

@@ -4,8 +4,9 @@ import { View, Pressable, TextInput } from 'react-native';
 import { Screen } from '@/core/ui/Screen';
 import { Card } from '@/core/ui/Card';
 import { Button } from '@/core/ui/Button';
-import { PageHeader } from '@/core/ui/PageHeader';
+import { SectionLabel } from '@/core/ui/SectionLabel';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { spacing } from '@/core/theme/designTokens';
 import { buildWeeklyReviewSummary } from './weeklyReview.summary';
 import {
   validateReviewDraft,
@@ -13,11 +14,13 @@ import {
   buildNextWeekPlanSuggestions,
   MAX_PRIORITIES,
   MAX_REFLECTION_LENGTH,
+  MAX_COMMITMENT_NOTES_LENGTH,
 } from './weeklyReview.domain';
 import { executeWeeklyReview, type ExecutionResult } from './weeklyReview.executor';
 import { applyNextWeekPlanSuggestions } from './weeklyReview.applyNextWeek';
 import { getWeeklyReviewByWeekKey } from './weeklyReview.data';
 import { ReviewHistoryView } from './ReviewHistoryView';
+import { weekHasAnyScheduledOrRecordedActivity } from './weeklyReviewScreenGuards';
 import type {
   WeeklyReviewSummaryV1,
   WeeklyReviewDraft,
@@ -26,22 +29,29 @@ import type {
   NewTodoCommitmentDraft,
 } from './weeklyReview.types';
 
-type Step =
-  'summary' | 'insights' | 'todos' | 'priorities' | 'new_todos' | 'reflection' | 'preview' | 'done';
+/**
+ * W12 reflection model (design D12.2): `Review → Decide → Plan → Reflect →
+ * Confirm`. The previous seven-step wizard spent four of its steps on read-only
+ * statistics before the user reached any decision; this model leads with the
+ * week's factual story and then asks for the decisions that actually persist.
+ * Every domain count from Summary+Insights is preserved behind one `All
+ * numbers` disclosure, and no step loses draft state.
+ */
+type Step = 'review' | 'decide' | 'plan' | 'reflect' | 'confirm' | 'done';
 
-const STEP_ORDER: Step[] = [
-  'summary',
-  'insights',
-  'todos',
-  'priorities',
-  'new_todos',
-  'reflection',
-  'preview',
-];
+const STEP_ORDER: Step[] = ['review', 'decide', 'plan', 'reflect', 'confirm'];
+
+const STEP_LABELS: Record<Exclude<Step, 'done'>, string> = {
+  review: 'Review',
+  decide: 'Decide',
+  plan: 'Plan',
+  reflect: 'Reflect',
+  confirm: 'Confirm',
+};
 
 export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
   const { tokens } = useAppTheme();
-  const [step, setStep] = useState<Step>('summary');
+  const [step, setStep] = useState<Step>('review');
   const [summary, setSummary] = useState<WeeklyReviewSummaryV1 | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +65,9 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
   const [executing, setExecuting] = useState(false);
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [showAllNumbers, setShowAllNumbers] = useState(false);
   const [applyStatus, setApplyStatus] = useState<'idle' | 'applying' | 'applied' | 'error'>('idle');
   const [applyMessage, setApplyMessage] = useState<string | null>(null);
 
@@ -105,7 +117,7 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
   }, [canGoForward, currentStepIndex]);
 
   const handleConfirm = useCallback(async () => {
-    if (!summary) return;
+    if (!summary || executing) return;
     const draft: WeeklyReviewDraft = {
       weekKey: week.weekKey,
       todoDecisions,
@@ -119,26 +131,36 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
       return;
     }
     setValidationErrors([]);
+    setSaveError(null);
     setExecuting(true);
     try {
       const result = await executeWeeklyReview({ summary, draft });
       setExecutionResult(result);
       setStep('done');
     } catch (e) {
-      setValidationErrors([e instanceof Error ? e.message : 'Execution failed']);
+      // A rejected review write must never reach the completion state.
+      setSaveError(
+        e instanceof Error
+          ? `The review was not saved: ${e.message}`
+          : 'The review was not saved. Try again.',
+      );
     } finally {
       setExecuting(false);
     }
-  }, [summary, week.weekKey, todoDecisions, priorities, newCommitments, reflection]);
+  }, [summary, week.weekKey, todoDecisions, priorities, newCommitments, reflection, executing]);
 
   const handleConfirmPress = useCallback(() => {
     void handleConfirm();
   }, [handleConfirm]);
 
-  const failedCommitmentCount = useMemo(
-    () => executionResult?.commitmentOutcomes.filter((o) => o.status === 'failed').length ?? 0,
+  // Codex P2 (PR #76): a partially-failed run must not read as a clean success.
+  // The executor deliberately resolves after saving the review row even when a
+  // commitment is rejected, so the surface has to name what did not persist.
+  const failedCommitments = useMemo(
+    () => executionResult?.commitmentOutcomes.filter((o) => o.status === 'failed') ?? [],
     [executionResult],
   );
+  const failedCommitmentCount = failedCommitments.length;
 
   const carryForwardTodoIds = useMemo(
     () =>
@@ -193,8 +215,13 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
       accessibilityRole="button"
       accessibilityLabel={showHistory ? 'Hide past reviews' : 'Show past reviews'}
       accessibilityState={{ expanded: showHistory }}
-      className="mb-3 self-start rounded-full border px-3 py-1.5"
-      style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+      aria-expanded={showHistory}
+      className="mb-3 self-start justify-center rounded-xl border px-3"
+      style={{
+        borderColor: tokens.border,
+        backgroundColor: tokens.surface,
+        minHeight: 44,
+      }}
       onPress={() => setShowHistory((current) => !current)}
     >
       <Text className="text-sm" style={{ color: tokens.text }}>
@@ -206,7 +233,6 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
   if (loading) {
     return (
       <Screen scroll>
-        <PageHeader title="Weekly Review" />
         <View className="items-center py-12">
           <Text className="text-base" style={{ color: tokens.textMuted }}>
             Loading weekly summary…
@@ -219,7 +245,6 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
   if (error || !summary) {
     return (
       <Screen scroll>
-        <PageHeader title="Weekly Review" />
         <Card>
           <Text className="text-base text-center py-6" style={{ color: tokens.dangerText }}>
             {error ?? 'Failed to load summary'}
@@ -233,30 +258,59 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
   if (step === 'done') {
     return (
       <Screen scroll>
-        <PageHeader title="Weekly Review" />
         {historyToggle}
         {showHistory ? (
           <View className="mb-4">
             <ReviewHistoryView />
           </View>
         ) : null}
-        <Card accentColor={tokens.successText ?? '#16a34a'}>
+        <Card
+          accentColor={
+            failedCommitmentCount > 0
+              ? (tokens.warningText ?? '#d97706')
+              : (tokens.successText ?? '#16a34a')
+          }
+        >
           <View className="py-8 items-center">
-            <Text className="text-2xl font-bold mb-2" style={{ color: tokens.text }}>
-              Review Complete ✓
+            {/* The review row IS saved in both cases; when a commitment was
+                rejected the heading and copy say so instead of celebrating. */}
+            <Text variant="titleLg" className="mb-2" style={{ color: tokens.text }}>
+              {failedCommitmentCount > 0 ? 'Review saved — some items need retry' : 'Review saved'}
             </Text>
             <Text className="text-base text-center mb-6" style={{ color: tokens.textMuted }}>
-              Your weekly review for {week.startDateKey} – {week.endDateKey} has been saved.
+              Your weekly review for {week.startDateKey} – {week.endDateKey} is saved.
             </Text>
             {failedCommitmentCount > 0 ? (
-              <Text className="mb-4 text-center text-sm" style={{ color: tokens.dangerText }}>
-                {failedCommitmentCount} new commitment
-                {failedCommitmentCount === 1 ? '' : 's'} could not be created. Re-confirming the
-                review will retry only those.
-              </Text>
+              <View className="mb-4 w-full items-center gap-1">
+                <Text className="text-center text-sm" style={{ color: tokens.dangerText }}>
+                  {failedCommitmentCount === 1
+                    ? 'One new commitment was not created:'
+                    : `${failedCommitmentCount} new commitments were not created:`}
+                </Text>
+                {failedCommitments.map((outcome) => (
+                  <Text
+                    key={outcome.commitmentId}
+                    className="text-center text-sm"
+                    style={{ color: tokens.dangerText }}
+                  >
+                    • {outcome.title || '(untitled)'}
+                  </Text>
+                ))}
+                <Text className="text-center text-xs" style={{ color: tokens.textMuted }}>
+                  Retrying creates only the missing items; ones already created are not duplicated.
+                </Text>
+              </View>
+            ) : null}
+            {failedCommitmentCount > 0 ? (
+              <Button
+                label={executing ? 'Retrying…' : 'Retry failed commitments'}
+                variant="secondary"
+                disabled={executing}
+                onPress={handleConfirmPress}
+              />
             ) : null}
             {nextWeekSuggestions.length > 0 && applyStatus !== 'applied' ? (
-              <View className="mb-6 w-full items-center gap-2">
+              <View className="mb-6 mt-4 w-full items-center gap-2">
                 <Text className="text-center text-sm" style={{ color: tokens.textMuted }}>
                   {carryForwardTodoIds.length} carry-forward candidate
                   {carryForwardTodoIds.length === 1 ? '' : 's'} can seed next week&apos;s daily
@@ -275,7 +329,7 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
             ) : null}
             {applyMessage ? (
               <Text
-                className="mb-6 text-center text-sm"
+                className="mb-6 mt-3 text-center text-sm"
                 style={{ color: applyStatus === 'error' ? tokens.dangerText : tokens.textMuted }}
               >
                 {applyMessage}
@@ -290,7 +344,6 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
 
   return (
     <Screen scroll>
-      <PageHeader title="Weekly Review" />
       {historyToggle}
       {showHistory ? (
         <View className="mb-4">
@@ -298,21 +351,14 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
         </View>
       ) : null}
 
-      {/* Step indicator */}
-      <View className="flex-row justify-center mb-4">
-        {STEP_ORDER.map((s, i) => (
-          <View
-            key={s}
-            className="w-2 h-2 rounded-full mx-1"
-            style={{
-              backgroundColor: i === currentStepIndex ? tokens.primary : tokens.border,
-            }}
-          />
-        ))}
-      </View>
+      {/* Labelled step progress — the baseline's seven unlabelled dots did not
+          tell the user which step they were on or how many remained. */}
+      <Text className="text-xs mb-3" style={{ color: tokens.textMuted }}>
+        Step {currentStepIndex + 1} of {STEP_ORDER.length} · {STEP_LABELS[step]}
+      </Text>
 
       {/* Existing review warning */}
-      {existingReview && step === 'summary' && (
+      {existingReview && step === 'review' && (
         <Card className="mb-3">
           <Text className="text-sm" style={{ color: tokens.warningText ?? '#d97706' }}>
             A review for this week already exists. Saving will update it.
@@ -322,32 +368,38 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
 
       {/* Step content */}
       <View className="mb-4">
-        {step === 'summary' && <SummaryStep summary={summary} />}
-        {step === 'insights' && <InsightsStep summary={summary} />}
-        {step === 'todos' && (
+        {step === 'review' && (
+          <ReviewStep
+            summary={summary}
+            showAllNumbers={showAllNumbers}
+            onToggleAllNumbers={() => setShowAllNumbers((open) => !open)}
+          />
+        )}
+        {step === 'decide' && (
           <TodoDecisionsStep
             summary={summary}
             decisions={todoDecisions}
             onChange={setTodoDecisions}
           />
         )}
-        {step === 'priorities' && (
-          <PrioritiesStep priorities={priorities} onChange={setPriorities} />
+        {step === 'plan' && (
+          <PlanStep
+            priorities={priorities}
+            onPrioritiesChange={setPriorities}
+            commitments={newCommitments}
+            onCommitmentsChange={setNewCommitments}
+            nextWeekStartDateKey={week.nextWeekStartDateKey}
+          />
         )}
-        {step === 'new_todos' && (
-          <NewCommitmentsStep commitments={newCommitments} onChange={setNewCommitments} />
-        )}
-        {step === 'reflection' && (
-          <ReflectionStep reflection={reflection} onChange={setReflection} />
-        )}
-        {step === 'preview' && (
-          <PreviewStep
-            summary={summary}
+        {step === 'reflect' && <ReflectionStep reflection={reflection} onChange={setReflection} />}
+        {step === 'confirm' && (
+          <ConfirmStep
             todoDecisions={todoDecisions}
             priorities={priorities}
             newCommitments={newCommitments}
             reflection={reflection}
             validationErrors={validationErrors}
+            saveError={saveError}
           />
         )}
       </View>
@@ -355,7 +407,7 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
       {/* Navigation */}
       <View className="flex-row justify-between mt-2">
         {canGoBack ? <Button label="Back" variant="ghost" onPress={goBack} /> : <View />}
-        {step === 'preview' ? (
+        {step === 'confirm' ? (
           <Button
             label={executing ? 'Saving…' : 'Confirm & Save'}
             onPress={handleConfirmPress}
@@ -373,123 +425,148 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
 
 // ── Step Components ──────────────────────────────────────────────────────────
 
-function SummaryStep({ summary }: { summary: WeeklyReviewSummaryV1 }) {
+/**
+ * Review step (design D12.2/D12.3): the week context and its factual story
+ * lead; every domain count stays reachable behind one `All numbers`
+ * disclosure so the statistics support the story instead of replacing it.
+ */
+function ReviewStep({
+  summary,
+  showAllNumbers,
+  onToggleAllNumbers,
+}: {
+  summary: WeeklyReviewSummaryV1;
+  showAllNumbers: boolean;
+  onToggleAllNumbers: () => void;
+}) {
   const { tokens } = useAppTheme();
   const w = summary.week;
+  const observations = [...summary.wins, ...summary.attention];
 
   return (
     <View>
-      <Text className="text-lg font-bold mb-3" style={{ color: tokens.text }}>
-        Week of {w.startDateKey} – {w.endDateKey}
+      <Text variant="titleLg" style={{ color: tokens.text }}>
+        {w.startDateKey} – {w.endDateKey}
+      </Text>
+      <Text className="text-sm mt-1 mb-3" style={{ color: tokens.textMuted }}>
+        {weekHasAnyScheduledOrRecordedActivity(summary)
+          ? `Week ${w.weekKey}`
+          : 'Nothing scheduled this week.'}
       </Text>
 
-      <Card headerTitle="Todos" className="mb-3">
-        <StatRow label="Completed" value={summary.todos.completedCount} />
-        <StatRow label="Incomplete" value={summary.todos.incompleteCount} />
-        <StatRow label="Overdue" value={summary.todos.overdueCount} />
-        <StatRow label="Due next week" value={summary.todos.dueNextWeekCount} />
-      </Card>
-
-      <Card headerTitle="Habits" className="mb-3">
-        <StatRow
-          label="Consistency"
-          value={
-            summary.habits.consistencyPercent !== null
-              ? `${summary.habits.consistencyPercent}%`
-              : 'N/A'
-          }
-        />
-        <StatRow
-          label="Completed"
-          value={`${summary.habits.completedOccurrences}/${summary.habits.scheduledOccurrences}`}
-        />
-      </Card>
-
-      <Card headerTitle="Focus" className="mb-3">
-        <StatRow label="Sessions" value={summary.focus.sessions} />
-        <StatRow label="Minutes" value={summary.focus.minutes} />
-        {summary.focus.priorWeekMinutes !== null && (
-          <StatRow label="Prior week" value={`${summary.focus.priorWeekMinutes} min`} />
-        )}
-      </Card>
-
-      <Card headerTitle="Workouts" className="mb-3">
-        <StatRow label="Sessions" value={summary.workouts.sessions} />
-        {summary.workouts.scheduledSessions !== undefined &&
-        summary.workouts.scheduledSessions > 0 ? (
-          <StatRow
-            label="Scheduled"
-            value={`${summary.workouts.sessions}/${summary.workouts.scheduledSessions}`}
-          />
-        ) : null}
-        {summary.workouts.completedSets !== undefined ? (
-          <StatRow label="Completed sets" value={summary.workouts.completedSets} />
-        ) : null}
-        {summary.workouts.measurableVolume !== undefined &&
-        summary.workouts.measurableVolume > 0 ? (
-          <StatRow
-            label="Measurable volume"
-            value={Math.round(summary.workouts.measurableVolume)}
-          />
-        ) : null}
-        {summary.workouts.priorWeekSessions !== null && (
-          <StatRow label="Prior week" value={summary.workouts.priorWeekSessions} />
-        )}
-      </Card>
-
-      <Card headerTitle="Calories" className="mb-3">
-        <StatRow label="Logged days" value={summary.calories.loggedDays} />
-        {summary.calories.averageCaloriesOnLoggedDays !== null && (
-          <StatRow label="Avg/day" value={`${summary.calories.averageCaloriesOnLoggedDays} kcal`} />
-        )}
-        {summary.calories.configuredGoal !== null && (
-          <StatRow label="Goal" value={`${summary.calories.configuredGoal} kcal`} />
-        )}
-      </Card>
-    </View>
-  );
-}
-
-function InsightsStep({ summary }: { summary: WeeklyReviewSummaryV1 }) {
-  const { tokens } = useAppTheme();
-
-  return (
-    <View>
-      <Text className="text-lg font-bold mb-3" style={{ color: tokens.text }}>
-        Wins & Attention
-      </Text>
-
-      {summary.wins.length > 0 && (
-        <Card headerTitle="Wins" className="mb-3">
-          {summary.wins.map((w, i) => (
-            <Text key={i} className="text-sm mb-1" style={{ color: tokens.text }}>
-              ✓ {w.message}
-            </Text>
-          ))}
+      {observations.length > 0 ? (
+        <Card innerClassName="p-4">
+          <View className="gap-1.5">
+            {observations.map((item, i) => (
+              <Text key={`${item.kind}-${i}`} className="text-sm" style={{ color: tokens.text }}>
+                {item.message}
+              </Text>
+            ))}
+          </View>
         </Card>
-      )}
-
-      {summary.attention.length > 0 && (
-        <Card headerTitle="Attention" className="mb-3">
-          {summary.attention.map((a, i) => (
-            <Text
-              key={i}
-              className="text-sm mb-1"
-              style={{ color: tokens.warningText ?? '#d97706' }}
-            >
-              ⚠ {a.message}
-            </Text>
-          ))}
-        </Card>
-      )}
-
-      {summary.wins.length === 0 && summary.attention.length === 0 && (
-        <Card>
-          <Text className="text-sm text-center py-4" style={{ color: tokens.textMuted }}>
+      ) : (
+        <Card innerClassName="p-4">
+          <Text className="text-sm" style={{ color: tokens.textMuted }}>
             No notable wins or attention items this week.
           </Text>
         </Card>
       )}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={showAllNumbers ? 'Hide all numbers' : 'Show all numbers'}
+        accessibilityState={{ expanded: showAllNumbers }}
+        aria-expanded={showAllNumbers}
+        className="min-h-11 mt-3 self-start justify-center rounded-xl border px-3"
+        style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+        onPress={onToggleAllNumbers}
+      >
+        <Text className="text-sm" style={{ color: tokens.text }}>
+          {showAllNumbers ? 'Hide all numbers −' : 'All numbers +'}
+        </Text>
+      </Pressable>
+
+      {showAllNumbers ? (
+        <View className="mt-3 gap-3">
+          <View>
+            <SectionLabel>Todos</SectionLabel>
+            <Card innerClassName="p-0">
+              <StatRow label="Completed" value={summary.todos.completedCount} />
+              <StatRow label="Incomplete" value={summary.todos.incompleteCount} />
+              <StatRow label="Overdue" value={summary.todos.overdueCount} />
+              <StatRow label="Due next week" value={summary.todos.dueNextWeekCount} />
+            </Card>
+          </View>
+          <View>
+            <SectionLabel>Habits</SectionLabel>
+            <Card innerClassName="p-0">
+              <StatRow
+                label="Consistency"
+                value={
+                  summary.habits.consistencyPercent !== null
+                    ? `${summary.habits.consistencyPercent}%`
+                    : 'Not tracked'
+                }
+              />
+              <StatRow
+                label="Completed"
+                value={`${summary.habits.completedOccurrences}/${summary.habits.scheduledOccurrences}`}
+              />
+            </Card>
+          </View>
+          <View>
+            <SectionLabel>Focus</SectionLabel>
+            <Card innerClassName="p-0">
+              <StatRow label="Sessions" value={summary.focus.sessions} />
+              <StatRow label="Minutes" value={`${summary.focus.minutes} min`} />
+              {summary.focus.priorWeekMinutes !== null && (
+                <StatRow label="Prior week" value={`${summary.focus.priorWeekMinutes} min`} />
+              )}
+            </Card>
+          </View>
+          <View>
+            <SectionLabel>Workouts</SectionLabel>
+            <Card innerClassName="p-0">
+              <StatRow label="Sessions" value={summary.workouts.sessions} />
+              {summary.workouts.scheduledSessions !== undefined &&
+              summary.workouts.scheduledSessions > 0 ? (
+                <StatRow
+                  label="Scheduled"
+                  value={`${summary.workouts.sessions}/${summary.workouts.scheduledSessions}`}
+                />
+              ) : null}
+              {summary.workouts.completedSets !== undefined ? (
+                <StatRow label="Completed sets" value={summary.workouts.completedSets} />
+              ) : null}
+              {summary.workouts.measurableVolume !== undefined &&
+              summary.workouts.measurableVolume > 0 ? (
+                <StatRow
+                  label="Measurable volume"
+                  value={Math.round(summary.workouts.measurableVolume)}
+                />
+              ) : null}
+              {summary.workouts.priorWeekSessions !== null && (
+                <StatRow label="Prior week" value={summary.workouts.priorWeekSessions} />
+              )}
+            </Card>
+          </View>
+          <View>
+            <SectionLabel>Calories</SectionLabel>
+            <Card innerClassName="p-0">
+              <StatRow label="Logged days" value={summary.calories.loggedDays} />
+              {summary.calories.averageCaloriesOnLoggedDays !== null && (
+                <StatRow
+                  label="Avg/day"
+                  value={`${summary.calories.averageCaloriesOnLoggedDays} kcal`}
+                />
+              )}
+              {summary.calories.configuredGoal !== null && (
+                <StatRow label="Goal" value={`${summary.calories.configuredGoal} kcal`} />
+              )}
+            </Card>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -509,8 +586,8 @@ function TodoDecisionsStep({
   if (incompleteTodos.length === 0) {
     return (
       <View>
-        <Text className="text-lg font-bold mb-3" style={{ color: tokens.text }}>
-          Todo Decisions
+        <Text variant="titleLg" className="mb-3" style={{ color: tokens.text }}>
+          Decide
         </Text>
         <Card>
           <Text className="text-sm text-center py-4" style={{ color: tokens.textMuted }}>
@@ -535,15 +612,18 @@ function TodoDecisionsStep({
 
   return (
     <View>
-      <Text className="text-lg font-bold mb-3" style={{ color: tokens.text }}>
-        Todo Decisions
+      <Text variant="titleLg" style={{ color: tokens.text }}>
+        Decide
+      </Text>
+      <Text className="text-sm mt-1 mb-3" style={{ color: tokens.textMuted }}>
+        What happens to this week&apos;s unfinished todos?
       </Text>
       {incompleteTodos.map((todo) => {
         const decision = decisions.find((d) => d.todoId === todo.id);
         const currentAction = decision?.action ?? 'leave';
 
         return (
-          <Card key={todo.id} className="mb-2">
+          <Card key={todo.id} className="mb-2" innerClassName="p-3">
             <Text className="text-sm font-medium mb-2" style={{ color: tokens.text }}>
               {todo.title}
             </Text>
@@ -551,10 +631,16 @@ function TodoDecisionsStep({
               {(['leave', 'carry_forward', 'reschedule'] as const).map((action) => (
                 <Pressable
                   key={action}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${action === 'leave' ? 'Leave' : action === 'carry_forward' ? 'Carry forward' : 'Reschedule'} ${todo.title}`}
+                  accessibilityState={{ selected: currentAction === action }}
                   onPress={() => updateDecision(todo.id, action)}
-                  className="px-3 py-1 rounded-full"
+                  className="justify-center rounded-full px-3"
                   style={{
+                    minHeight: 44,
                     backgroundColor: currentAction === action ? tokens.primary : tokens.surface,
+                    borderWidth: 1,
+                    borderColor: currentAction === action ? tokens.primary : tokens.border,
                   }}
                 >
                   <Text
@@ -566,7 +652,7 @@ function TodoDecisionsStep({
                     {action === 'leave'
                       ? 'Leave'
                       : action === 'carry_forward'
-                        ? 'Carry'
+                        ? 'Carry forward'
                         : 'Reschedule'}
                   </Text>
                 </Pressable>
@@ -579,37 +665,71 @@ function TodoDecisionsStep({
   );
 }
 
-function PrioritiesStep({
+/**
+ * Plan step (design D12.2): next-week priorities and new commitments in one
+ * step. Priorities lead with exactly one add affordance bounded by the existing
+ * minimum/maximum; commitments follow with exactly one add affordance and
+ * notes behind a per-row disclosure. No draft value is lost on step change.
+ */
+function PlanStep({
   priorities,
-  onChange,
+  onPrioritiesChange,
+  commitments,
+  onCommitmentsChange,
+  nextWeekStartDateKey,
 }: {
   priorities: WeeklyPriorityDraft[];
-  onChange: (p: WeeklyPriorityDraft[]) => void;
+  onPrioritiesChange: (p: WeeklyPriorityDraft[]) => void;
+  commitments: NewTodoCommitmentDraft[];
+  onCommitmentsChange: (c: NewTodoCommitmentDraft[]) => void;
+  nextWeekStartDateKey: string;
 }) {
   const { tokens } = useAppTheme();
+  const [expandedCommitment, setExpandedCommitment] = useState<string | null>(null);
 
   const addPriority = () => {
     if (priorities.length >= MAX_PRIORITIES) return;
-    onChange([...priorities, { id: `p${Date.now()}`, text: '' }]);
+    onPrioritiesChange([...priorities, { id: `p${Date.now()}${priorities.length}`, text: '' }]);
   };
 
   const updatePriority = (id: string, text: string) => {
-    onChange(priorities.map((p) => (p.id === id ? { ...p, text } : p)));
+    onPrioritiesChange(priorities.map((p) => (p.id === id ? { ...p, text } : p)));
   };
 
   const removePriority = (id: string) => {
-    onChange(priorities.filter((p) => p.id !== id));
+    onPrioritiesChange(priorities.filter((p) => p.id !== id));
+  };
+
+  const addCommitment = () => {
+    onCommitmentsChange([
+      ...commitments,
+      {
+        id: `c${Date.now()}${commitments.length}`,
+        title: '',
+        priority: 'normal' as const,
+        dueDate: nextWeekStartDateKey,
+      },
+    ]);
+  };
+
+  const updateCommitment = (id: string, updates: Partial<NewTodoCommitmentDraft>) => {
+    onCommitmentsChange(commitments.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+  };
+
+  const removeCommitment = (id: string) => {
+    onCommitmentsChange(commitments.filter((c) => c.id !== id));
   };
 
   return (
     <View>
-      <Text className="text-lg font-bold mb-1" style={{ color: tokens.text }}>
-        Next Week Priorities
+      <Text variant="titleLg" style={{ color: tokens.text }}>
+        Plan
       </Text>
-      <Text className="text-sm mb-3" style={{ color: tokens.textMuted }}>
-        Choose 1–{MAX_PRIORITIES} priorities to protect next week.
+      <Text className="text-sm mt-1 mb-3" style={{ color: tokens.textMuted }}>
+        Protect 1–{MAX_PRIORITIES} priorities next week, and add any commitments.
       </Text>
 
+      <SectionLabel>Next week priorities</SectionLabel>
       {priorities.map((p, i) => (
         <View key={p.id} className="flex-row items-center mb-2">
           <Text className="text-sm mr-2 w-5" style={{ color: tokens.textMuted }}>
@@ -619,8 +739,10 @@ function PrioritiesStep({
             value={p.text}
             onChangeText={(text) => updatePriority(p.id, text)}
             placeholder={`Priority ${i + 1}`}
+            accessibilityLabel={`Priority ${i + 1}`}
             className="flex-1 px-3 py-2 rounded-lg text-sm"
             style={{
+              minHeight: 44,
               backgroundColor: tokens.surface,
               color: tokens.text,
               borderWidth: 1,
@@ -628,97 +750,130 @@ function PrioritiesStep({
             }}
             maxLength={200}
           />
-          <Pressable onPress={() => removePriority(p.id)} className="ml-2 p-1">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Remove priority ${i + 1}`}
+            onPress={() => removePriority(p.id)}
+            className="ml-2 h-11 w-11 items-center justify-center"
+          >
             <Text style={{ color: tokens.dangerText }}>✕</Text>
           </Pressable>
         </View>
       ))}
 
-      {priorities.length < MAX_PRIORITIES && (
-        <Button label="+ Add Priority" variant="ghost" onPress={addPriority} />
-      )}
-    </View>
-  );
-}
+      {priorities.length < MAX_PRIORITIES ? (
+        <Button label="Add priority" variant="ghost" onPress={addPriority} />
+      ) : null}
 
-function NewCommitmentsStep({
-  commitments,
-  onChange,
-}: {
-  commitments: NewTodoCommitmentDraft[];
-  onChange: (c: NewTodoCommitmentDraft[]) => void;
-}) {
-  const { tokens } = useAppTheme();
+      <View className="mt-4">
+        <SectionLabel>New commitments</SectionLabel>
+        <Text className="text-xs mb-2" style={{ color: tokens.textMuted }}>
+          Optional new todos for next week.
+        </Text>
 
-  const addCommitment = () => {
-    onChange([
-      ...commitments,
-      {
-        id: `c${Date.now()}`,
-        title: '',
-        priority: 'normal' as const,
-        dueDate: getReviewWeek().nextWeekStartDateKey,
-      },
-    ]);
-  };
+        {commitments.map((c) => {
+          const expanded = expandedCommitment === c.id;
+          return (
+            <Card key={c.id} className="mb-2" innerClassName="p-3">
+              <View className="flex-row items-center">
+                <TextInput
+                  value={c.title}
+                  onChangeText={(text) => updateCommitment(c.id, { title: text })}
+                  placeholder="Todo title"
+                  accessibilityLabel="Commitment title"
+                  className="flex-1 px-3 py-2 rounded-lg text-sm"
+                  style={{
+                    minHeight: 44,
+                    backgroundColor: tokens.surface,
+                    color: tokens.text,
+                    borderWidth: 1,
+                    borderColor: tokens.border,
+                  }}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove commitment ${c.title || 'untitled'}`}
+                  onPress={() => removeCommitment(c.id)}
+                  className="ml-2 h-11 w-11 items-center justify-center"
+                >
+                  <Text style={{ color: tokens.dangerText }}>✕</Text>
+                </Pressable>
+              </View>
+              <View className="flex-row items-center mt-1">
+                <Text className="text-xs mr-2" style={{ color: tokens.textMuted }}>
+                  Due {c.dueDate ?? nextWeekStartDateKey}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    expanded ? 'Hide commitment options' : 'Show commitment options'
+                  }
+                  accessibilityState={{ expanded }}
+                  aria-expanded={expanded}
+                  className="justify-center rounded-lg border px-2"
+                  style={{
+                    // 44pt touch contract (W14-01); the visible label stays small.
+                    minHeight: 44,
+                    borderColor: tokens.border,
+                    backgroundColor: tokens.surface,
+                  }}
+                  onPress={() => setExpandedCommitment(expanded ? null : c.id)}
+                >
+                  <Text className="text-xs" style={{ color: tokens.text }}>
+                    {expanded ? 'Options −' : 'Options +'}
+                  </Text>
+                </Pressable>
+              </View>
+              {expanded ? (
+                <View className="mt-2 gap-2">
+                  <View className="flex-row items-center">
+                    <Text className="text-xs mr-2 w-12" style={{ color: tokens.textMuted }}>
+                      Due
+                    </Text>
+                    <TextInput
+                      value={c.dueDate ?? ''}
+                      onChangeText={(text) => updateCommitment(c.id, { dueDate: text })}
+                      placeholder="YYYY-MM-DD"
+                      accessibilityLabel="Commitment due date"
+                      className="flex-1 px-3 py-1 rounded text-xs"
+                      style={{
+                        minHeight: 44,
+                        backgroundColor: tokens.surface,
+                        color: tokens.text,
+                        borderWidth: 1,
+                        borderColor: tokens.border,
+                      }}
+                    />
+                  </View>
+                  <View className="flex-row items-center">
+                    <Text className="text-xs mr-2 w-12" style={{ color: tokens.textMuted }}>
+                      Notes
+                    </Text>
+                    <TextInput
+                      value={c.notes ?? ''}
+                      onChangeText={(text) => updateCommitment(c.id, { notes: text })}
+                      placeholder="Optional notes"
+                      accessibilityLabel="Commitment notes"
+                      multiline
+                      className="flex-1 px-3 py-1 rounded text-xs"
+                      style={{
+                        minHeight: 60,
+                        backgroundColor: tokens.surface,
+                        color: tokens.text,
+                        borderWidth: 1,
+                        borderColor: tokens.border,
+                      }}
+                      maxLength={MAX_COMMITMENT_NOTES_LENGTH}
+                    />
+                  </View>
+                </View>
+              ) : null}
+            </Card>
+          );
+        })}
 
-  const updateCommitment = (id: string, updates: Partial<NewTodoCommitmentDraft>) => {
-    onChange(commitments.map((c) => (c.id === id ? { ...c, ...updates } : c)));
-  };
-
-  const removeCommitment = (id: string) => {
-    onChange(commitments.filter((c) => c.id !== id));
-  };
-
-  return (
-    <View>
-      <Text className="text-lg font-bold mb-1" style={{ color: tokens.text }}>
-        New Commitments
-      </Text>
-      <Text className="text-sm mb-3" style={{ color: tokens.textMuted }}>
-        Create new Todos for next week (optional).
-      </Text>
-
-      {commitments.map((c) => (
-        <Card key={c.id} className="mb-2">
-          <View className="flex-row items-center mb-2">
-            <TextInput
-              value={c.title}
-              onChangeText={(text) => updateCommitment(c.id, { title: text })}
-              placeholder="Todo title"
-              className="flex-1 px-3 py-2 rounded-lg text-sm"
-              style={{
-                backgroundColor: tokens.surface,
-                color: tokens.text,
-                borderWidth: 1,
-                borderColor: tokens.border,
-              }}
-            />
-            <Pressable onPress={() => removeCommitment(c.id)} className="ml-2 p-1">
-              <Text style={{ color: tokens.dangerText }}>✕</Text>
-            </Pressable>
-          </View>
-          <View className="flex-row items-center">
-            <Text className="text-xs mr-2" style={{ color: tokens.textMuted }}>
-              Due:
-            </Text>
-            <TextInput
-              value={c.dueDate ?? ''}
-              onChangeText={(text) => updateCommitment(c.id, { dueDate: text })}
-              placeholder="YYYY-MM-DD"
-              className="flex-1 px-3 py-1 rounded text-xs"
-              style={{
-                backgroundColor: tokens.surface,
-                color: tokens.text,
-                borderWidth: 1,
-                borderColor: tokens.border,
-              }}
-            />
-          </View>
-        </Card>
-      ))}
-
-      <Button label="+ Add Commitment" variant="ghost" onPress={addCommitment} />
+        <Button label="Add commitment" variant="ghost" onPress={addCommitment} />
+      </View>
     </View>
   );
 }
@@ -734,16 +889,17 @@ function ReflectionStep({
 
   return (
     <View>
-      <Text className="text-lg font-bold mb-1" style={{ color: tokens.text }}>
-        Reflection
+      <Text variant="titleLg" style={{ color: tokens.text }}>
+        Reflect
       </Text>
-      <Text className="text-sm mb-3" style={{ color: tokens.textMuted }}>
+      <Text className="text-sm mt-1 mb-3" style={{ color: tokens.textMuted }}>
         Optional notes about your week.
       </Text>
       <TextInput
         value={reflection}
         onChangeText={onChange}
         placeholder="How did this week go?"
+        accessibilityLabel="Weekly reflection"
         multiline
         numberOfLines={6}
         textAlignVertical="top"
@@ -764,20 +920,20 @@ function ReflectionStep({
   );
 }
 
-function PreviewStep({
-  summary,
+function ConfirmStep({
   todoDecisions,
   priorities,
   newCommitments,
   reflection,
   validationErrors,
+  saveError,
 }: {
-  summary: WeeklyReviewSummaryV1;
   todoDecisions: WeeklyTodoDecision[];
   priorities: WeeklyPriorityDraft[];
   newCommitments: NewTodoCommitmentDraft[];
   reflection: string;
   validationErrors: string[];
+  saveError: string | null;
 }) {
   const { tokens } = useAppTheme();
 
@@ -786,12 +942,12 @@ function PreviewStep({
 
   return (
     <View>
-      <Text className="text-lg font-bold mb-3" style={{ color: tokens.text }}>
-        Preview
+      <Text variant="titleLg" className="mb-3" style={{ color: tokens.text }}>
+        Review changes
       </Text>
 
       {validationErrors.length > 0 && (
-        <Card className="mb-3">
+        <Card className="mb-3" innerClassName="p-3">
           {validationErrors.map((e, i) => (
             <Text key={i} className="text-sm" style={{ color: tokens.dangerText }}>
               {e}
@@ -800,53 +956,52 @@ function PreviewStep({
         </Card>
       )}
 
-      <Card headerTitle="Priorities" className="mb-3">
-        {priorities.length === 0 ? (
-          <Text className="text-sm" style={{ color: tokens.textMuted }}>
-            None
+      {saveError ? (
+        <Card className="mb-3" innerClassName="p-3">
+          <Text className="text-sm" style={{ color: tokens.dangerText }}>
+            {saveError}
           </Text>
-        ) : (
-          priorities.map((p, i) => (
-            <Text key={p.id} className="text-sm" style={{ color: tokens.text }}>
-              {i + 1}. {p.text || '(empty)'}
-            </Text>
-          ))
-        )}
+        </Card>
+      ) : null}
+
+      <Card className="mb-3" innerClassName="p-0">
+        <StatRow label="Priorities" value={priorities.length} />
+        <StatRow label="Carried forward" value={carryForwards.length} />
+        <StatRow label="Rescheduled" value={reschedules.length} />
+        <StatRow label="New commitments" value={newCommitments.length} />
+        <StatRow label="Reflection" value={reflection ? 'included' : 'none'} />
       </Card>
 
-      {carryForwards.length > 0 && (
-        <Card headerTitle="Carry Forward" className="mb-3">
-          <Text className="text-sm" style={{ color: tokens.textMuted }}>
-            {carryForwards.length} todo(s) will be carried to next week
-          </Text>
-        </Card>
-      )}
+      {priorities.length > 0 ? (
+        <View className="mb-3">
+          <SectionLabel>Priorities</SectionLabel>
+          <Card innerClassName="p-3">
+            {priorities.map((p, i) => (
+              <Text key={p.id} className="text-sm" style={{ color: tokens.text }}>
+                {i + 1}. {p.text || '(empty)'}
+              </Text>
+            ))}
+          </Card>
+        </View>
+      ) : null}
 
-      {reschedules.length > 0 && (
-        <Card headerTitle="Rescheduled" className="mb-3">
-          <Text className="text-sm" style={{ color: tokens.textMuted }}>
-            {reschedules.length} todo(s) will be rescheduled
-          </Text>
-        </Card>
-      )}
+      {newCommitments.length > 0 ? (
+        <View className="mb-3">
+          <SectionLabel>New commitments</SectionLabel>
+          <Card innerClassName="p-3">
+            {newCommitments.map((c) => (
+              <Text key={c.id} className="text-sm" style={{ color: tokens.text }}>
+                + {c.title || '(empty)'} {c.dueDate ? `due ${c.dueDate}` : ''}
+              </Text>
+            ))}
+          </Card>
+        </View>
+      ) : null}
 
-      {newCommitments.length > 0 && (
-        <Card headerTitle="New Commitments" className="mb-3">
-          {newCommitments.map((c) => (
-            <Text key={c.id} className="text-sm" style={{ color: tokens.text }}>
-              + {c.title || '(empty)'} {c.dueDate ? `due ${c.dueDate}` : ''}
-            </Text>
-          ))}
-        </Card>
-      )}
-
-      {reflection && (
-        <Card headerTitle="Reflection" className="mb-3">
-          <Text className="text-sm" style={{ color: tokens.text }}>
-            {reflection}
-          </Text>
-        </Card>
-      )}
+      <Text className="text-xs" style={{ color: tokens.textMuted }}>
+        Saving writes this week&apos;s review and applies the decisions above. Applying
+        carry-forwards to next week&apos;s daily plans is a separate action afterwards.
+      </Text>
     </View>
   );
 }
@@ -856,11 +1011,14 @@ function PreviewStep({
 function StatRow({ label, value }: { label: string; value: number | string }) {
   const { tokens } = useAppTheme();
   return (
-    <View className="flex-row justify-between py-1">
+    <View
+      className="flex-row justify-between items-center px-4"
+      style={{ minHeight: 44, paddingVertical: spacing.xs }}
+    >
       <Text className="text-sm" style={{ color: tokens.textMuted }}>
         {label}
       </Text>
-      <Text className="text-sm font-medium" style={{ color: tokens.text }}>
+      <Text className="text-sm font-medium tabular-nums" style={{ color: tokens.text }}>
         {value}
       </Text>
     </View>

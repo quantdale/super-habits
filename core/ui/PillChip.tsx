@@ -55,6 +55,13 @@ export function PillChip({ label, accessibilityLabel, active, color, onPress, ic
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
         accessibilityState={{ selected: active }}
+        // W13: `accessibilityState` is not mapped to the DOM by this
+        // react-native-web version, so the chip's selected state was invisible
+        // to web assistive tech and to tests. `aria-pressed` is the attribute
+        // the rest of the app already uses for a toggle-style control
+        // (HabitDayStrip / HabitEditorChoice); the chip is a toggle, so it sets
+        // it directly instead of relying on the unmapped state object.
+        aria-pressed={active}
         hitSlop={{ top: 2, bottom: 2 }}
         style={{
           borderRadius: radius.full,

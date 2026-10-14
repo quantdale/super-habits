@@ -45,9 +45,11 @@ tags:
 - waitForAnimationToEnd:
     timeout: 3000
 - tapOn: 'Add routine'
+# The new routine is prepended to the routines list, which sits ABOVE the
+# 'New routine' form, so the row is reached by scrolling UP.
 - scrollUntilVisible:
     element: 'Open Native Gym V2 resume routine routine'
-    direction: DOWN
+    direction: UP
     visibilityPercentage: 50
     centerElement: true
 - waitForAnimationToEnd:
@@ -145,10 +147,12 @@ tags:
     visible: 'Start'
     timeout: 10000
 - tapOn: 'Start'
+# W9 numbers each set's control: the accessible name is `Complete set <n>`,
+# never a bare `Complete set`.
 - extendedWaitUntil:
-    visible: 'Complete set'
+    visible: 'Complete set 1'
     timeout: 5000
-- tapOn: 'Weight input'
+- tapOn: 'Weight'
 - inputText: '42'
 - assertVisible: '42'
 # Enter-to-blur, not hideKeyboard: run 36423379932 failed at this exact step
@@ -157,7 +161,7 @@ tags:
 # killApp/launchApp at 'Resume workout'. Evidence:
 # openspec/changes/final-certification-closure/ios-flow-classification.md
 - pressKey: enter
-- tapOn: 'Reps input'
+- tapOn: 'Reps'
 - inputText: '6'
 - waitForAnimationToEnd:
     timeout: 5000
@@ -174,16 +178,18 @@ tags:
     # "Workout" and an unscoped index-0 match can land on inert content.
     childOf:
       text: 'Section tabs'
+# The landing's active-session panel is titled 'Session in progress' on the
+# current source ('Workout in progress' was the pre-W9.5 wording).
 - extendedWaitUntil:
-    visible: 'Workout in progress'
+    visible: 'Session in progress'
     timeout: 15000
 - tapOn: 'Resume workout'
 - extendedWaitUntil:
-    visible: 'Complete set now'
+    visible: 'Complete set 1'
     timeout: 10000
 - assertVisible: '42'
 - assertVisible: '6'
-- tapOn: 'Complete set now'
+- tapOn: 'Complete set 1'
 - extendedWaitUntil:
     visible: 'Workout complete!'
     timeout: 5000
@@ -192,6 +198,13 @@ tags:
     visible: 'Workout saved'
     timeout: 15000
 - tapOn: 'Done'
+# W9 collapses History & insights by default, and 'Recent sessions' renders
+# inside it, so the disclosure must be opened before the session list exists.
+- scrollUntilVisible:
+    element: 'History and insights'
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn: 'History and insights'
 - scrollUntilVisible:
     element: 'Recent sessions'
     direction: DOWN
@@ -209,6 +222,11 @@ tags:
     # "Workout" and an unscoped index-0 match can land on inert content.
     childOf:
       text: 'Section tabs'
+- scrollUntilVisible:
+    element: 'History and insights'
+    direction: DOWN
+    visibilityPercentage: 50
+- tapOn: 'History and insights'
 - scrollUntilVisible:
     element: 'Recent sessions'
     direction: DOWN

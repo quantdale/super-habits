@@ -646,7 +646,16 @@ W9 host-load classification (same class as gap 15, recorded not silenced):
 the local `tests/agentDocConsistency.test.ts` register-parse failure
 (`expected 0 to be greater than 10`) reproduces on this Windows host because
 git `core.autocrlf=true` checks `docs/testing/known-gaps.md` out as CRLF so
-the parser sees zero entries; CI's LF checkout passes. The W9 D14 baseline is
+the parser sees zero entries; CI's LF checkout passes.
+**W17 correction (2026-10-14):** this was misclassified. The failure is a
+TEST_BUG, not an environment residual. `read()` in
+`tests/agentDocConsistency.test.ts` returned file content verbatim, so on any
+CRLF checkout `^##\s+(.+)$` captured the trailing `
+` and `$` never matched;
+the register parser therefore compared zero entries and tripped its own
+`expect(gaps.length).toBeGreaterThan(10)` guard. Normalizing CRLF -> LF in
+`read()` fixes it on every platform, and `npm test` is now fully green
+(2,691 passed / 2 skipped / 0 failed). The W9 D14 baseline is
 clean: `three-months-in` measured coldOverview 606/5000ms (87.9% headroom),
 maxSwitch 538/800ms (32.8%), diarySearch 367/500ms (26.6%) — no ceiling, floor,
 or assertion changed. Native certification remains outside web evidence
@@ -708,10 +717,77 @@ assertion is now point-tolerant (`Math.round(bounds.width) >= 44`), which keeps
 the 44pt contract while tolerating sub-pixel layout rounding (43.999).
 
 **Inherited residuals unchanged by W10:** braces/node-forge audit reds;
-Windows-CRLF `agentDocConsistency` ENVIRONMENT failure; D14 host-load headroom
+_(the Windows-CRLF `agentDocConsistency` failure listed here was resolved as a
+TEST_BUG in W17 — see the W9 host-load note above and
+`docs/ui-ux/v3-audit/w17/defect-register.md` R-1);_ D14 host-load headroom
 residuals; Focus notification-timestamp residual; Android API36 pending W16;
 iOS owner-deferred; `npm run format:check` reports 134 pre-existing files
 (not a CI quality gate).
+
+### W15 persistent visual-regression baselines (2026-10-14)
+
+**Gate site:** `e2e/visual-regression.spec.ts`
+
+**Reason:** This lane stores PNG goldens, so it is deliberately **not**
+`test.skip`-gated: it runs as the registered `visual` Playwright project in both
+`npm run e2e` (main lane) and an explicit PR-lane CI step followed by its own
+retry-report gate. It carries `retries: 0`, so an unstable baseline fails rather
+than being papered over.
+
+Its only platform limitation is the renderer: the goldens are curated against
+the pinned Chromium served by `scripts/serve-e2e.js` on the repository's
+supported `ubuntu-latest` runners and the documented Windows dev host. A
+different OS/browser renderer (font rasterisation, sub-pixel layout) would
+produce diffs that are **not** absorbed by loosening a threshold — the
+comparison is `maxDiffPixels: 0` by design. Generating or updating baselines is
+a local, reviewed act (`npm run visual:update`, then the
+`docs/ui-ux/v3-audit/w15/golden-manifest.md` change log); CI has no path to
+write them.
+
+**Closing path:** if a supported runner's rendering ever diverges, pin the
+runner (or document the exclusion) rather than relaxing the comparison. Initial
+two-run stability and the negative-sensitivity proof are recorded in
+`docs/ui-ux/v3-audit/w15/README.md`.
+
+### W13 secondary-surface rendered audit (2026-10-14)
+
+**Gate site:** `e2e/secondary-surface-w13-audit.spec.ts`
+
+**Reason:** This before/after visual-evidence instrument is deliberately gated
+by `VISUAL_AUDIT=1` and writes deterministic light/dark/viewport captures for
+the W13 Settings / Command Center / Achievements reconstruction. It is not a
+behavioral regression test and is not supposed to run in every standard CI
+lane. Normal behavior is covered unconditionally by
+`e2e/secondary-surface-w13.spec.ts` (settings value authority, row detail
+disclosure, command input-first, preview-before-confirm), `e2e/settings.spec.ts`,
+`e2e/command.spec.ts`, `e2e/gamification.spec.ts` and `e2e/theming.spec.ts`. The
+opt-in instrument produced the before captures under
+`docs/ui-ux/v3-audit/w13/before/` and the after captures under
+`docs/ui-ux/v3-audit/w13/after/`. No behavioral assertion is skipped in the
+standard lane in reliance on those screenshots.
+
+**Closing path:** W13 evidence is archived. Rerun only after a secondary-surface
+visual change; W15 builds the persistent visual-regression authority.
+
+### W12 reflection-surfaces rendered audit (2026-10-14)
+
+**Gate site:** `e2e/planning-w12-audit.spec.ts`
+
+**Reason:** This before/after visual-evidence instrument is deliberately gated
+by `VISUAL_AUDIT=1` and writes deterministic light/dark/viewport captures for
+the W12 Weekly Review / Progress / Activity reconstruction. It is not a
+behavioral regression test and is not supposed to run in every standard CI
+lane. Normal behavior is covered unconditionally by
+`e2e/planning-w12.spec.ts` (Progress disclosure, zero-prior-window rule,
+Timeline filter persistence/reset, filtered-empty copy) and
+`e2e/weekly-review.spec.ts` (guided review flow with SQLite/outbox oracles and
+a rejected-write regression). The opt-in instrument produced the before
+captures under `docs/ui-ux/v3-audit/w12/before/` and the after captures under
+`docs/ui-ux/v3-audit/w12/after/`. No behavioral assertion is skipped in the
+standard lane in reliance on those screenshots.
+
+**Closing path:** W12 evidence is archived. Rerun only after a reflection-surface
+visual change; W15 builds the persistent visual-regression authority.
 
 ### W11 Planning rendered audit (2026-10-13)
 

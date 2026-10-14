@@ -1,0 +1,61 @@
+# W17 — Release-candidate manifest (Frontend V3 W12–W17)
+
+## Candidate identity
+
+| Field                  | Value                                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------------- |
+| Branch                 | `frontend-v3-w12-w17-integration`                                                                 |
+| Pre-W17 integrated SHA | `d04793bd327a385396337e3a2ef353ad96c15b86` (W16 published)                                        |
+| W17 fix SHA            | `3aaca2a` (verified ladder run)                                                                   |
+| Base                   | `1f23da4defd7fa45c679261e0db5fade1374bbd5` = `origin/main` (W11.5.1)                              |
+| Tree state             | clean for tracked files; only the preserved foreign `.tmp-ios36423379932/` is untracked by policy |
+| Wave commits           | W12 `1d54b70`, W13 `b1569f0`, W14 `c6937b5`, W15 `42d1c20`, W16 `d04793b`, W17 `3aaca2a`          |
+| Pull request           | #76 (`W12–W13` title; body extended with W13) on the campaign branch                              |
+
+## Build and artifacts
+
+| Artifact       | Command                                                       | Identity                                                                                                     |
+| -------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Web/PWA export | `npm run build:e2e`                                           | `dist/`, 0 `supabase.co` hosts                                                                               |
+| Visual goldens | `e2e/__screenshots__/visual-regression.spec.ts/*.png`         | 30 PNGs, set hash `0676368d…` stable across two runs                                                         |
+| Android APK    | `node scripts/qa-native-provision.mjs --serial emulator-5594` | source `b50034d`, SHA-256 `AA89D9FE84AC3B33ADBE75455EB31A6BC09247F39E7B89E35BA945D60EEC2E0E`, 0 remote hosts |
+
+The Android APK was built at `b50034d`. W17's changes are:
+
+- `tests/agentDocConsistency.test.ts` (test-only),
+- `tests/maestroCommandCenterFlowGuards.test.ts` (test-only),
+- `.maestro/flows/command-center-v2.yaml` (a comment moved; the asserted block is unchanged).
+
+None affects native runtime code, so the W16 APK certification remains valid for
+the W17 SHA **for the native lanes it covers**. W17 did not re-run the native
+device matrix; that limitation is recorded in the verification matrix and the
+handoff rather than being silently inherited.
+
+## Environment
+
+| Field      | Value                                                                               |
+| ---------- | ----------------------------------------------------------------------------------- |
+| Node / npm | v24.3.0 / 11.4.2 (repo pins Node 22.23.2 for some lanes; `nvmrc` honored in CI)     |
+| OS         | Windows 11                                                                          |
+| Browser    | pinned Chromium via Playwright `^1.58.2`                                            |
+| Timezone   | `Asia/Manila` (pinned in `playwright.config.ts`)                                    |
+| E2E server | `scripts/serve-e2e.js` on :8086 (owned, terminated after each lane)                 |
+| Android    | emulator 37.1.11.0, AVD `Nitro_API_36` (API 36, x86_64), `-gpu host`, Maestro 2.9.0 |
+
+## CI status
+
+| Field               | Value                                                                                                               |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Hosted quality gate | Baseline (`1f23da4`) and every wave head fail **only** `Audit runtime dependencies` on the two inherited advisories |
+| Hosted e2e/nightly  | skipped behind that gate (not passed)                                                                               |
+| Local equivalent    | every quality step reproduces green locally, including the audit-step output                                        |
+
+## Known limits of this candidate
+
+1. **Android certification is at `b50034d`, not the W17 SHA.** W17's diff is
+   test/docs only, but the strict claim is not re-earned at `3aaca2a`.
+2. **iOS is owner-deferred** and unclaimed.
+3. **Two dependency advisories** remain (no upstream fix; build-time tooling
+   only; absent from both bundles) — recorded, not waived.
+4. Hosted `e2e`/`nightly` have not run since the baseline; local lanes are the
+   evidence.

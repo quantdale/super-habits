@@ -110,7 +110,17 @@ tags:
     direction: DOWN
 - tapOn: 'Inject Snooze response'
 - tapOn: 'Close'
+# Closing the Edit-habit modal dismisses the detail modal too (measured
+# on-device: the Habits list is showing afterwards), so re-open the habit's
+# detail and its Settings tab before reading the schedule/reminder block. The
+# reminder renders inside one caption node ('Current schedule · Reminder
+# 18:00'); Maestro matches the full text.
 - scrollUntilVisible:
-    element: 'Reminder 18:00'
+    element: 'Open Native Gym action details'
     direction: DOWN
-- assertVisible: 'Reminder 18:00'
+- tapOn: 'Open Native Gym action details'
+- tapOn: 'Settings'
+- scrollUntilVisible:
+    element: 'Current schedule · Reminder 18:00'
+    direction: DOWN
+- assertVisible: 'Current schedule · Reminder 18:00'

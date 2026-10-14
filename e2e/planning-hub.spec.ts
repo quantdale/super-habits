@@ -116,7 +116,9 @@ test.describe('Planning Hub', () => {
     });
 
     // --- Progress view: the disposition-ledger Weekly Review entry and the
-    // insight cards (fed live by progress.data through real SQLite). ---
+    // insight surface (fed live by progress.data through real SQLite). W12
+    // leads with the period + narrative and keeps the full metric set behind
+    // one disclosure, so the metric rows are asserted after opening it. ---
     await page.getByRole('tab', { name: 'Progress' }).click();
     await expect(
       page.getByRole('dialog').getByRole('button', { name: 'Open weekly review' }),
@@ -124,8 +126,9 @@ test.describe('Planning Hub', () => {
       timeout: 20_000,
     });
     await expect(page.getByText(/^Last 7 days \(/)).toBeVisible({ timeout: 20_000 });
+    await page.getByRole('button', { name: 'Show metric details' }).click();
     await expect(page.getByText('Tasks completed')).toBeVisible();
-    await expect(page.getByText('Habit completions')).toBeVisible();
+    await expect(page.getByText('Habit check-ins')).toBeVisible();
 
     // --- Timeline view: the real activity rows surface as feed items. ---
     await page.getByRole('tab', { name: 'Timeline' }).click();

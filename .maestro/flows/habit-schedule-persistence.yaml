@@ -61,7 +61,17 @@ tags:
 - extendedWaitUntil:
     visible: 'Native M-W-F habit'
     timeout: 5000
+# The list row shows the schedule only when today is a scheduled day; assert
+# the durable fact in the habit detail modal, which renders the current
+# schedule (and reminder) for any date.
+- tapOn: 'Open Native M-W-F habit details'
+# The schedule/reminder block lives in the detail modal's Settings tab.
+- tapOn: 'Settings'
+- extendedWaitUntil:
+    visible: 'Schedule & reminder'
+    timeout: 10000
 - assertVisible: 'Mon / Wed / Fri'
+- tapOn: 'Close'
 - killApp
 - launchApp
 - extendedWaitUntil:
@@ -77,6 +87,13 @@ tags:
 - extendedWaitUntil:
     visible: 'Native M-W-F habit'
     timeout: 15000
+- tapOn: 'Open Native M-W-F habit details'
+# The schedule/reminder block lives in the detail modal's Settings tab.
+- tapOn: 'Settings'
+- extendedWaitUntil:
+    visible: 'Schedule & reminder'
+    timeout: 10000
 - extendedWaitUntil:
     visible: 'Mon / Wed / Fri'
     timeout: 5000
+- tapOn: 'Close'

@@ -50,8 +50,6 @@ export function SettingsAccessibilitySection() {
         <SettingsSectionHeading
           eyebrow="Accessibility"
           title="Motion"
-          subtitle="Control how much animation SuperHabits uses."
-          icon="accessibility"
           accentColor={tokens.textMuted}
         />
         <Card accentColor={tokens.textMuted} className="mb-0">
@@ -61,8 +59,7 @@ export function SettingsAccessibilitySection() {
                 Reduce motion
               </Text>
               <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-                Reduced motion swaps large animations for instant state changes. Nothing in the app
-                depends on animations playing.
+                Reduced motion swaps large animations for instant state changes.
               </Text>
             </View>
 
@@ -81,23 +78,22 @@ export function SettingsAccessibilitySection() {
               ))}
             </View>
 
+            {/* W13 (SUR-08): one row states the effective motion; the old
+                `Current selection` + `Active behavior` pair narrated the same
+                preference twice. Nothing in the app depends on animations
+                playing, so the guarantee moves into Details. */}
             <SettingsRow
               first
-              label="Current selection"
-              description={MOTION_DESCRIPTIONS[preference]}
-              statusLabel={preference}
-              statusTone="accent"
-              accentColor={tokens.textMuted}
-            />
-            <SettingsRow
-              last
-              label="Active behavior"
-              description={
+              label="Effective motion"
+              value={
                 effectiveMotion === 'reduced'
                   ? 'Animations are minimized right now; state changes stay instant.'
                   : 'Animations play at full motion right now.'
               }
+              explanation={`Nothing in the app depends on animations playing. ${MOTION_DESCRIPTIONS[preference]}`}
               statusLabel={effectiveMotion}
+              accentColor={tokens.textMuted}
+              last
             />
           </View>
         </Card>
@@ -107,8 +103,6 @@ export function SettingsAccessibilitySection() {
         <SettingsSectionHeading
           eyebrow="Accessibility"
           title="Reward feedback"
-          subtitle="How completing habits, quests, and levels feels."
-          icon="celebration"
           accentColor={REWARD_COLORS.accent}
         />
         <Card accentColor={REWARD_COLORS.accent} className="mb-0">
@@ -156,14 +150,17 @@ export function SettingsAccessibilitySection() {
               />
             </View>
 
+            {/* W13 (SUR-08): the pills already carry the values; these two rows
+                state each one once, with the behavioural detail in Details. */}
             <SettingsRow
               first
               label="Haptics"
-              description={
+              value={
                 rewardFeedback.haptics
                   ? 'Vibration feedback is on for completions and milestones.'
                   : 'Vibration feedback is off. Rewards are visual only.'
               }
+              explanation="A routine check-off gets a light tap; milestones get the stronger pattern."
               statusLabel={rewardFeedback.haptics ? 'on' : 'off'}
               statusTone={rewardFeedback.haptics ? 'accent' : 'neutral'}
               accentColor={REWARD_COLORS.accent}
@@ -171,11 +168,12 @@ export function SettingsAccessibilitySection() {
             <SettingsRow
               last
               label="Reward sounds"
-              description={
+              value={
                 rewardFeedback.sound
-                  ? 'Quest and level rewards play a short tone. Check-offs stay silent.'
+                  ? 'Quest and level rewards play a short tone.'
                   : 'All reward sounds are off.'
               }
+              explanation="Check-offs stay silent; only quest, streak, day, badge and level rewards play a tone."
               statusLabel={rewardFeedback.sound ? 'on' : 'off'}
               statusTone={rewardFeedback.sound ? 'accent' : 'neutral'}
               accentColor={REWARD_COLORS.accent}

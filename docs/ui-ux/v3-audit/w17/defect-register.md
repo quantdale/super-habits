@@ -1,0 +1,149 @@
+# W17 — Defect register
+
+Findings reproduced on the integrated W12–W16 source during the W17 ladder, plus
+the carried residuals from earlier waves. Every entry names an owner and a
+verification state; nothing here is marked fixed without evidence.
+
+## Resolved in W17
+
+### R-1 — `agentDocConsistency` register check never ran (TEST_BUG, fixed)
+
+| Field                         | Value                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Surface                       | `tests/agentDocConsistency.test.ts` → `docs/testing/known-gaps.md`                                                                                                                                                                                                                                                                                                          |
+| Category                      | TEST_BUG (misclassified for 10 waves as `ENVIRONMENT`)                                                                                                                                                                                                                                                                                                                      |
+| Severity                      | P2 — a documentation-consistency guard silently stopped guarding                                                                                                                                                                                                                                                                                                            |
+| Source                        | `d04793b` (reproduced); fixed at `3aaca2a`                                                                                                                                                                                                                                                                                                                                  |
+| Repro                         | `npx vitest run --project unit tests/agentDocConsistency.test.ts` → `expected 0 to be greater than 10`                                                                                                                                                                                                                                                                      |
+| Root cause                    | `read()` returned file content verbatim. With `core.autocrlf=true` a Windows checkout materializes tracked text as CRLF; the parser splits on `\n` and anchors headings with `^##\s+(.+)$`, so `(.+)` captured the trailing `\r` and `$` never matched. The register section list came back empty, tripping the test's own `expect(gaps.length).toBeGreaterThan(10)` guard. |
+| Proof it is not environmental | Normalizing the same bytes yields **2** matching sections (`contract gaps`, `capability gaps`) and 11/11 tests pass; the identical failure reproduced on pristine `main` because that checkout has the same CRLF materialization.                                                                                                                                           |
+| Fix                           | `read()` normalizes CRLF → LF (comment explains why)                                                                                                                                                                                                                                                                                                                        |
+| Regression                    | `tests/agentDocConsistency.test.ts` 11/11; full suite 2,691 passed / 2 skipped / **0 failed**; also verified under `TZ=UTC`                                                                                                                                                                                                                                                 |
+| Status                        | **VERIFIED-FIXED**                                                                                                                                                                                                                                                                                                                                                          |
+
+**Impact of this fix:** the campaign's previous "inherited residuals" list
+included this as an `ENVIRONMENT` limitation that every wave from W7 onward
+re-reported. It was a real test defect: an assertion that never executed its
+intended check. It also removes the last known Vitest failure in the repository,
+so the suite is green for the first time since W7.
+
+### R-2 — W13 broke the command-center flow guard (TEST_BUG, fixed)
+
+| Field      | Value                                                                                                                                                                                                                                                                                                                                  |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Surface    | `tests/maestroCommandCenterFlowGuards.test.ts`                                                                                                                                                                                                                                                                                         |
+| Category   | TEST_BUG (caused by a legitimate W13 product change)                                                                                                                                                                                                                                                                                   |
+| Severity   | P2 — a guard pinning the repaired native flow broke, so the flow's expected shape was no longer enforced                                                                                                                                                                                                                               |
+| Source     | `d04793b` (reproduced); fixed at `3aaca2a`                                                                                                                                                                                                                                                                                             |
+| Repro      | `npm test` → 2 failures in `command-center-v2 Android smoke flow`                                                                                                                                                                                                                                                                      |
+| Root cause | The guard pins the Android block by exact contiguous text, including `assertVisible: 'Command input'`. W13 deliberately removed that card header (the input now leads the surface), so the flow was corrected and the guard's expectation went stale. A comment I initially placed _inside_ the block also broke the contiguous match. |
+| Fix        | The guard now expects `assertVisible: 'Command'` (the current field label); the explanatory comment moved above the block                                                                                                                                                                                                              |
+| Regression | Guard suite **8/8**, including its own reconstructed-defect case, which still fails as designed (non-vacuous)                                                                                                                                                                                                                          |
+| Status     | **VERIFIED-FIXED**                                                                                                                                                                                                                                                                                                                     |
+
+### R-6 — Closed wave plans failed the hosted ExecPlan gate (PROCESS, fixed)
+
+| Field        | Value                                                                                                                                                                                                                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Surface      | `openspec/changes/frontend-v3-w1{2..7}-*/execplan.md`                                                                                                                                                                                                                                                  |
+| Category     | PROCESS/TEST (a real gate failure, caught by hosted CI)                                                                                                                                                                                                                                                |
+| Severity     | P2 — the campaign's own record-integrity gate failed on the campaign's head                                                                                                                                                                                                                            |
+| Source       | `84b3294` (hosted run 38495121175); fixed at `b9e775f`                                                                                                                                                                                                                                                 |
+| Repro        | `npm run agent:plan:validate:all` → six `FAIL ... [COMPLETED]` with `COMPLETED plan requires a completed remaining definition of done`                                                                                                                                                                 |
+| Root cause   | The six plans were flipped to `COMPLETED` while their `Remaining definition of done` lines still carried the pre-completion text ("W12 commit/publication; then W13–W17"), which the validator correctly rejects. My earlier local read was truncated to the last three lines, so it appeared to pass. |
+| Fix          | Each plan now states an explicit completion sentence for its own scope                                                                                                                                                                                                                                 |
+| Verification | `npm run agent:plan:validate:all` exits 0; hosted `Validate versioned ExecPlans` PASS at `b9e775f`; full suite still 2,699 passed / 0 failed hosted                                                                                                                                                    |
+| Status       | **VERIFIED-FIXED**                                                                                                                                                                                                                                                                                     |
+
+**Lesson recorded:** the hosted gate caught what a tail-truncated local reading
+hid. This is the practical argument for exact-head hosted verification in the
+ladder, and it is why the W17 matrix now cites the hosted run rather than only
+the local equivalent.
+
+### R-3 — Fabricated clock time on date-only activity rows (PRODUCT, fixed)
+
+| Field      | Value                                                                                                                                                                                                                                                                                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Surface    | `features/activity/ActivityTimelineView.tsx`                                                                                                                                                                                                                                                                                                                 |
+| Category   | PRODUCT_BUG (truthfulness)                                                                                                                                                                                                                                                                                                                                   |
+| Severity   | P2 — a date-only occurrence rendered as a precise event time                                                                                                                                                                                                                                                                                                 |
+| Source     | `4f1179f` (reported by Codex on PR #76); fixed at `af8eeda`                                                                                                                                                                                                                                                                                                  |
+| Repro      | Open the Timeline with calorie activity; each calorie row showed a clock time derived from `new Date('YYYY-MM-DD')`                                                                                                                                                                                                                                          |
+| Root cause | `activityTimeline.data.ts` deliberately supplies calorie rows a date-only `occurredAt` (a deterministic sort key, commented "must not be presented as precise event time"), but the row formatter ran it through `new Date()` — fabricating midnight and, west of UTC, potentially the previous evening while the row stayed grouped under the consumed date |
+| Fix        | New `hasClockTime()` domain helper is the single authority; the view formats a time only for timestamp-backed sources                                                                                                                                                                                                                                        |
+| Regression | `tests/activityTimeline.test.ts` +3 cases (21 total)                                                                                                                                                                                                                                                                                                         |
+| Status     | **VERIFIED-FIXED**                                                                                                                                                                                                                                                                                                                                           |
+
+### R-4 — Unfinished weeks described as empty (PRODUCT, fixed)
+
+| Field      | Value                                                                                                                                                                                                                                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Surface    | `features/weekly-review/WeeklyReviewScreen.tsx`                                                                                                                                                                                                                                                              |
+| Category   | PRODUCT_BUG (truthfulness)                                                                                                                                                                                                                                                                                   |
+| Severity   | P2 — a false claim about the user's own plan                                                                                                                                                                                                                                                                 |
+| Source     | `4f1179f` (Codex); fixed at `af8eeda`                                                                                                                                                                                                                                                                        |
+| Repro      | Review a week with an unfinished in-window todo, or a planned workout week with no completed session                                                                                                                                                                                                         |
+| Root cause | The empty-week line tested only `habits.scheduledOccurrences === 0 && todos.completedCount === 0`, ignoring every other schedule-bearing count                                                                                                                                                               |
+| Fix        | `weekHasAnyScheduledOrRecordedActivity()` (`features/weekly-review/weeklyReviewScreenGuards.ts`) covers todos completed/incomplete/overdue/due-next-week, habit scheduled and completed occurrences, focus sessions and minutes, workout sessions/scheduled sessions/completed sets, and calorie logged days |
+| Regression | `tests/weeklyReview.domain.test.ts` +6 cases                                                                                                                                                                                                                                                                 |
+| Status     | **VERIFIED-FIXED**                                                                                                                                                                                                                                                                                           |
+
+### R-5 — Clean success announced while commitments had failed (PRODUCT, fixed)
+
+| Field      | Value                                                                                                                                                                                                       |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Surface    | `features/weekly-review/WeeklyReviewScreen.tsx`                                                                                                                                                             |
+| Category   | PRODUCT_BUG (false success)                                                                                                                                                                                 |
+| Severity   | P2 — the W12 spec requires per-commitment failure reporting                                                                                                                                                 |
+| Source     | `4f1179f` (Codex); fixed at `af8eeda`                                                                                                                                                                       |
+| Repro      | Make `addTodo` reject for one commitment; `executeWeeklyReview` still saves the review row, so the screen entered `done` and announced "Review saved" with only a count                                     |
+| Root cause | The completion branch rendered a success card and a count, never the failed items themselves                                                                                                                |
+| Fix        | The heading becomes "Review saved — some items need retry", the warning tone replaces the success tone, and each failed commitment is listed by title with a note that retry creates only the missing items |
+| Regression | `e2e/weekly-review.spec.ts` 2/2 (incl. the rejected-write case) and `e2e/planning-w12.spec.ts` 5/5                                                                                                          |
+| Status     | **VERIFIED-FIXED**                                                                                                                                                                                          |
+
+## Carried residuals (unchanged, correctly classified)
+
+| ID  | Item                                                                                             | Class                     | Owner / next action                                                                                                                                                                                                                         |
+| --- | ------------------------------------------------------------------------------------------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C-1 | `braces` GHSA-vfj7-8cjw-p6xm (high)                                                              | Security                  | No upstream fix; see [security](#security-reconciliation)                                                                                                                                                                                   |
+| C-2 | `node-forge` GHSA-86w9-cpqp-85rv (high)                                                          | Security                  | No upstream fix; see [security](#security-reconciliation)                                                                                                                                                                                   |
+| C-3 | `settings-ripple` Calories-ripple step                                                           | Test / product            | Reproduced identically on the W12 baseline with all later changes stashed; **not** a W12–W17 regression. Owned by the settings-ripple journey; needs a decision on whether the Calories hero's `Goal 2,400` marker is the intended contract |
+| C-4 | iOS native qualification                                                                         | External (owner-deferred) | Requires an authorized simulator or EAS-linked cloud lane                                                                                                                                                                                   |
+| C-5 | Native notification-tray delivery, long-horizon recurrence, `Alert.alert`, system offline toggle | Capability gap            | Documented in `docs/testing/known-gaps.md`; unchanged                                                                                                                                                                                       |
+| C-6 | AVD `Nitro_API_36` requires `-gpu host` on this host                                             | Environment               | Recorded in W16 `design.md` D16.6 and `README.md`                                                                                                                                                                                           |
+| C-7 | Hosted `e2e`/`nightly` skipped behind the audit gate                                             | External CI               | Resolve C-1/C-2 or accept the local ladder as the evidence                                                                                                                                                                                  |
+
+## Security reconciliation
+
+**Current head:** `3aaca2a`. `node scripts/audit-runtime-deps.mjs` (the exact CI
+gate) reports **2 undocumented high advisories**; the gate therefore remains red
+and is **not** waived, allowlisted, or softened in this session.
+
+| Advisory                   | Package      | Installed | Latest published | Range | Fix available | Runtime reachable?                                                                 | Ships in bundle? |
+| -------------------------- | ------------ | --------- | ---------------- | ----- | ------------- | ---------------------------------------------------------------------------------- | ---------------- |
+| GHSA-vfj7-8cjw-p6xm (high) | `braces`     | `3.0.3`   | `3.0.3`          | `*`   | **No**        | Build-time only: `tailwindcss → chokidar / micromatch → braces`                    | **No**           |
+| GHSA-86w9-cpqp-85rv (high) | `node-forge` | `1.4.0`   | `1.4.0`          | `*`   | **No**        | Build-time only: `expo → @expo/cli → @expo/code-signing-certificates → node-forge` | **No**           |
+
+Evidence for the exposure claim:
+
+- Both packages are installed at their **latest published versions**, and both
+  advisories carry range `*`, so no patched release exists upstream — there is
+  nothing to upgrade to.
+- Neither is a direct dependency (`dependencies` contains neither).
+- `node-forge` does **not** appear in the web bundle or in `dist/` at all
+  (0 matches for `node-forge` / `forge.pki`).
+- `braces` matches in the bundle are **false positives**: a bare `braces` string
+  inside a React error message and the Material Icons names `application-braces`
+  / `cloud-braces`. There is no `require('braces')` and no `braces@` occurrence.
+
+**Disposition:** leave red; document; do not weaken the gate. The prior waves
+already recorded these as inherited. A safe remediation would require an
+upstream release (or dropping the tooling that pulls them in, e.g. tailwind or
+the Expo CLI code-signing path), neither of which is a W17-scoped change.
+
+## Coverage gaps recorded, not scored
+
+- PWA project and `journeys-sync` were not re-run in W17.
+- Android lanes were not re-run at the W17 SHA (test/docs-only diff).
+- No live Supabase/RLS round-trip was attempted.

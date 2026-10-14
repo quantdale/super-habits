@@ -35,14 +35,6 @@ tags:
     start: '95%, 75%'
     end: '95%, 25%'
     duration: 300
-- swipe:
-    start: '95%, 75%'
-    end: '95%, 25%'
-    duration: 300
-- swipe:
-    start: '95%, 75%'
-    end: '95%, 25%'
-    duration: 300
 - scrollUntilVisible:
     element:
       text: 'Backup status and restore'

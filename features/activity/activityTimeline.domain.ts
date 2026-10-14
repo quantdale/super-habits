@@ -6,6 +6,19 @@ import type {
   ActivityTimelineSourceFilter,
 } from '@/features/activity/activityTimeline.types';
 
+/**
+ * Whether an occurrence carries a real clock time.
+ *
+ * Calorie rows deliberately use a date-only `YYYY-MM-DD` sort key (see
+ * `activityTimeline.data.ts`) so the UI never invents an event time; a
+ * timestamp-backed source carries a full ISO instant. Rendering a clock for a
+ * date-only value would fabricate midnight and, west of UTC, could even show the
+ * previous evening while the row stays grouped under the consumed date.
+ */
+export function hasClockTime(occurredAt: string): boolean {
+  return /T\d{2}:\d{2}/.test(occurredAt);
+}
+
 export const SOURCE_CATEGORY: Record<ActivityTimelineSource, ActivityTimelineCategory> = {
   todo: 'productivity',
   project: 'productivity',

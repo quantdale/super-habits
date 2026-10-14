@@ -172,6 +172,15 @@ function TabButton({
           color: isFocused ? ink : tokens.textMuted,
           fontSize: isRail ? 12 : 11,
           letterSpacing: 0.1,
+          // W16 (native qualification): Android's Nunito metrics render wider
+          // than the web build's, so `numberOfLines={1}` ellipsised long
+          // destinations (measured on-device: `Tod…`, `Habi…`, `Worko…`,
+          // `Calori…` inside a 55.6dp slot). Asking the label to use the full
+          // slot width removes the false ellipsis without changing the label,
+          // its size, the tab count or the touch targets. Web keeps the same
+          // single-line contract and a 360px bar still fits every label.
+          alignSelf: 'stretch',
+          textAlign: 'center',
         }}
         numberOfLines={1}
       >
@@ -249,6 +258,9 @@ function SectionContainer({
   // the user cannot see.
   useEffect(() => {
     if (Platform.OS !== 'web') return;
+    // SAFETY: only web reaches here; on web the ref is attached to a View,
+    // which react-native-web renders as an HTMLElement. Type checks the RN
+    // ViewProps contract cannot express (a DOM node only exists on web).
     const node = containerRef.current as unknown as HTMLElement | null;
     if (!node || typeof node.setAttribute !== 'function') return;
     if (isActive) node.removeAttribute('inert');

@@ -1,0 +1,63 @@
+# W15 golden-baseline manifest
+
+30 curated `toHaveScreenshot` goldens under
+`e2e/__screenshots__/visual-regression.spec.ts/`.
+
+**Capture environment.** `npm run build:e2e` artifact (hermetic, 0 Supabase
+hosts), pinned Chromium from `playwright.config.ts`, `deviceScaleFactor: 1`,
+`timezoneId: 'Asia/Manila'`, locale `en-US`, reduced motion emulated,
+animations disabled at capture, fixed clock `2026-10-13T19:30:00` local,
+`maxDiffPixels: 0`, **no masks**.
+
+**Fixture classes.** FIRST_RUN = `resetAll` only (no seed). TYPICAL / HEAVY per
+`e2e/helpers/seed.ts`.
+
+| #   | Snapshot                               | Surface        | Fixture             | Viewport | Theme | Rationale                                                |
+| --- | -------------------------------------- | -------------- | ------------------- | -------- | ----- | -------------------------------------------------------- |
+| 1   | `shell-today-first-run-390-light`      | Today          | FIRST_RUN           | 390×844  | light | First-run empty shell anatomy and onboarding affordances |
+| 2   | `shell-today-first-run-360-light`      | Today          | FIRST_RUN           | 360×740  | light | Narrow-phone first-run reflow (no clipping)              |
+| 3   | `shell-today-390-light`                | Today          | TYPICAL             | 390×844  | light | Primary phone home: hero, glance strip, plan, rewards    |
+| 4   | `shell-today-390-dark`                 | Today          | TYPICAL             | 390×844  | dark  | Dark hero contrast (SYS-10) and dark surface ladder      |
+| 5   | `shell-today-768-light`                | Today          | TYPICAL             | 768×1024 | light | Tablet gutter/rhythm                                     |
+| 6   | `shell-today-1280-light`               | Today          | TYPICAL             | 1280×800 | light | Desktop rail + two-column glance                         |
+| 7   | `todos-390-light`                      | To Do          | TYPICAL             | 390×844  | light | Flat row grammar, one summary line (SYS-05)              |
+| 8   | `todos-390-dark`                       | To Do          | TYPICAL             | 390×844  | dark  | Dark rows, danger ink for overdue, checkbox contrast     |
+| 9   | `todos-long-title-390-light`           | To Do          | TYPICAL + LONG_TEXT | 390×844  | light | Wrap-never-clip row growth                               |
+| 10  | `todos-empty-360-light`                | To Do          | FIRST_RUN           | 360×740  | light | Empty state + one action at narrow width                 |
+| 11  | `todos-heavy-1280-light`               | To Do          | HEAVY               | 1280×800 | light | Virtualized HEAVY list density                           |
+| 12  | `habits-390-light`                     | Habits         | TYPICAL             | 390×844  | light | Daily check-in row anatomy                               |
+| 13  | `habits-quantitative-detail-390-light` | Habits         | TYPICAL             | 390×844  | light | Quantitative habit detail + section tabs                 |
+| 14  | `focus-idle-390-light`                 | Focus          | TYPICAL             | 390×844  | light | Calm idle timer screen                                   |
+| 15  | `workout-landing-390-light`            | Workout        | TYPICAL             | 390×844  | light | Training-state header + quick-start rows                 |
+| 16  | `calories-390-light`                   | Calories       | TYPICAL             | 390×844  | light | Logging-first day summary + macros                       |
+| 17  | `calories-390-dark`                    | Calories       | TYPICAL             | 390×844  | dark  | Dark nutrition surfaces                                  |
+| 18  | `quick-capture-390-light`              | Quick Capture  | TYPICAL             | 390×844  | light | Sheet anatomy: X + primary + Describe it                 |
+| 19  | `settings-top-390-light`               | Settings       | TYPICAL             | 390×844  | light | W13 grouped rows + single value authority + `Details`    |
+| 20  | `settings-top-1280-dark`               | Settings       | TYPICAL             | 1280×800 | dark  | Grouped settings in dark at wide width                   |
+| 21  | `settings-backup-390-light`            | Settings       | TYPICAL             | 390×844  | light | Backup/restore rows and scope coverage                   |
+| 22  | `command-input-390-light`              | Command Center | TYPICAL             | 390×844  | light | W13 input-first shell (no CURRENT SECTION panel)         |
+| 23  | `achievements-390-light`               | Achievements   | TYPICAL             | 390×844  | light | W13 milestone-first + next target                        |
+| 24  | `review-step1-390-light`               | Weekly Review  | TYPICAL             | 390×844  | light | W12 narrative-first step 1 + `All numbers`               |
+| 25  | `review-step1-390-dark`                | Weekly Review  | TYPICAL             | 390×844  | dark  | W12 review in dark                                       |
+| 26  | `progress-details-390-light`           | Progress       | TYPICAL             | 390×844  | light | W12 headline rows + expanded details disclosure          |
+| 27  | `timeline-filters-390-light`           | Activity       | TYPICAL             | 390×844  | light | W12 flat rows + open filter disclosure                   |
+| 28  | `timeline-1280-light`                  | Activity       | TYPICAL             | 1280×800 | light | Timeline at wide width                                   |
+| 29  | `plan-hub-today-390-light`             | Planning Hub   | TYPICAL             | 390×844  | light | Daily plan intention-first hierarchy                     |
+| 30  | `plan-hub-projects-768-light`          | Planning Hub   | TYPICAL             | 768×1024 | light | Projects list at tablet width                            |
+
+**Masking:** none. The fixed clock makes the date heading (`TUESDAY, OCTOBER 13`),
+the greeting (`Good evening`) and every week strip deterministic, so no region
+needs masking and no pixel tolerance is granted.
+
+**Explicit exclusions.** Non-Chromium renderers (documented in
+`docs/testing/known-gaps.md`); native Android/iOS rendering (W16); motion-heavy
+in-flight states (Focus running, active workout session) which are covered by
+their behavioural specs rather than frozen screenshots.
+
+## Baseline change log
+
+| Date       | Snapshot(s) | Source           | Change                        | Review                                                                                                                        |
+| ---------- | ----------- | ---------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 2026-10-14 | all 30      | `c6937b5` (+W15) | Initial curation (tasks 15.1) | All 30 captures opened and inspected; each asserts a real semantic element before capture, so none is a loading/error surface |
+
+Future changes append a row with the source revision and the reason.

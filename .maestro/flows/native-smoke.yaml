@@ -34,8 +34,11 @@ tags:
     text: 'To Do'
     childOf:
       text: 'Section tabs'
+# W6 removed the Pop-era doc subtitle ('Offline-first task manager.'); the
+# To Do surface now identifies itself with its own section title, which is
+# always rendered (W6.5/W12 keep it).
 - extendedWaitUntil:
-    visible: 'Offline-first task manager.'
+    visible: 'Todos'
     timeout: 10000
 - waitForAnimationToEnd:
     timeout: 8000
@@ -43,14 +46,11 @@ tags:
     text: 'Habits'
     childOf:
       text: 'Section tabs'
-# Small screens fit only down to the day strip; the groups render below it.
-- scrollUntilVisible:
-    element: 'Anytime'
-    direction: DOWN
+# W7 rebuilt Habits as a date-scoped daily check-in and removed the Pop-era
+# time-of-day groups ('Anytime', 'Morning', ...). The section's own eyebrow is
+# the current marker and matches the web journey's 'Daily check-in' entry.
 - extendedWaitUntil:
-    # The simplified Habits surface leads with time-of-day groups; the
-    # Today's rhythm summary remains below the check-in controls.
-    visible: 'Anytime'
+    visible: 'DAILY CHECK-IN'
     timeout: 10000
 - waitForAnimationToEnd:
     timeout: 8000
@@ -72,10 +72,11 @@ tags:
     text: 'Workout'
     childOf:
       text: 'Section tabs'
-# Fresh device (clearState): the Workout subtitle's has-activity variant is
-# off, so the current Gym V2 onboarding copy renders.
+# Workout became a training-first workspace (W9/W9.5): the quick-start section
+# is the always-rendered marker and matches the web journey's 'Quick start'
+# SECTION_MARKERS entry. (The onboarding subtitle it replaces was W9 copy.)
 - extendedWaitUntil:
-    visible: 'Build a training plan, start a guided workout, and track your progress.'
+    visible: 'QUICK START'
     timeout: 10000
 - waitForAnimationToEnd:
     timeout: 8000
@@ -89,7 +90,7 @@ tags:
 # summary. The previous exact-SHA run passed this same assertion slowly; keep a
 # longer bounded wait for the initial render.
 - extendedWaitUntil:
-    visible: '2000 kcal left'
+    visible: '2,000 kcal left'
     timeout: 30000
 - waitForAnimationToEnd:
     timeout: 8000

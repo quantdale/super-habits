@@ -33,13 +33,7 @@ export function CommandInputCard({
   const suggestionChips = isInputEmpty ? history.slice(0, 4) : [];
 
   return (
-    <Card
-      variant="header"
-      accentColor={tokens.textMuted}
-      headerTitle="Command input"
-      headerSubtitle="Parsing saves text in recent commands on this device. App actions require confirmation."
-      className="mb-0"
-    >
+    <Card innerClassName="p-3" className="mb-0">
       <View className="gap-3">
         <TextField
           label="Command"
@@ -48,6 +42,48 @@ export function CommandInputCard({
           placeholder={placeholder}
           nativeID="command-input"
         />
+
+        {/* W13 (design D13.3, SYS-14): one caption replaces the two-sentence
+            implementation narration; the header title is gone entirely. */}
+        <Text className="text-xs" style={{ color: tokens.textMuted }}>
+          Parsing saves text in recent commands on this device. App actions require confirmation.
+        </Text>
+
+        <Button
+          label={isParsing ? 'Parsing...' : 'Parse command'}
+          onPress={onParse}
+          color={tokens.textMuted}
+          disabled={parseDisabled}
+        />
+
+        {/* Examples and history are discovery aids, so they render only while
+            the field is empty — a typed command must not sit under a wall of
+            example text (W13-06). */}
+        {isInputEmpty && (examples.length > 0 || suggestionChips.length > 0) ? (
+          <View>
+            <Text className="mb-1 text-sm font-semibold" style={{ color: tokens.text }}>
+              Try
+            </Text>
+            <View className="flex-row flex-wrap gap-2">
+              {[...new Set([...examples, ...suggestionChips])]
+                .slice(0, COMMAND_CHIP_LIMIT)
+                .map((entry) => (
+                  <Pressable
+                    key={`try-${entry}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Use example: ${entry}`}
+                    className="rounded-full border px-3 py-1.5"
+                    style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+                    onPress={() => onChangeText(entry)}
+                  >
+                    <Text numberOfLines={1} className="text-xs" style={{ color: tokens.textMuted }}>
+                      {entry}
+                    </Text>
+                  </Pressable>
+                ))}
+            </View>
+          </View>
+        ) : null}
 
         {history.length > 0 ? (
           <View>
@@ -72,59 +108,6 @@ export function CommandInputCard({
             </View>
           </View>
         ) : null}
-
-        {suggestionChips.length > 0 ? (
-          <View>
-            <Text className="mb-1 text-sm font-semibold" style={{ color: tokens.text }}>
-              Suggestions
-            </Text>
-            <View className="flex-row flex-wrap gap-2">
-              {suggestionChips.map((entry) => (
-                <Pressable
-                  key={`suggestion-${entry}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Use suggested command: ${entry}`}
-                  className="rounded-full border px-3 py-1.5"
-                  style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-                  onPress={() => onChangeText(entry)}
-                >
-                  <Text numberOfLines={1} className="text-xs" style={{ color: tokens.textMuted }}>
-                    {entry}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        <View
-          className="rounded-xl border px-3 py-3"
-          style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-        >
-          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-            Supported examples
-          </Text>
-          {examples.map((example) => (
-            <Pressable
-              key={example}
-              accessibilityRole="button"
-              accessibilityLabel={`Use example: ${example}`}
-              onPress={() => onChangeText(example)}
-              className="mt-1"
-            >
-              <Text className="text-sm" style={{ color: tokens.textMuted }}>
-                {example}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Button
-          label={isParsing ? 'Parsing...' : 'Parse command'}
-          onPress={onParse}
-          color={tokens.textMuted}
-          disabled={parseDisabled}
-        />
       </View>
     </Card>
   );

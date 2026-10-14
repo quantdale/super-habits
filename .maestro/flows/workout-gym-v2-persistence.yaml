@@ -47,9 +47,11 @@ tags:
 - waitForAnimationToEnd:
     timeout: 3000
 - tapOn: 'Add routine'
+# The new routine is prepended to the routines list, which sits ABOVE the
+# 'New routine' form, so the row is reached by scrolling UP.
 - scrollUntilVisible:
     element: 'Open Native Gym V2 typed routine routine'
-    direction: DOWN
+    direction: UP
     visibilityPercentage: 50
     centerElement: true
 - waitForAnimationToEnd:
@@ -220,12 +222,23 @@ tags:
 - pressKey: enter
 - assertVisible: 'Target load'
 - pressKey: BACK
+# The weekly-plan section label is 'This week' (the uppercase rendering is a
+# CSS transform, not the text node), and Maestro matches the full text.
 - scrollUntilVisible:
-    element: 'Week'
+    element: 'This week'
     direction: UP
     visibilityPercentage: 50
-- assertVisible: 'Week'
-- tapOn: 'Monday Native Gym V2 typed routine'
+- assertVisible: 'This week'
+# Assigning a routine to a weekday goes through the day's assign sheet: the
+# cell opens it and the routine is one of its chips. (The previous flow tapped
+# a combined 'Monday <routine>' label that no longer exists.)
+- tapOn: 'Monday assign routine'
+- extendedWaitUntil:
+    visible: 'Assign Monday in your recurring weekly plan.'
+    timeout: 10000
+- tapOn: 'Native Gym V2 typed routine'
+# Assigning closes the day sheet itself, so there is no Close to tap here.
+- assertVisible: 'Monday: Native Gym V2 typed routine'
 - killApp
 - launchApp
 - extendedWaitUntil:
@@ -239,15 +252,19 @@ tags:
     # "Workout" and an unscoped index-0 match can land on inert content.
     childOf:
       text: 'Section tabs'
-- assertVisible: 'Monday Native Gym V2 typed routine'
+- assertVisible: 'Monday: Native Gym V2 typed routine'
+# W9 renamed the routines section to 'Quick start'; 'Your routines' no longer
+# exists on the landing.
 - scrollUntilVisible:
-    element: 'Your routines'
+    element: 'QUICK START'
     direction: DOWN
     visibilityPercentage: 50
-- assertVisible: 'Your routines'
+- assertVisible: 'QUICK START'
+# The new routine is prepended to the routines list, which sits ABOVE the
+# 'New routine' form, so the row is reached by scrolling UP.
 - scrollUntilVisible:
     element: 'Open Native Gym V2 typed routine routine'
-    direction: DOWN
+    direction: UP
     visibilityPercentage: 50
 - tapOn: 'Open Native Gym V2 typed routine routine'
 - tapOn: 'Configure Native custom press exercise'

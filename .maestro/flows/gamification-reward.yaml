@@ -68,6 +68,12 @@ tags:
     timeout: 15000
 # The drawer's own week hint reports the complete day; the dashboard pill with
 # the same wording sits behind the open drawer and is correctly not visible.
+# W13 put an earned milestone and a next target above the week strip, so the
+# hint now sits below the first fold and must be scrolled to.
+- scrollUntilVisible:
+    element: '.*Every habit is done today.*'
+    direction: DOWN
+    visibilityPercentage: 50
 - assertVisible: '.*Every habit is done today.*'
 - scrollUntilVisible:
     element: 'Bronze Complete days'

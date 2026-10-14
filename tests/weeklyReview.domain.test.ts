@@ -13,6 +13,7 @@ import {
   summarizeHabitWeekOccurrences,
   MAX_REFLECTION_LENGTH,
 } from '@/features/weekly-review/weeklyReview.domain';
+import { weekHasAnyScheduledOrRecordedActivity } from '@/features/weekly-review/weeklyReviewScreenGuards';
 import { createHabitRule } from '@/features/habits/habits.domain';
 import type {
   WeeklyReviewDraft,
@@ -270,6 +271,156 @@ describe('generateInsights', () => {
     };
     const { attention } = generateInsights(summary);
     expect(attention.some((a) => a.kind === 'workout_decline')).toBe(true);
+  });
+});
+
+/**
+ * W12 design D12.3 — the narrative-first review must report facts, not
+ * verdicts. These are the regressions for the wording that the baseline
+ * review rendered (`0% habit consistency — room to improve`, an under-goal
+ * "win") and for the duplicate per-habit attention rows.
+ */
+describe('generateInsights W12 truthful wording', () => {
+  const baseSummary: WeeklyReviewSummaryV1 = {
+    version: 1,
+    week: {
+      weekKey: '2026-08-17',
+      startDateKey: '2026-08-17',
+      endDateKey: '2026-08-23',
+      nextWeekStartDateKey: '2026-08-24',
+      nextWeekEndDateKey: '2026-08-30',
+    },
+    todos: {
+      completedCount: 0,
+      incompleteCount: 0,
+      overdueCount: 0,
+      dueNextWeekCount: 0,
+      carryForwardCandidates: [],
+    },
+    habits: {
+      scheduledOccurrences: 0,
+      completedOccurrences: 0,
+      consistencyPercent: null,
+      attention: [],
+    },
+    focus: { sessions: 0, minutes: 0, priorWeekMinutes: null },
+    workouts: { sessions: 0, priorWeekSessions: null, routines: [] },
+    calories: {
+      loggedDays: 0,
+      averageCaloriesOnLoggedDays: null,
+      configuredGoal: null,
+    },
+    wins: [],
+    attention: [],
+  };
+
+  it('states habit consistency as a fact with no evaluative verdict', () => {
+    for (const consistencyPercent of [0, 30, 80, 100]) {
+      const summary = { ...baseSummary, habits: { ...baseSummary.habits, consistencyPercent } };
+      const { wins, attention } = generateInsights(summary);
+      const lines = [...wins, ...attention].map((i) => i.message);
+      const habitLine = lines.find((l) => l.includes('habit consistency'));
+      expect(habitLine).toBe(`${consistencyPercent}% habit consistency`);
+      for (const line of lines) {
+        expect(line).not.toMatch(/strong week|room to improve/i);
+      }
+    }
+  });
+
+  it('reports no habit line at all when nothing was scheduled', () => {
+    const summary = {
+      ...baseSummary,
+      habits: { ...baseSummary.habits, consistencyPercent: null },
+    };
+    const { wins, attention } = generateInsights(summary);
+    expect([...wins, ...attention].some((i) => i.message.includes('consistency'))).toBe(false);
+  });
+
+  it('aggregates per-habit no-completion attention into one line naming the count', () => {
+    const summary = {
+      ...baseSummary,
+      habits: {
+        ...baseSummary.habits,
+        scheduledOccurrences: 14,
+        consistencyPercent: 0,
+        attention: [
+          {
+            habitId: 'h1',
+            name: 'Habit 1',
+            kind: 'no_completions',
+            message: 'No completions this week',
+          },
+          {
+            habitId: 'h2',
+            name: 'Habit 2',
+            kind: 'no_completions',
+            message: 'No completions this week',
+          },
+          {
+            habitId: 'h3',
+            name: 'Habit 3',
+            kind: 'no_completions',
+            message: 'No completions this week',
+          },
+        ],
+      },
+    };
+    const { attention } = generateInsights(summary);
+    const noCompletionLines = attention.filter((a) => a.message.includes('no completions'));
+    expect(noCompletionLines).toHaveLength(1);
+    expect(noCompletionLines[0].message).toBe('3 habits had no completions this week');
+    expect(attention.some((a) => a.message.startsWith('Habit 1:'))).toBe(false);
+  });
+
+  it('names a single habit directly when only one had no completions', () => {
+    const summary = {
+      ...baseSummary,
+      habits: {
+        ...baseSummary.habits,
+        scheduledOccurrences: 7,
+        consistencyPercent: 0,
+        attention: [
+          {
+            habitId: 'h1',
+            name: 'Morning walk',
+            kind: 'no_completions',
+            message: 'No completions this week',
+          },
+        ],
+      },
+    };
+    const { attention } = generateInsights(summary);
+    const line = attention.find((a) => a.message.includes('no completions'));
+    expect(line?.message).toBe('Morning walk had no completions this week');
+  });
+
+  it('reports an off-goal calorie average on either side without calling it a win', () => {
+    for (const averageCaloriesOnLoggedDays of [3000, 900]) {
+      const summary = {
+        ...baseSummary,
+        calories: {
+          loggedDays: 5,
+          averageCaloriesOnLoggedDays,
+          configuredGoal: 2000,
+        },
+      };
+      const { wins, attention } = generateInsights(summary);
+      expect(wins.some((w) => w.kind === 'calories_off_goal')).toBe(false);
+      expect(wins.some((w) => w.message.includes('kcal/day'))).toBe(false);
+      const line = attention.find((a) => a.kind === 'calories_off_goal');
+      expect(line?.message).toBe(
+        `Average ${averageCaloriesOnLoggedDays} kcal/day vs 2000 kcal goal`,
+      );
+    }
+  });
+
+  it('stays silent when the calorie average is inside the goal band', () => {
+    const summary = {
+      ...baseSummary,
+      calories: { loggedDays: 5, averageCaloriesOnLoggedDays: 2100, configuredGoal: 2000 },
+    };
+    const { wins, attention } = generateInsights(summary);
+    expect([...wins, ...attention].some((i) => i.message.includes('kcal/day'))).toBe(false);
   });
 });
 
@@ -697,5 +848,89 @@ describe('buildNextWeekPlanSuggestions', () => {
     expect(suggestions[0].dateKey).toBe('2026-08-30');
     expect(suggestions[1].dateKey).toBe('2026-08-31');
     expect(suggestions[2].dateKey).toBe('2026-09-01');
+  });
+});
+
+/**
+ * W17 (Codex P2, PR #76): the review step must not call a week empty when it
+ * held obligations. An unfinished todo in-window has `completedCount === 0`
+ * but `incompleteCount > 0`, and a planned workout week can have
+ * `scheduledSessions > 0` with no completed session; either would otherwise be
+ * described as "Nothing scheduled this week."
+ */
+describe('weekHasAnyScheduledOrRecordedActivity (W17 empty-week truth)', () => {
+  // Baseline: a week with genuinely nothing scheduled or recorded.
+  const emptyWeek: WeeklyReviewSummaryV1 = {
+    version: 1,
+    week: {
+      weekKey: '2026-10-12',
+      startDateKey: '2026-10-12',
+      endDateKey: '2026-10-18',
+      nextWeekStartDateKey: '2026-10-19',
+      nextWeekEndDateKey: '2026-10-25',
+    },
+    todos: {
+      completedCount: 0,
+      incompleteCount: 0,
+      overdueCount: 0,
+      dueNextWeekCount: 0,
+      carryForwardCandidates: [],
+    },
+    habits: {
+      scheduledOccurrences: 0,
+      completedOccurrences: 0,
+      consistencyPercent: null,
+      attention: [],
+    },
+    focus: { sessions: 0, minutes: 0, priorWeekMinutes: null },
+    workouts: { sessions: 0, priorWeekSessions: null, routines: [] },
+    calories: { loggedDays: 0, averageCaloriesOnLoggedDays: null, configuredGoal: null },
+    wins: [],
+    attention: [],
+  };
+
+  it('reports a genuinely empty week as empty', () => {
+    expect(weekHasAnyScheduledOrRecordedActivity(emptyWeek)).toBe(false);
+  });
+
+  it('does NOT call a week empty when an in-window todo is unfinished', () => {
+    const summary = {
+      ...emptyWeek,
+      todos: { ...emptyWeek.todos, incompleteCount: 3 },
+    };
+    expect(weekHasAnyScheduledOrRecordedActivity(summary)).toBe(true);
+  });
+
+  it('does NOT call a week empty when workouts were scheduled', () => {
+    const summary = {
+      ...emptyWeek,
+      workouts: { ...emptyWeek.workouts, scheduledSessions: 4 },
+    };
+    expect(weekHasAnyScheduledOrRecordedActivity(summary)).toBe(true);
+  });
+
+  it('does NOT call a week empty when habits were scheduled (even with zero completions)', () => {
+    const summary = {
+      ...emptyWeek,
+      habits: { ...emptyWeek.habits, scheduledOccurrences: 7, completedOccurrences: 0 },
+    };
+    expect(weekHasAnyScheduledOrRecordedActivity(summary)).toBe(true);
+  });
+
+  it('does NOT call a week empty when only an overdue todo exists', () => {
+    const summary = { ...emptyWeek, todos: { ...emptyWeek.todos, overdueCount: 2 } };
+    expect(weekHasAnyScheduledOrRecordedActivity(summary)).toBe(true);
+  });
+
+  it('recognises recorded activity in every domain', () => {
+    for (const patch of [
+      { todos: { ...emptyWeek.todos, completedCount: 1 } },
+      { habits: { ...emptyWeek.habits, completedOccurrences: 1 } },
+      { focus: { sessions: 1, minutes: 25, priorWeekMinutes: null } },
+      { workouts: { ...emptyWeek.workouts, sessions: 1 } },
+      { calories: { loggedDays: 1, averageCaloriesOnLoggedDays: 1800, configuredGoal: 2000 } },
+    ]) {
+      expect(weekHasAnyScheduledOrRecordedActivity({ ...emptyWeek, ...patch })).toBe(true);
+    }
   });
 });

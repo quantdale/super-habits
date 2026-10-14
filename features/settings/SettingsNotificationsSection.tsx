@@ -380,17 +380,18 @@ export function SettingsNotificationsSection() {
       <SettingsSectionHeading
         eyebrow="Notifications / Timer defaults"
         title="Reminders"
-        subtitle="Due-date reminders for todos and a daily plan nudge. Native apps only; web keeps working without them."
-        icon="notifications-active"
         accentColor={ACCENT}
       />
       <Card accentColor={ACCENT} className="mb-0">
+        {/* W13 (D13.2/D13.5): the OS permission state and the desired schedule
+            are different facts. This row reports the OS status only; the switch
+            below owns the user's preference, so a denied permission can never
+            read as enabled. */}
         <SettingsRow
           first
-          label="Notification permission"
-          description={
-            loading ? 'Checking notification access...' : `System status: ${permissionLabel}`
-          }
+          label="System notification permission"
+          value={loading ? 'Checking notification access...' : `System status: ${permissionLabel}`}
+          explanation="Permission is granted or denied by the operating system. Reminders below only fire while it is allowed; web does not schedule native notifications."
           statusLabel={loading ? 'Loading' : permissionLabel === 'Allowed' ? 'On' : 'Check'}
           statusTone={loading ? 'neutral' : permissionLabel === 'Allowed' ? 'accent' : 'warning'}
           accentColor={ACCENT}

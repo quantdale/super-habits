@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "status": "BLOCKED",
+  "classification": "ENVIRONMENT",
+  "platform": "android",
+  "appId": "com.dale16.superhabits",
+  "gitSha": "e8ce067eb2929fb96b0d5463249456d666e21740",
+  "sourceSha": "e8ce067eb2929fb96b0d5463249456d666e21740",
+  "sourceTreeClean": true,
+  "sourceTreeStatus": [],
+  "sourceShaError": null,
+  "sourceTreeStatusError": null,
+  "requestedSerial": "emulator-5580",
+  "reason": "Requested Android target 'emulator-5580' is not connected (observed: emulator-5570).",
+  "details": {},
+  "replayCommand": "npm run qa:native:provision -- --serial emulator-5580",
+  "capturedAt": "2026-10-13T18:03:56.357Z"
+}
