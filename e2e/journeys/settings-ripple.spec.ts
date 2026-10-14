@@ -140,14 +140,17 @@ defineJourney({
 
         // --- Ripple: the Calories section shows the new goal. ---
         await switchSection(page, 'calories');
-        // W10 hero: the goal lives in the daily summary's goal control and the
-        // remaining-kcal title; both read the saved goal.
-        await expect(page.getByText('Goal 2,400', { exact: true }).first()).toBeVisible({
+        // W10 grammar (spec calorie-goal-settings-propagation): the saved goal
+        // is expressed only through the remaining-kcal title, the
+        // consumed-of-goal context line, and the edit-goal control's accessible
+        // name. There is deliberately no separate `Goal N` statistic.
+        await expect(page.getByText('2,400 kcal left')).toBeVisible({
           timeout: 15_000,
         });
+        await expect(page.getByText('0 of 2,400 kcal logged')).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Edit daily calorie goal' })).toBeVisible();
         // With the default 2000 kcal goal the remaining would read 2,000; the
         // new goal must drive the progress display.
-        await expect(page.getByText('2,400 kcal left')).toBeVisible();
         await expect(page.getByText('2,000 kcal left')).toHaveCount(0);
 
         // --- Persisted row (app_meta.calorie_goal). ---
@@ -161,12 +164,14 @@ defineJourney({
           });
         });
 
-        // --- Survives a reload. ---
+        // --- Survives a reload: the same W10 grammar reads the durable goal. ---
         await returnToApp(page);
         await switchSection(page, 'calories');
-        await expect(page.getByText('Goal 2,400', { exact: true }).first()).toBeVisible({
+        await expect(page.getByText('2,400 kcal left')).toBeVisible({
           timeout: 15_000,
         });
+        await expect(page.getByText('0 of 2,400 kcal logged')).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Edit daily calorie goal' })).toBeVisible();
 
         // --- Negative oracle: no calorie rows were created by the settings change. ---
         await expectRows(

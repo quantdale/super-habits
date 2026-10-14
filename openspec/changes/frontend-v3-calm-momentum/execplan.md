@@ -62,16 +62,24 @@ historical evidence only.
 
 ## Current Checkpoint
 
-- Current milestone: W11.5.1 Timezone Determinism & Review Closure COMPLETE and merged to main as `ec53e1efcae8deb1531238409293d10b201170ec` (PR #75, branch `frontend-v3-w1151-timezone-review-closure`, final head `8299339`): the W11.5 planning fixtures now derive their browser-local date inside the Chromium context (`e2e/helpers/browserDate.ts`, mirroring `toDateKey()`), the UTC→Manila crossover is proven deterministically with a clock-controlled regression (`e2e/planning-w1151-timezone.spec.ts`) plus host-TZ independence runs, both PR #74 Codex P2 threads are resolved with verified `isResolved: true` (timezone fixed with evidence; stale ExecPlan verified already corrected on `main` `17553e6`), and no production/schema/dependency/security change was made. W11.5 closure state preserved; W12 Weekly Review / Progress / Activity remains the next unstarted milestone.
-- Completed: W0–W7 unchanged semantically; W6.5 closed and MERGED to main as merge commit `f37539a969bdc7c3dc539c2d47db3f6580429c64` (PR58 MERGED 2026-10-08). W7 rebuilt Habits as a date-scoped, list-first daily check-in and merged to main as merge commit `f679a26a28a8abf3472b44e3b5fbdf229222b927` (PR 59) in three commits `9bf4fda`, `0a8e86d`, `3086b27`; its exact-head CI run is [37822880601](https://github.com/quantdale/super-habits/actions/runs/37822880601) with the follow-up scheduled run [37848841434](https://github.com/quantdale/super-habits/actions/runs/37848841434) recorded as reference ids only. W8 Focus was published in three merges: `b47179b` (PR 60, Focus reconstruction), `ce00e37` (PR 61, visual-audit registration), and the W8 closure `c32685364cbe9c6d34a512c3b2bcef9b3a432e0b` (PR 62, commits `3c4b96c`, `e4fd28f`, `9009c17`). The final W8 baseline is `c32685364cbe9c6d34a512c3b2bcef9b3a432e0b`, with exact-head CI run [37914856206](https://github.com/quantdale/super-habits/actions/runs/37914856206) succeeding on every frontend gate through unit/integration — 2,576 hosted tests passed / 3 skipped — and failing only the two pre-existing undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv), so hosted `e2e`/`nightly` skip behind that gate and are NOT passed. W8.5 closed the Focus timer-start race and merged to main as merge commit `aa5835e9fe8ecaa43b55b805d866232503b28c77` (PR 63, branch `frontend-v3-w85-focus-startup`) in two coherent commits `be6db92` and `ca169f5`. Its exact-head CI runs are [37942994150](https://github.com/quantdale/super-habits/actions/runs/37942994150) (push) and [37942146908](https://github.com/quantdale/super-habits/actions/runs/37942146908) (pull request): every frontend gate passed — Typecheck, the Supabase edge-function type-check, Lint, theme tokens, openspec contracts, journey-label and quarantine-register parity, versioned ExecPlans, and the unit+integration test projects — and the first failing step was `Audit runtime dependencies (gates on new high/critical)`, failing on exactly the same two pre-existing undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm at `node_modules/braces`, `node-forge` GHSA-86w9-cpqp-85rv at `node_modules/node-forge`), so hosted `e2e`/`nightly` skipped behind that gate and are NOT passed. No dependency, lockfile, or patch file changed in either wave. No new hosted failure was introduced and no security-gate waiver was added. Stash, foreign iOS evidence, and historical captures preserved. No overall certification.
-- In progress: None in W11.5 after publication; its code, evidence and records close through PR #74. W12 has not begun. Existing security/native product-certification residuals remain tracked; W11.5 introduced no dependency, schema, migration or security-policy change.
-- Important modified files: W8.5 touched `features/pomodoro/pomodoro.startup.ts` (new), `features/pomodoro/PomodoroScreen.tsx`, `features/pomodoro/pomodoro.domain.ts`, `features/pomodoro/pomodoroCommandBridgeContext.ts`, `features/pomodoro/pomodoroCommandBridge.tsx`, `features/command/command.executor.ts`, `tests/pomodoro.startup.test.ts` (new), `tests/integration/pomodoroStartupIntent.test.ts` (new), `e2e/pomodoro.spec.ts`, `e2e/pomodoro-w85-audit.spec.ts` (new), `docs/ui-ux/v3-audit/w8.5/`, and both plans. No data-layer, schema, dependency, or security-policy change; no migration was added.
-- Last successful validation: W11 local exact-head `74d4aaf` — typecheck 0; lint 0/0; Vitest 2,675 passed / 3 skipped (single failure proven to be the Windows-CRLF residual, identical on pristine main); integration 416 passed / 2 skipped; themes 140/140; OpenSpec 80/80; plans PASS; parity guards OK; hermetic export PASS; planning 7/7; journeys P0 25/25; deterministic simulation PASS. W10.5 standalone targeted Playwright run `38277711149` at `15b859a` — 26/26 Chromium PASS; W10.5 hosted CI `38277711157` PASS through unit/integration 2,676 / 3 skipped before inherited audit-only red.
-- Current failures: Inherited high advisories `braces` GHSA-vfj7-8cjw-p6xm and `node-forge` GHSA-86w9-cpqp-85rv block hosted E2E/nightly; Windows-CRLF register parsing, D14 host-load headroom, and Focus notification-timestamp issues remain recorded; no new W10 product regression proven.
+<!-- Post-W17 correction (2026-10-14, change `frontend-v3-post-w17-correction`):
+     this checkpoint was REPLACED IN PLACE. The pre-correction text told the
+     next agent to "Author the W12 Weekly Review / Progress / Activity OpenSpec
+     slice" although W12–W17 are published on `main`. Historical wave notes
+     stay unchanged under Progress and the Validation Ledger below. -->
+
+- Current milestone: W12–W17 are PUBLISHED on `main` (PR #76 merged as `3f2a847`, PR #77 merged as `b80233d`, documentation head `1177ac2` then docs-only `bf09c0d`). The post-W17 correction is complete and published for review as PR #78 (branch `frontend-v3-post-w17-adversarial-correction`, worktree `D:/Documents/tryPython/superhabits-post-w17-correction`); only its post-merge SHA record remains. This parent plan stays `ACTIVE` because hosted security and iOS certification remain unearned.
+- Completed: W0–W11.5.1 exactly as recorded under Progress below. W12 Weekly Review / Progress / Activity, W13 Settings / Command / Achievements, W14 whole-app integrity sweep, W15 persistent visual regression (30 curated goldens), W16 Android API-36 qualification (23/23 flows), and W17 final regression / RC (verdict CONDITIONAL / NEAR-COMPLETE) are implemented, tested, and published on `main`; their evidence lives in `docs/ui-ux/v3-audit/w12` through `w17/`.
+- In progress: None. The post-W17 correction is implemented, validated, reviewed, and published as PR #78; its ExecPlan's only tail is recording the merged `origin/main` SHA after merge.
+- Important modified files: none in this plan's own implementation scope after W17. The correction's edits live on `frontend-v3-post-w17-adversarial-correction` and are tracked by that change's ExecPlan.
+- Last successful validation: the W17 closure ladder at `1177ac2` (recorded per-lane in `docs/ui-ux/v3-audit/w17/verification-matrix.md`; counts stay attributed to the runs that produced them). The post-W17 correction re-validates at its own SHA and records it in `docs/ui-ux/v3-audit/post-w17-correction/`.
+- Current failures: `node scripts/audit-runtime-deps.mjs` remains RED on the two inherited undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv) — not waived, not allowlisted, not softened. Hosted `e2e`/`nightly` skip behind that gate and are NOT passed.
 - Relevant quarantines: none added; existing internal/remote/visual opt-ins unchanged.
-- Blockers: None for web continuation. Native Android qualification remains environment-blocked (the required API36/x86_64 target was not previously available; Android W16 pending) and iOS remains owner-deferred, so no native timer or notification certification is claimed from browser tests. Full application certification is not claimed.
-- Exact next action: Author the W12 Weekly Review / Progress / Activity OpenSpec slice and versioned ExecPlan (narrative-first review, charts supporting the story, reduced analytics-wall presentation — SUR-12), inspect the live weekly-review/progress/activity flows, then begin source changes only after design lock.
-- Remaining definition of done: Overall Frontend V3 campaign remains ACTIVE. W0–W11 published and documented; W12–W17 pending. Android API36 W16, iOS owner-deferred, Focus notification timestamp, D14/CRLF environmental residuals and unresolved dependency audit advisories prevent overall application certification.
+- Blockers: iOS is owner-deferred (NOT RUN unless an authorized lane actually executes). Hosted `e2e`/`nightly` are gated behind the audit red. Android is qualified at exact source `52a10d0` (post-W17 correction: 23/23 flows across six tags on `Nitro_API_36`, APK SHA-256 `65558DFE…`) — its app source includes `af8eeda`'s `features/activity`/`features/weekly-review` edits; the older `b50034d` W16 APK remains valid for `b50034d` only.
+- Condition required to unblock: None.
+- Exact resume action after unblock: None.
+- Exact next action: Resume `openspec/changes/frontend-v3-post-w17-correction/execplan.md` and follow ITS Exact next action (the post-W17 correction is the only active implementation work). Do not author, restart, or re-run W12–W17. The `settings-ripple` C-3 item of `docs/ui-ux/v3-audit/w17/correction-handoff.md` is resolved by that change.
+- Remaining definition of done: the certification residuals named under Blockers (dependency audit clean without a waiver, iOS), plus the post-W17 correction's post-merge SHA record. Warning: W12–W17 slice `tasks.md` checkbox counts are NOT current authority — those slices show mostly unchecked boxes while their wave ExecPlans say `COMPLETED` and the waves are published on `main`; do not re-execute a wave or mass-check its boxes to "fix" the count. (The Progress list below is the parent's own milestone record and is reconciled with Git.)
 
 ## Progress
 
@@ -118,12 +126,12 @@ historical evidence only.
 - [x] W11 — Planning / Goals / Projects / Daily Plan (slice `openspec/changes/frontend-v3-w11-planning/`; shared objective/status/context/progress row grammar, collapsed filter/sort disclosures with persisted state and active-filter signal, detail disclosures for secondary fields, Daily Plan intention/priority-first hierarchy with Save above optional sections, Today briefing disclosure; adversarial-review failure surfaces for rejected saves/deletes/lifecycle transitions; 82 inspected before/after captures in `docs/ui-ux/v3-audit/w11/`; planning E2E 7/7, journeys P0 25/25, integration 416 passed local exact-head; merged to main as `ffb02f2` (PR #73) with exact-head CI run 38343799936 green on every quality step through unit+integration, audit-only red on the two inherited advisories, hosted e2e/nightly skipped)
 - [x] W11.5 — Planning reliability & regression closure (branch `frontend-v3-w115-planning-reliability`, merged to main as `d8bb43a`, PR #74; PR #73 P2 full-card press-target thread verified and resolved with executable title/context/percent/bar clicks + reorder independence; 8 real-SQLite trigger-injection regressions close the W11 D10 not-stageable limitation with row/outbox/retry oracles; raw engine-message leak fixed via `planningWriteError.ts`; evidence in `docs/ui-ux/v3-audit/w11.5/`; ExecPlan `.agent/execplans/frontend-v3-w115-planning-reliability.md` COMPLETED; no schema/dependency/policy change)
 - [x] W11.5.1 — Timezone determinism & review closure (branch `frontend-v3-w1151-timezone-review-closure`, merged to main as `ec53e1e`, PR #75; W11.5 planning fixtures derive their browser-local date in Chromium via `e2e/helpers/browserDate.ts`, deterministic UTC→Manila crossover regression `e2e/planning-w1151-timezone.spec.ts` plus host-TZ independence runs under TZ=UTC / TZ=Pacific/Kiritimati; both PR #74 Codex P2 threads resolved with verified `isResolved: true`; no production/schema/dependency/security change; ExecPlan `.agent/execplans/frontend-v3-w1151-timezone-review-closure.md` COMPLETED)
-- [ ] W12 — Weekly Review / Progress / Activity
-- [ ] W13 — Settings / secondary surfaces
-- [ ] W14 — full visual integrity sweep
-- [ ] W15 — persistent visual regression suite
-- [ ] W16 — Android current-source qualification
-- [ ] W17 — final regression + adversarial review
+- [x] W12 — Weekly Review / Progress / Activity (published `1d54b70`, PR #76 → `3f2a847`)
+- [x] W13 — Settings / secondary surfaces (published `b1569f0`, PR #76)
+- [x] W14 — full visual integrity sweep (published `c6937b5`)
+- [x] W15 — persistent visual regression suite (published `42d1c20`; determinism closure `e70ccc7`, PR #77 → `b80233d`)
+- [x] W16 — Android current-source qualification (published `d04793b`; APK certified at `b50034d`)
+- [x] W17 — final regression + adversarial review (`3aaca2a`…`1177ac2`, PR #76/#77 line; docs head `bf09c0d`)
 
 ## Surprises & Discoveries
 
@@ -722,11 +730,22 @@ W7 delivered areas (merged as `f679a26`):
 
 ## Recovery / Resume Instructions
 
+<!-- Post-W17 correction (2026-10-14): replaced in place. The previous text
+     resumed at "W12 Weekly Review / Progress / Activity", a published wave. -->
+
 - Fresh session: run `npm run agent:resume -- --plan
 openspec/changes/frontend-v3-calm-momentum/execplan.md`, then
   `git status --short` / `git log --oneline -5` and reconcile against the
-  checkpoint above before editing anything. W5 tasks (5.1–5.3) are verified
-  and checked in `tasks.md`; do not reopen them without contrary evidence.
+  checkpoint above before editing anything.
+- W0–W17 are published on `main`. Do not author, restart, or re-run
+  W12–W17, and do not mass-check their slice `tasks.md` boxes — those
+  checkbox counts are not current authority. W5 tasks (5.1–5.3), W7 tasks
+  (7.1–7.3), W9 tasks (9.1–9.3) and W11 tasks (11.1–11.2) are verified and
+  checked in `tasks.md`; do not reopen them without contrary evidence.
+- The active work is the post-W17 correction: resume
+  `openspec/changes/frontend-v3-post-w17-correction/execplan.md` and continue
+  only from ITS Exact next action. Current correction and release status lives
+  in `docs/ui-ux/v3-audit/post-w17-correction/`.
 - If hosted CI fails at "Validate versioned ExecPlans": run
   `npm run agent:plan:validate:all` locally, fix the named plan sections
   against `scripts/agent-execplan.mjs` aliases, re-run until PASS.
@@ -734,19 +753,23 @@ openspec/changes/frontend-v3-calm-momentum/execplan.md`, then
   `E2E_PORT=8083 VISUAL_AUDIT=1 VISUAL_AUDIT_OUTPUT_DIR=docs/ui-ux/v3-audit/w6.5
 npx playwright test e2e/visual-audit.spec.ts`. Inspect port owners first;
   never kill historical PID42924 or any unrelated process.
-- Final documentation-only publication: use normal hooks, then inspect
+- Documentation publication uses normal hooks, then inspect
   `gh run list --commit $(git rev-parse HEAD) --workflow CI` and exact run
-  metadata/logs; do not substitute product-head evidence for a newer HEAD.
-  Exact-main CI capture for the merge commit and the final documentation
-  head lives at `w65-main/final-ci*.json`/`final-ci*-failed.log`; compare
-  each `headSha` with Git before relying on it.
-- Resume point: W12 Weekly Review / Progress / Activity. Read `openspec/changes/frontend-v3-calm-momentum/execplan.md` (this file) for the wave status; the parent tracks wave closure while each wave's living implementation state is its own slice plan. W5 tasks (5.1–5.3), W7 tasks (7.1–7.3), W9 tasks (9.1–9.3) and W11 tasks (11.1–11.2) are verified and checked in `tasks.md`; do not reopen them without contrary evidence.
+  metadata/logs; compare each `headSha` with Git before relying on it, and do
+  not substitute product-head evidence for a newer HEAD. The historical
+  exact-main CI capture for W6.5's merge commit and final documentation head
+  still lives at `w65-main/final-ci*.json`/`final-ci*-failed.log` (unchanged
+  location).
 - Wave rendered-evidence lanes: each wave owns its opt-in audit spec
   (`e2e/workout-w95-audit.spec.ts` writes `docs/ui-ux/v3-audit/w9.5/`);
   earlier waves' captures are preserved untouched.
 
 ## Outcomes & Retrospective
 
+- Post-W17 correction (2026-10-14): W12–W17 are published on `main`; the
+  "campaign remains mid-flight" wording below is the W7-era retrospective
+  snapshot, not current status. Current state lives in the Current Checkpoint
+  above and `docs/ui-ux/v3-audit/post-w17-correction/`.
 - W6.5 COMPLETE and merged in PR58 at final main `d29c67b`; W7 is active.
   Compact expanding rows and windowed HEAVY states preserve order/persistence;
   baseline12 stale harness failures were repaired, not quarantined/relaxed.

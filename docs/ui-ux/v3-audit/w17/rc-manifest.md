@@ -1,5 +1,14 @@
 # W17 — Release-candidate manifest (Frontend V3 W12–W17)
 
+> **Post-W17 correction note (2026-10-14, change
+> `frontend-v3-post-w17-correction`).** Candidate identity below is the W17
+> closure record. `1177ac2` was `main` at handoff, not the current head
+> (docs-only `bf09c0d` followed it; the correction runs on
+> `frontend-v3-post-w17-adversarial-correction`). Specific stale claims are
+> corrected inline as `[Post-W17 correction: …]`; historical run records and
+> counts stay on the revisions that produced them. Current status lives in
+> `docs/ui-ux/v3-audit/post-w17-correction/`.
+
 ## Candidate identity
 
 | Field                  | Value                                                                                              |
@@ -12,15 +21,15 @@
 | Wave commits           | W12 `1d54b70`, W13 `b1569f0`, W14 `c6937b5`, W15 `42d1c20`, W16 `d04793b`, W17 `3aaca2a`…`1177ac2` |
 | Pull request           | #76 (`W12–W13` title; body extended with W13) on the campaign branch                               |
 
-**Published:** PR #76 merged to `main` as `3f2a847`; the W15 visual-lane closure (PR #77) merged as `b80233d`; the final documentation commit is `1177ac2`. `origin/main` = `1177ac2` at handoff, working tree clean (only the preserved foreign evidence directory remains untracked by policy).
+**Published:** PR #76 merged to `main` as `3f2a847`; the W15 visual-lane closure (PR #77) merged as `b80233d`; the final documentation commit is `1177ac2`. `origin/main` = `1177ac2` at handoff, working tree clean (only the preserved foreign evidence directory remains untracked by policy). `[Post-W17 correction: “the final documentation commit” held only until docs-only `bf09c0d`landed on`main`on top of`1177ac2`; the post-W17 correction branch follows. “At handoff” remains accurate for the `origin/main` claim.]`
 
 ## Build and artifacts
 
-| Artifact       | Command                                                       | Identity                                                                                                     |
-| -------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Web/PWA export | `npm run build:e2e`                                           | `dist/`, 0 `supabase.co` hosts                                                                               |
-| Visual goldens | `e2e/__screenshots__/visual-regression.spec.ts/*.png`         | 30 PNGs, set hash `0676368d…` stable across two runs                                                         |
-| Android APK    | `node scripts/qa-native-provision.mjs --serial emulator-5594` | source `b50034d`, SHA-256 `AA89D9FE84AC3B33ADBE75455EB31A6BC09247F39E7B89E35BA945D60EEC2E0E`, 0 remote hosts |
+| Artifact       | Command                                                       | Identity                                                                                                                                                                                                                                                                                                                                                          |
+| -------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web/PWA export | `npm run build:e2e`                                           | `dist/`, 0 `supabase.co` hosts                                                                                                                                                                                                                                                                                                                                    |
+| Visual goldens | `e2e/__screenshots__/visual-regression.spec.ts/*.png`         | 30 PNGs, set hash `0676368d…` stable across two runs `[Post-W17 correction: `0676368d…`is the historical W15 two-run-proof hash; the set shipped in this candidate (3 goldens regenerated in`e70ccc7`, reviewed) hashes `f19261d5d676ac1ef10cc526a4fb19d41e0edbf1a6e3ebd87fcb437c50dcdeaa`, method `sha256sum e2e/**screenshots**/visual-regression.spec.ts/*.png | sha256sum`] |
+| Android APK    | `node scripts/qa-native-provision.mjs --serial emulator-5594` | source `b50034d`, SHA-256 `AA89D9FE84AC3B33ADBE75455EB31A6BC09247F39E7B89E35BA945D60EEC2E0E`, 0 remote hosts                                                                                                                                                                                                                                                      |
 
 The Android APK was built at `b50034d`. W17's changes are:
 
@@ -31,7 +40,11 @@ The Android APK was built at `b50034d`. W17's changes are:
 None affects native runtime code, so the W16 APK certification remains valid for
 the W17 SHA **for the native lanes it covers**. W17 did not re-run the native
 device matrix; that limitation is recorded in the verification matrix and the
-handoff rather than being silently inherited.
+handoff rather than being silently inherited. `[Post-W17 correction: the list
+above enumerates `3aaca2a`'s files only. The W17 fix chain continued through
+`af8eeda`, which changed user-facing feature source (`features/activity/_`,
+`features/weekly-review/_`), so “None affects native runtime code” is false for
+the full chain: the `b50034d`APK certification does not extend past`3aaca2a`and covers neither`1177ac2`/`bf09c0d` nor the correction branch.]`
 
 ## Environment
 
@@ -55,7 +68,14 @@ handoff rather than being silently inherited.
 ## Known limits of this candidate
 
 1. **Android certification is at `b50034d`, not the W17 SHA.** W17's diff is
-   test/docs only, but the strict claim is not re-earned at `3aaca2a`.
+   test/docs only through `3aaca2a`, and that APK was not re-earned at `3aaca2a`.
+   Post-W17 correction: "test/docs only" holds through `3aaca2a` only.
+   `af8eeda` later changed `features/activity/*` and `features/weekly-review/*`,
+   so the `b50034d` APK does not cover `af8eeda` or later app source. That
+   historical limit is not a denial of the later correction qualification:
+   app source was re-qualified at exact source `52a10d0` (23/23). No `features/`,
+   `app/`, `core/`, or `lib/` file changed between `52a10d0` and `95d5b23`.
+   See `docs/ui-ux/v3-audit/post-w17-correction/release-convergence.md`.
 2. **iOS is owner-deferred** and unclaimed.
 3. **Two dependency advisories** remain (no upstream fix; build-time tooling
    only; absent from both bundles) — recorded, not waived.

@@ -3,6 +3,7 @@ import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
 import { queryRows } from './helpers/dbHarness';
 import { seedSql } from './helpers/seed';
+import { browserLocalTodayKey } from './helpers/browserDate';
 import { clickCaloriesAddEntry, fillCalorieMacrosOnly, fillCaloriesMacros } from './helpers/forms';
 
 /**
@@ -15,23 +16,22 @@ import { clickCaloriesAddEntry, fillCalorieMacrosOnly, fillCaloriesMacros } from
  * Assertions are structural/behavioral (no screenshot baselines).
  */
 
-const pad = (n: number) => String(n).padStart(2, '0');
-
-function localTodayKey(): string {
-  const date = new Date();
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
 /** Seed one realistic day (4 meals) plus a saved-meal catalog via raw SQL. */
 async function seedW10Day(page: import('@playwright/test').Page) {
+  // Browser-evaluated on purpose (post-W17 correction H08): the app derives
+  // "today" from the browser's pinned Asia/Manila clock; a Node-side date key
+  // follows the HOST timezone and seeds the wrong `consumed_on` whenever the
+  // host calendar day differs (e.g. a UTC runner across the UTC/Manila
+  // boundary). Absolute `created_at`/`updated_at` timestamps stay as-is.
+  const todayKey = await browserLocalTodayKey(page);
   await clearDatabase(page);
   await seedSql(
     page,
     `INSERT OR REPLACE INTO app_meta (key, value) VALUES ('calorie_goal', '{"calories":2000,"protein":150,"carbs":200,"fats":65}');
      INSERT INTO calorie_entries (id,food_name,calories,protein,carbs,fats,fiber,meal_type,consumed_on,created_at,updated_at,deleted_at) VALUES
-      ('cal_w10_a','Oatmeal with berries',294,10,54,6,8,'breakfast','${localTodayKey()}','${new Date().toISOString()}','${new Date().toISOString()}',null),
-      ('cal_w10_b','Chicken breast salad',402,45,20,14,5,'lunch','${localTodayKey()}','${new Date().toISOString()}','${new Date().toISOString()}',null),
-      ('cal_w10_c','Salmon rice bowl',604,40,62,20,6,'dinner','${localTodayKey()}','${new Date().toISOString()}','${new Date().toISOString()}',null);
+      ('cal_w10_a','Oatmeal with berries',294,10,54,6,8,'breakfast','${todayKey}','${new Date().toISOString()}','${new Date().toISOString()}',null),
+      ('cal_w10_b','Chicken breast salad',402,45,20,14,5,'lunch','${todayKey}','${new Date().toISOString()}','${new Date().toISOString()}',null),
+      ('cal_w10_c','Salmon rice bowl',604,40,62,20,6,'dinner','${todayKey}','${new Date().toISOString()}','${new Date().toISOString()}',null);
      INSERT INTO saved_meals (id,food_name,calories,protein,carbs,fats,fiber,meal_type,use_count,last_used_at,created_at) VALUES
       ('smeal_w10_long','Grilled chicken and quinoa power bowl with avocado',511,42,48,16,9,'lunch',3,'${new Date().toISOString()}','${new Date().toISOString()}');`,
   );
@@ -158,10 +158,11 @@ test.describe('W10 Calories logging-first surface', () => {
       timeout: 15_000,
     });
     // Row-level oracle LAST: the DB harness read destroys the live app page.
+    const oracleTodayKey = await browserLocalTodayKey(page);
     const rows = await queryRows(
       page,
       "SELECT COUNT(*) AS n FROM calorie_entries WHERE deleted_at IS NULL AND consumed_on = '" +
-        localTodayKey() +
+        oracleTodayKey +
         "'",
     );
     expect(Number(rows[0]?.n)).toBe(2);
