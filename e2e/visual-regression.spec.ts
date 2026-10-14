@@ -599,6 +599,17 @@ test.describe('W15 capture readiness self-checks', () => {
   test('an inactive hidden section stuck opaque fails the capture with a named readiness diagnostic', async ({
     page,
   }) => {
+    // This control drives the FULL capture path — `capture()`, not just
+    // `settle()` — so it proves toHaveScreenshot is unreachable after an unmet
+    // readiness condition even if capture() ever wrapped settle's error. If
+    // the failure ever stopped failing closed, capture() would proceed to
+    // `toHaveScreenshot` against a committed golden, so this control also
+    // refuses to run under `--update-snapshots`.
+    const updateMode = test.info().config.updateSnapshots;
+    test.skip(
+      updateMode === 'all' || updateMode === 'changed',
+      'capture-level readiness control only runs in comparison mode, never in --update-snapshots mode',
+    );
     await openWithFixture(page, PHONE, null);
     // A stubbed inactive hidden section that never fades: through the whole
     // bounded settle wait it must keep the capture from comparing a golden.
@@ -610,7 +621,19 @@ test.describe('W15 capture readiness self-checks', () => {
       probe.style.opacity = '1';
       document.body.appendChild(probe);
     });
-    await expectSettleFailure(page, /section readiness unmet[\s\S]*readiness-probe-stuck/);
+    let failure: string | null = null;
+    try {
+      await capture(page, 'shell-today-first-run-390-light');
+    } catch (error) {
+      failure = error instanceof Error ? error.message : String(error);
+    }
+    if (failure === null) {
+      throw new Error('capture() reached toHaveScreenshot despite unmet section readiness');
+    }
+    // The propagated failure must be settle()'s named readiness diagnostic;
+    // a toHaveScreenshot comparison failure must NOT count as fail-closed.
+    expect(failure).toMatch(/visual settle: section readiness unmet[\s\S]*readiness-probe-stuck/);
+    expect(failure).not.toMatch(/Screenshot comparison failed/);
   });
 
   test('a non-finite computed opacity is unmet readiness, not a pass', async ({ page }) => {
@@ -693,5 +716,9 @@ test.describe('W15 capture readiness self-checks', () => {
     if (comparisonFailure === null) {
       throw new Error('the strict golden comparison accepted a perturbed capture');
     }
+    // The rejection must be the pixel comparison itself — a readiness failure
+    // or an unrelated throw must NOT count as proof of strictness.
+    expect(comparisonFailure).toMatch(/screenshot|snapshot/i);
+    expect(comparisonFailure).not.toMatch(/visual settle:/);
   });
 });

@@ -15,8 +15,8 @@ conditional verdict rather than a false release-ready claim.
 - Explore baseline: `main` and `origin/main` were `bf09c0d50ca35a23bcc9df2582ea8398124d1038` on 2026-10-14. The user's main checkout also has stash `pre-recovery-local-changes` and untracked `.tmp-ios36423379932/`. Do not stage, delete, or normalize either.
 - This change lives only in worktree `D:/Documents/tryPython/superhabits-post-w17-correction`, branch `frontend-v3-post-w17-adversarial-correction`, created from that SHA. The worktree has no `node_modules` yet.
 - OpenSpec artifacts: `proposal.md`, `design.md`, `tasks.md`, and specs for calorie-goal settings propagation, visual capture readiness, post-W17 evidence, and a release-contract schema sentence update.
-- Parent plan `openspec/changes/frontend-v3-calm-momentum/execplan.md` is still `ACTIVE` and its checkpoint still says W12 has not begun. That is the first doc defect, not the first code edit.
-- Source reading, not a runtime run, classified the `Goal 2,400` assertion as a stale selector. Runtime reproduction is still required before editing it.
+- Parent plan `openspec/changes/frontend-v3-calm-momentum/execplan.md` was `ACTIVE` with a checkpoint that said W12 had not begun; that checkpoint and its Recovery text were replaced in place by this change (task 4.1) and the plan remains `ACTIVE` for the audit/iOS certification residuals. Slice `tasks.md` checkbox counts are not current authority.
+- Source reading, not a runtime run, first classified the `Goal 2,400` assertion as a stale selector; runtime reproduction then confirmed it (task 2.1) and the retarget is complete (task 2.2).
 
 ## Scope
 
@@ -35,10 +35,11 @@ conditional verdict rather than a false release-ready claim.
 
 ## Current Checkpoint
 
-- Current milestone: Validation ladder and native qualification complete; evidence pack committed (`16c5b2b`); independent read-only review in progress. Remaining: integrate review findings, push + PR, Outcomes, hygiene gate.
-- Completed: Tasks 1–5.5 and 6.1/6.2/7.1. Native: APK provisioned at exact source `52a10d0` (SHA-256 `65558DFE…`, 0 remote hosts) on Nitro_API_36/:5594; smoke 2/2, persistence 11/11 (run 3 clean; runs 1–2 had one distinct FLAKY_TEST each — `habit-reminder-disable`, `workout-gym-v2-persistence` — both green elsewhere/replayed), lifecycle 6/6, reward 1/1, backup-v2 1/1, portable-backup 2/2 after a reproduced TEST_BUG flow fix (`eb718ca`: scroll-before-assert for 'Export data'; 2/2 repro → 2/2 green). iOS NOT RUN. Validation: typecheck 0, lint 0/0, themes 140/140, OpenSpec 87/87, plans PASS, npm test 2,702 executed (2,700 passed / 2 skipped / 0 failed), qa:timezones 111 (5 zones), settings-ripple 6/6, P0 25/25, counts recomputed (vitest list 2,700; playwright 501 tests/56 files). Evidence pack committed with verdict CONDITIONAL / NEAR-COMPLETE (unresolved: audit FAILED-UNREMEDIATED, iOS NOT RUN).
-- In progress: independent read-only review of `bf09c0d..HEAD` (subagent run `62fbf05c`); review artifacts exposed under `.review-artifacts/` (temp, delete before push). Reviewer's confirmed interim finding integrated: the over-goal-day spec scenario has NO gated test (findings.md corrected — coverage gap recorded, not claimed).
-- Important modified files: as before plus `docs/ui-ux/v3-audit/post-w17-correction/` (findings/evidence-index/release-convergence), `.maestro/flows/portable-backup.yaml` (flow fix), uncommitted `openspec/changes/frontend-v3-post-w17-correction/tasks.md` (checkboxes).
+- Current milestone: All implementation, validation, native qualification, evidence-pack, and review tasks are complete at `78adfb3` + review-2 fixes. PR #78 is open against `origin/main` (`bf09c0d`). The only remaining tail is the post-merge SHA record.
+- Completed: Tasks 1–7.1 and 6.3/6.4-publish. settings-ripple retargeted green 6/6 (SQL/reload/entry-count oracles intact). Visual capture fail-closed after red-first negative controls (30 goldens untouched, `maxDiffPixels: 0`, set hash `f19261d5…` vs historical `0676368d…`). H08 date keys reproduced (16/41 boundary red) and fixed browser-side (41/41 boundary + control; `calories-w10-audit.spec.ts` fixed in the second review pass). Parent checkpoint/recovery replaced in place (plan `ACTIVE`). W17 provenance annotated (counts unmoved, `b50034d` boundary stated). Audit UNREMEDIATED (gate red, nothing waived). Android exact-source qualified at `52a10d0` (23/23 flows; two FLAKY_TEST incidents preserved; one native TEST_BUG flow fixed). Independent reviews: review 1 (blocking-findings) integrated in `d064cd5`; review 2 of PR #78 integrated in the working tree (checkpoint truth, Android status convergence, capture-level control proof, perturbation-throw tightening, browserDate dedup, wrapper removal, audit-spec date key, 6.4 box honesty, per-SHA release-convergence rows).
+- In progress: None. Remaining tail is post-merge bookkeeping only.
+- Important modified files: All committed through `78adfb3` (branch `frontend-v3-post-w17-adversarial-correction`); the review-2 fixes are the pending commit on top. Nothing is left uncommitted beyond that commit's content.
+- Last successful validation: 2026-10-14 — strengthened visual readiness self-checks 4/4 (capture-level fail-closed proof + comparison-only perturbation check) on :8081; `npx tsc --noEmit` 0 errors and `npx eslint --max-warnings 0` clean on every file touched in review 2.
 - Last successful validation: 2026-10-14 — `NATIVE_ANDROID_SERIAL=emulator-5594 node scripts/qa-native.mjs --platform android --tag portable-backup` 2/2 post-fix; `npx prettier --check` + `npx eslint --max-warnings 0` clean at `16c5b2b`.
 - Current failures: None open in gates. Audit remains intentionally red (UNREMEDIATED).
 - Relevant quarantines: None added.
@@ -97,10 +98,7 @@ conditional verdict rather than a false release-ready claim.
 - `openspec/changes/frontend-v3-post-w17-correction/design.md` — dispositions and approach.
 - `openspec/changes/frontend-v3-post-w17-correction/tasks.md` — implementation checklist.
 - `openspec/changes/frontend-v3-post-w17-correction/specs/` — four behavior deltas.
-- `openspec/changes/frontend-v3-post-w17-correction/execplan.md` — this living plan.
-- `e2e/journeys/settings-ripple.spec.ts` — stale `Goal 2,400` selector retargeted to the W10 grammar (title + context line + edit-goal accessible name) at both the ripple and reload checks; SQL, reload, and entry-count oracles untouched.
-- `e2e/visual-regression.spec.ts` — `settle()` fail-closed with named diagnostics (section readiness incl. non-finite opacity; required font family), `prepareCapture` extracted from `capture()`, 4 harness self-checks (negative controls + strict comparison) appended.
-- All of the above committed as docs-only `d0a6fdc` (planning only). The two e2e files are uncommitted product/test edits so far.
+- Important modified files (all committed on `frontend-v3-post-w17-adversarial-correction`): `openspec/changes/frontend-v3-post-w17-correction/` (this plan + tasks), `openspec/changes/frontend-v3-calm-momentum/execplan.md` (checkpoint/recovery replacement), `docs/ui-ux/v3-audit/w17/*.md` (provenance annotations), `docs/ui-ux/v3-audit/post-w17-correction/` (evidence pack), `.agent/execplans/frontend-v3-w12-w17-unified-campaign.md` (CRLF claim + C-3 pointer), `e2e/journeys/settings-ripple.spec.ts`, `e2e/visual-regression.spec.ts`, `e2e/helpers/browserDate.ts`, `e2e/{planning-hub,calories,calories-w10,calories-w10-audit,calories-day-navigation,workout-w9}.spec.ts`, `.maestro/flows/portable-backup.yaml`.
 
 ## Recovery / Resume Instructions
 

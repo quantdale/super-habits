@@ -3,6 +3,7 @@ import { goToTab } from './helpers/navigation';
 import { resetAll } from './helpers/reset';
 import { ensureAppContext, returnToApp } from './helpers/dbHarness';
 import { seedSql } from './helpers/seed';
+import { browserLocalTodayKey } from './helpers/browserDate';
 
 /**
  * W10 rendered-truth instrument for the Calories / Health surfaces.
@@ -60,15 +61,6 @@ const SAVED_MEALS: { name: string; kcal: number; p: number; c: number; f: number
   },
 ];
 
-function pad(n: number) {
-  return String(n).padStart(2, '0');
-}
-
-function todayKey(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
 function isoAtLocal(key: string, hour: number, minute = 0): string {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(y, m - 1, d, hour, minute, 0, 0).toISOString();
@@ -78,7 +70,11 @@ function isoAtLocal(key: string, hour: number, minute = 0): string {
 async function seedDay(page: Page, opts: { over: boolean }) {
   await resetAll(page);
   await ensureAppContext(page);
-  const key = todayKey();
+  // Browser-evaluated (post-W17 correction H08, design D7): the app derives
+  // "today" from the browser's pinned Asia/Manila clock; a Node-side key
+  // follows the HOST timezone and seeds the wrong `consumed_on` across a
+  // host/browser calendar boundary.
+  const key = await browserLocalTodayKey(page);
   const rows = [...DAY];
   if (opts.over) {
     rows.push({

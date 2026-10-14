@@ -9,17 +9,10 @@ import {
   browserLocalWeekday,
 } from './helpers/browserDate';
 
-/**
- * Browser-local date key `days` from today (negative = past).
- *
- * Browser-evaluated on purpose (post-W17 correction H08): a Node-side
- * `new Date()` follows the HOST timezone while the app follows the browser's
- * pinned `Asia/Manila`, so across a UTC/Manila calendar boundary the host and
- * the app disagree about "today" and fixtures/oracles land on the wrong day.
- */
-function dateKeyOffset(page: Page, days: number): Promise<string> {
-  return browserLocalDateKeyOffset(page, days);
-}
+// Date keys are browser-evaluated (post-W17 correction H08): the app's
+// `toDateKey()` reads the browser's pinned Asia/Manila clock, so a Node-side
+// `new Date()` would compare/seed the host's calendar day and break across a
+// UTC/Manila boundary. Use `browserLocalDateKeyOffset(page, days)` directly.
 
 function isoAtLocal(key: string, hour: number): string {
   const [y, m, d] = key.split('-').map(Number);
@@ -54,7 +47,7 @@ test.describe('Calories diary day navigation', () => {
   });
 
   test('prev/next/jump-to-today with per-day totals header', async ({ page }) => {
-    await seedPastDayEntry(page, await dateKeyOffset(page, -1), 'Yesterday oats');
+    await seedPastDayEntry(page, await browserLocalDateKeyOffset(page, -1), 'Yesterday oats');
 
     const prev = page.getByRole('button', { name: 'Previous day', exact: true });
     const next = page.getByRole('button', { name: 'Next day', exact: true });
@@ -93,7 +86,11 @@ test.describe('Calories diary day navigation', () => {
     // On Monday, yesterday belongs to the previous Monday-start strip. Seed
     // today instead so the assertion remains inside the rendered week.
     const loggedDateOffset = mondayOffset === 0 ? 0 : -1;
-    await seedPastDayEntry(page, await dateKeyOffset(page, loggedDateOffset), 'Logged oats');
+    await seedPastDayEntry(
+      page,
+      await browserLocalDateKeyOffset(page, loggedDateOffset),
+      'Logged oats',
+    );
 
     // At least one strip cell carries a logged dot (non-transparent marker).
     const countLoggedDots = () =>
@@ -124,7 +121,7 @@ test.describe('Calories diary day navigation', () => {
   test('copy-day end-to-end surfaces the structured outcome and repeat behavior', async ({
     page,
   }) => {
-    await seedPastDayEntry(page, await dateKeyOffset(page, -2), 'Copy source oats');
+    await seedPastDayEntry(page, await browserLocalDateKeyOffset(page, -2), 'Copy source oats');
 
     // Select yesterday so the seeded day-before-yesterday is an earlier candidate.
     await page.getByRole('button', { name: 'Previous day', exact: true }).click();
@@ -154,7 +151,7 @@ test.describe('Calories diary day navigation', () => {
   });
 
   test('copy modal offers no candidates when no earlier day is logged', async ({ page }) => {
-    await seedPastDayEntry(page, await dateKeyOffset(page, -1), 'Yesterday oats');
+    await seedPastDayEntry(page, await browserLocalDateKeyOffset(page, -1), 'Yesterday oats');
 
     // On yesterday, the only logged day (yesterday itself) is not an earlier
     // candidate, and future days are excluded by construction.
@@ -166,9 +163,9 @@ test.describe('Calories diary day navigation', () => {
   test('entry day correction moves the entry in place and fixes both day totals', async ({
     page,
   }) => {
-    const seededKey = await dateKeyOffset(page, -1);
+    const seededKey = await browserLocalDateKeyOffset(page, -1);
     await seedPastDayEntry(page, seededKey, 'Misfiled ramen');
-    const today = await dateKeyOffset(page, 0);
+    const today = await browserLocalDateKeyOffset(page, 0);
 
     // Yesterday holds the misfiled 300 kcal entry.
     await page.getByRole('button', { name: 'Previous day', exact: true }).click();

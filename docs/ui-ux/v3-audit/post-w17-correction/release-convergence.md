@@ -26,17 +26,18 @@ visual capture fail-closed, H08 date keys reproduced and fixed, native
 
 Revision limits of each lane in this verdict:
 
-| Lane                                              | State                                                         | Revision limit                                    |
-| ------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------- |
-| Web unit + integration                            | PASS (2,700 / 2,702 executed, 0 failed)                       | correction tree                                   |
-| Web journeys (settings-ripple 6/6, P0 25/25)      | PASS                                                          | correction tree                                   |
-| Visual goldens + readiness self-checks (34/34 ×2) | PASS                                                          | correction tree; golden set `f19261d5…`           |
-| Timezones (111, 5 zones)                          | PASS                                                          | correction tree                                   |
-| Android native (23/23, six tags)                  | PASS at exact source with two recorded `FLAKY_TEST` incidents | APK source `52a10d0` = this revision's app source |
-| Dependency audit                                  | **FAILED — UNREMEDIATED**                                     | re-run at correction tree                         |
-| iOS                                               | **NOT RUN**                                                   | none                                              |
-| Hosted `e2e` / `nightly`                          | **NOT RUN** (skip behind the audit gate)                      | none since W11.5.1 baseline                       |
-| `e2e:sync` (dist-sync lane)                       | **NOT RUN** in this change (nightly-class; report-only lane)  | none                                              |
+| Lane                                              | State                                                         | Revision limit                                                                                                |
+| ------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Web unit + integration                            | PASS (2,700 / 2,702 executed, 0 failed)                       | produced on the tree committed as `52a10d0` (product unchanged through `78adfb3`)                             |
+| Web journeys (settings-ripple 6/6, P0 25/25)      | PASS                                                          | settings-ripple fixed at `2c1fe99`, re-run green at `52a10d0`; P0 at `52a10d0`                                |
+| Visual goldens + readiness self-checks (34/34 ×2) | PASS                                                          | runs at `b0d5d0c` tree; strengthened self-checks 4/4 at the review-2 tree; golden set `f19261d5…`             |
+| Timezones (111, 5 zones)                          | PASS                                                          | `52a10d0`                                                                                                     |
+| Date-key boundary + control (41/41 ×2)            | PASS                                                          | fixed at `76f0fa6`; `calories-w10-audit.spec.ts` date key fixed in the review-2 tree                          |
+| Android native (23/23, six tags)                  | PASS at exact source with two recorded `FLAKY_TEST` incidents | APK source `52a10d0` = this revision's app source (covers `af8eeda`; the `b50034d` APK covers `b50034d` only) |
+| Dependency audit                                  | **FAILED — UNREMEDIATED**                                     | re-run at `52a10d0` tree                                                                                      |
+| iOS                                               | **NOT RUN**                                                   | none                                                                                                          |
+| Hosted `e2e` / `nightly`                          | **NOT RUN** (skip behind the audit gate)                      | none since W11.5.1 baseline                                                                                   |
+| `e2e:sync` (dist-sync lane)                       | **NOT RUN** in this change (nightly-class; report-only lane)  | none                                                                                                          |
 
 Because the security gate is failed and iOS is not run, this verdict is
 deliberately **not** "release-ready" (spec: the correction SHALL NOT use
@@ -63,6 +64,14 @@ Historical pre-migration-25 notes stay dated and historical — none were
 rewritten.
 
 ## Inherited-campaign closure state
+
+- **Android status convergence.** The W17 document annotations correctly say
+  that only `b50034d` was Android-certified for the revisions up to `bf09c0d`
+  — the `b50034d` APK does not cover `af8eeda`'s feature edits. That is
+  superseded for this branch by the correction's own exact-source
+  qualification: the APK built at `52a10d0` covers the app source of
+  `af8eeda` through `78adfb3` (23/23 flows). Revisions between `b50034d` and
+  `52a10d0` never had their own APK.
 
 - **Recovery does not restart finished waves** (spec scenario): the parent
   Calm Momentum plan's Current Checkpoint/Recovery were replaced in place; its

@@ -298,6 +298,38 @@ correction revision `52a10d0`.
 **iOS: NOT RUN** (Windows host; no authorized simulator/cloud lane). No iOS
 claim is made.
 
+## Review record
+
+- **Review 1** (independent read-only, run `62fbf05c`, range `bf09c0d..16c5b2b`):
+  verdict _blocking-findings_ — 1 BLOCKING (over-goal coverage misgrounding) +
+  4 NITs (timeout-claim precision, evidence-index typo, one-shot H08 proof,
+  parent Recovery artifact pointer). All integrated in `d064cd5`.
+- **Review 2** (PR #78 standards+spec review, range `bf09c0d..78adfb3`): the
+  reviewer cleared the product/verdict substance and found record-truth and
+  proof-strength gaps. All integrated:
+  1. Child ExecPlan checkpoint/Context/Changed-Files were stale snapshots
+     (review still "in progress", files "uncommitted") — replaced in place.
+  2. Parent checkpoint denied the `52a10d0` Android qualification recorded in
+     the evidence pack — converged (parent + this pack now state: `b50034d`
+     covers `b50034d` only; `52a10d0` covers `af8eeda`..`78adfb3` app source),
+     and BLOCKED-plan fields were reset to `None` under `Status: ACTIVE`.
+  3. Parent Progress list (the parent's own milestone record, not the slice
+     `tasks.md` boxes) reconciled with Git: W12–W17 checked with SHAs.
+  4. Visual controls upgraded: the stuck-section control now drives the FULL
+     `capture()` path and proves `toHaveScreenshot` is unreachable after an
+     unmet readiness condition (named diagnostic required; comparison
+     failures don't count), and the perturbation control now requires the
+     failure to be the pixel comparison itself (not any throw).
+  5. `browserLocalTodayKey` now delegates to `browserLocalDateKeyOffset(page,
+0)` (no duplicated pad/join block); the forwarding `dateKeyOffset`
+     wrapper in `calories-day-navigation.spec.ts` removed.
+  6. `e2e/calories-w10-audit.spec.ts` (design D7's sixth suspect, opt-in
+     lane) fixed: its host-side `todayKey()` is now browser-evaluated — the
+     same reproduced H08 class, closed for the audit lane too.
+  7. Task 6.4's checkbox restored to unchecked until the merged `origin/main`
+     SHA is actually recorded; release-convergence rows now name their
+     producing revisions instead of "correction tree".
+
 ## Regression-impact notes
 
 - No product source changed (`features/`, `core/`, `app/`, `lib/` untouched),

@@ -68,18 +68,18 @@ historical evidence only.
      slice" although W12–W17 are published on `main`. Historical wave notes
      stay unchanged under Progress and the Validation Ledger below. -->
 
-- Current milestone: W12–W17 are PUBLISHED on `main` (PR #76 merged as `3f2a847`, PR #77 merged as `b80233d`, documentation head `1177ac2` then docs-only `bf09c0d`). The active work is the post-W17 correction change `frontend-v3-post-w17-correction` (worktree `D:/Documents/tryPython/superhabits-post-w17-correction`, branch `frontend-v3-post-w17-adversarial-correction`). This parent plan stays `ACTIVE` because hosted security, iOS, and exact-source Android certification remain unearned.
+- Current milestone: W12–W17 are PUBLISHED on `main` (PR #76 merged as `3f2a847`, PR #77 merged as `b80233d`, documentation head `1177ac2` then docs-only `bf09c0d`). The post-W17 correction is complete and published for review as PR #78 (branch `frontend-v3-post-w17-adversarial-correction`, worktree `D:/Documents/tryPython/superhabits-post-w17-correction`); only its post-merge SHA record remains. This parent plan stays `ACTIVE` because hosted security and iOS certification remain unearned.
 - Completed: W0–W11.5.1 exactly as recorded under Progress below. W12 Weekly Review / Progress / Activity, W13 Settings / Command / Achievements, W14 whole-app integrity sweep, W15 persistent visual regression (30 curated goldens), W16 Android API-36 qualification (23/23 flows), and W17 final regression / RC (verdict CONDITIONAL / NEAR-COMPLETE) are implemented, tested, and published on `main`; their evidence lives in `docs/ui-ux/v3-audit/w12` through `w17/`.
-- In progress: post-W17 correction (`openspec/changes/frontend-v3-post-w17-correction/`): the carried `settings-ripple` Calories journey (C-3), the visual-capture fail-closed readiness fix, and provenance reconciliation of this plan and the W17 current-status records.
+- In progress: None. The post-W17 correction is implemented, validated, reviewed, and published as PR #78; its ExecPlan's only tail is recording the merged `origin/main` SHA after merge.
 - Important modified files: none in this plan's own implementation scope after W17. The correction's edits live on `frontend-v3-post-w17-adversarial-correction` and are tracked by that change's ExecPlan.
 - Last successful validation: the W17 closure ladder at `1177ac2` (recorded per-lane in `docs/ui-ux/v3-audit/w17/verification-matrix.md`; counts stay attributed to the runs that produced them). The post-W17 correction re-validates at its own SHA and records it in `docs/ui-ux/v3-audit/post-w17-correction/`.
 - Current failures: `node scripts/audit-runtime-deps.mjs` remains RED on the two inherited undocumented HIGH advisories (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv) — not waived, not allowlisted, not softened. Hosted `e2e`/`nightly` skip behind that gate and are NOT passed.
 - Relevant quarantines: none added; existing internal/remote/visual opt-ins unchanged.
-- Blockers: Android qualification exists only at `b50034d`; `af8eeda` (later) changed user-facing `features/activity/*` and `features/weekly-review/*`, so `af8eeda` and every later revision are NOT Android-certified. iOS is owner-deferred (NOT RUN unless an authorized lane actually executes). Hosted `e2e`/`nightly` are gated behind the audit red.
-- Condition required to unblock: an upstream or dependency-graph fix that removes both HIGH advisories without a waiver; an exact-source Android provision at the release revision; an authorized iOS simulator/cloud lane.
-- Exact resume action after unblock: re-run `node scripts/audit-runtime-deps.mjs`, `npm run qa:native:provision` (+ tag lanes), or `npm run qa:native:ios` respectively, and record the evidence in `docs/ui-ux/v3-audit/post-w17-correction/` at the tested revision.
+- Blockers: iOS is owner-deferred (NOT RUN unless an authorized lane actually executes). Hosted `e2e`/`nightly` are gated behind the audit red. Android is qualified at exact source `52a10d0` (post-W17 correction: 23/23 flows across six tags on `Nitro_API_36`, APK SHA-256 `65558DFE…`) — its app source includes `af8eeda`'s `features/activity`/`features/weekly-review` edits; the older `b50034d` W16 APK remains valid for `b50034d` only.
+- Condition required to unblock: None.
+- Exact resume action after unblock: None.
 - Exact next action: Resume `openspec/changes/frontend-v3-post-w17-correction/execplan.md` and follow ITS Exact next action (the post-W17 correction is the only active implementation work). Do not author, restart, or re-run W12–W17. The `settings-ripple` C-3 item of `docs/ui-ux/v3-audit/w17/correction-handoff.md` is resolved by that change.
-- Remaining definition of done: the certification residuals named under Blockers (dependency audit clean without a waiver, exact-source Android, iOS), plus the post-W17 correction's own definition of done. Warning: W12–W17 slice `tasks.md` checkbox counts are NOT current authority — those slices show mostly unchecked boxes while their wave ExecPlans say `COMPLETED` and the waves are published on `main`; do not re-execute a wave or mass-check its boxes to "fix" the count.
+- Remaining definition of done: the certification residuals named under Blockers (dependency audit clean without a waiver, iOS), plus the post-W17 correction's post-merge SHA record. Warning: W12–W17 slice `tasks.md` checkbox counts are NOT current authority — those slices show mostly unchecked boxes while their wave ExecPlans say `COMPLETED` and the waves are published on `main`; do not re-execute a wave or mass-check its boxes to "fix" the count. (The Progress list below is the parent's own milestone record and is reconciled with Git.)
 
 ## Progress
 
@@ -126,12 +126,12 @@ historical evidence only.
 - [x] W11 — Planning / Goals / Projects / Daily Plan (slice `openspec/changes/frontend-v3-w11-planning/`; shared objective/status/context/progress row grammar, collapsed filter/sort disclosures with persisted state and active-filter signal, detail disclosures for secondary fields, Daily Plan intention/priority-first hierarchy with Save above optional sections, Today briefing disclosure; adversarial-review failure surfaces for rejected saves/deletes/lifecycle transitions; 82 inspected before/after captures in `docs/ui-ux/v3-audit/w11/`; planning E2E 7/7, journeys P0 25/25, integration 416 passed local exact-head; merged to main as `ffb02f2` (PR #73) with exact-head CI run 38343799936 green on every quality step through unit+integration, audit-only red on the two inherited advisories, hosted e2e/nightly skipped)
 - [x] W11.5 — Planning reliability & regression closure (branch `frontend-v3-w115-planning-reliability`, merged to main as `d8bb43a`, PR #74; PR #73 P2 full-card press-target thread verified and resolved with executable title/context/percent/bar clicks + reorder independence; 8 real-SQLite trigger-injection regressions close the W11 D10 not-stageable limitation with row/outbox/retry oracles; raw engine-message leak fixed via `planningWriteError.ts`; evidence in `docs/ui-ux/v3-audit/w11.5/`; ExecPlan `.agent/execplans/frontend-v3-w115-planning-reliability.md` COMPLETED; no schema/dependency/policy change)
 - [x] W11.5.1 — Timezone determinism & review closure (branch `frontend-v3-w1151-timezone-review-closure`, merged to main as `ec53e1e`, PR #75; W11.5 planning fixtures derive their browser-local date in Chromium via `e2e/helpers/browserDate.ts`, deterministic UTC→Manila crossover regression `e2e/planning-w1151-timezone.spec.ts` plus host-TZ independence runs under TZ=UTC / TZ=Pacific/Kiritimati; both PR #74 Codex P2 threads resolved with verified `isResolved: true`; no production/schema/dependency/security change; ExecPlan `.agent/execplans/frontend-v3-w1151-timezone-review-closure.md` COMPLETED)
-- [ ] W12 — Weekly Review / Progress / Activity
-- [ ] W13 — Settings / secondary surfaces
-- [ ] W14 — full visual integrity sweep
-- [ ] W15 — persistent visual regression suite
-- [ ] W16 — Android current-source qualification
-- [ ] W17 — final regression + adversarial review
+- [x] W12 — Weekly Review / Progress / Activity (published `1d54b70`, PR #76 → `3f2a847`)
+- [x] W13 — Settings / secondary surfaces (published `b1569f0`, PR #76)
+- [x] W14 — full visual integrity sweep (published `c6937b5`)
+- [x] W15 — persistent visual regression suite (published `42d1c20`; determinism closure `e70ccc7`, PR #77 → `b80233d`)
+- [x] W16 — Android current-source qualification (published `d04793b`; APK certified at `b50034d`)
+- [x] W17 — final regression + adversarial review (`3aaca2a`…`1177ac2`, PR #76/#77 line; docs head `bf09c0d`)
 
 ## Surprises & Discoveries
 
