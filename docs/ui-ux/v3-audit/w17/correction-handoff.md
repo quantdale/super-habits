@@ -33,6 +33,17 @@ but it is a real red journey that has been carried since W11.5.
 
 ---
 
+## 0. Resolved this session (do not re-open)
+
+All three PR #76 Codex P2 findings were reproduced, fixed and pinned in
+`af8eeda`; their threads are replied to and resolved.
+
+| ID  | Finding                                                                                  | Fix                                                                                      | Regression                                                      |
+| --- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| R-3 | Calorie timeline rows rendered a fabricated clock time from a date-only key              | `hasClockTime()` domain guard; the view formats a time only for timestamp-backed sources | `tests/activityTimeline.test.ts` +3                             |
+| R-4 | Unfinished/planned-but-unrecorded weeks were described as "Nothing scheduled this week." | `weekHasAnyScheduledOrRecordedActivity()` covers every schedule-bearing count            | `tests/weeklyReview.domain.test.ts` +6                          |
+| R-5 | "Review saved" was announced while a new commitment had failed                           | Partial-failure heading, warning tone, per-commitment titles, retry retained             | `e2e/weekly-review.spec.ts` 2/2, `e2e/planning-w12.spec.ts` 5/5 |
+
 ## 1. P0 / P1 — none outstanding
 
 No P0 or P1 defect remains untriaged on the integrated web/PWA surface. The last

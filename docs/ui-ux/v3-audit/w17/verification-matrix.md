@@ -39,7 +39,7 @@ this revision. `Not run` means exactly that.
 
 ### Lane 2 — Unit, domain and real-SQLite integration
 
-- `npm test`: **2,693 executed, 2,691 passed, 0 failed, 2 skipped**.
+- `npm test`: **2,702 executed, 2,700 passed, 0 failed, 2 skipped**.
   - The two skips are pre-existing opt-in lanes (disposable cloud).
   - **This is the first fully-green run of the campaign.** Every prior wave
     (W7–W16, including pristine `main`) recorded exactly 1 failure,

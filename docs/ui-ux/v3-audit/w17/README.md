@@ -6,7 +6,7 @@
 
 Substantial implementation and verification are finished across all six waves
 (W12–W17) with every relevant web/PWA gate green — including, for the first time
-in the campaign, a fully green Vitest suite (2,691 passed / 0 failed) and a
+in the campaign, a fully green Vitest suite (2,700 passed / 0 failed) and a
 source-authenticated Android API-36 PASS. The verdict is not "release-candidate
 ready" in the whole-application sense because:
 
@@ -57,7 +57,7 @@ second guard broken by W13's legitimate change was repaired. Both are recorded
 as `TEST_BUG` with the misclassification preserved in the register so the
 history is not rewritten.
 
-## Verification summary (source `3aaca2a`)
+## Verification summary (source `af8eeda`)
 
 | Lane                                                         | Result                                          |
 | ------------------------------------------------------------ | ----------------------------------------------- |
