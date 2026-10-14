@@ -71,7 +71,7 @@ activityTimelineData}.test.ts`.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
 - Exact next action: None — task complete. Commit the W12 slice and begin W13 (Settings / Command Center / Achievements design lock + reconstruction).
-- Remaining definition of done: W12 commit/publication; then W13–W17.
+- Remaining definition of done: Complete — W12 is implemented, tested, evidenced and published; the slice plan is closed.
 
 ## Progress
 

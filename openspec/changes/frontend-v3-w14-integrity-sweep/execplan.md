@@ -69,7 +69,7 @@ curate baselines from a verified-stable render, not a moving target.
 - Exact next action: None — task complete. Commit W14, then begin W15 — author
   `openspec/changes/frontend-v3-w15-visual-regression/` and build the curated
   deterministic `toHaveScreenshot` suite with two-run stability.
-- Remaining definition of done: W14 commit/publication; then W15–W17.
+- Remaining definition of done: Complete — the sweep is executed, the P1 defect is fixed and verified, and the ledger is written.
 
 ## Progress
 

@@ -63,7 +63,7 @@ AchievementsScreen.tsx`, `BadgeGrid.tsx`, `LevelHero.tsx`.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
 - Exact next action: None — task complete. Commit W13 and open its PR, then begin W14 (whole-app integrity sweep).
-- Remaining definition of done: W13 commit/publication; then W14–W17.
+- Remaining definition of done: Complete — W13 is implemented, tested, evidenced and published; the slice plan is closed.
 
 ## Progress
 

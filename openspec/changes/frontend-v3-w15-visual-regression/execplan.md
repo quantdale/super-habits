@@ -76,7 +76,7 @@ navigation,todoHeavy,habitsW7}.ts`, `e2e/fixtures.ts`,
 - Exact next action: None — task complete. Commit W15, then begin W16 — Android API-36 current-source
   native qualification (boot `Nitro_API_36`, build the credential-free
   `e2e-test` equivalent, run the native smoke/persistence/lifecycle lanes).
-- Remaining definition of done: W15 commit/publication; then W16–W17.
+- Remaining definition of done: Complete — the suite is built, CI-integrated, two-run stable and sensitivity-verified.
 
 ## Progress
 

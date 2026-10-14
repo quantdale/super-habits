@@ -61,8 +61,7 @@ packet — with a verdict the evidence supports.
   then the full ladder from `correction-handoff.md` §7.
 - Exact next action: None — task complete. Commit W17, verify the exact-head state, reconcile PR #76
   threads, remove the certification worktree and confirm port hygiene.
-- Remaining definition of done: W17 commit/publication; review reconciliation;
-  worktree/port cleanup.
+- Remaining definition of done: Complete — the ladder is executed, the defects are resolved, the security gate is reconciled and the handoff is written.
 
 ## Progress
 

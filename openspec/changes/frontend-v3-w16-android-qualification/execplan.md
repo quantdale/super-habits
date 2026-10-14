@@ -60,8 +60,7 @@ native pass.
 - Exact resume action after unblock: None.
 - Exact next action: None — task complete. Commit W16, then begin W17 — the integrated release-
   candidate verification ladder, security/native reconciliation and handoff.
-- Remaining definition of done: W16 commit/publication; worktree cleanup; then
-  W17.
+- Remaining definition of done: Complete — the exact-source Android matrix passed and the evidence is recorded; iOS remains owner-deferred.
 
 ## Progress
 
