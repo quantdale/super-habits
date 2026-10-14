@@ -33,24 +33,39 @@ Fix: edge-swipe the field off the tab bar, assert the typed name is visible, rev
 
 ## Web validation on this worktree
 
-`npm run build:e2e` exported a hermetic `dist/` with 0 Supabase hosts. The export nested wasm under `dist/assets/_superhabits/` because this worktree's `node_modules` is a junction to the sibling checkout; the harness still reads `dist/assets/node_modules/...`. A copy of the wasm file was placed at the harness path for the run. That copy is gitignored `dist/` and is not a product change.
+A first hermetic export nested wasm under `dist/assets/_superhabits/` because this worktree's `node_modules` is a junction to the sibling checkout. The harness then required a manual copy onto `dist/assets/node_modules/...`. That copy is gone. `discoverWasmAsset()` now uses the path the export actually hosts.
 
-`npx playwright test e2e/calories-w10.spec.ts e2e/habits.spec.ts --project=chromium`: **29 passed, 0 failed, 0 skipped** (3.5m). That includes the new over-by-1, 400 kcal delete-back, exact-goal, and habit-footer viewport tests, plus the existing W10 and habit save/reload specs.
+Proof: `dist/` was deleted and `npm run build:e2e` was run again. The only wasm was `dist/assets/_superhabits/node_modules/expo-sqlite/web/wa-sqlite/wa-sqlite.7ca566fbbc2ec2a172c5aefa63a20f4b.wasm`. Canonical `dist/assets/node_modules` was absent. The over-goal tests, which call `queryRows`, passed against that export. Bundle scan: 0 Supabase hosts.
 
-`npx tsc --noEmit`: exit 0. `tests/calories.domain.test.ts`: 44/44.
+Completed independent lanes on that clean export, working tree before the recording commit:
 
-P0 journeys: `npx playwright test --project=journeys --grep @p0` — **25 passed**.
+| Lane          | Command                                    | Result                           |
+| ------------- | ------------------------------------------ | -------------------------------- |
+| chromium      | `npx playwright test --project=chromium`   | 250 passed, 44 skipped, 0 failed |
+| journeys      | `npx playwright test --project=journeys`   | 76 passed, 42 skipped, 0 failed  |
+| visual        | `npx playwright test --project=visual`     | 34 passed, 0 skipped, 0 failed   |
+| pwa           | `npx playwright test --project=pwa`        | 5 passed, 0 skipped, 0 failed    |
+| simulation    | `npx playwright test --project=simulation` | 3 passed, 0 skipped, 0 failed    |
+| journeys-sync | not executed                               | NOT RUN — no disposable backend  |
 
-Broader local battery (`--project=chromium --project=pwa --project=journeys --project=simulation --project=visual`) was interrupted. Captured output through test 451: **365 passed, 86 skipped, 0 failed**. The skips are the `@sync` steps, which do not run in the local journeys project. The runner was then killed after the tool wait ended and the process stopped making artifacts; it is not a completed suite. A follow-up `--project=simulation` run observed 2 passed before that wait also ended. Do not read this as 453/453.
+Chromium skips are opt-in visual-audit and internal-parser specs. Journey skips are `@sync` steps that run only in `journeys-sync`. Visual goldens were not regenerated.
 
-`e2e:sync` / hosted `nightly`: **NOT RUN**. No disposable backend was used.
+The earlier combined battery that stopped at test 451 is superseded by these finished lanes. Do not add the two runs together.
+
+## Review
+
+- Habit footer: a 360×740 edit of an existing habit keeps `Save changes` in the viewport after scrolling to linked actions. Tab from the name field reaches it. Enter saves. Reload and SQLite agree. Create uses an unforced button click. Older specs still force-click; they passed and were not rewritten.
+- Workout Maestro: the extra 16% edge swipe after `Add routine` becomes visible is an unverified assumption that it will not scroll the button off the top. It was not changed again because no responsive owned emulator was available. It is a residual harness risk, not a reproduced persistence defect.
+- `habit-reminder-disable` still has `scrollUntilVisible` for `Create habit`. The footer should make that label visible immediately, so the center swipe should not run. Not device-proven.
+- No new product P0/P1 was reproduced in the completed lanes.
 
 ## Security
 
-`npm view` on 2026-10-15: both packages are still the latest published versions and both advisory ranges were `*` at the last gate run. No allowlist edit. Hosted `e2e` / `nightly` on run `38595232448` remain SKIPPED, not passed.
+`npm view` on 2026-10-15: both packages are still the latest published versions. No allowlist edit. Hosted quality run `38612438342` on PR #79 failed only at `Audit runtime dependencies`. Hosted `e2e` and `nightly` were skipped behind that gate. They are not passed.
 
 ## Not claimed
 
-- iOS: NOT RUN.
-- Android exact-source pass at this branch: NOT RUN until an APK is built from this app source and the affected flows execute.
-- Full Playwright inventory: not an execution result.
+- iOS: NOT RUN. GitHub iOS workflow `38612438402` skipped.
+- Android exact-source pass at this branch: NOT RUN. `adb shell` hung on the already-attached emulators; they were not rebooted or overwritten.
+- `e2e:sync` and hosted nightly: NOT RUN.
+- PR #79 is not merge-ready while the audit gate is red.

@@ -3,12 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { defineJourney } from '../helpers/journey';
 import { expectOutbox, expectRows, switchSection, type OutboxRecord } from '../helpers/oracles';
-import {
-  queryRows,
-  returnToApp,
-  WA_SQLITE_ASSET_DIR,
-  discoverWasmName,
-} from '../helpers/dbHarness';
+import { queryRows, returnToApp, discoverWasmName, wasmAssetDirectory } from '../helpers/dbHarness';
 import { resetAll } from '../helpers/reset';
 import { setOffline } from '../helpers/failure';
 import { clickCaloriesAddEntry, fillCaloriesMacros } from '../helpers/forms';
@@ -129,7 +124,7 @@ async function registerOfflineWasmRoute(page: Page): Promise<void> {
     route.fulfill({
       status: 200,
       contentType: 'application/wasm',
-      body: fs.readFileSync(path.join(WA_SQLITE_ASSET_DIR, name)),
+      body: fs.readFileSync(path.join(wasmAssetDirectory(), name)),
     }),
   );
 }

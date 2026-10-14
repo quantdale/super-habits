@@ -25,4 +25,4 @@
 ## 5. Security and successor sweep
 
 - [x] 5.1 Re-run `node scripts/audit-runtime-deps.mjs` and record installed versus latest versions without a waiver — FAIL, 2 undocumented HIGH, latest = installed
-- [ ] 5.2 Investigate the next reproduced P0/P1/P2 defect or record that locally executable high-value work is exhausted
+- [x] 5.2 Investigate the next reproduced P0/P1/P2 defect or record that locally executable high-value work is exhausted — the worktree WASM path was a real harness defect and is fixed; no further product P0/P1 was reproduced in the completed local lanes

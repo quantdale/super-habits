@@ -32,16 +32,16 @@ Close the post-W17 reliability gaps that a new agent can still hit: a recovery p
 
 ## Current Checkpoint
 
-- Current milestone: web slice is green on the hermetic export; native device re-run is blocked by hung emulator shells; security gate remains red.
-- Completed: baseline fetch; native failure forensics; parent recovery pointer; habit footer; workout flow edge-swipe hardening; gated over-goal tests; plan and OpenSpec validation; hermetic Playwright for the touched specs.
-- In progress: commit this slice, then the next reproduced defect or the available broader web lanes. Do not install over the attached emulators.
-- Important modified files: `features/habits/HabitsScreen.tsx`, `e2e/calories-w10.spec.ts`, `e2e/habits.spec.ts`, `.maestro/flows/habit-reminder-disable.yaml`, `.maestro/flows/workout-gym-v2-persistence.yaml`, `openspec/changes/frontend-v3-calm-momentum/execplan.md`, this change directory, `docs/ui-ux/v3-audit/post-w17-overnight/`.
-- Last successful validation: `npx playwright test e2e/calories-w10.spec.ts e2e/habits.spec.ts --project=chromium` 29/29 on the hermetic `dist/` from this worktree (0 Supabase hosts). `tsc --noEmit` exit 0. Domain test 44/44. Both ExecPlans validate ACTIVE. `openspec validate --all` 88/88.
-- Current failures: `node scripts/audit-runtime-deps.mjs` exit 1 — 2 undocumented HIGH (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv). Installed versions are still the latest published (`3.0.3`, `1.4.0`). Not waived.
-- Relevant quarantines: none added.
-- Blockers: Android re-run BLOCKED_EXTERNAL. `adb devices` listed `emulator-5570` and `emulator-5594`, but `adb shell getprop` and `adb emu avd name` hung. Do not kill adb, reboot those AVDs, or install over them.
-- Exact next action: Publish this branch through a normal pull request. Do not waive the audit. Do not start `qa:native:provision` against the hung attached emulators. Do not describe the interrupted broad Playwright battery as a completed full run.
-- Remaining definition of done: this slice committed with the validation above; native flows classified from the preserved artifacts plus the emulator-shell block; audit remains visibly red; no recovery pointer to the completed correction; further locally executable defects fixed or explicitly rejected.
+- Current milestone: local web lanes are complete on a clean hermetic export; PR #79 stays open because the audit gate is red.
+- Completed: recovery pointer; habit footer; workout flow hardening; over-goal tests; WASM discovery so a junctioned worktree export needs no manual copy; independent project lanes.
+- In progress: none locally executable. Do not merge. Do not install over the attached emulators.
+- Important modified files: `e2e/helpers/dbHarness.ts`, `e2e/journeys/the-commute.spec.ts`, `e2e/habits.spec.ts`, plus the earlier footer, flow, and plan files.
+- Last successful validation: clean `npm run build:e2e` (0 Supabase hosts, wasm only under `dist/assets/_superhabits/...`). Chromium 250 passed / 44 skipped / 0 failed. Journeys 76 passed / 42 skipped / 0 failed. Visual 34/34. PWA 5/5. Simulation 3/3. Habit long-form keyboard save passed at 360×740.
+- Current failures: hosted quality run `38612438342` failed only at `Audit runtime dependencies`. `e2e` and `nightly` skipped behind that gate. iOS workflow skipped.
+- Relevant quarantines: none added. Chromium skips are opt-in audit/internal specs. Journey skips are `@sync` steps that belong to `journeys-sync`.
+- Blockers: Android re-run BLOCKED_EXTERNAL. `adb devices` lists `emulator-5570` and `emulator-5594`, but `adb shell getprop` hung again. Do not kill adb or install over them. iOS NOT RUN. Audit FAILED-UNREMEDIATED.
+- Exact next action: Keep PR #79 open. Do not waive the audit or merge. Do not start `qa:native:provision` against the hung emulators. Resume only if an upstream advisory fix appears or a responsive owned emulator is available.
+- Remaining definition of done: the audit is clean without a waiver, and Android/iOS are either exact-source qualified or still explicitly unrun. Local web definition of done for this change is met.
 
 ## Progress
 
@@ -50,10 +50,10 @@ Close the post-W17 reliability gaps that a new agent can still hit: a recovery p
 - [x] Recovery pointer
 - [x] Calories gated tests written
 - [x] Habit footer and workout flow hardening written
-- [ ] Hermetic web validation
-- [ ] Security re-verification recorded
-- [ ] Native re-run or explicit external block
-- [ ] Independent review and successor decision
+- [x] Hermetic web validation
+- [x] Security re-verification recorded
+- [x] Native re-run or explicit external block
+- [x] Independent review and successor decision
 
 ## Surprises & Discoveries
 
@@ -81,6 +81,8 @@ Close the post-W17 reliability gaps that a new agent can still hit: a recovery p
 - 2026-10-15 — `adb devices` showed emulator-5570 and emulator-5594; `adb shell getprop` and `adb emu avd name` hung. Native install not attempted.
 - 2026-10-15 — P0 journeys 25/25. Broader chromium+pwa+journeys+simulation+visual battery interrupted after 365 passed / 86 skipped / 0 failed observed (through test 451). Not a completed full run. `e2e:sync` NOT RUN.
 - 2026-10-15 — Published as PR #79 (`https://github.com/quantdale/super-habits/pull/79`), head `6617d85`, base `main` `fb10d6c`. Not merged. Hosted quality was pending at publication; the audit gate is still expected to fail.
+- 2026-10-15 — Hosted quality run `38612438342` failed only at the audit step. Typecheck, lint, OpenSpec, ExecPlans, and unit/integration passed. `e2e`/`nightly` skipped. iOS workflow skipped.
+- 2026-10-15 — Clean hermetic rebuild with no canonical wasm copy. Discovery used `dist/assets/_superhabits/...`. Over-goal SQL oracles passed. Later lanes: chromium 250/44/0, journeys 76/42/0, visual 34/34, pwa 5/5, simulation 3/3. `journeys-sync` NOT RUN.
 
 ## Changed Files / Areas
 
