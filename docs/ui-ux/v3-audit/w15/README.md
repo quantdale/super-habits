@@ -109,3 +109,58 @@ So a green result is evidence, not an assumption.
   unit/integration/journey specs; no functional test was replaced or weakened.
 - `visual:update` must be run deliberately by a reviewer; CI has no path to
   write a baseline.
+
+## W17 addendum (2026-10-14) — a real cross-fade nondeterminism found and fixed
+
+After W16 and W17 landed, the curated suite went red: the `to do typical`,
+`to do dark` and `timeline rows` snapshots failed intermittently. W15's own
+two-run proof had passed, so this was newly exposed rather than a regression in
+the W15 harness. Investigation found **two** independent causes.
+
+### Cause 1 — section cross-fade races the capture (real, fixed)
+
+`SectionContainer` in `app/index.tsx` animates the outgoing section's opacity
+over 200ms (translate 240ms) with RN Web's `Animated`, which drives inline styles
+from `requestAnimationFrame`. Playwright's `animations: 'disabled'` neutralises
+CSS transitions and animations but **not** JS-driven inline styles, so the
+outgoing section was still visible when the capture fired.
+
+Measured directly on the To Do snapshot: the previous section sat at
+`opacity: 0.647` about 60 ms after the switch and reached 0 by about 260 ms. The
+old `settle()` waited 150 ms, so roughly half of runs caught the previous
+section bleeding through the new one — the failing images showed the Today
+content (`0/2000 kcal`, "Today's Plan", "Level & Streaks") faintly behind the To
+Do list. Reproduced at a **50% failure rate in 10 consecutive runs**.
+
+`settle()` now waits until every inactive section container reports opacity 0
+(bounded, rAF-polled) before capturing.
+
+### Cause 2 — `document.fonts.ready` is not font readiness (real, fixed)
+
+`document.fonts.ready` resolved while `Nunito_400Regular` was still reported
+`unloaded` (6 faces existed; the regular weight had never been used yet). The
+face then loaded lazily on first use, so rasterisation could race the capture.
+`settle()` now explicitly `document.fonts.load()`s every app family first.
+
+### Verification
+
+| Measurement                          | Result                                                     |
+| ------------------------------------ | ---------------------------------------------------------- |
+| Pre-fix, focused snapshot, 10 runs   | **5 pass / 5 fail** (ratios 0.01, 0.03, 0.05)              |
+| Pre-fix, full curated suite, 3 runs  | **0 pass / 3 fail**                                        |
+| Post-fix, focused snapshot, 10 runs  | **10 pass / 0 fail**                                       |
+| Post-fix, full curated suite, 3 runs | **3 pass / 0 fail**, baseline hash unchanged (`f19261d5…`) |
+
+Three goldens were regenerated under the W15 review process, each inspected
+side-by-side against its predecessor:
+
+- `timeline-1280-light` — the intentional W17 R-3 fix: the calorie row no longer
+  shows a fabricated `08:00` clock time, because `activityTimeline.data.ts`
+  supplies date-only occurrences for calorie days.
+- `todos-390-dark` / `todos-long-title-390-light` — the intentional W16 nav-label
+  centring (`alignSelf: 'stretch'` + `textAlign: 'center'`); the measured
+  differences are confined to the bottom navigation bar (116 px and 1 px
+  respectively, vs ~8,000–28,000 px for the cross-fade artifact).
+
+No comparison threshold was loosened: `maxDiffPixels` remains `0` and no region
+is masked.
