@@ -35,26 +35,26 @@ conditional verdict rather than a false release-ready claim.
 
 ## Current Checkpoint
 
-- Current milestone: OpenSpec proposal, specs, design, and tasks are drafted. No product or test code has been edited. No hermetic export or journey has been run.
-- Completed: Read-only explore against `bf09c0d`. Isolated worktree and branch created. Change `frontend-v3-post-w17-correction` scaffolded with proposal, four spec deltas, design, and tasks.
-- In progress: None. Implementation has not started.
-- Important modified files: `openspec/changes/frontend-v3-post-w17-correction/` only, uncommitted on the correction branch.
-- Last successful validation: 2026-10-14, planning only. `openspec validate frontend-v3-post-w17-correction --strict --type change` passed with zero issues. `npm run agent:plan:validate -- --plan openspec/changes/frontend-v3-post-w17-correction/execplan.md` passed. Neither command is a product or journey pass.
-- Current failures: None recorded from a test command. The carried `settings-ripple` failure is a source hypothesis until the journey runs.
+- Current milestone: Tasks 4 and 5 (5.1–5.4) complete. H08 date-key defects REPRODUCED (16 failed / 25 passed under a −1 day host-date shim) and FIXED page-side (41/41 boundary + 41/41 control). Task 6 (validation ladder) next, then native attempt (5.5 — Nitro_API_36 IS booted at :5594, API 36), evidence pack, review, PR.
+- Completed: Tasks 1–4 (recorded previously). Task 5.1: host-local date keys in planning-hub/calories/calories-w10/calories-day-navigation/workout-w9 reproduced as TEST_BUG class across a host/browser calendar boundary (probe method: NODE_OPTIONS Date shim, −24h constant shift, since Node ignores TZ on Windows); fixed by browser-evaluating date keys/weekday/labels via new `browserDate.ts` helpers at every use site; absolute `toISOString()` timestamps untouched per disposition; boundary re-run 41/41, control 41/41. Task 5.2: weekly-review boundaries probed (executor + screen orchestration) — commitment-create failure and decision-update throw both report correct visible/SQL results; per locked H12 no regression added. Task 5.3 NOT APPLICABLE (zero product surfaces touched). Task 5.4: audit re-run records 2 UNDOCUMENTED highs at latest versions with no upstream fix — UNREMEDIATED, exposure limited, gate red, nothing waived.
+- In progress: Task 6 validation ladder (typecheck/lint/themes/OpenSpec/plans/qa:affected + unit/integration/timezones/corrected journey + recomputed counts).
+- Important modified files: `e2e/helpers/browserDate.ts` (+3 helpers), `e2e/{planning-hub,calories,calories-w10,calories-day-navigation,workout-w9}.spec.ts` (browser-evaluated dates), `e2e/visual-regression.spec.ts` (fail-closed settle + self-checks), `e2e/journeys/settings-ripple.spec.ts` (W10 retarget), parent + W17 docs (provenance), OpenSpec change files.
+- Last successful validation: 2026-10-14 — boundary probe (Date shim −1 day) 41/41 + control 41/41 on the five fixed specs; `npx eslint --max-warnings 0` + `npx prettier --check` LINT CLEAN on all touched e2e files.
+- Current failures: None open in tests.
 - Relevant quarantines: None added.
-- Blockers: None for the next reproduction. Android and iOS qualification may later be externally blocked; that does not block the journey reproduction.
-- Exact next action: In `D:/Documents/tryPython/superhabits-post-w17-correction`, install dependencies if `node_modules` is absent, build the hermetic export, and reproduce `e2e/journeys/settings-ripple.spec.ts` on an owned free port before editing any assertion.
-- Remaining definition of done: Tasks 1.1–7.2 are checked only with evidence. The Calories spec is proven by the journey plus SQL and reload oracles. Visual negative controls fail on the old helper and pass after the fail-closed change, with strict goldens preserved. Parent checkpoint no longer says to start W12 and stays `ACTIVE`. Current-status docs do not move old run counts onto a new SHA. Audit stays red unless the audit command itself is clean without a new waiver. Verdict is not release-ready while security, iOS, or exact-source Android evidence is missing.
+- Blockers: None for web validation. Native: emulators `emulator-5594` (API 36 = Nitro_API_36) and `emulator-5570` (API 35) are booted, Maestro 2.9.0 present — the provisioner requires an EMPTY git tree, so the native attempt runs after the correction commit (5.5).
+- Exact next action: Task 6.1/6.2 — run the validation ladder at the correction SHA (`npm run typecheck`, `npm run lint`, `npm run validate:themes`, `npm run openspec:validate`, `npm run agent:plan:validate:all`, `npm run qa:affected`, then unit+integration, `npm run qa:timezones`, and the corrected journey), recomputing counts with `npx vitest list` / `npx playwright test --list`.
+- Remaining definition of done: validation ladder recorded; native exact-source attempt or BLOCKED_EXTERNAL; independent read-only review of the diff; normal PR against latest origin/main; evidence pack `docs/ui-ux/v3-audit/post-w17-correction/` (findings, evidence index, release convergence) with a verdict from the spec taxonomy; ExecPlan Outcomes filled last; `npm run web:hygiene` final gate.
 
 ## Progress
 
 - [x] Explore completed and dispositions recorded in `design.md`
 - [x] OpenSpec change drafted (proposal, specs, design, tasks, this plan)
-- [ ] Worktree dependencies installed and planning files validated
-- [ ] Settings-ripple reproduced and repaired or disproven
-- [ ] Visual readiness negative controls and fail-closed helper
-- [ ] Parent plan and provenance reconciliation
-- [ ] Independent probes and any confirmed fixes
+- [x] Worktree dependencies installed and planning files validated (planning committed `d0a6fdc`, deps installed, Node v24.3.0)
+- [x] Settings-ripple reproduced and repaired (TEST_BUG stale selector; journey green 6/6 with SQL/reload oracles)
+- [x] Visual readiness negative controls and fail-closed helper (red-first proof; 34/34 twice; goldens untouched)
+- [x] Parent plan and provenance reconciliation (parent ACTIVE + validating; W17 docs annotated; counts left on their own runs)
+- [x] Independent probes and any confirmed fixes (H08 reproduced+fixed; H12 probed-correct; audit UNREMEDIATED; 5.3 N/A)
 - [ ] Validation ladder, review, publication, and evidence pack
 
 ## Surprises & Discoveries
@@ -80,6 +80,16 @@ conditional verdict rather than a false release-ready claim.
 - 2026-10-14 — `openspec new change frontend-v3-post-w17-correction` in the worktree — scaffold created.
 - 2026-10-14 — `openspec validate frontend-v3-post-w17-correction --strict --type change` — passed, 0 issues.
 - 2026-10-14 — `npm run agent:plan:validate -- --plan openspec/changes/frontend-v3-post-w17-correction/execplan.md` — passed, Status ACTIVE.
+- 2026-10-14 — `npm install` in the correction worktree (Node v24.3.0, npm 11.4.2) — dependencies installed; `npm audit` reports existing findings (kept for task 5.4; no fix applied).
+- 2026-10-14 — `git commit` docs-only planning commit `d0a6fdc` on `frontend-v3-post-w17-adversarial-correction` — 9 planning files added; lint-staged/prettier hook passed.
+- 2026-10-14 — `npm run build:e2e` — hermetic export OK, `dist/` written, 0 Supabase hosts.
+- 2026-10-14 — `npx playwright test --project=journeys e2e/journeys/settings-ripple.spec.ts` (port 8081, pre-fix) — FAIL at settings-ripple.spec.ts:145: `getByText('Goal 2,400')` not found (15s); step 1 passed; failure snapshot showed W10 grammar `2,400 kcal left` / `Today · 0 of 2,400 kcal logged` / `Edit daily calorie goal`. Classified `TEST_BUG` (stale selector), consistent with locked C-3/H01.
+- 2026-10-14 — `npx playwright test --project=visual -g "capture readiness self-checks"` (pre-fix, old `settle()`) — 3 failed / 1 passed. All three fail-open branches proven: stuck opaque section, non-finite opacity, rejected font family each reported `settle() unexpectedly succeeded — readiness must fail closed here`. The strict-comparison control passed (it must pass on both helpers).
+- 2026-10-14 — `npx playwright test --project=visual -g "capture readiness self-checks"` (first fail-closed attempt) — 3 failed: `SETTLE_TIMEOUT_MS is not defined` inside `page.evaluate` (Node-side constant leaked into browser context). Fixed by passing `{ families, timeoutMs }` as the evaluate argument; unnecessary `as` assertions removed per lint.
+- 2026-10-14 — `npx playwright test --project=visual -g "capture readiness self-checks"` (post-fix) — 4/4 passed: named `section readiness unmet` diagnostics (incl. non-finite opacity) and `required font load failed — Nunito_700Bold`, strict comparison accepted the settled capture and rejected the perturbed one.
+- 2026-10-14 — `npx playwright test --project=visual` (:8081, fresh) — 34/34 (3.0m). Golden-set hash before/after: `f19261d5d676ac1ef10cc526a4fb19d41e0edbf1a6e3ebd87fcb437c50dcdeaa` (unchanged; distinct from historical `0676368d…`).
+- 2026-10-14 — `npx playwright test --project=visual` (:8089, fresh) — 34/34 (3.1m). Hash `f19261d5…` stable across both runs; `git status -- e2e/__screenshots__/` empty (no golden rewritten).
+- 2026-10-14 — `npx prettier --write` + `npx eslint --max-warnings 0` on `e2e/visual-regression.spec.ts` and `e2e/journeys/settings-ripple.spec.ts` — LINT CLEAN.
 
 ## Changed Files / Areas
 
@@ -88,7 +98,9 @@ conditional verdict rather than a false release-ready claim.
 - `openspec/changes/frontend-v3-post-w17-correction/tasks.md` — implementation checklist.
 - `openspec/changes/frontend-v3-post-w17-correction/specs/` — four behavior deltas.
 - `openspec/changes/frontend-v3-post-w17-correction/execplan.md` — this living plan.
-- No product, test, CI, or golden file has been changed.
+- `e2e/journeys/settings-ripple.spec.ts` — stale `Goal 2,400` selector retargeted to the W10 grammar (title + context line + edit-goal accessible name) at both the ripple and reload checks; SQL, reload, and entry-count oracles untouched.
+- `e2e/visual-regression.spec.ts` — `settle()` fail-closed with named diagnostics (section readiness incl. non-finite opacity; required font family), `prepareCapture` extracted from `capture()`, 4 harness self-checks (negative controls + strict comparison) appended.
+- All of the above committed as docs-only `d0a6fdc` (planning only). The two e2e files are uncommitted product/test edits so far.
 
 ## Recovery / Resume Instructions
 
