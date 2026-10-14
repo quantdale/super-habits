@@ -5,27 +5,44 @@ this revision. `Not run` means exactly that.
 
 ## Summary
 
-| Lane                        | Source SHA    | Run command                                             |   Executed |    Passed | Failed | Skipped | Blocked / Not run       | Classification                     |
-| --------------------------- | ------------- | ------------------------------------------------------- | ---------: | --------: | -----: | ------: | ----------------------- | ---------------------------------- |
-| Static / contracts          | `3aaca2a`     | `npm run typecheck`                                     |          1 |         1 |      0 |       0 | —                       | PASS                               |
-| Lint                        | `3aaca2a`     | `npm run lint`                                          |          1 |         1 |      0 |       0 | —                       | PASS                               |
-| Themes                      | `3aaca2a`     | `npm run validate:themes`                               |        140 |       140 |      0 |       0 | —                       | PASS                               |
-| OpenSpec contracts          | `3aaca2a`     | `npm run openspec:validate`                             |         86 |        86 |      0 |       0 | —                       | PASS                               |
-| Versioned ExecPlans         | `3aaca2a`     | `npm run agent:plan:validate:all`                       |          — |       all |      0 |       — | —                       | PASS                               |
-| Release-profile guard       | `3aaca2a`     | `npm run release:profiles:guard`                        |          3 |         3 |      0 |       0 | —                       | PASS                               |
-| Unit + integration (Vitest) | `3aaca2a`     | `npm test`                                              |      2,693 | **2,691** |  **0** |       2 | —                       | PASS (first fully-green run)       |
-| Integration project only    | `3aaca2a`     | `npm run qa:integration`                                |        421 |       419 |      0 |       2 | —                       | PASS                               |
-| Timezone / clock            | `3aaca2a`     | `npm run qa:timezones`                                  |        105 |       105 |      0 |       0 | —                       | PASS (5 zones)                     |
-| P0 journeys                 | `3aaca2a`     | `npm run e2e:journeys:p0`                               |         25 |        25 |      0 |       0 | —                       | PASS                               |
-| Full Chromium battery       | `3aaca2a`     | `npx playwright test --project=chromium`                |        245 |   **245** |      0 |       0 | —                       | PASS                               |
-| Visual regression goldens   | `3aaca2a`     | `npm run visual`                                        |         30 |        30 |      0 |       0 | —                       | PASS                               |
-| Accessibility instrument    | `3aaca2a`     | `npx playwright test e2e/a11y.spec.ts`                  |         10 |        10 |      0 |       0 | —                       | PASS                               |
-| Deterministic simulation    | `3aaca2a`     | `npm run qa:simulation`                                 | 1 scenario |         1 |      0 |       0 | —                       | PASS                               |
-| Android API-36 native       | **`b50034d`** | `node scripts/qa-native.mjs --platform android --tag …` |         23 |        23 |      0 |       0 | —                       | PASS at that SHA (see limit 1)     |
-| Dependency security audit   | `3aaca2a`     | `node scripts/audit-runtime-deps.mjs`                   | 2 findings |         0 |      2 |       — | —                       | **FAIL (inherited, unremediated)** |
-| Hosted CI (GitHub Actions)  | various       | `gh run list`                                           |          — |         — |      — |       — | `e2e`/`nightly` skipped | Blocked behind the audit gate      |
+| Lane                        | Source SHA    | Run command                                             |   Executed |            Passed | Failed | Skipped | Blocked / Not run       | Classification                            |
+| --------------------------- | ------------- | ------------------------------------------------------- | ---------: | ----------------: | -----: | ------: | ----------------------- | ----------------------------------------- |
+| Static / contracts          | `3aaca2a`     | `npm run typecheck`                                     |          1 |                 1 |      0 |       0 | —                       | PASS                                      |
+| Lint                        | `3aaca2a`     | `npm run lint`                                          |          1 |                 1 |      0 |       0 | —                       | PASS                                      |
+| Themes                      | `3aaca2a`     | `npm run validate:themes`                               |        140 |               140 |      0 |       0 | —                       | PASS                                      |
+| OpenSpec contracts          | `3aaca2a`     | `npm run openspec:validate`                             |         86 |                86 |      0 |       0 | —                       | PASS                                      |
+| Versioned ExecPlans         | `3aaca2a`     | `npm run agent:plan:validate:all`                       |          — |               all |      0 |       — | —                       | PASS                                      |
+| Release-profile guard       | `3aaca2a`     | `npm run release:profiles:guard`                        |          3 |                 3 |      0 |       0 | —                       | PASS                                      |
+| Unit + integration (Vitest) | `3aaca2a`     | `npm test`                                              |      2,693 |         **2,691** |  **0** |       2 | —                       | PASS (first fully-green run)              |
+| Integration project only    | `3aaca2a`     | `npm run qa:integration`                                |        421 |               419 |      0 |       2 | —                       | PASS                                      |
+| Timezone / clock            | `3aaca2a`     | `npm run qa:timezones`                                  |        105 |               105 |      0 |       0 | —                       | PASS (5 zones)                            |
+| P0 journeys                 | `3aaca2a`     | `npm run e2e:journeys:p0`                               |         25 |                25 |      0 |       0 | —                       | PASS                                      |
+| Full Chromium battery       | `3aaca2a`     | `npx playwright test --project=chromium`                |        245 |           **245** |      0 |       0 | —                       | PASS                                      |
+| Visual regression goldens   | `3aaca2a`     | `npm run visual`                                        |         30 |                30 |      0 |       0 | —                       | PASS                                      |
+| Accessibility instrument    | `3aaca2a`     | `npx playwright test e2e/a11y.spec.ts`                  |         10 |                10 |      0 |       0 | —                       | PASS                                      |
+| Deterministic simulation    | `3aaca2a`     | `npm run qa:simulation`                                 | 1 scenario |                 1 |      0 |       0 | —                       | PASS                                      |
+| Android API-36 native       | **`b50034d`** | `node scripts/qa-native.mjs --platform android --tag …` |         23 |                23 |      0 |       0 | —                       | PASS at that SHA (see limit 1)            |
+| Dependency security audit   | `3aaca2a`     | `node scripts/audit-runtime-deps.mjs`                   | 2 findings |                 0 |      2 |       — | —                       | **FAIL (inherited, unremediated)**        |
+| Hosted CI (GitHub Actions)  | `b9e775f`     | `gh run view 38495572049`                               |          1 | all but the audit |      1 |       — | `e2e`/`nightly` skipped | FAIL only on the two inherited advisories |
 
 ## Lane detail
+
+### Hosted CI at the final head (`b9e775f`)
+
+Run [38495572049](https://github.com/quantdale/super-habits/actions/runs/38495572049)
+(PR) and 38495566101 (push) both succeed every quality step — Setup, Install,
+**Typecheck**, Deno edge-function type-check, **Lint**, theme tokens, OpenSpec
+contracts, journey-label + quarantine-register parity, **Validate versioned
+ExecPlans**, and **Test (unit + integration) at 2,699 passed / 0 failed / 3
+skipped (2,702 executed)** — and fail only `Audit runtime dependencies` on
+exactly `braces` GHSA-vfj7-8cjw-p6xm and `node-forge` GHSA-86w9-cpqp-85rv.
+Hosted `e2e` and `nightly` skip behind that gate and are **not** passed.
+
+This is the first campaign head where the hosted plan-validation step passes.
+The previous head (`84b3294`) failed it because the just-closed wave plans still
+carried pre-completion "Remaining definition of done" text — a real defect the
+hosted gate caught that my locally truncated reading had missed; it is fixed in
+`b9e775f`.
 
 ### Lane 1 — Static and contract integrity
 

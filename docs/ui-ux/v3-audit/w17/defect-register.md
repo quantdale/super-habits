@@ -41,6 +41,25 @@ so the suite is green for the first time since W7.
 | Regression | Guard suite **8/8**, including its own reconstructed-defect case, which still fails as designed (non-vacuous)                                                                                                                                                                                                                          |
 | Status     | **VERIFIED-FIXED**                                                                                                                                                                                                                                                                                                                     |
 
+### R-6 — Closed wave plans failed the hosted ExecPlan gate (PROCESS, fixed)
+
+| Field        | Value                                                                                                                                                                                                                                                                                                  |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Surface      | `openspec/changes/frontend-v3-w1{2..7}-*/execplan.md`                                                                                                                                                                                                                                                  |
+| Category     | PROCESS/TEST (a real gate failure, caught by hosted CI)                                                                                                                                                                                                                                                |
+| Severity     | P2 — the campaign's own record-integrity gate failed on the campaign's head                                                                                                                                                                                                                            |
+| Source       | `84b3294` (hosted run 38495121175); fixed at `b9e775f`                                                                                                                                                                                                                                                 |
+| Repro        | `npm run agent:plan:validate:all` → six `FAIL ... [COMPLETED]` with `COMPLETED plan requires a completed remaining definition of done`                                                                                                                                                                 |
+| Root cause   | The six plans were flipped to `COMPLETED` while their `Remaining definition of done` lines still carried the pre-completion text ("W12 commit/publication; then W13–W17"), which the validator correctly rejects. My earlier local read was truncated to the last three lines, so it appeared to pass. |
+| Fix          | Each plan now states an explicit completion sentence for its own scope                                                                                                                                                                                                                                 |
+| Verification | `npm run agent:plan:validate:all` exits 0; hosted `Validate versioned ExecPlans` PASS at `b9e775f`; full suite still 2,699 passed / 0 failed hosted                                                                                                                                                    |
+| Status       | **VERIFIED-FIXED**                                                                                                                                                                                                                                                                                     |
+
+**Lesson recorded:** the hosted gate caught what a tail-truncated local reading
+hid. This is the practical argument for exact-head hosted verification in the
+ladder, and it is why the W17 matrix now cites the hosted run rather than only
+the local equivalent.
+
 ### R-3 — Fabricated clock time on date-only activity rows (PRODUCT, fixed)
 
 | Field      | Value                                                                                                                                                                                                                                                                                                                                                        |
