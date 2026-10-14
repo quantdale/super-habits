@@ -97,32 +97,32 @@
 
 ## 12. W12 — Weekly Review / Progress / Activity
 
-- [ ] 12.1 Narrative-first review; charts support the story (SUR-12)
-- [ ] 12.2 Reduce analytics-wall presentation
+- [x] 12.1 Narrative-first review; charts support the story (SUR-12) — W12: `Review → Decide → Plan → Reflect → Confirm` with the week's factual story first and every count behind one `All numbers` disclosure; SUR-12 VERIFIED-FIXED (`docs/ui-ux/v3-audit/w12/`; `e2e/planning-w12.spec.ts` 5/5, `e2e/weekly-review.spec.ts` 2/2, `tests/integration/weeklyReviewW12Persistence.test.ts` 3/3)
+- [x] 12.2 Reduce analytics-wall presentation — W12: Progress leads with ≤3 headline rows and one `More details` disclosure; Activity replaces 25 always-visible chips with one `Filters` control and flat chronological rows (first event moved from below the fold to the first fold)
 
 ## 13. W13 — Settings / secondary surfaces
 
-- [ ] 13.1 Grouped-row grammar; kill narration duplicates (SUR-08); quiet Command Center (SYS-14, SUR-11)
-- [ ] 13.2 Achievements milestone-first (SUR-13)
+- [x] 13.1 Grouped-row grammar; kill narration duplicates (SUR-08); quiet Command Center (SYS-14, SUR-11) — W13: `SettingsRow` renders `label · value` + an optional disclosed explanation; the duplicated `Current selection`/`Active behavior` rows are gone; the `CURRENT SECTION` panel and `Command input` header are gone and examples render only while the field is empty; all four ledger ids VERIFIED-FIXED (`docs/ui-ux/v3-audit/w13/`; `e2e/secondary-surface-w13.spec.ts` 5/5)
+- [x] 13.2 Achievements milestone-first (SUR-13) — W13: an earned milestone leads, one next target follows, earned tiers render inline and the collection sits behind one `All badges` disclosure; SUR-13 VERIFIED-FIXED (`e2e/gamification.spec.ts` 4/4)
 
 ## 14. W14 — Full integrity sweep
 
-- [ ] 14.1 Re-run audit harness on all waves; new defects → ledger
-- [ ] 14.2 Error/offline/HEAVY/large-text states captured where feasible
-- [ ] 14.3 Dark + light full matrix re-inspection
+- [x] 14.1 Re-run audit harness on all waves; new defects → ledger — W14: 247 captures across 360/390/412/768/1024/1280/1440 light+dark; every per-wave audit re-run on the integrated build; W14 defect register in `docs/ui-ux/v3-audit/w14/README.md`
+- [x] 14.2 Error/offline/HEAVY/large-text states captured where feasible — W14: HEAVY/LONG_TEXT/FIRST_RUN/EMPTY covered by the matrix; offline/rejected-write states are covered by their behavioural specs (recorded as such, not silently dropped)
+- [x] 14.3 Dark + light full matrix re-inspection — W14: full dark/light representative matrix; found and fixed the P1 44pt disclosure touch-target defect (`tests/uiTouchTargetContract.test.ts` 8/8); full Chromium battery 245/245
 
 ## 15. W15 — Persistent visual regression suite
 
-- [ ] 15.1 `e2e/visual-regression.spec.ts` + curated baselines (deterministic: fixture, viewport, reduced motion, stable clock)
-- [ ] 15.2 Verify baseline stability across two runs; wire into standard battery
+- [x] 15.1 `e2e/visual-regression.spec.ts` + curated baselines — W15: 30 curated goldens under `e2e/__screenshots__/` with a `visual` Playwright project, fixed clock, reduced motion + disabled animations, `document.fonts.ready`, no masking, `maxDiffPixels: 0` (manifest: `docs/ui-ux/v3-audit/w15/golden-manifest.md`)
+- [x] 15.2 Verify baseline stability across two runs; wire into standard battery — W15: two independent fresh-state runs at 30/30 with an unchanged baseline hash (`0676368d…`); negative sensitivity proven (perturb → 18 failures, restore → 30/30); registered in `npm run e2e` and an explicit CI PR-lane step with its own retry-report gate
 
 ## 16. W16/W17 — Native + final regression
 
-- [ ] 16.1 Android current-source smoke on Nitro_API_36 (shell, nav, all sections, capture, one modal, one keyboard form)
-- [ ] 16.2 Full validation ladder; classify residuals; final report
+- [x] 16.1 Android current-source smoke on Nitro_API_36 — W16: exact-source (`b50034d`) credential-free APK (SHA-256 `AA89D9FE…`, 0 remote hosts) on API 36 / x86_64 / `Nitro_API_36`; smoke 2/2, persistence 11/11, lifecycle 6/6, reward 1/1, backup-v2 1/1, portable-backup 2/2 = **23/23 flows**; two product defects found and fixed (nav-label truncation; weekly-plan day/assignment a11y) and nine stale flow markers corrected (`docs/ui-ux/v3-audit/w16/`)
+- [x] 16.2 Full validation ladder; classify residuals; final report — W17: seven-lane ladder at `3aaca2a`; **Vitest fully green for the first time** (2,691 passed / 0 failed) after proving the reported Windows-CRLF residual was a TEST_BUG; Chromium 245/245, visual 30/30, a11y 10/10, timezones 105, integration 419, simulation 1/1, P0 journeys 25/25; security audit re-read (2 inherited advisories, no upstream fix, not waived); verdict CONDITIONAL / NEAR-COMPLETE with a bounded handoff (`docs/ui-ux/v3-audit/w17/`)
 
 ## 17. Continuous
 
-- [ ] 17.1 Commit per wave (research/lock, foundation, shell, per-screen, regression infra, QA)
-- [ ] 17.2 Update ExecPlan checkpoint at every milestone
-- [ ] 17.3 Keep defect ledger statuses current (OPEN/FIXED/VERIFIED-FIXED)
+- [x] 17.1 Commit per wave — W12 `1d54b70`, W13 `b1569f0`, W14 `c6937b5`, W15 `42d1c20`, W16 `d04793b`, W17 `3aaca2a` on `frontend-v3-w12-w17-integration` (PR #76)
+- [x] 17.2 Update ExecPlan checkpoint at every milestone — master + six wave plan statuses kept current
+- [x] 17.3 Keep defect ledger statuses current — `SUR-12`, `SUR-08`, `SYS-14`, `SUR-11`, `SUR-13` all VERIFIED-FIXED with rendered evidence; W14/W16 ledgers record their own findings

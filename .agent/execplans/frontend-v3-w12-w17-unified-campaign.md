@@ -76,40 +76,41 @@ Authority: `D:\Downloads\SuperHabits_Frontend_V3_W12-W17_Unified_Campaign.md`
 
 ## Current Checkpoint
 
-- Current milestone: **C7 complete → C8 — W17 integrated release-candidate
-  verification** (W12–W16 done; W17 not yet started).
+- Current milestone: **C8 complete → C9/C10 — publication and handoff**
+  (W12–W17 all implemented, tested and evidenced).
 - Completed:
-  - C0 recovery; C1/C2 W12; C3/C4 W13; C5 W14; C6 W15; **C7 W16 Android**.
-  - W16: exact-source `Nitro_API_36` (API 36 / x86_64) qualification at
-    `b50034d` from a clean detached worktree with a credential-free
-    `e2e-test`-equivalent APK (`AA89D9FE…`, 0 remote hosts). All six lanes
-    green: smoke 2/2, persistence 11/11, lifecycle 6/6, reward 1/1,
-    backup-v2 1/1, portable-backup 2/2. Two product defects fixed and
-    re-verified on a rebuilt APK (native nav-label truncation; weekly-plan
-    day/assignment a11y link) and nine stale/date-dependent flow markers
-    corrected without weakening any assertion. iOS remains owner-deferred.
-- In progress: W16 commit/publication and certification-worktree cleanup.
-- Important modified files: `app/index.tsx`,
-  `features/workout/WorkoutScreen.tsx`, `.maestro/flows/*` (9),
-  `docs/ui-ux/v3-audit/w16/**`,
-  `openspec/changes/frontend-v3-w16-android-qualification/*`.
-- Last successful validation: W16 native lanes above; typecheck 0; eslint 0/0;
-  W15 visual 30/30; W14 full Chromium 245/245; OpenSpec 84/84.
-- Current failures: the inherited Windows-CRLF `agentDocConsistency`
-  ENVIRONMENT residual and the pre-existing `settings-ripple` step.
+  - C0 recovery; C1/C2 W12; C3/C4 W13; C5 W14; C6 W15; C7 W16 Android;
+    **C8 W17 release-candidate verification**.
+  - W17: seven-lane ladder executed at `3aaca2a`; **Vitest fully green for the
+    first time** (2,691 passed / 2 skipped / 0 failed) after proving the
+    long-reported "Windows-CRLF ENVIRONMENT residual" was a TEST_BUG; the full
+    Chromium battery 245/245; visual 30/30; a11y 10/10; timezones 105;
+    integration 419; simulation 1/1; P0 journeys 25/25. Security audit re-read
+    at current head: 2 inherited advisories with **no upstream fix**, absent
+    from both bundles, left red and documented — not waived. Deliverables:
+    `docs/ui-ux/v3-audit/w17/{README,rc-manifest,verification-matrix,defect-register,correction-handoff}.md`.
+- In progress: committing W17 and the final publication/handoff.
+- Important modified files: `tests/agentDocConsistency.test.ts`,
+  `tests/maestroCommandCenterFlowGuards.test.ts`,
+  `.maestro/flows/command-center-v2.yaml`, `docs/testing/known-gaps.md`,
+  `docs/ui-ux/v3-audit/w17/*`,
+  `openspec/changes/frontend-v3-w17-release-readiness/*`.
+- Last successful validation: the full ladder above.
+- Current failures: the dependency audit gate (C-1/C-2) and the pre-existing
+  `settings-ripple` step (C-3). Both are carried, owned and documented.
 - Relevant quarantines: none added.
-- Blockers: None. iOS is owner-deferred and not claimed; EAS/cloud Maestro
-  access was not verified.
-- Condition required to unblock: None for Android/web.
-- Exact resume action after unblock: None currently.
-- Exact next action: Begin W17 — reconcile the integrated source and exact RC
-  SHA, run the full seven-lane verification ladder (static, unit+integration,
-  Playwright/PWA, timezone, simulation/performance, visual/a11y, native +
-  security), fix bounded cross-wave defects, then write
-  `docs/ui-ux/v3-audit/w17/{README,rc-manifest,verification-matrix,defect-register,correction-handoff}.md`
-  and publish the campaign.
-- Remaining definition of done: W17 seven-lane verification matrix, RC verdict
-  and correction handoff; publication and review-thread reconciliation.
+- Blockers: none for web/PWA. iOS owner-deferred; hosted CI gated by the audit.
+- Condition required to unblock: an upstream patched release for `braces` /
+  `node-forge` (or removing their tooling chains); an authorized iOS lane;
+  a hosted CI run once the audit is resolved.
+- Exact resume action after unblock: `node scripts/audit-runtime-deps.mjs`, then
+  the acceptance gates in `correction-handoff.md` §7.
+- Exact next action: commit W17, verify the exact-head state, reconcile PR #76
+  review threads, remove the W16 certification worktree and confirm port
+  hygiene — then hand off.
+- Remaining definition of done: W17 commit/publication; review-thread
+  reconciliation; worktree/port cleanup. The campaign is at a truthful
+  CONDITIONAL / NEAR-COMPLETE verdict.
 
 ## Progress
 
@@ -127,9 +128,10 @@ Authority: `D:\Downloads\SuperHabits_Frontend_V3_W12-W17_Unified_Campaign.md`
 - [x] C6 — W15 curated baselines, two-run stability, CI integration
 - [x] W14 publication (commit `c6937b5`)
 - [x] W15 publication (commit `42d1c20`)
-- [ ] W16 publication (commit)
+- [x] W16 publication (commit `d04793b`)
+- [ ] W17 publication (commit)
 - [x] C7 — W16 exact-source Android API-36 qualification
-- [ ] C8 — W17 verification ladder, RC verdict, correction handoff
+- [x] C8 — W17 verification ladder, RC verdict, correction handoff
 - [ ] C9/C10 — publication, review threads, final source and records
 
 ## Surprises & Discoveries

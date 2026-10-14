@@ -646,7 +646,16 @@ W9 host-load classification (same class as gap 15, recorded not silenced):
 the local `tests/agentDocConsistency.test.ts` register-parse failure
 (`expected 0 to be greater than 10`) reproduces on this Windows host because
 git `core.autocrlf=true` checks `docs/testing/known-gaps.md` out as CRLF so
-the parser sees zero entries; CI's LF checkout passes. The W9 D14 baseline is
+the parser sees zero entries; CI's LF checkout passes.
+**W17 correction (2026-10-14):** this was misclassified. The failure is a
+TEST_BUG, not an environment residual. `read()` in
+`tests/agentDocConsistency.test.ts` returned file content verbatim, so on any
+CRLF checkout `^##\s+(.+)$` captured the trailing `
+` and `$` never matched;
+the register parser therefore compared zero entries and tripped its own
+`expect(gaps.length).toBeGreaterThan(10)` guard. Normalizing CRLF -> LF in
+`read()` fixes it on every platform, and `npm test` is now fully green
+(2,691 passed / 2 skipped / 0 failed). The W9 D14 baseline is
 clean: `three-months-in` measured coldOverview 606/5000ms (87.9% headroom),
 maxSwitch 538/800ms (32.8%), diarySearch 367/500ms (26.6%) — no ceiling, floor,
 or assertion changed. Native certification remains outside web evidence
@@ -708,7 +717,9 @@ assertion is now point-tolerant (`Math.round(bounds.width) >= 44`), which keeps
 the 44pt contract while tolerating sub-pixel layout rounding (43.999).
 
 **Inherited residuals unchanged by W10:** braces/node-forge audit reds;
-Windows-CRLF `agentDocConsistency` ENVIRONMENT failure; D14 host-load headroom
+_(the Windows-CRLF `agentDocConsistency` failure listed here was resolved as a
+TEST_BUG in W17 — see the W9 host-load note above and
+`docs/ui-ux/v3-audit/w17/defect-register.md` R-1);_ D14 host-load headroom
 residuals; Focus notification-timestamp residual; Android API36 pending W16;
 iOS owner-deferred; `npm run format:check` reports 134 pre-existing files
 (not a CI quality gate).
