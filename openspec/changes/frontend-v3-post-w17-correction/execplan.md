@@ -43,8 +43,8 @@ conditional verdict rather than a false release-ready claim.
 - Current failures: None open in gates. Audit remains intentionally red (UNREMEDIATED).
 - Relevant quarantines: None added.
 - Blockers: None. iOS NOT RUN (no authorized lane — external).
-- Exact next action: When the review returns: integrate any blocking findings, delete `.review-artifacts/`, commit the tasks.md/findings.md updates, then push the branch and open a normal PR against latest `origin/main` (task 6.4), then fill Outcomes (7.2) and run `npm run web:hygiene`.
-- Remaining definition of done: review integrated (6.3), PR published (6.4), ExecPlan Outcomes filled after the verdict's unresolved lanes are named (7.2 — done in release-convergence.md), final hygiene gate.
+- Exact next action: After PR #78 (`frontend-v3-post-w17-adversarial-correction` → `main`) merges, record the merged `origin/main` SHA in the evidence pack separately from the pre-merge evidence (task 6.4 tail), then this plan's next action becomes `None — task complete.` No in-scope implementation remains.
+- Remaining definition of done: the post-merge SHA record only. All implementation, validation, review, evidence-pack, and publication tasks are complete.
 
 ## Progress
 
@@ -55,7 +55,7 @@ conditional verdict rather than a false release-ready claim.
 - [x] Visual readiness negative controls and fail-closed helper (red-first proof; 34/34 twice; goldens untouched)
 - [x] Parent plan and provenance reconciliation (parent ACTIVE + validating; W17 docs annotated; counts left on their own runs)
 - [x] Independent probes and any confirmed fixes (H08 reproduced+fixed; H12 probed-correct; audit UNREMEDIATED; 5.3 N/A)
-- [ ] Validation ladder, review, publication, and evidence pack
+- [x] Validation ladder, review, publication, and evidence pack (PR #78; review findings integrated; verdict CONDITIONAL / NEAR-COMPLETE)
 
 ## Surprises & Discoveries
 
@@ -117,4 +117,39 @@ npm run agent:resume -- --plan openspec/changes/frontend-v3-post-w17-correction/
 
 ## Outcomes & Retrospective
 
-Not started. Explore and the OpenSpec draft are the only completed work. No release verdict is claimed.
+- Status: Complete except post-merge bookkeeping (record the merged
+  `origin/main` SHA after PR #78 merges — the only remaining action).
+- Summary: The post-W17 correction reproduced and fixed the carried
+  settings-ripple red (stale selector, `TEST_BUG` — retargeted to the W10
+  grammar with SQL/reload/entry-count oracles intact, 6/6), made curated
+  visual capture fail closed after red-first negative controls (30 goldens
+  and `maxDiffPixels: 0` untouched; set hash `f19261d5…` vs historical
+  `0676368d…` kept distinct), reproduced and fixed host-local E2E date keys
+  across a host/browser calendar boundary (16/41 red → 41/41 boundary and
+  control), replaced the parent plan's recovery record in place (still
+  `ACTIVE`; no W12 restart), reconciled W17 provenance without moving any
+  historical run count or SHA, re-proven Android at exact source `52a10d0`
+  (23/23 flows, two `FLAKY_TEST` incidents preserved, one native `TEST_BUG`
+  flow fixed), and left the dependency audit red and unwaived
+  (UNREMEDIATED — exposure limited) with iOS NOT RUN.
+- Proof: `docs/ui-ux/v3-audit/post-w17-correction/` (findings, evidence
+  index, release convergence); validation ladder recorded in the index
+  (typecheck 0, lint 0/0, themes 140/140, OpenSpec 87/87, plans PASS,
+  Vitest 2,702 executed / 0 failed, qa:timezones 111 across 5 zones, P0
+  25/25, visual 34/34 ×2); independent read-only review verdict
+  (blocking-findings) with all findings integrated in `d064cd5`; PR #78.
+- Verdict: **CONDITIONAL / NEAR-COMPLETE** — not release-ready while the
+  dependency audit is failed-unremediated and iOS is not run; hosted
+  `e2e`/`nightly` remain not-run behind the audit gate. Every unresolved
+  lane and its revision limit is named in `release-convergence.md`.
+- Remaining work: (1) after PR #78 merges, record the merged `origin/main`
+  SHA separately from the pre-merge evidence (task 6.4 tail); (2) the
+  accepted residuals listed in `findings.md` (over-goal-day gated coverage,
+  one-shot H08 boundary proof, native lane flakes) are documented, not
+  scheduled.
+- Lessons: negative controls must fail on the old behavior before the fix
+  (the red run is the proof); probe boundary conditions with delta-preserving
+  shims when platform TZ levers are broken (Node ignores `TZ` on Windows);
+  provenance corrections are annotations on history, never re-attribution;
+  a native lane that flakes once per run at different steps is load-flaky,
+  but a flow that fails twice at the same step is a reproducible defect.

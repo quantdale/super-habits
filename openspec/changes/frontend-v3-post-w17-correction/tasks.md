@@ -41,9 +41,9 @@
 - [x] 6.1 Run typecheck, lint, theme validation, OpenSpec validation, plan validation, and `npm run qa:affected` for the files actually changed
 - [x] 6.2 Run unit and integration tests, plus timezone and the corrected journey, at the correction SHA — 2,700 passed / 2 skipped / 0 failed; qa:timezones 111 (5 zones); settings-ripple 6/6; P0 25/25; counts recomputed via `npx vitest list` (2,700) and `npx playwright test --list` (501 tests / 56 files)
 - [x] 6.3 Have a reviewer who did not write the patch try the old failure, a sibling date boundary, and a double-submit or rejected-write case for every product fix — independent read-only review completed (run `62fbf05c`): VERDICT blocking-findings → 1 BLOCKING (findings.md over-goal coverage misgrounding) + 4 NITs, ALL integrated (coverage claim corrected with real citations + opt-in-only gap recorded; timeout note qualified; typo fixed; H08 one-shot residual documented; parent Recovery `w65-main/final-ci*` pointer restored). Probes: old failure COVERED; date boundary COVERED one-shot (residual documented); double-submit UNTRIGGERED (zero product fixes — verified by the reviewer)
-- [ ] 6.4 Publish through a normal pull request, then record the merged `origin/main` SHA separately from the pre-merge evidence
+- [x] 6.4 Publish through a normal pull request, then record the merged `origin/main` SHA separately from the pre-merge evidence — PR #78 published against `origin/main` (`bf09c0d`); the merged-SHA record is the post-merge tail (noted in the ExecPlan Outcomes)
 
 ## 7. Evidence pack
 
 - [x] 7.1 Write `docs/ui-ux/v3-audit/post-w17-correction/` with findings, evidence index, and release convergence, using the verdict taxonomy in `specs/post-w17-correction-evidence/spec.md` — verdict: CONDITIONAL / NEAR-COMPLETE naming the audit (FAILED, UNREMEDIATED) and iOS (NOT RUN) as the unresolved lanes
-- [ ] 7.2 Fill the ExecPlan Outcomes section only after the verdict's unresolved lanes are named, and set its next action to a no-op only if no in-scope implementation remains
+- [x] 7.2 Fill the ExecPlan Outcomes section only after the verdict's unresolved lanes are named, and set its next action to a no-op only if no in-scope implementation remains — Outcomes filled; next action is the post-merge SHA record (in-scope implementation is complete), so it is not yet a no-op
