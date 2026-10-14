@@ -39,6 +39,12 @@ Fix: edge-swipe the field off the tab bar, assert the typed name is visible, rev
 
 `npx tsc --noEmit`: exit 0. `tests/calories.domain.test.ts`: 44/44.
 
+P0 journeys: `npx playwright test --project=journeys --grep @p0` — **25 passed**.
+
+Broader local battery (`--project=chromium --project=pwa --project=journeys --project=simulation --project=visual`) was interrupted. Captured output through test 451: **365 passed, 86 skipped, 0 failed**. The skips are the `@sync` steps, which do not run in the local journeys project. The runner was then killed after the tool wait ended and the process stopped making artifacts; it is not a completed suite. A follow-up `--project=simulation` run observed 2 passed before that wait also ended. Do not read this as 453/453.
+
+`e2e:sync` / hosted `nightly`: **NOT RUN**. No disposable backend was used.
+
 ## Security
 
 `npm view` on 2026-10-15: both packages are still the latest published versions and both advisory ranges were `*` at the last gate run. No allowlist edit. Hosted `e2e` / `nightly` on run `38595232448` remain SKIPPED, not passed.

@@ -40,7 +40,7 @@ Close the post-W17 reliability gaps that a new agent can still hit: a recovery p
 - Current failures: `node scripts/audit-runtime-deps.mjs` exit 1 — 2 undocumented HIGH (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv). Installed versions are still the latest published (`3.0.3`, `1.4.0`). Not waived.
 - Relevant quarantines: none added.
 - Blockers: Android re-run BLOCKED_EXTERNAL. `adb devices` listed `emulator-5570` and `emulator-5594`, but `adb shell getprop` and `adb emu avd name` hung. Do not kill adb, reboot those AVDs, or install over them.
-- Exact next action: Commit this slice on `frontend-v3-post-w17-overnight-successor`, then continue the successor sweep (broader hermetic Playwright lanes that can finish, and any reproduced P1/P2). Do not start `qa:native:provision` against the hung attached emulators.
+- Exact next action: Publish this branch through a normal pull request. Do not waive the audit. Do not start `qa:native:provision` against the hung attached emulators. Do not describe the interrupted broad Playwright battery as a completed full run.
 - Remaining definition of done: this slice committed with the validation above; native flows classified from the preserved artifacts plus the emulator-shell block; audit remains visibly red; no recovery pointer to the completed correction; further locally executable defects fixed or explicitly rejected.
 
 ## Progress
@@ -79,6 +79,7 @@ Close the post-W17 reliability gaps that a new agent can still hit: a recovery p
 - 2026-10-15 — `npm run build:e2e` hermetic, 0 Supabase hosts. `npx playwright test e2e/calories-w10.spec.ts e2e/habits.spec.ts --project=chromium` 29 passed, 0 failed, 0 skipped.
 - 2026-10-15 — `node scripts/audit-runtime-deps.mjs` exit 1, 2 undocumented HIGH. No waiver.
 - 2026-10-15 — `adb devices` showed emulator-5570 and emulator-5594; `adb shell getprop` and `adb emu avd name` hung. Native install not attempted.
+- 2026-10-15 — P0 journeys 25/25. Broader chromium+pwa+journeys+simulation+visual battery interrupted after 365 passed / 86 skipped / 0 failed observed (through test 451). Not a completed full run. `e2e:sync` NOT RUN.
 
 ## Changed Files / Areas
 
