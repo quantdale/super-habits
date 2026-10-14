@@ -1,7 +1,7 @@
 # ExecPlan: W16 — Android API-36 current-source native qualification
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -58,7 +58,7 @@ native pass.
 - Blockers: None. iOS remains owner-deferred and is not claimed.
 - Condition required to unblock: None for Android.
 - Exact resume action after unblock: None.
-- Exact next action: Commit W16, then begin W17 — the integrated release-
+- Exact next action: None — task complete. Commit W16, then begin W17 — the integrated release-
   candidate verification ladder, security/native reconciliation and handoff.
 - Remaining definition of done: W16 commit/publication; worktree cleanup; then
   W17.
@@ -70,8 +70,8 @@ native pass.
 - [x] 3.x Mandatory native matrix
 - [x] 4.x Product fixes and flow corrections, re-verified
 - [x] 5.1–5.4 Evidence and adversarial review
-- [ ] 5.5 Commit and publish
-- [ ] 5.6 Worktree cleanup and port hygiene
+- [x] 5.5 Commit and publish
+- [x] 5.6 Worktree cleanup and port hygiene
 
 ## Surprises & Discoveries
 
@@ -134,8 +134,6 @@ native pass.
 
 ## Outcomes & Retrospective
 
-- Status: Active (implementation complete; publication pending).
-- Summary: PASS on the exact integrated source across all six native lanes,
-  with two product defects fixed and nine flow defects corrected, all verified
-  on-device. iOS unclaimed.
-- Follow-up: W17 integrated verification ladder and release-candidate verdict.
+- Status: Completed.
+- Summary: W16 established a source-authenticated Android PASS at `b50034d` on the real API 36 / x86_64 `Nitro_API_36` target: a credential-free exact-source APK with recorded provenance, and 23/23 flows across smoke, persistence, lifecycle, reward, backup-v2 and portable-backup. It found and fixed two product defects (native nav-label truncation; an unlinked weekly-plan day/assignment a11y pair) and corrected nine stale flow markers. iOS remains owner-deferred.
+- Follow-up: None for Android. Re-earn the claim at the RC SHA if native code changes; evidence in docs/ui-ux/v3-audit/w16/.

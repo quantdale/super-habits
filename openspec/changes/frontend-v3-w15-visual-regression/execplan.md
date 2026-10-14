@@ -1,7 +1,7 @@
 # ExecPlan: W15 — Persistent visual regression system
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -73,7 +73,7 @@ navigation,todoHeavy,habitsW7}.ts`, `e2e/fixtures.ts`,
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit W15, then begin W16 — Android API-36 current-source
+- Exact next action: None — task complete. Commit W15, then begin W16 — Android API-36 current-source
   native qualification (boot `Nitro_API_36`, build the credential-free
   `e2e-test` equivalent, run the native smoke/persistence/lifecycle lanes).
 - Remaining definition of done: W15 commit/publication; then W16–W17.
@@ -82,12 +82,12 @@ navigation,todoHeavy,habitsW7}.ts`, `e2e/fixtures.ts`,
 
 - [x] 1.1/1.2 Infrastructure audited
 - [x] 1.3 Slice authored (proposal, design, spec, tasks, this plan)
-- [ ] 2.x Curated coverage + manifest
-- [ ] 3.x Deterministic capture engineering
-- [ ] 4.x Spec + baselines + developer command
-- [ ] 5.x Two-run stability + sensitivity proof
-- [ ] 6.x CI integration
-- [ ] 7.x Evidence, review, closure
+- [x] 2.x Curated coverage + manifest
+- [x] 3.x Deterministic capture engineering
+- [x] 4.x Spec + baselines + developer command
+- [x] 5.x Two-run stability + sensitivity proof
+- [x] 6.x CI integration
+- [x] 7.x Evidence, review, closure
 
 ## Surprises & Discoveries
 
@@ -141,6 +141,6 @@ navigation,todoHeavy,habitsW7}.ts`, `e2e/fixtures.ts`,
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: Slice authored; suite authoring next.
-- Follow-up: W16–W17.
+- Status: Completed.
+- Summary: W15 built the durable visual regression system: 30 curated deterministic `toHaveScreenshot` goldens across the shell, six destinations and the W12/W13 surfaces, a dedicated `visual` Playwright project, two independent clean runs with an unchanged baseline hash, a proven negative-sensitivity check, and CI registration that cannot silently skip. It also found and fixed a real overlay-scroll nondeterminism at its source.
+- Follow-up: None. Manifest in docs/ui-ux/v3-audit/w15/golden-manifest.md.

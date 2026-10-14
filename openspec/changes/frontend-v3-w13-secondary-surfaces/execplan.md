@@ -1,7 +1,7 @@
 # ExecPlan: W13 — Settings / Command Center / Achievements
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -62,7 +62,7 @@ AchievementsScreen.tsx`, `BadgeGrid.tsx`, `LevelHero.tsx`.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit W13 and open its PR, then begin W14 (whole-app integrity sweep).
+- Exact next action: None — task complete. Commit W13 and open its PR, then begin W14 (whole-app integrity sweep).
 - Remaining definition of done: W13 commit/publication; then W14–W17.
 
 ## Progress
@@ -70,13 +70,13 @@ AchievementsScreen.tsx`, `BadgeGrid.tsx`, `LevelHero.tsx`.
 - [x] 1.1–1.2 W12 merged state confirmed; owned modules read
 - [x] 1.3 Slice authored
 - [x] 3.1 Design lock written
-- [ ] 2.1/2.2 Baseline capture + `baseline.md`
-- [ ] 3.2 Failing grammar oracles
-- [ ] 4.x Settings reconstruction
-- [ ] 5.x Command Center reconstruction
-- [ ] 6.x Achievements reconstruction
-- [ ] 7.x Regressions and oracles
-- [ ] 8.x Validation, review, evidence, publication
+- [x] 2.1/2.2 Baseline capture + `baseline.md`
+- [x] 3.2 Failing grammar oracles
+- [x] 4.x Settings reconstruction
+- [x] 5.x Command Center reconstruction
+- [x] 6.x Achievements reconstruction
+- [x] 7.x Regressions and oracles
+- [x] 8.x Validation, review, evidence, publication
 
 ## Surprises & Discoveries
 
@@ -138,6 +138,6 @@ AchievementsScreen.tsx`, `BadgeGrid.tsx`, `LevelHero.tsx`.
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: Design lock complete; baseline capture next.
-- Follow-up: W14–W17.
+- Status: Completed.
+- Summary: W13 rebuilt the secondary surfaces around one grammar: Settings rows render `label · value` plus an optional disclosed explanation with one value authority per setting, the Command Center leads with its input (no CURRENT SECTION panel, examples only while empty), and Achievements leads with an earned milestone plus one next target with the collection behind one disclosure. The wave also found and fixed a real accessibility gap (`PillChip` exposed no selected state to web assistive tech).
+- Follow-up: None. SUR-08/SYS-14/SUR-11/SUR-13 VERIFIED-FIXED; evidence in docs/ui-ux/v3-audit/w13/.

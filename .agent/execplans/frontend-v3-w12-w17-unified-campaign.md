@@ -1,7 +1,7 @@
 # ExecPlan: Frontend V3 W12–W17 Unified Campaign (Calm Momentum completion)
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -76,41 +76,51 @@ Authority: `D:\Downloads\SuperHabits_Frontend_V3_W12-W17_Unified_Campaign.md`
 
 ## Current Checkpoint
 
-- Current milestone: **C8 complete → C9/C10 — publication and handoff**
-  (W12–W17 all implemented, tested and evidenced).
+- Current milestone: **C9/C10 complete — campaign operationally finished and
+  handed off.** All six waves (W12–W17) are implemented, integrated, evidenced,
+  published on `frontend-v3-w12-w17-integration`, and their slice plans are
+  COMPLETED. Parent full-application certification stays open (see below).
 - Completed:
-  - C0 recovery; C1/C2 W12; C3/C4 W13; C5 W14; C6 W15; C7 W16 Android;
-    **C8 W17 release-candidate verification**.
-  - W17: seven-lane ladder executed at `3aaca2a`; **Vitest fully green for the
-    first time** (2,691 passed / 2 skipped / 0 failed) after proving the
-    long-reported "Windows-CRLF ENVIRONMENT residual" was a TEST_BUG; the full
-    Chromium battery 245/245; visual 30/30; a11y 10/10; timezones 105;
-    integration 419; simulation 1/1; P0 journeys 25/25. Security audit re-read
-    at current head: 2 inherited advisories with **no upstream fix**, absent
-    from both bundles, left red and documented — not waived. Deliverables:
-    `docs/ui-ux/v3-audit/w17/{README,rc-manifest,verification-matrix,defect-register,correction-handoff}.md`.
-- In progress: committing W17 and the final publication/handoff.
-- Important modified files: `tests/agentDocConsistency.test.ts`,
-  `tests/maestroCommandCenterFlowGuards.test.ts`,
-  `.maestro/flows/command-center-v2.yaml`, `docs/testing/known-gaps.md`,
-  `docs/ui-ux/v3-audit/w17/*`,
-  `openspec/changes/frontend-v3-w17-release-readiness/*`.
-- Last successful validation: the full ladder above.
-- Current failures: the dependency audit gate (C-1/C-2) and the pre-existing
-  `settings-ripple` step (C-3). Both are carried, owned and documented.
-- Relevant quarantines: none added.
+  - W12 `1d54b70` — Weekly Review / Progress / Activity narrative-first.
+  - W13 `b1569f0` — Settings grouped rows, input-first Command Center,
+    milestone-first Achievements; plus a real `PillChip` a11y fix.
+  - W14 `c6937b5` — whole-app integrity sweep (247 captures) + P1 44pt fix.
+  - W15 `42d1c20` — 30 deterministic visual-regression goldens, two-run
+    stability, negative sensitivity, CI lane.
+  - W16 `d04793b` — exact-source Android API-36 PASS (23/23 flows) with
+    provenance; two product defects fixed on-device.
+  - W17 `af8eeda`/`528fbe9` — seven-lane ladder; **Vitest fully green
+    (2,700 passed / 0 failed)**; five defects resolved (R-1…R-5); security
+    reconciled without waiver; RC manifest, verification matrix, defect
+    register and correction handoff written. Verdict: CONDITIONAL /
+    NEAR-COMPLETE.
+  - Publication: PR #76 open on the campaign branch; all three Codex P2 review
+    threads replied to and `isResolved: true`; certification worktree removed
+    and ports free.
+- In progress: None — the campaign is operationally complete.
+- Important modified files: see the six slices and
+  `docs/ui-ux/v3-audit/w12…w17/`.
+- Last successful validation: `npm test` 2,700 passed / 2 skipped / 0 failed;
+  typecheck 0; lint 0/0; themes 140/140; OpenSpec 86/86; plans PASS;
+  integration 419 pass; timezones 105; P0 journeys 25/25; Chromium 245/245;
+  visual 30/30; a11y 10/10; simulation 1/1.
+- Current failures: the dependency audit gate (2 inherited advisories, no
+  upstream fix, documented not waived) and the pre-existing `settings-ripple`
+  journey.
+- Relevant quarantines: none added by this campaign.
 - Blockers: none for web/PWA. iOS owner-deferred; hosted CI gated by the audit.
 - Condition required to unblock: an upstream patched release for `braces` /
-  `node-forge` (or removing their tooling chains); an authorized iOS lane;
-  a hosted CI run once the audit is resolved.
+  `node-forge` (or removing their tooling chains); an authorized iOS lane.
 - Exact resume action after unblock: `node scripts/audit-runtime-deps.mjs`, then
-  the acceptance gates in `correction-handoff.md` §7.
-- Exact next action: commit W17, verify the exact-head state, reconcile PR #76
-  review threads, remove the W16 certification worktree and confirm port
-  hygiene — then hand off.
-- Remaining definition of done: W17 commit/publication; review-thread
-  reconciliation; worktree/port cleanup. The campaign is at a truthful
-  CONDITIONAL / NEAR-COMPLETE verdict.
+  the acceptance gates in `docs/ui-ux/v3-audit/w17/correction-handoff.md` §7.
+- Exact next action: None — the campaign is complete. The next session should
+  follow `docs/ui-ux/v3-audit/w17/correction-handoff.md`, whose first bounded
+  action is the `settings-ripple` Calories marker decision (C-3).
+- Remaining definition of done: Complete for the W12–W17 campaign scope. The
+  **parent** Frontend V3 change stays open only for full-certification
+  conditions outside this campaign (security advisories, iOS, hosted CI,
+  Android re-earn at the RC SHA), which are tracked in
+  `docs/ui-ux/v3-audit/w17/correction-handoff.md`.
 
 ## Progress
 
@@ -118,21 +128,21 @@ Authority: `D:\Downloads\SuperHabits_Frontend_V3_W12-W17_Unified_Campaign.md`
       stash/untracked evidence preserved
 - [x] Master ExecPlan + W12 OpenSpec slice authored before production edits
 - [x] W12 baseline inventory (`baseline.md`) + hermetic `build:e2e` PASS
-- [ ] W12 design lock (reflection hierarchy, narrative rules, filter grammar)
-- [ ] W12 implementation: Weekly Review, Progress Insights, Activity Timeline
-- [ ] W12 regressions + real-SQLite oracles + rendered before/after evidence
-- [ ] W13 implementation: Settings grouped rows, Command input-first,
+- [x] W12 design lock (reflection hierarchy, narrative rules, filter grammar)
+- [x] W12 implementation: Weekly Review, Progress Insights, Activity Timeline
+- [x] W12 regressions + real-SQLite oracles + rendered before/after evidence
+- [x] W13 implementation: Settings grouped rows, Command input-first,
       Achievements milestone-first
-- [ ] W13 regressions + rendered evidence + adversarial review
+- [x] W13 regressions + rendered evidence + adversarial review
 - [x] C5 — W14 whole-app matrix, defect ledger, bounded convergence fixes
 - [x] C6 — W15 curated baselines, two-run stability, CI integration
 - [x] W14 publication (commit `c6937b5`)
 - [x] W15 publication (commit `42d1c20`)
 - [x] W16 publication (commit `d04793b`)
-- [ ] W17 publication (commit)
+- [x] W17 publication (commits `af8eeda`, `528fbe9`; PR #76 threads resolved)
 - [x] C7 — W16 exact-source Android API-36 qualification
 - [x] C8 — W17 verification ladder, RC verdict, correction handoff
-- [ ] C9/C10 — publication, review threads, final source and records
+- [x] C9/C10 — publication, review threads, final source and records
 
 ## Surprises & Discoveries
 

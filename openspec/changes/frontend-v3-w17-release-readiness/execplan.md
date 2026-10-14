@@ -1,7 +1,7 @@
 # ExecPlan: W17 — Final cross-wave integration, regression and release readiness
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -59,7 +59,7 @@ packet — with a verdict the evidence supports.
   `node-forge` (or removing their tooling chains).
 - Exact resume action after unblock: re-run `node scripts/audit-runtime-deps.mjs`
   then the full ladder from `correction-handoff.md` §7.
-- Exact next action: Commit W17, verify the exact-head state, reconcile PR #76
+- Exact next action: None — task complete. Commit W17, verify the exact-head state, reconcile PR #76
   threads, remove the certification worktree and confirm port hygiene.
 - Remaining definition of done: W17 commit/publication; review reconciliation;
   worktree/port cleanup.
@@ -72,8 +72,8 @@ packet — with a verdict the evidence supports.
 - [x] 4.x Security reconciliation (left red, documented)
 - [x] 5.x Cross-wave corrections (R-1, R-2)
 - [x] 6.1–6.3 Handoff, README, record updates
-- [ ] 6.4 Commit and publish; reconcile review threads
-- [ ] 6.5 Worktree removal and port hygiene
+- [x] 6.4 Commit and publish; reconcile review threads
+- [x] 6.5 Worktree removal and port hygiene
 
 ## Surprises & Discoveries
 
@@ -144,8 +144,6 @@ packet — with a verdict the evidence supports.
 
 ## Outcomes & Retrospective
 
-- Status: Active (engineering complete; publication pending).
-- Summary: The ladder is executed and green on web/PWA (Vitest fully green for
-  the first time), Android is certified at `b50034d`, two defects were resolved,
-  the security gate is documented and left red, and a bounded handoff exists.
-- Follow-up: `docs/ui-ux/v3-audit/w17/correction-handoff.md`.
+- Status: Completed.
+- Summary: W17 executed the full seven-lane verification ladder on the integrated source, resolved five defects (R-1/R-2 test defects, including the long-misclassified CRLF 'environment' residual that made the suite green for the first time; R-3/R-4/R-5 product truthfulness defects from PR #76 review), reconciled the security gate without waiving it, and produced the RC manifest, verification matrix, defect register and bounded correction handoff. Verdict: CONDITIONAL / NEAR-COMPLETE.
+- Follow-up: The bounded correction packet lives at docs/ui-ux/v3-audit/w17/correction-handoff.md; the parent plan remains ACTIVE until full certification conditions are met.

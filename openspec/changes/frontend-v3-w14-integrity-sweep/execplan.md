@@ -1,7 +1,7 @@
 # ExecPlan: W14 — Full UI/UX integrity sweep and convergence
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -66,7 +66,7 @@ curate baselines from a verified-stable render, not a moving target.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit W14, then begin W15 — author
+- Exact next action: None — task complete. Commit W14, then begin W15 — author
   `openspec/changes/frontend-v3-w15-visual-regression/` and build the curated
   deterministic `toHaveScreenshot` suite with two-run stability.
 - Remaining definition of done: W14 commit/publication; then W15–W17.
@@ -75,10 +75,10 @@ curate baselines from a verified-stable render, not a moving target.
 
 - [x] 1.1 W12 + W13 confirmed on one branch
 - [x] 1.2 Slice authored (proposal, design, spec, tasks, this plan)
-- [ ] 2.x Matrix execution
-- [ ] 3.x Defect ledger
-- [ ] 4.x Bounded convergence fixes
-- [ ] 5.x Validation and closure
+- [x] 2.x Matrix execution
+- [x] 3.x Defect ledger
+- [x] 4.x Bounded convergence fixes
+- [x] 5.x Validation and closure
 
 ## Surprises & Discoveries
 
@@ -125,6 +125,6 @@ curate baselines from a verified-stable render, not a moving target.
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: Slice authored; matrix execution next.
-- Follow-up: W15–W17.
+- Status: Completed.
+- Summary: W14 reconciled the integrated W12+W13 build against Calm Momentum authority with a 247-capture matrix across 360–1440 and both themes, re-ran every per-wave audit on one build, and fixed one real P1 (the new disclosure controls were 32/36/40pt, below the repository's 44pt interactive contract) with a new source-contract regression. Three further candidates were assessed as not-defects with recorded evidence.
+- Follow-up: None. Evidence and ledger in docs/ui-ux/v3-audit/w14/.

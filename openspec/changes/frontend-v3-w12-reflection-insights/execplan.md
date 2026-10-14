@@ -1,7 +1,7 @@
 # ExecPlan: W12 — Weekly Review / Progress / Activity (narrative-led reflection)
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -70,19 +70,19 @@ activityTimelineData}.test.ts`.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: Commit the W12 slice and begin W13 (Settings / Command Center / Achievements design lock + reconstruction).
+- Exact next action: None — task complete. Commit the W12 slice and begin W13 (Settings / Command Center / Achievements design lock + reconstruction).
 - Remaining definition of done: W12 commit/publication; then W13–W17.
 
 ## Progress
 
 - [x] 1.3 Slice authored (proposal, design, spec, tasks, this plan)
 - [x] 3.1 Design lock written (design.md D12.1–D12.6)
-- [ ] 2.1/2.2 Before-capture + `baseline.md`
-- [ ] 4.x Weekly Review reconstruction
-- [ ] 5.x Progress Insights reconstruction
-- [ ] 6.x Activity Timeline reconstruction
-- [ ] 7.x Regressions and oracles
-- [ ] 8.x Validation, review, evidence, publication
+- [x] 2.1/2.2 Before-capture + `baseline.md`
+- [x] 4.x Weekly Review reconstruction
+- [x] 5.x Progress Insights reconstruction
+- [x] 6.x Activity Timeline reconstruction
+- [x] 7.x Regressions and oracles
+- [x] 8.x Validation, review, evidence, publication
 
 ## Surprises & Discoveries
 
@@ -148,6 +148,6 @@ Confirm`; the campaign's own wording is the target model and the current
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: Design lock complete; implementation starting.
-- Follow-up: W13–W17.
+- Status: Completed.
+- Summary: W12 reconstructed Weekly Review, Progress and Activity as narrative-first surfaces: the seven-step wizard became `Review → Decide → Plan → Reflect → Confirm` with a labelled step indicator and every domain count behind one `All numbers` disclosure, evaluative insight wording was replaced by numeric facts, Progress moved to ranked headlines behind one `More details` disclosure, and the Activity timeline replaced 25 always-visible chips with one `Filters` control and flat chronological rows.
+- Follow-up: None. SUR-12 VERIFIED-FIXED; evidence in docs/ui-ux/v3-audit/w12/.
