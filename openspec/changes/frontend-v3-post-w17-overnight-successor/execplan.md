@@ -80,6 +80,7 @@ Close the post-W17 reliability gaps that a new agent can still hit: a recovery p
 - 2026-10-15 — `node scripts/audit-runtime-deps.mjs` exit 1, 2 undocumented HIGH. No waiver.
 - 2026-10-15 — `adb devices` showed emulator-5570 and emulator-5594; `adb shell getprop` and `adb emu avd name` hung. Native install not attempted.
 - 2026-10-15 — P0 journeys 25/25. Broader chromium+pwa+journeys+simulation+visual battery interrupted after 365 passed / 86 skipped / 0 failed observed (through test 451). Not a completed full run. `e2e:sync` NOT RUN.
+- 2026-10-15 — Published as PR #79 (`https://github.com/quantdale/super-habits/pull/79`), head `6617d85`, base `main` `fb10d6c`. Not merged. Hosted quality was pending at publication; the audit gate is still expected to fail.
 
 ## Changed Files / Areas
 
