@@ -47,7 +47,11 @@ Authority: `D:\Downloads\SuperHabits_Frontend_V3_W12-W17_Unified_Campaign.md`
   block hosted `e2e`/`nightly` (quality job otherwise green); Windows-CRLF
   register-parsing ENVIRONMENT failure; D14 host-load headroom; Focus
   notification-timestamp residual. Android API36 pending W16; iOS
-  owner-deferred.
+  owner-deferred. `[Post-W17 correction (2026-10-14): the
+“Windows-CRLF register-parsing ENVIRONMENT failure” classification was
+wrong and is resolved — it was a TEST_BUG in
+`tests/agentDocConsistency.test.ts`'s `read()`(CRLF checkouts), fixed at`3aaca2a`(see`docs/ui-ux/v3-audit/w17/defect-register.md` R-1). The
+suite is green end-to-end; it is not an environment residual.]`
 
 ## Scope
 
@@ -116,6 +120,11 @@ Authority: `D:\Downloads\SuperHabits_Frontend_V3_W12-W17_Unified_Campaign.md`
 - Exact next action: None — the campaign is complete. The next session should
   follow `docs/ui-ux/v3-audit/w17/correction-handoff.md`, whose first bounded
   action is the `settings-ripple` Calories marker decision (C-3).
+  `[Post-W17 correction (2026-10-14): C-3 is RESOLVED — the journey's
+`Goal 2,400`assertion was a stale selector and was retargeted to the W10
+grammar with its SQL/reload/entry-count oracles intact (green 6/6). Active
+work is`openspec/changes/frontend-v3-post-w17-correction/`; do not redo
+C-3.]`
 - Remaining definition of done: Complete for the W12–W17 campaign scope. The
   **parent** Frontend V3 change stays open only for full-certification
   conditions outside this campaign (security advisories, iOS, hosted CI,

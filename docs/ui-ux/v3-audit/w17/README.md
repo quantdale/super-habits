@@ -1,5 +1,16 @@
 # W17 — Final cross-wave integration, regression and release readiness
 
+> **Post-W17 correction note (2026-10-14, change
+> `frontend-v3-post-w17-correction`).** This document records the W17
+> closure. Where it says “final”, “final shipped”, or “current”, that means
+> the revision named at closure time (`1177ac2` / `3aaca2a`), **not** the
+> repository head now: docs-only `bf09c0d` followed `1177ac2`, and the
+> post-W17 correction runs on `frontend-v3-post-w17-adversarial-correction`.
+> Every run count and result below stays attributed to the revision that
+> produced it and is not re-attributed to a later revision. Specific stale
+> claims are corrected inline as `[Post-W17 correction: …]`. Current status
+> lives in `docs/ui-ux/v3-audit/post-w17-correction/`.
+
 ## Verdict
 
 **CONDITIONAL / NEAR-COMPLETE.**
@@ -16,7 +27,11 @@ ready" in the whole-application sense because:
 3. **Hosted `e2e`/`nightly` have never run** since the W11.5.1 baseline; the
    evidence is the local ladder.
 4. **The Android certification is at `b50034d`**, one test/docs-only commit
-   behind the W17 SHA, and was not re-earned at the final revision.
+   behind the W17 SHA, and was not re-earned at the final revision. `[Post-W17
+correction: the “test/docs-only commit behind” premise holds only through
+`3aaca2a`. `af8eeda`(after`3aaca2a`) changed user-facing feature source
+in `features/activity/_`and`features/weekly-review/_`, so the `b50034d`APK does not cover`af8eeda`, `1177ac2`, `bf09c0d`, or the correction
+branch. Android beyond `b50034d` stays unearned.]`
 5. One pre-existing red journey (`settings-ripple`) is carried (C-3).
 
 None of these is a product/data/security regression introduced by W12–W17.
@@ -59,19 +74,19 @@ history is not rewritten.
 
 ## Verification summary (source `1177ac2`)
 
-| Lane                                                         | Result                                          |
-| ------------------------------------------------------------ | ----------------------------------------------- |
-| Typecheck / lint / themes / OpenSpec / plans / profile guard | 0 errors · 140/140 · 86/86 · all PASS · 3/3     |
-| Vitest unit + integration                                    | **2,691 passed / 2 skipped / 0 failed**         |
-| Integration project                                          | 419 passed / 2 skipped                          |
-| Timezones (5 zones)                                          | 105 passed                                      |
-| P0 journeys                                                  | 25/25                                           |
-| Full Chromium battery                                        | **245/245** in 23.8m                            |
-| W15 visual goldens                                           | 30/30 (hash `0676368d…`)                        |
-| Accessibility                                                | 10/10                                           |
-| Deterministic simulation                                     | 1/1 scenario, 24 steps                          |
-| Android API-36 (at `b50034d`)                                | 23/23 flows                                     |
-| Dependency audit                                             | **FAIL — 2 inherited advisories, unremediated** |
+| Lane                                                         | Result                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Typecheck / lint / themes / OpenSpec / plans / profile guard | 0 errors · 140/140 · 86/86 · all PASS · 3/3                                                                                                                                                                                                                                                                                                                     |
+| Vitest unit + integration                                    | **2,691 passed / 2 skipped / 0 failed**                                                                                                                                                                                                                                                                                                                         |
+| Integration project                                          | 419 passed / 2 skipped                                                                                                                                                                                                                                                                                                                                          |
+| Timezones (5 zones)                                          | 105 passed                                                                                                                                                                                                                                                                                                                                                      |
+| P0 journeys                                                  | 25/25                                                                                                                                                                                                                                                                                                                                                           |
+| Full Chromium battery                                        | **245/245** in 23.8m                                                                                                                                                                                                                                                                                                                                            |
+| W15 visual goldens                                           | 30/30 (hash `0676368d…`) `[Post-W17 correction: `0676368d…`is the historical W15 two-run-proof hash of the pre-regeneration set; the set at`1177ac2`(3 goldens regenerated in`e70ccc7`, side-by-side reviewed) hashes `f19261d5d676ac1ef10cc526a4fb19d41e0edbf1a6e3ebd87fcb437c50dcdeaa`, method `sha256sum e2e/**screenshots**/visual-regression.spec.ts/*.png | sha256sum`. The 30/30 pass count stands.]` |
+| Accessibility                                                | 10/10                                                                                                                                                                                                                                                                                                                                                           |
+| Deterministic simulation                                     | 1/1 scenario, 24 steps                                                                                                                                                                                                                                                                                                                                          |
+| Android API-36 (at `b50034d`)                                | 23/23 flows                                                                                                                                                                                                                                                                                                                                                     |
+| Dependency audit                                             | **FAIL — 2 inherited advisories, unremediated**                                                                                                                                                                                                                                                                                                                 |
 
 ## Cross-wave integration checks
 

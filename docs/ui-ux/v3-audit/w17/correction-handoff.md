@@ -1,8 +1,20 @@
 # W17 — Correction handoff (next-session bounded repair packet)
 
+> **Post-W17 correction note (2026-10-14, change
+> `frontend-v3-post-w17-correction`).** This packet is the W17-closure
+> record. Where it implies “current”, that means the revision named at
+> closure (`3aaca2a`), not the repository head now (docs-only `bf09c0d`
+> followed `1177ac2`; the correction runs on
+> `frontend-v3-post-w17-adversarial-correction`). Items resolved by the
+> post-W17 correction are marked inline as `[Post-W17 correction: …]`.
+> Current status lives in `docs/ui-ux/v3-audit/post-w17-correction/`.
+
 Campaign state at handoff: **CONDITIONAL / NEAR-COMPLETE**.
 Source: `frontend-v3-w12-w17-integration` at `3aaca2a` (W17 fix SHA).
 Read `docs/ui-ux/v3-audit/w17/README.md` first, then this file.
+
+`[Post-W17 correction: `3aaca2a`was this packet's source revision, not the
+current head; the branch continued`3aaca2a`→`af8eeda`→`b9e775f`→`1177ac2`and`bf09c0d`followed on`main`.]`
 
 This packet is bounded: each item names a reproduction, the expected treatment,
 the acceptance test and a runnable command. Nothing here requires re-auditing the
@@ -11,6 +23,14 @@ application or redoing a completed wave.
 ---
 
 ## Top next action
+
+`[Post-W17 correction: RESOLVED — do not redo. Runtime reproduction showed
+the journey asserts a stale selector: the W10 Calories grammar has no
+`Goal 2,400`surface. The journey was retargeted to the shipped W10 contract
+(title`2,400 kcal left`, context `0 of 2,400 kcal logged`, accessible name
+`Edit daily calorie goal`) with the `app_meta.calorie_goal`SQL oracle, the
+reload check, and the unchanged calorie-entry-count oracle intact; the
+journey is green 6/6. Evidence:`docs/ui-ux/v3-audit/post-w17-correction/`.]`
 
 **Resolve the `settings-ripple` Calories marker mismatch (C-3).**
 
@@ -66,11 +86,11 @@ P1-class findings were fixed in their waves:
 
 ### 2.2 Documentation consistency
 
-| ID  | Item                                                                                                               | Evidence                                   | Treatment                                                                                                                                                                                 |
-| --- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D-1 | `docs/testing/known-gaps.md` still lists the Windows-CRLF `agentDocConsistency` failure as an environment residual | W17 R-1 fixed it; the suite is fully green | Remove/annotate that residual and record the fix (`tests/agentDocConsistency.test.ts`). `tests/agentDocConsistency.test.ts` itself pins several guidance strings, so update both together |
-| D-2 | `docs/PROJECT_STRUCTURE_MAP.md` / `AGENTS.md` baselines quote stale test counts                                    | counts drift every wave                    | Re-derive from `npx vitest list` / `npx playwright test --list`                                                                                                                           |
-| D-3 | W16 `native-android-build.json` describes `b50034d`, not the W17 SHA                                               | W17's diff is test/docs only               | Either re-provision at the RC SHA to re-earn the native claim, or keep the explicit limit                                                                                                 |
+| ID  | Item                                                                                                               | Evidence                                   | Treatment                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-1 | `docs/testing/known-gaps.md` still lists the Windows-CRLF `agentDocConsistency` failure as an environment residual | W17 R-1 fixed it; the suite is fully green | Remove/annotate that residual and record the fix (`tests/agentDocConsistency.test.ts`). `tests/agentDocConsistency.test.ts` itself pins several guidance strings, so update both together `[Post-W17 correction: DONE — the register carries the W17 correction annotations at the W9 note and the W10 inherited-residuals line; the test's `read()` normalizes CRLF. Verified, no unqualified claim remains in the register.]` |
+| D-2 | `docs/PROJECT_STRUCTURE_MAP.md` / `AGENTS.md` baselines quote stale test counts                                    | counts drift every wave                    | Re-derive from `npx vitest list` / `npx playwright test --list`                                                                                                                                                                                                                                                                                                                                                                 |
+| D-3 | W16 `native-android-build.json` describes `b50034d`, not the W17 SHA                                               | W17's diff is test/docs only               | Either re-provision at the RC SHA to re-earn the native claim, or keep the explicit limit `[Post-W17 correction: the “test/docs only” premise holds through `3aaca2a`only —`af8eeda`changed`features/activity/_`and`features/weekly-review/_`; the `b50034d` claim stays explicitly limited and no later revision is covered until a new exact-source provision runs.]`                                                         |
 
 ## 3. P3 — polish (optional, non-blocking)
 
@@ -126,6 +146,12 @@ E2E_PORT=8086 npm run visual              # 30/30, hash 0676368d…
 E2E_PORT=8086 npx playwright test --project=chromium   # 245/245
 node scripts/audit-runtime-deps.mjs       # currently red — C-1/C-2
 ```
+
+`[Post-W17 correction: the counts and the golden hash in the block above are
+the W17 run's records, not pass thresholds — totals drift as tests are added
+(D-2). Re-derive current inventories with `npx vitest list`and`npx playwright test --list`; the visual golden set hash is
+`f19261d5d676ac1ef10cc526a4fb19d41e0edbf1a6e3ebd87fcb437c50dcdeaa`(since`e70ccc7`regenerated 3 reviewed goldens);`0676368d…` is the
+historical W15 two-run-proof hash.]`
 
 After a change that touches native code or the Android flows, also re-provision
 and re-run the six Android tag lanes (§4).

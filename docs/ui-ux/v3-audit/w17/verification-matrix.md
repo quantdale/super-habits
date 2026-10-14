@@ -1,5 +1,14 @@
 # W17 — Verification matrix
 
+> **Post-W17 correction note (2026-10-14, change
+> `frontend-v3-post-w17-correction`).** `1177ac2` was `main` at the W17
+> closure, not the current head (docs-only `bf09c0d` followed it; the
+> correction runs on `frontend-v3-post-w17-adversarial-correction`). Every
+> row below stays attributed to the revision in its “Source SHA” column and
+> is not re-attributed to any later revision. Specific stale claims are
+> corrected inline as `[Post-W17 correction: …]`. Current status lives in
+> `docs/ui-ux/v3-audit/post-w17-correction/`.
+
 Source: final shipped `main` `1177ac2`. Every number below is from the lane's own run on
 this revision. `Not run` means exactly that.
 
@@ -29,6 +38,9 @@ this revision. `Not run` means exactly that.
 
 ### Hosted CI at the final head (`1177ac2`)
 
+`[Post-W17 correction: “the final head” is the W17-closure head, not the
+current repository head.]`
+
 Run [38495572049](https://github.com/quantdale/super-habits/actions/runs/38495572049)
 (PR) and 38495566101 (push) both succeed every quality step — Setup, Install,
 **Typecheck**, Deno edge-function type-check, **Lint**, theme tokens, OpenSpec
@@ -42,7 +54,10 @@ This is the first campaign head where the hosted plan-validation step passes.
 The previous head (`1177ac2`) failed it because the just-closed wave plans still
 carried pre-completion "Remaining definition of done" text — a real defect the
 hosted gate caught that my locally truncated reading had missed; it is fixed in
-`1177ac2`.
+`1177ac2`. `[Post-W17 correction: both SHAs in this sentence render as
+`1177ac2`, which cannot be both the failing previous head and the fix. The
+defect register's own attribution is authoritative: the plan-gate defect was
+fixed at `b9e775f`and hosted`Validate versioned ExecPlans`PASSED at`b9e775f`. No run count is re-attributed by this note.]`
 
 ### Lane 1 — Static and contract integrity
 
@@ -93,7 +108,7 @@ hosted gate caught that my locally truncated reading had missed; it is fixed in
 
 ### Lane 6 — Visual and accessibility
 
-- W15 curated goldens: **30/30**, hash `0676368d…` (two-run stability proven in W15).
+- W15 curated goldens: **30/30**, hash `0676368d…` (two-run stability proven in W15). `[Post-W17 correction: the set hash at `1177ac2`is`f19261d5…`(3 goldens regenerated in`e70ccc7`, reviewed); `0676368d…` is the W15 two-run-proof hash of the pre-regeneration set. The 30/30 pass count stands.]`
 - `a11y.spec.ts`: **10/10**.
 - The W14 sweep inspected 247 captures across 7 widths and both themes; the W12
   and W13 waves inspected 40 and 44 before/after captures respectively; the W16
@@ -113,7 +128,7 @@ hosted gate caught that my locally truncated reading had missed; it is fixed in
 | ----------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | Hosted `e2e` / `nightly` jobs                                           | Gated behind the failing dependency audit at the baseline; not passed     |
 | PWA project + sync (`journeys-sync`) lane                               | Not executed in W17; covered by W15/W16 evidence and the standard battery |
-| Android matrix at the W17 SHA                                           | W17 changed only tests/docs; the APK is certified at `b50034d`            |
+| Android matrix at the W17 SHA                                           | W17 changed only tests/docs; the APK is certified at `b50034d`            | `[Post-W17 correction: the “tests/docs only” premise holds through `3aaca2a`only —`af8eeda`changed`features/activity/_`and`features/weekly-review/_`, so the later revisions are not covered by the `b50034d` APK.]` |
 | iOS simulator/cloud                                                     | Owner-deferred; no authorized environment                                 |
 | Live Supabase / RLS round-trip                                          | Requires explicit authorization and a disposable project                  |
 | Native notification-tray delivery, `Alert.alert`, system offline toggle | Documented capability gaps (unchanged)                                    |
@@ -125,3 +140,8 @@ hosted gate caught that my locally truncated reading had missed; it is fixed in
 - Playwright totals are per project; the 245 is the chromium project only.
 - The Android figure is 23 flows across six tag lanes, each counted once.
 - No lane's tests are counted twice as separate coverage.
+- The three Vitest pass totals recorded in W17 documents (2,691, 2,699,
+  2,700) each belong to their own named run — local `npm test`, hosted CI,
+  and the “re-verified” lane detail respectively. They are kept on the runs
+  that produced them and must not be merged, re-attributed, or quoted as one
+  current number. `[Post-W17 correction]`

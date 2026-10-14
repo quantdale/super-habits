@@ -1,5 +1,14 @@
 # W17 — Defect register
 
+> **Post-W17 correction note (2026-10-14, change
+> `frontend-v3-post-w17-correction`).** This register records the W17
+> closure. Where it says “current head”, that means the revision named at
+> closure (`3aaca2a`), not the repository head now (docs-only `bf09c0d`
+> followed `1177ac2`; the correction runs on
+> `frontend-v3-post-w17-adversarial-correction`). Historical run records and
+> counts stay on the revisions that produced them. Specific stale claims are
+> corrected inline as `[Post-W17 correction: …]`.
+
 Findings reproduced on the integrated W12–W16 source during the W17 ladder, plus
 the carried residuals from earlier waves. Every entry names an owner and a
 verification state; nothing here is marked fixed without evidence.
@@ -130,7 +139,13 @@ the local equivalent.
 
 ## Security reconciliation
 
-**Current head:** `3aaca2a`. `node scripts/audit-runtime-deps.mjs` (the exact CI
+**Current head:** `3aaca2a`. `[Post-W17 correction: `3aaca2a`was the head
+when this reconciliation ran; it is not the current head — the branch
+continued through`af8eeda`, `b9e775f`, `1177ac2`, then docs-only `bf09c0d`on`main`, and the correction runs on
+`frontend-v3-post-w17-adversarial-correction`. The audit result below is the
+record of that run; the post-W17 correction re-runs the audit at its own SHA
+and records it in `docs/ui-ux/v3-audit/post-w17-correction/`.]`
+`node scripts/audit-runtime-deps.mjs` (the exact CI
 gate) reports **2 undocumented high advisories**; the gate therefore remains red
 and is **not** waived, allowlisted, or softened in this session.
 
