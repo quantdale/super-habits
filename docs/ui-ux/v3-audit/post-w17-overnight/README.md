@@ -65,7 +65,7 @@ The earlier combined battery that stopped at test 451 is superseded by these fin
 
 ## Not claimed
 
-- iOS: NOT RUN. GitHub iOS workflow `38612438402` skipped.
+- iOS: EXECUTED AND FAILED at head `9aa0f78` (run [`38676461813`](https://github.com/quantdale/super-habits/actions/runs/38676461813) — not the older skipped `38612438402`). 4 flows genuinely failed (`todo-persistence`, `calories-persistence`, `workout-gym-v2-persistence`, `workout-gym-v2-session-lifecycle`); 9 actually passed (Maestro exit 0) but were misreported `NOT_CERTIFIED` by a coverage-reader bug (fixed `29dd16a`). Two of the four are fixed selector bugs (`db04415`); two are nav/gesture divergences deferred for evidence-based triage. A verifying re-run is dispatched (run `38712060166`). **Not yet certified.**
 - Android exact-source pass at this branch: NOT RUN. `adb shell` hung on the already-attached emulators; they were not rebooted or overwritten.
 - `e2e:sync` and hosted nightly: NOT RUN.
 - PR #79 is not merge-ready while the audit gate is red.

@@ -70,7 +70,22 @@ foreign AVD was killed, reset, or modified at any point.
    `habit-reminder-disable` (footer `Save changes` hit-target) and
    `workout-gym-v2-persistence` (edge-swipe / typed-name oracle).
 
-## B. iOS — `NOT RUN` pending the repo's own GHA lane (dispatch at final head)
+## B. iOS — `EXECUTED AND FAILED` (run 38676461813, head 9aa0f78); verifying re-run dispatched
+
+> **Correction (this campaign).** This section previously read `NOT RUN`. That was
+> stale. The repo's own GHA iOS lane **did execute** at PR #79 head `9aa0f78` (run
+> [38676461813](https://github.com/quantdale/super-habits/actions/runs/38676461813)):
+> it booted the iOS 26.2 simulator, built/installed/launched the unsigned Release app,
+> and ran all 13 Maestro flows. It **failed** — but **not as 13 application defects**.
+> A coverage-accounting defect in `readExecutedFlows` (it only understood Maestro's
+> legacy `manifest.json` layout) reported every flow `executed: []`, so **9 flows that
+> actually passed (Maestro exit 0) were misreported `NOT_CERTIFIED`**, and 4 genuinely
+> failed (`FAILED_NEEDS_TRIAGE`): `todo-persistence`, `calories-persistence`,
+> `workout-gym-v2-persistence`, `workout-gym-v2-session-lifecycle`. The harness defect is
+> fixed (`29dd16a`, proven 13/13 against the run-38676461813 artifact); two of the four
+> are fixed selector bugs (`db04415`); the other two are nav/gesture divergences deferred
+> for evidence-based triage. A verifying re-run at `db04415` (run `38712060166`) is
+> dispatched to certify the 9 passing flows and confirm the 2 fixes.
 
 - **Static readiness (this campaign):** `app.json` iOS block is coherent
   (`com.dale16.superhabits`, tablet support, `ITSAppUsesNonExemptEncryption=false`,
@@ -101,5 +116,8 @@ A single owned, responsive emulator (or the GHA/cloud macOS lane succeeding at t
 exact head) plus the two flows passing **three clean consecutive runs** at that
 source, with the APK SHA-256/install provenance recorded by
 `scripts/qa-native-provision.mjs` reports and the iOS provenance JSON from
-`scripts/qa-ios-simctl.mjs`. Neither exists at this record's date; both remain
-`NOT RUN` until they do.
+An owned, responsive Android device is still unavailable on this host (Section A), so
+Android stays `ENVIRONMENT_BLOCKED`. iOS is no longer `NOT RUN`: it is **`EXECUTED AND
+FAILED`** (Section B) and earns certification only when a run at an exact source SHA
+reports all 13 flows PASS (run `38712060166` at `db04415` is the dispatched attempt).
+Neither lane is certified at this record's date.
