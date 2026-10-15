@@ -92,6 +92,11 @@ Close the post-W17 reliability gaps that a new agent can still hit: a recovery p
 - 2026-10-15 — Published as PR #79 (`https://github.com/quantdale/super-habits/pull/79`), head `6617d85`, base `main` `fb10d6c`. Not merged. Hosted quality was pending at publication; the audit gate is still expected to fail.
 - 2026-10-15 — Hosted quality run `38612438342` failed only at the audit step. Typecheck, lint, OpenSpec, ExecPlans, and unit/integration passed. `e2e`/`nightly` skipped. iOS workflow skipped.
 - 2026-10-15 — Clean hermetic rebuild with no canonical wasm copy. Discovery used `dist/assets/_superhabits/...`. Over-goal SQL oracles passed. Later lanes: chromium 250/44/0, journeys 76/42/0, visual 34/34, pwa 5/5, simulation 3/3. `journeys-sync` NOT RUN.
+- 2026-10-15 (RC convergence campaign) — A1 coverage reader proven 13/13 against the real run-38676461813 debug trees (was 0/13): the 13-flow iOS suite at `9aa0f78` is 9 genuine PASS + 4 genuine FAIL, not 0/13.
+- 2026-10-15 (RC convergence) — QA gates green at head `beb6a26`: `tsc --noEmit` 0; `eslint . --max-warnings 0` 0; full Vitest 2703 passed | 2 skipped (265 files, unit + real-SQLite integration); `openspec validate --all` 88/88; `agent:plan:validate` ACTIVE/valid; `npm run build:e2e` hermetic (0 Supabase hosts); security guards 87 passed.
+- 2026-10-15 (RC convergence) — Scoped web evidence (web-e2e-validation.yml NOT dispatchable, HTTP 404 on default branch): local full Playwright suite **369 passed / 86 skipped / 0 failed** (455 tests, 43.9m, chromium+journeys+visual+pwa+simulation) + `e2e-retry-report.mjs` OK (strictRetriedThenPassed 0). `journeys-sync` NOT RUN (no disposable backend).
+- 2026-10-15 (RC convergence) — iOS verification re-run dispatched at `db04415` (run `38712060166`) to certify the 9 passing flows and confirm the 2 selector fixes (To-Do persistence, Gym V2 session-lifecycle); result pending at this line.
+- 2026-10-15 (RC convergence) — `node scripts/audit-runtime-deps.mjs` exit 1 (braces + node-forge, both `first_patched_version: null`). SECURED UNCHANGED. No merge.
 
 ## Changed Files / Areas
 
