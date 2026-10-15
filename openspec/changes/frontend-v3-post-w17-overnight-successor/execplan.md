@@ -32,16 +32,14 @@ Close the post-W17 reliability gaps that a new agent can still hit: a recovery p
 
 ## Current Checkpoint
 
-- Current milestone: local web lanes are complete on a clean hermetic export; PR #79 stays open because the audit gate is red.
-- Completed: recovery pointer; habit footer; workout flow hardening; over-goal tests; WASM discovery so a junctioned worktree export needs no manual copy; independent project lanes.
-- In progress: none locally executable. Do not merge. Do not install over the attached emulators.
-- Important modified files: `e2e/helpers/dbHarness.ts`, `e2e/journeys/the-commute.spec.ts`, `e2e/habits.spec.ts`, plus the earlier footer, flow, and plan files.
-- Last successful validation: clean `npm run build:e2e` (0 Supabase hosts, wasm only under `dist/assets/_superhabits/...`). Chromium 250 passed / 44 skipped / 0 failed. Journeys 76 passed / 42 skipped / 0 failed. Visual 34/34. PWA 5/5. Simulation 3/3. Habit long-form keyboard save passed at 360×740.
-- Current failures: hosted quality run `38612438342` failed only at `Audit runtime dependencies`. `e2e` and `nightly` skipped behind that gate. iOS workflow skipped.
-- Relevant quarantines: none added. Chromium skips are opt-in audit/internal specs. Journey skips are `@sync` steps that belong to `journeys-sync`.
-- Blockers: Android re-run BLOCKED_EXTERNAL. `adb devices` lists `emulator-5570` and `emulator-5594`, but `adb shell getprop` hung again. Do not kill adb or install over them. iOS NOT RUN. Audit FAILED-UNREMEDIATED.
-- Exact next action: Keep PR #79 open. Do not waive the audit or merge. Do not start `qa:native:provision` against the hung emulators. Resume only if an upstream advisory fix appears or a responsive owned emulator is available.
-- Remaining definition of done: the audit is clean without a waiver, and Android/iOS are either exact-source qualified or still explicitly unrun. Local web definition of done for this change is met.
+- Current milestone: final-convergence campaign (2026-10-15): security lane investigated to closure, harness defects fixed, non-release hosted validation lane added. PR #79 stays open because the audit gate is genuinely unremediable (below).
+- Completed (this campaign): `braces`/`node-forge` registry + advisory + graph re-verification with a real npm install experiment (tailwindcss devRelocation DISPROVEN via nativewind/react-native-css-interop peer deps plus the expo→@expo/metro→metro-file-map→micromatch path); SECURITY-DISPOSITION.md written; `e2e/helpers/dbHarness.ts` + `e2e/journeys/the-commute.spec.ts` fail-closed ordering fixed (mark-after-throw poisoned Playwright retries); `e2e/habits.spec.ts` empty-name test strengthened (dialog-open + alert + zero-row oracle); `e2e/calories-w10.spec.ts` macro over-target branch actually covered (test mislabeled before); `.github/workflows/web-e2e-validation.yml` added (workflow_dispatch-only, no `needs:`, explicitly non-release-certifying, for hosted evidence while the audit gate is red).
+- In progress: Android exact-source qualification on a campaign-owned AVD clone (`campaign-api36`, port 5584, 512MB) — the host has ~1.6GB free RAM with two foreign emulators resident; attempt evidence in `simulation-output/campaign-emulator-*` (gitignored). iOS GHA simulator lane dispatch at the final head. Full local ladder at the final head.
+- Important modified files: `e2e/helpers/dbHarness.ts`, `e2e/journeys/the-commute.spec.ts`, `e2e/habits.spec.ts`, `e2e/calories-w10.spec.ts`, `.github/workflows/web-e2e-validation.yml`, `docs/ui-ux/v3-audit/post-w17-overnight/SECURITY-DISPOSITION.md`, this plan.
+- Current failures: `node scripts/audit-runtime-deps.mjs` still exit 1 with the two undocumented HIGH advisories — genuinely unfixable today (no published patch for `braces <= 3.0.3` or `node-forge <= 1.4.0`; no Expo release through 58.x drops `node-forge`; `braces` is also reachable inside the framework via `@expo/metro`). Do not merge. Do not waive. Do not reclassify.
+- Blockers: Android ENVIRONMENT (host RAM; foreign emulators `emulator-5570`/`emulator-5594` left untouched — evidence: shells on them respond, mine does not yet). iOS OWNER-DEFERRED except the repo's own credential-free GHA macOS lane, which this campaign dispatches at the final head if infrastructure permits. Sync lane NOT RUN: no disposable backend (Docker engine down; `SUPABASE_ACCESS_TOKEN` not available to this session) and production Supabase is out of scope.
+- Exact next action: finish the 5584 emulator boot check; if booted, run `npm run qa:native:provision -- --serial emulator-5584` then the `persistence` tag and the two target flows, ALL scoped with `-s emulator-5584`; if still not booted after the bounded window, record ANDROID_NOT_RUN/ENVIRONMENT_BLOCKED with the attempt log, run the full local ladder, push, dispatch the two hosted lanes at the final head, and leave PR #79 open with the exact blocker.
+- Remaining definition of done: the audit is clean without a waiver (blocked: no upstream fix exists), hosted functional evidence exists at the final head (this campaign's non-release lane), Android either exact-source qualified or explicitly ENVIRONMENT_BLOCKED with evidence, iOS either run by the repo's GHA lane or explicitly NOT RUN.
 
 ## Progress
 
@@ -54,6 +52,12 @@ Close the post-W17 reliability gaps that a new agent can still hit: a recovery p
 - [x] Security re-verification recorded
 - [x] Native re-run or explicit external block
 - [x] Independent review and successor decision
+- [x] Final convergence: security lanes re-verified to closure and dispositioned (2026-10-15)
+- [x] Final convergence: harness fail-closed fixes + weak assertion strengthened + macro coverage gap closed (2026-10-15)
+- [x] Final convergence: non-release hosted validation workflow added (2026-10-15)
+- [ ] Final convergence: Android exact-source qualification or explicit ENVIRONMENT_BLOCKED (in progress)
+- [ ] Final convergence: hosted lanes dispatched at the final head (pending final push)
+- [ ] Final convergence: final local ladder + release decision at the final head
 
 ## Surprises & Discoveries
 
@@ -69,6 +73,9 @@ Close the post-W17 reliability gaps that a new agent can still hit: a recovery p
 - 2026-10-15 — Move habit Create/Save to the modal footer rather than only lengthening a Maestro timeout. The failure screenshot shows the action off screen, and the modal already has a footer slot.
 - 2026-10-15 — Treat the workout failure as a harness gesture bug. Do not change workout persistence code without a lost-row reproduction.
 - 2026-10-15 — Do not waive the two HIGH advisories.
+- 2026-10-15 — Final convergence: keep the audit gate red rather than reclassify. The tailwindcss devRelocation experiment was executed in a throwaway worktree and disproven (peer deps + metro path); no allowlist/policy change is authorized or needed to describe the truth.
+- 2026-10-15 — Final convergence: hosted E2E evidence may run from a dispatch-only, explicitly non-release workflow that does not depend on the red audit; the audit job remains a separate hard gate and no combined-green is produced.
+- 2026-10-15 — Final convergence: the iOS keyboard/footer exposure (no KeyboardAvoidingView; `UIModalPresentationOverFullScreen` means the pinned footer is covered while the name field is focused) is recorded as a P2 known gap with repro steps, not fixed blind: the fix is a shared-Modal change that cannot be device-verified in this campaign (iOS NOT RUN except the GHA lane, which does not run the habit-editor flow).
 
 ## Validation Ledger
 

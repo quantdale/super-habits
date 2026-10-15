@@ -113,8 +113,17 @@ test.describe('Habits', () => {
 
   test('does not add habit with empty name', async ({ page }) => {
     await openAddHabitModal(page);
-    await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
+    const editor = page.getByRole('dialog').filter({ hasText: 'New Habit' });
+    // Unforced semantic click on the footer action (the modal is settled here):
+    // a forced click can land on the dismiss backdrop and close the sheet, and
+    // the old background-text assertion would still pass in that case.
+    await editor.getByRole('button', { name: 'Create habit', exact: true }).click();
+    // The failed save keeps the editor open and announces the error.
+    await expect(editor).toBeVisible();
+    await expect(editor.getByRole('alert')).toHaveText(/Habit name is required\./);
     await expect(page.getByText(/Add a habit to start today's check-in/i)).toBeVisible();
+    // Negative oracle: no habit row was written by the rejected submit.
+    await expectRows(page, 'SELECT COUNT(*) AS n FROM habits WHERE deleted_at IS NULL', [{ n: 0 }]);
   });
 
   test('adds a new habit', async ({ page }) => {

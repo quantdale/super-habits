@@ -118,13 +118,38 @@ test.describe('W10 Calories logging-first surface', () => {
     await expect(page.getByText('Goal 2,000', { exact: true })).toHaveCount(0);
   });
 
-  test('macro rows show totals and targets; over target is factual', async ({ page }) => {
+  test('macro rows show totals and targets for an under-target day', async ({ page }) => {
     await seedW10Day(page);
     await expect(page.getByText('95g / 150g', { exact: true })).toBeVisible();
     await expect(page.getByText('136g / 200g', { exact: true })).toBeVisible();
     await expect(page.getByText('40g / 65g', { exact: true })).toBeVisible();
-    // The over-goal caption states the amount, never a judgement.
+    // The day-total caption states the remainder, never a judgement.
     await expect(page.getByText('700 kcal left', { exact: true })).toBeVisible();
+  });
+
+  test('a macro over its target states the factual overage without contradicting the day', async ({
+    page,
+  }) => {
+    // A day UNDER its kcal goal can still be OVER an individual macro target:
+    // the macro caption must state the overage while the hero keeps stating
+    // the remaining kcal — two different facts, not a contradiction.
+    const todayKey = await browserLocalTodayKey(page);
+    await clearDatabase(page);
+    await seedSql(
+      page,
+      `INSERT OR REPLACE INTO app_meta (key, value) VALUES ('calorie_goal', '{"calories":2000,"protein":150,"carbs":200,"fats":65}');
+       INSERT INTO calorie_entries (id,food_name,calories,protein,carbs,fats,fiber,meal_type,consumed_on,created_at,updated_at,deleted_at) VALUES
+        ('cal_macro_over','Protein-forward dinner',1800,155,90,60,5,'dinner','${todayKey}','2026-10-14T02:00:00.000Z','2026-10-14T02:00:00.000Z',null);`,
+    );
+    await goToTab(page, 'calories');
+    await expect(page.getByText('155g / 150g', { exact: true })).toBeVisible();
+    await expect(page.getByText('5g over', { exact: true })).toBeVisible();
+    // Protein is the only macro over target; the others stay factual.
+    await expect(page.getByText('110g left', { exact: true })).toBeVisible();
+    await expect(page.getByText('5g left', { exact: true })).toBeVisible();
+    // The day itself is under goal, so no day-level over caption may appear.
+    await expect(page.getByText('200 kcal left', { exact: true })).toBeVisible();
+    await expect(page.getByText(/kcal over/)).toHaveCount(0);
   });
 
   test('meal groups expose totals and immediately accessible edit/delete', async ({ page }) => {

@@ -242,7 +242,11 @@ const installed = new WeakSet<Page>();
 /** Register the harness routes on a page. Idempotent per page. */
 export async function installDbHarness(page: Page): Promise<void> {
   if (installed.has(page)) return;
-  installed.add(page);
+  // Discover/bake BEFORE claiming the page: discoverWasmUrl() throws when the
+  // export has no (or conflicting) wa-sqlite assets, and marking first would
+  // leave a retried attempt "installed" with no routes registered — a
+  // fail-closed first attempt that decays into a misleading 20s harness
+  // timeout on retry (Playwright retries reuse the same page object).
   const wasmUrl = discoverWasmUrl();
   const workerSource = buildWorkerSource(wasmUrl);
 
@@ -290,6 +294,7 @@ export async function installDbHarness(page: Page): Promise<void> {
     }
     return route.fulfill({ status: 404, contentType: 'text/plain', body: 'not found' });
   });
+  installed.add(page);
 }
 
 /** Unregister the app's service worker so page.route can intercept navigations. */
