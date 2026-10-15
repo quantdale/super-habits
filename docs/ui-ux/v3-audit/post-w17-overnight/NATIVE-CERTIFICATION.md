@@ -57,18 +57,54 @@ Per campaign rules, an unowned/unavailable device host is an `ENVIRONMENT` block
 no application defect is inferred, and no foreign emulator, the ADB daemon, or a
 foreign AVD was killed, reset, or modified at any point.
 
-### Minimal unblocking prerequisites (in order)
+### 2026-10-16 successor campaign: boot blocker SOLVED; new precise blocker found
 
-1. Free ~4 GB host RAM or stop one foreign emulator **with its owner's consent**
-   (neither `emulator-5570` nor `emulator-5594` was started by this campaign), or
-2. Run the qualification on a different host / CI lane with ≥4 GB headroom:
-   `npm run qa:native:provision -- --serial <owned-serial>` then
-   `npm run qa:native:targeted` (persistence) and the two flows
-   `habit-reminder-disable` and `workout-gym-v2-persistence`, plus smoke and
-   lifecycle lanes, at the exact PR head.
-3. The two PR #79 flow fixes themselves are still unverified on any device:
-   `habit-reminder-disable` (footer `Save changes` hit-target) and
-   `workout-gym-v2-persistence` (edge-swipe / typed-name oracle).
+One bounded campaign-owned attempt at the improved host state (3.5 GB free)
+produced two hard findings and one unlock:
+
+1. **The boot wedge is GPU-mode-specific.** `campaign-api36c` (fresh
+   API-36 `default` x86_64, pixel_7) booted with `sys.boot_completed=1` in
+   ~30s using **`-gpu host`** — the exact configuration both live emulators
+   on this host use. All 7 prior attempts used `-gpu swiftshader_indirect`
+   (or equivalent) and wedged. `adb shell` on the campaign device answers
+   instantly.
+2. **Exact-source Android provisioning works end to end.** From a clean
+   checkout (`superhabits-android-cert` @ `5e62038`): local Gradle Release
+   build 7m47s → APK installed on `emulator-5578`:
+   `com.dale16.superhabits 1.0.0 (source 5e620385441343d763d21e9458d8e1ba4f51091c,
+APK SHA-256 9CB978BA342351F219971BB7E93A3A8DAA663E0D196390790C0A60C84A426C4D)`
+   with a clean bundle scan (1 JS entry, no Supabase host).
+3. **New blocker (ENVIRONMENT): Maestro cannot enumerate devices on this
+   host while the foreign `emulator-5594` transport is wedged.**
+   `DeviceService.listAndroidDevices` (Maestro 2.9.0) opens an `adb shell`
+   on EVERY transport on the shared adb server before honoring `--device`;
+   `emulator-5594`'s shell read never returns (bounded per-device probe:
+   `emulator-5570` → alive, `emulator-5578` → alive, `emulator-5594` →
+   hangs past 12s, JVM thread-dump shows `dadb … AdbServer.readString` in
+   `listAndroidDevices`). dadb hard-codes the ADB-server endpoint
+   (`ANDROID_ADB_SERVER_PORT` verified ignored: an isolated server on 5041
+   never lists the wedged device, yet Maestro still hangs), so there is no
+   zero-touch route around a wedged transport on the shared server. Per
+   campaign rules the foreign emulator/transport is not touched.
+
+**Owner-action remediation (unblocks the flows immediately):** repair or
+shut down the foreign `emulator-5594` (its adbd shell service is
+half-open — `adb devices` shows `device` while `adb shell` hangs) **with its
+owner's consent**, or reboot the host; then, on the campaign device (already
+provisioned at the exact source):
+
+```
+emulator -avd campaign-api36c -no-snapshot -no-window -gpu host -memory 2048 -cores 2 -port 5578
+npm run qa:native:provision -- --serial emulator-5578   # already done for 5e62038
+npm run qa:native:targeted        # persistence tag
+node scripts/qa-native.mjs --platform android --flow .maestro/flows/habit-reminder-disable.yaml --serial emulator-5578 --no-provision --no-stop
+node scripts/qa-native.mjs --platform android --flow .maestro/flows/workout-gym-v2-persistence.yaml --serial emulator-5578 --no-provision --no-stop   # x3 consecutive
+node scripts/qa-native.mjs --platform android --flow .maestro/flows/workout-gym-v2-session-lifecycle.yaml --serial emulator-5578 --no-provision --no-stop
+```
+
+Android certification remains `ENVIRONMENT_BLOCKED` at this record's date,
+but the blocker is now a single wedged foreign transport with a documented
+remediation — not host capacity.
 
 ## B. iOS — `EXECUTED AND FAILED` (run 38676461813, head 9aa0f78); verifying re-run dispatched
 
