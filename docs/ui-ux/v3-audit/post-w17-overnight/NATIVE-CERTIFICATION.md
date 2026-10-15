@@ -89,8 +89,15 @@ foreign AVD was killed, reset, or modified at any point.
 > (ETIMEDOUT) while `list`/`screenshot` succeeded and the app log stayed empty — the iOS
 > simulator's app-launch/installd service wedged (ENVIRONMENT flake, not an app defect; the
 > app built+installed fine). `Run iOS flows` was SKIPPED, so **no certification was earned**.
-> A clean retry is dispatched at head `5ebf2d4` (run `38726951043`) to certify the 9 passing
-> flows and confirm the 2 fixes.
+> A clean retry **ran the flows at exact head `5ebf2d4` (run `38726951043`): 10 PASS / 3 FAIL.**
+> `todo-persistence` PASSED (selector fix confirmed) and `workout-gym-v2-session-lifecycle`'s
+> input fix let it progress past the typed-value assert; the coverage reader is proven
+> end-to-end (flows now report their real PASS/FAIL). Still failing: `calories-persistence`
+> and `workout-gym-v2-persistence` (unchanged deferred divergences) and
+> `workout-gym-v2-session-lifecycle` (now at a NEW post-relaunch point — the app was
+> unreachable, `App crashed or stopped`, with no crash exception in the captured logs;
+> inconclusive between a real crash and the run-2 launch-service flake — needs isolated
+> repro + DiagnosticReports). iOS is **10/13 certified at `5ebf2d4`; not fully certified.**
 
 - **Static readiness (this campaign):** `app.json` iOS block is coherent
   (`com.dale16.superhabits`, tablet support, `ITSAppUsesNonExemptEncryption=false`,
