@@ -39,12 +39,16 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function sourceUnchangedApartFromGeneratedIos() {
+function sourceTreeOffenders() {
   const status = capture('git', ['status', '--porcelain', '--untracked-files=all']);
   return status
     .split('\n')
     .filter(Boolean)
-    .every((line) => /^\?\? ios\//.test(line));
+    .filter((line) => !/^\?\? ios\//.test(line));
+}
+
+function sourceUnchangedApartFromGeneratedIos() {
+  return sourceTreeOffenders().length === 0;
 }
 
 function iosFlows() {
@@ -497,6 +501,15 @@ async function main() {
       recovered: flow.launchRaceRecovery.recovered,
     }));
   report.sourceUnchangedApartFromGeneratedIos = sourceUnchangedApartFromGeneratedIos();
+  if (!report.sourceUnchangedApartFromGeneratedIos) {
+    // Record the offending entries: runs 38676461813/38726951043 ended
+    // sourceUnchanged=false with no recorded cause, which made the gate
+    // undiagnosable from the artifacts.
+    report.sourceTreeOffenders = sourceTreeOffenders();
+    console.warn(
+      `Source tree is not clean apart from generated ios/: ${report.sourceTreeOffenders.join(' | ')}`,
+    );
+  }
   report.status = resolveLaneStatus({
     flowStatuses: report.flows.map((flow) => flow.status),
     expectedCount: flows.length,
@@ -508,7 +521,14 @@ async function main() {
   writeSummary(report, reportPath);
   console.log(`iOS provenance report: ${reportPath}`);
   console.log(JSON.stringify(report, null, 2));
-  if (!['PASS', 'PASS_WITH_LAUNCH_RACE_RECOVERY', 'SUBSET_PASS'].includes(report.status)) {
+  if (
+    ![
+      'PASS',
+      'PASS_WITH_LAUNCH_RACE_RECOVERY',
+      'SUBSET_PASS',
+      'SUBSET_PASS_WITH_LAUNCH_RACE_RECOVERY',
+    ].includes(report.status)
+  ) {
     process.exitCode = 1;
   }
 }

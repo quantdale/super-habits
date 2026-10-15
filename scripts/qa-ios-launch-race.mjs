@@ -173,7 +173,10 @@ export function resolveLaneStatus({
       (status) => status === 'PASS' || status === 'PASS_AFTER_LAUNCH_RACE_RECOVERY',
     );
   const anyRecovery = flowStatuses.some((status) => status === 'PASS_AFTER_LAUNCH_RACE_RECOVERY');
-  if (subset) return allPassed ? 'SUBSET_PASS' : 'SUBSET_NOT_CERTIFIED';
+  if (subset) {
+    if (!allPassed) return 'SUBSET_NOT_CERTIFIED';
+    return anyRecovery ? 'SUBSET_PASS_WITH_LAUNCH_RACE_RECOVERY' : 'SUBSET_PASS';
+  }
   if (!allPassed) return 'NOT_CERTIFIED';
   return anyRecovery ? 'PASS_WITH_LAUNCH_RACE_RECOVERY' : 'PASS';
 }

@@ -207,6 +207,16 @@ describe('resolveLaneStatus', () => {
         sourceUnchanged: true,
       }),
     ).toBe('SUBSET_PASS');
+    // A subset run that used a launch-race recovery keeps the marker in its
+    // status too — the retry distinction must survive every naming route.
+    expect(
+      resolveLaneStatus({
+        flowStatuses: ['PASS', 'PASS_AFTER_LAUNCH_RACE_RECOVERY'],
+        expectedCount: 2,
+        subset: ['calories-persistence'],
+        sourceUnchanged: true,
+      }),
+    ).toBe('SUBSET_PASS_WITH_LAUNCH_RACE_RECOVERY');
     expect(
       resolveLaneStatus({
         flowStatuses: ['PASS', 'FAILED_NEEDS_TRIAGE'],

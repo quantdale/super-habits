@@ -86,3 +86,12 @@ supabase/.temp/
 # produced by adb-driven QA sessions — keep on disk, never commit.
 .cursor/native-verify/
 /android-build.log
+
+# Maestro `takeScreenshot: <bare-name>` writes the PNG into the process CWD
+# (the repository root). The two gym-v2 flow breadcrumbs are debugging aids,
+# not source; left unignored they fail BOTH the iOS lane's
+# sourceUnchangedApartFromGeneratedIos gate and the Android runner's
+# checkTarget (runs 38676461813 / 38726951043 both ended sourceUnchanged:
+# false because of these files).
+/gym-v2-custom-exercise-submit.png
+/gym-v2-session-custom-exercise-submit.png

@@ -132,4 +132,20 @@ describe('Maestro flows avoid constructs proven to fail on the iOS CI target', (
     expect(tail).toMatch(/assertVisible:\s*'42'/);
     expect(tail).toMatch(/assertVisible:\s*'6'/);
   });
+
+  it('every takeScreenshot breadcrumb is gitignored at the repo root', () => {
+    // Maestro writes `takeScreenshot: <bare-name>` into the process CWD (the
+    // repo root). Unignored, those PNGs fail BOTH the iOS lane's
+    // sourceUnchangedApartFromGeneratedIos gate and the Android runner's
+    // checkTarget: runs 38676461813 and 38726951043 ended sourceUnchanged=false
+    // for exactly this reason. Keep every breadcrumb name ignored.
+    const gitignore = readFileSync(join(process.cwd(), '.gitignore'), 'utf8');
+    const names = flowNames.flatMap((name) =>
+      [...read(name).matchAll(/^- takeScreenshot:\s*(\S+)\s*$/gm)].map((match) => match[1]),
+    );
+    expect(names.length, 'no takeScreenshot breadcrumbs found to guard').toBeGreaterThan(0);
+    for (const name of names) {
+      expect(gitignore, `takeScreenshot '${name}' is not gitignored`).toContain(`/${name}.png`);
+    }
+  });
 });
