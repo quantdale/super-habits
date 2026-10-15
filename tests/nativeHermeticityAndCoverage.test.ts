@@ -405,6 +405,11 @@ describe('native flow coverage proof', () => {
     writeFileSync(join(runDir, 'commands-(calories-persistence.yaml).json'), '{}');
     // A flat filename that is not per-flow evidence must never be counted.
     writeFileSync(join(runDir, 'commands.json'), '{}');
+    // ai-report/ai-summary artifacts are NOT proof of execution: a flow with only
+    // these (no commands-<flow>.yaml.json) must not be credited as executed, or a
+    // report emitted for an un-run flow could fake a coverage PASS.
+    writeFileSync(join(runDir, 'ai-(solo).json'), '{}');
+    writeFileSync(join(runDir, 'ai-report-solo.html'), '<html>');
     try {
       expect(readExecutedFlows(dir).executed).toEqual(['calories-persistence', 'todo-persistence']);
     } finally {

@@ -193,26 +193,24 @@ export function describeBinaryEvidence({ provisioned, installedApkSha256 }) {
  * Map one Maestro 2.x flat evidence filename to its flow id, or null.
  *
  * Maestro 2.x writes a per-flow evidence SET beside `maestro.log` instead of a
- * per-flow subdirectory. The files this repository's runs actually produce are:
- *   `commands-(<flow>.yaml).json`  the authoritative per-flow command log
- *   `ai-(<flow>).json`             a per-flow summary
- *   `ai-report-<flow>.html`        a per-flow HTML report
- * All three carry the same flow id (the `.yaml` suffix, when present, is the
- * flow file's extension and is stripped). Recognizing any of them is enough to
- * prove the flow started; `commands-` is the strongest signal and is tried
- * first. Filenames that do not match (`maestro.log`, `commands.json`, a
- * directory name) yield null and are never counted as a flow.
+ * per-flow subdirectory: `commands-(<flow>.yaml).json` (the authoritative
+ * per-flow command log), `ai-(<flow>).json` (a summary), and
+ * `ai-report-<flow>.html` (a report). ONLY the `commands-` log is accepted as
+ * proof a flow executed: the `ai-*` / `ai-report-*` artifacts are reports that
+ * could in principle be emitted for a flow that never ran, so trusting them
+ * risks a false coverage PASS. Requiring `commands-` is fail-closed — a run
+ * that somehow lacks it reads as UNPROVEN, never as a pass and never as a
+ * fabricated empty run. The `.yaml` suffix, when present, is the flow file's
+ * extension and is stripped. Filenames that do not match (`maestro.log`,
+ * `commands.json`, an `ai-report-*.html`, a directory name) yield null and are
+ * never counted as a flow.
  *
  * @param {string} name a single directory entry name
  * @returns {string | null}
  */
 function flatEvidenceFlowId(name) {
-  const match =
-    /^commands-\((.+)\)\.json$/i.exec(name) ??
-    /^ai-\((.+)\)\.json$/i.exec(name) ??
-    /^ai-report-(.+)\.html$/i.exec(name);
-  if (!match) return null;
-  return match[1].replace(/\.(ya?ml)$/i, '');
+  const match = /^commands-\((.+)\)\.json$/i.exec(name);
+  return match ? match[1].replace(/\.(ya?ml)$/i, '') : null;
 }
 
 /**
