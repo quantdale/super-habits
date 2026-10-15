@@ -193,20 +193,23 @@ tags:
 - tapOn: 'Linear'
 - waitForAnimationToEnd:
     timeout: 3000
-# UNPROVEN REPLACEMENT, pending task 3.3. Run 36423379932 (seq64-seq72)
-# reported all eight swipes COMPLETED and still failed: the failure hierarchy
-# held none of the exercise-card nodes, only the Workout landing cards. So the
-# old construct left the routine detail, but the artifact does not show which
-# gesture did it, nor that this scroll stays on the card. centerElement is
-# omitted on purpose: the comment this block replaced recorded that a centered
-# scroll already escaped to the Workout screen, and Maestro's default swipe is
-# still centred. Treat this as a hypothesis for the next exact-SHA run.
-# Evidence: openspec/changes/final-certification-closure/
-# ios-flow-classification.md
+# ROOT CAUSE (run 38726951043, reproduced identically at run 38676461813):
+# the escape was not a scroll gesture. At this scroll offset the progression
+# row sits at the dialog panel's bottom clip edge ('progression increment'
+# resolved to [41,812][141,843] against a dialog panel bottom of ~813),
+# and Maestro taps element bounds centers: the tap landed 15pt below the
+# panel on the modal's full-screen dismiss scrim (core/ui/Modal), closing
+# the routine detail. inputText/pressKey then targeted nothing and the next
+# scroll failed searching the Workout landing for the row's sibling field.
+# Fix: center the row INSIDE the panel before tapping it (centerElement is
+# proven on this device — the lifecycle flow's centered scrolls pass), so
+# every tap in this block lands on its own control. Each following
+# scrollUntilVisible doubles as a truthful modal-still-open check.
 - scrollUntilVisible:
     element: 'Native custom press progression increment'
     direction: DOWN
     visibilityPercentage: 50
+    centerElement: true
     timeout: 30000
 - assertVisible: 'Native custom press progression increment'
 - tapOn: 'Native custom press progression increment'
@@ -215,26 +218,41 @@ tags:
 - scrollUntilVisible:
     element: 'Native custom press minimum reps'
     direction: DOWN
+    visibilityPercentage: 50
+    centerElement: true
 - tapOn: 'Native custom press minimum reps'
 - inputText: '5'
 - pressKey: enter
 - scrollUntilVisible:
     element: 'Native custom press maximum reps'
     direction: DOWN
+    visibilityPercentage: 50
+    centerElement: true
 - tapOn: 'Native custom press maximum reps'
 - inputText: '8'
 - pressKey: enter
 - scrollUntilVisible:
     element: 'Target reps min'
     direction: DOWN
-- tapOn: 'Target reps min'
-- inputText: '5'
+    visibilityPercentage: 50
+    centerElement: true
+# NumberStepperField exposes its label Text and the input under the same name:
+# index 0 is the inert label (inputText after it silently drops), so the input
+# is index 1 — the same convention as the lifecycle flow's Weight/Reps.
+- tapOn:
+    text: 'Target reps min'
+    index: 1
+- inputText: '7'
 - pressKey: enter
 - scrollUntilVisible:
     element: 'Target reps max'
     direction: DOWN
-- tapOn: 'Target reps max'
-- inputText: '8'
+    visibilityPercentage: 50
+    centerElement: true
+- tapOn:
+    text: 'Target reps max'
+    index: 1
+- inputText: '11'
 - pressKey: enter
 # The reps inputs sit under Maestro's center-swipe origin, so
 # scrollUntilVisible's
@@ -251,7 +269,9 @@ tags:
     visibilityPercentage: 50
     centerElement: true
 - tapOn: 'Target load'
-- inputText: '40'
+# 42 is unique on this screen (bare 40 would collide with the set's default
+# Active-seconds value and pass even if Target load never persisted).
+- inputText: '42'
 - pressKey: enter
 - assertVisible: 'Target load'
 - pressKey: BACK
@@ -294,11 +314,15 @@ tags:
     visibilityPercentage: 50
 - assertVisible: 'QUICK START'
 # The new routine is prepended to the routines list, which sits ABOVE the
-# 'New routine' form, so the row is reached by scrolling UP.
+# 'New routine' form, so the row is reached by scrolling UP. Center the row
+# before tapping: a row parked half under the floating tab bar gets its
+# bounds-center tap stolen by a tab (the calories-persistence failure
+# class), and this tap must open the routine, not switch sections.
 - scrollUntilVisible:
     element: 'Open Native Gym V2 typed routine routine'
     direction: UP
     visibilityPercentage: 50
+    centerElement: true
 - tapOn: 'Open Native Gym V2 typed routine routine'
 - tapOn: 'Configure Native custom press exercise'
 - swipe:
@@ -309,6 +333,12 @@ tags:
     element: 'Target load'
     direction: DOWN
 - assertVisible: 'Target load'
-- assertVisible: '40'
+# Each persisted value is unique on the screen (full-match text semantics), so
+# every assert is satisfiable only by its own field: progression increment 2.5,
+# min reps 5, max reps 8, Target reps min 7, Target reps max 11, load 42.
+- assertVisible: '2.5'
 - assertVisible: '5'
 - assertVisible: '8'
+- assertVisible: '7'
+- assertVisible: '11'
+- assertVisible: '42'

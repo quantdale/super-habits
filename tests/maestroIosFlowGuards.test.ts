@@ -68,7 +68,7 @@ describe('Maestro flows avoid constructs proven to fail on the iOS CI target', (
     }
   });
 
-  it('gym-v2 persistence no longer swipe-repeats the increment out of the card', () => {
+  it('gym-v2 persistence pulls the increment row inside the dialog panel before tapping', () => {
     const flow = read('workout-gym-v2-persistence.yaml');
     expect(flow).toContain(
       "- scrollUntilVisible:\n    element: 'Native custom press progression increment'",
@@ -78,9 +78,16 @@ describe('Maestro flows avoid constructs proven to fail on the iOS CI target', (
     expect(flow).not.toMatch(
       /while:\s*\n\s*notVisible:\s*'Native custom press progression increment'/,
     );
-    // No centerElement: the comment this replaced recorded that a centered
-    // scroll already escaped to the Workout screen, so centering is unproven
-    // here and must not be re-introduced as a fix.
+    // CENTERED on purpose (guard revised 2026-10-16 with new evidence). The
+    // old "a centered scroll escaped to the Workout screen" hypothesis is
+    // refuted by the run-38726951043 artifact: the scrollUntilVisible at the
+    // divergence completed with try count 0 (ZERO swipes issued), and the
+    // escape was the bounds-center TAP on 'progression increment'
+    // ([41,812][141,843]) landing below the routine dialog panel's bottom clip
+    // edge (~813 on the 874pt target, core/ui/Modal dialog maxHeight 86%
+    // centered) on the modal's full-screen Dismiss scrim. Identical signature
+    // at run 38676461813. Centering the row inside the panel is the fix, so
+    // every field tap in the block must be preceded by a centered scroll.
     const incrementBlock = flow
       .slice(
         flow.indexOf(
@@ -88,7 +95,25 @@ describe('Maestro flows avoid constructs proven to fail on the iOS CI target', (
         ),
       )
       .split('\n- ')[0];
-    expect(incrementBlock).not.toMatch(/centerElement/);
+    expect(incrementBlock).toMatch(/centerElement: true/);
+  });
+
+  it('gym-v2 persistence taps stepper inputs by index and asserts unique values', () => {
+    const flow = read('workout-gym-v2-persistence.yaml');
+    // NumberStepperField exposes its label Text and the input under the same
+    // name; index 0 is the inert label and inputText after a label tap is a
+    // silent no-op (proven for the old `Weight` tap in run 36423379932), so
+    // the input is index 1 — the same convention as the lifecycle flow.
+    expect(flow).toMatch(/tapOn:\s*\n\s*text: 'Target reps min'\s*\n\s*index: 1/);
+    expect(flow).toMatch(/tapOn:\s*\n\s*text: 'Target reps max'\s*\n\s*index: 1/);
+    // The post-restart persistence oracles must each be satisfiable only by
+    // their own field (full-match text semantics): bare '40' is the set's
+    // default Active-seconds value and would pass even if Target load never
+    // persisted, and 5/8 must not double as the Target reps values.
+    expect(flow).not.toMatch(/assertVisible: '40'/);
+    for (const value of ['2.5', '5', '8', '7', '11', '42']) {
+      expect(flow).toContain(`assertVisible: '${value}'`);
+    }
   });
 
   it('gym-v2 lifecycle dismisses the keyboard with enter-to-blur, not hideKeyboard', () => {

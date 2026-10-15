@@ -11,6 +11,14 @@ on:
   # operator rule is main only, so the dispatch path pins github.sha and the
   # existing exact-source assertions below verify it.
   workflow_dispatch:
+    inputs:
+      flows:
+        description: >-
+          Optional focused subset (comma-separated flow names without .yaml,
+          e.g. "calories-persistence,workout-gym-v2-persistence"). Subset runs
+          exercise only those flows and can never certify.
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -42,6 +50,7 @@ jobs:
       EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST: 'true'
       EXPO_PUBLIC_SUPABASE_URL: ''
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ''
+      IOS_FLOW_SUBSET: ${{ github.event.inputs.flows || '' }}
 
     steps:
       - uses: actions/checkout@v4

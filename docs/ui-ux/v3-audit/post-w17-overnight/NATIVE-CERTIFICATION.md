@@ -133,3 +133,80 @@ Android stays `ENVIRONMENT_BLOCKED`. iOS is no longer `NOT RUN`: it is **`EXECUT
 FAILED`** (Section B) and earns certification only when a run at an exact source SHA
 reports all 13 flows PASS (run `38712060166` flaked at launch; retry `38726951043` at `5ebf2d4` is the dispatched attempt).
 Neither lane is certified at this record's date.
+
+## D. Run-3 failure root causes (successor campaign, 2026-10-15/16)
+
+Run `38726951043` (head `5ebf2d4a95efe11a3035625f5809743bbde47899`) closed at
+**10 PASS / 3 FAIL**. All three failures are now root-caused from that run's own
+Maestro `commands-*.json`, `maestro.log`, failure hierarchies, screenshots, and
+the captured `simulator-app.log` (system log). None is an application data or
+persistence defect.
+
+| Flow                               | Classification                                              | Root cause (evidence)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Fix                                                                                                                                                                                                                                                                                                                                |
+| ---------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `calories-persistence`             | **TEST_BUG** — tap-target occlusion                         | `Manual add` resolved to `[204,776][318,820]` while `Section tabs` occupied `[8,778][394,840]`; Maestro taps element bounds centers, so the tap activated the **Focus tab** and the failure hierarchy is the Focus surface. Identical bounds/signature at run 38676461813 (deterministic).                                                                                                                                                                                                                                                    | Flow scrolls to the empty day-log title (`No meals logged on this day`) first so the action row clears the floating tab bar before the tap.                                                                                                                                                                                        |
+| `workout-gym-v2-persistence`       | **TEST_BUG** — tap-target occlusion on the dialog clip edge | `progression increment` resolved to `[41,812][141,843]` against the routine dialog panel's bottom clip edge (`core/ui/Modal` dialog: maxHeight 86% centered ⇒ panel bottom ≈813). The center tap landed on the modal's full-screen **Dismiss scrim** and closed the routine detail; the flow then searched the Workout landing for the row's sibling field. Identical at run 38676461813. **Refutes the prior "gesture escaped the card" hypothesis**: the scroll command at the divergence completed in 1.2s without issuing a single swipe. | Flow centers the row inside the panel (`centerElement: true`) before every field tap in the block and centers the routine-row tap post-restart.                                                                                                                                                                                    |
+| `workout-gym-v2-session-lifecycle` | **ENVIRONMENT** — automation launch race, **not a crash**   | `launchApp` completed 14:23:05.16; SpringBoard recorded PID 64694 `running-active-Visible` at 14:23:05.0; XCTestDriver's 14:23:06.05 `viewHierarchy` returned `"Application com.dale16.superhabits is not running"` and Maestro aborted with "App crashed or stopped" at 14:23:06.4; the same PID kept logging (UIKit boot 14:23:06.5–14:23:09.6, JS `[sync] flush` 14:23:17.7). Failure screenshot is the black pre-first-frame screen. No crash/termination record.                                                                         | Harness-level, evidence-gated, identified single re-run (below). Maestro cannot absorb this in-flow: `IOSDeviceErrors.AppCrash` is not a `MaestroException`, and `MaestroCommandRunner` rethrows non-`MaestroException` failures (verified against Maestro sources), so `optional: true`/`retry` are ineffective against the race. |
+
+### Harness hardening (Campaign 2 invariants)
+
+- `scripts/qa-ios-launch-race.mjs` (new, unit-tested in `tests/qaIosLaunchRace.test.ts`):
+  signature detection, flow error extraction from the Maestro 2.x command
+  evidence, crash-report scanning, and a pure recovery decision.
+- `scripts/qa-ios-github-actions.mjs`: every failed flow now captures
+  **crash reports** (`~/Library/Logs/DiagnosticReports` listing + copies),
+  **process liveness** (`simctl spawn … ps`), and a **failure screenshot**
+  alongside `simulator-app.log` — so crash-vs-unreachable is decidable from
+  the artifact alone (a missing crash report is never treated as proof by
+  itself).
+- Launch-race recovery is allowed **only** when the failure carries the
+  `App crashed or stopped` / `is not running` signature **and** the app
+  process is alive **and** no new app crash report exists. It is bounded to
+  one full re-run per flow per lane run and reported as
+  `PASS_AFTER_LAUNCH_RACE_RECOVERY` (lane status
+  `PASS_WITH_LAUNCH_RACE_RECOVERY`) — identified, never a plain `PASS`, so a
+  recovered flow is never silently counted as a deterministic pass.
+- `.github/workflows/ios-native-e2e.yml` accepts an optional focused
+  `flows` subset (`IOS_FLOW_SUBSET`) for development iteration. Subset runs
+  report `SUBSET_PASS` and **can never certify** (`expectedFlowCount` keeps
+  the full inventory; unknown subset names fail closed).
+- No assertion was weakened anywhere: the occluded taps are re-anchored
+  semantically and the post-relaunch readiness requirement remains strict.
+
+### Adversarial review round (independent read-only review, 2026-10-16)
+
+An independent review confirmed all three root causes (none could be disproved)
+and found real defects in the first harness draft and latent flow weaknesses;
+all P1/P2 items were fixed in the same campaign:
+
+- **P1 (flow evidence honesty)** — `Target reps min/max` are `NumberStepperField`
+  labels shared by an inert label `Text` and the input itself, so an unscoped
+  `tapOn` hits index 0 (the label) and the following `inputText` is a silent
+  no-op (the exact defect previously fixed for `Weight` in run 36423379932).
+  Fixed with `index: 1` taps. The post-restart oracles were also colliding:
+  bare `40` is satisfied by the set's default Active-seconds value, and `5`/`8`
+  were used for two fields each. Fixed with six unique values
+  (`2.5`/`5`/`8`/`7`/`11`/`42`) each asserted individually.
+- **P2 (harness honesty)** — a flow row could surface `PASS` from the native
+  report even when the harness predicate (exit 0 + exact source SHA) failed,
+  and a failed recovery could collapse into a plain `PASS`. Fixed:
+  `attemptStatus()` never yields `PASS` without the full predicate, a failed
+  recovery keeps the first attempt's failure status, and every recovery
+  attempt (recovered or not) is listed in the lane report and summary.
+- **P2 (gate robustness)** — process liveness matched raw `ps` lines (crash
+  tooling arguments could fake a live app) and an unreadable
+  DiagnosticReports folder was indistinguishable from "no crash". Fixed:
+  liveness matches the `SuperHabits` executable name only, and the crash scan
+  is fail-closed (`CRASH_REPORT_SCAN_UNAVAILABLE` refuses recovery).
+- **Guard revision** — `tests/maestroIosFlowGuards.test.ts` previously pinned
+  "no `centerElement` on the increment scroll" from the refuted hypothesis. The
+  pin is replaced by the proven invariant (the increment scroll must center the
+  row inside the dialog panel) plus new pins for the `index: 1` stepper taps
+  and the unique persistence oracles. The revision is evidence-backed: the
+  run-38726951043 command log shows the divergent scroll completed with zero
+  swipes, so no scroll gesture — centered or not — caused the escape.
+- Residual (documented, not fixed): the calories flow's modal-submit tap
+  (`Add entry`) shares its label with the diary empty-state action; iOS
+  `accessibilityViewIsModal` excludes the background, and a missed submit
+  cannot false-pass because the post-save header oracle (`1,630 kcal left`)
+  would fail. Left as-is pending device evidence.
