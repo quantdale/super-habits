@@ -84,8 +84,13 @@ foreign AVD was killed, reset, or modified at any point.
 > `workout-gym-v2-persistence`, `workout-gym-v2-session-lifecycle`. The harness defect is
 > fixed (`29dd16a`, proven 13/13 against the run-38676461813 artifact); two of the four
 > are fixed selector bugs (`db04415`); the other two are nav/gesture divergences deferred
-> for evidence-based triage. A verifying re-run at `db04415` (run `38712060166`) is
-> dispatched to certify the 9 passing flows and confirm the 2 fixes.
+> for evidence-based triage. A first verifying re-run (run `38712060166`, head `db04415`)
+> **did not reach the flows**: `simctl launch` and `simctl get_app_container` both hung
+> (ETIMEDOUT) while `list`/`screenshot` succeeded and the app log stayed empty — the iOS
+> simulator's app-launch/installd service wedged (ENVIRONMENT flake, not an app defect; the
+> app built+installed fine). `Run iOS flows` was SKIPPED, so **no certification was earned**.
+> A clean retry is dispatched at head `5ebf2d4` (run `38726951043`) to certify the 9 passing
+> flows and confirm the 2 fixes.
 
 - **Static readiness (this campaign):** `app.json` iOS block is coherent
   (`com.dale16.superhabits`, tablet support, `ITSAppUsesNonExemptEncryption=false`,
@@ -119,5 +124,5 @@ source, with the APK SHA-256/install provenance recorded by
 An owned, responsive Android device is still unavailable on this host (Section A), so
 Android stays `ENVIRONMENT_BLOCKED`. iOS is no longer `NOT RUN`: it is **`EXECUTED AND
 FAILED`** (Section B) and earns certification only when a run at an exact source SHA
-reports all 13 flows PASS (run `38712060166` at `db04415` is the dispatched attempt).
+reports all 13 flows PASS (run `38712060166` flaked at launch; retry `38726951043` at `5ebf2d4` is the dispatched attempt).
 Neither lane is certified at this record's date.
