@@ -118,14 +118,16 @@ test.describe('Habits', () => {
     // a forced click can land on the dismiss backdrop and close the sheet, and
     // the old background-text assertion would still pass in that case.
     await editor.getByRole('button', { name: 'Create habit', exact: true }).click();
-    // The failed save keeps the editor open and announces the error.
+    // The failed save keeps the editor open and announces the error (the
+    // reminder alert is a separate, always-present web notice; target the
+    // habit validation message itself).
     await expect(editor).toBeVisible();
-    await expect(editor.getByRole('alert')).toHaveText(/Habit name is required\./);
+    await expect(editor.getByText(/Habit name is required\./)).toBeVisible();
     await expect(page.getByText(/Add a habit to start today's check-in/i)).toBeVisible();
     // Negative oracle: no habit row was written by the rejected submit.
-    await expectRows(page, 'SELECT COUNT(*) AS n FROM habits WHERE deleted_at IS NULL', [{ n: 0 }]);
+    const rows = await queryRows(page, 'SELECT COUNT(*) AS n FROM habits WHERE deleted_at IS NULL');
+    expect(Number(rows[0]?.n)).toBe(0);
   });
-
   test('adds a new habit', async ({ page }) => {
     await openAddHabitModal(page);
     await page.getByLabel('Habit name').fill('Morning run');
