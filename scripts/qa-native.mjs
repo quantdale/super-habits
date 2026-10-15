@@ -691,7 +691,12 @@ function runPlatform(platform, options) {
   const report = {
     schemaVersion: 2,
     status: runStatus,
-    classification: result.status === 0 ? null : 'PRODUCT_BUG',
+    // A non-zero Maestro exit is a FAILURE to triage, not a proven product
+    // defect: the class (PRODUCT_BUG / TEST_BUG / ENVIRONMENT / FLAKY_TEST /
+    // EXPECTED_KNOWN_GAP / SPEC_AMBIGUITY) is assigned only after inspecting
+    // the captured hierarchy, screenshot, and logs. Leaving it null keeps the
+    // record honest instead of pre-judging every failure as a PRODUCT_BUG.
+    classification: null,
     failureClasses: FAILURE_CLASSES,
     platform,
     appId: APP_ID,
