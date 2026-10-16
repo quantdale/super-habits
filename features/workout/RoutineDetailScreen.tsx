@@ -2,7 +2,6 @@ import { Text } from '@/core/ui/Text';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, TextInput, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Modal } from '@/core/ui/Modal';
 import { Button } from '@/core/ui/Button';
@@ -371,12 +370,6 @@ export function RoutineDetailModal({
     [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
     setExercises(next);
     await queueBuilderMutation(() => updateExerciseOrder(next.map((exercise) => exercise.id)));
-    await refresh();
-  };
-
-  const handleDragEnd = async ({ data }: { data: ExerciseWithSets[] }) => {
-    setExercises(data);
-    await queueBuilderMutation(() => updateExerciseOrder(data.map((exercise) => exercise.id)));
     await refresh();
   };
 
@@ -1002,25 +995,25 @@ export function RoutineDetailModal({
             })}
           </View>
         ) : (
-          <DraggableFlatList
-            data={exercises}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-            activationDistance={8}
-            ItemSeparatorComponent={() => <View className="h-3" />}
-            onDragEnd={(result) => void handleDragEnd(result)}
-            renderItem={({ item, drag, isActive }) => (
-              <ScaleDecorator>
+          // The native list renders as a plain map of the same cards: the old
+          // DraggableFlatList wrapper swallowed every pan inside the modal's
+          // ScrollView on iOS (run 38838647812 — six swipes over the form all
+          // settled `isScreenStatic = true`, leaving the lower fields
+          // unreachable and clip-edge taps landing on the Dismiss scrim, which
+          // is exactly what the gym-v2 flows kept tripping). Reorder stays
+          // fully accessible through each card's Move up / Move down actions.
+          <View>
+            {exercises.map((item, index) => (
+              <View key={item.id} style={index > 0 ? { marginTop: 12 } : undefined}>
                 <RoutineExerciseCard
                   exercise={item}
                   firstExerciseId={exercises[0]?.id}
                   lastExerciseId={exercises[exercises.length - 1]?.id}
                   isOpen={expandedId === item.id}
-                  isActive={isActive}
+                  isActive={false}
                   onToggle={toggleExpanded}
                   onDelete={handleDeleteExercise}
                   onMove={moveExercise}
-                  onDrag={drag}
                   onUpdateExercise={queuedUpdateExercise}
                   onUpdateSet={queuedUpdateSet}
                   onUpdateSetPrescription={queuedUpdateSetPrescription}
@@ -1029,9 +1022,9 @@ export function RoutineDetailModal({
                   onRefresh={refresh}
                   onError={setWorkoutError}
                 />
-              </ScaleDecorator>
-            )}
-          />
+              </View>
+            ))}
+          </View>
         )}
 
         <View className="mt-6">

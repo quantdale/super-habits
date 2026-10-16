@@ -190,7 +190,11 @@ tags:
 - extendedWaitUntil:
     visible: 'Session in progress'
     timeout: 15000
-- tapOn: 'Resume workout'
+# The resume button's accessible name carries the routine ('Resume workout ·
+# Native Gym V2 resume routine' — run 38838647812), so the selector must be a
+# partial-match wrapper: a full-match 'Resume workout' misses it (the same
+# class as the todo-persistence 'Edit task: <title>' fix).
+- tapOn: '.*Resume workout.*'
 - extendedWaitUntil:
     visible: 'Complete set 1'
     timeout: 10000

@@ -302,3 +302,42 @@ failures are one reproducible harness regression (fixed and guarded) plus two
 slow-runner flakes (budgeted). A clean qualification run at the next head is
 the remaining iOS evidence; given the runner's demonstrated per-run flake
 rate, a single run should be read with the per-flow logs, not as a coin flip.
+
+## F. Qualification runs 38826965738 / 38838647812 (head `21db3eb`) — 11 PASS / 2 FAIL
+
+Run 38826965738 died at `simctl launch` **ETIMEDOUT(150s)** — the run-38712060166
+launch-service ENVIRONMENT flake (build + install fine; flows never ran). The
+retry, run 38838647812, executed the full suite:
+
+| #     | Flow                                                                                                                | Result                                                                     |
+| ----- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| 1-6   | smoke / todo / habit-persistence / habit-progress-insights / habit-reminder-actions / habit-reminder-actions-replay | PASS                                                                       |
+| 7     | `calories-persistence`                                                                                              | PASS (2nd consecutive)                                                     |
+| 8     | `workout-persistence`                                                                                               | **PASS** — run-5's slow-runner flake resolved by the 30s row-scroll budget |
+| 9     | `workout-gym-v2-persistence`                                                                                        | FAILED — product defect G below                                            |
+| 10    | `workout-gym-v2-session-lifecycle`                                                                                  | FAILED — selector defect H below                                           |
+| 11    | `settings-persistence`                                                                                              | **PASS** — the drawer animation-settle + 15s budget fixed its flake        |
+| 12-13 | `pomodoro-lifecycle` / `pomodoro-notification-path`                                                                 | PASS                                                                       |
+
+**Finding G (PRODUCT defect, fixed): the routine-detail dialog's form cannot
+scroll on native.** The exercise list was a `react-native-draggable-flatlist`
+(`scrollEnabled={false}`, `activationDistance={8}`) nested in the modal's
+ScrollView, and it swallowed every pan: all six swipes over the form in run
+38838647812 settled `isScreenStatic = true` (while the plain-ScrollView
+custom-exercise modal scrolled normally with the same mechanics). Consequence:
+the lower form fields were unreachable — for the flows and plausibly for
+users — and the clip-edge fields' center taps landed on the Dismiss scrim
+(the exact gym-v2 escape signature seen in runs 38676461813 / 38726951043 /
+38793221651 / 38838647812). Fixed by rendering the same `RoutineExerciseCard`
+in a plain map (the drag wrapper removed); reorder remains fully accessible
+card-by-card through the existing Move up / Move down actions, and the modal's
+ScrollView then scrolls the form exactly as the flows' crossing-swipe idioms
+assume.
+
+**Finding H (flow selector defect, fixed): `Resume workout` is not a
+full-match.** The button's accessible name carries the routine
+(`Resume workout · Native Gym V2 resume routine`), so the full-match selector
+missed a correctly restored session (run 38838647812 — the relaunch and
+session restore both worked; `Session in progress` was on screen). Fixed with
+the partial-match wrapper, the same convention as the todo-persistence
+`Edit task: <title>` fix.
