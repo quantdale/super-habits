@@ -78,12 +78,15 @@ tags:
     timeout: 3000
 - tapOn: 'Add routine'
 # The new routine is prepended to the routines list, which sits ABOVE the
-# 'New routine' form, so the row is reached by scrolling UP.
+# 'New routine' form, so the row is reached by scrolling UP. No centerElement:
+# Maestro 2.2.0's centering with direction UP does not converge on this
+# target (run 38793221651 — the row was found fully visible yet the centering
+# swipes overshot it until the 20s budget expired in hierarchy fetches).
 - scrollUntilVisible:
     element: 'Open Native Gym V2 typed routine routine'
     direction: UP
     visibilityPercentage: 50
-    centerElement: true
+    timeout: 30000
 - waitForAnimationToEnd:
     timeout: 3000
 - tapOn: 'Open Native Gym V2 typed routine routine'
@@ -201,15 +204,22 @@ tags:
 # panel on the modal's full-screen dismiss scrim (core/ui/Modal), closing
 # the routine detail. inputText/pressKey then targeted nothing and the next
 # scroll failed searching the Workout landing for the row's sibling field.
-# Fix: center the row INSIDE the panel before tapping it (centerElement is
-# proven on this device — the lifecycle flow's centered scrolls pass), so
-# every tap in this block lands on its own control. Each following
+# Fix: pull the form above the clip edge with an explicit side-margin swipe
+# (the flow's established crossing idiom) before tapping the row, so every
+# tap in this block lands on its own control. centerElement is deliberately
+# NOT used: run 38793221651 proved Maestro 2.2.0's centering cannot converge
+# within its budget on this target (the element was found fully visible —
+# Visibility Percent 1.0 — yet the centering swipes overshot it until the
+# 20s window expired inside hierarchy fetches). Each following
 # scrollUntilVisible doubles as a truthful modal-still-open check.
+- swipe:
+    start: '85%, 72%'
+    end: '85%, 25%'
+    duration: 300
 - scrollUntilVisible:
     element: 'Native custom press progression increment'
     direction: DOWN
     visibilityPercentage: 50
-    centerElement: true
     timeout: 30000
 - assertVisible: 'Native custom press progression increment'
 - tapOn: 'Native custom press progression increment'
@@ -219,7 +229,6 @@ tags:
     element: 'Native custom press minimum reps'
     direction: DOWN
     visibilityPercentage: 50
-    centerElement: true
 - tapOn: 'Native custom press minimum reps'
 - inputText: '5'
 - pressKey: enter
@@ -227,7 +236,6 @@ tags:
     element: 'Native custom press maximum reps'
     direction: DOWN
     visibilityPercentage: 50
-    centerElement: true
 - tapOn: 'Native custom press maximum reps'
 - inputText: '8'
 - pressKey: enter
@@ -235,7 +243,6 @@ tags:
     element: 'Target reps min'
     direction: DOWN
     visibilityPercentage: 50
-    centerElement: true
 # NumberStepperField exposes its label Text and the input under the same name:
 # index 0 is the inert label (inputText after it silently drops), so the input
 # is index 1 — the same convention as the lifecycle flow's Weight/Reps.
@@ -248,7 +255,6 @@ tags:
     element: 'Target reps max'
     direction: DOWN
     visibilityPercentage: 50
-    centerElement: true
 - tapOn:
     text: 'Target reps max'
     index: 1
@@ -267,7 +273,6 @@ tags:
     element: 'Target load'
     direction: DOWN
     visibilityPercentage: 50
-    centerElement: true
 - tapOn: 'Target load'
 # 42 is unique on this screen (bare 40 would collide with the set's default
 # Active-seconds value and pass even if Target load never persisted).
@@ -314,15 +319,16 @@ tags:
     visibilityPercentage: 50
 - assertVisible: 'QUICK START'
 # The new routine is prepended to the routines list, which sits ABOVE the
-# 'New routine' form, so the row is reached by scrolling UP. Center the row
-# before tapping: a row parked half under the floating tab bar gets its
-# bounds-center tap stolen by a tab (the calories-persistence failure
-# class), and this tap must open the routine, not switch sections.
+# 'New routine' form, so the row is reached by scrolling UP. No centerElement
+# here: Maestro 2.2.0's centering with direction UP does not converge on this
+# target (run 38793221651: the row was found fully visible — Visibility
+# Percent 1.0 — yet the centering swipes overshot it until the 20s budget
+# expired in hierarchy fetches). The plain visibility stop is the run-3-proven
+# construct for this row.
 - scrollUntilVisible:
     element: 'Open Native Gym V2 typed routine routine'
     direction: UP
     visibilityPercentage: 50
-    centerElement: true
 - tapOn: 'Open Native Gym V2 typed routine routine'
 - tapOn: 'Configure Native custom press exercise'
 - swipe:

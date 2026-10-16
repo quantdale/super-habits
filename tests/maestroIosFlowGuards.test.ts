@@ -78,16 +78,16 @@ describe('Maestro flows avoid constructs proven to fail on the iOS CI target', (
     expect(flow).not.toMatch(
       /while:\s*\n\s*notVisible:\s*'Native custom press progression increment'/,
     );
-    // CENTERED on purpose (guard revised 2026-10-16 with new evidence). The
-    // old "a centered scroll escaped to the Workout screen" hypothesis is
-    // refuted by the run-38726951043 artifact: the scrollUntilVisible at the
-    // divergence completed with try count 0 (ZERO swipes issued), and the
-    // escape was the bounds-center TAP on 'progression increment'
-    // ([41,812][141,843]) landing below the routine dialog panel's bottom clip
-    // edge (~813 on the 874pt target, core/ui/Modal dialog maxHeight 86%
-    // centered) on the modal's full-screen Dismiss scrim. Identical signature
-    // at run 38676461813. Centering the row inside the panel is the fix, so
-    // every field tap in the block must be preceded by a centered scroll.
+    // The pull uses the flow's explicit side-margin crossing swipe, NOT
+    // centerElement. Two evidence layers: (1) the tap escape itself — at the
+    // row's clipped position ([41,812][141,843] against the dialog panel's
+    // bottom edge ~813, core/ui/Modal dialog maxHeight 86% centered on the
+    // 874pt target) the bounds-center tap lands on the modal's Dismiss scrim
+    // and closes the routine (runs 38726951043 and 38676461813); (2)
+    // centerElement cannot be the positioning fix — run 38793221651 proved
+    // Maestro 2.2.0's centering does not converge on this target (the row
+    // was found fully visible — Visibility Percent 1.0 — yet the centering
+    // swipes overshot it until the 20s budget expired in hierarchy fetches).
     const incrementBlock = flow
       .slice(
         flow.indexOf(
@@ -95,7 +95,30 @@ describe('Maestro flows avoid constructs proven to fail on the iOS CI target', (
         ),
       )
       .split('\n- ')[0];
-    expect(incrementBlock).toMatch(/centerElement: true/);
+    expect(incrementBlock).not.toMatch(/centerElement/);
+    // The crossing swipe must immediately precede the row's scroll so the
+    // row sits inside the panel before any bounds-center tap.
+    expect(flow).toMatch(
+      /- swipe:\s*\n\s*start: '85%, 72%'\s*\n\s*end: '85%, 25%'[\s\S]{0,120}- scrollUntilVisible:\s*\n\s*element: 'Native custom press progression increment'/,
+    );
+  });
+
+  it('no workout row scroll pairs centerElement with direction UP', () => {
+    // Maestro 2.2.0's centering with direction UP does not converge on the
+    // iOS CI target (run 38793221651: all three UP+center row scrolls failed
+    // while every DOWN+center scroll passed). The plain visibility stop is
+    // the proven construct for those rows.
+    for (const name of flowNames.filter((n) => n.startsWith('workout-'))) {
+      const flow = read(name);
+      const blocks = flow.split(/\n- /);
+      for (const block of blocks) {
+        if (/scrollUntilVisible:/.test(block) && /direction: UP/.test(block)) {
+          expect(block, `${name} pairs centerElement with a direction UP scroll`).not.toMatch(
+            /centerElement/,
+          );
+        }
+      }
+    }
   });
 
   it('gym-v2 persistence taps stepper inputs by index and asserts unique values', () => {

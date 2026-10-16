@@ -51,11 +51,15 @@ tags:
     timeout: 3000
 - tapOn: 'Add routine'
 # The new routine is prepended to the routines list, which sits ABOVE the
-# 'New routine' form, so the row is reached by scrolling UP.
+# 'New routine' form, so the row is reached by scrolling UP. No centerElement:
+# Maestro 2.2.0's centering with direction UP does not converge on this
+# target (run 38793221651 — the row was found fully visible yet the centering
+# swipes overshot it until the 20s budget expired in hierarchy fetches).
 - scrollUntilVisible:
     element: 'Open Native strength routine routine'
     direction: UP
-    centerElement: true
+    visibilityPercentage: 50
+    timeout: 30000
 - waitForAnimationToEnd:
     timeout: 3000
 - extendedWaitUntil:

@@ -246,3 +246,59 @@ all P1/P2 items were fixed in the same campaign:
   `accessibilityViewIsModal` excludes the background, and a missed submit
   cannot false-pass because the post-save header oracle (`1,630 kcal left`)
   would fail. Left as-is pending device evidence.
+
+## E. Qualification run 38793221651 (head `5f7a45b`) — 9 PASS / 4 FAIL, and its two findings
+
+The full 13-flow suite ran at the fix head (4h05m on the loaded intel runner;
+the source-cleanliness gate finally reported `sourceUnchangedApartFromGeneratedIos:
+true`, so the earlier breadcrumb blocker is confirmed closed).
+
+| #   | Flow                               | Result                                                                              |
+| --- | ---------------------------------- | ----------------------------------------------------------------------------------- |
+| 1   | `native-smoke`                     | PASS                                                                                |
+| 2   | `todo-persistence`                 | PASS                                                                                |
+| 3   | `habit-persistence`                | PASS                                                                                |
+| 4   | `habit-progress-insights`          | PASS                                                                                |
+| 5   | `habit-reminder-actions`           | PASS                                                                                |
+| 6   | `habit-reminder-actions-replay`    | PASS                                                                                |
+| 7   | **`calories-persistence`**         | **PASS** — the tap-occlusion fix is device-verified (first-ever pass for this flow) |
+| 8   | `workout-persistence`              | FAILED (flaked — see finding 2)                                                     |
+| 9   | `workout-gym-v2-persistence`       | FAILED (regressed by finding 1, then flaked)                                        |
+| 10  | `workout-gym-v2-session-lifecycle` | FAILED (flaked — see finding 2)                                                     |
+| 11  | `settings-persistence`             | FAILED (flaked — see finding 3)                                                     |
+| 12  | `pomodoro-lifecycle`               | PASS                                                                                |
+| 13  | `pomodoro-notification-path`       | PASS                                                                                |
+
+**Finding 1 (regression, fixed): `centerElement: true` does not converge with
+`direction: UP` in Maestro 2.2.0 on this target.** The run's command log shows
+the routine row found **fully visible** (`Visibility Percent: 1.0`) yet the
+centering swipes overshot it until the 20s budget expired inside 8s-per-fetch
+hierarchy calls (`Scrolling try count: 0` → swipe → timeout). Every
+`direction: UP` + `centerElement` scroll failed this run while every
+`direction: DOWN` + `centerElement` scroll passed (the habit flows). The three
+workout row scrolls that pair them are now plain visibility stops (the
+run-3-proven construct), and a guard test pins the pairing as forbidden.
+
+**Finding 2 (target flake, mitigated): slow AX-tree materialization.** The
+runner was ~2x slower than run 3 (4h05m vs ~2h): post-launch hierarchy polls
+returned empty depth-6 trees for ~25s, and each fetch cost up to 8s. The
+`workout-persistence` / `workout-gym-v2-session-lifecycle` row scrolls lost
+that race (finding 1 amplified it); their budgets are now 30s.
+
+**Finding 3 (target flake, mitigated): the settings drawer assert raced the
+same materialization.** `Close settings` was fully rendered by the failure
+dump but its 5s `extendedWaitUntil` polled thin trees throughout. Both drawer
+asserts now wait for the entrance animation and carry an evidence-based 15s
+budget.
+
+Also fixed from this run: the recovery-gate liveness probe parsed `ps` output
+wrongly (reported a live app as dead — safe direction, but useless evidence);
+it now matches the executable comm exactly.
+
+**Position after E:** the three original failures are root-caused and fixed
+(calories now device-verified; the gym-persistence progression block awaits
+device proof — its earlier steps were never reached in this run); the 3 new
+failures are one reproducible harness regression (fixed and guarded) plus two
+slow-runner flakes (budgeted). A clean qualification run at the next head is
+the remaining iOS evidence; given the runner's demonstrated per-run flake
+rate, a single run should be read with the per-flow logs, not as a coin flip.

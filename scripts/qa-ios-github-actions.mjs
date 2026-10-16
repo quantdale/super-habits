@@ -246,6 +246,9 @@ function captureFailureDiagnostics(nativeReport, simulator) {
  * True when the simulator's process table holds the app EXECUTABLE (SuperHabits
  * as the comm name). Matching the raw `ps` line would also match crash tooling
  * whose arguments mention the app, which falsely reports a crashed app alive.
+ * The comm column is everything after the pid column (it may be a full path
+ * that itself contains spaces), so the parse splits on the first run of
+ * whitespace only.
  */
 function probeAppProcess(simulator) {
   const ps = spawnSync(
@@ -260,8 +263,8 @@ function probeAppProcess(simulator) {
   );
   const output = `${ps.stdout ?? ''}`;
   const lines = output.split('\n').filter((line) => {
-    const comm = line.trim().split(/\s+/).pop() ?? '';
-    return basename(comm) === 'SuperHabits';
+    const comm = line.trim().replace(/^\d+\s+/, '');
+    return comm.length > 0 && basename(comm) === 'SuperHabits';
   });
   return {
     alive: lines.length > 0,
