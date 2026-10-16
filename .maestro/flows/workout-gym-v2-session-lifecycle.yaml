@@ -211,16 +211,20 @@ tags:
 - tapOn: 'Done'
 # W9 collapses History & insights by default, and 'Recent sessions' renders
 # inside it, so the disclosure must be opened before the session list exists.
-# The history disclosure parks at the bottom edge at the scroll stop (run
-# 38855979274: [16,748][386,808] — its bounds-center (201,778) lands on the
-# floating tab bar's top edge and the tap never opens it). Center it first:
-# direction DOWN + centerElement is the convergence-proven pairing.
+# The history disclosure parks at the bottom edge (run 38855979274:
+# [16,748][386,808] — the bounds-center (201,778) lands on the floating tab
+# bar's top edge and the tap never opens it). It also cannot be centered:
+# the section is at the content's end, so run 38869382876 showed the
+# centering stall at [16,581] (try 1→2 unchanged) and time out. Pull it
+# clear with one controlled slow drag instead (no fling), then tap.
 - scrollUntilVisible:
     element: 'History and insights'
     direction: DOWN
     visibilityPercentage: 50
-    centerElement: true
-    timeout: 30000
+- swipe:
+    start: '50%, 78%'
+    end: '50%, 63%'
+    duration: 800
 - tapOn: 'History and insights'
 - scrollUntilVisible:
     element: 'Recent sessions'
@@ -239,14 +243,17 @@ tags:
     # "Workout" and an unscoped index-0 match can land on inert content.
     childOf:
       text: 'Section tabs'
-# Center before tapping for the same tab-bar-edge reason as the pre-restart
-# block (run 38855979274).
+# Same tab-bar-edge pull as the pre-restart block (runs 38855979274 /
+# 38869382876): no centerElement — the section sits at the content's end and
+# centering can never converge there.
 - scrollUntilVisible:
     element: 'History and insights'
     direction: DOWN
     visibilityPercentage: 50
-    centerElement: true
-    timeout: 30000
+- swipe:
+    start: '50%, 78%'
+    end: '50%, 63%'
+    duration: 800
 - tapOn: 'History and insights'
 - scrollUntilVisible:
     element: 'Recent sessions'

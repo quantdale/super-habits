@@ -276,7 +276,10 @@ tags:
 - inputText: '42'
 - pressKey: enter
 - assertVisible: 'Target load'
-- pressKey: BACK
+# Close the routine dialog through its own close control: `pressKey: BACK`
+# is not a reliable modal dismiss on iOS (run 38869382876: the dialog was
+# still open and 'This week' was never visible).
+- tapOn: 'Close'
 # The weekly-plan section label is 'This week' (the uppercase rendering is a
 # CSS transform, not the text node), and Maestro matches the full text.
 - scrollUntilVisible:
