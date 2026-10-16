@@ -341,3 +341,30 @@ missed a correctly restored session (run 38838647812 — the relaunch and
 session restore both worked; `Session in progress` was on screen). Fixed with
 the partial-match wrapper, the same convention as the todo-persistence
 `Edit task: <title>` fix.
+
+## G. Qualification run 38855979274 (head `bf0fe1b`) — 11 PASS / 2 FAIL, and the last two fixes
+
+The scrollability fix (F/G) took both gym flows deep into their scripts:
+`workout-gym-v2-persistence` scrolled the form all the way to its bottom
+section and `workout-gym-v2-session-lifecycle` resumed the saved session,
+completed the set, saved the workout, and reached the history section. The
+residual failures were the same tap-occlusion class at two new spots:
+
+- **the history disclosure parked at `[16,748][386,808]`** — its
+  bounds-center `(201, 778)` lands exactly on the floating tab bar's top
+  edge, so the tap never opened it and `Recent sessions` never rendered (the
+  pre-restart occurrence passed only because the row landed higher). Both
+  `History and insights` scrolls now center the row before tapping.
+- **the 300ms side-margin crossing swipe FLINGS the modal's scroll view
+  ~1000pt** past the progression row (the form ended at `+ Add set`), and
+  plain `scrollUntilVisible` cannot reposition a row that the screen-based
+  visibility metric already reads as 100% visible (the clip-edge row at
+  `[41,812]` returns immediately without scrolling). The field scrolls now
+  use `centerElement: true` with `direction: DOWN` — the pairing that
+  bypasses the visibility early-return and converges in one swipe — with
+  30s budgets. (`centerElement` + `direction: UP` remains forbidden: run
+  38793221651 proved that pairing cannot converge.)
+
+Both fixes are pinned by `tests/maestroIosFlowGuards.test.ts`. Qualification
+run 38869382876 (head `c548f52`) is the verification vehicle for this
+section.
