@@ -211,10 +211,16 @@ tags:
 - tapOn: 'Done'
 # W9 collapses History & insights by default, and 'Recent sessions' renders
 # inside it, so the disclosure must be opened before the session list exists.
+# The history disclosure parks at the bottom edge at the scroll stop (run
+# 38855979274: [16,748][386,808] — its bounds-center (201,778) lands on the
+# floating tab bar's top edge and the tap never opens it). Center it first:
+# direction DOWN + centerElement is the convergence-proven pairing.
 - scrollUntilVisible:
     element: 'History and insights'
     direction: DOWN
     visibilityPercentage: 50
+    centerElement: true
+    timeout: 30000
 - tapOn: 'History and insights'
 - scrollUntilVisible:
     element: 'Recent sessions'
@@ -233,10 +239,14 @@ tags:
     # "Workout" and an unscoped index-0 match can land on inert content.
     childOf:
       text: 'Section tabs'
+# Center before tapping for the same tab-bar-edge reason as the pre-restart
+# block (run 38855979274).
 - scrollUntilVisible:
     element: 'History and insights'
     direction: DOWN
     visibilityPercentage: 50
+    centerElement: true
+    timeout: 30000
 - tapOn: 'History and insights'
 - scrollUntilVisible:
     element: 'Recent sessions'

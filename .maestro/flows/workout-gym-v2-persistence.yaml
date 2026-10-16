@@ -196,30 +196,26 @@ tags:
 - tapOn: 'Linear'
 - waitForAnimationToEnd:
     timeout: 3000
-# ROOT CAUSE (run 38726951043, reproduced identically at run 38676461813):
-# the escape was not a scroll gesture. At this scroll offset the progression
-# row sits at the dialog panel's bottom clip edge ('progression increment'
-# resolved to [41,812][141,843] against a dialog panel bottom of ~813),
-# and Maestro taps element bounds centers: the tap landed 15pt below the
-# panel on the modal's full-screen dismiss scrim (core/ui/Modal), closing
-# the routine detail. inputText/pressKey then targeted nothing and the next
-# scroll failed searching the Workout landing for the row's sibling field.
-# Fix: pull the form above the clip edge with an explicit side-margin swipe
-# (the flow's established crossing idiom) before tapping the row, so every
-# tap in this block lands on its own control. centerElement is deliberately
-# NOT used: run 38793221651 proved Maestro 2.2.0's centering cannot converge
-# within its budget on this target (the element was found fully visible —
-# Visibility Percent 1.0 — yet the centering swipes overshot it until the
-# 20s window expired inside hierarchy fetches). Each following
+# ROOT CAUSE (runs 38676461813 / 38726951043 / 38793221651 / 38838647812):
+# at the resting scroll offset the progression row sits at the dialog
+# panel's bottom clip edge ('progression increment' resolves to
+# [41,812][141,843] against a panel bottom of ~813), and Maestro taps
+# element bounds centers: the tap lands below the panel on core/ui/Modal's
+# full-screen Dismiss scrim and closes the routine detail.
+# Fix: center the row INSIDE the panel before tapping it. centerElement is
+# the ONLY construct that repositions a row Maestro already considers
+# 'visible' (its screen-based metric reads the clip-edge row as 100%
+# visible and returns without scrolling), and with direction DOWN it
+# converges in one swipe. It must NOT be paired with direction UP — run
+# 38793221651 proved that pairing cannot converge on this target. No
+# crossing swipe here: run 38838647812 showed a 300ms side swipe FLINGS
+# the modal's scroll view ~1000pt past the row. Each following
 # scrollUntilVisible doubles as a truthful modal-still-open check.
-- swipe:
-    start: '85%, 72%'
-    end: '85%, 25%'
-    duration: 300
 - scrollUntilVisible:
     element: 'Native custom press progression increment'
     direction: DOWN
     visibilityPercentage: 50
+    centerElement: true
     timeout: 30000
 - assertVisible: 'Native custom press progression increment'
 - tapOn: 'Native custom press progression increment'
@@ -229,6 +225,8 @@ tags:
     element: 'Native custom press minimum reps'
     direction: DOWN
     visibilityPercentage: 50
+    centerElement: true
+    timeout: 30000
 - tapOn: 'Native custom press minimum reps'
 - inputText: '5'
 - pressKey: enter
@@ -236,6 +234,8 @@ tags:
     element: 'Native custom press maximum reps'
     direction: DOWN
     visibilityPercentage: 50
+    centerElement: true
+    timeout: 30000
 - tapOn: 'Native custom press maximum reps'
 - inputText: '8'
 - pressKey: enter
@@ -243,6 +243,8 @@ tags:
     element: 'Target reps min'
     direction: DOWN
     visibilityPercentage: 50
+    centerElement: true
+    timeout: 30000
 # NumberStepperField exposes its label Text and the input under the same name:
 # index 0 is the inert label (inputText after it silently drops), so the input
 # is index 1 — the same convention as the lifecycle flow's Weight/Reps.
@@ -255,24 +257,19 @@ tags:
     element: 'Target reps max'
     direction: DOWN
     visibilityPercentage: 50
+    centerElement: true
+    timeout: 30000
 - tapOn:
     text: 'Target reps max'
     index: 1
 - inputText: '11'
 - pressKey: enter
-# The reps inputs sit under Maestro's center-swipe origin, so
-# scrollUntilVisible's
-# own swipes are consumed by the focused EditText and the list never moves.
-# Cross the remaining form with an explicit side-margin swipe (same class as the
-# auth-session/backup-v2 flows) before the scoped scroll.
-- swipe:
-    start: '85%, 72%'
-    end: '85%, 25%'
-    duration: 300
 - scrollUntilVisible:
     element: 'Target load'
     direction: DOWN
     visibilityPercentage: 50
+    centerElement: true
+    timeout: 30000
 - tapOn: 'Target load'
 # 42 is unique on this screen (bare 40 would collide with the set's default
 # Active-seconds value and pass even if Target load never persisted).
