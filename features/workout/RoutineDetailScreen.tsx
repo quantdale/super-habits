@@ -633,7 +633,7 @@ export function RoutineDetailModal({
                       ) : null}
                       <TextInput
                         accessibilityLabel={`${ex.name} notes`}
-                        value={ex.notes ?? ''}
+                        defaultValue={ex.notes ?? ''}
                         onChangeText={(value) => {
                           void queuedUpdateExercise(ex.id, { notes: value }).then(refresh);
                         }}
@@ -648,7 +648,7 @@ export function RoutineDetailModal({
                       />
                       <TextInput
                         accessibilityLabel={`${ex.name} superset group`}
-                        value={ex.superset_group ?? ''}
+                        defaultValue={ex.superset_group ?? ''}
                         onChangeText={(value) => {
                           void queuedUpdateExercise(ex.id, { supersetGroup: value }).then(refresh);
                         }}
@@ -698,7 +698,7 @@ export function RoutineDetailModal({
                             <View className="min-w-0 flex-1">
                               <TextInput
                                 accessibilityLabel={`${ex.name} progression increment`}
-                                value={
+                                defaultValue={
                                   ex.progression_increment == null
                                     ? ''
                                     : String(ex.progression_increment)
@@ -724,7 +724,7 @@ export function RoutineDetailModal({
                             <View className="min-w-0 flex-1">
                               <TextInput
                                 accessibilityLabel={`${ex.name} minimum reps`}
-                                value={
+                                defaultValue={
                                   ex.progression_min_reps == null
                                     ? ''
                                     : String(ex.progression_min_reps)
@@ -750,7 +750,7 @@ export function RoutineDetailModal({
                             <View className="min-w-0 flex-1">
                               <TextInput
                                 accessibilityLabel={`${ex.name} maximum reps`}
-                                value={
+                                defaultValue={
                                   ex.progression_max_reps == null
                                     ? ''
                                     : String(ex.progression_max_reps)
@@ -881,7 +881,7 @@ export function RoutineDetailModal({
                               <View className="min-w-0 flex-1">
                                 <TextInput
                                   accessibilityLabel="Target distance"
-                                  value={
+                                  defaultValue={
                                     set.target_distance == null ? '' : String(set.target_distance)
                                   }
                                   onChangeText={(value) =>
@@ -903,7 +903,9 @@ export function RoutineDetailModal({
                               <View className="min-w-0 flex-1">
                                 <TextInput
                                   accessibilityLabel="Target pace"
-                                  value={set.target_pace == null ? '' : String(set.target_pace)}
+                                  defaultValue={
+                                    set.target_pace == null ? '' : String(set.target_pace)
+                                  }
                                   onChangeText={(value) =>
                                     void queuedUpdateSetPrescription(set.id, {
                                       targetPace: value ? Number(value) : null,
@@ -925,7 +927,7 @@ export function RoutineDetailModal({
                           {modality === 'weighted_strength' || modality === 'bodyweight' ? (
                             <TextInput
                               accessibilityLabel="Target load"
-                              value={set.target_load == null ? '' : String(set.target_load)}
+                              defaultValue={set.target_load == null ? '' : String(set.target_load)}
                               onChangeText={(value) =>
                                 void queuedUpdateSetPrescription(set.id, {
                                   targetLoad: value ? Number(value) : null,
@@ -1053,7 +1055,7 @@ export function RoutineDetailModal({
           </Text>
           <View className="flex-row gap-2">
             <TextInput
-              value={newExerciseName}
+              defaultValue={newExerciseName}
               onChangeText={(t) => {
                 setWorkoutError(null);
                 setNewExerciseName(t);

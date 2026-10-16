@@ -234,7 +234,7 @@ export function RoutineExerciseCard({
           ) : null}
           <TextInput
             accessibilityLabel={`${ex.name} notes`}
-            value={ex.notes ?? ''}
+            defaultValue={ex.notes ?? ''}
             onChangeText={(value) => {
               void onUpdateExercise(ex.id, { notes: value }).then(onRefresh);
             }}
@@ -249,7 +249,7 @@ export function RoutineExerciseCard({
           />
           <TextInput
             accessibilityLabel={`${ex.name} superset group`}
-            value={ex.superset_group ?? ''}
+            defaultValue={ex.superset_group ?? ''}
             onChangeText={(value) => {
               void onUpdateExercise(ex.id, { supersetGroup: value }).then(onRefresh);
             }}
@@ -287,7 +287,9 @@ export function RoutineExerciseCard({
                 <View className="min-w-0 flex-1">
                   <TextInput
                     accessibilityLabel={`${ex.name} progression increment`}
-                    value={ex.progression_increment == null ? '' : String(ex.progression_increment)}
+                    defaultValue={
+                      ex.progression_increment == null ? '' : String(ex.progression_increment)
+                    }
                     onChangeText={(value) => {
                       const parsed = parseNumericInput(value, { allowDecimal: true });
                       void onUpdateExercise(ex.id, {
@@ -308,7 +310,9 @@ export function RoutineExerciseCard({
                 <View className="min-w-0 flex-1">
                   <TextInput
                     accessibilityLabel={`${ex.name} minimum reps`}
-                    value={ex.progression_min_reps == null ? '' : String(ex.progression_min_reps)}
+                    defaultValue={
+                      ex.progression_min_reps == null ? '' : String(ex.progression_min_reps)
+                    }
                     onChangeText={(value) => {
                       const parsed = parseNumericInput(value);
                       void onUpdateExercise(ex.id, {
@@ -329,7 +333,9 @@ export function RoutineExerciseCard({
                 <View className="min-w-0 flex-1">
                   <TextInput
                     accessibilityLabel={`${ex.name} maximum reps`}
-                    value={ex.progression_max_reps == null ? '' : String(ex.progression_max_reps)}
+                    defaultValue={
+                      ex.progression_max_reps == null ? '' : String(ex.progression_max_reps)
+                    }
                     onChangeText={(value) => {
                       const parsed = parseNumericInput(value);
                       void onUpdateExercise(ex.id, {
@@ -440,7 +446,7 @@ export function RoutineExerciseCard({
                   <View className="min-w-0 flex-1">
                     <TextInput
                       accessibilityLabel="Target distance"
-                      value={set.target_distance == null ? '' : String(set.target_distance)}
+                      defaultValue={set.target_distance == null ? '' : String(set.target_distance)}
                       onChangeText={(value) =>
                         void onUpdateSetPrescription(set.id, {
                           targetDistance: value ? Number(value) : null,
@@ -460,7 +466,7 @@ export function RoutineExerciseCard({
                   <View className="min-w-0 flex-1">
                     <TextInput
                       accessibilityLabel="Target pace"
-                      value={set.target_pace == null ? '' : String(set.target_pace)}
+                      defaultValue={set.target_pace == null ? '' : String(set.target_pace)}
                       onChangeText={(value) =>
                         void onUpdateSetPrescription(set.id, {
                           targetPace: value ? Number(value) : null,
@@ -482,7 +488,7 @@ export function RoutineExerciseCard({
               {modality === 'weighted_strength' || modality === 'bodyweight' ? (
                 <TextInput
                   accessibilityLabel="Target load"
-                  value={set.target_load == null ? '' : String(set.target_load)}
+                  defaultValue={set.target_load == null ? '' : String(set.target_load)}
                   onChangeText={(value) =>
                     void onUpdateSetPrescription(set.id, {
                       targetLoad: value ? Number(value) : null,

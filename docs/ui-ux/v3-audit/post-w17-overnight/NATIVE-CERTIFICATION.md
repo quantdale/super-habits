@@ -365,6 +365,27 @@ residual failures were the same tap-occlusion class at two new spots:
   30s budgets. (`centerElement` + `direction: UP` remains forbidden: run
   38793221651 proved that pairing cannot converge.)
 
-Both fixes are pinned by `tests/maestroIosFlowGuards.test.ts`. Qualification
-run 38869382876 (head `c548f52`) is the verification vehicle for this
-section.
+Both fixes are pinned by `tests/maestroIosFlowGuards.test.ts`.
+
+## H. Qualification runs 38941052793 (head `c05860e`) — 12 PASS / 1 FAIL, and the final fix
+
+The `simctl launch` retry (c05860e) carried the lane past the twice-seen
+launch-service flake and the full suite ran. **`workout-gym-v2-session-lifecycle`
+PASSED for the first time ever** (modal `Close` + history-pull fixes verified).
+`workout-gym-v2-persistence` completed every step and failed only its LAST
+oracle: `Target load` persisted **`2`** instead of `42`.
+
+**Finding I (PRODUCT input bug, fixed): the controlled number inputs drop
+characters.** The workout editor's raw `TextInput`s were `value=`-controlled
+from the re-fetched entity with save-on-`onChangeText` → `.then(refresh)`:
+when the refresh re-render lands between keystrokes it resets the field to
+the not-yet-saved value and clears the typed text (run 38941052793: `42`
+became `2`; the five other values survived only by timing). Fixed by making
+these edit fields uncontrolled (`defaultValue`) — mid-edit re-renders cannot
+clobber typing, saves still flow through `onChangeText`, and a re-opened
+editor remounts with the loaded value. `NumberStepperField` stays
+controlled (its +/- buttons read `value`) as a documented residual.
+
+Final gates at this state: typecheck 0, lint 0, full Vitest 2722 passed |
+2 skipped, targeted web E2E (`workout-gym-v2` + `calories-w10`) 25 passed |
+3 skipped.
