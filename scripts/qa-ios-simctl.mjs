@@ -81,6 +81,13 @@ export function runIosSimctlOperation(operation, options = {}) {
     runCommand = runNativeCommand,
     now = () => new Date().toISOString(),
     clock = () => performance.now(),
+    // The launch step is exposed to the shared-runner launch-service flake:
+    // runs 38826965738 and 38890327344 both died with `spawnSync xcrun
+    // ETIMEDOUT` after 150s while the app was installed and fine. One
+    // bounded retry (identified in the report as `retriedAfterTimeout`, never
+    // silent) turns that infrastructure flake into a diagnosed, resilient
+    // step instead of a wasted 2-hour run.
+    retryOnTimeout = false,
     ...invocationOptions
   } = options;
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
@@ -88,26 +95,57 @@ export function runIosSimctlOperation(operation, options = {}) {
   }
 
   const invocation = buildIosSimctlInvocation(operation, invocationOptions);
-  const startedAt = now();
-  const started = clock();
-  const result = runCommand(invocation.command, invocation.args, { timeoutMs });
-  const durationMs = Math.max(0, Math.round(clock() - started));
-  const timedOut = Boolean(result.timedOut);
 
+  const attempt = () => {
+    const startedAt = now();
+    const started = clock();
+    const result = runCommand(invocation.command, invocation.args, { timeoutMs });
+    const durationMs = Math.max(0, Math.round(clock() - started));
+    const timedOut = Boolean(result.timedOut);
+    return {
+      operation,
+      command: invocation.command,
+      args: invocation.args,
+      timeoutMs,
+      startedAt,
+      completedAt: now(),
+      durationMs,
+      status: result.status ?? 1,
+      stdout: result.stdout ?? '',
+      stderr: result.stderr ?? '',
+      error: result.error ?? null,
+      timedOut,
+      success: !timedOut && result.status === 0,
+    };
+  };
+
+  const first = attempt();
+  const attempts = [
+    {
+      startedAt: first.startedAt,
+      durationMs: first.durationMs,
+      status: first.status,
+      timedOut: first.timedOut,
+      success: first.success,
+    },
+  ];
+  if (!(retryOnTimeout && first.timedOut && !first.success)) {
+    return { ...first, attempts, retriedAfterTimeout: false, firstAttempt: null };
+  }
+
+  const second = attempt();
+  attempts.push({
+    startedAt: second.startedAt,
+    durationMs: second.durationMs,
+    status: second.status,
+    timedOut: second.timedOut,
+    success: second.success,
+  });
   return {
-    operation,
-    command: invocation.command,
-    args: invocation.args,
-    timeoutMs,
-    startedAt,
-    completedAt: now(),
-    durationMs,
-    status: result.status ?? 1,
-    stdout: result.stdout ?? '',
-    stderr: result.stderr ?? '',
-    error: result.error ?? null,
-    timedOut,
-    success: !timedOut && result.status === 0,
+    ...second,
+    attempts,
+    retriedAfterTimeout: true,
+    firstAttempt: attempts[0],
   };
 }
 
@@ -233,7 +271,9 @@ function main() {
       `[ios-simctl] ${operation} start: ${invocation.command} ${invocation.args.join(' ')} ` +
         `(timeout=${IOS_SIMCTL_TIMEOUT_MS}ms)`,
     );
-    const report = runIosSimctlOperation(operation);
+    const report = runIosSimctlOperation(operation, {
+      retryOnTimeout: operation === 'launch',
+    });
     const reportPath = writeIosSimctlEvidence(report, {
       outputDirectory: evidenceDirectory,
       runId,

@@ -88,6 +88,62 @@ describe('iOS simulator command evidence', () => {
     });
   });
 
+  it('retries launch exactly once on timeout and identifies the retry in the report', () => {
+    const calls: { args: string[]; timeoutMs: number }[] = [];
+    let attempt = 0;
+    const report = runIosSimctlOperation('launch', {
+      simulatorId: 'SIMULATOR-UDID',
+      timeoutMs: 150_000,
+      retryOnTimeout: true,
+      runCommand: (_command: string, args: string[], { timeoutMs }: { timeoutMs: number }) => {
+        calls.push({ args, timeoutMs });
+        attempt += 1;
+        if (attempt === 1) {
+          return {
+            status: 124,
+            stdout: '',
+            stderr: 'launch did not return',
+            error: 'ETIMEDOUT',
+            timedOut: true,
+          };
+        }
+        return { status: 0, stdout: '4242', stderr: '', error: null, timedOut: false };
+      },
+      now: () => 'T',
+      clock: () => 0,
+    });
+
+    expect(calls).toHaveLength(2);
+    expect(calls[0].args).toEqual(['simctl', 'launch', 'SIMULATOR-UDID', 'com.dale16.superhabits']);
+    expect(report).toMatchObject({
+      operation: 'launch',
+      success: true,
+      status: 0,
+      retriedAfterTimeout: true,
+    });
+    expect(report.attempts).toHaveLength(2);
+    expect(report.firstAttempt).toMatchObject({ timedOut: true, success: false });
+  });
+
+  it('never retries a non-timeout failure', () => {
+    const calls: string[][] = [];
+    const report = runIosSimctlOperation('launch', {
+      simulatorId: 'SIMULATOR-UDID',
+      timeoutMs: 150_000,
+      retryOnTimeout: true,
+      runCommand: (_command: string, args: string[]) => {
+        calls.push(args);
+        return { status: 1, stdout: '', stderr: 'bad bundle', error: null, timedOut: false };
+      },
+      now: () => 'T',
+      clock: () => 0,
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(report).toMatchObject({ success: false, retriedAfterTimeout: false });
+    expect(report.attempts).toHaveLength(1);
+  });
+
   it('runs bounded diagnostics independently and continues after one times out', () => {
     const calls: { args: string[]; timeoutMs: number }[] = [];
     const report = runIosSimulatorDiagnostics({
