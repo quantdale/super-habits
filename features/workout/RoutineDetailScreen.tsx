@@ -150,8 +150,10 @@ export function RoutineDetailModal({
 
   // Text inputs and prescription chips can emit several writes before React
   // has rendered the next snapshot. Serialize those writes and make the
-  // primary action wait for them, so a session can never start from a stale
-  // routine configuration.
+  // primary action wait for them, so a session never starts while edits are
+  // still in flight. A REJECTED edit is surfaced in the editor and the
+  // session then starts from SQLite's committed configuration (the queue
+  // resolves on failure by design — see surfaceBuilderFailure).
   const queueBuilderMutation = useCallback((mutation: () => Promise<void>): Promise<void> => {
     const next = pendingBuilderMutationsRef.current.then(mutation, mutation);
     pendingBuilderMutationsRef.current = next.then(
@@ -1073,7 +1075,16 @@ export function RoutineDetailModal({
             <Button
               label="Use as template (duplicate)"
               variant="ghost"
-              onPress={() => void onUseAsTemplate()}
+              onPress={() => {
+                void Promise.resolve(onUseAsTemplate()).catch((error) => {
+                  // A failed duplication must be visible in this dialog — the
+                  // copy is atomic, so a rejection means nothing was created
+                  // and the user gets no feedback otherwise.
+                  setWorkoutError(
+                    error instanceof Error ? error.message : 'Could not duplicate the routine.',
+                  );
+                });
+              }}
             />
             <Text className="mt-1 text-center text-xs" style={{ color: tokens.textMuted }}>
               Creates “{routineName} (copy)” with the same exercises and sets.

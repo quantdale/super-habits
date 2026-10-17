@@ -47,9 +47,18 @@ test.describe('Workout editor input reliability', () => {
     await load.fill('');
     await load.pressSequentially('42', { delay: 80 });
     await expect(load).toHaveValue('42');
-    // The save → refresh round trip must never reset what is being typed.
-    await page.waitForTimeout(1200);
+
+    // Force a full save -> refresh round trip AFTER the load write and wait
+    // for its echo to land in the exercise summary ("1 set · <active>s /
+    // <rest>s"). That re-render is exactly the one that used to clobber
+    // typing; a fixed sleep could pass vacuously while the echo was still in
+    // flight, this signal cannot.
+    const rest = builder.getByRole('textbox', { name: 'Rest (seconds, 0 = no rest)' });
+    await rest.fill('');
+    await rest.pressSequentially('90', { delay: 80 });
+    await expect(builder.getByText(/1 set · 40s \/ 90s/)).toBeVisible();
     await expect(load).toHaveValue('42');
+    await expect(rest).toHaveValue('90');
   });
 
   test('keeps rapid keystrokes in builder number steppers and persists them', async ({ page }) => {
@@ -70,7 +79,10 @@ test.describe('Workout editor input reliability', () => {
     await active.fill('');
     await active.pressSequentially('120', { delay: 80 });
     await expect(active).toHaveValue('120');
-    await page.waitForTimeout(1200);
+    // The exercise summary renders the refreshed set values; seeing "120s"
+    // there proves the save -> refresh echo landed, so the re-assert below
+    // pins that the echo cannot clobber the typed draft (no fixed sleeps).
+    await expect(builder.getByText(/1 set · 120s/)).toBeVisible();
     await expect(active).toHaveValue('120');
 
     const load = builder.getByRole('textbox', { name: 'Target load' });

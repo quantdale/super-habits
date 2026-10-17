@@ -119,7 +119,7 @@ verdicts.
   forms rely on async value pushes). Durable state lives in THIS plan; the
   post-w17 plan is COMPLETED with a forward pointer.
 - Completed work: Campaign 0 — repository recovery, baseline gates at `f601226`, iOS deferral recorded (2026-10-17). Campaign 1 — workout input/persistence reliability COMPLETE at `cd25edd` (pushed): defects A/B/C fixed at source + web keystroke-loss root cause (`keyboardDismissMode` blur-on-scroll in `core/ui/Modal.tsx` + `core/ui/Screen.tsx`) + `lib/snapshotSequencer.ts`; pre-fix browser reproduction captured (3/3 designed failures at `f601226`); new spec 9/9 across 3 repeats; targeted lanes 47/47; full battery at `cd25edd` **368 passed / 86 skipped / 4 host-load-class misses** (all 4 re-verified green in isolation/quiet-host runs: 3 HEAVY timeouts pass alone, the habits-w7 800ms check-in ceiling passes 3/3 quiet — same host-load class as CG-4/CG-5; strict assertions preserved).
-- Campaign 2 (local-first) discovery complete via two parallel read-only audits. Fixed at source (in progress → gates): (F1) `rescheduleWorkoutDate` now moves a day in ONE transaction (was two commits — a failed destination leg left the workout "moved to nowhere"); (F3) `runBackupMutation` fails closed when a mutation queues sync intents but reports `changed: false` (row writes without their intents could previously commit silently — enforced by convention only); (F6) `updateRoutine`/`updateCustomExercise`/`updateBodyWeightEntry` now read-merge-write inside the serialized transaction (stale-snapshot sibling-field clobber — the rule `updateExercise`/`updateSet` already enforced) and `addSet` assigns `set_number` in-transaction (two rapid "add set" taps could share a number); (rejected-writes) the divergence-class silent-rejection sites now surface errors and keep the editor open: TodosScreen drag-reorder (optimistic reorder snapped back silently) + editor Save, HabitsScreen editor Save, CalorieGoalModal (closed as if saved), PomodoroSettingsInline (silent no-op). New real-SQLite suite `tests/integration/workoutMutationIntegrity.data.test.ts` (5 tests) pins move-atomicity (failure-injection oracle), the fail-closed guard, concurrent-field merge, and set-number distinctness. Full Vitest after Phase 2: 267 files passed | 1 skipped (0 failures).
+- Campaign 2 (local-first) discovery complete via two parallel read-only audits. Fixed at source (in progress → gates): (F1) `rescheduleWorkoutDate` now moves a day in ONE transaction (was two commits — a failed destination leg left the workout "moved to nowhere"); (F3) `runBackupMutation` fails closed when a mutation queues sync intents but reports `changed: false` (row writes without their intents could previously commit silently — enforced by convention only); (F6) `updateRoutine`/`updateCustomExercise`/`updateBodyWeightEntry` now read-merge-write inside the serialized transaction (stale-snapshot sibling-field clobber — the rule `updateExercise`/`updateSet` already enforced) and `addSet` assigns `set_number` in-transaction (two rapid "add set" taps could share a number); (rejected-writes) the divergence-class silent-rejection sites now surface errors and keep the editor open: TodosScreen drag-reorder (optimistic reorder snapped back silently) + editor Save, HabitsScreen editor Save, CalorieGoalModal (closed as if saved), PomodoroSettingsInline (silent no-op). New real-SQLite suite `tests/integration/workoutMutationIntegrity.data.test.ts` (8 tests by closure) pins move-atomicity (failure-injection oracle), successful-move parity, impossible-date rejection, the fail-closed guard (with rollback proof), atomic duplication (fault injection), concurrent-field merge, and set-number race/after-delete numbering. Full Vitest after Phase 2: 267 files passed | 1 skipped (0 failures).
 - In progress: hermetic `build:e2e` (Phase 2) + targeted Playwright lanes (todos/habits/calories/pomodoro/workout + new spec), then the Phase-2 milestone commit/push.
 - Important modified files: `features/workout/workout.data.ts` (atomic move + in-transaction reads/numbering), `core/sync/syncedMutation.ts` (fail-closed intent contract), `features/todos/TodosScreen.tsx`, `features/habits/HabitsScreen.tsx`, `features/calories/CalorieGoalModal.tsx`, `features/pomodoro/PomodoroSettingsInline.tsx` (rejected-save surfacing), `tests/integration/workoutMutationIntegrity.data.test.ts` (new).
 - Last successful validation: 2026-10-17 — `tsc --noEmit` 0; `eslint . --max-warnings 0` 0; Vitest **2707 passed | 20 skipped** (the 3 test + 1 suite failures in the first parallel run were host-load 5s/10s subprocess timeouts — `auditRuntimeDeps`, `nativeAuthMock`, `qaNativeProvision`, `restore.coordinator` — each re-passed serially); `lib/snapshotSequencer.test.ts` 6/6; pre-fix repro run captured (3/3 failed as designed).
@@ -232,7 +232,7 @@ verdicts.
   misses (3 HEAVY timeouts pass alone; habits-w7 800ms ceiling passes 3/3 on
   a quiet host) — assertions preserved, no weakening.
 - 2026-10-17 — Phase-2 milestone `6b23b6e` (pushed): full Vitest 267 files
-  passed | 1 skipped (0 failures) incl. 5 new real-SQLite integrity tests
+  passed | 1 skipped (0 failures) incl. 5 new real-SQLite integrity tests (8 by closure)
   (move atomicity failure-injection, fail-closed guard, concurrent-field
   merge, set-number distinctness); targeted Playwright 95/95 across todos,
   habits, calories, pomodoro, workout (incl. HEAVY ceilings and the
@@ -255,6 +255,32 @@ verdicts.
   `node scripts/audit-runtime-deps.mjs` exit 1 with the same 2 undocumented
   HIGH (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv).
   SECURED UNCHANGED. No waiver, no allowlist change, no merge.
+- 2026-10-17 (final convergence) — Independent closure review of
+  `f601226..22b59d8`: no P0/P1; all ten substantive claims survived direct
+  attack. Findings fixed in the closure commit: P2-1 duplicate-path silent
+  rejection (now surfaced in the routine dialog), P2-2 vacuous e2e settle
+  (replaced by an observable echo signal — no timing sleeps), P3-1/P3-2 doc
+  count/claim honesty, P3-3 reschedule catch scoping, P3-4 stale-config
+  comment. P2-3 (sequencer wiring pin) registered as backlog. Closure flake
+  fix: `tests/restore.coordinator.test.ts` `beforeAll` given an evidence-based
+  30s setup budget (3 documented full-suite 10s hook timeouts, all serial
+  re-passes green; no assertion touched).
+- 2026-10-17 (final convergence) — Final QA matrix at the closure source:
+  `tsc` 0; `eslint --max-warnings 0` 0; `qa:fast` 182/182 unit files + all
+  parity guards OK; `qa:integration` 84 passed / 1 skipped files;
+  `qa:timezones` 5 zones OK; full Vitest **2736 passed | 2 skipped** (268
+  files); `openspec validate --all` PASS; `agent:plan:validate:all` PASS;
+  hermetic `build:e2e` 0 Supabase hosts; **one full Playwright run on a
+  quiet host: 373 passed / 86 skipped / 0 failed** (459 tests, 40.7 min,
+  chromium+journeys+simulation+pwa+visual) — the historical 368/86/4
+  host-load failures all pass in-suite, classification closed without retry
+  assembly.
+- 2026-10-17 (final convergence) — Browser geometry inspection (24 states:
+  six surfaces × phone/desktop × light/dark): zero overflow, truncation,
+  tiny-target, or dialog-geometry defects; 10 floating-nav tap occlusions all
+  verified reachable on scroll (zero trapped controls). Aesthetic review of
+  `simulation-output/phase3/` marked **OWNER_VISUAL_REVIEW_PENDING** (agent
+  cannot view images; no human-visual approval is claimed).
 
 ## Changed Files / Areas
 

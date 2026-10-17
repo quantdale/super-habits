@@ -94,18 +94,53 @@ read-merge-write and `MAX(set_number)+1`, fail-closed intent contract
   tap on newly async save buttons) → accepted trade-offs, recorded.
 - **C1–C6** confirmed: no legitimate mutate trips the guard (audited 50+
   sites), extraction parity, in-transaction merges correct, sequencer sound,
-  and the new tests genuinely pin their claims (fail on pre-fix code).
+  and the new integration tests + e2e tests 1 & 3 genuinely pin their claims
+  (fail on pre-fix code) — see §5 for the precise per-test evidence notes.
 
 ## 5. Tests and actual results
+
+**Final QA matrix (closure source, 2026-10-17):**
+
+| Gate                                            | Result                                                                                                        |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `npm run typecheck`                             | 0 errors                                                                                                      |
+| `npm run lint --max-warnings 0`                 | 0 errors, 0 warnings                                                                                          |
+| `npm run qa:affected`                           | matched workout-gym-v2, e2e/simulation infra, native UI/persistence, agent workflow rules — ladder executed   |
+| `npm run qa:fast`                               | **182/182 unit files** + journey-label / quarantine-register / release-profile guards OK                      |
+| `npm run qa:integration`                        | **84 passed / 1 skipped** files (real SQLite)                                                                 |
+| `npm run qa:timezones`                          | PASS ×5 zones (Asia/Manila, UTC, America/New_York, Pacific/Honolulu, Pacific/Kiritimati)                      |
+| Full Vitest (`npm test`)                        | **2736 passed / 2 skipped** tests (267 passed / 1 skipped of 268 files)                                       |
+| `openspec validate --all`                       | PASS                                                                                                          |
+| `agent:plan:validate:all`                       | PASS                                                                                                          |
+| Hermetic `build:e2e`                            | OK, 0 Supabase hosts                                                                                          |
+| **Full Playwright (one quiet-host run)**        | **373 passed / 86 skipped / 0 failed** (459 tests, 40.7 min; chromium + journeys + simulation + pwa + visual) |
+| Security audit `scripts/audit-runtime-deps.mjs` | exit 1 — 2 undocumented HIGH (correctly red, no waiver)                                                       |
 
 - **New tests:** `e2e/workout-editor-input-reliability.spec.ts` (3: add-field
   state, rapid TextInput keystrokes, rapid stepper keystrokes + persistence +
   SQL row oracle) — 3/3 **failed as designed** pre-fix, 9/9 across 3 repeats
-  post-fix; `tests/snapshotSequencer.test.ts` (6); `tests/integration/
-workoutMutationIntegrity.data.test.ts` (7 real-SQLite: move atomicity with
-  failure injection, impossible-date rejection, fail-closed guard with
-  rollback proof, concurrent-field merge, set-number race and post-delete
-  numbering, atomic duplicate with deterministic fault injection).
+  post-fix; `tests/snapshotSequencer.test.ts` (6 — new-code coverage of the
+  ordering primitive); `tests/integration/
+workoutMutationIntegrity.data.test.ts` (8 real-SQLite: move atomicity with
+  failure injection, successful-move parity, impossible-date rejection,
+  fail-closed guard with rollback proof, atomic duplicate with deterministic
+  fault injection, concurrent-field merge, set-number race, and post-delete
+  numbering). The integration suite and e2e tests 1 & 3 fail on pre-fix code;
+  e2e test 2's pre-fix failure was timing-dependent (the keystroke-loss race
+  it reproduces is inherently timing-based); the sequencer tests pin the
+  primitive, not its wiring.
+- **Full Playwright disposition:** the historical **368 passed / 86 skipped /
+  4 failed** run (at `cd25edd`, under background load) was reviewed artifact
+  by artifact: 3 HEAVY timeouts and the habits-w7 800ms check-in ceiling
+  (measured 1029/1049 ms) — each re-verified green in isolation or quiet-host
+  re-runs, matching the documented CG-4/CG-5 host-load class. The one final
+  full run on a quiet host at the closure source passed **373 / 86 / 0 in a
+  single run** (no retry assembly; the four historical failures pass
+  in-suite), which closes the classification. No assertion was weakened; the
+  only harness change is an evidence-based 30s `beforeAll` hook budget in
+  `tests/restore.coordinator.test.ts` (its heavy module-mock setup measured
+  ~7s standalone but exceeded Vitest's 10s hook default 3× under full-suite
+  parallelism — setup budget only, no test semantics touched).
 - **Full Vitest:** 2707 passed | 20 skipped (265→268 files as tests grew); at
   final state 266 files passed | 1 skipped. The only failures ever seen were
   host-load 5s/10s subprocess/hook timeouts, each re-passed serially
@@ -146,12 +181,19 @@ habit concurrency, workout save integrity) re-run green at every milestone.
   focus/blur trace (`focusout INPUT → key -> BODY` with the
   `blurTextInput ← _handleScroll` stack) — throwaway probes since deleted;
   evidence recorded in the plan.
-- Phase-3 sweep: 24 screenshots (390×844 + 1280×800 × light/dark × six
-  surfaces) at `simulation-output/phase3/` for **owner review** — the agent
-  cannot view images. Machine-checkable quality axes all green: a11y AA
-  contrast/name/focus in 3 themes (six sections, Settings, Command Center),
-  34 visual goldens, boundary/NaN sweeps, keyboard-focus specs, HEAVY perf
-  ceilings.
+- **Closure geometry inspection (browser-based, all six surfaces × phone /
+  desktop × light / dark = 24 states):** zero horizontal overflow, zero
+  truncated text, zero tiny targets, zero out-of-viewport dialogs. 10 tap-
+  center occlusions by the floating bottom tab bar at initial scroll were
+  measured and **all 10 clear on scroll** (`tap-occluded-but-reachable`, zero
+  `tap-TRAPPED-unreachable`) — the standard floating-nav underlap pattern,
+  not a defect. No material layout defect found by mechanical inspection.
+- **`OWNER_VISUAL_REVIEW_PENDING`** — the 24 Phase-3 screenshots
+  (`simulation-output/phase3/`) cover phone/desktop × light/dark × six
+  surfaces. The agent cannot view images (model limitation), so aesthetics
+  (typography feel, spacing taste, color harmony, iconography) remain
+  explicitly **pending human review**. Machine-checkable accessibility,
+  visual-golden, and geometry checks do NOT constitute human visual approval.
 
 ## 8. Security disposition
 
@@ -178,17 +220,23 @@ no reclassification. **PR #79 stays OPEN and must not merge while red.**
 - **Hosted `e2e`/`nightly` lanes + `e2e:sync`** — CI-owned; `e2e:sync`
   needs the disposable-backend nightly lane.
 
-## 10. Registered successor candidates (not done here, with reasons)
+## 10. Prioritized successor backlog (classified)
 
-- Tier-2 silent-no-op UI writes (todo toggle/delete, habit pause/archive,
-  project/goal link-unlink, pomodoro notes/presets, daily-plan and
-  weekly-review deletes) — no divergence, no feedback; mechanical follow-up.
-- F4 linked-action dispatch crash window — needs a durable dispatch marker
-  (architectural).
-- F5 outbox revision no-op guard — reachable only after a hydrate failure.
-- F7 settings backup snapshot gap — needs a repair/drift design decision.
-- F8 reward backfill window — local-only reward layer, under-payment only.
-- Owner review of the 24 Phase-3 sweep screenshots (agent cannot view images).
+Final independent review (closure round, `f601226..22b59d8`) confirmed the
+substantive claims and closed its own findings (§13). The registered
+candidates below were classified; **none blocks closure**: no P0/P1 remains,
+and every candidate is either architectural, a design decision, or a
+low-severity polish item.
+
+| Candidate                                                                                                                                                     | Severity           | Reproducibility                               | Data-loss risk                                            | Implementation risk                                                             | Validation available           | Needed for closure                      |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | --------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------ | --------------------------------------- |
+| Tier-2 silent-no-op UI writes (task toggle/delete, habit pause/archive, project/goal link-unlink, pomodoro notes/presets, daily-plan / weekly-review deletes) | P3 UX              | Deterministic on write failure (rare trigger) | None (no divergence — DB unchanged, no feedback)          | Low (mechanical catch + surface at ~15 sites)                                   | E2E failure injection per site | No                                      |
+| F4 linked-action dispatch crash window (source commit → `processSourceAction`)                                                                                | P2                 | Crash-timing only                             | Low (one rule effect lost; no row corruption)             | Medium-high (needs a durable dispatch marker + startup sweeper — architectural) | Crash-injection integration    | No                                      |
+| F5 outbox revision no-op guard                                                                                                                                | P3                 | Only after a hydrate failure (narrow)         | Low (stale remote row + blocked outbox)                   | Medium (must not break legitimate coalescing)                                   | Integration with hydrate fault | No                                      |
+| F7 settings backup snapshot gap (value committed before its snapshot intent; no drift repair)                                                                 | P3                 | Crash between two writes                      | Low (remote snapshot stale; restore returns old settings) | Medium (needs a repair/drift design decision)                                   | Crash-injection + drift test   | No                                      |
+| F8 reward backfill window (backdated check-ins older than yesterday)                                                                                          | P3                 | Deterministic for >1-day backdates            | None (local-only reward layer, under-earn only)           | Low                                                                             | Integration with backdate      | No                                      |
+| `snapshotSequencer` wiring regression pin (unit tests cover the primitive, not the `refresh()` call site)                                                     | P3 maintainability | Refactor-dependent                            | None today                                                | Low-medium (needs component-level test infra, which this repo lacks)            | Component tests (new infra)    | No                                      |
+| Owner visual review of the 24 `simulation-output/phase3/` screenshots                                                                                         | —                  | —                                             | —                                                         | —                                                                               | Human eyes                     | **Yes — `OWNER_VISUAL_REVIEW_PENDING`** |
 
 ## 11. Exact repository recovery instructions
 
@@ -213,3 +261,40 @@ npm run build:e2e && npx playwright test e2e/workout-editor-input-reliability.sp
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Engineering completion**    | **COMPLETE for the Windows-verifiable scope** — three workstreams + adversarial-review round, every fix reproduction-backed, all local gates green at the final head.                                                |
 | **Product release readiness** | **BLOCKED** — mandatory security gate red (2 unremediated HIGH, no upstream patch), iOS device certification deferred by owner (the newest fixes un-certified on device), Android qualification environment-blocked. |
+
+## 13. Closure round — final independent review findings and resolutions
+
+Final adversarial review of the complete campaign diff (`f601226..22b59d8`)
+reported **no P0/P1**; the atomicity, sync-intent, in-transaction merge,
+numbering, and draft-input claims all survived direct attack (remount
+semantics, `void onCommit` swallow contract, sequencer interactions, and
+guard false-positive audit all verified sound). Findings and resolutions in
+the closure commit:
+
+- **P2-1** — "Use as template (duplicate)" dropped `duplicateRoutine`
+  rejections (silent no-op + unhandled rejection), an inconsistency with the
+  campaign's own rejected-write invariant. **Fixed**: the button surfaces the
+  error in the routine dialog's banner.
+- **P2-2** — the new e2e spec's fixed `waitForTimeout(1200)` could pass
+  vacuously on a slow host. **Fixed**: the settle is now proven by an
+  observable echo (the exercise summary re-renders with the refreshed set
+  values) before the no-clobber re-assertion; no timing sleeps remain.
+- **P3-1** — test-count claims disagreed across docs (5/7 vs actual 8).
+  **Fixed** everywhere.
+- **P3-2** — "the new tests genuinely pin their claims" was overbroad.
+  **Fixed** with precise per-test evidence notes.
+- **P3-3** — `WorkoutScreen`'s reschedule `.catch` could mislabel a post-move
+  refresh failure as a failed move. **Fixed** (two-argument `then`).
+- **P3-4** — `handleStartWorkout`'s comment overpromised ("never start from a
+  stale configuration" — true only for pending, not rejected, writes).
+  **Fixed** (honest contract wording).
+- **P3-5** — `duplicateRoutine` binds `set_number ?? 0`; unreachable for
+  NOT NULL rows. **Noted**, no change.
+- **P2-3** — `snapshotSequencer`'s wiring is not directly regression-pinned
+  (only the pure primitive is). **Registered** as a maintainability backlog
+  item (§10); component-level test infra does not exist in this repo.
+- Closure flake fix: `tests/restore.coordinator.test.ts`'s heavy `beforeAll`
+  exceeded Vitest's 10s hook default 3× under full-suite parallelism (each
+  serial re-run passed). Given an evidence-based 30s setup budget (no
+  assertion touched) — **verified**: `qa:fast` 182/182 and the final full
+  Vitest run are clean in-suite.

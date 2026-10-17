@@ -1061,18 +1061,21 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
               fromDateKey,
               toDateKey: rescheduleDateInput,
               routineId,
-            })
-              .then(async () => {
+            }).then(
+              () => {
                 setRescheduleVisible(false);
-                await refresh();
-              })
-              .catch((error) => {
+                void refresh();
+              },
+              (error) => {
                 // The move is atomic in the data layer; a rejection keeps the
                 // dialog open with the reason instead of vanishing silently.
+                // The second-argument form keeps a later refresh failure from
+                // being mislabeled as a failed move.
                 setWorkoutError(
                   error instanceof Error ? error.message : 'Could not move the workout.',
                 );
-              });
+              },
+            );
           }}
         />
       </Modal>
