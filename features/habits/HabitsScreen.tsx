@@ -491,6 +491,10 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     setIsSavingHabit(true);
     try {
       await runHabitSubmit();
+    } catch (error) {
+      // A rejected save must be visible and keep the editor open on the typed
+      // values — never a silent no-op (the modal only closes on a real save).
+      setHabitError(error instanceof Error ? error.message : 'Could not save the habit.');
     } finally {
       habitSubmitGuard.current.finish();
       setIsSavingHabit(false);

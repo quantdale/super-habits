@@ -11,7 +11,7 @@ import { validatePomodoroSettings } from '@/lib/validation';
 
 type Props = {
   settings: PomodoroSettings;
-  onSave: (settings: PomodoroSettings) => void;
+  onSave: (settings: PomodoroSettings) => void | Promise<void>;
   onCancel: () => void;
 };
 
@@ -23,19 +23,27 @@ export function PomodoroSettingsInline({ settings, onSave, onCancel }: Props) {
   const [sessions, setSessions] = useState(String(settings.sessionsBeforeLongBreak));
   const [settingsError, setSettingsError] = useState<string | null>(null);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const err = validatePomodoroSettings(focus, shortBrk, longBrk, sessions);
     if (err) {
       setSettingsError(err);
       return;
     }
     setSettingsError(null);
-    onSave({
-      focusMinutes: Number(focus.trim()),
-      shortBreakMinutes: Number(shortBrk.trim()),
-      longBreakMinutes: Number(longBrk.trim()),
-      sessionsBeforeLongBreak: Number(sessions.trim()),
-    });
+    try {
+      await onSave({
+        focusMinutes: Number(focus.trim()),
+        shortBreakMinutes: Number(shortBrk.trim()),
+        longBreakMinutes: Number(longBrk.trim()),
+        sessionsBeforeLongBreak: Number(sessions.trim()),
+      });
+    } catch (error) {
+      // A rejected save must stay visible here instead of silently keeping the
+      // old durations while the editor looks saved.
+      setSettingsError(
+        error instanceof Error ? error.message : 'Could not save the timer durations.',
+      );
+    }
   };
 
   return (

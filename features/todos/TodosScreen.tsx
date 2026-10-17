@@ -359,6 +359,10 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
       setModalVisible(false);
       resetForm();
       void refresh();
+    } catch (error) {
+      // A rejected save must be visible and keep the editor open on the typed
+      // values — never a silent no-op (the modal only closes on a real save).
+      setTodoError(error instanceof Error ? error.message : 'Could not save the task.');
     } finally {
       submitGuardRef.current.finish();
       setIsSubmitting(false);
@@ -701,10 +705,23 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
           return newIndex !== -1 ? { ...item, sort_order: newIndex + 1 } : item;
         }),
       );
-      await updateTodoOrder(data.map((d) => d.id));
+      try {
+        await updateTodoOrder(data.map((d) => d.id));
+      } catch (error) {
+        // The reorder above was optimistic: a rejected write must surface and
+        // re-sync the list to SQLite's order instead of silently snapping back.
+        showNotice(
+          createLinkedActionsNotice({
+            message: error instanceof Error ? error.message : 'Could not save the new task order.',
+            reason: 'reorder_failed',
+            source: { feature: 'todos', entityType: 'todo' },
+            target: { feature: 'todos', entityType: 'todo' },
+          }),
+        );
+      }
       void refresh();
     },
-    [canReorderManually, pendingIdSet, pendingTasks, refresh],
+    [canReorderManually, pendingIdSet, pendingTasks, refresh, showNotice],
   );
   const projectNameById = useMemo(
     () => new Map(projectOptions.map((p) => [p.id, p.name])),

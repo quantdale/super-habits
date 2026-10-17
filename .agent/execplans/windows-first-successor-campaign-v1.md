@@ -118,9 +118,10 @@ verdicts.
   `NumberStepperField` (core/ui semantics unchanged; settings/session-resume
   forms rely on async value pushes). Durable state lives in THIS plan; the
   post-w17 plan is COMPLETED with a forward pointer.
-- Completed work: Campaign 0 — repository recovery, baseline gates at `f601226`, iOS deferral recorded (2026-10-17). Campaign 1 discovery — defects A/B/C identified, scoped, and REPRODUCED in-browser at `f601226` (2026-10-17): all three tests of `e2e/workout-editor-input-reliability.spec.ts` failed pre-fix — add-name kept `Curls` and would double-add; rapid `Target load` typing persisted `4` of `42` (proving the f601226 `defaultValue` fix is insufficient on web); the stepper reverted `fill('')` to `40` and its `+` button acted on the stale value (`41`, unclamped).
-- In progress: post-fix gates — hermetic `build:e2e` rebuilding with the blur fix, then the new spec (repeat runs for determinism) + targeted workout/calories Playwright + full Vitest, then the Phase-1 milestone commit/push.
-- Important modified files: `features/workout/DraftNumberField.tsx` + `features/workout/DraftTextField.tsx` (new synchronous-draft wrappers: save-on-change builder fields keep user text through echo re-renders), `features/workout/RoutineDetailScreen.tsx` (all 13 save-on-change fields draft-backed; `newExerciseName` restored to controlled local state; queued writes surface rejected saves via `setWorkoutError` and still refresh; `refresh()` snapshot applications are sequenced via `lib/snapshotSequencer.ts`), `features/workout/RoutineExerciseCard.tsx` (same 13 fields), `core/ui/NumberStepperField.tsx` (`+` clamps to `min`), `core/ui/Modal.tsx` + `core/ui/Screen.tsx` (**web keystroke-loss root cause**: `keyboardDismissMode` now Platform-gated — RNW blurred the focused input on every scroll event during save-on-change typing), `lib/snapshotSequencer.ts` + `tests/snapshotSequencer.test.ts` (new, 6 tests), `e2e/workout-editor-input-reliability.spec.ts` (new, 3 tests incl. SQL row oracle).
+- Completed work: Campaign 0 — repository recovery, baseline gates at `f601226`, iOS deferral recorded (2026-10-17). Campaign 1 — workout input/persistence reliability COMPLETE at `cd25edd` (pushed): defects A/B/C fixed at source + web keystroke-loss root cause (`keyboardDismissMode` blur-on-scroll in `core/ui/Modal.tsx` + `core/ui/Screen.tsx`) + `lib/snapshotSequencer.ts`; pre-fix browser reproduction captured (3/3 designed failures at `f601226`); new spec 9/9 across 3 repeats; targeted lanes 47/47; full battery at `cd25edd` **368 passed / 86 skipped / 4 host-load-class misses** (all 4 re-verified green in isolation/quiet-host runs: 3 HEAVY timeouts pass alone, the habits-w7 800ms check-in ceiling passes 3/3 quiet — same host-load class as CG-4/CG-5; strict assertions preserved).
+- Campaign 2 (local-first) discovery complete via two parallel read-only audits. Fixed at source (in progress → gates): (F1) `rescheduleWorkoutDate` now moves a day in ONE transaction (was two commits — a failed destination leg left the workout "moved to nowhere"); (F3) `runBackupMutation` fails closed when a mutation queues sync intents but reports `changed: false` (row writes without their intents could previously commit silently — enforced by convention only); (F6) `updateRoutine`/`updateCustomExercise`/`updateBodyWeightEntry` now read-merge-write inside the serialized transaction (stale-snapshot sibling-field clobber — the rule `updateExercise`/`updateSet` already enforced) and `addSet` assigns `set_number` in-transaction (two rapid "add set" taps could share a number); (rejected-writes) the divergence-class silent-rejection sites now surface errors and keep the editor open: TodosScreen drag-reorder (optimistic reorder snapped back silently) + editor Save, HabitsScreen editor Save, CalorieGoalModal (closed as if saved), PomodoroSettingsInline (silent no-op). New real-SQLite suite `tests/integration/workoutMutationIntegrity.data.test.ts` (5 tests) pins move-atomicity (failure-injection oracle), the fail-closed guard, concurrent-field merge, and set-number distinctness. Full Vitest after Phase 2: 267 files passed | 1 skipped (0 failures).
+- In progress: hermetic `build:e2e` (Phase 2) + targeted Playwright lanes (todos/habits/calories/pomodoro/workout + new spec), then the Phase-2 milestone commit/push.
+- Important modified files: `features/workout/workout.data.ts` (atomic move + in-transaction reads/numbering), `core/sync/syncedMutation.ts` (fail-closed intent contract), `features/todos/TodosScreen.tsx`, `features/habits/HabitsScreen.tsx`, `features/calories/CalorieGoalModal.tsx`, `features/pomodoro/PomodoroSettingsInline.tsx` (rejected-save surfacing), `tests/integration/workoutMutationIntegrity.data.test.ts` (new).
 - Last successful validation: 2026-10-17 — `tsc --noEmit` 0; `eslint . --max-warnings 0` 0; Vitest **2707 passed | 20 skipped** (the 3 test + 1 suite failures in the first parallel run were host-load 5s/10s subprocess timeouts — `auditRuntimeDeps`, `nativeAuthMock`, `qaNativeProvision`, `restore.coordinator` — each re-passed serially); `lib/snapshotSequencer.test.ts` 6/6; pre-fix repro run captured (3/3 failed as designed).
 - Failures: `node scripts/audit-runtime-deps.mjs` exit 1 (braces 3.0.3 / node-forge 1.4.0 HIGH, no published compatible patch) — genuine, unfixable today, gate correctly red. Do not merge PR #79. Do not waive.
 - Relevant quarantines: none added by this campaign; no assertion weakened.
@@ -173,6 +174,19 @@ verdicts.
 
 ## Decision Log
 
+- 2026-10-17 — Deferred (documented, not fixed, from the Campaign 2 audits):
+  (F2) `duplicateRoutine` is N+1 transactions — a mid-copy failure leaves a
+  half-built routine (needs one-transaction copy); (F4) linked-action dispatch
+  on user paths is at-most-once with a crash window before `processSourceAction`
+  (needs a durable dispatch marker — architectural); (F5)
+  `upsertSyncOutboxRecord` silently no-ops a non-advancing revision (only
+  reachable after a hydrate failure); (F7) settings writes commit before their
+  backup-snapshot intent with no drift repair; (F8) reward backfill covers only
+  yesterday+today so backdated check-ins older than yesterday under-earn
+  (local-only reward layer). Tier-2/3 UI silent-no-op sites (todo toggle/delete,
+  habit pause/archive, project/goal link-unlink, pomodoro notes/presets,
+  daily-plan and weekly-review deletes) keep their current behavior — each is
+  a no-op-without-feedback, not data divergence; recorded for a successor.
 - 2026-10-17 — iOS is `IOS_QUALIFICATION_DEFERRED_BY_OWNER`: accepted external
   dependency, no simulator runs, no 13/13 claim, release readiness never
   green on iOS grounds.
