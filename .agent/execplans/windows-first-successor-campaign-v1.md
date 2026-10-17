@@ -118,24 +118,25 @@ verdicts.
   `NumberStepperField` (core/ui semantics unchanged; settings/session-resume
   forms rely on async value pushes). Durable state lives in THIS plan; the
   post-w17 plan is COMPLETED with a forward pointer.
-- Completed work: Campaign 0 — repository recovery, baseline gates at `f601226`, iOS deferral recorded (2026-10-17). Campaign 1 discovery — defects A/B/C identified and scoped (2026-10-17).
-- In progress: implementing Defect A/B/C fixes + snapshot-ordering guard in `features/workout/`.
-- Important modified files: `docs/ui-ux/v3-audit/post-w17-overnight/NATIVE-CERTIFICATION.md` (§I deferral), `openspec/changes/frontend-v3-post-w17-overnight-successor/execplan.md` (closed with forward pointer); campaign code changes land in `features/workout/` and `e2e/`.
-- Last successful validation: 2026-10-17 baseline at `f601226` — `npm run typecheck` exit 0; `npm run lint` exit 0; `npm test` green (265 files passed, 1 skipped); `npm run openspec:validate` 88/88; `npm run agent:plan:validate:all` PASS.
+- Completed work: Campaign 0 — repository recovery, baseline gates at `f601226`, iOS deferral recorded (2026-10-17). Campaign 1 discovery — defects A/B/C identified, scoped, and REPRODUCED in-browser at `f601226` (2026-10-17): all three tests of `e2e/workout-editor-input-reliability.spec.ts` failed pre-fix — add-name kept `Curls` and would double-add; rapid `Target load` typing persisted `4` of `42` (proving the f601226 `defaultValue` fix is insufficient on web); the stepper reverted `fill('')` to `40` and its `+` button acted on the stale value (`41`, unclamped).
+- In progress: post-fix gates — hermetic `build:e2e` rebuilding with the blur fix, then the new spec (repeat runs for determinism) + targeted workout/calories Playwright + full Vitest, then the Phase-1 milestone commit/push.
+- Important modified files: `features/workout/DraftNumberField.tsx` + `features/workout/DraftTextField.tsx` (new synchronous-draft wrappers: save-on-change builder fields keep user text through echo re-renders), `features/workout/RoutineDetailScreen.tsx` (all 13 save-on-change fields draft-backed; `newExerciseName` restored to controlled local state; queued writes surface rejected saves via `setWorkoutError` and still refresh; `refresh()` snapshot applications are sequenced via `lib/snapshotSequencer.ts`), `features/workout/RoutineExerciseCard.tsx` (same 13 fields), `core/ui/NumberStepperField.tsx` (`+` clamps to `min`), `core/ui/Modal.tsx` + `core/ui/Screen.tsx` (**web keystroke-loss root cause**: `keyboardDismissMode` now Platform-gated — RNW blurred the focused input on every scroll event during save-on-change typing), `lib/snapshotSequencer.ts` + `tests/snapshotSequencer.test.ts` (new, 6 tests), `e2e/workout-editor-input-reliability.spec.ts` (new, 3 tests incl. SQL row oracle).
+- Last successful validation: 2026-10-17 — `tsc --noEmit` 0; `eslint . --max-warnings 0` 0; Vitest **2707 passed | 20 skipped** (the 3 test + 1 suite failures in the first parallel run were host-load 5s/10s subprocess timeouts — `auditRuntimeDeps`, `nativeAuthMock`, `qaNativeProvision`, `restore.coordinator` — each re-passed serially); `lib/snapshotSequencer.test.ts` 6/6; pre-fix repro run captured (3/3 failed as designed).
 - Failures: `node scripts/audit-runtime-deps.mjs` exit 1 (braces 3.0.3 / node-forge 1.4.0 HIGH, no published compatible patch) — genuine, unfixable today, gate correctly red. Do not merge PR #79. Do not waive.
-- Relevant quarantines: none added by this campaign; no assertion may be weakened.
+- Relevant quarantines: none added by this campaign; no assertion weakened.
 - Blockers: (a) security gate red (external, standing) — release BLOCKED; (b) iOS qualification owner-deferred (`IOS_QUALIFICATION_DEFERRED_BY_OWNER`); (c) Android ENVIRONMENT_BLOCKED.
-- Exact next action: implement Defect A (restore `value={newExerciseName}` in `features/workout/RoutineDetailScreen.tsx`), then the workout-local draft stepper for Defect B's 10 call sites (`RoutineDetailScreen.tsx`, `RoutineExerciseCard.tsx`), then Defect C's error surfacing + monotonic snapshot sequencer for `refresh`; capture pre-fix browser reproduction of A/B, then run the Phase-1 gates.
-- Remaining definition of done: Phase 1 DoD — all three defects fixed at source with reproduction evidence; Phase-1 gates green (qa:affected ladder, hermetic `build:e2e`, targeted Playwright, full Vitest); no assertion weakened; milestone committed and pushed to the campaign branch.
+- Exact next action: run `npx playwright test e2e/workout-editor-input-reliability.spec.ts e2e/workout-gym-v2.spec.ts --project=chromium` against the rebuilt hermetic dist (expect 3/3 new + workout-gym-v2 green), then commit + push the Phase-1 milestone to the campaign branch.
+- Remaining definition of done: Phase 1 DoD — all three defects fixed at source with reproduction evidence (pre-fix failures captured); Phase-1 gates green (qa:affected ladder, hermetic `build:e2e`, targeted Playwright, full Vitest); no assertion weakened; milestone committed and pushed to the campaign branch.
 
 ## Progress
 
 - [x] Campaign 0 — repository recovery, baseline gates at `f601226`, iOS deferral recorded (2026-10-17)
 - [x] Campaign 1 — discovery: defects A/B/C identified and scoped (2026-10-17)
-- [ ] Campaign 1 — fix Defect A (add-exercise name field)
-- [ ] Campaign 1 — fix Defect B (draft-backed steppers, 10 call sites)
-- [ ] Campaign 1 — fix Defect C (rejected-save surfacing) + snapshot ordering guard
-- [ ] Campaign 1 — tests: pre-fix reproduction, post-fix Playwright oracle, sequencer unit test
+- [x] Campaign 1 — pre-fix browser reproduction captured (3/3 designed failures at `f601226`)
+- [x] Campaign 1 — fix Defect A (add-exercise name field restored to controlled local state)
+- [x] Campaign 1 — fix Defect B (synchronous-draft fields for all 26 save-on-change builder inputs; `+` clamp in `NumberStepperField`)
+- [x] Campaign 1 — fix Defect C (rejected-save surfacing in queued writes + handlers) + snapshot ordering guard (`lib/snapshotSequencer.ts`)
+- [ ] Campaign 1 — tests green post-fix (new spec + workout-gym-v2 targeted Playwright, sequencer unit tests)
 - [ ] Campaign 1 — Phase-1 gates + milestone commit/push
 - [ ] Campaign 2 — local-first reliability (discovery-led, defect-gated)
 - [ ] Campaign 3 — Windows/web product-quality browser inspection
@@ -151,6 +152,24 @@ verdicts.
   serialized transaction (`withSQLiteTransaction` chains per-DB tails), so
   cross-field stale overwrites at the data layer are already guarded; the
   residual defects are UI-side value binding and refresh ordering.
+- The `f601226` `defaultValue` uncontrolled-input fix is INSUFFICIENT on web:
+  browser reproduction kept `4` of `42` in `Target load`. The clobber is a
+  timing race between per-keystroke saves and their refresh re-renders (echo
+  writes reach the DOM between keystrokes); both `value=` and `defaultValue=`
+  bindings lose text. The synchronous-draft wrapper is the robust contract.
+- **Keystroke loss root cause (web): RNW `ScrollView._handleScroll` calls
+  `dismissKeyboard()` on EVERY scroll event when `keyboardDismissMode="on-drag"`
+  — and `core/ui/Modal.tsx` + `core/ui/Screen.tsx` set that prop unconditionally.
+  Any scroll event — including layout reflows fired by save-on-change refreshes
+  (ValidationError insertion, content resize) and `scrollIntoView` — blurs the
+  focused input (blur() stack: `blurTextInput` ← `_handleScroll`), so subsequent
+  keystrokes land on BODY and are lost. Reproduced deterministically with a
+  focus/blur trace (`focusout INPUT … → key '2' -> BODY`). Fixed by
+  Platform-gating the prop (`none` on web — no soft keyboard to dismiss —
+  `on-drag` kept on native).**
+- `NumberStepperField`'s `+` on an empty field computed `min(max, validNum+1)`
+  from `Number('') = 0`, yielding `1` even for `min=5` fields (reproduced:
+  `41` from a stale `40` after a reverted clear). Now clamped to `min`.
 
 ## Decision Log
 
@@ -175,6 +194,20 @@ verdicts.
   `npm run lint` exit 0 (standalone re-run); `npm test` green (265 test files
   passed, 1 skipped); `npm run openspec:validate` 88/88;
   `npm run agent:plan:validate:all` PASS.
+- 2026-10-17 — Campaign 1 pre-fix reproduction (hermetic `build:e2e`, 0
+  Supabase hosts): `npx playwright test e2e/workout-editor-input-reliability.spec.ts
+--project=chromium` — 3/3 FAILED at `f601226` exactly as designed (add-name
+  stale text; `Target load` rapid typing kept `4` of `42`; stepper reverted
+  `fill('')` to `40` and `+` produced unclamped `41`). A MutationObserver probe
+  (throwaway spec, since deleted) showed the same input node surviving echo
+  writes while the value still regressed — a timing race between per-keystroke
+  saves and their refresh re-renders, in both `value=` and `defaultValue=`
+  bindings.
+- 2026-10-17 — Post-fix static gates: `tsc --noEmit` 0; `eslint .
+--max-warnings 0` 0; Vitest `npm test` 2707 passed | 20 skipped with 3 test
+  - 1 suite host-load timeouts (`auditRuntimeDeps`, `nativeAuthMock`,
+    `qaNativeProvision`, `restore.coordinator` — all subprocess/probe/hook
+    timing under parallel load) — each re-passed in a serial re-run.
 
 ## Changed Files / Areas
 
