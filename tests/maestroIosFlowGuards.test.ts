@@ -68,7 +68,7 @@ describe('Maestro flows avoid constructs proven to fail on the iOS CI target', (
     }
   });
 
-  it('gym-v2 persistence no longer swipe-repeats the increment out of the card', () => {
+  it('gym-v2 persistence pulls the increment row inside the dialog panel before tapping', () => {
     const flow = read('workout-gym-v2-persistence.yaml');
     expect(flow).toContain(
       "- scrollUntilVisible:\n    element: 'Native custom press progression increment'",
@@ -78,9 +78,20 @@ describe('Maestro flows avoid constructs proven to fail on the iOS CI target', (
     expect(flow).not.toMatch(
       /while:\s*\n\s*notVisible:\s*'Native custom press progression increment'/,
     );
-    // No centerElement: the comment this replaced recorded that a centered
-    // scroll already escaped to the Workout screen, so centering is unproven
-    // here and must not be re-introduced as a fix.
+    // CENTERED with direction DOWN — the only pairing that repositions a row
+    // Maestro already reads as visible. Evidence chain: (1) the escape — at
+    // the row's clipped position ([41,812][141,843] against the dialog panel
+    // bottom ~813, core/ui/Modal dialog maxHeight 86% centered on the 874pt
+    // target) the bounds-center tap lands on the modal's Dismiss scrim and
+    // closes the routine (runs 38676461813 / 38726951043 / 38793221651);
+    // (2) only centerElement repositions such a row — the screen-based
+    // visibility metric reads it as 100% visible and plain scrolls return
+    // without moving; (3) direction DOWN converges in one swipe while
+    // direction UP cannot converge on this target (run 38793221651: the row
+    // was found fully visible yet the centering swipes overshot it until the
+    // budget expired); (4) no side-margin crossing swipe may precede the
+    // block — run 38838647812 showed a 300ms side swipe FLINGS the modal's
+    // scroll view ~1000pt past the row.
     const incrementBlock = flow
       .slice(
         flow.indexOf(
@@ -88,7 +99,47 @@ describe('Maestro flows avoid constructs proven to fail on the iOS CI target', (
         ),
       )
       .split('\n- ')[0];
-    expect(incrementBlock).not.toMatch(/centerElement/);
+    expect(incrementBlock).toMatch(/centerElement: true/);
+    expect(incrementBlock).toMatch(/direction: DOWN/);
+    expect(flow).not.toMatch(
+      /- swipe:\s*\n\s*start: '85%, 72%'[\s\S]{0,120}- scrollUntilVisible:\s*\n\s*element: 'Native custom press progression increment'/,
+    );
+  });
+
+  it('no workout row scroll pairs centerElement with direction UP', () => {
+    // Maestro 2.2.0's centering with direction UP does not converge on the
+    // iOS CI target (run 38793221651: all three UP+center row scrolls failed
+    // while every DOWN+center scroll passed). The plain visibility stop is
+    // the proven construct for those rows.
+    for (const name of flowNames.filter((n) => n.startsWith('workout-'))) {
+      const flow = read(name);
+      const blocks = flow.split(/\n- /);
+      for (const block of blocks) {
+        if (/scrollUntilVisible:/.test(block) && /direction: UP/.test(block)) {
+          expect(block, `${name} pairs centerElement with a direction UP scroll`).not.toMatch(
+            /centerElement/,
+          );
+        }
+      }
+    }
+  });
+
+  it('gym-v2 persistence taps stepper inputs by index and asserts unique values', () => {
+    const flow = read('workout-gym-v2-persistence.yaml');
+    // NumberStepperField exposes its label Text and the input under the same
+    // name; index 0 is the inert label and inputText after a label tap is a
+    // silent no-op (proven for the old `Weight` tap in run 36423379932), so
+    // the input is index 1 — the same convention as the lifecycle flow.
+    expect(flow).toMatch(/tapOn:\s*\n\s*text: 'Target reps min'\s*\n\s*index: 1/);
+    expect(flow).toMatch(/tapOn:\s*\n\s*text: 'Target reps max'\s*\n\s*index: 1/);
+    // The post-restart persistence oracles must each be satisfiable only by
+    // their own field (full-match text semantics): bare '40' is the set's
+    // default Active-seconds value and would pass even if Target load never
+    // persisted, and 5/8 must not double as the Target reps values.
+    expect(flow).not.toMatch(/assertVisible: '40'/);
+    for (const value of ['2.5', '5', '8', '7', '11', '42']) {
+      expect(flow).toContain(`assertVisible: '${value}'`);
+    }
   });
 
   it('gym-v2 lifecycle dismisses the keyboard with enter-to-blur, not hideKeyboard', () => {
@@ -106,5 +157,21 @@ describe('Maestro flows avoid constructs proven to fail on the iOS CI target', (
     expect(tail).toMatch(/-\s*launchApp/);
     expect(tail).toMatch(/assertVisible:\s*'42'/);
     expect(tail).toMatch(/assertVisible:\s*'6'/);
+  });
+
+  it('every takeScreenshot breadcrumb is gitignored at the repo root', () => {
+    // Maestro writes `takeScreenshot: <bare-name>` into the process CWD (the
+    // repo root). Unignored, those PNGs fail BOTH the iOS lane's
+    // sourceUnchangedApartFromGeneratedIos gate and the Android runner's
+    // checkTarget: runs 38676461813 and 38726951043 ended sourceUnchanged=false
+    // for exactly this reason. Keep every breadcrumb name ignored.
+    const gitignore = readFileSync(join(process.cwd(), '.gitignore'), 'utf8');
+    const names = flowNames.flatMap((name) =>
+      [...read(name).matchAll(/^- takeScreenshot:\s*(\S+)\s*$/gm)].map((match) => match[1]),
+    );
+    expect(names.length, 'no takeScreenshot breadcrumbs found to guard').toBeGreaterThan(0);
+    for (const name of names) {
+      expect(gitignore, `takeScreenshot '${name}' is not gitignored`).toContain(`/${name}.png`);
+    }
   });
 });

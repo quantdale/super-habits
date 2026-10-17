@@ -46,12 +46,15 @@ tags:
     timeout: 3000
 - tapOn: 'Add routine'
 # The new routine is prepended to the routines list, which sits ABOVE the
-# 'New routine' form, so the row is reached by scrolling UP.
+# 'New routine' form, so the row is reached by scrolling UP. No centerElement:
+# Maestro 2.2.0's centering with direction UP does not converge on this
+# target (run 38793221651 — the row was found fully visible yet the centering
+# swipes overshot it until the 20s budget expired in hierarchy fetches).
 - scrollUntilVisible:
     element: 'Open Native Gym V2 resume routine routine'
     direction: UP
     visibilityPercentage: 50
-    centerElement: true
+    timeout: 30000
 - waitForAnimationToEnd:
     timeout: 3000
 - tapOn: 'Open Native Gym V2 resume routine routine'
@@ -152,7 +155,9 @@ tags:
 - extendedWaitUntil:
     visible: 'Complete set 1'
     timeout: 5000
-- tapOn: 'Weight'
+- tapOn:
+    text: 'Weight'
+    index: 1
 - inputText: '42'
 - assertVisible: '42'
 # Enter-to-blur, not hideKeyboard: run 36423379932 failed at this exact step
@@ -161,7 +166,9 @@ tags:
 # killApp/launchApp at 'Resume workout'. Evidence:
 # openspec/changes/final-certification-closure/ios-flow-classification.md
 - pressKey: enter
-- tapOn: 'Reps'
+- tapOn:
+    text: 'Reps'
+    index: 1
 - inputText: '6'
 - waitForAnimationToEnd:
     timeout: 5000
@@ -183,7 +190,11 @@ tags:
 - extendedWaitUntil:
     visible: 'Session in progress'
     timeout: 15000
-- tapOn: 'Resume workout'
+# The resume button's accessible name carries the routine ('Resume workout ·
+# Native Gym V2 resume routine' — run 38838647812), so the selector must be a
+# partial-match wrapper: a full-match 'Resume workout' misses it (the same
+# class as the todo-persistence 'Edit task: <title>' fix).
+- tapOn: '.*Resume workout.*'
 - extendedWaitUntil:
     visible: 'Complete set 1'
     timeout: 10000
@@ -200,10 +211,20 @@ tags:
 - tapOn: 'Done'
 # W9 collapses History & insights by default, and 'Recent sessions' renders
 # inside it, so the disclosure must be opened before the session list exists.
+# The history disclosure parks at the bottom edge (run 38855979274:
+# [16,748][386,808] — the bounds-center (201,778) lands on the floating tab
+# bar's top edge and the tap never opens it). It also cannot be centered:
+# the section is at the content's end, so run 38869382876 showed the
+# centering stall at [16,581] (try 1→2 unchanged) and time out. Pull it
+# clear with one controlled slow drag instead (no fling), then tap.
 - scrollUntilVisible:
     element: 'History and insights'
     direction: DOWN
     visibilityPercentage: 50
+- swipe:
+    start: '50%, 78%'
+    end: '50%, 63%'
+    duration: 800
 - tapOn: 'History and insights'
 - scrollUntilVisible:
     element: 'Recent sessions'
@@ -222,10 +243,17 @@ tags:
     # "Workout" and an unscoped index-0 match can land on inert content.
     childOf:
       text: 'Section tabs'
+# Same tab-bar-edge pull as the pre-restart block (runs 38855979274 /
+# 38869382876): no centerElement — the section sits at the content's end and
+# centering can never converge there.
 - scrollUntilVisible:
     element: 'History and insights'
     direction: DOWN
     visibilityPercentage: 50
+- swipe:
+    start: '50%, 78%'
+    end: '50%, 63%'
+    duration: 800
 - tapOn: 'History and insights'
 - scrollUntilVisible:
     element: 'Recent sessions'

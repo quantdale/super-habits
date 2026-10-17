@@ -92,7 +92,10 @@ export function Screen({
             bottomPadding > 0 ? { paddingBottom: bottomPadding } : null,
           ]}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
+          // Web has no soft keyboard: RNW maps "on-drag" to blurring the
+          // focused input on EVERY scroll event (including layout reflows from
+          // save-on-change refreshes), which drops keystrokes mid-typing.
+          keyboardDismissMode={Platform.OS === 'web' ? 'none' : 'on-drag'}
           nestedScrollEnabled
           scrollEnabled
           refreshControl={refreshControl}

@@ -2,7 +2,6 @@ import { Text } from '@/core/ui/Text';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, TextInput, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import DraggableFlatList, { ScaleDecorator } from 'react-native-draggable-flatlist';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Modal } from '@/core/ui/Modal';
 import { Button } from '@/core/ui/Button';
@@ -36,7 +35,9 @@ import { SECTION_COLORS } from '@/constants/sectionColors';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { validateExerciseName, validateRoutineName, validateSetTiming } from '@/lib/validation';
 import { parseNumericInput } from '@/lib/numericInput';
-import { NumberStepperField } from '@/core/ui/NumberStepperField';
+import { createSnapshotSequencer } from '@/lib/snapshotSequencer';
+import { DraftNumberField } from './DraftNumberField';
+import { DraftTextField } from './DraftTextField';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { PillChip } from '@/core/ui/PillChip';
 import { TextField } from '@/core/ui/TextField';
@@ -130,8 +131,10 @@ export function RoutineDetailModal({
   const [managerPending, setManagerPending] = useState(false);
   const [managerClosing, setManagerClosing] = useState(false);
   const pendingBuilderMutationsRef = useRef<Promise<void>>(Promise.resolve());
+  const snapshotSequencerRef = useRef(createSnapshotSequencer());
 
   const refresh = useCallback(async () => {
+    const seq = snapshotSequencerRef.current.begin();
     const exList = await listExercises(routineId);
     const withSets = await Promise.all(
       exList.map(async (ex) => ({
@@ -139,13 +142,18 @@ export function RoutineDetailModal({
         sets: await listSets(ex.id),
       })),
     );
+    // Two overlapping refreshes can resolve out of order; a slower older read
+    // must never overwrite the state a newer read already applied.
+    if (!snapshotSequencerRef.current.claim(seq)) return;
     setExercises(withSets);
   }, [routineId]);
 
   // Text inputs and prescription chips can emit several writes before React
   // has rendered the next snapshot. Serialize those writes and make the
-  // primary action wait for them, so a session can never start from a stale
-  // routine configuration.
+  // primary action wait for them, so a session never starts while edits are
+  // still in flight. A REJECTED edit is surfaced in the editor and the
+  // session then starts from SQLite's committed configuration (the queue
+  // resolves on failure by design — see surfaceBuilderFailure).
   const queueBuilderMutation = useCallback((mutation: () => Promise<void>): Promise<void> => {
     const next = pendingBuilderMutationsRef.current.then(mutation, mutation);
     pendingBuilderMutationsRef.current = next.then(
@@ -166,39 +174,55 @@ export function RoutineDetailModal({
     }
   }, [isStarting, onStartWorkout]);
 
+  // A rejected builder write must never be silent: surface it in the editor
+  // and swallow the rejection so the caller's follow-up refresh still re-syncs
+  // the UI to SQLite and no unhandled rejection escapes the queue.
+  const surfaceBuilderFailure = useCallback(
+    async (mutation: () => Promise<void>): Promise<void> => {
+      try {
+        await mutation();
+        setWorkoutError(null);
+      } catch (error) {
+        setWorkoutError(error instanceof Error ? error.message : 'Could not save the change.');
+      }
+    },
+    [],
+  );
+
   const queuedUpdateExercise = useCallback(
     (id: string, updates: Parameters<typeof updateExercise>[1]) =>
-      queueBuilderMutation(() => updateExercise(id, updates)),
-    [queueBuilderMutation],
+      queueBuilderMutation(() => surfaceBuilderFailure(() => updateExercise(id, updates))),
+    [queueBuilderMutation, surfaceBuilderFailure],
   );
 
   const queuedUpdateSet = useCallback(
     (id: string, updates: Parameters<typeof updateSet>[1]) =>
-      queueBuilderMutation(() => updateSet(id, updates)),
-    [queueBuilderMutation],
+      queueBuilderMutation(() => surfaceBuilderFailure(() => updateSet(id, updates))),
+    [queueBuilderMutation, surfaceBuilderFailure],
   );
 
   const queuedUpdateSetPrescription = useCallback(
     (id: string, updates: Parameters<typeof updateSetPrescription>[1]) =>
-      queueBuilderMutation(() => updateSetPrescription(id, updates)),
-    [queueBuilderMutation],
+      queueBuilderMutation(() => surfaceBuilderFailure(() => updateSetPrescription(id, updates))),
+    [queueBuilderMutation, surfaceBuilderFailure],
   );
 
   const queuedDeleteSet = useCallback(
-    (id: string) => queueBuilderMutation(() => deleteSet(id)),
-    [queueBuilderMutation],
+    (id: string) => queueBuilderMutation(() => surfaceBuilderFailure(() => deleteSet(id))),
+    [queueBuilderMutation, surfaceBuilderFailure],
   );
 
   const queuedAddDefaultSet = useCallback(
-    (exerciseId: string) => queueBuilderMutation(() => addDefaultSet(exerciseId)),
-    [queueBuilderMutation],
+    (exerciseId: string) =>
+      queueBuilderMutation(() => surfaceBuilderFailure(() => addDefaultSet(exerciseId))),
+    [queueBuilderMutation, surfaceBuilderFailure],
   );
 
   useEffect(() => {
     if (!visible || !routineId) return;
     // Data fetch on open: setExercises fires after the awaits inside
     // refresh(), not synchronously in this effect body.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+
     void refresh();
   }, [visible, routineId, refresh]);
 
@@ -215,18 +239,28 @@ export function RoutineDetailModal({
       setRenameDraft(null);
       return;
     }
-    // Pre-validate with a notice (same contract the data layer now asserts):
-    // this handler has no try/catch, so a data-layer throw would reject
-    // into the queue unhandled. Keep the draft open so the user can fix it.
+    // Pre-validate with a notice (same contract the data layer now asserts),
+    // then keep the draft open on a rejected write so the user can fix it.
     const err = validateRoutineName(trimmed);
     if (err) {
       setWorkoutError(err);
       return;
     }
     setWorkoutError(null);
-    await updateRoutine(routineId, { name: trimmed });
+    try {
+      await updateRoutine(routineId, { name: trimmed });
+    } catch (error) {
+      setWorkoutError(error instanceof Error ? error.message : 'Could not rename the routine.');
+      return;
+    }
     setRenameDraft(null);
-    await onRenamed?.(trimmed);
+    try {
+      await onRenamed?.(trimmed);
+    } catch (error) {
+      setWorkoutError(
+        error instanceof Error ? error.message : 'Could not refresh after renaming the routine.',
+      );
+    }
   }, [onRenamed, renameDraft, routineId, routineName]);
 
   // Collapse the open exercise when the modal closes, without an effect:
@@ -244,15 +278,19 @@ export function RoutineDetailModal({
       return;
     }
     setWorkoutError(null);
-    const exId = await addExercise({
-      routineId,
-      name: newExerciseName.trim(),
-      sortOrder: exercises.length + 1,
-    });
-    await queuedAddDefaultSet(exId);
-    setNewExerciseName('');
-    await refresh();
-    setExpandedId(exId);
+    try {
+      const exId = await addExercise({
+        routineId,
+        name: newExerciseName.trim(),
+        sortOrder: exercises.length + 1,
+      });
+      await queuedAddDefaultSet(exId);
+      setNewExerciseName('');
+      await refresh();
+      setExpandedId(exId);
+    } catch (error) {
+      setWorkoutError(error instanceof Error ? error.message : 'Could not add the exercise.');
+    }
   };
 
   const closePicker = () => {
@@ -261,19 +299,23 @@ export function RoutineDetailModal({
   };
 
   const handleAddCatalogExercise = async (item: ExerciseCatalogItem) => {
-    const exId = await addExercise({
-      routineId,
-      name: item.name,
-      catalogExerciseId: item.id,
-      modality: item.modality,
-      unilateral: item.unilateral,
-      supportsExternalLoad: exerciseSupportsExternalLoad(item),
-      sortOrder: exercises.length + 1,
-    });
-    await queuedAddDefaultSet(exId);
-    closePicker();
-    await refresh();
-    setExpandedId(exId);
+    try {
+      const exId = await addExercise({
+        routineId,
+        name: item.name,
+        catalogExerciseId: item.id,
+        modality: item.modality,
+        unilateral: item.unilateral,
+        supportsExternalLoad: exerciseSupportsExternalLoad(item),
+        sortOrder: exercises.length + 1,
+      });
+      await queuedAddDefaultSet(exId);
+      closePicker();
+      await refresh();
+      setExpandedId(exId);
+    } catch (error) {
+      setWorkoutError(error instanceof Error ? error.message : 'Could not add the exercise.');
+    }
   };
 
   const handleCreateCustomExercise = async () => {
@@ -370,13 +412,11 @@ export function RoutineDetailModal({
     const next = [...exercises];
     [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
     setExercises(next);
-    await queueBuilderMutation(() => updateExerciseOrder(next.map((exercise) => exercise.id)));
-    await refresh();
-  };
-
-  const handleDragEnd = async ({ data }: { data: ExerciseWithSets[] }) => {
-    setExercises(data);
-    await queueBuilderMutation(() => updateExerciseOrder(data.map((exercise) => exercise.id)));
+    await queueBuilderMutation(() =>
+      surfaceBuilderFailure(() => updateExerciseOrder(next.map((exercise) => exercise.id))),
+    );
+    // Re-sync either way: on a rejected write the optimistic swap above must
+    // not stay on screen while SQLite keeps the old order.
     await refresh();
   };
 
@@ -390,11 +430,11 @@ export function RoutineDetailModal({
       });
       if (!confirmed) return;
 
-      await deleteExercise(id);
+      await queueBuilderMutation(() => surfaceBuilderFailure(() => deleteExercise(id)));
       if (expandedId === id) setExpandedId(null);
       await refresh();
     },
-    [confirm, expandedId, refresh],
+    [confirm, expandedId, queueBuilderMutation, refresh, surfaceBuilderFailure],
   );
 
   const toggleExpanded = (id: string) => {
@@ -638,35 +678,23 @@ export function RoutineDetailModal({
                           />
                         </View>
                       ) : null}
-                      <TextInput
+                      <DraftTextField
                         accessibilityLabel={`${ex.name} notes`}
-                        value={ex.notes ?? ''}
-                        onChangeText={(value) => {
-                          void queuedUpdateExercise(ex.id, { notes: value }).then(refresh);
-                        }}
+                        initialValue={ex.notes ?? ''}
+                        onCommit={(value) =>
+                          void queuedUpdateExercise(ex.id, { notes: value }).then(refresh)
+                        }
                         placeholder="Cues or setup notes"
-                        placeholderTextColor={tokens.textMuted}
                         className="mb-3 rounded-xl border px-3 py-2 text-sm"
-                        style={{
-                          borderColor: tokens.border,
-                          backgroundColor: tokens.surfaceElevated,
-                          color: tokens.text,
-                        }}
                       />
-                      <TextInput
+                      <DraftTextField
                         accessibilityLabel={`${ex.name} superset group`}
-                        value={ex.superset_group ?? ''}
-                        onChangeText={(value) => {
-                          void queuedUpdateExercise(ex.id, { supersetGroup: value }).then(refresh);
-                        }}
+                        initialValue={ex.superset_group ?? ''}
+                        onCommit={(value) =>
+                          void queuedUpdateExercise(ex.id, { supersetGroup: value }).then(refresh)
+                        }
                         placeholder="Superset group (optional)"
-                        placeholderTextColor={tokens.textMuted}
                         className="mb-3 rounded-xl border px-3 py-2 text-sm"
-                        style={{
-                          borderColor: tokens.border,
-                          backgroundColor: tokens.surfaceElevated,
-                          color: tokens.text,
-                        }}
                       />
                       {modality === 'weighted_strength' ||
                       modality === 'bodyweight' ||
@@ -703,14 +731,14 @@ export function RoutineDetailModal({
                           </View>
                           <View className="flex-row gap-2">
                             <View className="min-w-0 flex-1">
-                              <TextInput
+                              <DraftTextField
                                 accessibilityLabel={`${ex.name} progression increment`}
-                                value={
+                                initialValue={
                                   ex.progression_increment == null
                                     ? ''
                                     : String(ex.progression_increment)
                                 }
-                                onChangeText={(value) => {
+                                onCommit={(value) => {
                                   const parsed = parseNumericInput(value, { allowDecimal: true });
                                   void queuedUpdateExercise(ex.id, {
                                     progressionIncrement:
@@ -718,25 +746,18 @@ export function RoutineDetailModal({
                                   }).then(refresh);
                                 }}
                                 placeholder="Load + (kg)"
-                                placeholderTextColor={tokens.textMuted}
                                 keyboardType="decimal-pad"
-                                className="rounded-xl border px-3 py-2 text-sm"
-                                style={{
-                                  borderColor: tokens.border,
-                                  backgroundColor: tokens.surfaceElevated,
-                                  color: tokens.text,
-                                }}
                               />
                             </View>
                             <View className="min-w-0 flex-1">
-                              <TextInput
+                              <DraftTextField
                                 accessibilityLabel={`${ex.name} minimum reps`}
-                                value={
+                                initialValue={
                                   ex.progression_min_reps == null
                                     ? ''
                                     : String(ex.progression_min_reps)
                                 }
-                                onChangeText={(value) => {
+                                onCommit={(value) => {
                                   const parsed = parseNumericInput(value);
                                   void queuedUpdateExercise(ex.id, {
                                     progressionMinReps:
@@ -744,25 +765,18 @@ export function RoutineDetailModal({
                                   }).then(refresh);
                                 }}
                                 placeholder="Min reps"
-                                placeholderTextColor={tokens.textMuted}
                                 keyboardType="number-pad"
-                                className="rounded-xl border px-3 py-2 text-sm"
-                                style={{
-                                  borderColor: tokens.border,
-                                  backgroundColor: tokens.surfaceElevated,
-                                  color: tokens.text,
-                                }}
                               />
                             </View>
                             <View className="min-w-0 flex-1">
-                              <TextInput
+                              <DraftTextField
                                 accessibilityLabel={`${ex.name} maximum reps`}
-                                value={
+                                initialValue={
                                   ex.progression_max_reps == null
                                     ? ''
                                     : String(ex.progression_max_reps)
                                 }
-                                onChangeText={(value) => {
+                                onCommit={(value) => {
                                   const parsed = parseNumericInput(value);
                                   void queuedUpdateExercise(ex.id, {
                                     progressionMaxReps:
@@ -770,14 +784,7 @@ export function RoutineDetailModal({
                                   }).then(refresh);
                                 }}
                                 placeholder="Max reps"
-                                placeholderTextColor={tokens.textMuted}
                                 keyboardType="number-pad"
-                                className="rounded-xl border px-3 py-2 text-sm"
-                                style={{
-                                  borderColor: tokens.border,
-                                  backgroundColor: tokens.surfaceElevated,
-                                  color: tokens.text,
-                                }}
                               />
                             </View>
                           </View>
@@ -791,10 +798,10 @@ export function RoutineDetailModal({
                           >
                             Set {set.set_number}
                           </Text>
-                          <NumberStepperField
+                          <DraftNumberField
                             label="Active (seconds)"
-                            value={String(set.active_seconds)}
-                            onChange={async (v) => {
+                            initialValue={String(set.active_seconds)}
+                            onCommit={async (v) => {
                               const next = Math.round(Number(v.trim()));
                               if (!Number.isFinite(next)) return;
                               const timingErr = validateSetTiming(next, set.rest_seconds);
@@ -818,10 +825,10 @@ export function RoutineDetailModal({
                             min={5}
                             max={3600}
                           />
-                          <NumberStepperField
+                          <DraftNumberField
                             label="Rest (seconds, 0 = no rest)"
-                            value={String(set.rest_seconds)}
-                            onChange={async (v) => {
+                            initialValue={String(set.rest_seconds)}
+                            onCommit={async (v) => {
                               const next = Math.round(Number(v.trim()));
                               if (!Number.isFinite(next)) return;
                               const timingErr = validateSetTiming(set.active_seconds, next);
@@ -850,12 +857,12 @@ export function RoutineDetailModal({
                           modality === null ? (
                             <View className="flex-row gap-2">
                               <View className="min-w-0 flex-1">
-                                <NumberStepperField
+                                <DraftNumberField
                                   label="Target reps min"
-                                  value={
+                                  initialValue={
                                     set.target_reps_min == null ? '' : String(set.target_reps_min)
                                   }
-                                  onChange={(value) =>
+                                  onCommit={(value) =>
                                     void queuedUpdateSetPrescription(set.id, {
                                       targetRepsMin: value ? Number(value) : null,
                                     }).then(refresh)
@@ -866,12 +873,12 @@ export function RoutineDetailModal({
                                 />
                               </View>
                               <View className="min-w-0 flex-1">
-                                <NumberStepperField
+                                <DraftNumberField
                                   label="Target reps max"
-                                  value={
+                                  initialValue={
                                     set.target_reps_max == null ? '' : String(set.target_reps_max)
                                   }
-                                  onChange={(value) =>
+                                  onCommit={(value) =>
                                     void queuedUpdateSetPrescription(set.id, {
                                       targetRepsMax: value ? Number(value) : null,
                                     }).then(refresh)
@@ -886,54 +893,42 @@ export function RoutineDetailModal({
                           {modality === 'cardio' ? (
                             <View className="flex-row gap-2">
                               <View className="min-w-0 flex-1">
-                                <TextInput
+                                <DraftTextField
                                   accessibilityLabel="Target distance"
-                                  value={
+                                  initialValue={
                                     set.target_distance == null ? '' : String(set.target_distance)
                                   }
-                                  onChangeText={(value) =>
+                                  onCommit={(value) =>
                                     void queuedUpdateSetPrescription(set.id, {
                                       targetDistance: value ? Number(value) : null,
                                     }).then(refresh)
                                   }
                                   placeholder="Distance"
-                                  placeholderTextColor={tokens.textMuted}
                                   keyboardType="decimal-pad"
-                                  className="rounded-xl border px-3 py-2 text-sm"
-                                  style={{
-                                    borderColor: tokens.border,
-                                    backgroundColor: tokens.surfaceElevated,
-                                    color: tokens.text,
-                                  }}
                                 />
                               </View>
                               <View className="min-w-0 flex-1">
-                                <TextInput
+                                <DraftTextField
                                   accessibilityLabel="Target pace"
-                                  value={set.target_pace == null ? '' : String(set.target_pace)}
-                                  onChangeText={(value) =>
+                                  initialValue={
+                                    set.target_pace == null ? '' : String(set.target_pace)
+                                  }
+                                  onCommit={(value) =>
                                     void queuedUpdateSetPrescription(set.id, {
                                       targetPace: value ? Number(value) : null,
                                     }).then(refresh)
                                   }
                                   placeholder="Pace / speed"
-                                  placeholderTextColor={tokens.textMuted}
                                   keyboardType="decimal-pad"
-                                  className="rounded-xl border px-3 py-2 text-sm"
-                                  style={{
-                                    borderColor: tokens.border,
-                                    backgroundColor: tokens.surfaceElevated,
-                                    color: tokens.text,
-                                  }}
                                 />
                               </View>
                             </View>
                           ) : null}
                           {modality === 'weighted_strength' || modality === 'bodyweight' ? (
-                            <TextInput
+                            <DraftTextField
                               accessibilityLabel="Target load"
-                              value={set.target_load == null ? '' : String(set.target_load)}
-                              onChangeText={(value) =>
+                              initialValue={set.target_load == null ? '' : String(set.target_load)}
+                              onCommit={(value) =>
                                 void queuedUpdateSetPrescription(set.id, {
                                   targetLoad: value ? Number(value) : null,
                                 }).then(refresh)
@@ -943,25 +938,19 @@ export function RoutineDetailModal({
                                   ? 'Additional load (optional)'
                                   : 'Target load (optional)'
                               }
-                              placeholderTextColor={tokens.textMuted}
                               keyboardType="decimal-pad"
                               className="mb-3 rounded-xl border px-3 py-2 text-sm"
-                              style={{
-                                borderColor: tokens.border,
-                                backgroundColor: tokens.surfaceElevated,
-                                color: tokens.text,
-                              }}
                             />
                           ) : null}
                           {modality === 'timed' || modality === 'cardio' ? (
-                            <NumberStepperField
+                            <DraftNumberField
                               label="Target duration (seconds)"
-                              value={
+                              initialValue={
                                 set.target_duration_seconds == null
                                   ? ''
                                   : String(set.target_duration_seconds)
                               }
-                              onChange={(value) =>
+                              onCommit={(value) =>
                                 void queuedUpdateSetPrescription(set.id, {
                                   targetDurationSeconds: value ? Number(value) : null,
                                 }).then(refresh)
@@ -1002,25 +991,25 @@ export function RoutineDetailModal({
             })}
           </View>
         ) : (
-          <DraggableFlatList
-            data={exercises}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-            activationDistance={8}
-            ItemSeparatorComponent={() => <View className="h-3" />}
-            onDragEnd={(result) => void handleDragEnd(result)}
-            renderItem={({ item, drag, isActive }) => (
-              <ScaleDecorator>
+          // The native list renders as a plain map of the same cards: the old
+          // DraggableFlatList wrapper swallowed every pan inside the modal's
+          // ScrollView on iOS (run 38838647812 — six swipes over the form all
+          // settled `isScreenStatic = true`, leaving the lower fields
+          // unreachable and clip-edge taps landing on the Dismiss scrim, which
+          // is exactly what the gym-v2 flows kept tripping). Reorder stays
+          // fully accessible through each card's Move up / Move down actions.
+          <View>
+            {exercises.map((item, index) => (
+              <View key={item.id} style={index > 0 ? { marginTop: 12 } : undefined}>
                 <RoutineExerciseCard
                   exercise={item}
                   firstExerciseId={exercises[0]?.id}
                   lastExerciseId={exercises[exercises.length - 1]?.id}
                   isOpen={expandedId === item.id}
-                  isActive={isActive}
+                  isActive={false}
                   onToggle={toggleExpanded}
                   onDelete={handleDeleteExercise}
                   onMove={moveExercise}
-                  onDrag={drag}
                   onUpdateExercise={queuedUpdateExercise}
                   onUpdateSet={queuedUpdateSet}
                   onUpdateSetPrescription={queuedUpdateSetPrescription}
@@ -1029,9 +1018,9 @@ export function RoutineDetailModal({
                   onRefresh={refresh}
                   onError={setWorkoutError}
                 />
-              </ScaleDecorator>
-            )}
-          />
+              </View>
+            ))}
+          </View>
         )}
 
         <View className="mt-6">
@@ -1086,7 +1075,16 @@ export function RoutineDetailModal({
             <Button
               label="Use as template (duplicate)"
               variant="ghost"
-              onPress={() => void onUseAsTemplate()}
+              onPress={() => {
+                void Promise.resolve(onUseAsTemplate()).catch((error) => {
+                  // A failed duplication must be visible in this dialog — the
+                  // copy is atomic, so a rejection means nothing was created
+                  // and the user gets no feedback otherwise.
+                  setWorkoutError(
+                    error instanceof Error ? error.message : 'Could not duplicate the routine.',
+                  );
+                });
+              }}
             />
             <Text className="mt-1 text-center text-xs" style={{ color: tokens.textMuted }}>
               Creates “{routineName} (copy)” with the same exercises and sets.

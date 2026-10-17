@@ -673,18 +673,25 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
    */
   const assignWeekday = useCallback(
     async (weekday: number, routineId: string | null, scope: 'today' | 'weekly') => {
-      if (scope === 'today') {
-        await setWorkoutScheduleOverride({
-          dateKey: todayKey,
-          overrideKind: routineId ? 'workout' : 'rest',
-          ...(routineId ? { routineId } : {}),
-        });
-      } else {
-        await upsertWeeklyPlanEntry({
-          weekday,
-          planKind: routineId ? 'workout' : 'rest',
-          routineId,
-        });
+      try {
+        if (scope === 'today') {
+          await setWorkoutScheduleOverride({
+            dateKey: todayKey,
+            overrideKind: routineId ? 'workout' : 'rest',
+            ...(routineId ? { routineId } : {}),
+          });
+        } else {
+          await upsertWeeklyPlanEntry({
+            weekday,
+            planKind: routineId ? 'workout' : 'rest',
+            routineId,
+          });
+        }
+      } catch (error) {
+        // Keep the assignment sheet open with the reason instead of closing as
+        // if the day was assigned.
+        setWorkoutError(error instanceof Error ? error.message : 'Could not assign the day.');
+        return;
       }
       setDaySheet(null);
       await refresh();
@@ -1054,10 +1061,21 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
               fromDateKey,
               toDateKey: rescheduleDateInput,
               routineId,
-            }).then(async () => {
-              setRescheduleVisible(false);
-              await refresh();
-            });
+            }).then(
+              () => {
+                setRescheduleVisible(false);
+                void refresh();
+              },
+              (error) => {
+                // The move is atomic in the data layer; a rejection keeps the
+                // dialog open with the reason instead of vanishing silently.
+                // The second-argument form keeps a later refresh failure from
+                // being mislabeled as a failed move.
+                setWorkoutError(
+                  error instanceof Error ? error.message : 'Could not move the workout.',
+                );
+              },
+            );
           }}
         />
       </Modal>

@@ -190,12 +190,53 @@ export function describeBinaryEvidence({ provisioned, installedApkSha256 }) {
 }
 
 /**
+ * Map one Maestro 2.x flat evidence filename to its flow id, or null.
+ *
+ * Maestro 2.x writes a per-flow evidence SET beside `maestro.log` instead of a
+ * per-flow subdirectory: `commands-(<flow>.yaml).json` (the authoritative
+ * per-flow command log), `ai-(<flow>).json` (a summary), and
+ * `ai-report-<flow>.html` (a report). ONLY the `commands-` log is accepted as
+ * proof a flow executed: the `ai-*` / `ai-report-*` artifacts are reports that
+ * could in principle be emitted for a flow that never ran, so trusting them
+ * risks a false coverage PASS. Requiring `commands-` is fail-closed — a run
+ * that somehow lacks it reads as UNPROVEN, never as a pass and never as a
+ * fabricated empty run. The `.yaml` suffix, when present, is the flow file's
+ * extension and is stripped. Filenames that do not match (`maestro.log`,
+ * `commands.json`, an `ai-report-*.html`, a directory name) yield null and are
+ * never counted as a flow.
+ *
+ * @param {string} name a single directory entry name
+ * @returns {string | null}
+ */
+function flatEvidenceFlowId(name) {
+  const match = /^commands-\((.+)\)\.json$/i.exec(name);
+  return match ? match[1].replace(/\.(ya?ml)$/i, '') : null;
+}
+
+/**
  * Read the flows Maestro actually executed, from its debug output.
  *
- * Maestro writes `<debugOutput>/.maestro/tests/<run>/<flowId>/manifest.json`
- * for every flow it starts and a `maestro.log` beside them. The newest run
- * directory wins so a stale directory from an earlier run in the same stamp
- * cannot be mistaken for this one.
+ * Maestro has used two debug layouts, and this reader must prove coverage
+ * against BOTH:
+ *
+ *  - Legacy: `<run>/<flowId>/manifest.json` per started flow, with `maestro.log`
+ *    beside the flow directories.
+ *  - Maestro 2.x (observed on CLI 2.2.0): flat per-flow evidence files
+ *    (`commands-(<flow>.yaml).json`, `ai-(<flow>).json`,
+ *    `ai-report-<flow>.html`) written into a timestamped run directory, often
+ *    with the `maestro.log` in a SEPARATE timestamped run directory.
+ *
+ * The debug output directory is created fresh (unique stamp) per Maestro
+ * invocation by `scripts/qa-native.mjs`, so every run directory beneath it
+ * belongs to that invocation. The union of recognized flow evidence across all
+ * run directories is therefore the executed set; restricting to a single
+ * "newest" directory would undercount whenever Maestro splits the log from the
+ * evidence.
+ *
+ * Evidence this tool does not recognize is never assumed to be an empty run.
+ * If no per-flow evidence is recognized at all, coverage is UNPROVEN (`null`)
+ * rather than a false "did not execute", so an unrecognized format can never
+ * become a false PASS nor a false FAILURE.
  *
  * @param {string} debugOutputDir
  * @returns {{ executed: string[] | null, runDir: string | null, reason: string | null }}
@@ -220,12 +261,38 @@ export function readExecutedFlows(debugOutputDir) {
       reason: `Maestro created no run directory under ${runsRoot}; executed flow coverage cannot be proven.`,
     };
   }
-  const runDir = runDirs[0];
-  const executed = readdirSync(runDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && existsSync(join(runDir, entry.name, 'manifest.json')))
-    .map((entry) => entry.name)
-    .sort();
-  return { executed, runDir, reason: null };
+  const executed = new Set();
+  let recognized = 0;
+  for (const runDir of runDirs) {
+    for (const entry of readdirSync(runDir, { withFileTypes: true })) {
+      const full = join(runDir, entry.name);
+      if (entry.isDirectory()) {
+        // Legacy layout: a started flow is a directory holding manifest.json.
+        if (existsSync(join(full, 'manifest.json'))) {
+          executed.add(entry.name);
+          recognized += 1;
+        }
+        continue;
+      }
+      // Maestro 2.x layout: flat per-flow evidence files.
+      const id = flatEvidenceFlowId(entry.name);
+      if (id) {
+        executed.add(id);
+        recognized += 1;
+      }
+    }
+  }
+  if (recognized === 0) {
+    return {
+      executed: null,
+      runDir: runDirs[0],
+      reason:
+        `Maestro wrote run output at ${runDirs[0]} but no per-flow evidence this tool recognizes ` +
+        `(neither '<flowId>/manifest.json' nor 'commands-(<flow>.yaml).json'); ` +
+        `executed flow coverage cannot be proven.`,
+    };
+  }
+  return { executed: [...executed].sort(), runDir: runDirs[0], reason: null };
 }
 
 /**

@@ -252,7 +252,13 @@ beforeAll(async () => {
     primeDatasetOwner: accountData.primeLocalDatasetOwner,
     getAuthUserId: getFixtureAuthUserId,
   };
-});
+  // Explicit hook budget: this setup replaces the module graph of the whole
+  // restore coordinator (vi.resetModules + 8 doMocks + heavy dynamic imports).
+  // It measures ~7s standalone but exceeded Vitest's 10s hook default three
+  // times under full-suite parallelism on the reference Windows host
+  // (2026-10-17 closure runs), each time passing serially. The 30s budget
+  // bounds setup latency only — no assertion is skipped, retried, or weakened.
+}, 30_000);
 
 async function loadCoordinator(options: {
   localCounts: Record<string, number>;

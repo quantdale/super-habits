@@ -3,6 +3,7 @@ import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
 import { advanceToNextDay, installClock } from './helpers/clock';
 import { expectRows } from './helpers/oracles';
+import { queryRows } from './helpers/dbHarness';
 
 /** Opens the add-habit modal from the header action. */
 async function openAddHabitModal(page: Page) {
@@ -32,6 +33,79 @@ test.describe('Habits', () => {
     await expect(page.getByText('Daily check-in')).toBeVisible({ timeout: 15_000 });
   });
 
+  test('habit editor primary action stays inside the dialog viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openAddHabitModal(page);
+    const dialog = page.getByRole('dialog');
+    const create = dialog.getByRole('button', { name: 'Create habit', exact: true });
+    await expect(create).toBeVisible();
+    const box = await create.boundingBox();
+    const viewport = page.viewportSize();
+    expect(box, 'Create habit box').not.toBeNull();
+    expect(viewport, 'viewport').not.toBeNull();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(viewport!.height);
+    // The optional linked-actions copy can sit below the fold; the save action
+    // must not. Cancel stays with it in the dialog footer.
+    await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+  });
+
+  test('editing a long habit form keeps Save changes on screen and keyboard-activable', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 740 });
+    await openAddHabitModal(page);
+    const createDialog = page.getByRole('dialog');
+    await createDialog.getByLabel('Habit name').fill('Footer edit habit');
+    await createDialog.getByRole('button', { name: 'Create habit', exact: true }).click();
+    await expect(page.getByText('Footer edit habit', { exact: true })).toBeVisible();
+
+    await openHabitDetails(page, 'Footer edit habit');
+    await page.getByRole('dialog').getByRole('tab', { name: 'Settings', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Edit habit', exact: true }).click();
+    await expect(page.getByText('Edit Habit', { exact: true })).toBeVisible();
+    const editor = page.getByRole('dialog').filter({ hasText: 'Edit Habit' });
+    const save = editor.getByRole('button', { name: 'Save changes', exact: true });
+    const viewport = page.viewportSize();
+    const expectOnScreen = async (label: string) => {
+      const box = await save.boundingBox();
+      expect(box, label).not.toBeNull();
+      expect(viewport, 'viewport').not.toBeNull();
+      expect(box!.y, `${label} top`).toBeGreaterThanOrEqual(0);
+      expect(box!.y + box!.height, `${label} bottom`).toBeLessThanOrEqual(viewport!.height);
+    };
+    await expectOnScreen('Save changes before scrolling');
+
+    await editor.getByText('Habit completion rules').scrollIntoViewIfNeeded();
+    await expectOnScreen('Save changes after the long form is scrolled');
+
+    const name = editor.getByLabel('Habit name');
+    await name.fill('Footer edit habit renamed');
+    await name.focus();
+    let reachedSave = false;
+    for (let step = 0; step < 40; step += 1) {
+      await page.keyboard.press('Tab');
+      reachedSave = await save.evaluate(
+        (element) => element === document.activeElement || element.contains(document.activeElement),
+      );
+      if (reachedSave) break;
+    }
+    expect(reachedSave, 'Save changes is reachable from the name field by Tab').toBe(true);
+    await page.keyboard.press('Enter');
+    await expect(editor).toBeHidden({ timeout: 10_000 });
+    const renamed = page.getByRole('button', { name: 'Open Footer edit habit renamed details' });
+    await expect(renamed).toBeVisible();
+
+    await page.reload({ waitUntil: 'load' });
+    await goToTab(page, 'habits');
+    await expect(renamed).toBeVisible();
+    const rows = await queryRows(
+      page,
+      "SELECT COUNT(*) AS n FROM habits WHERE deleted_at IS NULL AND name = 'Footer edit habit renamed'",
+    );
+    expect(Number(rows[0]?.n)).toBe(1);
+  });
+
   test('shows empty state when no habits exist', async ({ page }) => {
     await expect(page.getByText(/Add a habit to start today's check-in/i)).toBeVisible();
     await expect(page.getByLabel('Add habit')).toBeVisible();
@@ -39,10 +113,21 @@ test.describe('Habits', () => {
 
   test('does not add habit with empty name', async ({ page }) => {
     await openAddHabitModal(page);
-    await page.getByText('Create habit', { exact: true }).locator('..').click({ force: true });
+    const editor = page.getByRole('dialog').filter({ hasText: 'New Habit' });
+    // Unforced semantic click on the footer action (the modal is settled here):
+    // a forced click can land on the dismiss backdrop and close the sheet, and
+    // the old background-text assertion would still pass in that case.
+    await editor.getByRole('button', { name: 'Create habit', exact: true }).click();
+    // The failed save keeps the editor open and announces the error (the
+    // reminder alert is a separate, always-present web notice; target the
+    // habit validation message itself).
+    await expect(editor).toBeVisible();
+    await expect(editor.getByText(/Habit name is required\./)).toBeVisible();
     await expect(page.getByText(/Add a habit to start today's check-in/i)).toBeVisible();
+    // Negative oracle: no habit row was written by the rejected submit.
+    const rows = await queryRows(page, 'SELECT COUNT(*) AS n FROM habits WHERE deleted_at IS NULL');
+    expect(Number(rows[0]?.n)).toBe(0);
   });
-
   test('adds a new habit', async ({ page }) => {
     await openAddHabitModal(page);
     await page.getByLabel('Habit name').fill('Morning run');

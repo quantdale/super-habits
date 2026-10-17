@@ -70,30 +70,86 @@ const JS_HEADERS = {
   'Cross-Origin-Resource-Policy': 'cross-origin',
 };
 
-/** On-disk wa-sqlite asset directory of the served export (e.g. `dist/assets/...`). */
-export const WA_SQLITE_ASSET_DIR = path.resolve(
-  process.cwd(),
-  DIST_DIR,
-  'assets',
-  'node_modules',
-  'expo-sqlite',
-  'web',
-  'wa-sqlite',
-);
+export type WasmAsset = {
+  /** Directory that contains the single exported `.wasm` file. */
+  dir: string;
+  name: string;
+  /** Origin-relative URL path the static server actually hosts. */
+  hrefPath: string;
+};
 
-/** The single `.wasm` filename inside the export's wa-sqlite asset dir. */
-export function discoverWasmName(): string {
-  const name = fs.readdirSync(WA_SQLITE_ASSET_DIR).find((f) => f.endsWith('.wasm'));
-  if (!name) {
+const CANONICAL_WASM_SUFFIX = ['node_modules', 'expo-sqlite', 'web', 'wa-sqlite'];
+
+function listWasmDirs(dir: string, found: string[]): void {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.name === 'wa-sqlite') found.push(full);
+    else listWasmDirs(full, found);
+  }
+}
+
+/**
+ * Locate the exported wa-sqlite WASM.
+ *
+ * A checkout whose `node_modules` is a junction to a sibling repo exports the
+ * file under `dist/assets/_<repo>/node_modules/...` instead of the canonical
+ * `dist/assets/node_modules/...`. The harness must request the path the static
+ * server hosts. Copying the file onto the canonical path is not required.
+ */
+export function discoverWasmAsset(): WasmAsset {
+  const exportRoot = path.resolve(process.cwd(), DIST_DIR);
+  const assetsRoot = path.join(exportRoot, 'assets');
+  const dirs: string[] = [];
+  listWasmDirs(assetsRoot, dirs);
+  const matches = dirs.flatMap((dir) => {
+    let names: string[] = [];
+    try {
+      names = fs.readdirSync(dir).filter((file) => file.endsWith('.wasm'));
+    } catch {
+      return [];
+    }
+    return names.map((name) => ({ dir, name }));
+  });
+  if (matches.length === 0) {
     throw new Error(
       `expo-sqlite wasm not found under ${DIST_DIR}/assets — run \`npm run build:e2e\` (or the dist-sync build) before journeys.`,
     );
   }
-  return name;
+  const hashes = new Set(matches.map((match) => match.name));
+  if (hashes.size !== 1) {
+    throw new Error(
+      `conflicting wa-sqlite wasm files in ${DIST_DIR}/assets: ${[...hashes].join(', ')}`,
+    );
+  }
+  const canonical = path.resolve(assetsRoot, ...CANONICAL_WASM_SUFFIX);
+  const chosen = matches.find((match) => path.resolve(match.dir) === canonical) ?? matches[0];
+  const relativeDir = path.relative(exportRoot, chosen.dir).split(path.sep).join('/');
+  return {
+    dir: chosen.dir,
+    name: chosen.name,
+    hrefPath: `/${relativeDir}/${chosen.name}`,
+  };
+}
+
+/** On-disk wa-sqlite asset directory of the served export. */
+export function wasmAssetDirectory(): string {
+  return discoverWasmAsset().dir;
+}
+
+/** The single `.wasm` filename inside the export's wa-sqlite asset dir. */
+export function discoverWasmName(): string {
+  return discoverWasmAsset().name;
 }
 
 function discoverWasmUrl(): string {
-  return `${APP_BASE_URL}/assets/node_modules/expo-sqlite/web/wa-sqlite/${discoverWasmName()}`;
+  return `${APP_BASE_URL}${discoverWasmAsset().hrefPath}`;
 }
 
 function readWaModule(file: string): string {
@@ -186,7 +242,11 @@ const installed = new WeakSet<Page>();
 /** Register the harness routes on a page. Idempotent per page. */
 export async function installDbHarness(page: Page): Promise<void> {
   if (installed.has(page)) return;
-  installed.add(page);
+  // Discover/bake BEFORE claiming the page: discoverWasmUrl() throws when the
+  // export has no (or conflicting) wa-sqlite assets, and marking first would
+  // leave a retried attempt "installed" with no routes registered — a
+  // fail-closed first attempt that decays into a misleading 20s harness
+  // timeout on retry (Playwright retries reuse the same page object).
   const wasmUrl = discoverWasmUrl();
   const workerSource = buildWorkerSource(wasmUrl);
 
@@ -234,6 +294,7 @@ export async function installDbHarness(page: Page): Promise<void> {
     }
     return route.fulfill({ status: 404, contentType: 'text/plain', body: 'not found' });
   });
+  installed.add(page);
 }
 
 /** Unregister the app's service worker so page.route can intercept navigations. */

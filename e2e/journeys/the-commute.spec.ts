@@ -3,12 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { defineJourney } from '../helpers/journey';
 import { expectOutbox, expectRows, switchSection, type OutboxRecord } from '../helpers/oracles';
-import {
-  queryRows,
-  returnToApp,
-  WA_SQLITE_ASSET_DIR,
-  discoverWasmName,
-} from '../helpers/dbHarness';
+import { queryRows, returnToApp, discoverWasmName, wasmAssetDirectory } from '../helpers/dbHarness';
 import { resetAll } from '../helpers/reset';
 import { setOffline } from '../helpers/failure';
 import { clickCaloriesAddEntry, fillCaloriesMacros } from '../helpers/forms';
@@ -123,15 +118,19 @@ let remoteBoundaryDetected = false;
  */
 async function registerOfflineWasmRoute(page: Page): Promise<void> {
   if (installedWasmRoute.has(page)) return;
-  installedWasmRoute.add(page);
+  // Same fail-closed ordering as installDbHarness(): discover before marking,
+  // register before marking, so a discovery failure stays loud on a retry
+  // instead of silently registering no route for this page.
   const name = discoverWasmName();
+  const directory = wasmAssetDirectory();
   await page.route(`**/wa-sqlite/${name}`, (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/wasm',
-      body: fs.readFileSync(path.join(WA_SQLITE_ASSET_DIR, name)),
+      body: fs.readFileSync(path.join(directory, name)),
     }),
   );
+  installedWasmRoute.add(page);
 }
 
 /**

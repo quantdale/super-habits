@@ -13,9 +13,16 @@ tags:
     visible: 'Today'
     timeout: 30000
 - tapOn: 'Open settings'
+# The drawer's content materializes slowly on the loaded CI runner (run
+# 38793221651: hierarchy polls returned empty depth-6 trees for ~25s after
+# launch, and this 5s assert lost that race even though the drawer was fully
+# rendered by the failure dump). Wait for the entrance animation to settle
+# and give the assertion an evidence-based 15s budget.
+- waitForAnimationToEnd:
+    timeout: 3000
 - extendedWaitUntil:
     visible: 'Close settings'
-    timeout: 5000
+    timeout: 15000
 - tapOn: 'Dark'
 - tapOn: 'Close settings'
 - killApp
@@ -24,5 +31,9 @@ tags:
     visible: 'Today'
     timeout: 30000
 - tapOn: 'Open settings'
-- assertVisible: 'Dark'
+- waitForAnimationToEnd:
+    timeout: 3000
+- extendedWaitUntil:
+    visible: 'Dark'
+    timeout: 15000
 - tapOn: 'Close settings'

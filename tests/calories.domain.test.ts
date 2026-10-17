@@ -152,6 +152,19 @@ describe('calculateGoalProgress', () => {
   it('remaining is 0 when over goal', () => {
     expect(calculateGoalProgress(2500, 2000).remaining).toBe(0);
   });
+
+  it('treats one kcal over as over and an exact goal as not over', () => {
+    expect(calculateGoalProgress(2001, 2000)).toEqual({
+      percent: 100,
+      remaining: 0,
+      over: true,
+    });
+    expect(calculateGoalProgress(2000, 2000)).toEqual({
+      percent: 100,
+      remaining: 0,
+      over: false,
+    });
+  });
 });
 
 describe('buildCalorieActivityDays', () => {

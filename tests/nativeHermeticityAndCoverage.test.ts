@@ -369,6 +369,68 @@ describe('native flow coverage proof', () => {
     }
   });
 
+  it('reads the executed flow set from a Maestro 2.x flat evidence tree', async () => {
+    // Regression: Maestro CLI 2.2.0 writes flat per-flow evidence files and
+    // keeps maestro.log in a SEPARATE timestamped run directory (observed in
+    // iOS GHA run 38676461813). The reader must not require '<flow>/manifest.json',
+    // or every real run undercounts to zero executed flows and is misreported
+    // as "did not execute".
+    const { readExecutedFlows } = await coverageModule();
+    const dir = join(ROOT, 'simulation-output', 'native', 'coverage-flat-fixture');
+    const testsRoot = join(dir, '.maestro', 'tests');
+    const logDir = join(testsRoot, '2026-10-15_051951');
+    const evidenceDir = join(testsRoot, '2026-10-15_051954');
+    mkdirSync(logDir, { recursive: true });
+    mkdirSync(evidenceDir, { recursive: true });
+    writeFileSync(join(logDir, 'maestro.log'), 'log');
+    writeFileSync(join(evidenceDir, 'commands-(native-smoke.yaml).json'), '{}');
+    writeFileSync(join(evidenceDir, 'ai-(native-smoke).json'), '{}');
+    writeFileSync(join(evidenceDir, 'ai-report-native-smoke.html'), '<html>');
+    try {
+      const result = readExecutedFlows(dir);
+      expect(result.executed).toEqual(['native-smoke']);
+      expect(result.reason).toBeNull();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('proves coverage from a multi-flow flat evidence tree and never fakes an empty run', async () => {
+    const { readExecutedFlows } = await coverageModule();
+    const dir = join(ROOT, 'simulation-output', 'native', 'coverage-flat-multi');
+    const runDir = join(dir, '.maestro', 'tests', '2026-10-15_052632');
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(join(runDir, 'maestro.log'), 'log');
+    writeFileSync(join(runDir, 'commands-(todo-persistence.yaml).json'), '{}');
+    writeFileSync(join(runDir, 'commands-(calories-persistence.yaml).json'), '{}');
+    // A flat filename that is not per-flow evidence must never be counted.
+    writeFileSync(join(runDir, 'commands.json'), '{}');
+    // ai-report/ai-summary artifacts are NOT proof of execution: a flow with only
+    // these (no commands-<flow>.yaml.json) must not be credited as executed, or a
+    // report emitted for an un-run flow could fake a coverage PASS.
+    writeFileSync(join(runDir, 'ai-(solo).json'), '{}');
+    writeFileSync(join(runDir, 'ai-report-solo.html'), '<html>');
+    try {
+      expect(readExecutedFlows(dir).executed).toEqual(['calories-persistence', 'todo-persistence']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+
+    // Unrecognized output is UNPROVEN (null), never a false empty-run claim.
+    const unknown = join(ROOT, 'simulation-output', 'native', 'coverage-unknown-fixture');
+    const unknownRun = join(unknown, '.maestro', 'tests', '2026-10-15_053000');
+    mkdirSync(unknownRun, { recursive: true });
+    writeFileSync(join(unknownRun, 'maestro.log'), 'log');
+    writeFileSync(join(unknownRun, 'some-other-file.txt'), 'x');
+    try {
+      const result = readExecutedFlows(unknown);
+      expect(result.executed).toBeNull();
+      expect(result.reason).toMatch(/cannot be proven/);
+    } finally {
+      rmSync(unknown, { recursive: true, force: true });
+    }
+  });
+
   it('passes only when the executed set equals the expected set and Maestro exited 0', async () => {
     const { evaluateFlowCoverage } = await coverageModule();
     const expected = [

@@ -32,28 +32,61 @@ tags:
           end: '5%, 25%'
           duration: 400
 - assertVisible: 'Routine name'
-# The field is visible after the bounded search; an extra swipe hides it.
+# Maestro treats a field as visible when its bounds intersect the screen, even
+# when those bounds sit under the floating tab bar (failure at source 52a10d0:
+# New routine name bounds y=2199 on a 2400px display, tap center landed on the
+# centered capture button / nav zone, then the following center-swipe opened
+# the Plan sheet and Add routine was gone). Lift the field with an edge swipe
+# — not scrollUntilVisible, whose gesture starts at screen center — then prove
+# the characters landed in the routine field before searching for Add routine.
+- swipe:
+    start: '90%, 78%'
+    end: '90%, 52%'
+    duration: 400
 - tapOn: 'New routine name'
 - inputText: 'Native Gym V2 typed routine'
 - pressKey: enter
-- scrollUntilVisible:
-    element: 'Add routine'
-    direction: DOWN
-    # Center it: the floating tab bar overlaps bottom-edge content, so
-    # a11y "visible" can still sit under the tab bar and the tap navigates.
-    centerElement: true
+- extendedWaitUntil:
+    visible: 'Native Gym V2 typed routine'
+    timeout: 8000
+- assertNotVisible: 'Save Plan'
+# Reveal Add routine from the screen edge so the swipe cannot start on the
+# capture button or a mid-screen planning control. The short follow-up swipe
+# always runs: the repeat stops as soon as the button intersects the screen,
+# which on this form is the bottom edge under the tab bar. 16% of the height
+# lifts that edge without carrying a mid-screen button off the top.
+- repeat:
+    times: 4
+    while:
+      notVisible: 'Add routine'
+    commands:
+      - swipe:
+          start: '90%, 72%'
+          end: '90%, 42%'
+          duration: 400
+- swipe:
+    start: '90%, 68%'
+    end: '90%, 52%'
+    duration: 300
+- extendedWaitUntil:
+    visible: 'Add routine'
+    timeout: 8000
+- assertNotVisible: 'Save Plan'
 # Settle before tapping: a tap aimed from a still-settling hierarchy can land
 # on stale coordinates (documented in native-smoke).
 - waitForAnimationToEnd:
     timeout: 3000
 - tapOn: 'Add routine'
 # The new routine is prepended to the routines list, which sits ABOVE the
-# 'New routine' form, so the row is reached by scrolling UP.
+# 'New routine' form, so the row is reached by scrolling UP. No centerElement:
+# Maestro 2.2.0's centering with direction UP does not converge on this
+# target (run 38793221651 — the row was found fully visible yet the centering
+# swipes overshot it until the 20s budget expired in hierarchy fetches).
 - scrollUntilVisible:
     element: 'Open Native Gym V2 typed routine routine'
     direction: UP
     visibilityPercentage: 50
-    centerElement: true
+    timeout: 30000
 - waitForAnimationToEnd:
     timeout: 3000
 - tapOn: 'Open Native Gym V2 typed routine routine'
@@ -129,7 +162,8 @@ tags:
 - assertVisible: 'Custom exercise instructions'
 - tapOn: 'Custom exercise instructions'
 - inputText: 'Brace and press with a controlled descent'
-# Blur the final text field so the submit tap is not competing with the iOS keyboard.
+# Blur the final text field so the submit tap is not competing
+# with the iOS keyboard.
 - pressKey: enter
 - waitForAnimationToEnd:
     timeout: 2000
@@ -162,19 +196,26 @@ tags:
 - tapOn: 'Linear'
 - waitForAnimationToEnd:
     timeout: 3000
-# UNPROVEN REPLACEMENT, pending task 3.3. Run 36423379932 (seq64-seq72)
-# reported all eight swipes COMPLETED and still failed: the failure hierarchy
-# held none of the exercise-card nodes, only the Workout landing cards. So the
-# old construct left the routine detail, but the artifact does not show which
-# gesture did it, nor that this scroll stays on the card. centerElement is
-# omitted on purpose: the comment this block replaced recorded that a centered
-# scroll already escaped to the Workout screen, and Maestro's default swipe is
-# still centred. Treat this as a hypothesis for the next exact-SHA run.
-# Evidence: openspec/changes/final-certification-closure/ios-flow-classification.md
+# ROOT CAUSE (runs 38676461813 / 38726951043 / 38793221651 / 38838647812):
+# at the resting scroll offset the progression row sits at the dialog
+# panel's bottom clip edge ('progression increment' resolves to
+# [41,812][141,843] against a panel bottom of ~813), and Maestro taps
+# element bounds centers: the tap lands below the panel on core/ui/Modal's
+# full-screen Dismiss scrim and closes the routine detail.
+# Fix: center the row INSIDE the panel before tapping it. centerElement is
+# the ONLY construct that repositions a row Maestro already considers
+# 'visible' (its screen-based metric reads the clip-edge row as 100%
+# visible and returns without scrolling), and with direction DOWN it
+# converges in one swipe. It must NOT be paired with direction UP — run
+# 38793221651 proved that pairing cannot converge on this target. No
+# crossing swipe here: run 38838647812 showed a 300ms side swipe FLINGS
+# the modal's scroll view ~1000pt past the row. Each following
+# scrollUntilVisible doubles as a truthful modal-still-open check.
 - scrollUntilVisible:
     element: 'Native custom press progression increment'
     direction: DOWN
     visibilityPercentage: 50
+    centerElement: true
     timeout: 30000
 - assertVisible: 'Native custom press progression increment'
 - tapOn: 'Native custom press progression increment'
@@ -183,45 +224,62 @@ tags:
 - scrollUntilVisible:
     element: 'Native custom press minimum reps'
     direction: DOWN
+    visibilityPercentage: 50
+    centerElement: true
+    timeout: 30000
 - tapOn: 'Native custom press minimum reps'
 - inputText: '5'
 - pressKey: enter
 - scrollUntilVisible:
     element: 'Native custom press maximum reps'
     direction: DOWN
+    visibilityPercentage: 50
+    centerElement: true
+    timeout: 30000
 - tapOn: 'Native custom press maximum reps'
 - inputText: '8'
 - pressKey: enter
 - scrollUntilVisible:
     element: 'Target reps min'
     direction: DOWN
-- tapOn: 'Target reps min'
-- inputText: '5'
+    visibilityPercentage: 50
+    centerElement: true
+    timeout: 30000
+# NumberStepperField exposes its label Text and the input under the same name:
+# index 0 is the inert label (inputText after it silently drops), so the input
+# is index 1 — the same convention as the lifecycle flow's Weight/Reps.
+- tapOn:
+    text: 'Target reps min'
+    index: 1
+- inputText: '7'
 - pressKey: enter
 - scrollUntilVisible:
     element: 'Target reps max'
     direction: DOWN
-- tapOn: 'Target reps max'
-- inputText: '8'
+    visibilityPercentage: 50
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    text: 'Target reps max'
+    index: 1
+- inputText: '11'
 - pressKey: enter
-# The reps inputs sit under Maestro's center-swipe origin, so scrollUntilVisible's
-# own swipes are consumed by the focused EditText and the list never moves.
-# Cross the remaining form with an explicit side-margin swipe (same class as the
-# auth-session/backup-v2 flows) before the scoped scroll.
-- swipe:
-    start: '85%, 72%'
-    end: '85%, 25%'
-    duration: 300
 - scrollUntilVisible:
     element: 'Target load'
     direction: DOWN
     visibilityPercentage: 50
     centerElement: true
+    timeout: 30000
 - tapOn: 'Target load'
-- inputText: '40'
+# 42 is unique on this screen (bare 40 would collide with the set's default
+# Active-seconds value and pass even if Target load never persisted).
+- inputText: '42'
 - pressKey: enter
 - assertVisible: 'Target load'
-- pressKey: BACK
+# Close the routine dialog through its own close control: `pressKey: BACK`
+# is not a reliable modal dismiss on iOS (run 38869382876: the dialog was
+# still open and 'This week' was never visible).
+- tapOn: 'Close'
 # The weekly-plan section label is 'This week' (the uppercase rendering is a
 # CSS transform, not the text node), and Maestro matches the full text.
 - scrollUntilVisible:
@@ -261,7 +319,12 @@ tags:
     visibilityPercentage: 50
 - assertVisible: 'QUICK START'
 # The new routine is prepended to the routines list, which sits ABOVE the
-# 'New routine' form, so the row is reached by scrolling UP.
+# 'New routine' form, so the row is reached by scrolling UP. No centerElement
+# here: Maestro 2.2.0's centering with direction UP does not converge on this
+# target (run 38793221651: the row was found fully visible — Visibility
+# Percent 1.0 — yet the centering swipes overshot it until the 20s budget
+# expired in hierarchy fetches). The plain visibility stop is the run-3-proven
+# construct for this row.
 - scrollUntilVisible:
     element: 'Open Native Gym V2 typed routine routine'
     direction: UP
@@ -276,6 +339,12 @@ tags:
     element: 'Target load'
     direction: DOWN
 - assertVisible: 'Target load'
-- assertVisible: '40'
+# Each persisted value is unique on the screen (full-match text semantics), so
+# every assert is satisfiable only by its own field: progression increment 2.5,
+# min reps 5, max reps 8, Target reps min 7, Target reps max 11, load 42.
+- assertVisible: '2.5'
 - assertVisible: '5'
 - assertVisible: '8'
+- assertVisible: '7'
+- assertVisible: '11'
+- assertVisible: '42'

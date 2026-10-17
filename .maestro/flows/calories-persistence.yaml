@@ -23,17 +23,18 @@ tags:
 - tapOn: 'Diary view'
 - waitForAnimationToEnd:
     timeout: 3000
-# This button is usually within the first diary screen; use the bounded swipe
-# pattern so an already-visible control never reaches scrollUntilVisible.
-- repeat:
-    times: 8
-    while:
-      notVisible: 'Manual add'
-    commands:
-      - swipe:
-          start: '5%, 80%'
-          end: '5%, 25%'
-          duration: 400
+# The diary's action row parks under the floating tab bar at the initial
+# scroll offset: at run 38726951043 'Manual add' resolved to
+# [204,776][318,820] while Section tabs occupied [8,778][394,840], so
+# Maestro's bounds-center tap landed on the Focus tab and the flow ended on
+# the Focus surface (identical signature at run 38676461813). Pull the row
+# into the clear band first: the empty day log renders below it (this
+# clearState run has no entries yet), so anchoring on its empty-state title
+# scrolls the row well above the tab bar and the tap hits the button itself.
+- scrollUntilVisible:
+    element: 'No meals logged on this day'
+    direction: DOWN
+    visibilityPercentage: 50
 - assertVisible: 'Manual add'
 - tapOn: 'Manual add'
 - extendedWaitUntil:

@@ -200,21 +200,29 @@ export async function updateRoutine(routineId: string, updates: RoutineUpdate): 
   // never silently keep the old row like the pre-assert fallback did).
   if (updates.name !== undefined) assertRoutineWrite({ name: updates.name });
   const db = await getDatabase();
-  const current = await db.getFirstAsync<WorkoutRoutine>(
-    'SELECT * FROM workout_routines WHERE id = ? AND deleted_at IS NULL',
-    [routineId],
-  );
-  if (!current) return;
-  const name = updates.name?.trim() || current.name;
-  const description =
-    updates.description === undefined ? current.description : updates.description?.trim() || null;
-  const goalTag =
-    updates.goalTag === undefined ? (current.goal_tag ?? null) : updates.goalTag?.trim() || null;
   const now = nowIso();
   await runSyncedMutation({
     db,
     record: { entity: 'workout_routines', id: routineId, updatedAt: now, operation: 'update' },
     mutate: async (transactionDb) => {
+      // Read the current row inside the same serialized mutation transaction:
+      // concurrent edits to different fields must not let a slower stale
+      // snapshot overwrite a newer sibling field (the same rule updateExercise
+      // and updateSet already enforce).
+      const current = await transactionDb.getFirstAsync<WorkoutRoutine>(
+        'SELECT * FROM workout_routines WHERE id = ? AND deleted_at IS NULL',
+        [routineId],
+      );
+      if (!current) return { changed: false, value: undefined };
+      const name = updates.name?.trim() || current.name;
+      const description =
+        updates.description === undefined
+          ? current.description
+          : updates.description?.trim() || null;
+      const goalTag =
+        updates.goalTag === undefined
+          ? (current.goal_tag ?? null)
+          : updates.goalTag?.trim() || null;
       const result = await transactionDb.runAsync(
         `UPDATE workout_routines
          SET name = ?, description = ?, goal_tag = ?, updated_at = ?
@@ -661,7 +669,8 @@ export async function updateExerciseOrder(orderedIds: string[]): Promise<void> {
 
 export async function addSet(input: {
   exerciseId: string;
-  setNumber: number;
+  /** Omitted = assign the next number inside the write transaction (race-safe). */
+  setNumber?: number;
   activeSeconds: number;
   restSeconds: number;
   targetRepsMin?: number | null;
@@ -695,6 +704,17 @@ export async function addSet(input: {
         [input.exerciseId],
       );
       if (!activeExercise) throw new Error('Exercise or routine not found.');
+      // When the caller does not pin the number, derive it inside this
+      // serialized transaction: two rapid "add set" taps must land on N+1 and
+      // N+2, never two rows at N+1 (the table has no UNIQUE(exercise_id,
+      // set_number) to catch it). MAX(set_number)+1 keeps numbers unique even
+      // after a mid-list delete leaves COUNT below the surviving numbers.
+      const maxRow = await transactionDb.getFirstAsync<{ max_number: number | null }>(
+        `SELECT MAX(set_number) AS max_number FROM routine_exercise_sets
+         WHERE exercise_id = ? AND deleted_at IS NULL`,
+        [input.exerciseId],
+      );
+      const setNumber = input.setNumber ?? (maxRow?.max_number ?? 0) + 1;
       const hasPrescription =
         input.targetRepsMin !== undefined ||
         input.targetRepsMax !== undefined ||
@@ -708,7 +728,7 @@ export async function addSet(input: {
            (id, exercise_id, set_number, active_seconds, rest_seconds,
             created_at, updated_at, deleted_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`,
-          [id, input.exerciseId, input.setNumber, input.activeSeconds, input.restSeconds, now, now],
+          [id, input.exerciseId, setNumber, input.activeSeconds, input.restSeconds, now, now],
         );
       } else {
         await transactionDb.runAsync(
@@ -720,7 +740,7 @@ export async function addSet(input: {
           [
             id,
             input.exerciseId,
-            input.setNumber,
+            setNumber,
             input.activeSeconds,
             input.restSeconds,
             input.targetRepsMin ?? null,
@@ -914,19 +934,13 @@ export async function deleteSet(id: string): Promise<void> {
 }
 
 export async function addDefaultSet(exerciseId: string): Promise<void> {
-  const db = await getDatabase();
-  const countRow = await db.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) AS count FROM routine_exercise_sets
-     WHERE exercise_id = ? AND deleted_at IS NULL`,
-    [exerciseId],
-  );
-  const nextNumber = (countRow?.count ?? 0) + 1;
   // Rest policy (Option A): 0 means intentional no rest. The preference seeds
   // newly created sets; stored per-set values run verbatim thereafter.
   const restSeconds = await loadRestSecondsDefault();
+  // setNumber is assigned inside addSet's transaction so concurrent adds
+  // cannot collide on the same number.
   await addSet({
     exerciseId,
-    setNumber: nextNumber,
     activeSeconds: 40,
     restSeconds,
   });
@@ -1580,10 +1594,12 @@ export async function listSessionTotalsForRange(
 
 /**
  * Duplicate a routine ("use as template"): creates a new routine copying
- * routine_exercises and routine_exercise_sets via the existing insert
- * helpers (addExercise/addSet), which own the createId prefixes and sync
- * enqueue calls for every nested row. Returns the new routine id, or null
- * when the source routine no longer exists.
+ * routine_exercises and routine_exercise_sets. ONE transaction — the old
+ * version built the copy through N+1 separate transactions (one shell + one
+ * per exercise + one per set), so a mid-copy failure left a silently
+ * truncated, "valid-looking" routine. Every copied row still carries its own
+ * durable create intent. Returns the new routine id, or null when the source
+ * routine no longer exists.
  */
 export async function duplicateRoutine(routineId: string): Promise<string | null> {
   const db = await getDatabase();
@@ -1599,54 +1615,92 @@ export async function duplicateRoutine(routineId: string): Promise<string | null
     `${source.name} (copy)`.length <= 100
       ? `${source.name} (copy)`
       : `${source.name.slice(0, 93).trimEnd()} (copy)`;
-  await runSyncedMutation({
+  await runBackupMutation({
     db,
-    record: { entity: 'workout_routines', id: newId, updatedAt: now, operation: 'create' },
-    mutate: async (transactionDb) => {
+    mutate: async (transactionDb, enqueue) => {
       await transactionDb.runAsync(
         'INSERT INTO workout_routines (id, name, description, goal_tag, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, NULL)',
         [newId, newName, source.description, source.goal_tag ?? null, now, now],
       );
+      enqueue({ entity: 'workout_routines', id: newId, updatedAt: now, operation: 'create' });
+      for (const exercise of source.exercises) {
+        const exerciseId = createId('ex');
+        await transactionDb.runAsync(
+          `INSERT INTO routine_exercises
+             (id, routine_id, name, sort_order, catalog_exercise_id, modality, unilateral,
+              supports_external_load, notes,
+              superset_group, progression_mode, progression_increment, progression_min_reps,
+              progression_max_reps, created_at, updated_at, deleted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+          [
+            exerciseId,
+            newId,
+            exercise.name,
+            exercise.sort_order ?? 0,
+            exercise.catalog_exercise_id ?? null,
+            exercise.modality ?? 'timed',
+            // Same normalization the old addExercise-based copy applied.
+            exercise.unilateral === 1 ? 1 : 0,
+            (
+              exercise.supports_external_load === undefined
+                ? exercise.catalog_exercise_id
+                  ? exercise.modality === 'weighted_strength'
+                  : true
+                : exercise.supports_external_load === 1
+            )
+              ? 1
+              : 0,
+            exercise.notes ?? null,
+            exercise.superset_group ?? null,
+            exercise.progression_mode ?? 'none',
+            exercise.progression_increment ?? null,
+            exercise.progression_min_reps ?? null,
+            exercise.progression_max_reps ?? null,
+            now,
+            now,
+          ],
+        );
+        enqueue({
+          entity: 'routine_exercises',
+          id: exerciseId,
+          updatedAt: now,
+          operation: 'create',
+        });
+        for (const set of exercise.sets) {
+          const setId = createId('eset');
+          await transactionDb.runAsync(
+            `INSERT INTO routine_exercise_sets
+               (id, exercise_id, set_number, active_seconds, rest_seconds,
+                target_reps_min, target_reps_max, target_load, target_duration_seconds,
+                target_distance, target_pace, created_at, updated_at, deleted_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+            [
+              setId,
+              exerciseId,
+              set.set_number ?? 0,
+              set.active_seconds ?? 0,
+              set.rest_seconds ?? 0,
+              set.target_reps_min ?? null,
+              set.target_reps_max ?? null,
+              set.target_load ?? null,
+              set.target_duration_seconds ?? null,
+              set.target_distance ?? null,
+              set.target_pace ?? null,
+              now,
+              now,
+            ],
+          );
+          enqueue({
+            entity: 'routine_exercise_sets',
+            id: setId,
+            updatedAt: now,
+            operation: 'create',
+          });
+        }
+      }
       return { changed: true, value: undefined };
     },
   });
-
-  for (const exercise of source.exercises) {
-    const exerciseId = await addExercise({
-      routineId: newId,
-      name: exercise.name,
-      sortOrder: exercise.sort_order,
-      catalogExerciseId: exercise.catalog_exercise_id,
-      modality: exercise.modality,
-      unilateral: exercise.unilateral === 1,
-      supportsExternalLoad:
-        exercise.supports_external_load === undefined
-          ? exercise.catalog_exercise_id
-            ? exercise.modality === 'weighted_strength'
-            : true
-          : exercise.supports_external_load === 1,
-      notes: exercise.notes,
-      supersetGroup: exercise.superset_group,
-      progressionMode: exercise.progression_mode,
-      progressionIncrement: exercise.progression_increment,
-      progressionMinReps: exercise.progression_min_reps,
-      progressionMaxReps: exercise.progression_max_reps,
-    });
-    for (const set of exercise.sets) {
-      await addSet({
-        exerciseId,
-        setNumber: set.set_number,
-        activeSeconds: set.active_seconds,
-        restSeconds: set.rest_seconds,
-        targetRepsMin: set.target_reps_min,
-        targetRepsMax: set.target_reps_max,
-        targetLoad: set.target_load,
-        targetDurationSeconds: set.target_duration_seconds,
-        targetDistance: set.target_distance,
-        targetPace: set.target_pace,
-      });
-    }
-  }
   return newId;
 }
 
@@ -2178,35 +2232,39 @@ export async function updateCustomExercise(
 ): Promise<void> {
   // An explicitly passed name must satisfy the same contract as create.
   if (updates.name !== undefined) assertExerciseWrite({ name: updates.name });
-  const db = await getDatabase();
-  const current = await db.getFirstAsync<CustomExercise>(
-    'SELECT * FROM custom_exercises WHERE id = ? AND deleted_at IS NULL',
-    [id],
-  );
-  if (!current) return;
   if (updates.modality) assertWorkoutModality(updates.modality);
-  const nextName = updates.name?.trim() || current.name;
-  const nextArea = updates.primaryArea?.trim().toLowerCase() || current.primary_area;
-  const nextSecondary = updates.secondaryAreas
-    ? normalizeSecondaryAreas(updates.secondaryAreas)
-    : current.secondary_areas;
-  const nextAliases = updates.aliases
-    ? normalizeAliases(updates.aliases)
-    : (current.aliases ?? '[]');
-  const nextInstructions =
-    updates.instructions === undefined
-      ? (current.instructions ?? null)
-      : updates.instructions?.trim() || null;
-  const nextSupportsExternalLoad =
-    updates.supportsExternalLoad === undefined
-      ? (current.supports_external_load ?? (current.modality === 'weighted_strength' ? 1 : 0))
-      : updates.supportsExternalLoad
-        ? 1
-        : 0;
+  const db = await getDatabase();
   const now = nowIso();
   await runBackupMutation({
     db,
     mutate: async (transactionDb, enqueue) => {
+      // Read the current row inside the same serialized mutation transaction:
+      // concurrent edits to different fields must not let a slower stale
+      // snapshot overwrite a newer sibling field (the same rule updateExercise
+      // and updateSet already enforce).
+      const current = await transactionDb.getFirstAsync<CustomExercise>(
+        'SELECT * FROM custom_exercises WHERE id = ? AND deleted_at IS NULL',
+        [id],
+      );
+      if (!current) return { changed: false, value: undefined };
+      const nextName = updates.name?.trim() || current.name;
+      const nextArea = updates.primaryArea?.trim().toLowerCase() || current.primary_area;
+      const nextSecondary = updates.secondaryAreas
+        ? normalizeSecondaryAreas(updates.secondaryAreas)
+        : current.secondary_areas;
+      const nextAliases = updates.aliases
+        ? normalizeAliases(updates.aliases)
+        : (current.aliases ?? '[]');
+      const nextInstructions =
+        updates.instructions === undefined
+          ? (current.instructions ?? null)
+          : updates.instructions?.trim() || null;
+      const nextSupportsExternalLoad =
+        updates.supportsExternalLoad === undefined
+          ? (current.supports_external_load ?? (current.modality === 'weighted_strength' ? 1 : 0))
+          : updates.supportsExternalLoad
+            ? 1
+            : 0;
       const result = await transactionDb.runAsync(
         `UPDATE custom_exercises
          SET name = ?, description = ?, aliases = ?, instructions = ?, primary_area = ?,
@@ -2438,13 +2496,74 @@ export async function upsertWeeklyPlanEntry(input: {
   requestWorkoutReminderReconciliation();
 }
 
-export async function setWorkoutScheduleOverride(input: {
+type ScheduleOverrideInput = {
   dateKey: string;
   overrideKind: WorkoutPlanKind;
   routineId?: string | null;
   movedFromDateKey?: string | null;
   note?: string | null;
-}): Promise<void> {
+};
+
+async function applyScheduleOverride(
+  transactionDb: Parameters<Parameters<typeof runBackupMutation>[0]['mutate']>[0],
+  enqueue: (record: SyncRecord) => void,
+  input: ScheduleOverrideInput,
+  now: string,
+): Promise<void> {
+  if (input.routineId) {
+    const routine = await transactionDb.getFirstAsync<{ id: string }>(
+      'SELECT id FROM workout_routines WHERE id = ? AND deleted_at IS NULL',
+      [input.routineId],
+    );
+    if (!routine) throw new Error('Routine not found.');
+  }
+  const existing = await transactionDb.getFirstAsync<{ id: string }>(
+    'SELECT id FROM workout_schedule_overrides WHERE date_key = ? AND deleted_at IS NULL',
+    [input.dateKey],
+  );
+  const selectedRoutineId = input.overrideKind === 'workout' ? (input.routineId ?? null) : null;
+  const values: (string | null)[] = [
+    selectedRoutineId,
+    input.overrideKind,
+    input.movedFromDateKey ?? null,
+    input.note ?? null,
+    now,
+  ];
+  if (existing) {
+    await transactionDb.runAsync(
+      `UPDATE workout_schedule_overrides
+       SET routine_id = ?, override_kind = ?, moved_from_date_key = ?, note = ?, updated_at = ?
+       WHERE id = ? AND deleted_at IS NULL`,
+      [...values, existing.id],
+    );
+    enqueue({
+      entity: 'workout_schedule_overrides',
+      id: existing.id,
+      updatedAt: now,
+      operation: 'update',
+    });
+  } else {
+    const id = createId('wover');
+    await transactionDb.runAsync(
+      `INSERT INTO workout_schedule_overrides
+       (id, date_key, override_kind, routine_id, moved_from_date_key, note, created_at, updated_at, deleted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+      [
+        id,
+        input.dateKey,
+        input.overrideKind,
+        selectedRoutineId,
+        input.movedFromDateKey ?? null,
+        input.note ?? null,
+        now,
+        now,
+      ],
+    );
+    enqueue({ entity: 'workout_schedule_overrides', id, updatedAt: now, operation: 'create' });
+  }
+}
+
+export async function setWorkoutScheduleOverride(input: ScheduleOverrideInput): Promise<void> {
   if (!isValidDateKey(input.dateKey)) throw new Error('A valid date is required.');
   if (input.overrideKind === 'workout' && !input.routineId) {
     throw new Error('A workout override needs a routine.');
@@ -2454,57 +2573,7 @@ export async function setWorkoutScheduleOverride(input: {
   await runBackupMutation({
     db,
     mutate: async (transactionDb, enqueue) => {
-      if (input.routineId) {
-        const routine = await transactionDb.getFirstAsync<{ id: string }>(
-          'SELECT id FROM workout_routines WHERE id = ? AND deleted_at IS NULL',
-          [input.routineId],
-        );
-        if (!routine) throw new Error('Routine not found.');
-      }
-      const existing = await transactionDb.getFirstAsync<{ id: string }>(
-        'SELECT id FROM workout_schedule_overrides WHERE date_key = ? AND deleted_at IS NULL',
-        [input.dateKey],
-      );
-      const selectedRoutineId = input.overrideKind === 'workout' ? (input.routineId ?? null) : null;
-      const values: (string | null)[] = [
-        selectedRoutineId,
-        input.overrideKind,
-        input.movedFromDateKey ?? null,
-        input.note ?? null,
-        now,
-      ];
-      if (existing) {
-        await transactionDb.runAsync(
-          `UPDATE workout_schedule_overrides
-           SET routine_id = ?, override_kind = ?, moved_from_date_key = ?, note = ?, updated_at = ?
-           WHERE id = ? AND deleted_at IS NULL`,
-          [...values, existing.id],
-        );
-        enqueue({
-          entity: 'workout_schedule_overrides',
-          id: existing.id,
-          updatedAt: now,
-          operation: 'update',
-        });
-      } else {
-        const id = createId('wover');
-        await transactionDb.runAsync(
-          `INSERT INTO workout_schedule_overrides
-           (id, date_key, override_kind, routine_id, moved_from_date_key, note, created_at, updated_at, deleted_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-          [
-            id,
-            input.dateKey,
-            input.overrideKind,
-            selectedRoutineId,
-            input.movedFromDateKey ?? null,
-            input.note ?? null,
-            now,
-            now,
-          ],
-        );
-        enqueue({ entity: 'workout_schedule_overrides', id, updatedAt: now, operation: 'create' });
-      }
+      await applyScheduleOverride(transactionDb, enqueue, input, now);
       return { changed: true, value: undefined };
     },
   });
@@ -2573,27 +2642,49 @@ export async function rescheduleWorkoutDate(input: {
   toDateKey: string;
   routineId: string;
 }): Promise<void> {
-  if (
-    !/^\d{4}-\d{2}-\d{2}$/.test(input.fromDateKey) ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(input.toDateKey)
-  ) {
+  // The same calendar validation the override API enforces: a regex alone
+  // would accept impossible dates like 2026-02-30.
+  if (!isValidDateKey(input.fromDateKey) || !isValidDateKey(input.toDateKey)) {
     throw new Error('A valid source and destination date are required.');
   }
-  if (input.fromDateKey !== input.toDateKey) {
-    await setWorkoutScheduleOverride({
-      dateKey: input.fromDateKey,
-      overrideKind: 'rest',
-      movedFromDateKey: input.fromDateKey,
-      note: `Moved to ${input.toDateKey}`,
-    });
-  }
-  await setWorkoutScheduleOverride({
-    dateKey: input.toDateKey,
-    overrideKind: 'workout',
-    routineId: input.routineId,
-    movedFromDateKey: input.fromDateKey,
-    note: `Moved from ${input.fromDateKey}`,
+  const moveSource = input.fromDateKey !== input.toDateKey;
+  const db = await getDatabase();
+  const now = nowIso();
+  // A move is ONE unit of work: both overrides (and both sync intents) commit
+  // in the same transaction. The previous two-call split committed the source
+  // leg first, so a failing destination leg left the workout moved to nowhere.
+  await runBackupMutation({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      if (moveSource) {
+        await applyScheduleOverride(
+          transactionDb,
+          enqueue,
+          {
+            dateKey: input.fromDateKey,
+            overrideKind: 'rest',
+            movedFromDateKey: input.fromDateKey,
+            note: `Moved to ${input.toDateKey}`,
+          },
+          now,
+        );
+      }
+      await applyScheduleOverride(
+        transactionDb,
+        enqueue,
+        {
+          dateKey: input.toDateKey,
+          overrideKind: 'workout',
+          routineId: input.routineId,
+          movedFromDateKey: input.fromDateKey,
+          note: `Moved from ${input.fromDateKey}`,
+        },
+        now,
+      );
+      return { changed: true, value: undefined };
+    },
   });
+  requestWorkoutReminderReconciliation();
 }
 
 export type WorkoutPreferences = {
@@ -2728,22 +2819,25 @@ export async function updateBodyWeightEntry(
   }>,
 ): Promise<void> {
   const db = await getDatabase();
-  const current = await db.getFirstAsync<BodyWeightEntry>(
-    'SELECT * FROM body_weight_entries WHERE id = ? AND deleted_at IS NULL',
-    [id],
-  );
-  if (!current) return;
-  const measuredAt = updates.measuredAt ?? current.measured_at;
-  const weight = updates.weight ?? current.weight;
-  if (!Number.isFinite(weight) || weight <= 0 || weight > 1_000)
-    throw new Error('Invalid body weight.');
-  if (!Number.isFinite(Date.parse(measuredAt))) throw new Error('Invalid measurement time.');
-  assertWorkoutWeightUnit(updates.unit ?? current.unit);
   const now = nowIso();
   await runBackupMutation({
     db,
     mutate: async (transactionDb, enqueue) => {
-      await transactionDb.runAsync(
+      // Read the current row inside the same serialized mutation transaction:
+      // concurrent corrections must not let a slower stale snapshot overwrite a
+      // newer sibling field (the same rule updateExercise/updateSet enforce).
+      const current = await transactionDb.getFirstAsync<BodyWeightEntry>(
+        'SELECT * FROM body_weight_entries WHERE id = ? AND deleted_at IS NULL',
+        [id],
+      );
+      if (!current) return { changed: false, value: undefined };
+      const measuredAt = updates.measuredAt ?? current.measured_at;
+      const weight = updates.weight ?? current.weight;
+      if (!Number.isFinite(weight) || weight <= 0 || weight > 1_000)
+        throw new Error('Invalid body weight.');
+      if (!Number.isFinite(Date.parse(measuredAt))) throw new Error('Invalid measurement time.');
+      assertWorkoutWeightUnit(updates.unit ?? current.unit);
+      const result = await transactionDb.runAsync(
         `UPDATE body_weight_entries
          SET measured_on = ?, measured_at = ?, weight = ?, unit = ?, note = ?, updated_at = ?
          WHERE id = ? AND deleted_at IS NULL`,
@@ -2757,6 +2851,7 @@ export async function updateBodyWeightEntry(
           id,
         ],
       );
+      if (result.changes !== 1) return { changed: false, value: undefined };
       enqueue({ entity: 'body_weight_entries', id, updatedAt: now, operation: 'update' });
       return { changed: true, value: undefined };
     },

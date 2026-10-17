@@ -89,6 +89,17 @@ export async function runBackupMutation<T>(input: {
       preparedRecords.push(prepared);
     };
     const result = await input.mutate(transactionDb, enqueue);
+    if (!result.changed && preparedRecords.length > 0) {
+      // Fail closed: a mutation that queued backup intents must report the
+      // change. The converse (row writes under changed:false with NO intents)
+      // stays legal for local-only tables this wrapper does not see — what is
+      // enforced here is "never commit a row change whose sync intents would be
+      // silently dropped", so backup completeness is structural, not merely
+      // conventional. Throwing rolls the whole transaction back.
+      throw new Error(
+        'runBackupMutation: mutation queued sync intents but reported changed=false; refusing to commit row changes without their intents.',
+      );
+    }
     if (result.changed) {
       if (!existingOwnerUserId && ownerUserId && canPersistOwner) {
         await setLocalDatasetOwner(transactionDb, ownerUserId);

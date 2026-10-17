@@ -33,7 +33,7 @@ export function NumberStepperField({
   };
 
   const handlePlus = () => {
-    onChange(String(Math.min(max, validNum + 1)));
+    onChange(String(Math.min(max, Math.max(min, validNum + 1))));
   };
 
   return (

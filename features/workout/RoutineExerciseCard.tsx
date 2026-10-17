@@ -1,10 +1,11 @@
 import { Text } from '@/core/ui/Text';
 import React from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Card } from '@/core/ui/Card';
-import { NumberStepperField } from '@/core/ui/NumberStepperField';
+import { DraftNumberField } from './DraftNumberField';
+import { DraftTextField } from './DraftTextField';
 import { PillChip } from '@/core/ui/PillChip';
 import { validateSetTiming } from '@/lib/validation';
 import { parseNumericInput } from '@/lib/numericInput';
@@ -232,35 +233,23 @@ export function RoutineExerciseCard({
               />
             </View>
           ) : null}
-          <TextInput
+          <DraftTextField
             accessibilityLabel={`${ex.name} notes`}
-            value={ex.notes ?? ''}
-            onChangeText={(value) => {
+            initialValue={ex.notes ?? ''}
+            onCommit={(value) => {
               void onUpdateExercise(ex.id, { notes: value }).then(onRefresh);
             }}
             placeholder="Cues or setup notes"
-            placeholderTextColor={tokens.textMuted}
             className="mb-3 rounded-xl border px-3 py-2 text-sm"
-            style={{
-              borderColor: tokens.border,
-              backgroundColor: tokens.surfaceElevated,
-              color: tokens.text,
-            }}
           />
-          <TextInput
+          <DraftTextField
             accessibilityLabel={`${ex.name} superset group`}
-            value={ex.superset_group ?? ''}
-            onChangeText={(value) => {
+            initialValue={ex.superset_group ?? ''}
+            onCommit={(value) => {
               void onUpdateExercise(ex.id, { supersetGroup: value }).then(onRefresh);
             }}
             placeholder="Superset group (optional)"
-            placeholderTextColor={tokens.textMuted}
             className="mb-3 rounded-xl border px-3 py-2 text-sm"
-            style={{
-              borderColor: tokens.border,
-              backgroundColor: tokens.surfaceElevated,
-              color: tokens.text,
-            }}
           />
           {modality === 'weighted_strength' || modality === 'bodyweight' || modality === null ? (
             <>
@@ -285,66 +274,51 @@ export function RoutineExerciseCard({
               </View>
               <View className="flex-row gap-2">
                 <View className="min-w-0 flex-1">
-                  <TextInput
+                  <DraftTextField
                     accessibilityLabel={`${ex.name} progression increment`}
-                    value={ex.progression_increment == null ? '' : String(ex.progression_increment)}
-                    onChangeText={(value) => {
+                    initialValue={
+                      ex.progression_increment == null ? '' : String(ex.progression_increment)
+                    }
+                    onCommit={(value) => {
                       const parsed = parseNumericInput(value, { allowDecimal: true });
                       void onUpdateExercise(ex.id, {
                         progressionIncrement: parsed !== null && parsed > 0 ? parsed : null,
                       }).then(onRefresh);
                     }}
                     placeholder="Load + (kg)"
-                    placeholderTextColor={tokens.textMuted}
                     keyboardType="decimal-pad"
-                    className="rounded-xl border px-3 py-2 text-sm"
-                    style={{
-                      borderColor: tokens.border,
-                      backgroundColor: tokens.surfaceElevated,
-                      color: tokens.text,
-                    }}
                   />
                 </View>
                 <View className="min-w-0 flex-1">
-                  <TextInput
+                  <DraftTextField
                     accessibilityLabel={`${ex.name} minimum reps`}
-                    value={ex.progression_min_reps == null ? '' : String(ex.progression_min_reps)}
-                    onChangeText={(value) => {
+                    initialValue={
+                      ex.progression_min_reps == null ? '' : String(ex.progression_min_reps)
+                    }
+                    onCommit={(value) => {
                       const parsed = parseNumericInput(value);
                       void onUpdateExercise(ex.id, {
                         progressionMinReps: parsed !== null && parsed > 0 ? parsed : null,
                       }).then(onRefresh);
                     }}
                     placeholder="Min reps"
-                    placeholderTextColor={tokens.textMuted}
                     keyboardType="number-pad"
-                    className="rounded-xl border px-3 py-2 text-sm"
-                    style={{
-                      borderColor: tokens.border,
-                      backgroundColor: tokens.surfaceElevated,
-                      color: tokens.text,
-                    }}
                   />
                 </View>
                 <View className="min-w-0 flex-1">
-                  <TextInput
+                  <DraftTextField
                     accessibilityLabel={`${ex.name} maximum reps`}
-                    value={ex.progression_max_reps == null ? '' : String(ex.progression_max_reps)}
-                    onChangeText={(value) => {
+                    initialValue={
+                      ex.progression_max_reps == null ? '' : String(ex.progression_max_reps)
+                    }
+                    onCommit={(value) => {
                       const parsed = parseNumericInput(value);
                       void onUpdateExercise(ex.id, {
                         progressionMaxReps: parsed !== null && parsed > 0 ? parsed : null,
                       }).then(onRefresh);
                     }}
                     placeholder="Max reps"
-                    placeholderTextColor={tokens.textMuted}
                     keyboardType="number-pad"
-                    className="rounded-xl border px-3 py-2 text-sm"
-                    style={{
-                      borderColor: tokens.border,
-                      backgroundColor: tokens.surfaceElevated,
-                      color: tokens.text,
-                    }}
                   />
                 </View>
               </View>
@@ -355,10 +329,10 @@ export function RoutineExerciseCard({
               <Text className="mb-2 text-xs font-medium" style={{ color: tokens.textMuted }}>
                 Set {set.set_number}
               </Text>
-              <NumberStepperField
+              <DraftNumberField
                 label="Active (seconds)"
-                value={String(set.active_seconds)}
-                onChange={async (value) => {
+                initialValue={String(set.active_seconds)}
+                onCommit={async (value) => {
                   const next = Math.round(Number(value.trim()));
                   if (!Number.isFinite(next)) return;
                   const timingErr = validateSetTiming(next, set.rest_seconds);
@@ -378,10 +352,10 @@ export function RoutineExerciseCard({
                 min={5}
                 max={3600}
               />
-              <NumberStepperField
+              <DraftNumberField
                 label="Rest (seconds, 0 = no rest)"
-                value={String(set.rest_seconds)}
-                onChange={async (value) => {
+                initialValue={String(set.rest_seconds)}
+                onCommit={async (value) => {
                   const next = Math.round(Number(value.trim()));
                   if (!Number.isFinite(next)) return;
                   const timingErr = validateSetTiming(set.active_seconds, next);
@@ -406,10 +380,10 @@ export function RoutineExerciseCard({
               modality === null ? (
                 <View className="flex-row gap-2">
                   <View className="min-w-0 flex-1">
-                    <NumberStepperField
+                    <DraftNumberField
                       label="Target reps min"
-                      value={set.target_reps_min == null ? '' : String(set.target_reps_min)}
-                      onChange={(value) =>
+                      initialValue={set.target_reps_min == null ? '' : String(set.target_reps_min)}
+                      onCommit={(value) =>
                         void onUpdateSetPrescription(set.id, {
                           targetRepsMin: value ? Number(value) : null,
                         }).then(onRefresh)
@@ -420,10 +394,10 @@ export function RoutineExerciseCard({
                     />
                   </View>
                   <View className="min-w-0 flex-1">
-                    <NumberStepperField
+                    <DraftNumberField
                       label="Target reps max"
-                      value={set.target_reps_max == null ? '' : String(set.target_reps_max)}
-                      onChange={(value) =>
+                      initialValue={set.target_reps_max == null ? '' : String(set.target_reps_max)}
+                      onCommit={(value) =>
                         void onUpdateSetPrescription(set.id, {
                           targetRepsMax: value ? Number(value) : null,
                         }).then(onRefresh)
@@ -438,52 +412,38 @@ export function RoutineExerciseCard({
               {modality === 'cardio' ? (
                 <View className="flex-row gap-2">
                   <View className="min-w-0 flex-1">
-                    <TextInput
+                    <DraftTextField
                       accessibilityLabel="Target distance"
-                      value={set.target_distance == null ? '' : String(set.target_distance)}
-                      onChangeText={(value) =>
+                      initialValue={set.target_distance == null ? '' : String(set.target_distance)}
+                      onCommit={(value) =>
                         void onUpdateSetPrescription(set.id, {
                           targetDistance: value ? Number(value) : null,
                         }).then(onRefresh)
                       }
                       placeholder="Distance"
-                      placeholderTextColor={tokens.textMuted}
                       keyboardType="decimal-pad"
-                      className="rounded-xl border px-3 py-2 text-sm"
-                      style={{
-                        borderColor: tokens.border,
-                        backgroundColor: tokens.surfaceElevated,
-                        color: tokens.text,
-                      }}
                     />
                   </View>
                   <View className="min-w-0 flex-1">
-                    <TextInput
+                    <DraftTextField
                       accessibilityLabel="Target pace"
-                      value={set.target_pace == null ? '' : String(set.target_pace)}
-                      onChangeText={(value) =>
+                      initialValue={set.target_pace == null ? '' : String(set.target_pace)}
+                      onCommit={(value) =>
                         void onUpdateSetPrescription(set.id, {
                           targetPace: value ? Number(value) : null,
                         }).then(onRefresh)
                       }
                       placeholder="Pace / speed"
-                      placeholderTextColor={tokens.textMuted}
                       keyboardType="decimal-pad"
-                      className="rounded-xl border px-3 py-2 text-sm"
-                      style={{
-                        borderColor: tokens.border,
-                        backgroundColor: tokens.surfaceElevated,
-                        color: tokens.text,
-                      }}
                     />
                   </View>
                 </View>
               ) : null}
               {modality === 'weighted_strength' || modality === 'bodyweight' ? (
-                <TextInput
+                <DraftTextField
                   accessibilityLabel="Target load"
-                  value={set.target_load == null ? '' : String(set.target_load)}
-                  onChangeText={(value) =>
+                  initialValue={set.target_load == null ? '' : String(set.target_load)}
+                  onCommit={(value) =>
                     void onUpdateSetPrescription(set.id, {
                       targetLoad: value ? Number(value) : null,
                     }).then(onRefresh)
@@ -493,23 +453,17 @@ export function RoutineExerciseCard({
                       ? 'Additional load (optional)'
                       : 'Target load (optional)'
                   }
-                  placeholderTextColor={tokens.textMuted}
                   keyboardType="decimal-pad"
                   className="mb-3 rounded-xl border px-3 py-2 text-sm"
-                  style={{
-                    borderColor: tokens.border,
-                    backgroundColor: tokens.surfaceElevated,
-                    color: tokens.text,
-                  }}
                 />
               ) : null}
               {modality === 'timed' || modality === 'cardio' ? (
-                <NumberStepperField
+                <DraftNumberField
                   label="Target duration (seconds)"
-                  value={
+                  initialValue={
                     set.target_duration_seconds == null ? '' : String(set.target_duration_seconds)
                   }
-                  onChange={(value) =>
+                  onCommit={(value) =>
                     void onUpdateSetPrescription(set.id, {
                       targetDurationSeconds: value ? Number(value) : null,
                     }).then(onRefresh)

@@ -491,6 +491,10 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     setIsSavingHabit(true);
     try {
       await runHabitSubmit();
+    } catch (error) {
+      // A rejected save must be visible and keep the editor open on the typed
+      // values — never a silent no-op (the modal only closes on a real save).
+      setHabitError(error instanceof Error ? error.message : 'Could not save the habit.');
     } finally {
       habitSubmitGuard.current.finish();
       setIsSavingHabit(false);
@@ -986,6 +990,21 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
         visible={modalVisible}
         onClose={resetModal}
         scroll
+        footer={
+          <View className="flex-row gap-2">
+            <View className="flex-1">
+              <Button label="Cancel" variant="ghost" onPress={resetModal} />
+            </View>
+            <View className="flex-1">
+              <Button
+                label={editingHabit ? 'Save changes' : 'Create habit'}
+                onPress={onSubmit}
+                color={COLOR}
+                loading={isSavingHabit}
+              />
+            </View>
+          </View>
+        }
       >
         <Card accentColor={SECTION_COLORS.habits}>
           <TextField
@@ -1300,20 +1319,6 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
             />
           )}
           <ValidationError message={linkedActionsError} />
-
-          <View className="mt-3 flex-row gap-2">
-            <View className="flex-1">
-              <Button label="Cancel" variant="ghost" onPress={resetModal} />
-            </View>
-            <View className="flex-1">
-              <Button
-                label={editingHabit ? 'Save changes' : 'Create habit'}
-                onPress={onSubmit}
-                color={COLOR}
-                loading={isSavingHabit}
-              />
-            </View>
-          </View>
         </Card>
       </Modal>
       {currentDetailHabit && detailRow ? (

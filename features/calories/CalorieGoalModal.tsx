@@ -13,7 +13,7 @@ import { SECTION_COLORS } from '@/constants/sectionColors';
 type Props = {
   visible: boolean;
   currentGoal: CalorieGoal;
-  onSave: (goal: CalorieGoal) => void;
+  onSave: (goal: CalorieGoal) => void | Promise<void>;
   onClose: () => void;
 };
 
@@ -39,19 +39,26 @@ export function CalorieGoalModal({ visible, currentGoal, onSave, onClose }: Prop
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const err = validateCalorieGoal(calories, protein, carbs, fats);
     if (err) {
       setGoalError(err);
       return;
     }
     setGoalError(null);
-    onSave({
-      calories: Number(calories.trim()),
-      protein: Number(protein.trim()),
-      carbs: Number(carbs.trim()),
-      fats: Number(fats.trim()),
-    });
+    try {
+      await onSave({
+        calories: Number(calories.trim()),
+        protein: Number(protein.trim()),
+        carbs: Number(carbs.trim()),
+        fats: Number(fats.trim()),
+      });
+    } catch (error) {
+      // The modal only closes on a real save: a rejected write stays visible
+      // here instead of closing as if it saved.
+      setGoalError(error instanceof Error ? error.message : 'Could not save the daily goals.');
+      return;
+    }
     onClose();
   };
 

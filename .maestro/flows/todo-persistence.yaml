@@ -26,10 +26,10 @@ tags:
 # The new row can be below the first viewport even when the pending count has
 # already incremented. Reveal the row before asserting it and again on restart.
 - scrollUntilVisible:
-    element: 'Native persistence todo'
+    element: '.*Native persistence todo.*'
     direction: DOWN
 - extendedWaitUntil:
-    visible: 'Native persistence todo'
+    visible: '.*Native persistence todo.*'
     timeout: 10000
 - killApp
 - launchApp
@@ -44,8 +44,8 @@ tags:
     childOf:
       text: 'Section tabs'
 - scrollUntilVisible:
-    element: 'Native persistence todo'
+    element: '.*Native persistence todo.*'
     direction: DOWN
 - extendedWaitUntil:
-    visible: 'Native persistence todo'
+    visible: '.*Native persistence todo.*'
     timeout: 15000

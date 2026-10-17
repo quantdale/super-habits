@@ -222,7 +222,11 @@ export function Modal({
                   paddingBottom: (footer ? MODAL_FOOTER_HEIGHT_RESERVE : 0) + scrollBottomPadding,
                 }}
                 keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="on-drag"
+                // Web has no soft keyboard: RNW maps "on-drag" to blurring the
+                // focused input on EVERY scroll event (including layout reflows
+                // from save-on-change refreshes), which drops keystrokes
+                // mid-typing.
+                keyboardDismissMode={Platform.OS === 'web' ? 'none' : 'on-drag'}
                 nestedScrollEnabled
               >
                 {children}

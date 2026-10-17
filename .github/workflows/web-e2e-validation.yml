@@ -1,0 +1,118 @@
+name: Web E2E Validation (non-release)
+
+# NON-RELEASE VALIDATION LANE — evidence only.
+#
+# Why this exists: the `e2e` and `nightly` jobs of ci.yml sit behind
+# `needs: quality`, and the `quality` job's hard release gate
+# (`scripts/audit-runtime-deps.mjs`) is red on two unremediated HIGH
+# advisories with no published fix (see SECURITY-DISPOSITION.md). While that
+# gate is red, no hosted browser evidence is produced at all, which makes the
+# functional state of a release candidate unverifiable by anyone reviewing the
+# PR without a local multi-hour run.
+#
+# What this lane is: the SAME hosted E2E configuration as ci.yml's `e2e` job
+# (same checked-out source, same npm ci, same Playwright projects and
+# retry-report gates), invoked on demand at an exact SHA.
+#
+# What this lane is NOT:
+#   - It is NOT a release gate and NOT a required check. Nothing references it.
+#   - It does NOT run the dependency audit and deliberately has NO `needs:`
+#     dependency on any job, so its outcome carries no information about the
+#     security gate and cannot be read as a merge-ready signal.
+#   - A green run here means only: "these functional lanes passed on hosted
+#     Chromium at this SHA". Merge readiness still requires the red security
+#     gate in ci.yml to be honestly resolved (fixed upstream, or an
+#     owner-authorized policy change — neither of which exists today).
+#
+# Dispatch: workflow_dispatch only. No pull_request/push triggers, so this
+# file can never add a status context to a PR or main tip and never replace or
+# mask any ci.yml job.
+
+on:
+  workflow_dispatch:
+
+# Same per-ref concurrency pattern as ci.yml so a re-dispatch supersedes the
+# previous run instead of leaving two ubuntu runners executing side by side.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-e2e-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Record exact source SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Validated source SHA: $(git rev-parse HEAD)"
+          [ -z "$(git status --porcelain --untracked-files=all)" ] || {
+            echo '::error::working tree is not clean at this SHA'; exit 1; }
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      # Hermetic export (scripts/build-dist-e2e.mjs): no local .env Supabase
+      # credentials are inlined; same builder the gating lanes use.
+      - name: Build web export for E2E
+        run: npm run build:e2e
+
+      # Full functional suite: chromium feature suite + journeys + simulation
+      # + pwa + visual (`npm run e2e` projects). The journeys-sync project is
+      # intentionally NOT part of `npm run e2e` (it is the nightly-only
+      # remote-boundary lane and needs the disposable-backend credentials).
+      - name: Run full E2E suite (evidence-only; not a release gate)
+        id: playwright-full
+        run: npm run e2e
+        env:
+          TZ: Asia/Manila
+
+      # One invocation, one gate — the retry-report rule is inherited
+      # unchanged from ci.yml: a strict assertion that only held on a retry is
+      # not a clean pass. This job is evidence-only, so the verdict must be as
+      # strict as the gating lane's, not looser.
+      - name: Retry-report gate (strict assertions must not depend on a retry)
+        if: always() && steps.playwright-full.outcome != 'skipped'
+        run: node scripts/e2e-retry-report.mjs
+
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-e2e-validation-report-${{ github.run_id }}
+          path: .cursor/playwright-output/e2e-report/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload failure artifacts
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-e2e-validation-failures-${{ github.run_id }}
+          path: |
+            test-results/
+            .cursor/playwright-output/e2e-failures/
+          retention-days: 14
+          if-no-files-found: warn
