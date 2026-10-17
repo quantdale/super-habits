@@ -11,6 +11,7 @@ import type { PomodoroSession } from './types';
 import { formatSessionDuration, formatSessionTime } from './pomodoro.domain';
 import { setPomodoroSessionMeta } from './pomodoro.data';
 import { TodoAssociationPicker } from './TodoAssociationPicker';
+import { describePlanningWriteError } from '@/features/planning-hub/planningWriteError';
 import type { SessionAssociation } from './pomodoro.sessionMeta';
 
 const COLOR = SECTION_COLORS.focus;
@@ -45,6 +46,7 @@ export function SessionMetaEditModal({
   const [association, setAssociation] = useState<SessionAssociation | null>(null);
   const [hadLinkedTodo, setHadLinkedTodo] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visible || !session) return;
@@ -65,6 +67,7 @@ export function SessionMetaEditModal({
 
   const handleSave = async () => {
     setSaving(true);
+    setError(null);
     try {
       await setPomodoroSessionMeta({
         sessionId: session.id,
@@ -73,6 +76,10 @@ export function SessionMetaEditModal({
         linkedTodoTitle: linkChanged ? (association?.todoTitle ?? null) : undefined,
       });
       onSaved();
+    } catch (e) {
+      // A rejected write (note or link/unlink) surfaces inline with typed
+      // values and the modal open, never as an unhandled rejection.
+      setError(describePlanningWriteError(e, 'Could not save the session changes. Try again.'));
     } finally {
       setSaving(false);
     }
@@ -127,6 +134,16 @@ export function SessionMetaEditModal({
           loading={saving}
           onPress={() => void handleSave()}
         />
+        {error ? (
+          <Text
+            accessibilityRole="alert"
+            variant="bodyMd"
+            style={{ color: tokens.dangerText }}
+            className="mt-2"
+          >
+            {error}
+          </Text>
+        ) : null}
       </View>
     </Modal>
   );

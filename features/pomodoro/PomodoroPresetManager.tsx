@@ -113,7 +113,14 @@ export function PomodoroPresetManagerModal({ visible, presets, onClose, onChange
     const next = presets.some((p) => p.id === preset.id)
       ? presets.map((p) => (p.id === preset.id ? preset : p))
       : [...presets, preset];
-    await savePomodoroPresets(next);
+    try {
+      await savePomodoroPresets(next);
+    } catch {
+      // The preset list stays as-is and the draft stays open; a silent
+      // no-op would look like a saved preset that never persisted.
+      setError('Could not save the preset. Try again.');
+      return;
+    }
     setDraft(null);
     setError(null);
     onChanged();
@@ -127,8 +134,14 @@ export function PomodoroPresetManagerModal({ visible, presets, onClose, onChange
       confirmVariant: 'danger',
     });
     if (!confirmed) return;
-    await savePomodoroPresets(presets.filter((p) => p.id !== preset.id));
+    try {
+      await savePomodoroPresets(presets.filter((p) => p.id !== preset.id));
+    } catch {
+      setError('Could not delete the preset. Try again.');
+      return;
+    }
     if (draft?.id === preset.id) setDraft(null);
+    setError(null);
     onChanged();
   };
 
@@ -178,6 +191,7 @@ export function PomodoroPresetManagerModal({ visible, presets, onClose, onChange
       </View>
 
       <View className="mt-5 border-t pt-4" style={{ borderColor: tokens.border }}>
+        {draft === null && error ? <ValidationError message={error} /> : null}
         {draft === null ? (
           <Button
             label="New preset"

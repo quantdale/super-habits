@@ -5,6 +5,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
+import { ValidationError } from '@/core/ui/ValidationError';
 import { deleteWeeklyReview, listWeeklyReviews } from '@/features/weekly-review/weeklyReview.data';
 import type { WeeklyReview } from '@/features/weekly-review/weeklyReview.types';
 import {
@@ -25,6 +26,7 @@ export function ReviewHistoryView() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadReviews = useCallback(async () => {
     const next = await listWeeklyReviews(26);
@@ -56,10 +58,19 @@ export function ReviewHistoryView() {
       });
       if (!confirmed) return;
       setDeletingId(review.id);
+      setDeleteError(null);
       try {
         await deleteWeeklyReview(review.id);
         setExpandedId(null);
         await loadReviews();
+      } catch (e) {
+        // A rejected delete keeps the history row and the retriable button;
+        // the failure surfaces with the review's own message when present.
+        setDeleteError(
+          e instanceof Error && e.message
+            ? e.message
+            : 'Could not delete the review. Please try again.',
+        );
       } finally {
         setDeletingId(null);
       }
@@ -87,6 +98,7 @@ export function ReviewHistoryView() {
 
   return (
     <View className="gap-2">
+      {deleteError ? <ValidationError message={deleteError} /> : null}
       {reviews.map((review) => {
         const expanded = expandedId === review.id;
         const summary = expanded ? parseSummaryPayload(review.summary_payload) : null;

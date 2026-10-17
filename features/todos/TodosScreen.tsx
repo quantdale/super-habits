@@ -425,7 +425,41 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
 
   const handleToggleTodo = useCallback(
     async (todo: Todo) => {
-      const result = await toggleTodo(todo);
+      let result;
+      try {
+        result = await toggleTodo(todo);
+      } catch (error) {
+        // A failed toggle must never escape as an unhandled rejection; the row
+        // stays in its pre-tap state and the notice invites a retry (mirrors
+        // the bulk path's catch below).
+        showNotice(
+          createLinkedActionsNotice({
+            message:
+              error instanceof Error && error.message
+                ? error.message
+                : 'That task could not be updated. Try again.',
+            reason: 'todo_toggle_failed',
+            source: { feature: 'todos', entityType: 'todo' },
+            target: { feature: 'todos', entityType: 'todo' },
+          }),
+        );
+        return;
+      }
+      // The write landed on nothing (row deleted elsewhere or lost race):
+      // refresh so the list stops showing a ghost, and say so instead of
+      // running the settle animation for a change that never happened.
+      if (result.noop) {
+        showNotice(
+          createLinkedActionsNotice({
+            message: 'That task is no longer available.',
+            reason: 'todo_toggle_noop',
+            source: { feature: 'todos', entityType: 'todo' },
+            target: { feature: 'todos', entityType: 'todo' },
+          }),
+        );
+        void refresh();
+        return;
+      }
       for (const notice of result.linkedActions.notices) {
         showNotice(notice);
       }
@@ -464,10 +498,25 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
         confirmVariant: 'danger',
       });
       if (!confirmed) return;
-      await removeTodo(todo.id);
+      try {
+        await removeTodo(todo.id);
+      } catch (error) {
+        showNotice(
+          createLinkedActionsNotice({
+            message:
+              error instanceof Error && error.message
+                ? error.message
+                : 'Could not delete that task. Try again.',
+            reason: 'todo_delete_failed',
+            source: { feature: 'todos', entityType: 'todo' },
+            target: { feature: 'todos', entityType: 'todo' },
+          }),
+        );
+        return;
+      }
       void refresh();
     },
-    [confirm, refresh],
+    [confirm, refresh, showNotice],
   );
 
   const handleDeleteFromEditor = useCallback(async () => {
@@ -480,10 +529,27 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
       confirmVariant: 'danger',
     });
     if (!confirmed) return;
-    await removeTodo(target.id);
+    try {
+      await removeTodo(target.id);
+    } catch (error) {
+      // Keep the editor open on failure so the user can retry; the delete
+      // intent is untouched.
+      showNotice(
+        createLinkedActionsNotice({
+          message:
+            error instanceof Error && error.message
+              ? error.message
+              : 'Could not delete that task. Try again.',
+          reason: 'todo_delete_failed',
+          source: { feature: 'todos', entityType: 'todo' },
+          target: { feature: 'todos', entityType: 'todo' },
+        }),
+      );
+      return;
+    }
     closeModal();
     void refresh();
-  }, [editingTodo, confirm, closeModal, refresh]);
+  }, [editingTodo, confirm, closeModal, refresh, showNotice]);
 
   const requestStopRecurring = useCallback(() => {
     const target = editingTodo;
@@ -497,10 +563,25 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
         confirmLabel: 'Stop repeating',
       });
       if (!confirmed) return;
-      await stopRecurringSeries(recurrenceId);
+      try {
+        await stopRecurringSeries(recurrenceId);
+      } catch (error) {
+        showNotice(
+          createLinkedActionsNotice({
+            message:
+              error instanceof Error && error.message
+                ? error.message
+                : 'Could not stop that repeating task. Try again.',
+            reason: 'todo_stop_recurring_failed',
+            source: { feature: 'todos', entityType: 'todo' },
+            target: { feature: 'todos', entityType: 'todo' },
+          }),
+        );
+        return;
+      }
       void refresh();
     })();
-  }, [editingTodo, confirm, closeModal, refresh]);
+  }, [editingTodo, confirm, closeModal, refresh, showNotice]);
 
   const handleQuickAdd = useCallback(
     async (quickTitle: string) => {

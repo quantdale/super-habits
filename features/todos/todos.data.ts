@@ -54,6 +54,13 @@ export type TodoLinkedActionsDispatchResult = Pick<
 export type ToggleTodoResult = {
   completed: 0 | 1;
   linkedActions: TodoLinkedActionsDispatchResult;
+  /**
+   * True when the tap changed nothing because the row is gone (deleted
+   * elsewhere / tombstoned) or a concurrent write won the race. Persisted
+   * completions stay represented by completed: 1 with noop undefined, so UIs
+   * can distinguish "legitimately already in that state" from "silent no-op".
+   */
+  noop?: boolean;
 };
 
 export type PendingTodoFilters = {
@@ -876,6 +883,7 @@ async function setTodoCompletion(
     return {
       completed: 0,
       linkedActions: EMPTY_LINKED_ACTIONS_RESULT,
+      noop: true,
     };
   }
 
