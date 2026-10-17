@@ -179,6 +179,7 @@ export function RoutineDetailModal({
     async (mutation: () => Promise<void>): Promise<void> => {
       try {
         await mutation();
+        setWorkoutError(null);
       } catch (error) {
         setWorkoutError(error instanceof Error ? error.message : 'Could not save the change.');
       }
@@ -251,7 +252,13 @@ export function RoutineDetailModal({
       return;
     }
     setRenameDraft(null);
-    await onRenamed?.(trimmed);
+    try {
+      await onRenamed?.(trimmed);
+    } catch (error) {
+      setWorkoutError(
+        error instanceof Error ? error.message : 'Could not refresh after renaming the routine.',
+      );
+    }
   }, [onRenamed, renameDraft, routineId, routineName]);
 
   // Collapse the open exercise when the modal closes, without an effect:
@@ -403,7 +410,11 @@ export function RoutineDetailModal({
     const next = [...exercises];
     [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
     setExercises(next);
-    await queueBuilderMutation(() => updateExerciseOrder(next.map((exercise) => exercise.id)));
+    await queueBuilderMutation(() =>
+      surfaceBuilderFailure(() => updateExerciseOrder(next.map((exercise) => exercise.id))),
+    );
+    // Re-sync either way: on a rejected write the optimistic swap above must
+    // not stay on screen while SQLite keeps the old order.
     await refresh();
   };
 
@@ -417,11 +428,11 @@ export function RoutineDetailModal({
       });
       if (!confirmed) return;
 
-      await deleteExercise(id);
+      await queueBuilderMutation(() => surfaceBuilderFailure(() => deleteExercise(id)));
       if (expandedId === id) setExpandedId(null);
       await refresh();
     },
-    [confirm, expandedId, refresh],
+    [confirm, expandedId, queueBuilderMutation, refresh, surfaceBuilderFailure],
   );
 
   const toggleExpanded = (id: string) => {

@@ -705,18 +705,16 @@ export async function addSet(input: {
       );
       if (!activeExercise) throw new Error('Exercise or routine not found.');
       // When the caller does not pin the number, derive it inside this
-      // serialized transaction: two rapid "add set" taps must land as N+1 and
+      // serialized transaction: two rapid "add set" taps must land on N+1 and
       // N+2, never two rows at N+1 (the table has no UNIQUE(exercise_id,
-      // set_number) to catch it).
-      const setNumber =
-        input.setNumber ??
-        ((
-          await transactionDb.getFirstAsync<{ count: number }>(
-            `SELECT COUNT(*) AS count FROM routine_exercise_sets
-             WHERE exercise_id = ? AND deleted_at IS NULL`,
-            [input.exerciseId],
-          )
-        )?.count ?? 0) + 1;
+      // set_number) to catch it). MAX(set_number)+1 keeps numbers unique even
+      // after a mid-list delete leaves COUNT below the surviving numbers.
+      const maxRow = await transactionDb.getFirstAsync<{ max_number: number | null }>(
+        `SELECT MAX(set_number) AS max_number FROM routine_exercise_sets
+         WHERE exercise_id = ? AND deleted_at IS NULL`,
+        [input.exerciseId],
+      );
+      const setNumber = input.setNumber ?? (maxRow?.max_number ?? 0) + 1;
       const hasPrescription =
         input.targetRepsMin !== undefined ||
         input.targetRepsMax !== undefined ||
@@ -1596,10 +1594,12 @@ export async function listSessionTotalsForRange(
 
 /**
  * Duplicate a routine ("use as template"): creates a new routine copying
- * routine_exercises and routine_exercise_sets via the existing insert
- * helpers (addExercise/addSet), which own the createId prefixes and sync
- * enqueue calls for every nested row. Returns the new routine id, or null
- * when the source routine no longer exists.
+ * routine_exercises and routine_exercise_sets. ONE transaction — the old
+ * version built the copy through N+1 separate transactions (one shell + one
+ * per exercise + one per set), so a mid-copy failure left a silently
+ * truncated, "valid-looking" routine. Every copied row still carries its own
+ * durable create intent. Returns the new routine id, or null when the source
+ * routine no longer exists.
  */
 export async function duplicateRoutine(routineId: string): Promise<string | null> {
   const db = await getDatabase();
@@ -1615,54 +1615,92 @@ export async function duplicateRoutine(routineId: string): Promise<string | null
     `${source.name} (copy)`.length <= 100
       ? `${source.name} (copy)`
       : `${source.name.slice(0, 93).trimEnd()} (copy)`;
-  await runSyncedMutation({
+  await runBackupMutation({
     db,
-    record: { entity: 'workout_routines', id: newId, updatedAt: now, operation: 'create' },
-    mutate: async (transactionDb) => {
+    mutate: async (transactionDb, enqueue) => {
       await transactionDb.runAsync(
         'INSERT INTO workout_routines (id, name, description, goal_tag, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, NULL)',
         [newId, newName, source.description, source.goal_tag ?? null, now, now],
       );
+      enqueue({ entity: 'workout_routines', id: newId, updatedAt: now, operation: 'create' });
+      for (const exercise of source.exercises) {
+        const exerciseId = createId('ex');
+        await transactionDb.runAsync(
+          `INSERT INTO routine_exercises
+             (id, routine_id, name, sort_order, catalog_exercise_id, modality, unilateral,
+              supports_external_load, notes,
+              superset_group, progression_mode, progression_increment, progression_min_reps,
+              progression_max_reps, created_at, updated_at, deleted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+          [
+            exerciseId,
+            newId,
+            exercise.name,
+            exercise.sort_order ?? 0,
+            exercise.catalog_exercise_id ?? null,
+            exercise.modality ?? 'timed',
+            // Same normalization the old addExercise-based copy applied.
+            exercise.unilateral === 1 ? 1 : 0,
+            (
+              exercise.supports_external_load === undefined
+                ? exercise.catalog_exercise_id
+                  ? exercise.modality === 'weighted_strength'
+                  : true
+                : exercise.supports_external_load === 1
+            )
+              ? 1
+              : 0,
+            exercise.notes ?? null,
+            exercise.superset_group ?? null,
+            exercise.progression_mode ?? 'none',
+            exercise.progression_increment ?? null,
+            exercise.progression_min_reps ?? null,
+            exercise.progression_max_reps ?? null,
+            now,
+            now,
+          ],
+        );
+        enqueue({
+          entity: 'routine_exercises',
+          id: exerciseId,
+          updatedAt: now,
+          operation: 'create',
+        });
+        for (const set of exercise.sets) {
+          const setId = createId('eset');
+          await transactionDb.runAsync(
+            `INSERT INTO routine_exercise_sets
+               (id, exercise_id, set_number, active_seconds, rest_seconds,
+                target_reps_min, target_reps_max, target_load, target_duration_seconds,
+                target_distance, target_pace, created_at, updated_at, deleted_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+            [
+              setId,
+              exerciseId,
+              set.set_number ?? 0,
+              set.active_seconds ?? 0,
+              set.rest_seconds ?? 0,
+              set.target_reps_min ?? null,
+              set.target_reps_max ?? null,
+              set.target_load ?? null,
+              set.target_duration_seconds ?? null,
+              set.target_distance ?? null,
+              set.target_pace ?? null,
+              now,
+              now,
+            ],
+          );
+          enqueue({
+            entity: 'routine_exercise_sets',
+            id: setId,
+            updatedAt: now,
+            operation: 'create',
+          });
+        }
+      }
       return { changed: true, value: undefined };
     },
   });
-
-  for (const exercise of source.exercises) {
-    const exerciseId = await addExercise({
-      routineId: newId,
-      name: exercise.name,
-      sortOrder: exercise.sort_order,
-      catalogExerciseId: exercise.catalog_exercise_id,
-      modality: exercise.modality,
-      unilateral: exercise.unilateral === 1,
-      supportsExternalLoad:
-        exercise.supports_external_load === undefined
-          ? exercise.catalog_exercise_id
-            ? exercise.modality === 'weighted_strength'
-            : true
-          : exercise.supports_external_load === 1,
-      notes: exercise.notes,
-      supersetGroup: exercise.superset_group,
-      progressionMode: exercise.progression_mode,
-      progressionIncrement: exercise.progression_increment,
-      progressionMinReps: exercise.progression_min_reps,
-      progressionMaxReps: exercise.progression_max_reps,
-    });
-    for (const set of exercise.sets) {
-      await addSet({
-        exerciseId,
-        setNumber: set.set_number,
-        activeSeconds: set.active_seconds,
-        restSeconds: set.rest_seconds,
-        targetRepsMin: set.target_reps_min,
-        targetRepsMax: set.target_reps_max,
-        targetLoad: set.target_load,
-        targetDurationSeconds: set.target_duration_seconds,
-        targetDistance: set.target_distance,
-        targetPace: set.target_pace,
-      });
-    }
-  }
   return newId;
 }
 
@@ -2604,10 +2642,9 @@ export async function rescheduleWorkoutDate(input: {
   toDateKey: string;
   routineId: string;
 }): Promise<void> {
-  if (
-    !/^\d{4}-\d{2}-\d{2}$/.test(input.fromDateKey) ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(input.toDateKey)
-  ) {
+  // The same calendar validation the override API enforces: a regex alone
+  // would accept impossible dates like 2026-02-30.
+  if (!isValidDateKey(input.fromDateKey) || !isValidDateKey(input.toDateKey)) {
     throw new Error('A valid source and destination date are required.');
   }
   const moveSource = input.fromDateKey !== input.toDateKey;

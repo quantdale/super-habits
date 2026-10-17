@@ -1,7 +1,7 @@
 # ExecPlan: Windows-first successor campaign v1
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -126,8 +126,8 @@ verdicts.
 - Failures: `node scripts/audit-runtime-deps.mjs` exit 1 (braces 3.0.3 / node-forge 1.4.0 HIGH, no published compatible patch) — genuine, unfixable today, gate correctly red. Do not merge PR #79. Do not waive.
 - Relevant quarantines: none added by this campaign; no assertion weakened.
 - Blockers: (a) security gate red (external, standing) — release BLOCKED; (b) iOS qualification owner-deferred (`IOS_QUALIFICATION_DEFERRED_BY_OWNER`); (c) Android ENVIRONMENT_BLOCKED.
-- Exact next action: run `npx playwright test e2e/workout-editor-input-reliability.spec.ts e2e/workout-gym-v2.spec.ts --project=chromium` against the rebuilt hermetic dist (expect 3/3 new + workout-gym-v2 green), then commit + push the Phase-1 milestone to the campaign branch.
-- Remaining definition of done: Phase 1 DoD — all three defects fixed at source with reproduction evidence (pre-fix failures captured); Phase-1 gates green (qa:affected ladder, hermetic `build:e2e`, targeted Playwright, full Vitest); no assertion weakened; milestone committed and pushed to the campaign branch.
+- Exact next action: None — campaign closed 2026-10-17. Successor candidates are registered in Outcomes & Retrospective below and in `docs/ui-ux/v3-audit/post-w17-overnight/WINDOWS-FIRST-SUCCESSOR-REPORT.md`.
+- Remaining definition of done: All items complete or dispositioned — three Windows-verifiable workstreams plus the adversarial-review round shipped with reproduction evidence and green gates; externally blocked work (iOS `IOS_QUALIFICATION_DEFERRED_BY_OWNER`, Android `ENVIRONMENT_BLOCKED`, security `SECURITY_UNREMEDIATED`) stays explicitly external and is never claimed green; final report filed.
 
 ## Progress
 
@@ -137,11 +137,13 @@ verdicts.
 - [x] Campaign 1 — fix Defect A (add-exercise name field restored to controlled local state)
 - [x] Campaign 1 — fix Defect B (synchronous-draft fields for all 26 save-on-change builder inputs; `+` clamp in `NumberStepperField`)
 - [x] Campaign 1 — fix Defect C (rejected-save surfacing in queued writes + handlers) + snapshot ordering guard (`lib/snapshotSequencer.ts`)
-- [ ] Campaign 1 — tests green post-fix (new spec + workout-gym-v2 targeted Playwright, sequencer unit tests)
-- [ ] Campaign 1 — Phase-1 gates + milestone commit/push
-- [ ] Campaign 2 — local-first reliability (discovery-led, defect-gated)
-- [ ] Campaign 3 — Windows/web product-quality browser inspection
-- [ ] Final — security disposition re-verification, adversarial review, final report
+- [x] Campaign 1 — tests green post-fix (new spec 9/9 ×3 repeats, targeted lanes 47/47) + Phase-1 milestone committed/pushed (`cd25edd`)
+- [x] Campaign 1 — broad regression battery: full Playwright 368 passed / 86 skipped / 4 host-load-class misses (all re-verified green in isolation/quiet-host runs)
+- [x] Campaign 2 — local-first reliability: F1 atomic schedule move, F3 fail-closed intent contract, F6 in-transaction merge + set numbering, rejected-save surfacing at 5 divergence-class UI sites; real-SQLite integrity suite; milestone committed/pushed (`6b23b6e`)
+- [x] Campaign 3 — Windows/web product-quality sweep: 24 screenshots captured (`simulation-output/phase3/` — owner-reviewable; the agent cannot view images) + all machine-checkable quality axes green (a11y AA ×3 themes, 34 visual goldens, boundary/NaN sweeps, keyboard specs, HEAVY perf ceilings)
+- [x] Adversarial review of `f601226..6b23b6e` (independent agent) + response fixes: A1 date-key validation restored in `rescheduleWorkoutDate`, A2 move/delete-exercise rejection escapes closed, A3 rename callback escape closed, A4 contract wording made honest, B2 sticky error cleared on success, B3 WorkoutScreen reschedule/assign errors surfaced, B4 set numbering switched to `MAX(set_number)+1`
+- [x] Final — F2 atomic `duplicateRoutine` (one transaction, per-row intents) + fault-injection oracle
+- [x] Final — gates + security re-verification + final report (`docs/ui-ux/v3-audit/post-w17-overnight/WINDOWS-FIRST-SUCCESSOR-REPORT.md`)
 
 ## Surprises & Discoveries
 
@@ -222,6 +224,37 @@ verdicts.
   - 1 suite host-load timeouts (`auditRuntimeDeps`, `nativeAuthMock`,
     `qaNativeProvision`, `restore.coordinator` — all subprocess/probe/hook
     timing under parallel load) — each re-passed in a serial re-run.
+- 2026-10-17 — Phase-1 milestone `cd25edd` (pushed): new spec 9/9 across
+  3 repeats (deterministic after the blur fix), targeted lanes
+  (workout-gym-v2, calories-w10, habits, todos) 47/47, `qa:fast` OK,
+  `qa:integration` 84 files OK (real SQLite), `qa:timezones` 5 zones OK.
+  Full battery at `cd25edd`: 368 passed / 86 skipped / 4 host-load-class
+  misses (3 HEAVY timeouts pass alone; habits-w7 800ms ceiling passes 3/3 on
+  a quiet host) — assertions preserved, no weakening.
+- 2026-10-17 — Phase-2 milestone `6b23b6e` (pushed): full Vitest 267 files
+  passed | 1 skipped (0 failures) incl. 5 new real-SQLite integrity tests
+  (move atomicity failure-injection, fail-closed guard, concurrent-field
+  merge, set-number distinctness); targeted Playwright 95/95 across todos,
+  habits, calories, pomodoro, workout (incl. HEAVY ceilings and the
+  failed-write retry contracts).
+- 2026-10-17 — Adversarial review round (independent agent, `f601226..6b23b6e`):
+  A1–A4 confirmed defects fixed immediately (date-key validation regression,
+  two rejection escapes, overclaimed guard comment); B2/B3/B4 fixed (sticky
+  error, WorkoutScreen move/assign surfaces, MAX-based set numbering); B1/B5/
+  B6/B7 recorded as accepted trade-offs; C1–C6 confirmed the data-layer
+  fixes, guard false-positive audit, extraction parity, and that the tests
+  pin their claims.
+- 2026-10-17 — Final state gates: `tsc --noEmit` 0; `eslint . --max-warnings 0`
+  0; full Vitest 266 files passed | 1 skipped (1 host-load hook timeout —
+  `restore.coordinator` beforeAll, re-passed serially); workout e2e lanes
+  40/40 over the final build; `--project=visual` 34/34 (one earlier
+  achievements-overlay capture flake passed in isolation and in the full
+  re-run); `openspec validate --all` PASS; `agent:plan:validate:all` PASS.
+- 2026-10-17 — Security re-verification: `npm view braces version` = 3.0.3,
+  `npm view node-forge version` = 1.4.0 (both still latest, no patch);
+  `node scripts/audit-runtime-deps.mjs` exit 1 with the same 2 undocumented
+  HIGH (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge` GHSA-86w9-cpqp-85rv).
+  SECURED UNCHANGED. No waiver, no allowlist change, no merge.
 
 ## Changed Files / Areas
 
@@ -243,4 +276,38 @@ verdicts.
 
 ## Outcomes & Retrospective
 
-- Not complete. Fill this section only when Status becomes COMPLETED.
+- Closed 2026-10-17 with the Windows-verifiable scope exhausted and every
+  remaining item either dispositioned or explicitly external. Three
+  workstreams plus an adversarial-review round shipped, each behind
+  reproduction evidence: (1) workout input/persistence reliability — the web
+  keystroke-loss root cause (RNW scroll-driven `blurTextInput` via
+  `keyboardDismissMode="on-drag"`), the echo-clobber class (synchronous-draft
+  fields), the add-name regression, silent rejected saves, and out-of-order
+  refresh snapshots; (2) local-first write integrity — atomic schedule move,
+  atomic routine duplication, fail-closed sync-intent contract, in-transaction
+  read-merge-write and set numbering, rejected-save surfacing at the five
+  divergence-class UI sites; (3) web product quality — sweep artifacts plus
+  the green machine-checkable axes (a11y ×3 themes, 34 visual goldens,
+  boundary/NaN, keyboard, HEAVY ceilings).
+- Separately verdicted (see the final report): **engineering completion:
+  COMPLETE for the Windows-verifiable scope**; **product release readiness:
+  BLOCKED** — the mandatory security gate stays red (`braces` GHSA-vfj7-8cjw-p6xm,
+  `node-forge` GHSA-86w9-cpqp-85rv; registry re-checked 2026-10-17: 3.0.3 /
+  1.4.0 remain latest, no published patch), iOS is
+  `IOS_QUALIFICATION_DEFERRED_BY_OWNER`, Android is `ENVIRONMENT_BLOCKED`.
+  PR #79 stays OPEN and unmerged.
+- Successor candidates (registered, deliberately not done here): Tier-2
+  silent-no-op UI writes (task toggle/delete, habit pause/archive, project/
+  goal link-unlink, pomodoro notes/presets, daily-plan and weekly-review
+  deletes — no divergence, no feedback); F4 linked-action dispatch crash
+  window (needs a durable dispatch marker — architectural); F5 outbox
+  revision no-op guard (reachable only after hydrate failure); F7 settings
+  snapshot gap (needs a repair/drift design decision); F8 reward backfill
+  window (local-only reward layer, under-payment only); owner review of the
+  24 Phase-3 sweep screenshots (the agent cannot view images).
+- Lessons: the f601226 "uncontrolled input" fix was platform-blind — web and
+  native lose keystrokes through different mechanisms and both needed real
+  browser evidence; audit-then-fix with pre-fix reproduction made every
+  campaign fix defensible; and the independent adversarial review caught
+  four real gaps in the campaign's own fixes (validation regression,
+  rejection escapes, overclaimed contract), which is exactly why it runs.
