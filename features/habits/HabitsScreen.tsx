@@ -203,6 +203,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const [checkInError, setCheckInError] = useState<string | null>(null);
   const [detailHabit, setDetailHabit] = useState<Habit | null>(null);
   const [detailConfirmationOpen, setDetailConfirmationOpen] = useState(false);
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const deletionPending = useRef(false);
   const binaryWrites = useRef(new Set<string>());
   const [busyHabitIds, setBusyHabitIds] = useState<ReadonlySet<string>>(new Set());
@@ -263,27 +264,57 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 
   const handleTogglePause = useCallback(
-    async (habit: Habit) => {
-      if ((habit.status ?? 'active') === 'paused') {
-        await resumeHabit(habit.id);
-      } else {
-        await pauseHabit(habit.id);
+    async (habit: Habit): Promise<boolean> => {
+      if (busyHabitIds.has(habit.id)) return true;
+      setBusyHabitIds((ids) => new Set(ids).add(habit.id));
+      try {
+        if ((habit.status ?? 'active') === 'paused') {
+          await resumeHabit(habit.id);
+        } else {
+          await pauseHabit(habit.id);
+        }
+        setLifecycleError(null);
+        await refresh();
+        return true;
+      } catch {
+        setLifecycleError('The pause change did not save. Try again.');
+        return false;
+      } finally {
+        setBusyHabitIds((ids) => {
+          const next = new Set(ids);
+          next.delete(habit.id);
+          return next;
+        });
       }
-      await refresh();
     },
-    [refresh],
+    [busyHabitIds, refresh],
   );
 
   const handleToggleArchive = useCallback(
-    async (habit: Habit) => {
-      if ((habit.status ?? 'active') === 'archived') {
-        await unarchiveHabit(habit.id);
-      } else {
-        await archiveHabit(habit.id);
+    async (habit: Habit): Promise<boolean> => {
+      if (busyHabitIds.has(habit.id)) return true;
+      setBusyHabitIds((ids) => new Set(ids).add(habit.id));
+      try {
+        if ((habit.status ?? 'active') === 'archived') {
+          await unarchiveHabit(habit.id);
+        } else {
+          await archiveHabit(habit.id);
+        }
+        setLifecycleError(null);
+        await refresh();
+        return true;
+      } catch {
+        setLifecycleError('The lifecycle change did not save. Try again.');
+        return false;
+      } finally {
+        setBusyHabitIds((ids) => {
+          const next = new Set(ids);
+          next.delete(habit.id);
+          return next;
+        });
       }
-      await refresh();
     },
-    [refresh],
+    [busyHabitIds, refresh],
   );
 
   useEffect(() => {
@@ -882,7 +913,10 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                 onDecrement={() => {
                   void handleDecrement(habit.id, selectedDateKey, !item.row.quantitative);
                 }}
-                onOpen={() => setDetailHabit(habit)}
+                onOpen={() => {
+                  setDetailHabit(habit);
+                  setLifecycleError(null);
+                }}
               />
             );
           }}
@@ -1332,6 +1366,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
           busy={busyHabitIds.has(currentDetailHabit.id)}
           visible={!detailConfirmationOpen}
           checkInError={checkInError}
+          lifecycleError={lifecycleError}
           onClose={() => setDetailHabit(null)}
           onIncrement={() =>
             void handleIncrement(currentDetailHabit.id, selectedDateKey, !detailRow.quantitative)
@@ -1345,12 +1380,18 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
             void openEditModal(habit);
           }}
           onTogglePause={() => {
-            void handleTogglePause(currentDetailHabit);
-            setDetailHabit(null);
+            void handleTogglePause(currentDetailHabit).then((saved) => {
+              setDetailHabit((current) =>
+                saved && current?.id === currentDetailHabit.id ? null : current,
+              );
+            });
           }}
           onToggleArchive={() => {
-            void handleToggleArchive(currentDetailHabit);
-            setDetailHabit(null);
+            void handleToggleArchive(currentDetailHabit).then((saved) => {
+              setDetailHabit((current) =>
+                saved && current?.id === currentDetailHabit.id ? null : current,
+              );
+            });
           }}
         />
       ) : null}
