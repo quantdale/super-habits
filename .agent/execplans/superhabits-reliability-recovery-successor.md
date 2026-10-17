@@ -88,9 +88,33 @@ separate verdicts.
 
 ## Current Checkpoint
 
-- Current milestone: Phase 1 (A1) — linked-action crash recovery
-  implementation. All four read-only investigations COMPLETE (2026-10-17);
-  every candidate gap CONFIRMED. Findings:
+- Current milestone: Phase 2 (B) — silent UI write fixes. Phase 1 (A1)
+  COMPLETE and COMMITTED (see Validation Ledger). A1 shipped:
+  - `linkedActions.data.ts`: `insertLinkedActionEventInTransaction()` (in-tx
+    event persist + `ON CONFLICT DO NOTHING`) and
+    `listPendingRecoveryLinkedActionEvents(cutoffIso)` sweep for the recovery
+    module (keeps DB access in the data layer, satisfying lint rule 4).
+  - `linkedActions.engine.ts`: `buildTransactionalSourceEvent()` export
+    (normalized event with caller-supplied stable eventId).
+  - Dispatch paths hand off durably: `todos.data.ts` (setTodoCompletion +
+    bulkSetTodoCompletion — pre-mint `levt` id, in-tx insert, post-commit
+    dispatch with `eventId`), `habits.data.ts` (incrementHabit threshold
+    crossing + runCompleteHabitFromNotification),
+    `todoNotificationActions.data.ts`.
+  - `linkedActions.recovery.ts`: `recoverPendingLinkedActions()` — 7-day
+    lookback, NOT EXISTS terminal execution, per-event try/catch, replay
+    through `processSourceAction` (exactly-once machinery holds), report
+    {replayedEvents, skippedEvents, failedEvents}.
+  - `AppProviders.tsx`: sweeper wired after `migrateLegacySessionMeta()`
+    (post-hydrate so replayed effects' outbox intents allocate against the
+    restored durable revision); failures log only.
+  - `linkedActions.events.types.ts`: input `label` widened to
+    `string | null` so persisted events feed `processSourceAction` directly.
+  - Test-fixture fixes: engine mocks in `tests/todos.data.test.ts` +
+    `tests/habits.data.test.ts` spread `importOriginal` (real
+    `buildTransactionalSourceEvent`); todos data mock adds
+    `insertLinkedActionEventInTransaction`; habits unit expectation adds
+    `eventId: expect.any(String)`.
   - **A1 confirmed (P2)**: in-app dispatch paths (`todos.data.ts:886/1026`,
     `habits.data.ts:241`) call `processSourceAction` AFTER the source
     transaction commits with an event id minted in-memory
@@ -143,24 +167,24 @@ separate verdicts.
     (`e2e/habits-w7-audit.spec.ts:288-332`); no component-test framework
     needed.
 - Completed: Phase 0 (state verified, worktree + branch at `120ab19`,
-  ExecPlan created, npm install done); Phase 0 investigations (4/4 returned).
-- In progress: Phase 1 (A1) implementation — transactional event handoff +
-  startup sweeper + fault-injection tests.
-- Important modified files: none yet (implementation starting).
-- Last successful validation: baseline = prior campaign's green gates at
-  `120ab19` (recorded in the prior plan); this campaign's first own gate run
-  pending.
+  ExecPlan created, npm install done); Phase 0 investigations (4/4 returned);
+  Phase 1 (A1) implemented, validated, committed.
+- In progress: Phase 2 (B) — not started yet; next up habit pause/archive
+  (worst group, `HabitsScreen.tsx:265-287` + `1347-1354`).
+- Important modified files: A1 set (see milestone list); investigation
+  findings unchanged (embedded above).
+- Last successful validation: 2026-10-17 — `qa:fast` exit 0
+  (typecheck + lint + 182 unit files) in the successor worktree after A1.
 - Current failures: none.
 - Relevant quarantines: none.
 - Blockers: standing externals only — security gate red (release BLOCKED),
   iOS owner-deferred, Android ENVIRONMENT_BLOCKED. None block engineering.
 - Condition required to unblock: none (not blocked).
 - Exact resume action after unblock: N/A.
-- Exact next action: implement A1 (1) transactional source-event handoff in
-  `todos.data.ts` + `habits.data.ts`, (2) startup sweeper
-  (`recoverPendingLinkedActions`) wired in `AppProviders.tsx`, (3)
-  integration tests proving crash recovery + exactly-once; then `qa:affected`
-  gates.
+- Exact next action: Phase 2 (B) — implement silent-failure fixes starting
+  with habit pause/archive modal (`HabitsScreen.tsx:265-287` + `1347-1354`)
+  using pattern A (ValidationError inline) or B (InAppNotice), then continue
+  down the 8-group list; add pinned tests per fix.
 - Remaining definition of done: every named candidate fixed with
   reproduction-first evidence, disproven with pinned tests, or explicitly
   dispositioned; gates green (typecheck 0, lint 0, full Vitest, targeted
@@ -174,7 +198,8 @@ separate verdicts.
 - [x] Phase 0 — create this ExecPlan (Plan-Version 2, ACTIVE)
 - [x] Phase 0 — `npm install` (1273 packages, worktree hook warning benign)
 - [x] Phase 0 — investigations A1, A2/A3, B, C1/C2 all complete (4/4 confirmed)
-- [ ] Phase 1 (A1) — transactional event handoff + startup sweeper + recovery tests
+- [x] Phase 1 (A1) — transactional event handoff + startup sweeper + recovery
+      tests (committed 2026-10-17; 12 files, 930 insertions)
 - [ ] Phase 2 (B) — silent UI write fixes (8 material groups, patterns A–D)
 - [ ] Phase 3 (A2, A3) — settings dirty-anchor + outbox hydrate-failure recovery
 - [ ] Phase 4 (C1, C2) — bounded reward lookback + sequencer E2E pin
@@ -201,6 +226,14 @@ separate verdicts.
 - 2026-10-17 — Base successor on `120ab19` and target the stacked PR at the
   PR #79 branch — per campaign directive; remote verified unchanged before
   branching.
+- 2026-10-17 — Fail-closed event handoff: the in-tx event insert is NOT
+  wrapped in try/catch; an insert failure rolls the source mutation back so
+  the UI sees a real write failure instead of a silently-lost effect.
+- 2026-10-17 — Sweep AFTER hydrate: replayed effects enqueue outbox intents
+  that must allocate against the restored durable revision (A3 interplay).
+- 2026-10-17 — Keep DB access inside `linkedActions.data.ts` (recovery module
+  queries via `listPendingRecoveryLinkedActionEvents`) instead of adding a
+  lint-config exclusion for `linkedActions.recovery.ts`.
 - 2026-10-17 — Reproduction-or-proof gate before any implementation —
   campaign instruction; prevents speculative rewrites of sound machinery
   (esp. the outbox revision guard and linked-action engine).
@@ -210,6 +243,18 @@ separate verdicts.
 - 2026-10-17 — `git worktree add ...` — PASS — worktree at `120ab19`, clean.
 - 2026-10-17 — `npm install` — PASS — 1273 packages; ENOTDIR `.git/hooks`
   warning is expected in a linked worktree (git dir is a file).
+- 2026-10-17 — fault-injection integration tests
+  (`linkedActionsCrashRecovery.test.ts`, 4 tests) — PASS — crash after
+  source commit leaves persisted event; startup sweep replays exactly once.
+- 2026-10-17 — targeted linked-actions suites (6 files, 45 tests) — PASS.
+- 2026-10-17 — `npm run typecheck` — PASS — 0 errors (after widening input
+  `label` to `string | null` + test helper typing).
+- 2026-10-17 — `npm run lint` — PASS — 0 errors, 0 warnings (prettier CRLF
+  normalization + no-console + DB-client boundary respected via data-layer
+  query indirection).
+- 2026-10-17 — `npm run qa:fast` — PASS — exit 0: typecheck + lint + all
+  182 unit test files (initially 10 failures from stale vi.mock factories,
+  fixed with importOriginal spreads + updated expectations).
 
 ## Changed Files / Areas
 
