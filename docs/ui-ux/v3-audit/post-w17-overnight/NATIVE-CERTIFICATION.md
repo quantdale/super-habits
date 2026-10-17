@@ -389,3 +389,33 @@ controlled (its +/- buttons read `value`) as a documented residual.
 Final gates at this state: typecheck 0, lint 0, full Vitest 2722 passed |
 2 skipped, targeted web E2E (`workout-gym-v2` + `calories-w10`) 25 passed |
 3 skipped.
+
+---
+
+## I. iOS disposition — `IOS_QUALIFICATION_DEFERRED_BY_OWNER` (2026-10-17)
+
+Owner decision (2026-10-17): the owner has no Mac or iOS device and defers all
+further iOS simulator qualification. iOS is now an **accepted external-validation
+dependency**, not an active campaign workstream.
+
+- Last completed simulator qualification stays exactly as recorded in §H:
+  run 38941052793 at code head `c05860e` = **12 PASS / 1 FAIL**.
+- The remaining workout input bug was patched at `f601226` (the editor's raw
+  `TextInput` fields are now uncontrolled). That final patch is
+  **NOT device-certified**. **Do not claim 13/13 certification** and do not
+  mark release readiness green on its behalf.
+- No further iOS simulator builds, workflow dispatches, or iOS-only
+  implementation changes will be made without a justified, independently
+  testable reason. All iOS findings, tests, fixes, and artifacts
+  (`.tmp-ios36423379932/`, run reports, this file's history) are preserved
+  as-is.
+- The workout input reliability work that follows this deferral is validated
+  by Windows-verifiable evidence only (real-SQLite integration oracles and
+  browser/Playwright interaction evidence). Where the same code paths are
+  exercised by the 13-flow iOS suite, that suite remains the pending external
+  qualification lane and may re-open this disposition when a Mac runner is
+  available.
+
+Android remains `ANDROID_NOT_RUN / ENVIRONMENT_BLOCKED` (§A). The security
+disposition (`SECURITY-DISPOSITION.md`) is unchanged: `SECURITY_UNREMEDIATED`,
+release gate red, PR #79 not merged.

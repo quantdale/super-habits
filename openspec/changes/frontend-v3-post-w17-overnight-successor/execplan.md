@@ -1,7 +1,7 @@
 # ExecPlan: Post-W17 overnight successor convergence
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -43,8 +43,8 @@ Close the post-W17 reliability gaps that a new agent can still hit: a recovery p
 - Failures: `node scripts/audit-runtime-deps.mjs` remains exit 1 (braces 3.0.3 / node-forge 1.4.0 HIGH, no published compatible patch) - genuinely unfixable today. Do not merge. Do not waive. Do not reclassify.
 - Relevant quarantines: none added. The three fixes weaken no assertion: each occluded tap is re-anchored semantically, and the post-relaunch readiness requirement is still strict (the runner's recovery is bounded, evidence-gated, and identified).
 - Blockers: (a) SECURITY gate red (unremediated) -> PR #79 must stay OPEN, no merge. (b) Android ENVIRONMENT_BLOCKED unchanged. (c) web-e2e-validation.yml NOT dispatchable unchanged. (d) Sync/remote lanes NOT RUN unchanged. (e) iOS certification pending the qualification run at this head.
-- Exact next action: dispatch the focused iOS run (flows=calories-persistence,workout-gym-v2-persistence,workout-gym-v2-session-lifecycle) at this head; while it runs, execute successor checks (Android env recheck, security advisory recheck, adversarial review of the harness change); then dispatch the full 13-flow qualification and record its true matrix here.
-- Remaining definition of done: the three flows requalified at exact source (focused run then full matrix); launch-race recovery validated or its failure recorded truthfully; native coverage accounting still truthful; security audit uncompromised (retained); release decision distinguishes implemented/tested/ready; PR #79 + parent plan carry current recovery instructions.
+- Exact next action: None — plan closed 2026-10-17. The owner deferred iOS qualification (`IOS_QUALIFICATION_DEFERRED_BY_OWNER`, `NATIVE-CERTIFICATION.md` §I); the remaining engineering continues in `.agent/execplans/windows-first-successor-campaign-v1.md`.
+- Remaining definition of done: All items complete or dispositioned — iOS requalification is owner-deferred external validation (run 38941052793 stays 12 PASS / 1 FAIL; the `f601226` patch is not device-certified and 13/13 is NOT claimed); launch-race recovery was validated in run 38941052793 (session-lifecycle passed); native coverage accounting truthful; security audit uncompromised (retained); release decision distinguishes implemented/tested/ready (release BLOCKED on security); PR #79 + successor plan carry current recovery instructions.
 
 ## Progress
 
@@ -60,9 +60,9 @@ Close the post-W17 reliability gaps that a new agent can still hit: a recovery p
 - [x] Final convergence: security lanes re-verified to closure and dispositioned (2026-10-15)
 - [x] Final convergence: harness fail-closed fixes + weak assertion strengthened + macro coverage gap closed (2026-10-15)
 - [x] Final convergence: non-release hosted validation workflow added (2026-10-15)
-- [ ] Final convergence: Android exact-source qualification or explicit ENVIRONMENT_BLOCKED (in progress)
-- [ ] Final convergence: hosted lanes dispatched at the final head (pending final push)
-- [ ] Final convergence: final local ladder + release decision at the final head
+- [x] Final convergence: Android exact-source qualification or explicit ENVIRONMENT_BLOCKED (closed 2026-10-16: ENVIRONMENT_BLOCKED — foreign `emulator-5594` adbd wedge blocks Maestro device enumeration; owner-action remediation documented)
+- [x] Final convergence: hosted lanes dispatched at the final head (closed 2026-10-17: hosted lanes remain CI-owned on PR #79; the audit job stays red by design and no combined-green is produced)
+- [x] Final convergence: final local ladder + release decision at the final head (closed 2026-10-17: local ladder green at `f601226` per the successor plan's baseline; release decision = BLOCKED on the unremediated security gate — never green while `braces`/`node-forge` advisories stand)
 
 ## Surprises & Discoveries
 
@@ -117,8 +117,9 @@ Close the post-W17 reliability gaps that a new agent can still hit: a recovery p
 - Do not resume `openspec/changes/frontend-v3-post-w17-correction/execplan.md` for implementation. It is COMPLETED.
 - Do not pop `pre-recovery-local-changes` or delete `.tmp-ios36423379932/`.
 - Do not kill emulators you did not start. Identify AVD ownership before `qa:native:*`.
-- Continue only from Exact next action above.
+- This plan is COMPLETED (2026-10-17). Resume engineering from `.agent/execplans/windows-first-successor-campaign-v1.md` in the same worktree.
 
 ## Outcomes & Retrospective
 
-- Not complete. Fill this section only when Status becomes COMPLETED.
+- Closed 2026-10-17 with the owner's Windows-first successor directive. All engineering scope shipped: the recovery pointer, gated Calories over-goal oracles, the habit-editor footer, the two Maestro flow repairs, the launch-race harness hardening (with `tests/qaIosLaunchRace.test.ts`), the non-release hosted validation workflow, and the `f601226` workout-input fix (raw TextInputs uncontrolled). iOS native qualification closed at 12 PASS / 1 FAIL (run 38941052793) with the last oracle root-caused and patched but **not device-certified** — dispositioned `IOS_QUALIFICATION_DEFERRED_BY_OWNER`, 13/13 never claimed. Android stays ENVIRONMENT_BLOCKED with documented owner-action remediation. Security stays SECURED UNREMEDIATED (no waiver, no allowlist change, audit gate correctly red); PR #79 stays OPEN and unmerged.
+- Lesson carried forward: the controlled-input refresh clobber was a product bug reachable by any fast typist; the uncontrolled-input fix (f601226) left the `NumberStepperField` residual and one accidental uncontrolled revert — the successor plan closes those at their source with browser evidence.
