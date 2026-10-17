@@ -551,6 +551,95 @@ export async function createLinkedActionEvent(
   return normalizeLinkedActionEventRow(persisted);
 }
 
+/**
+ * Persist a linked-action source event inside the CALLER's SQLite transaction.
+ *
+ * This is the durable dispatch-handoff primitive: source mutations (todo
+ * completion, habit threshold crossing, notification completion) write the
+ * event row in the SAME transaction as the authoritative row write, then
+ * dispatch `processSourceAction` after commit. If the process dies between the
+ * two durable boundaries, the event row survives with the full normalized
+ * payload and the startup recovery sweep can replay the dispatch exactly once
+ * (the engine reads the persisted event by id and its guards/claim leases make
+ * replays idempotent). Events are local operational state outside the backup
+ * scope, so no outbox intent is required.
+ */
+export async function insertLinkedActionEventInTransaction(
+  transactionDb: SQLite.SQLiteDatabase,
+  event: LinkedActionEventRecord,
+  createdAt: string,
+): Promise<void> {
+  const row = buildLinkedActionEventRow(event, createdAt);
+  await transactionDb.runAsync(
+    `INSERT INTO linked_action_events (
+       id,
+       chain_id,
+       root_event_id,
+       parent_event_id,
+       chain_depth,
+       origin_kind,
+       origin_rule_id,
+       origin_event_id,
+       source_feature,
+       source_entity_type,
+       source_entity_id,
+       trigger_type,
+       source_record_id,
+       source_date_key,
+       source_label,
+       occurred_at,
+       payload,
+       created_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT DO NOTHING`,
+    [
+      row.id,
+      row.chain_id,
+      row.root_event_id,
+      row.parent_event_id,
+      row.chain_depth,
+      row.origin_kind,
+      row.origin_rule_id,
+      row.origin_event_id,
+      row.source_feature,
+      row.source_entity_type,
+      row.source_entity_id,
+      row.trigger_type,
+      row.source_record_id,
+      row.source_date_key,
+      row.source_label,
+      row.occurred_at,
+      row.payload,
+      row.created_at,
+    ],
+  );
+}
+
+/**
+ * List durable linked-action events still awaiting dispatch for startup
+ * recovery: created inside the lookback window and never terminal
+ * (`applied`/`skipped` execution). Events are local operational state, so
+ * this is deliberately a plain read with no sync involvement.
+ */
+export async function listPendingRecoveryLinkedActionEvents(
+  cutoffIso: string,
+): Promise<LinkedActionEventRecord[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<LinkedActionEventRow>(
+    `SELECT e.*
+     FROM linked_action_events AS e
+     WHERE e.occurred_at >= ?
+       AND NOT EXISTS (
+         SELECT 1
+         FROM linked_action_executions AS x
+         WHERE x.source_event_id = e.id
+           AND x.status IN ('applied', 'skipped')
+       )`,
+    [cutoffIso],
+  );
+  return rows.map(normalizeLinkedActionEventRow);
+}
+
 export async function getLinkedActionExecutionByRuleAndSourceEvent(
   ruleId: string,
   sourceEventId: string,

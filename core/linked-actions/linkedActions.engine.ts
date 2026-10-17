@@ -26,6 +26,7 @@ import {
   serializeLinkedActionEffectPayload,
   type LinkedActionEffectPlan,
   type LinkedActionEffectResult,
+  type LinkedActionEventRecord,
   type LinkedActionExecutionRecord,
   type LinkedActionOriginMetadata,
   type LinkedActionProcessMode,
@@ -294,6 +295,21 @@ function mapExecutionToDuplicateResult(
     notice,
     noticePreview: execution.noticePayload ?? plan.noticePreview,
   };
+}
+
+/**
+ * Build the fully normalized source event for the transactional dispatch
+ * handoff. Data layers pre-mint the `eventId`, persist this record inside the
+ * source mutation's SQLite transaction (via
+ * `insertLinkedActionEventInTransaction`), and dispatch
+ * `processSourceAction` after commit with the same id — the engine then reads
+ * the persisted event instead of minting a fresh one, so a crash between the
+ * two durable boundaries is recoverable from the event row alone.
+ */
+export function buildTransactionalSourceEvent(
+  input: Omit<LinkedActionSourceActionInput, 'eventId'> & { eventId: string },
+): LinkedActionEventRecord {
+  return normalizeSourceAction(input);
 }
 
 export class LinkedActionsEngine {

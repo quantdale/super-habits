@@ -17,7 +17,7 @@ export type LinkedActionSourceActionInput = {
   sourceRecordId?: string | null;
   sourceDateKey?: string | null;
   occurredAt?: string;
-  label?: string;
+  label?: string | null;
   payload?: Record<string, unknown>;
   origin?: Partial<LinkedActionOriginMetadata>;
   chain?: Partial<LinkedActionChainMetadata>;

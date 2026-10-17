@@ -9,6 +9,7 @@ import type {
 } from '@/core/linked-actions/linkedActions.types';
 import {
   deleteLinkedActionRulesForTargetEntity,
+  insertLinkedActionEventInTransaction,
   listLinkedActionRulesForSourceEntity,
   replaceLinkedActionRulesForSourceEntity,
 } from '@/core/linked-actions/linkedActions.data';
@@ -17,7 +18,10 @@ import { assertTodoPartialUpdate, assertTodoWrite } from '@/lib/validation';
 import { nowIso, toDateKey, dateKeyToLocalDate } from '@/lib/time';
 import { runBackupMutation, runSyncedMutation } from '@/core/sync/syncedMutation';
 import type { SyncRecord } from '@/core/sync/sync.engine';
-import { linkedActionsEngine } from '@/core/linked-actions/linkedActions.engine';
+import {
+  buildTransactionalSourceEvent,
+  linkedActionsEngine,
+} from '@/core/linked-actions/linkedActions.engine';
 import { parseTopTodoIds, serializeTopTodoIds } from '@/features/daily-plan/dailyPlan.domain';
 import {
   cancelTodoReminderSafely,
@@ -787,6 +791,13 @@ async function setTodoCompletion(
 ): Promise<ToggleTodoResult> {
   const db = await getDatabase();
   const now = nowIso();
+  // Durable dispatch handoff: the source event is pre-minted and persisted in
+  // the SAME transaction as the completion write, then dispatched after
+  // commit. A crash between the two durable boundaries leaves the event row
+  // on disk for the startup recovery sweep; the engine resumes from the
+  // persisted event id, so the effect is applied exactly once.
+  const linkedEventId = createId('levt');
+  const linkedSourceDateKey = toDateKey();
   type ToggleMutation = {
     current: Todo | null;
     previous: 0 | 1;
@@ -826,6 +837,36 @@ async function setTodoCompletion(
           changed: false,
           value: { current: null, previous: 0, next: 0 },
         };
+      }
+      // Linked actions fire only on a genuine non-recurring 0->1 completion;
+      // persist the dispatch intent atomically with the completion itself
+      // (same condition as the post-commit dispatch below).
+      if (previous === 0 && next === 1 && current.recurrence !== 'daily') {
+        await insertLinkedActionEventInTransaction(
+          transactionDb,
+          buildTransactionalSourceEvent({
+            eventId: linkedEventId,
+            occurredAt: now,
+            feature: 'todos',
+            entityType: 'todo',
+            entityId: current.id,
+            triggerType: 'todo.completed',
+            label: current.title,
+            sourceDateKey: linkedSourceDateKey,
+            sourceRecordId: current.id,
+            origin: {
+              originKind: 'user',
+              originRuleId: null,
+              originEventId: null,
+            },
+            payload: {
+              previousCompleted: previous,
+              currentCompleted: next,
+              recurrence: current.recurrence,
+            },
+          }),
+          now,
+        );
       }
       return { changed: true, value: { current, previous, next } };
     },
@@ -884,13 +925,14 @@ async function setTodoCompletion(
   }
 
   const processResult = await linkedActionsEngine.processSourceAction({
+    eventId: linkedEventId,
     occurredAt: now,
     feature: 'todos',
     entityType: 'todo',
     entityId: current.id,
     triggerType: 'todo.completed',
     label: current.title,
-    sourceDateKey: toDateKey(),
+    sourceDateKey: linkedSourceDateKey,
     sourceRecordId: current.id,
     origin: {
       originKind: 'user',
@@ -958,8 +1000,9 @@ export async function bulkSetTodoCompletion(
   if (ids.length === 0) return { changed: 0, skipped: 0 };
   const db = await getDatabase();
   const now = nowIso();
+  const linkedSourceDateKey = toDateKey();
 
-  type AppliedCompletion = { row: BulkCompletionRow; previous: 0 | 1 };
+  type AppliedCompletion = { row: BulkCompletionRow; previous: 0 | 1; linkedEventId: string };
   const outcome = await runBackupMutation<AppliedCompletion[]>({
     db,
     mutate: async (transactionDb, enqueue) => {
@@ -984,14 +1027,46 @@ export async function bulkSetTodoCompletion(
         );
         if (result.changes !== 1) continue;
         enqueue({ entity: 'todos', id: current.id, updatedAt: now, operation: 'update' });
-        applied.push({ row: current, previous });
+        // Durable dispatch handoff (same contract as setTodoCompletion): a
+        // genuine non-recurring 0->1 completion persists its source event in
+        // this transaction, so a post-commit crash is recoverable.
+        let linkedEventId: string | null = null;
+        if (previous === 0 && completed === 1 && current.recurrence !== 'daily') {
+          linkedEventId = createId('levt');
+          await insertLinkedActionEventInTransaction(
+            transactionDb,
+            buildTransactionalSourceEvent({
+              eventId: linkedEventId,
+              occurredAt: now,
+              feature: 'todos',
+              entityType: 'todo',
+              entityId: current.id,
+              triggerType: 'todo.completed',
+              label: current.title,
+              sourceDateKey: linkedSourceDateKey,
+              sourceRecordId: current.id,
+              origin: {
+                originKind: 'user',
+                originRuleId: null,
+                originEventId: null,
+              },
+              payload: {
+                previousCompleted: previous,
+                currentCompleted: completed,
+                recurrence: current.recurrence,
+              },
+            }),
+            now,
+          );
+        }
+        applied.push({ row: current, previous, linkedEventId: linkedEventId ?? '' });
       }
       return { changed: applied.length > 0, value: applied };
     },
   });
 
   // Post-commit side effects, identical to setTodoCompletion's per-item path.
-  for (const { row, previous } of outcome.value) {
+  for (const { row, previous, linkedEventId } of outcome.value) {
     const next = completed;
     if (next === 1) {
       await cancelTodoReminderSafely(row.id);
@@ -1020,17 +1095,20 @@ export async function bulkSetTodoCompletion(
     }
 
     // Linked actions fire only on a genuine non-recurring 0->1 completion,
-    // exactly like setTodoCompletion.
+    // exactly like setTodoCompletion; the per-item event id was persisted in
+    // the source transaction.
     if (!(previous === 0 && next === 1 && row.recurrence !== 'daily')) continue;
+    if (!linkedEventId) continue;
 
     await linkedActionsEngine.processSourceAction({
+      eventId: linkedEventId,
       occurredAt: now,
       feature: 'todos',
       entityType: 'todo',
       entityId: row.id,
       triggerType: 'todo.completed',
       label: row.title,
-      sourceDateKey: toDateKey(),
+      sourceDateKey: linkedSourceDateKey,
       sourceRecordId: row.id,
       origin: {
         originKind: 'user',
