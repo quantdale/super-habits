@@ -5,13 +5,14 @@ Branch: `frontend-v3-post-w17-overnight-successor` (PR #79, base `main` `fb10d6c
 
 ## 1. Commits
 
-| Commit    | Campaign                                                        |
-| --------- | --------------------------------------------------------------- |
-| `f601226` | **Start** (pre-campaign head; the un-certified iOS input patch) |
-| `2468216` | Campaign 0 — iOS deferral disposition + campaign plan opened    |
-| `cd25edd` | Campaign 1 — workout input/persistence reliability              |
-| `6b23b6e` | Campaign 2 — local-first write integrity                        |
-| (final)   | Adversarial-review response + atomic duplication + this report  |
+| Commit    | Campaign                                                                                  |
+| --------- | ----------------------------------------------------------------------------------------- |
+| `f601226` | **Start** (pre-campaign head; the un-certified iOS input patch)                           |
+| `2468216` | Campaign 0 — iOS deferral disposition + campaign plan opened                              |
+| `cd25edd` | Campaign 1 — workout input/persistence reliability                                        |
+| `6b23b6e` | Campaign 2 — local-first write integrity                                                  |
+| `22b59d8` | Closure — adversarial-review response + atomic duplication + report                       |
+| `3a63c6f` | **Final** — closure round: review findings, honest docs, flake budget, visual disposition |
 
 ## 2. Campaigns executed
 
