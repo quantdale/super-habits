@@ -13,7 +13,9 @@
  * export on a second port. Defaults are unchanged (8081 → dist/).
  */
 const http = require('http');
-const fs = require('fs').promises;
+const fsPromises = require('fs').promises;
+const nodeFs = require('fs');
+const fs = fsPromises;
 const path = require('path');
 
 function parseArgs(argv) {
@@ -107,13 +109,33 @@ const SW_BYPASS_PATCHED = 'const E2E_DISABLE_DEV_BYPASS = true;';
 // marker lives only for this server process and defaults to ''.
 let swVariantMarker = '';
 
+// `AUD-SH05-A`: the REAL two-build shell upgrade needs the server to switch from
+// build A's export to build B's export at the SAME origin, rather than appending
+// a synthetic marker. POST /__e2e__/serve-shell-b flips this for the rest of the
+// server process; every later document/asset/worker request resolves against
+// `dist-shell-b/`. It fails loudly when that tree was not prepared, so a spec can
+// never silently "upgrade" to the same build.
+let serveShellB = false;
+const SHELL_B_DIR = path.resolve(__dirname, '..', 'dist-shell-b');
+
+/** The directory serving the current build (A by default, B after the flip). */
+function activeDist() {
+  if (!serveShellB) return DIST;
+  if (!nodeFs.existsSync(path.join(SHELL_B_DIR, 'index.html'))) {
+    throw new Error(
+      'serve-e2e: dist-shell-b/index.html is missing — run `node scripts/prepare-shell-b.mjs` first.',
+    );
+  }
+  return SHELL_B_DIR;
+}
+
 async function readPatchedSwSource() {
   let source;
   try {
-    source = await fs.readFile(path.join(DIST, 'sw.js'), 'utf8');
+    source = await fs.readFile(path.join(activeDist(), 'sw.js'), 'utf8');
   } catch {
     throw new Error(
-      `serve-e2e: ${path.join(DIST, 'sw.js')} not found — run \`npm run build:e2e\` first.`,
+      `serve-e2e: ${path.join(activeDist(), 'sw.js')} not found — run \`npm run build:e2e\` first.`,
     );
   }
   if (!source.includes(SW_BYPASS_MARKER)) {
@@ -152,7 +174,7 @@ function getMime(filePath) {
 }
 
 function isInsideDist(candidate) {
-  const root = path.resolve(DIST);
+  const root = path.resolve(activeDist());
   const resolved = path.resolve(candidate);
   if (resolved === root) return true;
   const prefix = root.endsWith(path.sep) ? root : root + path.sep;
@@ -170,9 +192,34 @@ function coopCoepHeaders(extra = {}) {
 const server = http.createServer(async (req, res) => {
   try {
     const pathname = new URL(req.url || '/', 'http://localhost').pathname;
+
+    // `AUD-SH05-A`: the build switch is resolved BEFORE any path mapping, so it
+    // works against the current root and cannot be defeated by the static-file
+    // containment check.
+    if (pathname === '/__e2e__/serve-shell-a') {
+      // Reset to build A. Specs that need a FRESH upgrade must not inherit a
+      // previous test's switch: the server process is shared across the file.
+      serveShellB = false;
+      res.writeHead(200, coopCoepHeaders({ 'Content-Type': 'text/plain; charset=utf-8' }));
+      res.end('now serving build A');
+      return;
+    }
+
+    if (pathname === '/__e2e__/serve-shell-b') {
+      if (!nodeFs.existsSync(path.join(SHELL_B_DIR, 'index.html'))) {
+        res.writeHead(409, coopCoepHeaders({ 'Content-Type': 'text/plain; charset=utf-8' }));
+        res.end('dist-shell-b/index.html is missing — run `node scripts/prepare-shell-b.mjs`.');
+        return;
+      }
+      serveShellB = true;
+      res.writeHead(200, coopCoepHeaders({ 'Content-Type': 'text/plain; charset=utf-8' }));
+      res.end('now serving dist-shell-b');
+      return;
+    }
+
     const rel = pathname === '/' ? 'index.html' : pathname.replace(/^\//, '');
     const decoded = decodeURIComponent(rel);
-    const filePath = path.resolve(DIST, decoded);
+    const filePath = path.resolve(activeDist(), decoded);
 
     if (!isInsideDist(filePath)) {
       res.writeHead(403, coopCoepHeaders());
@@ -220,7 +267,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const indexPath = path.join(DIST, 'index.html');
+    const indexPath = path.join(activeDist(), 'index.html');
     const data = await fs.readFile(indexPath);
     res.writeHead(200, coopCoepHeaders({ 'Content-Type': 'text/html; charset=utf-8' }));
     res.end(data);

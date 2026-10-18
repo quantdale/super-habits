@@ -78,6 +78,8 @@ supabase/.temp/
 # Parent task 6.1a: the `dist-sync/` export (dummy Supabase env) is produced on
 # main/nightly CI and by the documented local command — never committed.
 /dist-sync/
+# AUD-SH05-A: the second real export used by the PWA shell-upgrade proof.
+/dist-shell-b/
 
 # Editor debug traces
 .cursor/debug-*.log

@@ -20,6 +20,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { applyShellRevision, assertRevisionIsContentDerived } from './pwa-shell-revision.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const EXPORT_DIR = join(ROOT, 'dist-sync');
@@ -101,6 +102,13 @@ child.on('exit', (code, signal) => {
   }
   try {
     verifyBakedEnv();
+    // AUD-SH05-C: the same content-hash revision step every other export runs.
+    const revision = applyShellRevision({
+      distDir: EXPORT_DIR,
+      templatePath: join(ROOT, 'public', 'sw.js'),
+    });
+    assertRevisionIsContentDerived(EXPORT_DIR);
+    console.log(`build:sync — shell revision sha-${revision} injected.`);
   } catch (err) {
     console.error(`build:sync — ${err.message}`);
     process.exit(1);

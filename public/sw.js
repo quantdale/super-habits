@@ -11,16 +11,24 @@
 // SKIP_WAITING message below, and only the tab that requested the update
 // reloads (applyRequested gate in registerServiceWorker.ts).
 //
+// CACHE_VERSION IS GENERATED, never hand-maintained (AUD-SH05-A). Browser worker
+// updates are detected by BYTE comparison, so a byte-identical worker never
+// installs: a hand-edited constant that a release forgets to bump strands every
+// existing client on the old precached shell forever. `scripts/pwa-shell-revision.mjs`
+// runs after EVERY export (production, hermetic E2E, dist-sync, web:verify) and
+// substitutes `sha-<content revision>` computed from a deterministic sorted
+// manifest of index.html plus the boot-critical asset graph. Identical bytes
+// therefore give an identical revision (no spurious update banner) and any
+// shell change gives a different one (a real install). File mtimes and clock
+// time never contribute, and this file is excluded from the hash input to avoid
+// a cycle.
+//
 // Precache manifest: CORE_SHELL_URLS is hand-maintained; everything else
 // index.html references (hashed entry JS/CSS, fonts, favicon) is discovered
-// and warmed at install by precacheShell(). The full upgrade path is
-// workbox-build `injectManifest` driven by a post-`expo export` step that
-// walks dist/, injects a revisioned manifest, and derives CACHE_VERSION from
-// a content hash (audit AREA 9 F3). Until that lands, boot-critical URLs
-// fail the install loudly instead of silently producing an offline-dead
-// shell.
+// and warmed at install by precacheShell(). Boot-critical URLs fail the install
+// loudly instead of silently producing an offline-dead shell.
 
-const CACHE_VERSION = 'v10';
+const CACHE_VERSION = '__SUPERHABITS_CACHE_VERSION__';
 const CACHE_NAME = `superhabits-shell-${CACHE_VERSION}`;
 
 // E2E hook: scripts/serve-e2e.js rewrites this constant to `true` when it

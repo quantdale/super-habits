@@ -145,7 +145,11 @@ export default defineConfig({
       // Opt-in via --project=pwa; serial because every test registers a
       // worker against the shared localhost origin.
       name: 'pwa',
-      testMatch: /pwa-update\.spec\.ts/,
+      // `AUD-SH05-A`: this project also owns the REAL two-build shell upgrade
+      // proof, which needs the same real-service-worker configuration and runs
+      // only when `dist-shell-b/` was prepared (`e2e:shell-upgrade`); otherwise
+      // its cases skip with an explicit reason.
+      testMatch: /pwa-(update|shell-upgrade)\.spec\.ts/,
       timeout: 90_000,
       expect: { timeout: 10_000 },
       workers: 1,

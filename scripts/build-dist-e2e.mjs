@@ -24,6 +24,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { runHermeticBuild, scanDirectoryForNeedle } from './hermetic-build.mjs';
+import { applyShellRevision, assertRevisionIsContentDerived } from './pwa-shell-revision.mjs';
 
 const root = process.cwd();
 const distDir = path.join(root, 'dist');
@@ -92,6 +93,20 @@ if (bridgeIntents.length === 0) {
   // silently have no data path.
   fail('simulation bridge code is absent from the hermetic export.');
 }
+// 4. PWA shell revision (`AUD-SH05-C`): the SAME content-hash step production
+// uses, so an E2E-tested artifact cannot differ from a released one here. A
+// worker still carrying the tracked placeholder cannot update an existing
+// client, so this fails closed.
+let shellRevision;
+try {
+  shellRevision = applyShellRevision({
+    distDir,
+    templatePath: path.join(root, 'public', 'sw.js'),
+  });
+  assertRevisionIsContentDerived(distDir);
+} catch (error) {
+  fail(error instanceof Error ? error.message : String(error));
+}
 console.log(
-  `[build:e2e] OK — hermetic export (0 Supabase hosts in dist/; simulation bridge in ${bridgeIntents.length} file(s)).`,
+  `[build:e2e] OK — hermetic export (0 Supabase hosts in dist/; simulation bridge in ${bridgeIntents.length} file(s); shell revision sha-${shellRevision}).`,
 );
