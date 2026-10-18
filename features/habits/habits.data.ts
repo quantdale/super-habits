@@ -1,4 +1,5 @@
 import { getDatabase } from '@/core/db/client';
+import { resolveProjectGoalAssociation } from '@/features/shared/associations';
 import {
   Habit,
   HabitCategory,
@@ -736,42 +737,35 @@ export async function setHabitProjectGoal(
         return { changed: false, value: undefined };
       }
 
-      let nextProjectId = current.project_id;
-      let nextGoalId = current.goal_id;
-
-      if (association.projectId !== undefined) {
-        if (association.projectId !== null) {
-          const project = await transactionDb.getFirstAsync<{ id: string }>(
-            `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
-            [association.projectId],
-          );
-          if (!project) throw new Error('Project not found.');
-        }
-        nextProjectId = association.projectId;
-      }
-
-      if (association.goalId !== undefined) {
-        if (association.goalId !== null) {
-          const goal = await transactionDb.getFirstAsync<{
-            id: string;
-            project_id: string | null;
-          }>(`SELECT id, project_id FROM goals WHERE id = ? AND deleted_at IS NULL`, [
-            association.goalId,
-          ]);
-          if (!goal) throw new Error('Goal not found.');
-          nextGoalId = association.goalId;
-          if (goal.project_id !== null) {
-            nextProjectId = goal.project_id;
-          }
-        } else {
-          nextGoalId = null;
-        }
-      }
+      // `AUD-SH12-B`: the SAME shared contract the Todo path uses. The previous
+      // hand-rolled version never cleared a Project-backed Goal when the Project
+      // was cleared or moved, so a Habit could keep a Goal that pinned a
+      // different Project.
+      const resolution = await resolveProjectGoalAssociation(
+        { project_id: current.project_id, goal_id: current.goal_id },
+        association,
+        {
+          projectExists: async (id) => {
+            const row = await transactionDb.getFirstAsync<{ id: string }>(
+              `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
+              [id],
+            );
+            return row !== null && row !== undefined;
+          },
+          goalProjectId: async (id) => {
+            const row = await transactionDb.getFirstAsync<{ project_id: string | null }>(
+              `SELECT project_id FROM goals WHERE id = ? AND deleted_at IS NULL`,
+              [id],
+            );
+            return row === null || row === undefined ? undefined : row.project_id;
+          },
+        },
+      );
 
       const result = await transactionDb.runAsync(
         `UPDATE habits SET project_id = ?, goal_id = ?, updated_at = ?
          WHERE id = ? AND deleted_at IS NULL`,
-        [nextProjectId, nextGoalId, now, habitId],
+        [resolution.nextProjectId, resolution.nextGoalId, now, habitId],
       );
       return { changed: result.changes === 1, value: undefined };
     },

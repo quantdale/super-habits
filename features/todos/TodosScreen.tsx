@@ -374,12 +374,20 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
           dueDate: string | null;
           priority: typeof priority;
           recurrence: 'daily' | null;
+          // `AUD-SH13-A`: the creation dialog's selections must reach the data
+          // layer. Edit mode already passed them; create mode used to drop both,
+          // so a newly created task silently lost the Project and Goal the user
+          // had just chosen.
+          projectId: string | null;
+          goalId: string | null;
         } = {
           title: title.trim(),
           notes: notes.trim() || undefined,
           dueDate: dueDate ?? null,
           priority,
           recurrence: isRecurring ? 'daily' : null,
+          projectId: editProjectId,
+          goalId: editGoalId,
         };
         if (isRecurringLinkedActionSource) {
           await addTodo(payload);

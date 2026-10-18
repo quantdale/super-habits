@@ -1,5 +1,6 @@
 import type * as SQLite from 'expo-sqlite';
 import { getDatabase } from '@/core/db/client';
+import { resolveProjectGoalAssociation } from '@/features/shared/associations';
 import type { Todo, TodoPriority, TodoRecurrence } from '@/core/db/types';
 import type {
   LinkedActionEffectAdapterResult,
@@ -197,6 +198,16 @@ export async function addTodo(input: {
     db,
     record: { entity: 'todos', id, updatedAt: now, operation: 'create' },
     mutate: async (transactionDb) => {
+      // `AUD-SH12-A`: creation goes through the SAME association resolver as
+      // edits, so a dangling parent is refused instead of persisted and a
+      // Project-backed Goal aligns its Project. Previously this INSERT wrote
+      // `input.projectId`/`input.goalId` verbatim: `addTodo({goalId: 'missing'})`
+      // was accepted, and assigning a Project-backed Goal left `project_id` NULL.
+      const resolution = await resolveTodoProjectGoalAssociation(
+        transactionDb,
+        { project_id: null, goal_id: null },
+        { projectId: input.projectId, goalId: input.goalId },
+      );
       // Allocate sort_order INSIDE the mutation transaction so two concurrent
       // adds can never read the same MAX(sort_order) and tie (F9).
       const maxRow = await transactionDb.getFirstAsync<{ maxOrder: number }>(
@@ -220,8 +231,8 @@ export async function addTodo(input: {
           sortOrder,
           input.recurrence ?? null,
           recurrenceId,
-          input.projectId ?? null,
-          input.goalId ?? null,
+          resolution.nextProjectId,
+          resolution.nextGoalId,
           now,
           now,
         ],
@@ -402,51 +413,29 @@ async function resolveTodoProjectGoalAssociation(
   current: Pick<Todo, 'project_id' | 'goal_id'>,
   association: TodoAssociationInput,
 ): Promise<TodoAssociationResolution> {
-  let nextProjectId = current.project_id;
-  let nextGoalId = current.goal_id;
-
-  if (association.projectId !== undefined) {
-    if (association.projectId !== null) {
-      const project = await transactionDb.getFirstAsync<{ id: string }>(
-        `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
-        [association.projectId],
-      );
-      if (!project) throw new Error('Project not found.');
-    }
-    nextProjectId = association.projectId;
-  }
-
-  if (association.goalId !== undefined) {
-    if (association.goalId !== null) {
-      const goal = await transactionDb.getFirstAsync<{
-        id: string;
-        project_id: string | null;
-      }>(`SELECT id, project_id FROM goals WHERE id = ? AND deleted_at IS NULL`, [
-        association.goalId,
-      ]);
-      if (!goal) throw new Error('Goal not found.');
-      nextGoalId = association.goalId;
-      // Hierarchical consistency: a Todo assigned to a Goal inherits the
-      // Goal's Project.
-      if (goal.project_id !== null) {
-        nextProjectId = goal.project_id;
-      }
-    } else {
-      nextGoalId = null;
-    }
-  } else if (association.projectId === null && nextGoalId !== null) {
-    // F12: clearing the project must not leave a goal that still binds this
-    // todo to a project.
-    const goal = await transactionDb.getFirstAsync<{ project_id: string | null }>(
-      `SELECT project_id FROM goals WHERE id = ? AND deleted_at IS NULL`,
-      [nextGoalId],
-    );
-    if (goal && goal.project_id !== null) {
-      nextGoalId = null;
-    }
-  }
-
-  return { nextProjectId, nextGoalId };
+  // `AUD-SH12-A/B`: one shared contract for every entrypoint. The parent lookups
+  // run INSIDE the caller's transaction, so validation and the write share one
+  // unit of work and a refusal leaves nothing behind.
+  return resolveProjectGoalAssociation(
+    { project_id: current.project_id, goal_id: current.goal_id },
+    association,
+    {
+      projectExists: async (id) => {
+        const row = await transactionDb.getFirstAsync<{ id: string }>(
+          `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
+          [id],
+        );
+        return row !== null && row !== undefined;
+      },
+      goalProjectId: async (id) => {
+        const row = await transactionDb.getFirstAsync<{ project_id: string | null }>(
+          `SELECT project_id FROM goals WHERE id = ? AND deleted_at IS NULL`,
+          [id],
+        );
+        return row === null || row === undefined ? undefined : row.project_id;
+      },
+    },
+  );
 }
 
 /**
@@ -838,6 +827,13 @@ export async function addTodoWithLinkedActionRules(input: {
     db,
     record: { entity: 'todos', id, updatedAt: now, operation: 'create' },
     mutate: async (transactionDb, enqueue) => {
+      // `AUD-SH12-A`: the composed create uses the shared association resolver
+      // too, so every creation entrypoint enforces the same contract.
+      const resolution = await resolveTodoProjectGoalAssociation(
+        transactionDb,
+        { project_id: null, goal_id: null },
+        { projectId: input.projectId, goalId: input.goalId },
+      );
       const maxRow = await transactionDb.getFirstAsync<{ maxOrder: number }>(
         `SELECT COALESCE(MAX(sort_order), 0) AS maxOrder
          FROM todos WHERE deleted_at IS NULL AND completed = 0`,
@@ -859,8 +855,8 @@ export async function addTodoWithLinkedActionRules(input: {
           sortOrder,
           input.recurrence ?? null,
           recurrenceId,
-          input.projectId ?? null,
-          input.goalId ?? null,
+          resolution.nextProjectId,
+          resolution.nextGoalId,
           now,
           now,
         ],

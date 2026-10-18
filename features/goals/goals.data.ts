@@ -1,3 +1,4 @@
+import type * as SQLite from 'expo-sqlite';
 import { getDatabase } from '@/core/db/client';
 import { runBackupMutation } from '@/core/sync/syncedMutation';
 import { createId } from '@/lib/id';
@@ -28,6 +29,30 @@ export async function getGoal(id: string): Promise<Goal | null> {
   return db.getFirstAsync<Goal>(`SELECT ${GOAL_SELECT} FROM goals WHERE id = ?`, [id]);
 }
 
+/**
+ * Refuse a non-null `projectId` that does not reference an active Project
+ * (`AUD-SH12-A`).
+ *
+ * The audited defect: `addGoal` wrote `input.projectId` straight into the INSERT
+ * and no update path validated it either, so a Goal could point at a project
+ * that never existed (or was soft-deleted). This mirrors the Todo/Habit
+ * association contract, which already refuses dangling parents.
+ *
+ * @param transactionDb the open mutation transaction
+ * @param projectId the requested parent, or null/undefined for none
+ */
+async function assertGoalProjectExists(
+  transactionDb: SQLite.SQLiteDatabase,
+  projectId: string | null | undefined,
+): Promise<void> {
+  if (projectId === null || projectId === undefined) return;
+  const project = await transactionDb.getFirstAsync<{ id: string }>(
+    `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
+    [projectId],
+  );
+  if (!project) throw new Error('Project not found.');
+}
+
 export async function addGoal(input: GoalInput): Promise<string> {
   const validation = validateGoalInput(input);
   if (!validation.ok || !input.title || input.title.trim().length === 0) {
@@ -41,6 +66,8 @@ export async function addGoal(input: GoalInput): Promise<string> {
   await runBackupMutation<string>({
     db,
     mutate: async (transactionDb, enqueue) => {
+      // `AUD-SH12-A`: a non-null parent must exist and be active.
+      await assertGoalProjectExists(transactionDb, input.projectId ?? null);
       await transactionDb.runAsync(
         `INSERT INTO goals
            (id, project_id, title, description, horizon, target_date, status, completed_at, progress_percent, created_at, updated_at, deleted_at)
