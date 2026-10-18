@@ -218,8 +218,12 @@ async function persistSettingsOutboxInTransaction(
     generation: null,
     payload: settingsSnapshot,
   });
-  await upsertSyncOutboxRecord(transactionDb, prepared, prepared.revision);
+  // Dirty flag BEFORE the outbox row: if the row insert fails after the marker
+  // and snapshot committed (the caller may swallow that failure to keep the
+  // local value), the next maintenance cycle sees dirt and re-captures instead
+  // of leaving a durable row with no in-memory queue entry.
   await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
+  await upsertSyncOutboxRecord(transactionDb, prepared, prepared.revision);
   return prepared;
 }
 
