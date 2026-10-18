@@ -1,7 +1,7 @@
 # ExecPlan: SuperHabits reliability, recovery & product completeness successor campaign
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -92,9 +92,18 @@ separate verdicts.
   `frontend-v3-post-w17-overnight-successor`, open; release BLOCKED on the
   security gate).
 
-- Current milestone: Phase 5 — final validation, adversarial review, stacked PR.
-  Phases 1–4 are COMPLETE and COMMITTED on
-  `superhabits-reliability-recovery-successor`:
+- Current milestone: COMPLETE. Closure round finished: the multi-rule
+  crash-recovery defect was reproduced (8/11 pre-fix failures in
+  `linkedActionsMultiRuleCrashRecovery`), corrected at rule level with
+  historical rule eligibility (`631b005`), regression matrix 11/11, all
+  gates green (typecheck 0, lint 0/0, `qa:fast` 2309, integration 449,
+  linked-action suites 30/30, hermetic `build:e2e`, full `npm run e2e`
+  376/0/0-flaky/87-skipped with visual 34/34, deterministic simulation
+  23/23, openspec 88/88), adversarial review recorded, and PR #80's
+  description reconciled.
+
+- Original campaign (Phases 1–4, COMPLETE and COMMITTED on
+  `superhabits-reliability-recovery-successor`):
   - `f964cb6` Phase 1 (A1) — durable linked-action dispatch handoff + startup
     sweep (in-tx source event with stable id at all three in-app dispatch
     paths, `recoverPendingLinkedActions()` 7-day sweeper in AppProviders,
@@ -137,30 +146,38 @@ separate verdicts.
 - Decisions recorded in the Decision Log (fail-closed event handoff; sweep
   after hydrate; recovery queries live in the data layer; reproduction-first
   gate; per-day cap scoping; notify-from-caller for reminder prefs).
-- Completed: Phase 0, Phase 1 (A1), Phase 2 (B, 8 groups), Phase 3 (A2 + A3),
-  and Phase 4 (C1 + C2) — six commits `f964cb6`..`b92d8da` on the successor
-  branch, each with pinned tests.
-- In progress: Phase 5 — final affected-gate sweep, adversarial self-review,
-  stacked PR publication, final report.
-- Important modified files: the seven commit ranges above; no schema change,
-  no migration.
-- Last successful validation: 2026-10-18 — typecheck 0 · lint 0 · `qa:fast`
-  182 files/2309 tests · integration 90 files/451 tests · hermetic
-  `build:e2e` · `npm run e2e` 367 passed (after the reviewed C1 golden
-  refresh; visual 34/34 ×3) · `qa:simulation` 23/23 · openspec 88/88 · focused
-  reruns 13/13 + journey 4/4.
+- Completed: original Phases 0–5 (`f964cb6`..`6642534`) plus closure
+  Phases 1–7 (`631b005` + this docs commit): multi-rule defect reproduced,
+  corrected at rule level, regression matrix green, full Playwright
+  qualification clean on the final source, adversarial review recorded,
+  docs/PR reconciled.
+- In progress: none.
+- Important modified files: closure round — `core/linked-actions/`
+  (`linkedActions.data.ts` recovery selection + matching cutoff,
+  `linkedActions.engine.ts` `recordedAt` + eligibility pass-through,
+  `linkedActions.events.types.ts`, `linkedActions.rows.ts`,
+  `linkedActions.recovery.ts` docs/classification) and
+  `tests/integration/linkedActionsMultiRuleCrashRecovery.test.ts` (11 tests).
+  No schema change, no migration.
+- Last successful validation: 2026-10-18 (closure round, final) — typecheck
+  0 · lint 0/0 · `qa:fast` 182 files/2309 tests · integration 89 files / 449
+  tests (2 pre-existing skips) · linked-action suites 30/30 · multi-rule
+  matrix 11/11 · hermetic `build:e2e` (0 Supabase hosts) · full `npm run
+e2e` 376 passed / 0 failed / 0 flaky / 87 skipped (visual 34/34,
+  `retries: 0`) · `qa:simulation --all --mode deterministic` 23/23 ·
+  openspec 88/88 · `agent:plan:validate` PASS.
 - Current failures: none.
 - Relevant quarantines: none.
 - Blockers: standing externals only — security gate red (release BLOCKED),
   iOS owner-deferred, Android ENVIRONMENT_BLOCKED. None block engineering.
 - Condition required to unblock: none (not blocked).
 - Exact resume action after unblock: N/A.
-- Exact next action: push the branch and open the stacked PR against
-  `frontend-v3-post-w17-overnight-successor` using the final report as the
-  body basis; record the PR URL in this plan, then mark Phase 5 complete.
-- Remaining definition of done: affected gates and full gates green; adversarial
-  review findings addressed or dispositioned; stacked PR published to the
-  PR #79 branch; final report filed with separate engineering/release verdicts.
+- Exact next action: None — task complete.
+- Remaining definition of done: None — full Playwright qualification clean on
+  the final source; adversarial-review findings recorded (no material defect);
+  ExecPlan/report/commit map internally consistent; PR #80 description
+  updated against the PR #79 branch; remote HEAD verified; final report filed
+  with separate engineering/release verdicts.
 
 ## Progress
 
@@ -177,7 +194,22 @@ separate verdicts.
       hydrate-failure revision-floor recovery — committed `6460f0e`, `5f3726f`
 - [x] Phase 4 (C1, C2) — bounded 7-day reward lookback + per-day cap; sequencer
       E2E pin proven failing without the claim — committed `c3d204a`, `b92d8da`
-- [ ] Phase 5 — adversarial review, final validation, stacked PR, final report
+- [x] Closure Phase 1 — multi-rule crash-recovery defect reproduced (real
+      SQLite, 8/11 pre-fix failures in `linkedActionsMultiRuleCrashRecovery`)
+- [x] Closure Phase 2 — rule-level recovery selection + historical rule
+      eligibility + `recordedAt` plumbing — committed `631b005`
+- [x] Closure Phase 3 — regression matrix 11/11 green, single-rule suites
+      preserved (30/30), full integration + `qa:fast` + lint 0/0 green
+- [x] Closure Phase 4 — one clean full `npm run e2e` against the reviewed
+      goldens on the final candidate source — PASS 376/0/0-flaky/87-skipped,
+      visual 34/34, source `631b005`
+- [x] Closure Phase 5 — adversarial review of the correction + tests (13
+      challenge areas, findings recorded in the report; no material defect)
+- [x] Closure Phase 6 — ExecPlan/report/PR reconciliation (commit map fixed
+      (`71a7024` restored, 15-row table), status truthfulness, visual
+      9-tests/8-goldens reconciled)
+- [x] Closure Phase 7 — final gates green, docs committed, branch pushed to
+      PR #80, remote HEAD verified, final report filed
 
 ## Surprises & Discoveries
 
@@ -207,6 +239,21 @@ separate verdicts.
   query then executes late and reads current rows. The genuine repro needs the
   `getAll` response (rows already read) delayed, identified by the
   `nativeStatementId` learned from the matching `prepare`.
+- Closure round: the report's commit table had drifted — `fa9cafe` never
+  existed (the review-round commit is `71a7024`) and four commits were
+  missing; the table is now the full `120ab19..HEAD` sequence.
+- Closure round: the "9 failed visual goldens" figure counts failing TESTS,
+  not goldens — the strict-comparison control reuses the
+  `shell-today-390-light` golden, so 9 failures map to 8 unique goldens (the
+  refreshed set). The lane's 34 tests = 30 goldens + 4 self-checks.
+- Closure round: `deleteHabit` cascades into
+  `deleteLinkedActionRulesForTargetEntity`, so a live "rule whose target is
+  missing" state barely occurs (only stray/restore ids); the observable
+  legitimate skip for an existing rule is the adapter's `already_completed` /
+  `target_missing` terminal skip.
+- Closure round: the old event-level exclusion also re-scanned no-rule events
+  forever (harmless but reported `skipped` each launch); the rule-level query
+  ends that as a side effect — an event with no eligible rule is never swept.
 
 ## Decision Log
 
@@ -233,6 +280,20 @@ separate verdicts.
 - 2026-10-18 — A3: recover the floor from a dedicated `MAX(revision)` query
   (not a retried full load) and rethrow so bootstrap still logs the degraded
   start; allocation stays monotonic.
+- 2026-10-18 — Closure: decide recovery completion at RULE granularity —
+  mirror the engine's durable unit (`UNIQUE(rule_id, source_event_id)`) in the
+  selection query instead of removing the `NOT EXISTS` filter wholesale; rule
+  A's terminal execution must never consume rule B's pending work, and
+  terminal siblings must never re-apply.
+- 2026-10-18 — Closure: historical rule eligibility is
+  `rule.created_at <= event.created_at` (the row's timestamp), enforced in
+  BOTH `listPendingRecoveryLinkedActionEvents` and the engine's matching via a
+  new `recordedAt` on the event record — no rule-identity snapshot schema, and
+  the retroactive-effect hole is closed on every path.
+- 2026-10-18 — Closure: changed-rule semantics stay "live pipeline" (the
+  established A1 replay behavior): a still-matching edited rule settles with
+  its current configuration; a rule edited to no longer match never fires.
+  Pinned as tests instead of inventing snapshot semantics.
 
 ## Validation Ledger
 
@@ -293,6 +354,55 @@ e2e/journeys/habit-lifecycle-persistence.spec.ts`) — PASS 4/4 (25.9s);
   23 scenarios.
 - 2026-10-18 — `npm run openspec:validate` — PASS 88/88.
 
+- 2026-10-18 (closure) — multi-rule reproduction against the UNFIXED code —
+  `linkedActionsMultiRuleCrashRecovery.test.ts` — FAIL 8/11 (expected):
+  failed-sibling, running-sibling (fresh + stale), missing-sibling (in-process
+  - restart), applied+skipped (no-rule event re-swept), new-rule-after-event,
+    edited-rule, and the 4-rule exactly-once event all show
+    `recoverPendingLinkedActions()` returning `{0,0,0}` while the sibling effect
+    is absent. PASS 3/11: both-applied, paused-rule, deleted-rule guards.
+- 2026-10-18 (closure) — same suite after `631b005` — PASS 11/11 (incl.
+  stable execution identity reuse and `sync_outbox` count stability).
+- 2026-10-18 (closure) — existing linked-action suites
+  (`linkedActions`, `linkedActionsCrashRecovery`,
+  `linkedActionEffectsExactlyOnce`, `linkedActionLogTargets`,
+  `linkedActions.engine`) — PASS 30/30 (single-rule idempotency preserved).
+- 2026-10-18 (closure) — `npx vitest run tests/integration` — PASS 89 files /
+  449 tests (1 file / 2 tests skipped, pre-existing).
+- 2026-10-18 (closure) — `npm run qa:fast` — PASS exit 0 (182 files, 2309
+  tests + journey-label/quarantine/release-profile parity guards).
+- 2026-10-18 (closure) — `npm run typecheck` — PASS 0 errors · `npm run lint`
+  — PASS 0 errors/0 warnings (after `lint:fix` normalization).
+- 2026-10-18 (closure) — `npm run qa:affected` — linked-actions rule matched:
+  required `qa:fast → qa:full → qa:integration → e2e:journeys →
+qa:simulation`, journeys `linked-actions` + `power-user`, broad regression
+  required.
+- 2026-10-18 (closure) — `npm run build:e2e` — PASS hermetic export, 0
+  Supabase hosts in `dist/`.
+- 2026-10-18 (closure) — `npm run openspec:validate` — PASS 88/88.
+- 2026-10-18 (closure) — FULL `npm run e2e` final qualification (5 projects:
+  chromium, journeys, simulation, pwa, visual) against `dist/` from the
+  hermetic `build:e2e` — **PASS: 376 passed / 0 failed / 0 flaky / 87
+  skipped in 39.1m** (chromium 254/45-skipped, journeys 80/42-skipped,
+  visual 34/34, pwa 5, simulation self-tests 3). Skips are the pre-existing
+  runtime gates (`@sync`/`@account`/`@portable` remote-boundary journeys and
+  native/unsupported lanes need a sync backend or device). Local `retries:
+0` — no retry masked anything. Source: `631b005` (verified byte-identical
+  for app + e2e specs + goldens). Artifacts:
+  `.cursor/playwright-output/e2e-report/` (HTML + JSON). This replaces the
+  campaign's earlier 367/9 run as the qualification of record; the nine
+  historical W15 visual failures stay documented (see report).
+- 2026-10-18 (closure) — `npm run agent:plan:validate` — PASS (structure).
+- 2026-10-18 (closure) — `npm run agent:resume` recovery command — verified
+  working (plan validation PASS; read-only orientation).
+- 2026-10-18 (closure) — `npm run qa:simulation -- --all --mode
+deterministic` — PASS, all 23 scenarios
+  (`simulation-output/run_mvdh1gtr_g920jhqo/run-report.json`).
+- 2026-10-18 (closure) — `npm run agent:plan:validate` — PASS at final
+  COMPLETED state; `npm run qa:affected` impact plan satisfied (qa:fast ✓,
+  qa:integration ✓, e2e:journeys subsumed by the full run ✓,
+  qa:simulation ✓, broad regression = the full e2e ✓).
+
 ## Changed Files / Areas
 
 - `core/linked-actions/` and tests (`linkedActionsCrashRecovery.test.ts`,
@@ -315,6 +425,14 @@ e2e/journeys/habit-lifecycle-persistence.spec.ts`) — PASS 4/4 (25.9s);
 - `features/gamification/gamification.data.ts`,
   `tests/integration/gamification.test.ts` — C1.
 - `e2e/workout-snapshot-ordering.spec.ts` — C2.
+- Closure round (`631b005`): `core/linked-actions/linkedActions.data.ts`
+  (rule-level recovery selection + matching eligibility cutoff),
+  `linkedActions.engine.ts` (`recordedAt` + eligibility pass-through),
+  `linkedActions.events.types.ts`, `linkedActions.rows.ts`,
+  `linkedActions.recovery.ts` (docs + outcome classification),
+  `tests/integration/linkedActionsMultiRuleCrashRecovery.test.ts` (11 tests).
+- Closure round (this docs commit): this plan and
+  `docs/ui-ux/v3-audit/reliability-recovery/RELIABILITY-RECOVERY-REPORT.md`.
 - No schema change; no migration.
 
 ## Recovery / Resume Instructions
@@ -327,16 +445,36 @@ e2e/journeys/habit-lifecycle-persistence.spec.ts`) — PASS 4/4 (25.9s);
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: all five campaigns implemented and committed with
-  reproduction-first pinned tests; final validation/adversarial review/PR
-  remain.
-- Follow-up: affected-gate sweep, adversarial review, stacked PR, final report.
+- Status: Completed.
+- Summary: all campaigns (A1–A2–A3, B, C1, C2) and the independent-review
+  closure correction (A1.1: multi-rule crash recovery at rule granularity +
+  historical rule eligibility) are implemented, reproduction-first pinned,
+  and gated. The suspected multi-rule recovery defect was CONFIRMED with real
+  SQLite before any production change, fixed at the narrowest correct layer
+  without schema/migration, and closed with an 11-case matrix plus one clean
+  full-suite Playwright qualification on the final source.
+- Retrospective: the reproduction-first gate did its job twice — it turned a
+  code-reading hypothesis into 8 pinned failing scenarios, and it exposed the
+  secondary retroactive-effect hole the naive "drop the NOT EXISTS" fix would
+  have shipped. Keeping recovery queries in the data layer (A1's earlier
+  decision) made the correction a one-query + one-cutoff change.
+- Follow-up: none required. Standing external items remain (security gate,
+  native qualification) and are recorded as release blockers, not engineering
+  work for this branch.
 
 ## Final disposition
 
-- Phase 5 complete: all campaigns implemented, pinned, gated; stacked PR #80
-  published; final report at
-  `docs/ui-ux/v3-audit/reliability-recovery/RELIABILITY-RECOVERY-REPORT.md`.
-- Engineering verdict: PASS. Release verdict: BLOCKED (unchanged security gate;
-  iOS owner-deferred; Android environment-blocked; neither PR may merge).
+- Closure round complete: the multi-rule crash-recovery defect was reproduced
+  (8/11 pre-fix failures), corrected (`631b005`, rule-level selection +
+  historical rule eligibility), and re-verified (matrix 11/11, single-rule
+  suites 30/30, full integration 449, `qa:fast` 2309, full `npm run e2e`
+  376 passed / 0 failed / 0 flaky / visual 34/34, deterministic simulation
+  23/23, openspec 88/88) on the final source.
+- Stacked PR #80 (base `frontend-v3-post-w17-overnight-successor`, PR #79
+  branch) description updated with the final state; neither PR may merge.
+- Final report:
+  `docs/ui-ux/v3-audit/reliability-recovery/RELIABILITY-RECOVERY-REPORT.md`
+  (commit map reconciled to the real `120ab19..HEAD` history).
+- Engineering verdict: PASS. Release verdict: BLOCKED (unchanged security
+  gate — `braces`, `node-forge`; iOS owner-deferred; Android
+  environment-blocked).
