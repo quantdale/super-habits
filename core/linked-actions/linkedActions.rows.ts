@@ -496,6 +496,7 @@ export function normalizeLinkedActionEventRow(row: LinkedActionEventRow): Linked
     sourceRecordId: row.source_record_id,
     sourceDateKey: row.source_date_key,
     occurredAt: row.occurred_at,
+    recordedAt: row.created_at,
     label: row.source_label,
     payload: parsedPayload,
     origin: {

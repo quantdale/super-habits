@@ -17,6 +17,12 @@ export type LinkedActionSourceActionInput = {
   sourceRecordId?: string | null;
   sourceDateKey?: string | null;
   occurredAt?: string;
+  /**
+   * When the source event row was (or will be) recorded. Historical rule
+   * eligibility is anchored here: only rules that existed at record time may
+   * act on the event, so rules authored later never gain retroactive effects.
+   */
+  recordedAt?: string;
   label?: string | null;
   payload?: Record<string, unknown>;
   origin?: Partial<LinkedActionOriginMetadata>;
@@ -32,6 +38,7 @@ export type LinkedActionSourceAction = {
   sourceRecordId: string | null;
   sourceDateKey: string | null;
   occurredAt: string;
+  recordedAt: string;
   label: string | null;
   payload: Record<string, unknown>;
   origin: LinkedActionOriginMetadata;

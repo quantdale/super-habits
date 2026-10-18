@@ -132,6 +132,7 @@ function normalizeSourceAction(input: LinkedActionSourceActionInput): LinkedActi
   const rootEventId = input.chain?.rootEventId ?? eventId;
   const parentEventId = input.chain?.parentEventId ?? origin.originEventId ?? null;
   const depth = input.chain?.depth ?? (origin.originKind === 'linked_action' ? 1 : 0);
+  const occurredAt = input.occurredAt ?? new Date().toISOString();
 
   return {
     eventId,
@@ -141,7 +142,8 @@ function normalizeSourceAction(input: LinkedActionSourceActionInput): LinkedActi
     triggerType: input.triggerType,
     sourceRecordId: input.sourceRecordId ?? null,
     sourceDateKey: input.sourceDateKey ?? null,
-    occurredAt: input.occurredAt ?? new Date().toISOString(),
+    occurredAt,
+    recordedAt: input.recordedAt ?? occurredAt,
     label: input.label ?? null,
     payload: input.payload ?? {},
     origin,
@@ -333,7 +335,12 @@ export class LinkedActionsEngine {
           (await createLinkedActionEvent(normalizedEvent)))
         : normalizedEvent;
 
-    const rules = await listMatchingLinkedActionRules(sourceEvent);
+    const rules = await listMatchingLinkedActionRules(sourceEvent, {
+      // Historical eligibility: only rules that existed when the event was
+      // recorded may act on it. Rules authored after the event never gain
+      // retroactive effects, on the dispatch path or during recovery replay.
+      createdNotAfter: sourceEvent.recordedAt,
+    });
     const effects: LinkedActionEffectResult[] = [];
     const notices: AppNotice[] = [];
 

@@ -183,6 +183,7 @@ export async function listLinkedActionRules(): Promise<LinkedActionRuleDefinitio
 
 export async function listMatchingLinkedActionRules(
   source: Pick<LinkedActionSourceAction, 'feature' | 'entityType' | 'entityId' | 'triggerType'>,
+  options?: { createdNotAfter?: string },
 ): Promise<LinkedActionRuleDefinition[]> {
   const db = await getDatabase();
   const rows = await db.getAllAsync<LinkedActionRuleRow>(
@@ -194,8 +195,16 @@ export async function listMatchingLinkedActionRules(
        AND source_entity_type = ?
        AND trigger_type = ?
        AND (source_entity_id = ? OR source_entity_id IS NULL)
+       AND (? IS NULL OR created_at <= ?)
      ORDER BY created_at ASC`,
-    [source.feature, source.entityType, source.triggerType, source.entityId],
+    [
+      source.feature,
+      source.entityType,
+      source.triggerType,
+      source.entityId,
+      options?.createdNotAfter ?? null,
+      options?.createdNotAfter ?? null,
+    ],
   );
   return rows.map(normalizeLinkedActionRuleRow);
 }
@@ -617,9 +626,25 @@ export async function insertLinkedActionEventInTransaction(
 
 /**
  * List durable linked-action events still awaiting dispatch for startup
- * recovery: created inside the lookback window and never terminal
- * (`applied`/`skipped` execution). Events are local operational state, so
- * this is deliberately a plain read with no sync involvement.
+ * recovery: created inside the lookback window and still owing work to at
+ * least one rule.
+ *
+ * Completion is decided at RULE granularity, mirroring the engine's durable
+ * unit (`UNIQUE(rule_id, source_event_id)`): an event is pending while some
+ * eligible rule has no terminal (`applied`/`skipped`) execution for it. A
+ * crash after rule A finished but before rule B did therefore keeps the
+ * event pending until rule B settles — rule A's terminal execution does not
+ * consume its siblings. Rule eligibility mirrors
+ * `listMatchingLinkedActionRules` (active, not deleted, matching the source
+ * signature) and adds the historical bound: only rules recorded at or before
+ * the event row existed may act on it, so rules authored after a historical
+ * event never gain retroactive effects and events with no applicable rules
+ * are never re-swept.
+ *
+ * Events are local operational state, so this is deliberately a plain read
+ * with no sync involvement. The correlated per-rule lookup resolves through
+ * the `idx_linked_action_executions_source_rule (rule_id, source_event_id)`
+ * unique index, keeping each probe an index seek rather than a scan.
  */
 export async function listPendingRecoveryLinkedActionEvents(
   cutoffIso: string,
@@ -629,12 +654,25 @@ export async function listPendingRecoveryLinkedActionEvents(
     `SELECT e.*
      FROM linked_action_events AS e
      WHERE e.occurred_at >= ?
-       AND NOT EXISTS (
+       AND EXISTS (
          SELECT 1
-         FROM linked_action_executions AS x
-         WHERE x.source_event_id = e.id
-           AND x.status IN ('applied', 'skipped')
-       )`,
+         FROM linked_action_rules AS r
+         WHERE r.deleted_at IS NULL
+           AND r.status = 'active'
+           AND r.created_at <= e.created_at
+           AND r.source_feature = e.source_feature
+           AND r.source_entity_type = e.source_entity_type
+           AND r.trigger_type = e.trigger_type
+           AND (r.source_entity_id = e.source_entity_id OR r.source_entity_id IS NULL)
+           AND NOT EXISTS (
+             SELECT 1
+             FROM linked_action_executions AS x
+             WHERE x.source_event_id = e.id
+               AND x.rule_id = r.id
+               AND x.status IN ('applied', 'skipped')
+           )
+       )
+     ORDER BY e.occurred_at ASC`,
     [cutoffIso],
   );
   return rows.map(normalizeLinkedActionEventRow);
