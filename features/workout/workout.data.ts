@@ -1966,17 +1966,20 @@ export async function loadRestSecondsDefault(): Promise<number> {
 export async function saveRestSecondsDefault(seconds: number): Promise<boolean> {
   try {
     const db = await getDatabase();
-    await runRecoverableSettingsMutation({
+    const result = await runRecoverableSettingsMutation({
       db,
       mutate: (transactionDb) =>
         setAppMetaJson(transactionDb, appMetaKeys.workoutRestSeconds, clampRestSeconds(seconds)),
     });
+    if (!result.backupEnqueued) {
+      console.warn('[backup] rest default saved locally; settings intent not recorded');
+    }
     return true;
   } catch (error) {
-    // Preference persistence stays non-fatal for the session, but the failure
-    // is no longer swallowed silently — the failure is logged and the caller
-    // receives false so the UI can offer a retriable message.
-    console.warn('[backup] settings enqueue or rest-default write failed', error);
+    // The local write itself failed. Preference persistence stays non-fatal
+    // for the session, but the failure is logged and the caller receives false
+    // so the UI can offer a retriable message.
+    console.warn('[backup] rest-default write failed', error);
     return false;
   }
 }
@@ -2763,11 +2766,14 @@ export async function getWorkoutPreferences(): Promise<WorkoutPreferences> {
 export async function saveWorkoutPreferences(preferences: WorkoutPreferences): Promise<void> {
   const db = await getDatabase();
   const normalized = normalizeWorkoutPreferences(preferences) ?? DEFAULT_WORKOUT_PREFERENCES;
-  await runRecoverableSettingsMutation({
+  const result = await runRecoverableSettingsMutation({
     db,
     mutate: (transactionDb) =>
       setAppMetaJson(transactionDb, appMetaKeys.workoutPreferences, normalized),
   });
+  if (!result.backupEnqueued) {
+    console.warn('[backup] workout preferences saved locally; settings intent not recorded');
+  }
   requestWorkoutReminderReconciliation();
 }
 

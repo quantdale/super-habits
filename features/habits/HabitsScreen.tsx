@@ -207,6 +207,10 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const deletionPending = useRef(false);
   const binaryWrites = useRef(new Set<string>());
   const [busyHabitIds, setBusyHabitIds] = useState<ReadonlySet<string>>(new Set());
+  // Synchronous mirror of busyHabitIds: state updates are visible only on the
+  // next render, so two taps in the same tick would both pass a state-only
+  // guard. The ref makes the in-flight check atomic with the insert.
+  const busyHabitIdsRef = useRef<Set<string>>(new Set());
 
   const displayedHabits = useMemo(
     () => sortHabits(filterHabits(habits, { status: statusFilter }), sortMode, streakMap),
@@ -265,7 +269,8 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
 
   const handleTogglePause = useCallback(
     async (habit: Habit): Promise<boolean> => {
-      if (busyHabitIds.has(habit.id)) return true;
+      if (busyHabitIdsRef.current.has(habit.id)) return false;
+      busyHabitIdsRef.current.add(habit.id);
       setBusyHabitIds((ids) => new Set(ids).add(habit.id));
       try {
         if ((habit.status ?? 'active') === 'paused') {
@@ -280,6 +285,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
         setLifecycleError('The pause change did not save. Try again.');
         return false;
       } finally {
+        busyHabitIdsRef.current.delete(habit.id);
         setBusyHabitIds((ids) => {
           const next = new Set(ids);
           next.delete(habit.id);
@@ -287,12 +293,13 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
         });
       }
     },
-    [busyHabitIds, refresh],
+    [refresh],
   );
 
   const handleToggleArchive = useCallback(
     async (habit: Habit): Promise<boolean> => {
-      if (busyHabitIds.has(habit.id)) return true;
+      if (busyHabitIdsRef.current.has(habit.id)) return false;
+      busyHabitIdsRef.current.add(habit.id);
       setBusyHabitIds((ids) => new Set(ids).add(habit.id));
       try {
         if ((habit.status ?? 'active') === 'archived') {
@@ -307,6 +314,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
         setLifecycleError('The lifecycle change did not save. Try again.');
         return false;
       } finally {
+        busyHabitIdsRef.current.delete(habit.id);
         setBusyHabitIds((ids) => {
           const next = new Set(ids);
           next.delete(habit.id);
@@ -314,7 +322,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
         });
       }
     },
-    [busyHabitIds, refresh],
+    [refresh],
   );
 
   useEffect(() => {

@@ -809,28 +809,16 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         visible={targetsSheetVisible}
         currentTargets={effectiveTargets}
         onSave={async (next) => {
-          try {
-            await saveMacroTargets(next);
-            setMacroTargets(next);
-            setMacroSaveNote(null);
-          } catch (error) {
-            // The local app_meta write may have committed before backup-intent
-            // bookkeeping failed. Re-read local truth rather than leave stale
-            // macro bars on screen until the next app mount.
-            const stored = await loadMacroTargets().catch(() => null);
-            if (stored) setMacroTargets(stored);
-            if (
-              stored &&
-              stored.calories === next.calories &&
-              stored.protein === next.protein &&
-              stored.carbs === next.carbs &&
-              stored.fats === next.fats
-            ) {
-              setMacroSaveNote('Targets saved locally. Backup update could not be confirmed.');
-              return; // Local save is real; modal may close truthfully.
-            }
-            throw error; // No confirmed local commit: keep the editor open.
-          }
+          // Local-first: the save only throws when the local write itself
+          // failed. A committed local value with an unrecorded backup intent
+          // still closes the editor and reports the unconfirmed backup.
+          const result = await saveMacroTargets(next);
+          setMacroTargets(next);
+          setMacroSaveNote(
+            result.backupEnqueued
+              ? null
+              : 'Targets saved locally. Backup update could not be confirmed.',
+          );
         }}
         onClose={() => setTargetsSheetVisible(false)}
       />

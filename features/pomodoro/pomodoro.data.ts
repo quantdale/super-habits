@@ -167,7 +167,7 @@ export async function getPomodoroSettings(): Promise<PomodoroSettings> {
 
 export async function savePomodoroSettings(settings: PomodoroSettings): Promise<void> {
   const db = await getDatabase();
-  await runRecoverableSettingsMutation({
+  const result = await runRecoverableSettingsMutation({
     db,
     mutate: (transactionDb) =>
       setAppMetaJson(
@@ -176,6 +176,9 @@ export async function savePomodoroSettings(settings: PomodoroSettings): Promise<
         normalizePomodoroSettings(settings),
       ),
   });
+  if (!result.backupEnqueued) {
+    console.warn('[backup] pomodoro settings saved locally; settings intent not recorded');
+  }
 }
 
 /**

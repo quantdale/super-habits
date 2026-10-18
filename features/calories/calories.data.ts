@@ -93,11 +93,14 @@ export async function getCalorieGoal(): Promise<CalorieGoal> {
 
 export async function setCalorieGoal(goal: CalorieGoal): Promise<void> {
   const db = await getDatabase();
-  await runRecoverableSettingsMutation({
+  const result = await runRecoverableSettingsMutation({
     db,
     mutate: (transactionDb) =>
       setAppMetaJson(transactionDb, appMetaKeys.calorieGoal, normalizeCalorieGoal(goal)),
   });
+  if (!result.backupEnqueued) {
+    console.warn('[backup] calorie goal saved locally; settings intent not recorded');
+  }
 }
 
 export async function listCalorieEntries(dateKey = toDateKey()): Promise<CalorieEntry[]> {
@@ -806,15 +809,21 @@ async function importLegacyAsyncStorageTargets(
  * Persist normalized targets to app_meta `calorie_targets` and re-capture the
  * recoverable-settings snapshot so the new value rides the backup outbox.
  */
-export async function saveMacroTargetsData(targets: MacroTargets): Promise<void> {
+export type MacroTargetsSaveResult = {
+  /** False when the local value committed but the backup intent did not. */
+  backupEnqueued: boolean;
+};
+
+export async function saveMacroTargetsData(targets: MacroTargets): Promise<MacroTargetsSaveResult> {
   const normalized = normalizeMacroTargets(targets);
   if (!normalized) {
     throw new Error('Invalid macro targets payload.');
   }
   const db = await getDatabase();
-  await runRecoverableSettingsMutation({
+  const result = await runRecoverableSettingsMutation({
     db,
     mutate: (transactionDb) =>
       setAppMetaJson(transactionDb, appMetaKeys.calorieTargets, normalized),
   });
+  return { backupEnqueued: result.backupEnqueued };
 }

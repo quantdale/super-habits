@@ -18,8 +18,10 @@ vi.mock('@/core/sync/syncedMutation', () => ({
   // Real runner shape: executes the in-transaction mutate so the app_meta
   // write assertions below keep exercising the data layer directly.
   runRecoverableSettingsMutation: vi.fn(
-    async <T>(input: { db: unknown; mutate: (db: unknown) => Promise<T> | T }) =>
-      input.mutate(input.db),
+    async <T>(input: { db: unknown; mutate: (db: unknown) => Promise<T> | T }) => ({
+      value: await input.mutate(input.db),
+      backupEnqueued: true,
+    }),
   ),
 }));
 

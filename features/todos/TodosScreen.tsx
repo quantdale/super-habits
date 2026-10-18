@@ -425,7 +425,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
 
   const handleToggleTodo = useCallback(
     async (todo: Todo) => {
-      let result;
+      let result: Awaited<ReturnType<typeof toggleTodo>>;
       try {
         result = await toggleTodo(todo);
       } catch (error) {
@@ -464,10 +464,10 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
         showNotice(notice);
       }
       // Fast path only for confirmed completions (idempotent per todo id,
-      // so a replay can never double-award). Failed toggles (missing/deleted
-      // row or lost race yield completed 0) and the un-complete direction
-      // degrade to reconcile backfill or silence — a stale-prop award for
-      // either would mint phantom XP, mirroring shouldAwardHabitFastPath.
+      // so a replay can never double-award). The no-op path returned above, so
+      // this only runs for a real state change; the un-complete direction
+      // degrades to reconcile backfill/silence because a stale-prop award would
+      // mint phantom XP, mirroring shouldAwardHabitFastPath.
       if (shouldAwardTodoFastPath(result.completed)) recordAction('todo', todo.id);
       if (todo.completed === 0 && !reducedMotion) {
         // Hold the just-completed row in the list while the settle animation
