@@ -67,6 +67,7 @@ export const habitRemindersV1 = defineScenario({
         targetPerDay: 1,
         reminderTime: '21:00',
       },
+      captures: 'habit_reminder_simulation_completed',
       oracles: [
         {
           kind: 'rows',
@@ -77,8 +78,10 @@ export const habitRemindersV1 = defineScenario({
     },
     {
       kind: 'apiLeg',
-      functionName: 'tickHabit',
-      args: { name: 'Reminder simulation completed' },
+      functionName: 'incrementHabit',
+      // AUD-SH19-A: the real data function needs the created habit's identity,
+      // so the create leg above publishes it and this leg consumes it.
+      args: { id: '{{capture.habit_reminder_simulation_completed.id}}' },
       description:
         'Complete the target before the configured reminder; the native planner suppresses today.',
       oracles: [

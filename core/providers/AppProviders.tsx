@@ -3,6 +3,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppState, Modal, Platform, Text, View } from 'react-native';
 import { initializeDatabase } from '@/core/db/client';
+import { installSimulationDataBridge } from '@/core/simulation/dataBridge';
 import { accountCoordinator } from '@/core/auth/accountCoordinator';
 import type { AccountActionResult, AccountState } from '@/core/auth/account.types';
 import { registerServiceWorker } from '@/core/pwa/registerServiceWorker';
@@ -115,6 +116,12 @@ export function AppProviders({ children }: PropsWithChildren) {
         // migrated. The shell renders before initializeDatabase() completes,
         // so a fixed-sleep wait races migrations under load.
         if (Platform.OS === 'web' && typeof document !== 'undefined') {
+          // Hermetic simulation build only (AUD-SH19-A/B): publish the typed,
+          // allowlisted data-layer bridge after the schema is ready, so
+          // simulation API legs call the REAL `*.data.ts` functions on this
+          // singleton connection instead of replaying hand-written SQL. Every
+          // other build inlines the flag as absent and installs nothing.
+          installSimulationDataBridge();
           document.documentElement.dataset.dbReady = 'true';
         }
       } catch (e) {

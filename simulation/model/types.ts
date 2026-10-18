@@ -162,16 +162,35 @@ export interface BehaviorParams {
  * oracle, and at least one of those must be a persisted-row or second-surface
  * check (`rows` or `across-surfaces`) — a bare toast or list re-render is never
  * the only evidence.
+ *
+ * Every correctness oracle MUST carry an executable expectation (AUD-SH18-A/B).
+ * An oracle without one is not an assertion: it can only report how many rows a
+ * query returned, which passes whether or not the behavior under test happened.
+ * A deliberately non-asserting read is a `diagnostic` oracle, which never counts
+ * as evidence for a step's correctness claim.
  */
 export type Oracle =
   /** Assert the rows returned by `sql` match `expected` (→ `expectRows`). */
-  | { kind: 'rows'; sql: string; expected?: unknown[] }
+  | { kind: 'rows'; sql: string; expected: unknown[] }
   /** Assert the same fact from >= 2 independent surfaces (+ optional reload) (→ `expectAcrossSurfaces`). */
   | { kind: 'across-surfaces'; text: string; tabs: SectionName[]; afterReload?: boolean }
-  /** Assert the sync outbox contents (→ `expectOutbox`). */
-  | { kind: 'outbox'; expected?: unknown[] }
+  /**
+   * Assert the sync outbox contents (→ `expectOutbox`).
+   *
+   * Every expected entry is a PARTIAL match: the named columns must equal the
+   * given values and every other row/entry is unaffected, so a scenario can pin
+   * the exact `(entity, operation)` set of the ids it captured without hardcoding
+   * generated ids or revisions (AUD-SH18-A/B).
+   */
+  | { kind: 'outbox'; expected: unknown[] }
   /** Negative oracle: rows for `sql` must NOT change across the step (→ `expectUnchanged`). */
-  | { kind: 'unchanged'; sql: string };
+  | { kind: 'unchanged'; sql: string }
+  /**
+   * Explicitly non-asserting read recorded in the run report for debugging. It
+   * never satisfies a mutating step's oracle requirement and never turns a
+   * scenario green; use `rows`/`outbox` with `expected` for correctness.
+   */
+  | { kind: 'diagnostic'; sql: string; note?: string };
 
 /* ------------------------------------------------------------------ */
 /* Semantic step                                                       */
@@ -324,6 +343,14 @@ export type SemanticStep =
       functionName: string;
       args?: Record<string, unknown>;
       description?: string;
+      /**
+       * Name under which this leg's resulting ids are stored for later steps.
+       * The returned captured values become available as `{{capture.<name>.<key>}}`
+       * placeholders in subsequent step strings AND inside `outbox` oracle
+       * expectations, so a scenario asserts on the real generated identity instead
+       * of re-deriving it with a hand-written SQL query.
+       */
+      captures?: string;
     } & StepBase);
 
 /* ------------------------------------------------------------------ */

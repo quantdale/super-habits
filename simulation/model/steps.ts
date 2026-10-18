@@ -77,7 +77,20 @@ export const KNOWN_SURFACE_NAMES: readonly SurfaceName[] = [
 export const KNOWN_FEATURE_NAMES: readonly FeatureName[] = KNOWN_SURFACE_NAMES;
 
 /** Oracle discriminator values the model accepts. */
-export const KNOWN_ORACLE_KINDS = ['rows', 'across-surfaces', 'outbox', 'unchanged'] as const;
+export const KNOWN_ORACLE_KINDS = [
+  'rows',
+  'across-surfaces',
+  'outbox',
+  'unchanged',
+  'diagnostic',
+] as const;
+
+/**
+ * Oracle kinds that carry an executable expectation and can therefore count as
+ * correctness evidence for a step. `diagnostic` is deliberately absent: it is a
+ * recorded read, not an assertion (AUD-SH18-A/B).
+ */
+export const ASSERTING_ORACLE_KINDS = ['rows', 'across-surfaces', 'outbox', 'unchanged'] as const;
 
 /** Step kinds that persist application state (data writes or session starts). */
 export const MUTATING_STEPS: ReadonlySet<SemanticStepName> = new Set<SemanticStepName>([
@@ -338,6 +351,14 @@ export function isKnownFeatureName(feature: string): feature is FeatureName {
 /** True if `oracle` is a recognized oracle discriminated union member. */
 export function isKnownOracle(oracle: { kind: string }): oracle is Oracle {
   return (KNOWN_ORACLE_KINDS as readonly string[]).includes(oracle.kind);
+}
+
+/**
+ * True when an oracle can fail. A `diagnostic` oracle records a read and never
+ * asserts, so it is not evidence (AUD-SH18-B).
+ */
+export function isAssertingOracle(oracle: { kind: string }): boolean {
+  return (ASSERTING_ORACLE_KINDS as readonly string[]).includes(oracle.kind);
 }
 
 /** Resolve a step to its catalog entry; throws on unknown kinds. */

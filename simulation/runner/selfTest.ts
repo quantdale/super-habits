@@ -137,8 +137,19 @@ const smokeScenario = defineScenario({
     // ---- verification: standalone outbox oracle ----
     {
       kind: 'expectOracle',
-      oracle: { kind: 'outbox' },
-      note: 'UI writes populate the outbox; parse + length check',
+      // AUD-SH18-B: an unspecified outbox read used to pass regardless of what
+      // the app enqueued. By this point the smoke has created one todo, one
+      // habit and one habit completion through the normal write paths, so the
+      // exact pending (entity, operation) set is knowable — pin it.
+      oracle: {
+        kind: 'outbox',
+        expected: [
+          { entity: 'habits', operation: 'create' },
+          { entity: 'habit_completions', operation: 'create' },
+          { entity: 'todos', operation: 'create' },
+        ],
+      },
+      note: 'every ordinary UI write left exactly one durable create intent per entity',
     },
     // ---- entity: calories ----
     {

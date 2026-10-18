@@ -1,0 +1,143 @@
+# ExecPlan: Resolve the independent repository audit
+
+Plan-Version: 2
+Status: ACTIVE
+
+## Purpose / User Outcome
+
+Provide a separate workhorse implementation session with sufficient durable context to address SH-01 through SH-21, preserve existing successor work, and produce an independently reviewable result. This planning session does not implement fixes. The owner will request an independent review after the resolution session.
+
+## Context
+
+The audit target is `main` at `fb10d6ccfe66b54613c6fd22cb82da7dd7626e4f`. The initial checkout contains pre-existing untracked `.tmp-ios36423379932/` and `features_tsx_list.txt`; preserve both. Runtime SQLite schema is 25, backup schema 2, scope 7, settings 5 at that revision; derive live values again before changes. PR #79 (`120ab19a9de2de76d502bfd2876e30a46648f788`) and stacked PR #80 (`92a9565b1ac8f7cdaec0abe8b00a90ec60eb7f23`) are open at planning time. Their pause handoff declares release blocked and owner-directed development freeze.
+
+Read START-HERE.md, audit-baseline.md, design.md, validation-matrix.md, tasks.md and the three delta specifications in this change. These are self-contained; chat history and temporary audit scripts are optional corroboration. Git is authoritative for source, specifications for required behavior, and this file for current campaign state. tasks.md holds granular work checkboxes, not a competing checkpoint.
+
+## Scope
+
+All 21 audit findings, associated regression tests, necessary contract/schema changes, safe local validation, compatibility, and a final review packet. SH-21 is conditional and must first be classified from evidence. The recurrence-association question is a requirement decision, not a confirmed defect.
+
+## Non-Goals
+
+No UI redesign, unrelated feature expansion, two-way sync, arbitrary framework upgrade, bulk production repair, production migration/deployment, security-policy waiver, PR merge, force-push, history rewrite, or automatic archive. Do not alter preserved evidence or disturb unrelated worktrees/devices. Implementation-session authorization does not grant authority to incur paid cloud costs or mutate production.
+
+## Current Checkpoint
+
+- Current milestone: Planning handoff ready; the separate resolution campaign has not started implementation.
+- Completed: All 21 audit findings have frozen evidence, mapped work packages, regression cases and acceptance requirements; successor reuse, external gates and independent-review evidence are specified.
+- In progress: None in product source. The next session begins with execution-base reconciliation.
+- Important modified files: Only this change's planning documents under openspec/changes/resolve-independent-repository-audit/.
+- Last successful validation: OpenSpec, ExecPlan, formatting, coverage, links and recovery checks passed on 2026-10-18. Typecheck/lint and isolated native-auth tests passed; the full fast-gate failure remains recorded below.
+- Current failures: Planning-run qa:fast failed one process-liveness test at its five-second timeout; the same unmodified file passed alone. No complete fast-gate pass is claimed. Audit-time dependency security remains unresolved; no resolution regressions have been implemented.
+- Relevant quarantines: Existing docs/testing/known-gaps.md dispositions remain in force; no new waiver authorized.
+- Blockers: No planning blocker. The separate resolution session must be started by the owner; backend/device certification and advisory remediation can require external resources.
+- Condition required to unblock: Owner starts this resolution campaign; external actions require their own applicable authorization/resources.
+- Exact resume action after unblock: Execute task 0.1 and reconcile current Git/source state before reproducing findings.
+- Exact next action: In the owner-started resolution session, execute task 0.1: reconcile current source, successor ancestry, worktrees, instructions and this package before selecting the implementation base.
+- Remaining definition of done: Execute W0 through W7, reconcile all 21 finding dispositions with regression evidence, retain any required external gate, and produce the independent-review packet. Planning readiness does not resolve the findings.
+
+## Progress
+
+- [x] Establish audited revision, preserve unrelated paths and inspect successor state.
+- [x] Complete and validate the self-contained planning handoff.
+- [ ] W0: Select/revalidate implementation base and reproduce the remaining defects.
+- [ ] W1: Correct evidence boundaries and isolate native test configuration.
+- [ ] W2: Close ownership, failure accounting, capped verification and backfill races.
+- [ ] W3: Prove and implement immutable published backup recovery.
+- [ ] W4: Close durable session/automation/composed-save boundaries.
+- [ ] W5: Correct identity, associations, timers, rewards and notification delivery identity.
+- [ ] W6: Complete PWA/simulation integration and compatibility checks.
+- [ ] W7: Run campaign regression, resolve external dispositions and prepare independent review.
+
+## Surprises & Discoveries
+
+- Some fixes already exist only on unmerged successor branches; baseline selection must precede reproducing/rewriting them.
+- The audit's passing 536 domain and 76 integration tests did not cover the demonstrated caller/effect boundaries.
+- A manifest retained in place is insufficient when its data is overwritten. A purely local checkpoint transaction cannot solve SH-02.
+- Recurring copies drop associations, but the audited specifications do not settle inheritance; no unrequested recurrence behavior change is planned.
+- Planning validation exposed one full-unit-run timeout in tests/nativeAuthMock.test.ts:96; isolated rerun passed without edits. This suggests load sensitivity but does not establish its cause. Recheck under the pinned toolchain in W0 and preserve both results, rather than silently folding the retry into a green full run.
+
+## Finding Dispositions
+
+This is the sole live execution table. OPEN means not yet revalidated on the implementation base, not an absence of audit evidence. Preserve the frozen audit confidence in audit-baseline.md. At execution, extend each row with implementing/reused commits, exact regression cases/results, artifact identities and residual gates; do not convert planning acceptance criteria into successful test evidence. The final resolution report copies a dated snapshot for review.
+
+| Finding | Audit severity / confidence | Execution disposition | Primary tasks | Evidence / remaining action                                                             |
+| ------- | --------------------------- | --------------------- | ------------- | --------------------------------------------------------------------------------------- |
+| SH-01   | High / Confirmed            | OPEN                  | 2.1–2.3       | Reproduce imported ownership adoption and every matching-source control.                |
+| SH-02   | High / Confirmed            | OPEN                  | 3.1–3.13      | Prove retained immutable generations and actual server publication/owner boundaries.    |
+| SH-03   | High / Confirmed            | OPEN                  | 2.4–2.6       | Prove record-specific streaks, restart state and bounded erroneous-ledger recovery.     |
+| SH-04   | High / Confirmed            | OPEN                  | 4.4–4.6       | Prove actual summary recovery, failed save and kill-after-commit behavior.              |
+| SH-05   | High / Confirmed            | OPEN                  | 6.1–6.3       | Prove content-derived revisions and an actual two-build installed-client upgrade.       |
+| SH-06   | High / Confirmed            | OPEN                  | 4.1–4.3       | Revalidate PR #80 candidate source and all multi-rule interruption controls.            |
+| SH-07   | Medium / Confirmed          | OPEN                  | 2.8–2.10      | Prove within-batch deletion/edit races without stale intent replacement.                |
+| SH-08   | Medium / Confirmed          | OPEN                  | 2.7, 2.10     | Prove bounded complete verification and captured-revision acknowledgement.              |
+| SH-09   | Medium / Confirmed          | OPEN                  | 5.1–5.2       | Prove distinct instance identity from entered sets to persisted history.                |
+| SH-10   | Medium / Confirmed          | OPEN                  | 5.7–5.8       | Prove truthful active countdown across pause/resume and interruption.                   |
+| SH-11   | Medium / Confirmed          | OPEN                  | 5.9           | Prove rejected first start releases the real session claim.                             |
+| SH-12   | Medium / Confirmed          | OPEN                  | 5.3–5.5       | Prove association mutation policy, invalid-parent refusal and safe legacy repair.       |
+| SH-13   | Medium / Confirmed          | OPEN                  | 5.6           | Prove real creation-dialog associations survive reload.                                 |
+| SH-14   | Medium / Confirmed          | OPEN                  | 4.7–4.9       | Prove parent/rule rollback or durable stable retry identity through the editors.        |
+| SH-15   | Medium / Confirmed          | OPEN                  | 4.10          | Revalidate PR #79 candidate and atomic source/destination/outbox rollback.              |
+| SH-16   | Medium / Confirmed          | OPEN                  | 5.10–5.11     | Prove unpaid eligible quests pay once from canonical post-action state.                 |
+| SH-17   | Medium / Confirmed          | OPEN                  | 5.12–5.13     | Prove distinct deliveries work while duplicate responses remain idempotent.             |
+| SH-18   | Medium / Confirmed          | OPEN                  | 1.1–1.3       | Prove attached and standalone oracle failures reach scenario failure.                   |
+| SH-19   | Medium / Confirmed          | OPEN                  | 1.4–1.9, 6.4  | Prove every semantic API operation uses the isolated production path.                   |
+| SH-20   | Medium / Confirmed          | OPEN                  | 1.13, 7.6     | Reassess final dependency graph and preserve any unresolved release block.              |
+| SH-21   | Medium / Probable           | OPEN                  | 1.10–1.12     | Establish affected cloud paths or counterevidence; separate synthetic and hosted proof. |
+
+## Decision Log
+
+- 2026-10-18: Create a planning-only branch, plan/independent-audit-resolution, from the audited main revision. No code, test, dependency or infrastructure modifications in this turn.
+- 2026-10-18: Prefer a fresh implementation worktree incorporating the current successor stack after revalidation, rather than duplicating its fixes or merging unapproved PRs. Record the actual implementation base separately from the audit baseline.
+- 2026-10-18: Keep audit IDs stable. Treat SH-21 as probable until its scope is established; do not promote uncertain behavior to a confirmed defect.
+- 2026-10-18: The future resolution session may make local implementation and test changes when explicitly started. Production changes, paid runs, policy waivers and releases remain separate actions.
+- 2026-10-18: Planning is complete; keep campaign Status ACTIVE because all product implementation and qualification remain pending. The implementation session must reconcile this checkpoint rather than treating artifact readiness as defect closure.
+
+## Validation Ledger
+
+- 2026-10-18: Audit evidence (historical, fb10d6c): typecheck/lint passed; 19 domain files/536 tests and seven selected integration files/76 tests passed. This is not a new baseline run or complete qualification.
+- 2026-10-18: Initial Git status: no tracked modifications; two pre-existing untracked paths preserved.
+- 2026-10-18: `node node_modules/@fission-ai/openspec/bin/openspec.js validate resolve-independent-repository-audit --strict` — PASS. All proposal/design/spec/task artifacts satisfy the change schema.
+- 2026-10-18: `node scripts/agent-execplan.mjs validate --plan openspec/changes/resolve-independent-repository-audit/execplan.md` — PASS. Structural readiness only, not proof of implementation.
+- 2026-10-18: Initial Prettier check found design.md formatting; formatted only planning files. Final `prettier --check 'openspec/changes/resolve-independent-repository-audit/**/*.{md,yaml}'` — PASS for all 11 files.
+- 2026-10-18: Read-only planning consistency check — PASS: all 21 IDs appear in baseline, regression matrix, tasks and live dispositions; 88 uniquely numbered implementation tasks remain unchecked; 25 normative requirements exist; six local Markdown links resolve.
+- 2026-10-18: OpenSpec status — PASS: proposal, design, specifications and tasks are complete/apply-ready. This describes planning artifacts only.
+- 2026-10-18: `npm run qa:impact -- --files <four primary planning documents>` — PASS: matched agent-workflow-and-documentation; required qa:fast and focused tests/agent-execplan.test.ts; no broad regression required for this planning diff.
+- 2026-10-18: `git diff --check`, tracked/staged diff inspection — PASS: no tracked or staged product changes. The only authored paths are the new change folder; original unrelated untracked paths remain preserved.
+- 2026-10-18: Final read-only resume orientation — PASS, ACTIVE and task 0.1 identified. No unexpected discrepancy warnings; 81 warnings refer only to preserved pre-existing untracked evidence/list paths.
+- 2026-10-18: `npm run qa:fast` — FAIL after typecheck and lint passed: 179 unit files/2,280 tests passed; one test failed at the 5,000 ms timeout in tests/nativeAuthMock.test.ts:96 (process-liveness probe). The required focused tests/agent-execplan.test.ts passed all nine tests. Remaining chained parity/profile steps did not execute in this command. Local Node 24.3.0/npm 11.4.2 are outside the declared Node 22/npm 10 range; this is diagnostic evidence, not pinned-toolchain certification. No source or test was modified.
+- 2026-10-18: `node node_modules/vitest/vitest.mjs run --project unit tests/nativeAuthMock.test.ts` — PASS, 12/12 tests; the liveness probe took 1,618 ms alone. Suspected load-sensitive test/environment behavior remains a W0 baseline question; this does not overwrite the full-run failure.
+- 2026-10-18: `node scripts/journey-label-parity.mjs`, `node scripts/quarantine-register-parity.mjs`, `node scripts/release-profile-guard.mjs` — individually PASS after the failed chain. These establish their own results, not a retroactive qa:fast pass.
+- 2026-10-18: Final OpenSpec/ExecPlan/Prettier rechecks — PASS. `npm run web:hygiene` — PASS, ports 8081/8082 free. Final Git inspection still shows only this new planning folder plus the two preserved unrelated untracked paths; no tracked diff, staged change or commit.
+- Implementation/release validation: not run in the planning session.
+
+## Changed Files / Areas
+
+Only these new planning files were authored. No tracked product files changed; no fixes, commits, pushes, PRs or external mutations were performed. The planning branch is plan/independent-audit-resolution. Preserve the pre-existing untracked .tmp-ios36423379932/ and features_tsx_list.txt; resume-tool warnings for their contents do not confer ownership of them.
+
+- `openspec/changes/resolve-independent-repository-audit/.openspec.yaml` — change metadata.
+- `openspec/changes/resolve-independent-repository-audit/START-HERE.md` — future-session prompt and base selection.
+- `openspec/changes/resolve-independent-repository-audit/proposal.md` — campaign scope and capabilities.
+- `openspec/changes/resolve-independent-repository-audit/design.md` — architecture and dependency decisions.
+- `openspec/changes/resolve-independent-repository-audit/audit-baseline.md` — frozen 21-finding evidence.
+- `openspec/changes/resolve-independent-repository-audit/validation-matrix.md` — regression assertions and review packet.
+- `openspec/changes/resolve-independent-repository-audit/tasks.md` — executable implementation checklist.
+- `openspec/changes/resolve-independent-repository-audit/execplan.md` — sole live checkpoint and dispositions.
+- `openspec/changes/resolve-independent-repository-audit/specs/published-backup-generations/spec.md` — published recovery requirements.
+- `openspec/changes/resolve-independent-repository-audit/specs/durable-user-operation-boundaries/spec.md` — user-operation requirements.
+- `openspec/changes/resolve-independent-repository-audit/specs/verification-evidence-integrity/spec.md` — trustworthy validation/delivery requirements.
+
+During resolution, replace this planning inventory with a concise implementation-area record; Git remains authoritative for the actual diff.
+
+## Recovery / Resume Instructions
+
+1. Follow AGENTS.md and .agent/PLANS.md, then read this whole plan and START-HERE.md.
+2. Run npm run agent:resume -- --plan openspec/changes/resolve-independent-repository-audit/execplan.md. Inspect its Git discrepancies and QA impact; do not treat structural validation as proof of execution.
+3. Inspect git status --short, git diff --stat, git diff --name-only, relevant diffs, branch ancestry, tasks.md and the most recent evidence artifacts.
+4. Reconcile the checkpoint with actual source/results. Run qa:affected against the actual campaign base where applicable; do not replay already completed work without a reason.
+5. Continue only from Exact next action. Update this checkpoint after every decision, failure, bounded work package, delegation boundary, validation milestone and before finishing.
+6. If external gates are blocked, continue independent local work. Once no safe independent work remains, leave the campaign BLOCKED with exact unblock conditions and commands. Do not label all findings resolved or release ready.
+
+## Outcomes & Retrospective
+
+The planning handoff is complete and ready for the separate workhorse session. No audit defect has been fixed by this turn. Resolution outcomes must distinguish implementation complete, qualification complete, external blockers and release disposition. The final packet must be suitable for an independent reviewer who has not seen the conversation. The owner will request that review separately; implementation self-checks do not constitute independent acceptance.

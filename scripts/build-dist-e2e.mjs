@@ -50,6 +50,14 @@ try {
     label: 'build:e2e',
     command: 'npx',
     args: ['expo', 'export', '-p', 'web', '--clear'],
+    // AUD-SH19-A/B: the ONLY export that enables the simulation data-layer
+    // bridge. Simulation API legs then invoke real `*.data.ts` functions on the
+    // app's singleton connection. `release-profile-guard.mjs` refuses this flag
+    // in every eas.json/app.json config, and `AppProviders` installs nothing
+    // when it is absent, so ordinary/release/verification exports expose no
+    // callable mutation surface. The value is set AFTER the hermetic strip, so
+    // it is deliberate rather than ambient.
+    set: { EXPO_PUBLIC_SIM_DATA_BRIDGE: 'true' },
   });
 } catch (error) {
   fail(
@@ -72,4 +80,18 @@ if (leakFiles.length > 0) {
       `sources (dotenv should be blocked by EXPO_NO_DOTENV=1).`,
   );
 }
-console.log('[build:e2e] OK — hermetic export (0 Supabase hosts in dist/).');
+// 3. Bridge guard: the bridge implementation must be present, because the
+// simulation lane depends on it. Metro inlines the flag comparison, so the
+// assembled bundle carries the compiled `__shDataBridge` installer rather than
+// the literal variable name; asserting on the installer is the exact check.
+const bridgeIntents = scanDirectoryForNeedle(distDir, root, '__shdatabridge');
+if (bridgeIntents.length === 0) {
+  // The bridge module is imported by AppProviders, so its code (including the
+  // `__shDataBridge` global name) must be present in this export. Its absence
+  // means the gated installer was tree-shaken out and simulation apiLegs would
+  // silently have no data path.
+  fail('simulation bridge code is absent from the hermetic export.');
+}
+console.log(
+  `[build:e2e] OK — hermetic export (0 Supabase hosts in dist/; simulation bridge in ${bridgeIntents.length} file(s)).`,
+);

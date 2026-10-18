@@ -1,59 +1,53 @@
 /**
- * API legs (`add-user-simulation-platform` task 3.2).
+ * API legs (`add-user-simulation-platform` task 3.2 / `AUD-SH19-A`/`B`).
  *
- * An `apiLeg` step is a headless leg that performs real data-layer work instead
- * of driving the UI. Design D9 / task 3.2: legs call the real `*.data.ts`
- * functions, or the Supabase client (disposable lane only) — NEVER hand-written
- * SQL from a scenario author.
+ * An `apiLeg` step performs real data-layer work without driving the UI.
+ *
+ * ## The audited defect (SH-19)
+ *
+ * The handlers used to replay hand-written SQL through the DB harness while
+ * claiming to call `*.data.ts`. That produced observably wrong results: a
+ * created todo stored `notes = 'null'` (the STRING), no `sync_outbox` row was
+ * enqueued, validation never ran, and ids used a private random suffix instead
+ * of `createId`. A scenario could pass over behavior the product never performs.
+ *
+ * ## The resolution
+ *
+ * `execApiLeg` invokes the hermetic data-layer bridge
+ * (`core/simulation/dataBridge.ts`) on the app page: the bridge resolves a
+ * semantic operation to the REAL feature data function and awaits it on the
+ * app's singleton SQLite connection. Consequences the specs assert:
+ * ids come from `createId` (canonical prefixes), `null` is SQL NULL, a write
+ * enqueues its durable outbox intent, and an invalid call rejects.
+ *
+ * The bridge exists only in the hermetic simulation export. Raw SQL is still
+ * legitimate for FIXTURE SETUP, read oracles and deliberate fault injection —
+ * those live in `e2e/helpers/*` and `simulation/model`, never in a mutation
+ * handler here, and they never claim production-API fidelity.
  *
  * ## The guard (task 3.2, mandatory)
  *
- * Scenario authors express `apiLeg { functionName: 'createHabit', args: {...} }`.
+ * Scenario authors express `apiLeg { functionName: 'createTodo', args: {...} }`.
  * Passing a raw SQL string — as `functionName` or inside `args` — is an ERROR:
  * `assertApiLegSafe()` throws. This is enforced at the model boundary, so a
  * scenario file cannot smuggle SQL into a run.
- *
- * ## Execution seam (documented, not hidden)
- *
- * The web export exposes NO bridge to the app's data layer: `*.data.ts` is
- * module-private inside expo-sqlite's worker, and `page.evaluate` on the app
- * page cannot reach it (see `e2e/helpers/dbHarness.ts` / `seed.ts`). The
- * parent's seeding approach therefore runs the real SQLite schema through the
- * DB harness (`runSql`), which reads/writes the SAME database the app uses.
- * API legs follow that exact approach: `functionName` resolves to a registry
- * entry whose handler replays the data-layer write through the DB harness with
- * the app's own row format (createId-style ids, ISO timestamps, `toDateKey`
- * date keys). `page.evaluate → import('features/...')` remains the intended
- * long-term resolution when the export grows a data-layer bridge; the
- * Supabase-client resolution is a disposable-lane (task 8) stub.
- *
- * The registry and guard are pure TypeScript so the guard is unit-testable
- * (`tests/simulation.apileg.test.ts`); the handlers drive the browser.
  */
 
 import type { Page } from '@playwright/test';
-import { queryRows, runSql, returnToApp } from '../../e2e/helpers/dbHarness';
+import { ensureAppContext, waitForAppReady } from '../../e2e/helpers/dbHarness';
 
-/** A local date key `YYYY-MM-DD` resolved from the PAGE'S clock. */
-function pageDateKey(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    const d = new Date();
-    const p = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-  });
-}
+/**
+ * Values a leg makes available to later steps (AUD-SH18-B). A leg executed
+ * through the real data path knows the identity it just created; publishing it
+ * here is what lets a later oracle assert on `{{capture.<name>.<key>}}` instead
+ * of inventing a second read that cannot fail.
+ */
+export type ApiLegCaptures = Record<string, string>;
 
-/** App-compatible id: `{prefix}_{ts36}_{8 rand}` (mirrors `lib/id.ts`). */
-let apiLegIdCounter = 0;
-function makeId(prefix: string): string {
-  apiLegIdCounter += 1;
-  const ts = Date.now().toString(36);
-  const rand = Math.random().toString(36).slice(2, 10);
-  return `${prefix}_${ts}_${rand}${apiLegIdCounter.toString(36)}`;
-}
-
-function sqlStr(v: string): string {
-  return `'${v.replace(/'/g, "''")}'`;
+/** A leg's action-log label plus any values it captured for later steps. */
+export interface ApiLegOutcome {
+  label: string;
+  captures: ApiLegCaptures;
 }
 
 /* ------------------------------------------------------------------ */
@@ -68,6 +62,125 @@ export function isRawSqlString(input: string): boolean {
   if (typeof input !== 'string' || input.trim() === '') return false;
   return SQL_KEYWORD_RE.test(input) || input.trim().includes(';');
 }
+
+/* ------------------------------------------------------------------ */
+/* Function registry                                                   */
+/* ------------------------------------------------------------------ */
+
+export type ApiLegResolution =
+  /** Calls the real feature data function through the hermetic bridge. */
+  | 'data-bridge'
+  /** Disposable-lane Supabase client (task 8); not executable in web lanes. */
+  | 'supabase-client'
+  /**
+   * Labelled FIXTURE SETUP: writes rows through the DB harness to build a state
+   * shape no single data-layer entry point can produce. It is reported as
+   * `fixture-sql` and NEVER counts as production write-path evidence.
+   */
+  | 'fixture-sql';
+
+export interface ApiLegFunctionSpec {
+  /** Semantic operation name, matching a `BRIDGE_OPERATIONS` entry. */
+  functionName: string;
+  /** Which mechanism resolves this leg at runtime. */
+  resolution: ApiLegResolution;
+  /** Human description for reports. */
+  description: string;
+  /** Required arg names, validated at execution. */
+  requiredArgs: string[];
+}
+
+/** Operations an apiLeg may invoke. Each maps to one real data-layer call. */
+export const API_LEG_FUNCTIONS: Record<string, ApiLegFunctionSpec> = {
+  createTodo: {
+    functionName: 'createTodo',
+    resolution: 'data-bridge',
+    description: 'features/todos/todos.data addTodo — the canonical create path.',
+    requiredArgs: ['title'],
+  },
+  setTodoCompletion: {
+    functionName: 'setTodoCompletion',
+    resolution: 'data-bridge',
+    description:
+      'features/todos/todos.data setTodoCompletionState — complete or reopen, with linked actions.',
+    requiredArgs: ['id', 'completed'],
+  },
+  completeTodo: {
+    functionName: 'completeTodo',
+    resolution: 'data-bridge',
+    description: 'features/todos/todos.data completeTodo — complete without toggling back.',
+    requiredArgs: ['id'],
+  },
+  deleteTodo: {
+    functionName: 'deleteTodo',
+    resolution: 'data-bridge',
+    description: 'features/todos/todos.data removeTodo — soft delete plus a delete intent.',
+    requiredArgs: ['id'],
+  },
+  createHabit: {
+    functionName: 'createHabit',
+    resolution: 'data-bridge',
+    description: 'features/habits/habits.data addHabit — the canonical create path.',
+    requiredArgs: ['name'],
+  },
+  incrementHabit: {
+    functionName: 'incrementHabit',
+    resolution: 'data-bridge',
+    description:
+      'features/habits/habits.data incrementHabit — today’s count +1 with linked actions.',
+    requiredArgs: ['id'],
+  },
+  decrementHabit: {
+    functionName: 'decrementHabit',
+    resolution: 'data-bridge',
+    description: 'features/habits/habits.data decrementHabit — today’s count −1.',
+    requiredArgs: ['id'],
+  },
+  deleteHabit: {
+    functionName: 'deleteHabit',
+    resolution: 'data-bridge',
+    description: 'features/habits/habits.data deleteHabit — soft delete plus a delete intent.',
+    requiredArgs: ['id'],
+  },
+  logCalories: {
+    functionName: 'logCalories',
+    resolution: 'data-bridge',
+    description: 'features/calories/calories.data addCalorieEntry — the canonical ledger write.',
+    requiredArgs: ['foodName', 'calories'],
+  },
+  createWorkoutRoutine: {
+    functionName: 'createWorkoutRoutine',
+    resolution: 'data-bridge',
+    description: 'features/workout/workout.data addRoutine — the canonical routine create.',
+    requiredArgs: ['name'],
+  },
+  createCatalogExercise: {
+    functionName: 'createCatalogExercise',
+    resolution: 'data-bridge',
+    description:
+      'features/workout/workout.data createCustomExercise — the canonical Gym V2 catalog create.',
+    requiredArgs: ['name', 'primaryArea'],
+  },
+  fixtureSeedGymTrainingState: {
+    functionName: 'fixtureSeedGymTrainingState',
+    resolution: 'fixture-sql',
+    description:
+      'FIXTURE SETUP (not API fidelity): seed a compact Gym V2 shape (prescription, catalog exercise, weekly plan, body weight) that no single data-layer entry point produces.',
+    requiredArgs: ['routineName'],
+  },
+  // Supabase-client resolution is reserved for the disposable-backend lane
+  // (task 8); a stub entry documents the seam.
+  supabaseUpsert: {
+    functionName: 'supabaseUpsert',
+    resolution: 'supabase-client',
+    description:
+      'Disposable-lane (task 8) leg: push rows via the Supabase JS client. Not executed in web lanes.',
+    requiredArgs: ['entity', 'rows'],
+  },
+};
+
+/** Every operation name an apiLeg may name. */
+export const API_LEG_OPERATIONS = Object.keys(API_LEG_FUNCTIONS);
 
 /**
  * Guard: reject an apiLeg whose `functionName` or `args` carry raw SQL.
@@ -94,7 +207,7 @@ export function assertApiLegSafe(input: {
   if (!API_LEG_FUNCTIONS[functionName]) {
     throw new Error(
       `apiLeg.functionName '${functionName}' is not a registered data-layer function; ` +
-        `known: ${Object.keys(API_LEG_FUNCTIONS).join(', ')}`,
+        `known: ${API_LEG_OPERATIONS.join(', ')}`,
     );
   }
   if (args) {
@@ -109,80 +222,8 @@ export function assertApiLegSafe(input: {
 }
 
 /* ------------------------------------------------------------------ */
-/* Function registry                                                   */
+/* Execution (browser-side)                                            */
 /* ------------------------------------------------------------------ */
-
-export type ApiLegResolution = 'db-harness' | 'supabase-client';
-
-export interface ApiLegFunctionSpec {
-  /** Canonical data-layer function name (e.g. `createHabit`). */
-  functionName: string;
-  /** Which mechanism resolves this leg at runtime. */
-  resolution: ApiLegResolution;
-  /** Human description for reports. */
-  description: string;
-  /** Required arg names, validated at execution. */
-  requiredArgs: string[];
-}
-
-/** Registered data-layer functions apiLegs may invoke. */
-export const API_LEG_FUNCTIONS: Record<string, ApiLegFunctionSpec> = {
-  createTodo: {
-    functionName: 'createTodo',
-    resolution: 'db-harness',
-    description: 'features/todos/todos.data createTodo — insert a todo row.',
-    requiredArgs: ['title'],
-  },
-  createHabit: {
-    functionName: 'createHabit',
-    resolution: 'db-harness',
-    description: 'features/habits/habits.data createHabit — insert a habit row.',
-    requiredArgs: ['name'],
-  },
-  tickHabit: {
-    functionName: 'tickHabit',
-    resolution: 'db-harness',
-    description:
-      'features/habits/habits.data tickHabit — increment today count via SELECT→INSERT/UPDATE.',
-    requiredArgs: ['name'],
-  },
-  logCalories: {
-    functionName: 'logCalories',
-    resolution: 'db-harness',
-    description: 'features/calories/calories.data logCalories — insert a calorie entry.',
-    requiredArgs: ['food', 'calories'],
-  },
-  createWorkoutRoutine: {
-    functionName: 'createWorkoutRoutine',
-    resolution: 'db-harness',
-    description: 'features/workout/workout.data createRoutine — insert a workout routine row.',
-    requiredArgs: ['name'],
-  },
-  seedGymTrainingState: {
-    functionName: 'seedGymTrainingState',
-    resolution: 'db-harness',
-    description:
-      'Workout data-layer fixture seam — adds a catalog exercise, custom exercise, weekly plan, and body-weight measurement for an existing routine.',
-    requiredArgs: ['routineName'],
-  },
-  // Supabase-client resolution is reserved for the disposable-backend lane
-  // (task 8); a stub entry documents the seam.
-  supabaseUpsert: {
-    functionName: 'supabaseUpsert',
-    resolution: 'supabase-client',
-    description:
-      'Disposable-lane (task 8) leg: push rows via the Supabase JS client. Not executed in web lanes.',
-    requiredArgs: ['entity', 'rows'],
-  },
-};
-
-/* ------------------------------------------------------------------ */
-/* Handlers (browser-side)                                             */
-/* ------------------------------------------------------------------ */
-
-function esc(v: unknown): string {
-  return sqlStr(String(v));
-}
 
 /** Validate args against the registry's requiredArgs; returns the spec. */
 function resolveSpec(functionName: string, args: Record<string, unknown>): ApiLegFunctionSpec {
@@ -202,422 +243,161 @@ function resolveSpec(functionName: string, args: Record<string, unknown>): ApiLe
   return spec;
 }
 
-/** Build the INSERT SQL mirroring the app's row format (parent seeding style). */
-function insertSql(table: string, columns: string[], values: string[]): string {
-  return `INSERT INTO ${table} (${columns.join(',')}) VALUES (${values.join(',')});`;
+/** The bridge shape the hermetic build installs on `window`. */
+interface BridgeGlobalShape {
+  invoke: (
+    operation: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ value: unknown; captures: Record<string, string> }>;
+  operations: readonly string[];
 }
-
-/** Run a write through the DB harness and restore app context. */
-async function withDb(page: Page, sql: string): Promise<void> {
-  await runSql(page, sql);
-  await returnToApp(page);
-}
-
-/** Handler for `createTodo`. */
-export async function execCreateTodo(page: Page, args: Record<string, unknown>): Promise<string> {
-  resolveSpec('createTodo', args);
-  const now = new Date().toISOString();
-  const title = String(args.title);
-  const priority = args.priority ?? 'normal';
-  const id = makeId('todo');
-  await withDb(
-    page,
-    insertSql(
-      'todos',
-      [
-        'id',
-        'title',
-        'notes',
-        'completed',
-        'created_at',
-        'updated_at',
-        'deleted_at',
-        'due_date',
-        'priority',
-        'sort_order',
-        'recurrence',
-        'recurrence_id',
-      ],
-      [
-        esc(id),
-        esc(title),
-        esc(args.notes ?? null),
-        '0',
-        esc(now),
-        esc(now),
-        'NULL',
-        'NULL',
-        esc(priority),
-        '0',
-        'NULL',
-        'NULL',
-      ],
-    ),
-  );
-  return `createTodo(${JSON.stringify(title)})`;
-}
-
-/** Handler for `createHabit`. */
-export async function execCreateHabit(page: Page, args: Record<string, unknown>): Promise<string> {
-  resolveSpec('createHabit', args);
-  const now = new Date().toISOString();
-  const effectiveFromDate = await pageDateKey(page);
-  const id = makeId('habit');
-  const target = Number(args.targetPerDay ?? 1);
-  const reminderTime = args.reminderTime === undefined ? null : args.reminderTime;
-  if (
-    reminderTime !== null &&
-    (typeof reminderTime !== 'string' || !/^\d{2}:\d{2}$/.test(reminderTime))
-  ) {
-    throw new Error(
-      `apiLeg createHabit reminderTime must be canonical HH:MM or null (got ${JSON.stringify(reminderTime)})`,
-    );
-  }
-  if (
-    typeof reminderTime === 'string' &&
-    (Number(reminderTime.slice(0, 2)) > 23 || Number(reminderTime.slice(3, 5)) > 59)
-  ) {
-    throw new Error(
-      `apiLeg createHabit reminderTime must be canonical HH:MM or null (got ${JSON.stringify(reminderTime)})`,
-    );
-  }
-  const weekdays = [
-    ...new Set(
-      (Array.isArray(args.weekdays) ? args.weekdays : [1, 2, 3, 4, 5, 6, 7])
-        .map(Number)
-        .filter((weekday) => Number.isInteger(weekday) && weekday >= 1 && weekday <= 7),
-    ),
-  ].sort((a, b) => a - b);
-  const ruleHistory = JSON.stringify([
-    { effective_from_date: effectiveFromDate, weekdays, target_per_day: target },
-  ]);
-  await withDb(
-    page,
-    insertSql(
-      'habits',
-      [
-        'id',
-        'name',
-        'target_per_day',
-        'reminder_time',
-        'category',
-        'icon',
-        'color',
-        'rule_history',
-        'created_at',
-        'updated_at',
-        'deleted_at',
-      ],
-      [
-        esc(id),
-        esc(String(args.name)),
-        esc(target),
-        reminderTime === null ? 'NULL' : esc(reminderTime),
-        esc('anytime'),
-        esc('check-circle'),
-        esc('#6366f1'),
-        esc(ruleHistory),
-        esc(now),
-        esc(now),
-        'NULL',
-      ],
-    ),
-  );
-  return `createHabit(${JSON.stringify(args.name)}, target=${String(target)}, weekdays=${weekdays.join(',')}, reminder=${reminderTime ?? 'off'})`;
-}
-
-/** Handler for `tickHabit`: SELECT→INSERT/UPDATE on habit_completions (today). */
-export async function execTickHabit(page: Page, args: Record<string, unknown>): Promise<string> {
-  resolveSpec('tickHabit', args);
-  const times = Number(args.times ?? 1);
-  const key = await pageDateKey(page);
-  const rows = await queryRows(
-    page,
-    `SELECT id FROM habits WHERE name = ${esc(String(args.name))} AND deleted_at IS NULL LIMIT 1`,
-  );
-  const habitId = rows[0]?.id as string | undefined;
-  if (!habitId) {
-    await returnToApp(page);
-    throw new Error(`tickHabit: no habit named '${String(args.name)}'`);
-  }
-  const existing = await queryRows(
-    page,
-    `SELECT id, count FROM habit_completions WHERE habit_id = ${esc(habitId)} AND date_key = ${esc(key)}`,
-  );
-  const now = new Date().toISOString();
-  if (existing.length > 0) {
-    const next = Number(existing[0].count ?? 0) + times;
-    await runSql(
-      page,
-      `UPDATE habit_completions SET count = ${next}, updated_at = ${esc(now)} WHERE id = ${esc(String(existing[0].id))};`,
-    );
-  } else {
-    await runSql(
-      page,
-      insertSql(
-        'habit_completions',
-        ['id', 'habit_id', 'date_key', 'count', 'created_at', 'updated_at'],
-        [esc(makeId('hcmp')), esc(habitId), esc(key), String(times), esc(now), esc(now)],
-      ),
-    );
-  }
-  await returnToApp(page);
-  return `tickHabit(${JSON.stringify(args.name)}, +${times})`;
-}
-
-/** Handler for `logCalories`. */
-export async function execLogCalories(page: Page, args: Record<string, unknown>): Promise<string> {
-  resolveSpec('logCalories', args);
-  const key = await pageDateKey(page);
-  const now = new Date().toISOString();
-  await withDb(
-    page,
-    insertSql(
-      'calorie_entries',
-      [
-        'id',
-        'food_name',
-        'calories',
-        'protein',
-        'carbs',
-        'fats',
-        'fiber',
-        'meal_type',
-        'consumed_on',
-        'created_at',
-        'updated_at',
-        'deleted_at',
-      ],
-      [
-        esc(makeId('cal')),
-        esc(String(args.food)),
-        esc(args.calories),
-        esc(args.protein ?? 0),
-        esc(args.carbs ?? 0),
-        esc(args.fats ?? 0),
-        esc(args.fiber ?? 0),
-        esc(args.mealType ?? 'snack'),
-        esc(key),
-        esc(now),
-        esc(now),
-        'NULL',
-      ],
-    ),
-  );
-  return `logCalories(${JSON.stringify(args.food)}, ${String(args.calories)})`;
-}
-
-/** Handler for `createWorkoutRoutine` (a routine with no exercises yet). */
-export async function execCreateWorkoutRoutine(
-  page: Page,
-  args: Record<string, unknown>,
-): Promise<string> {
-  resolveSpec('createWorkoutRoutine', args);
-  const now = new Date().toISOString();
-  await withDb(
-    page,
-    insertSql(
-      'workout_routines',
-      ['id', 'name', 'description', 'created_at', 'updated_at', 'deleted_at'],
-      [esc(makeId('wrk')), esc(String(args.name)), 'NULL', esc(now), esc(now), 'NULL'],
-    ),
-  );
-  return `createWorkoutRoutine(${JSON.stringify(args.name)})`;
-}
-
-/** Seed a compact Gym V2 state through the same DB harness as other API legs. */
-export async function execSeedGymTrainingState(
-  page: Page,
-  args: Record<string, unknown>,
-): Promise<string> {
-  resolveSpec('seedGymTrainingState', args);
-  const routineName = String(args.routineName);
-  const routineRows = await queryRows(
-    page,
-    `SELECT id FROM workout_routines WHERE name = ${esc(routineName)} AND deleted_at IS NULL LIMIT 1`,
-  );
-  const routineId = routineRows[0]?.id as string | undefined;
-  if (!routineId) throw new Error(`Gym V2 fixture routine not found: ${routineName}`);
-  const now = new Date().toISOString();
-  const exerciseId = makeId('ex');
-  const setId = makeId('eset');
-  const customId = makeId('cex');
-  const planId = makeId('wplan');
-  const bodyWeightId = makeId('bw');
-  await withDb(
-    page,
-    [
-      insertSql(
-        'routine_exercises',
-        [
-          'id',
-          'routine_id',
-          'name',
-          'sort_order',
-          'catalog_exercise_id',
-          'modality',
-          'unilateral',
-          'supports_external_load',
-          'notes',
-          'superset_group',
-          'progression_mode',
-          'progression_increment',
-          'progression_min_reps',
-          'progression_max_reps',
-          'created_at',
-          'updated_at',
-          'deleted_at',
-        ],
-        [
-          esc(exerciseId),
-          esc(routineId),
-          esc('Barbell bench press'),
-          '1',
-          esc('builtin_barbell_bench_press'),
-          esc('weighted_strength'),
-          '1',
-          '1',
-          esc('Simulation starter prescription'),
-          'NULL',
-          esc('linear'),
-          '2.5',
-          '8',
-          '10',
-          esc(now),
-          esc(now),
-          'NULL',
-        ],
-      ),
-      insertSql(
-        'routine_exercise_sets',
-        [
-          'id',
-          'exercise_id',
-          'set_number',
-          'active_seconds',
-          'rest_seconds',
-          'target_reps_min',
-          'target_reps_max',
-          'target_load',
-          'created_at',
-          'updated_at',
-          'deleted_at',
-        ],
-        [esc(setId), esc(exerciseId), '1', '30', '60', '8', '10', '60', esc(now), esc(now), 'NULL'],
-      ),
-      insertSql(
-        'custom_exercises',
-        [
-          'id',
-          'name',
-          'description',
-          'aliases',
-          'instructions',
-          'primary_area',
-          'secondary_areas',
-          'equipment',
-          'modality',
-          'unilateral',
-          'supports_external_load',
-          'created_at',
-          'updated_at',
-          'deleted_at',
-        ],
-        [
-          esc(customId),
-          esc('Cable Y raise'),
-          'NULL',
-          esc('["cable y"]'),
-          esc('Pull toward the shoulders.'),
-          esc('shoulders'),
-          esc('[]'),
-          esc('cable'),
-          esc('weighted_strength'),
-          '0',
-          '1',
-          esc(now),
-          esc(now),
-          'NULL',
-        ],
-      ),
-      insertSql(
-        'workout_weekly_plan',
-        [
-          'id',
-          'weekday',
-          'routine_id',
-          'plan_kind',
-          'note',
-          'created_at',
-          'updated_at',
-          'deleted_at',
-        ],
-        [
-          esc(planId),
-          '1',
-          esc(routineId),
-          esc('workout'),
-          esc('Gym V2 simulation'),
-          esc(now),
-          esc(now),
-          'NULL',
-        ],
-      ),
-      insertSql(
-        'body_weight_entries',
-        [
-          'id',
-          'measured_on',
-          'measured_at',
-          'weight',
-          'unit',
-          'note',
-          'created_at',
-          'updated_at',
-          'deleted_at',
-        ],
-        [
-          esc(bodyWeightId),
-          esc(await pageDateKey(page)),
-          esc(now),
-          '80',
-          esc('kg'),
-          esc('Simulation morning'),
-          esc(now),
-          esc(now),
-          'NULL',
-        ],
-      ),
-    ].join('\n'),
-  );
-  return `seedGymTrainingState(${JSON.stringify(routineName)})`;
-}
-
-const HANDLERS: Record<string, (page: Page, args: Record<string, unknown>) => Promise<string>> = {
-  createTodo: execCreateTodo,
-  createHabit: execCreateHabit,
-  tickHabit: execTickHabit,
-  logCalories: execLogCalories,
-  createWorkoutRoutine: execCreateWorkoutRoutine,
-  seedGymTrainingState: execSeedGymTrainingState,
-};
 
 /**
- * Execute an apiLeg step. Guards first (raw SQL is an error), resolves the
- * registry, runs the data-layer write through the DB harness, and returns an
- * action-log label for the run report.
+ * Invoke a semantic operation through the app's real data layer.
+ *
+ * Fails loudly when the bridge is missing: a lane that silently fell back to
+ * SQL would reproduce the audited defect, so an absent bridge is an error, not
+ * a degraded mode.
+ */
+async function invokeOnAppPage(
+  page: Page,
+  operation: string,
+  args: Record<string, unknown>,
+): Promise<{ value: unknown; captures: Record<string, string> }> {
+  // The bridge only exists on the APP document; a harness page has no app.
+  await ensureAppContext(page);
+  await waitForAppReady(page);
+  const present = await page.evaluate(
+    () => typeof (window as unknown as { __shDataBridge?: unknown }).__shDataBridge === 'object',
+  );
+  if (!present) {
+    throw new Error(
+      `apiLeg '${operation}' cannot run: this build exposes no data-layer bridge. ` +
+        'Simulation API legs require the hermetic export produced by `npm run build:e2e` ' +
+        '(EXPO_PUBLIC_SIM_DATA_BRIDGE=true). Refusing to fall back to SQL replay.',
+    );
+  }
+  return page.evaluate(
+    async ([op, payload]) => {
+      const bridge = (window as unknown as { __shDataBridge?: BridgeGlobalShape }).__shDataBridge;
+      if (!bridge)
+        throw new Error('data bridge disappeared between the readiness check and the call');
+      return bridge.invoke(op, payload);
+    },
+    [operation, args] as const,
+  );
+}
+
+/**
+ * Execute an apiLeg step: guard, resolve the registry entry, invoke the real
+ * data-layer function through the bridge, and return an action-log label plus
+ * any ids the operation published for later assertions.
+ *
+ * A `fixture-sql` operation is dispatched to its labelled fixture handler and
+ * its label always carries `[fixture]`, so a report reader can never mistake
+ * fixture construction for production-path evidence (AUD-SH19-A).
  */
 export async function execApiLeg(
   page: Page,
   input: { functionName: string; args?: Record<string, unknown> },
-): Promise<string> {
-  assertApiLegSafe(input);
-  const handler = HANDLERS[input.functionName];
-  if (!handler) {
-    throw new Error(
-      `apiLeg '${input.functionName}' has no executable handler in this lane ` +
-        `(resolution: ${API_LEG_FUNCTIONS[input.functionName]?.resolution ?? 'unknown'})`,
-    );
+): Promise<ApiLegOutcome> {
+  const args = input.args ?? {};
+  const spec = resolveSpec(input.functionName, args);
+  if (spec.resolution === 'fixture-sql') {
+    const outcome = await runFixtureHandler(page, input.functionName, args);
+    return { label: `[fixture] ${outcome.label}`, captures: outcome.captures };
   }
-  return handler(page, input.args ?? {});
+  const result = await invokeOnAppPage(page, input.functionName, args);
+  return {
+    label: `${input.functionName}(${describeArgs(input.functionName, args)})`,
+    captures: result.captures,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Fixture-setup handlers (explicitly NOT API fidelity)                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Handlers for `resolution: 'fixture-sql'` operations only.
+ *
+ * These exist because some seeded shapes have no single data-layer entry point
+ * (Gym V2's nested prescription + plan + body-weight graph). They write through
+ * the DB harness, so they are fixture setup — the same category as
+ * `e2e/helpers/seed.ts` — and are labelled `[fixture]` in every report.
+ */
+async function runFixtureHandler(
+  page: Page,
+  functionName: string,
+  args: Record<string, unknown>,
+): Promise<ApiLegOutcome> {
+  switch (functionName) {
+    case 'fixtureSeedGymTrainingState':
+      return fixtureSeedGymTrainingState(page, args);
+    default:
+      throw new Error(`apiLeg '${functionName}' declares a fixture-sql resolution with no handler`);
+  }
+}
+
+/** Deterministic-format id mirroring `lib/id.ts` (fixture rows only). */
+function fixtureId(prefix: string): string {
+  const ts = Date.now().toString(36);
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `${prefix}_${ts}_${rand}`;
+}
+
+/**
+ * Seed a compact Gym V2 shape. FIXTURE SETUP: see `runFixtureHandler`.
+ *
+ * @param page app-free DB-harness page
+ * @param args `{ routineName }`
+ */
+async function fixtureSeedGymTrainingState(
+  page: Page,
+  args: Record<string, unknown>,
+): Promise<ApiLegOutcome> {
+  const routineName = String(args.routineName);
+  const { runSql, queryRows, returnToApp } = await import('../../e2e/helpers/dbHarness');
+  const esc = (v: unknown): string => `'${String(v).replace(/'/g, "''")}'`;
+  const routineRows = await queryRows(
+    page,
+    `SELECT id FROM workout_routines WHERE name = ${esc(routineName)} AND deleted_at IS NULL LIMIT 1`,
+  );
+  const routineId = routineRows[0]?.id;
+  if (typeof routineId !== 'string' || routineId === '') {
+    throw new Error(`Gym V2 fixture routine not found: ${routineName}`);
+  }
+  const now = new Date().toISOString();
+  const exerciseId = fixtureId('ex');
+  const setId = fixtureId('eset');
+  const customId = fixtureId('cex');
+  const planId = fixtureId('wplan');
+  const bodyWeightId = fixtureId('bw');
+  const measuredOn = await page.evaluate(() => {
+    const d = new Date();
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  });
+  const statements = [
+    `INSERT INTO routine_exercises (id, routine_id, name, sort_order, catalog_exercise_id, modality, unilateral, supports_external_load, notes, superset_group, progression_mode, progression_increment, progression_min_reps, progression_max_reps, created_at, updated_at, deleted_at) VALUES (${esc(exerciseId)}, ${esc(routineId)}, ${esc('Barbell bench press')}, 1, ${esc('builtin_barbell_bench_press')}, ${esc('weighted_strength')}, 1, 1, ${esc('Simulation starter prescription')}, NULL, ${esc('linear')}, 2.5, 8, 10, ${esc(now)}, ${esc(now)}, NULL);`,
+    `INSERT INTO routine_exercise_sets (id, exercise_id, set_number, active_seconds, rest_seconds, target_reps_min, target_reps_max, target_load, created_at, updated_at, deleted_at) VALUES (${esc(setId)}, ${esc(exerciseId)}, 1, 30, 60, 8, 10, 60, ${esc(now)}, ${esc(now)}, NULL);`,
+    `INSERT INTO custom_exercises (id, name, description, aliases, instructions, primary_area, secondary_areas, equipment, modality, unilateral, supports_external_load, created_at, updated_at, deleted_at) VALUES (${esc(customId)}, ${esc('Cable Y raise')}, NULL, '["cable y"]', ${esc('Pull toward the shoulders.')}, ${esc('shoulders')}, '[]', ${esc('cable')}, ${esc('weighted_strength')}, 0, 1, ${esc(now)}, ${esc(now)}, NULL);`,
+    `INSERT INTO workout_weekly_plan (id, weekday, routine_id, plan_kind, note, created_at, updated_at, deleted_at) VALUES (${esc(planId)}, 1, ${esc(routineId)}, ${esc('workout')}, ${esc('Gym V2 simulation')}, ${esc(now)}, ${esc(now)}, NULL);`,
+    `INSERT INTO body_weight_entries (id, measured_on, measured_at, weight, unit, note, created_at, updated_at, deleted_at) VALUES (${esc(bodyWeightId)}, ${esc(measuredOn)}, ${esc(now)}, 80, ${esc('kg')}, ${esc('Simulation morning')}, ${esc(now)}, ${esc(now)}, NULL);`,
+  ];
+  await runSql(page, statements.join('\n'));
+  await returnToApp(page);
+  return {
+    label: `fixtureSeedGymTrainingState(${JSON.stringify(routineName)})`,
+    captures: { routineId, exerciseId, setId, customExerciseId: customId, planId, bodyWeightId },
+  };
+}
+
+/** Short human label for the action log (never includes generated ids). */
+function describeArgs(functionName: string, args: Record<string, unknown>): string {
+  const interesting = ['title', 'name', 'foodName', 'id', 'completed'];
+  const parts = interesting
+    .filter((key) => args[key] !== undefined)
+    .map((key) => JSON.stringify(args[key]));
+  return parts.length > 0 ? parts.join(', ') : functionName;
 }

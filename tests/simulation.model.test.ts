@@ -24,6 +24,7 @@ import { validateSimulationModel } from '../simulation/model/validate';
 const ROWS_ORACLE: Oracle = {
   kind: 'rows',
   sql: 'SELECT COUNT(*) AS n FROM todos WHERE deleted_at IS NULL',
+  expected: [{ n: 0 }],
 };
 const ACROSS_ORACLE: Oracle = { kind: 'across-surfaces', text: '3', tabs: ['overview', 'habits'] };
 
@@ -77,7 +78,13 @@ function validScenario(id = 'week-of-habits') {
       {
         kind: 'createTodo',
         title: 'Buy groceries',
-        oracles: [{ kind: 'rows', sql: "SELECT * FROM todos WHERE title = 'Buy groceries'" }],
+        oracles: [
+          {
+            kind: 'rows',
+            sql: "SELECT * FROM todos WHERE title = 'Buy groceries'",
+            expected: [{ title: 'Buy groceries' }],
+          },
+        ],
       },
       { kind: 'advanceClockToNextDay' },
       {

@@ -171,23 +171,28 @@ steps.push(
   },
   {
     kind: 'expectOracle',
-    note: 'the calorie total may trail by one entry when a UI form submission races the oracle navigation (the per-day oracles already pinned monotonic growth to 85)',
+    note: 'diagnostic read only (AUD-SH18-B): the calorie total may trail by one entry when a UI form submission races the oracle navigation, so this read is recorded but never asserts. The per-day oracles above already pin the exact growth of the Oatmeal history.',
     oracle: {
-      kind: 'rows',
+      kind: 'diagnostic',
       sql: "SELECT COUNT(*) AS n FROM calorie_entries WHERE food_name = 'Oatmeal' AND deleted_at IS NULL",
+      note: 'post-restore Oatmeal entry count for the failure digest',
     },
   },
   {
     kind: 'expectOracle',
     note: 'streak continuity oracle: the latest simulated days are completed, so the current streak is at least 2',
     oracle: {
+      // The predicate is expressed inside SQL so the oracle stays an exact
+      // assertion: `ok: 1` means ">= 2 fully-ticked recent days survived",
+      // which fails loudly instead of passing on any row count (AUD-SH18-A).
       kind: 'rows',
-      sql: `SELECT COUNT(*) AS n
+      sql: `SELECT CASE WHEN COUNT(*) >= 2 THEN 1 ELSE 0 END AS ok
             FROM habit_completions hc
             JOIN habits h ON h.id = hc.habit_id
             WHERE h.name = 'Drink water'
               AND hc.count >= 2
               AND hc.date_key >= date('now', '-3 days')`,
+      expected: [{ ok: 1 }],
     },
   },
 );

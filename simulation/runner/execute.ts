@@ -24,7 +24,7 @@ import * as path from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { resetAll } from '../../e2e/helpers/reset';
 import { seedFixture } from '../../e2e/helpers/seed';
-import { expectOutbox, expectRows, expectUnchanged } from '../../e2e/helpers/oracles';
+import { expectUnchanged } from '../../e2e/helpers/oracles';
 import { queryRows, returnToApp, APP_BASE_URL } from '../../e2e/helpers/dbHarness';
 import { clearInjectedFailures, setOffline } from '../../e2e/helpers/failure';
 import type { Oracle, RunMode, Scenario, SemanticStep, SimulationModel } from '../model/types';
@@ -83,6 +83,11 @@ import {
   runnerExpectAcrossSurfaces,
 } from './actions';
 import { execApiLeg } from './apiLeg';
+import {
+  markAssertionOutcome,
+  selectAttachedOracles,
+  standaloneOracleLabel,
+} from './oracleContract';
 
 /* ------------------------------------------------------------------ */
 /* Options / results                                                   */
@@ -155,26 +160,108 @@ export interface ExecuteScenarioResult {
 /* Workflow expansion                                                  */
 /* ------------------------------------------------------------------ */
 
+/**
+ * The JSON-ish shape every scenario/step field takes. Placeholder binding and
+ * capture substitution walk this shape only; the recursion is typed so no
+ * `unknown` escapes an inner helper.
+ */
+type StepValue = string | number | boolean | null | undefined | StepValue[] | StepBag;
+
+/** A nested object of step values (declared separately so the union recurses cleanly). */
+interface StepBag {
+  [key: string]: StepValue;
+}
+
+/**
+ * Structural view of a step/field for placeholder traversal. Step and oracle
+ * types are concrete interfaces (no index signature), so the traversal needs an
+ * explicit widening — `mapStepStrings` only rewrites string leaves, so the shape
+ * is preserved and the caller restores its own type.
+ */
+const asStepValue = (value: unknown): StepValue => value as StepValue;
+
+/** Rewrite every string leaf with `transform`, preserving the surrounding shape. */
+function mapStepStrings(value: StepValue, transform: (leaf: string) => string): StepValue {
+  if (typeof value === 'string') return transform(value);
+  if (Array.isArray(value)) return value.map((item) => mapStepStrings(item, transform));
+  if (value !== null && typeof value === 'object') {
+    const next: StepBag = {};
+    for (const [key, item] of Object.entries(value)) next[key] = mapStepStrings(item, transform);
+    return next;
+  }
+  return value;
+}
+
 /** Substitute `{{param}}` placeholders in a step's string fields. */
 function bindParams<T extends SemanticStep>(step: T, params: Record<string, unknown>): T {
   if (Object.keys(params).length === 0) return step;
-  const walk = (value: unknown): unknown => {
-    if (typeof value === 'string') {
-      let out = value;
-      for (const [key, val] of Object.entries(params)) {
-        out = out.split(`{{${key}}}`).join(String(val));
+  const bound = mapStepStrings(asStepValue(step), (leaf) => {
+    let out = leaf;
+    for (const [key, val] of Object.entries(params)) {
+      out = out.split(`{{${key}}}`).join(String(val));
+    }
+    return out;
+  });
+  // SAFETY: `mapStepStrings` preserves the input shape exactly — it only
+  // replaces string leaves — but the recursion narrows to `StepValue`, so the
+  // round-trip needs an assertion to restore the caller's step type.
+  return bound as unknown as T;
+}
+
+/**
+ * Values captured by earlier `apiLeg` steps, keyed by the leg's `captures` name.
+ * Later steps resolve them through the `{{capture.<name>.<key>}}` placeholder so
+ * an assertion can pin the real generated identity instead of re-deriving it
+ * with a second, weaker read (AUD-SH18-B).
+ */
+export type CaptureRegistry = Record<string, Record<string, string>>;
+
+const CAPTURE_PLACEHOLDER = /\{\{capture\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)\}\}/;
+
+/** Every `{{capture.<name>.<key>}}` placeholder reachable in a step/field. */
+export function unresolvedCapturePlaceholders(step: SemanticStep): string[] {
+  return collectCapturePlaceholders(asStepValue(step));
+}
+
+/** Placeholder collector shared by the step-level and value-level checks. */
+function collectCapturePlaceholders(value: StepValue): string[] {
+  const found: string[] = [];
+  mapStepStrings(value, (leaf) => {
+    for (const match of leaf.matchAll(new RegExp(CAPTURE_PLACEHOLDER, 'g'))) {
+      found.push(match[0]);
+    }
+    return leaf;
+  });
+  return found;
+}
+
+/**
+ * Substitute captured values into a step. A placeholder whose capture does not
+ * exist is a MODEL/RUNNER error: silently leaving it literal would make the
+ * oracle compare against the placeholder text and pass for the wrong reason.
+ */
+function applyCaptures<T>(value: T, captures: CaptureRegistry, context: string): T {
+  const substituted = mapStepStrings(asStepValue(value), (leaf) => {
+    let out = leaf;
+    for (const [name, keys] of Object.entries(captures)) {
+      for (const [key, captured] of Object.entries(keys)) {
+        out = out.split(`{{capture.${name}.${key}}}`).join(captured);
       }
-      return out;
     }
-    if (Array.isArray(value)) return value.map(walk);
-    if (value !== null && typeof value === 'object') {
-      const next: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(value as Record<string, unknown>)) next[k] = walk(v);
-      return next;
-    }
-    return value;
-  };
-  return walk(step) as T;
+    return out;
+  });
+  // Any placeholder still present names a capture that no earlier leg
+  // published, so the assertion would compare against literal text.
+  const unresolved = collectCapturePlaceholders(substituted);
+  if (unresolved.length > 0) {
+    throw new Error(
+      `${context}: unresolved capture placeholder(s) ${unresolved.join(', ')}; ` +
+        'declare a matching apiLeg `captures` name before this step',
+    );
+  }
+  // SAFETY: substitution only rewrites string leaves, so the shape is
+  // unchanged; this restores the caller's declared step type.
+  return substituted as T;
 }
 
 /** Expand workflows (in order) + inline steps into a flat ordered graph. */
@@ -197,53 +284,70 @@ export function expandScenarioSteps(model: SimulationModel, scenario: Scenario):
 /* Oracle evaluation                                                   */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Evaluate a `rows` oracle THROUGH the shared contract: read the rows, hand the
+ * result (or the thrown error) to `markAssertionOutcome`, and report that
+ * outcome. The runner never re-implements pass/fail logic, so a future oracle
+ * kind cannot silently bypass the assertion (AUD-SH18-A).
+ */
 async function evaluateRowsOracle(
   page: Page,
   oracle: Extract<Oracle, { kind: 'rows' }>,
 ): Promise<EvaluatedOracle> {
+  const evaluation = markAssertionOutcome(oracle, await readRowsSafely(page, oracle.sql));
+  return { sql: oracle.sql, ...evaluation };
+}
+
+async function evaluateOutboxOracle(
+  page: Page,
+  oracle: Extract<Oracle, { kind: 'outbox' }>,
+): Promise<EvaluatedOracle> {
+  const evaluation = markAssertionOutcome(oracle, await readRowsSafely(page, OUTBOX_SQL));
+  return { ...evaluation };
+}
+
+/**
+ * A `diagnostic` oracle records a read for the run report. It never asserts, so
+ * it can never pass a scenario: the outcome is `skipped` so a reader cannot
+ * mistake it for evidence. A failing read still surfaces as `failed`.
+ */
+async function evaluateDiagnosticOracle(
+  page: Page,
+  oracle: Extract<Oracle, { kind: 'diagnostic' }>,
+): Promise<EvaluatedOracle> {
+  const evaluation = markAssertionOutcome(oracle, await readRowsSafely(page, oracle.sql));
+  return { sql: oracle.sql, ...evaluation };
+}
+
+/**
+ * Read rows, returning the thrown error instead of propagating it, so the shared
+ * contract — not a `try/catch` at each call site — decides what a failed read
+ * means. A swallowed error was half the audited defect.
+ */
+async function readRowsSafely(page: Page, sql: string): Promise<Record<string, unknown>[] | Error> {
   try {
-    const expected = oracle.expected as Record<string, unknown>[] | undefined;
-    if (expected === undefined) {
-      const rows = await queryRows(page, oracle.sql);
-      return { kind: 'rows', sql: oracle.sql, result: 'passed', detail: `${rows.length} rows` };
-    }
-    await expectRows(page, oracle.sql, expected);
-    return { kind: 'rows', sql: oracle.sql, result: 'passed', detail: `${expected.length} rows` };
+    return await queryRows(page, sql);
   } catch (err) {
-    return {
-      kind: 'rows',
-      sql: oracle.sql,
-      result: 'failed',
-      detail: (err as Error).message,
-    };
+    return err instanceof Error ? err : new Error(String(err));
   }
 }
 
-async function evaluateOutboxOracle(page: Page): Promise<EvaluatedOracle> {
-  try {
-    const outbox = await queryRows(
-      page,
-      `SELECT entity, id, updated_at AS updatedAt, operation
+/** The outbox projection every outbox oracle reads (ids/revisions included). */
+const OUTBOX_SQL = `SELECT entity, id, updated_at AS updatedAt, operation
        FROM sync_outbox
-       ORDER BY revision ASC`,
-    );
-    return { kind: 'outbox', result: 'passed', detail: `${outbox.length} record(s)` };
-  } catch (err) {
-    return { kind: 'outbox', result: 'failed', detail: (err as Error).message };
-  }
-}
+       ORDER BY revision ASC`;
 
 /** Evaluate the oracles directly attached to a step (rows / across-surfaces / outbox). */
 async function evaluateStepOracles(page: Page, step: SemanticStep): Promise<EvaluatedOracle[]> {
   const results: EvaluatedOracle[] = [];
-  for (const oracle of step.oracles ?? []) {
+  for (const oracle of selectAttachedOracles(step)) {
     switch (oracle.kind) {
       case 'rows': {
         results.push(await evaluateRowsOracle(page, oracle));
         break;
       }
       case 'outbox': {
-        results.push(await evaluateOutboxOracle(page));
+        results.push(await evaluateOutboxOracle(page, oracle));
         break;
       }
       case 'across-surfaces': {
@@ -277,6 +381,10 @@ async function evaluateStepOracles(page: Page, step: SemanticStep): Promise<Eval
         results.push({ kind: 'unchanged', sql: oracle.sql, result: 'skipped' });
         break;
       }
+      case 'diagnostic': {
+        results.push(await evaluateDiagnosticOracle(page, oracle));
+        break;
+      }
     }
   }
   return results;
@@ -287,7 +395,11 @@ async function evaluateStepOracles(page: Page, step: SemanticStep): Promise<Eval
 /* ------------------------------------------------------------------ */
 
 /** Run one step's ACTION; returns the action-log label. */
-async function dispatchAction(page: Page, step: SemanticStep): Promise<string> {
+async function dispatchAction(
+  page: Page,
+  step: SemanticStep,
+  captures: CaptureRegistry,
+): Promise<string> {
   switch (step.kind) {
     case 'switchSection':
       return actionSwitchSection(page, step.tab);
@@ -337,25 +449,37 @@ async function dispatchAction(page: Page, step: SemanticStep): Promise<string> {
       return dispatchExpectOracle(page, step.oracle);
     case 'expectAcrossSurfaces':
       return actionExpectAcrossSurfaces(page, step);
-    case 'apiLeg':
-      return execApiLeg(page, { functionName: step.functionName, args: step.args });
+    case 'apiLeg': {
+      const outcome = await execApiLeg(page, {
+        functionName: step.functionName,
+        args: step.args,
+      });
+      // A leg that declares `captures` publishes the identity it really created
+      // so a later assertion pins that id instead of re-deriving it.
+      if (step.captures) captures[step.captures] = outcome.captures;
+      return outcome.label;
+    }
   }
 }
 
-/** Action for a standalone `expectOracle` step (returns a log label). */
+/**
+ * Action for a standalone `expectOracle` step (returns a log label).
+ *
+ * Every branch evaluates through the same shared contract as an attached
+ * oracle and THROWS on failure. The audited defect was that a standalone
+ * oracle could swallow a failed read and still return a passing label
+ * (AUD-SH18-B); the runner must have exactly one pass/fail rule.
+ */
 async function dispatchExpectOracle(page: Page, oracle: Oracle): Promise<string> {
+  const label = standaloneOracleLabel(oracle);
   switch (oracle.kind) {
     case 'rows': {
-      await evalRows(page, oracle);
-      return 'expectOracle rows';
+      assertEvaluation(await evaluateRowsOracle(page, oracle));
+      return label;
     }
     case 'outbox': {
-      if (oracle.expected !== undefined) {
-        await expectOutbox(page, oracle.expected as never);
-      } else {
-        await evaluateOutboxOracle(page);
-      }
-      return 'expectOracle outbox';
+      assertEvaluation(await evaluateOutboxOracle(page, oracle));
+      return label;
     }
     case 'across-surfaces': {
       await runnerExpectAcrossSurfaces(page, {
@@ -363,23 +487,25 @@ async function dispatchExpectOracle(page: Page, oracle: Oracle): Promise<string>
         tabs: oracle.tabs,
         afterReload: oracle.afterReload,
       });
-      return 'expectOracle across-surfaces';
+      return label;
     }
     case 'unchanged': {
-      // Standalone unchanged has no action to wrap around; record the state read.
-      await queryRows(page, oracle.sql);
-      return 'expectOracle unchanged';
+      // Standalone unchanged has no action to wrap around; the read must still
+      // succeed, so a missing table surfaces instead of vanishing.
+      assertEvaluation(markAssertionOutcome(oracle, await readRowsSafely(page, oracle.sql)));
+      return label;
+    }
+    case 'diagnostic': {
+      assertEvaluation(await evaluateDiagnosticOracle(page, oracle));
+      return label;
     }
   }
 }
 
-/** Rows oracle with exact-expected or passthrough read. */
-async function evalRows(page: Page, oracle: Extract<Oracle, { kind: 'rows' }>): Promise<void> {
-  const expected = oracle.expected as Record<string, unknown>[] | undefined;
-  if (expected !== undefined) {
-    await expectRows(page, oracle.sql, expected);
-  } else {
-    await queryRows(page, oracle.sql);
+/** Throw when a standalone oracle did not pass, matching attached-oracle rules. */
+function assertEvaluation(evaluation: EvaluatedOracle): void {
+  if (evaluation.result === 'failed') {
+    throw new Error(`oracle '${evaluation.kind}' failed: ${evaluation.detail ?? 'mismatch'}`);
   }
 }
 
@@ -530,6 +656,8 @@ export async function executeScenario(
   });
   const startedAt = new Date().toISOString();
   const screenshots: string[] = [];
+  /** Per-run capture registry: apiLeg ids resolve into later step oracles. */
+  const captures: CaptureRegistry = {};
   const consoleLines: string[] = [];
   const browserErrors: string[] = [];
   const serverErrors: string[] = [];
@@ -625,6 +753,7 @@ export async function executeScenario(
         report,
         started,
         injection,
+        captures,
       });
       const entry = report.steps[report.steps.length - 1];
       opts.onStep?.({
@@ -774,25 +903,31 @@ async function runOneStep(
     report: RunReport;
     started: string;
     injection?: StepLogEntry | null;
+    /** Values captured by earlier legs; this step may add to it. */
+    captures: CaptureRegistry;
   },
 ): Promise<{ label: string; status: 'passed' | 'failed' }> {
   const startedAt = ctx.started;
+  // `{{capture.<name>.<key>}}` references resolve before the step touches the
+  // app, so an oracle can assert on a real generated id (AUD-SH18-B).
+  const resolvedStep = applyCaptures(step, ctx.captures, `step ${index} (${step.kind})`);
+  const captured = ctx.captures;
   let actionLabel = '';
   let errorMessage: string | undefined;
   let oracleResults: EvaluatedOracle[] = [];
   const injection = ctx.injection ?? null;
 
   try {
-    const unchangedOracle = step.oracles?.find((o) => o.kind === 'unchanged');
+    const unchangedOracle = resolvedStep.oracles?.find((o) => o.kind === 'unchanged');
     if (unchangedOracle) {
       // Negative-oracle pattern: snapshot → action → compare (parent helper).
       await expectUnchanged(page, unchangedOracle.sql, async (p) => {
-        actionLabel = await dispatchWithInjection(p, step, injection);
+        actionLabel = await dispatchWithInjection(p, resolvedStep, injection, captured);
       });
-      oracleResults = await evaluateStepOracles(page, { ...step, oracles: [] });
+      oracleResults = await evaluateStepOracles(page, { ...resolvedStep, oracles: [] });
     } else {
-      actionLabel = await dispatchWithInjection(page, step, injection);
-      oracleResults = await evaluateStepOracles(page, step);
+      actionLabel = await dispatchWithInjection(page, resolvedStep, injection, captured);
+      oracleResults = await evaluateStepOracles(page, resolvedStep);
     }
     // A failed declared oracle fails the step (and hence the run).
     const failedOracle = oracleResults.find((o) => o.result === 'failed');
@@ -855,9 +990,10 @@ async function dispatchWithInjection(
   page: Page,
   step: SemanticStep,
   injection: StepLogEntry | null,
+  captures: CaptureRegistry,
 ): Promise<string> {
   if (injection === null) {
-    return dispatchAction(page, step);
+    return dispatchAction(page, step, captures);
   }
   if (injection.kind === 'abandonment') {
     return `${step.kind} skipped [injection:abandonment]`;
@@ -865,13 +1001,13 @@ async function dispatchWithInjection(
   if (injection.kind === 'offline-toggle') {
     await setOffline(page, true);
     try {
-      const label = await dispatchAction(page, step);
+      const label = await dispatchAction(page, step, captures);
       return `${label} [injection:offline-toggle]`;
     } finally {
       await setOffline(page, false);
     }
   }
-  const label = await dispatchAction(page, step);
+  const label = await dispatchAction(page, step, captures);
   return `${label} [injection:${injection.kind}]`;
 }
 
@@ -887,7 +1023,9 @@ function oracleExpectationText(step: SemanticStep): string | undefined {
     case 'across-surfaces':
       return oracle.text;
     case 'outbox':
-      return oracle.expected !== undefined ? JSON.stringify(oracle.expected) : 'outbox parse';
+      return JSON.stringify(oracle.expected);
+    case 'diagnostic':
+      return `${oracle.sql} (diagnostic read — not an assertion)`;
   }
 }
 
@@ -921,6 +1059,7 @@ export async function replaySteps(
     scenario: null,
     artifacts: buildRunArtifacts({ runId: opts.runId, reportPath: '', screenshots: [] }),
   });
+  const captures: CaptureRegistry = {};
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
     const started = new Date().toISOString();
@@ -930,6 +1069,7 @@ export async function replaySteps(
       report,
       started,
       injection: null,
+      captures,
     });
     const entry = report.steps[report.steps.length - 1];
     opts.onStep?.({ index: i, kind: step.kind, status: entry?.status ?? 'passed' });

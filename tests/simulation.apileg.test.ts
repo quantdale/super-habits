@@ -63,10 +63,30 @@ describe('assertApiLegSafe', () => {
       expect.arrayContaining([
         'createTodo',
         'createHabit',
-        'tickHabit',
+        'incrementHabit',
         'logCalories',
         'createWorkoutRoutine',
       ]),
     );
+  });
+
+  it('resolves every mutation leg through the real data bridge, never SQL', () => {
+    // AUD-SH19-A: a mutation handler that resolves through the DB harness is the
+    // audited shadow-SQL defect. Only an explicitly-labelled `fixture-sql`
+    // operation may bypass the data layer, and it must say so in its name.
+    for (const spec of Object.values(API_LEG_FUNCTIONS)) {
+      if (spec.resolution === 'fixture-sql') {
+        expect(spec.functionName.startsWith('fixture')).toBe(true);
+        continue;
+      }
+      expect(spec.resolution, spec.functionName).not.toBe('db-harness');
+    }
+  });
+
+  it('refuses the previous shadow-SQL operation names', () => {
+    // The audited registry names must vanish so a stale scenario fails loudly
+    // instead of silently replaying SQL again.
+    expect(Object.keys(API_LEG_FUNCTIONS)).not.toContain('tickHabit');
+    expect(Object.keys(API_LEG_FUNCTIONS)).not.toContain('seedGymTrainingState');
   });
 });

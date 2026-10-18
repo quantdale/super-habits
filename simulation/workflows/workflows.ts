@@ -75,9 +75,15 @@ export const completePomodoro = defineWorkflow({
     { kind: 'waitThinkTime', ms: 2500, note: 'let any live interval observe the elapsed delta' },
     {
       kind: 'expectOracle',
+      // AUD-SH18-B: this used to be an unspecified read that could not fail.
+      // Completion via `clock.setSystemTime` is not reliably observable, so the
+      // honest form is an explicitly diagnostic read: it is recorded in the
+      // report and can never turn a run green. The D11 invariants asserted by
+      // the consuming scenario are the real checks.
       oracle: {
-        kind: 'rows',
+        kind: 'diagnostic',
         sql: "SELECT COUNT(*) AS n FROM pomodoro_sessions WHERE ended_at IS NOT NULL AND session_type = 'focus' AND duration_seconds = 1500",
+        note: 'completed-focus projection for the failure digest',
       },
     },
   ],
@@ -174,9 +180,14 @@ export const changeSetting = defineWorkflow({
     { kind: 'openSettings', note: 'open and close the Settings drawer' },
     {
       kind: 'expectOracle',
+      // AUD-SH18-B: the settings store must be READABLE and initialized by the
+      // migrated schema. `app_meta` always carries `db_schema_version` (written
+      // by the migration runner), so a missing/empty store now fails the step
+      // instead of passing on any row count.
       oracle: {
         kind: 'rows',
-        sql: "SELECT COUNT(*) AS n FROM app_meta WHERE key IN ('calorie_goal', 'pomodoro_settings')",
+        sql: "SELECT CASE WHEN COUNT(*) = 1 THEN 1 ELSE 0 END AS ok FROM app_meta WHERE key = 'db_schema_version'",
+        expected: [{ ok: 1 }],
       },
     },
   ],

@@ -33,6 +33,18 @@ export const E2E_TEST_PROFILE = 'e2e-test';
 export const NATIVE_TEST_SEAM = 'EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST';
 
 /**
+ * The hermetic simulation data-layer bridge flag (`AUD-SH19-B`).
+ *
+ * When true, the app installs `globalThis.__shDataBridge`, a callable surface
+ * that invokes real mutation functions from a browser page. That is exactly
+ * what the simulation lane needs and exactly what no user-facing build may
+ * ship, so no eas.json profile and no app.json env may set it — the hermetic
+ * simulation export sets it directly through `scripts/build-dist-e2e.mjs`,
+ * which produces `dist/` only.
+ */
+export const SIM_BRIDGE_SEAM = 'EXPO_PUBLIC_SIM_DATA_BRIDGE';
+
+/**
  * Profiles that produce an artifact a human installs outside CI. `development`
  * is excluded because it is a development client, not a release candidate, and
  * because Metro's dev server is where the seam is exercised interactively.
@@ -96,6 +108,28 @@ export function evaluateReleaseProfiles(easJson, appJson) {
       `app.json expo.extra.env sets ${NATIVE_TEST_SEAM}, which Metro inlines into every build ` +
         `including production. The seam belongs only on the '${E2E_TEST_PROFILE}' eas.json profile.`,
     );
+  }
+
+  // The simulation bridge is a callable mutation surface: it must never be
+  // reachable from ANY build profile, including the native E2E one, because
+  // the native lane does not consume it and a shipped seam is a remote-write
+  // primitive. app.json env is likewise refused.
+  for (const [profile, config] of Object.entries(easJson?.build ?? {})) {
+    const env = /** @type {Record<string, unknown> | undefined} */ (config?.env);
+    if (env && Object.prototype.hasOwnProperty.call(env, SIM_BRIDGE_SEAM)) {
+      errors.push(
+        `eas.json build profile '${profile}' sets ${SIM_BRIDGE_SEAM}. The simulation data bridge ` +
+          'exposes callable real mutations; only the hermetic web export may enable it.',
+      );
+    }
+  }
+  for (const source of [appEnv, appExtraEnv]) {
+    if (source && Object.prototype.hasOwnProperty.call(source, SIM_BRIDGE_SEAM)) {
+      errors.push(
+        `app.json sets ${SIM_BRIDGE_SEAM}, which Metro inlines into every build. The simulation ` +
+          'data bridge is enabled by the hermetic web export only.',
+      );
+    }
   }
 
   return { errors, offenders, checkedProfiles: releaseCandidateProfiles(easJson) };

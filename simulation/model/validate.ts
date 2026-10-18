@@ -25,6 +25,7 @@ import type {
   Workflow,
 } from './types';
 import {
+  isAssertingOracle,
   isKnownFeatureName,
   isKnownOracle,
   isKnownSectionName,
@@ -123,6 +124,16 @@ function validateOracle(issues: ValidationIssue[], path: string, oracle: Oracle)
       if (typeof oracle.sql !== 'string' || oracle.sql.trim() === '') {
         push(issues, `${path}.sql`, 'rows oracle requires a non-empty sql string');
       }
+      // AUD-SH18-A: a rows oracle without `expected` is not an assertion. It
+      // would report a row count and pass regardless of the behavior under
+      // test, which is exactly the false-pass this campaign removes.
+      if (!Array.isArray(oracle.expected)) {
+        push(
+          issues,
+          `${path}.expected`,
+          'rows oracle requires an `expected` array (an unspecified read asserts nothing; use a diagnostic oracle if you only want the read recorded)',
+        );
+      }
       break;
     case 'across-surfaces':
       if (typeof oracle.text !== 'string' || oracle.text.trim() === '') {
@@ -143,13 +154,25 @@ function validateOracle(issues: ValidationIssue[], path: string, oracle: Oracle)
       }
       break;
     case 'outbox':
-      if (oracle.expected !== undefined && !Array.isArray(oracle.expected)) {
-        push(issues, `${path}.expected`, 'outbox oracle expected must be an array');
+      // AUD-SH18-B: the previous shape silently degraded an unspecified outbox
+      // oracle into a diagnostic count, so a scenario claiming "offline writes
+      // enqueued" could never fail.
+      if (!Array.isArray(oracle.expected)) {
+        push(
+          issues,
+          `${path}.expected`,
+          'outbox oracle requires an `expected` array (an unspecified outbox read asserts nothing)',
+        );
       }
       break;
     case 'unchanged':
       if (typeof oracle.sql !== 'string' || oracle.sql.trim() === '') {
         push(issues, `${path}.sql`, 'unchanged oracle requires a non-empty sql string');
+      }
+      break;
+    case 'diagnostic':
+      if (typeof oracle.sql !== 'string' || oracle.sql.trim() === '') {
+        push(issues, `${path}.sql`, 'diagnostic oracle requires a non-empty sql string');
       }
       break;
   }
@@ -184,6 +207,16 @@ function validateStepOracles(issues: ValidationIssue[], path: string, step: Sema
         issues,
         `${path}.oracles`,
         `mutating step '${step.kind}' lacks a persisted-row or second-surface oracle (rows/across-surfaces)`,
+      );
+    }
+    // A diagnostic read is never evidence: a mutating step must also carry at
+    // least one oracle that can actually fail (AUD-SH18-A).
+    const hasAssertion = oracles.some((o) => isAssertingOracle(o));
+    if (!hasAssertion) {
+      push(
+        issues,
+        `${path}.oracles`,
+        `mutating step '${step.kind}' declares no asserting oracle; a diagnostic read cannot certify a mutation`,
       );
     }
   }

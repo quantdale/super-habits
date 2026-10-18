@@ -143,7 +143,7 @@ export const syncUpsertRoundTrip = defineScenario({
         'The engine must push the four entities written by this legacy probe (upsert onConflict id); the production adapter also accepts the complete Backup V2/Gym V2 entity set. ' +
         `${REMOTE_VERIFY} After this step remote todos/habits/calorie_entries/workout_routines each contain exactly ONE row for the written ids — no duplicates.`,
       oracles: [
-        { kind: 'outbox' },
+        { kind: 'outbox', expected: [] },
         {
           kind: 'rows',
           sql: "SELECT COUNT(*) AS n FROM todos WHERE title = 'Upsert probe todo' AND deleted_at IS NULL",
@@ -167,7 +167,7 @@ export const syncUpsertRoundTrip = defineScenario({
             '(SELECT COUNT(*) FROM workout_routines WHERE deleted_at IS NULL) AS wrk',
           expected: [{ todos: 1, habits: 1, calories: 1, wrk: 1 }],
         },
-        { kind: 'outbox' },
+        { kind: 'outbox', expected: [] },
       ],
     },
   ],
@@ -207,7 +207,12 @@ export const syncDedupeRoundTrip = defineScenario({
         'Re-enqueues the exact same record (same entity:id, same timestamps) that addTodo already enqueued. Runner must then assert the outbox holds EXACTLY ONE record for entity:todos (`syncEngine.getPendingCount()` is 1) — the engine de-dupes by (entity, id); a duplicate would double-insert on the remote. ' +
         `${REMOTE_VERIFY}`,
       oracles: [
-        { kind: 'outbox' },
+        {
+          kind: 'outbox',
+          // AUD-SH18-B: the duplicate enqueue must COLLAPSE onto the single
+          // existing (entity, id) record; the engine dedupes by that key.
+          expected: [{ entity: 'todos', operation: 'create' }],
+        },
         {
           kind: 'rows',
           sql: "SELECT COUNT(*) AS n FROM todos WHERE title = 'Dedupe probe' AND deleted_at IS NULL",
@@ -227,7 +232,7 @@ export const syncDedupeRoundTrip = defineScenario({
           sql: "SELECT COUNT(*) AS n FROM todos WHERE title = 'Dedupe probe' AND deleted_at IS NULL",
           expected: [{ n: 1 }],
         },
-        { kind: 'outbox' },
+        { kind: 'outbox', expected: [] },
       ],
     },
     {
@@ -237,7 +242,11 @@ export const syncDedupeRoundTrip = defineScenario({
         'Second duplicate enqueue round while the row is already remote: outbox is again one record; a further flush must not grow remote row count beyond 1 (upsert overwrites by id). ' +
         `${REMOTE_VERIFY}`,
       oracles: [
-        { kind: 'outbox' },
+        {
+          kind: 'outbox',
+          // AUD-SH18-B: still exactly one record after a second duplicate round.
+          expected: [{ entity: 'todos', operation: 'create' }],
+        },
         {
           kind: 'rows',
           sql: "SELECT COUNT(*) AS n FROM todos WHERE title = 'Dedupe probe' AND deleted_at IS NULL",
@@ -255,7 +264,7 @@ export const syncDedupeRoundTrip = defineScenario({
           sql: "SELECT COUNT(*) AS n FROM todos WHERE title = 'Dedupe probe' AND deleted_at IS NULL",
           expected: [{ n: 1 }],
         },
-        { kind: 'outbox' },
+        { kind: 'outbox', expected: [] },
       ],
     },
   ],
@@ -309,7 +318,11 @@ export const syncBackoffRoundTrip = defineScenario({
         'Flush must REJECT (runner catches it). After the failure the outbox must contain exactly the todo record (requeued), and sync status must read consecutiveFailures=1, non-empty lastErrorMessage, nextRetryAt ≈ now + 30s (BACKOFF_SCHEDULE_MS[0]). Remote must NOT contain the row. ' +
         `${REMOTE_VERIFY}`,
       oracles: [
-        { kind: 'outbox' },
+        {
+          kind: 'outbox',
+          // AUD-SH18-B: the rejected push requeued exactly the todo record.
+          expected: [{ entity: 'todos', operation: 'create' }],
+        },
         {
           kind: 'rows',
           sql: "SELECT COUNT(*) AS n FROM todos WHERE title = 'Backoff probe' AND deleted_at IS NULL",
@@ -347,7 +360,7 @@ export const syncBackoffRoundTrip = defineScenario({
         "Flush after the backoff window succeeds: outbox empty, consecutiveFailures reset to 0, lastSuccessAt set, and the remote contains exactly one 'Backoff probe' row. " +
         `${REMOTE_VERIFY}`,
       oracles: [
-        { kind: 'outbox' },
+        { kind: 'outbox', expected: [] },
         {
           kind: 'rows',
           sql: "SELECT COUNT(*) AS n FROM todos WHERE title = 'Backoff probe' AND deleted_at IS NULL",
@@ -419,7 +432,12 @@ export const syncPartialFailureRoundTrip = defineScenario({
         'REMOTE assertion: remote habits CONTAINS the habit row; remote todos does NOT contain the todo row. ' +
         `${REMOTE_VERIFY}`,
       oracles: [
-        { kind: 'outbox' },
+        {
+          kind: 'outbox',
+          // AUD-SH18-B: the habit succeeded and left the outbox; exactly the
+          // todo record is requeued.
+          expected: [{ entity: 'todos', operation: 'create' }],
+        },
         {
           kind: 'rows',
           sql:
@@ -447,7 +465,7 @@ export const syncPartialFailureRoundTrip = defineScenario({
         'Second flush delivers the requeued todo: outbox empty; remote todos now CONTAINS the todo row (and habits still has its row — no double insert, no loss). ' +
         `${REMOTE_VERIFY}`,
       oracles: [
-        { kind: 'outbox' },
+        { kind: 'outbox', expected: [] },
         {
           kind: 'rows',
           sql: "SELECT COUNT(*) AS n FROM todos WHERE title = 'Partial-failure todo' AND deleted_at IS NULL",
@@ -545,7 +563,7 @@ export const restoreLifecycleRoundTrip = defineScenario({
       functionName: 'engine:flush',
       note: 'PHASE B — push the backup. `[remote]` Runner asserts the remote now holds exactly 1 row each for todos/habits/calorie_entries/workout_routines.',
       oracles: [
-        { kind: 'outbox' },
+        { kind: 'outbox', expected: [] },
         {
           kind: 'rows',
           sql: "SELECT COUNT(*) AS n FROM todos WHERE title = 'Restore me' AND deleted_at IS NULL",

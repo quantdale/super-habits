@@ -80,10 +80,11 @@ export const j1ATuesday = defineScenario({
     { kind: 'waitThinkTime', ms: 2500, note: 'let any live interval observe the elapsed delta' },
     {
       kind: 'expectOracle',
-      note: 'lenient probe: closing a session this way is not reliably expressible (clock.install mid-run does not fire the pre-install countdown interval), so count-only — the D11 invariants below are the strong checks',
+      note: 'diagnostic read only: closing a session this way is not reliably expressible (clock.install mid-run does not fire the pre-install countdown interval), so this read is recorded but never asserts. The D11 invariants below and the pinned per-session rows are the real checks.',
       oracle: {
-        kind: 'rows',
+        kind: 'diagnostic',
         sql: "SELECT COUNT(*) AS n FROM pomodoro_sessions WHERE ended_at IS NOT NULL AND session_type = 'focus' AND duration_seconds = 1500",
+        note: 'completed-focus projection for the failure digest',
       },
     },
     // Cross-surface: the new todo is pending on Todos AND Overview top-priorities.
@@ -106,9 +107,11 @@ export const j1ATuesday = defineScenario({
     },
     {
       kind: 'expectOracle',
+      note: 'the workflow logged exactly one Scrambled eggs entry and the reload did not duplicate it',
       oracle: {
         kind: 'rows',
         sql: "SELECT COUNT(*) AS n FROM calorie_entries WHERE food_name = 'Scrambled eggs' AND deleted_at IS NULL",
+        expected: [{ n: 1 }],
       },
     },
     {
@@ -235,8 +238,14 @@ export const j3TheCommute = defineScenario({
     { kind: 'goOnline', note: 'reconnect at the office' },
     {
       kind: 'expectOracle',
-      oracle: { kind: 'outbox' },
-      note: 'offline writes enqueued (exact ids are not statically known)',
+      note: 'AUD-SH18-B: the two offline writes enqueued one durable create intent each, and nothing else is pending. Generated ids are not statically known, so the assertion pins the exact (entity, operation) multiset — an empty or differently-shaped outbox still fails.',
+      oracle: {
+        kind: 'outbox',
+        expected: [
+          { entity: 'todos', operation: 'create' },
+          { entity: 'calorie_entries', operation: 'create' },
+        ],
+      },
     },
     {
       kind: 'reloadApp',
@@ -307,8 +316,11 @@ export const j4BadBackend = defineScenario({
     },
     {
       kind: 'expectOracle',
-      oracle: { kind: 'outbox' },
-      note: 'the failed record is still pending',
+      note: 'AUD-SH18-B: the rejected push left exactly one pending todo create intent',
+      oracle: {
+        kind: 'outbox',
+        expected: [{ entity: 'todos', operation: 'create' }],
+      },
     },
     {
       kind: 'reloadApp',
@@ -335,8 +347,11 @@ export const j4BadBackend = defineScenario({
     },
     {
       kind: 'expectOracle',
-      oracle: { kind: 'outbox' },
-      note: 'still pending after the partial failure',
+      note: 'AUD-SH18-B: still exactly one pending todo create intent after the partial failure',
+      oracle: {
+        kind: 'outbox',
+        expected: [{ entity: 'todos', operation: 'create' }],
+      },
     },
   ],
 });

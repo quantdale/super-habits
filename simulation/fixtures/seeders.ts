@@ -30,13 +30,23 @@ import type { Oracle, SemanticStep } from '../model/types';
 
 const esc = (s: string): string => s.replace(/'/g, "''");
 
+/** Deterministic capture name for an entity created by a preamble step. */
+export function captureName(prefix: string, label: string): string {
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return `${prefix}_${slug}`;
+}
+
 /** One `apiLeg` step with its row oracle (mutating steps must carry oracles). */
 function apiStep(
   functionName: string,
   args: Record<string, unknown>,
   oracle: Oracle,
+  captures?: string,
 ): SemanticStep {
-  return { kind: 'apiLeg', functionName, args, oracles: [oracle] };
+  return { kind: 'apiLeg', functionName, args, oracles: [oracle], captures };
 }
 
 /** Create one todo via the data layer; oracle: exactly one row with title + priority. */
@@ -76,34 +86,39 @@ export function habitStep(
         },
       ],
     },
+    captureName('habit', name),
   );
 }
 
 /**
- * The `k`-th tick of a habit for the current (clock) day. The oracle asserts the
- * running TOTAL (`COALESCE(SUM(count), 0) = k`) — correct whether the ticks land
- * on the same day (one row, count incremented) or across distinct days (one row
- * per day), because each tick goes through the data layer's SELECT→INSERT/UPDATE
- * path. The row COUNT is intentionally not asserted here (it differs between the
- * two cases).
+ * The `k`-th tick of a habit for the current (clock) day, through the REAL
+ * `incrementHabit` data function (AUD-SH19-A). The oracle asserts the running
+ * TOTAL, which is correct whether the ticks land on the same day (one row,
+ * count incremented) or across distinct days (one row per day).
+ *
+ * `habitId` comes from the habit's own create leg in the same scenario; when a
+ * caller has no captured id it can pass the habit name and the tick is skipped
+ * with an explicit error instead of quietly selecting a row by name (the SQL
+ * replay this campaign removed).
  */
-export function habitTickStep(name: string, k: number): SemanticStep {
+export function habitTickStep(habitName: string, k: number): SemanticStep {
+  const capture = captureName('habit', habitName);
   return apiStep(
-    'tickHabit',
-    { name },
+    'incrementHabit',
+    { id: `{{capture.${capture}.id}}` },
     {
       kind: 'rows',
-      sql: `SELECT COALESCE(SUM(count), 0) AS total FROM habit_completions hc JOIN habits h ON h.id = hc.habit_id WHERE h.name = '${esc(name)}'`,
+      sql: `SELECT COALESCE(SUM(hc.count), 0) AS total FROM habit_completions hc JOIN habits h ON h.id = hc.habit_id WHERE h.name = '${esc(habitName)}'`,
       expected: [{ total: k }],
     },
   );
 }
 
-/** Log one meal via the data layer (stored kcal is verbatim here, unlike the UI). */
+/** Log one meal through the real `addCalorieEntry` data function. */
 export function calorieStep(food: string, calories: number, mealType = 'snack'): SemanticStep {
   return apiStep(
     'logCalories',
-    { food, calories, mealType },
+    { foodName: food, calories, mealType },
     {
       kind: 'rows',
       sql: `SELECT food_name, meal_type, calories FROM calorie_entries WHERE food_name = '${esc(food)}' AND calories = ${calories} AND deleted_at IS NULL`,
@@ -125,10 +140,18 @@ export function routineStep(name: string): SemanticStep {
   );
 }
 
-/** Seed a compact Gym V2 shape after a routine exists. */
+/**
+ * Seed a compact Gym V2 shape after a routine exists.
+ *
+ * FIXTURE SETUP, not production API execution: this step is resolved by the
+ * explicitly-labeled `fixture-sql` seam (see `simulation/runner/apiLeg.ts`),
+ * because Gym V2's nested prescription/plan/body-weight graph has no single
+ * data-layer entry point a semantic leg could call. It is never counted as
+ * evidence that the app's own write path works (AUD-SH19-A).
+ */
 export function gymTrainingStep(routineName: string): SemanticStep {
   return apiStep(
-    'seedGymTrainingState',
+    'fixtureSeedGymTrainingState',
     { routineName },
     {
       kind: 'rows',

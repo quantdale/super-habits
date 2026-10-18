@@ -104,12 +104,23 @@ export interface OutboxRecord {
 }
 
 /**
+ * A partial outbox expectation: the named columns must equal the given values.
+ * Scenario models never know generated ids or revisions, so they pin the
+ * `(entity, operation)` set of the ids their own steps captured rather than an
+ * `id`/`updatedAt`/`revision` triple (AUD-SH18-A).
+ */
+export type OutboxExpectation = Partial<OutboxRecord>;
+
+/**
  * Assert the sync outbox contents (SQLite `sync_outbox` rows). Accepts either
- * the exact expected array (subset-agnostic deep equality) or a matcher.
+ * the exact expected array (subset-agnostic deep equality), a matcher, or an
+ * array of PARTIAL expectations — in which case each expectation must match at
+ * least one row and every row must be claimed by some expectation, so an
+ * unexpected extra record still fails.
  */
 export async function expectOutbox(
   page: Page,
-  expected: OutboxRecord[] | ((outbox: OutboxRecord[]) => void),
+  expected: OutboxRecord[] | OutboxExpectation[] | ((outbox: OutboxRecord[]) => void),
 ): Promise<void> {
   const rows = await queryRows(
     page,
@@ -123,9 +134,49 @@ export async function expectOutbox(
   const outbox = rows as unknown as OutboxRecord[];
   if (typeof expected === 'function') {
     expected(outbox);
-  } else {
-    expect(outbox, 'sync_outbox contents').toEqual(expected);
+    return;
   }
+  const isPartialSet =
+    expected.length > 0 && expected.some((entry) => !isFullOutboxRecord(entry as OutboxRecord));
+  if (isPartialSet) {
+    expectOutboxPartials(outbox, expected as OutboxExpectation[]);
+    return;
+  }
+  expect(outbox, 'sync_outbox contents').toEqual(expected);
+}
+
+function isFullOutboxRecord(entry: OutboxRecord): boolean {
+  return (
+    typeof entry?.entity === 'string' &&
+    typeof entry?.id === 'string' &&
+    typeof entry?.updatedAt === 'string' &&
+    typeof entry?.operation === 'string'
+  );
+}
+
+/** Each partial expectation matches >= 1 row and every row is claimed. */
+function expectOutboxPartials(outbox: OutboxRecord[], expected: OutboxExpectation[]): void {
+  const claimed = new Set<number>();
+  const unmatched: OutboxExpectation[] = [];
+  for (const want of expected) {
+    const index = outbox.findIndex(
+      (row, i) =>
+        !claimed.has(i) &&
+        Object.entries(want).every(([key, value]) => {
+          // No cast: read the flat `OutboxRecord` field by name through its own
+          // declared type, so the comparison stays type-checked.
+          const column = key as keyof OutboxRecord;
+          return Object.hasOwn(row, column) && row[column] === value;
+        }),
+    );
+    if (index === -1) unmatched.push(want);
+    else claimed.add(index);
+  }
+  const unexpected = outbox.filter((_, i) => !claimed.has(i));
+  expect(
+    { unmatched, unexpected, outbox },
+    'sync_outbox contents (each expectation must match one row; no unclaimed rows)',
+  ).toEqual({ unmatched: [], unexpected: [], outbox });
 }
 
 /**
