@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { appMetaKeys } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
-import { enqueueBackupSettingsRecord } from '@/core/sync/syncedMutation';
+import { runRecoverableSettingsMutation } from '@/core/sync/syncedMutation';
 import {
   CALORIES_TARGETS_STORAGE_KEY,
   loadMacroTargets,
@@ -15,7 +15,12 @@ vi.mock('@/core/db/client', () => ({
 }));
 
 vi.mock('@/core/sync/syncedMutation', () => ({
-  enqueueBackupSettingsRecord: vi.fn(),
+  // Real runner shape: executes the in-transaction mutate so the app_meta
+  // write assertions below keep exercising the data layer directly.
+  runRecoverableSettingsMutation: vi.fn(
+    async <T>(input: { db: unknown; mutate: (db: unknown) => Promise<T> | T }) =>
+      input.mutate(input.db),
+  ),
 }));
 
 vi.mock('@react-native-async-storage/async-storage', () => ({
@@ -52,7 +57,7 @@ describe('caloriesTargets (app_meta calorie_targets store)', () => {
       appMetaKeys.calorieTargets.key,
       JSON.stringify(TARGETS),
     ]);
-    expect(enqueueBackupSettingsRecord).toHaveBeenCalledWith(db);
+    expect(runRecoverableSettingsMutation).toHaveBeenCalledWith(expect.objectContaining({ db }));
 
     db.getFirstAsync.mockResolvedValueOnce({ value: JSON.stringify(TARGETS) });
     await expect(loadMacroTargets()).resolves.toEqual(TARGETS);
@@ -146,7 +151,7 @@ describe('caloriesTargets (app_meta calorie_targets store)', () => {
       await expect(saveMacroTargets({} as never)).rejects.toThrow('Invalid macro targets payload.');
 
       expect(db.runAsync).not.toHaveBeenCalled();
-      expect(enqueueBackupSettingsRecord).not.toHaveBeenCalled();
+      expect(runRecoverableSettingsMutation).not.toHaveBeenCalled();
     });
   });
 });

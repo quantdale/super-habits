@@ -28,6 +28,7 @@ import { ValidationError } from '@/core/ui/ValidationError';
 import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { SettingsRow, SettingsSectionHeading, SettingsStatusPill } from './SettingsSharedUi';
+import { enqueueBackupSettingsRecord } from '@/core/sync/syncedMutation';
 import { readableAccent, tintOver } from '@/core/theme/contrast';
 
 const ACCENT = SECTION_COLORS[POMODORO_SECTION_KEY];
@@ -55,6 +56,15 @@ export function SettingsNotificationsSection() {
   // another tinted card; resolve a readable variant once (target 7:1 so nested
   // tints cannot defeat it) and use it for every accent label below.
   const accentText = readableAccent(ACCENT, tintOver(tokens.surfaceElevated, ACCENT, 0.18), 7);
+
+  // Reminder prefs live in AsyncStorage (device-local), but the allowlisted
+  // backup snapshot overlays the live copies — re-capture after every save so
+  // a restore carries the user's choice. Failures log, never block the save.
+  const enqueueReminderPrefBackup = useCallback(() => {
+    void enqueueBackupSettingsRecord().catch((error: unknown) =>
+      console.warn('[backup] settings enqueue after reminder pref change failed', error),
+    );
+  }, []);
   const [todoRemindersEnabled, setTodoRemindersEnabledState] = useState(false);
   const [dailyPlanTimeInput, setDailyPlanTimeInput] = useState('08:00');
   const [weeklyEnabled, setWeeklyEnabledState] = useState(false);
@@ -137,6 +147,7 @@ export function SettingsNotificationsSection() {
       }
       await setTodoRemindersEnabled(enabled);
       setTodoRemindersEnabledState(enabled);
+      enqueueReminderPrefBackup();
       // Reconcile the whole todo-reminder namespace so toggle-off cancels
       // live reminders and toggle-on schedules existing due todos (audit F3).
       const reconcile = await reconcileTodoReminders();
@@ -181,6 +192,7 @@ export function SettingsNotificationsSection() {
     setSavedNote(null);
     try {
       await setDailyPlanReminderTime({ hour, minute });
+      enqueueReminderPrefBackup();
       const result = await syncDailyPlanReminder();
       setDailyPlanTimeInput(normalized);
       // Report what actually happened instead of an unconditional success
@@ -222,6 +234,7 @@ export function SettingsNotificationsSection() {
       const [hour, minute] = parts ? (parts.split(':').map(Number) as [number, number]) : [18, 0];
       await setWeeklyReviewReminder({ enabled, weekday: weeklyWeekday, hour, minute });
       setWeeklyEnabledState(enabled);
+      enqueueReminderPrefBackup();
       const result = await syncWeeklyReviewReminder();
       const when = `${WEEKDAY_LABELS[weeklyWeekday]} ${parts ?? weeklyTimeInput}`;
       if (result.status === 'scheduled') {
@@ -260,6 +273,7 @@ export function SettingsNotificationsSection() {
       });
       setWeeklyEnabledState(true);
       setWeeklyTimeInput(normalized);
+      enqueueReminderPrefBackup();
       const result = await syncWeeklyReviewReminder();
       const when = `${WEEKDAY_LABELS[weeklyWeekday]} ${normalized}`;
       if (result.status === 'scheduled') {

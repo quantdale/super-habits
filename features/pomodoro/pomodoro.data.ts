@@ -10,7 +10,11 @@ import { PomodoroSession } from '@/core/db/types';
 import type { LinkedActionEffectAdapterResult } from '@/core/linked-actions/linkedActions.types';
 import { createId } from '@/lib/id';
 import { getUtcIsoRangeForLocalDateKeys, nowIso } from '@/lib/time';
-import { runBackupMutation, enqueueBackupSettingsRecord } from '@/core/sync/syncedMutation';
+import {
+  runBackupMutation,
+  runRecoverableSettingsMutation,
+  enqueueBackupSettingsRecord,
+} from '@/core/sync/syncedMutation';
 
 import {
   BUILT_IN_PRESETS,
@@ -163,8 +167,15 @@ export async function getPomodoroSettings(): Promise<PomodoroSettings> {
 
 export async function savePomodoroSettings(settings: PomodoroSettings): Promise<void> {
   const db = await getDatabase();
-  await setAppMetaJson(db, appMetaKeys.pomodoroSettings, normalizePomodoroSettings(settings));
-  await enqueueBackupSettingsRecord(db);
+  await runRecoverableSettingsMutation({
+    db,
+    mutate: (transactionDb) =>
+      setAppMetaJson(
+        transactionDb,
+        appMetaKeys.pomodoroSettings,
+        normalizePomodoroSettings(settings),
+      ),
+  });
 }
 
 /**
@@ -678,12 +689,17 @@ export async function getPomodoroPresetsState(): Promise<PomodoroPresetsState> {
 
 /**
  * Persist preset state and snapshot it into the recoverable-settings backup
- * queue (best-effort — a backup enqueue failure never blocks a local save).
+ * queue (best-effort — a backup enqueue failure never blocks a local save,
+ * and failures are logged instead of vanishing).
  */
 export async function writePomodoroPresetsState(state: PomodoroPresetsState): Promise<void> {
   const db = await getDatabase();
   await setAppMetaJson(db, appMetaKeys.pomodoroPresets, state);
-  await enqueueBackupSettingsRecord(db).catch(() => undefined);
+  try {
+    await enqueueBackupSettingsRecord(db);
+  } catch (error) {
+    console.warn('[backup] settings enqueue after preset change failed', error);
+  }
 }
 
 // ---------------------------------------------------------------------------

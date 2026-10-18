@@ -9,7 +9,7 @@ import { assertCalorieEntryWrite } from '@/lib/validation';
 import {
   runBackupMutation,
   runSyncedMutation,
-  enqueueBackupSettingsRecord,
+  runRecoverableSettingsMutation,
 } from '@/core/sync/syncedMutation';
 
 import {
@@ -93,8 +93,11 @@ export async function getCalorieGoal(): Promise<CalorieGoal> {
 
 export async function setCalorieGoal(goal: CalorieGoal): Promise<void> {
   const db = await getDatabase();
-  await setAppMetaJson(db, appMetaKeys.calorieGoal, normalizeCalorieGoal(goal));
-  await enqueueBackupSettingsRecord(db);
+  await runRecoverableSettingsMutation({
+    db,
+    mutate: (transactionDb) =>
+      setAppMetaJson(transactionDb, appMetaKeys.calorieGoal, normalizeCalorieGoal(goal)),
+  });
 }
 
 export async function listCalorieEntries(dateKey = toDateKey()): Promise<CalorieEntry[]> {
@@ -809,6 +812,9 @@ export async function saveMacroTargetsData(targets: MacroTargets): Promise<void>
     throw new Error('Invalid macro targets payload.');
   }
   const db = await getDatabase();
-  await setAppMetaJson(db, appMetaKeys.calorieTargets, normalized);
-  await enqueueBackupSettingsRecord(db);
+  await runRecoverableSettingsMutation({
+    db,
+    mutate: (transactionDb) =>
+      setAppMetaJson(transactionDb, appMetaKeys.calorieTargets, normalized),
+  });
 }
