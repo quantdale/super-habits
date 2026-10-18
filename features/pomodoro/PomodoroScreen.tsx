@@ -655,6 +655,11 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
               completionDoneRef.current = false;
               setIsRunning(false);
               setIsPaused(false);
+              // `AUD-SH11-A`: the ACTIVE claim is part of the lifecycle authority,
+              // not only its rendered mirror. Leaving it set made a rejected
+              // startup refuse every later Start with a conflict, so one failed
+              // scheduling attempt permanently wedged the Focus surface.
+              sessionActiveRef.current = false;
               setStartedAt(null);
               startedAtRef.current = null;
               const idle = getModeDuration(currentModeRef.current, settingsRef.current);
