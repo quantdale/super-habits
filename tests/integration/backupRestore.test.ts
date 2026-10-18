@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
+import { chainableQuery } from './helpers/supabaseQueryDouble';
 
 /**
  * Backup Completeness V2 — full Restore V2 against real SQLite.
@@ -116,16 +117,20 @@ function buildRecordingSupabase() {
       // Push verification read-back (harden-silent-failure-certification 3.1):
       // a read that is issued inside the import transaction must still throw
       // above, which is exactly what the guarded-restore test asserts.
+      // AUD-SH08-A: the push-verification read-back is now
+      // select().in().eq().order().range(), so this fake must model the whole
+      // chain (and slice like a capped server) rather than stopping at .eq().
       select: vi.fn((_columns: string) => ({
         in: vi.fn((_column: string, ids: string[]) => ({
-          eq: vi.fn(async (_eqColumn: string, value: string) => ({
-            data: ids
-              .map((id) => stored.get(entity)?.get(id))
-              .filter((row): row is Record<string, unknown> => row !== undefined)
-              .filter((row) => row.user_id === value || row.user_id === undefined)
-              .map((row) => ({ id: row.id })),
-            error: null,
-          })),
+          eq: vi.fn((_eqColumn: string, value: string) =>
+            chainableQuery(
+              ids
+                .map((id) => stored.get(entity)?.get(id))
+                .filter((row): row is Record<string, unknown> => row !== undefined)
+                .filter((row) => row.user_id === value || row.user_id === undefined)
+                .map((row) => ({ id: row.id })),
+            ),
+          ),
         })),
       })),
       delete: vi.fn(() => ({

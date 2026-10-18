@@ -207,7 +207,7 @@ describe('summarizeCompletedSets', () => {
 
   it('counts naturally-timed-out active phases per exercise', () => {
     const summary = summarizeCompletedSets(seq, 0);
-    expect(summary).toEqual([{ exerciseName: 'Rows', setsCompleted: 1 }]);
+    expect(summary).toEqual([{ exerciseIndex: 0, exerciseName: 'Rows', setsCompleted: 1 }]);
   });
 
   it('does not count an active phase skipped via Skip (F1 fixed semantics)', () => {
@@ -218,17 +218,17 @@ describe('summarizeCompletedSets', () => {
 
   it('counts partial progress: skipped first set, timed-out second set', () => {
     const summary = summarizeCompletedSets(seq, 2, { 0: 'skipped', 2: 'completed' });
-    expect(summary).toEqual([{ exerciseName: 'Rows', setsCompleted: 1 }]);
+    expect(summary).toEqual([{ exerciseIndex: 0, exerciseName: 'Rows', setsCompleted: 1 }]);
   });
 
   it('counts a skipped final phase as not completed (skip completes without advancing)', () => {
     const summary = summarizeCompletedSets(seq, 2, { 0: 'completed', 2: 'skipped' });
-    expect(summary).toEqual([{ exerciseName: 'Rows', setsCompleted: 1 }]);
+    expect(summary).toEqual([{ exerciseIndex: 0, exerciseName: 'Rows', setsCompleted: 1 }]);
   });
 
   it('treats missing dispositions as completed for legacy callers', () => {
     const summary = summarizeCompletedSets(seq, 2);
-    expect(summary).toEqual([{ exerciseName: 'Rows', setsCompleted: 2 }]);
+    expect(summary).toEqual([{ exerciseIndex: 0, exerciseName: 'Rows', setsCompleted: 2 }]);
   });
 });
 
@@ -252,8 +252,22 @@ describe('collectSessionSetRecords', () => {
       { 0: { weight: '80', reps: '8' }, 2: { weight: '82.5', reps: '6' } },
     );
     expect(records).toEqual([
-      { exerciseName: 'Bench', setNumber: 1, weight: 80, reps: 8, completed: true },
-      { exerciseName: 'Bench', setNumber: 2, weight: 82.5, reps: 6, completed: false },
+      {
+        exerciseIndex: 0,
+        exerciseName: 'Bench',
+        setNumber: 1,
+        weight: 80,
+        reps: 8,
+        completed: true,
+      },
+      {
+        exerciseIndex: 0,
+        exerciseName: 'Bench',
+        setNumber: 2,
+        weight: 82.5,
+        reps: 6,
+        completed: false,
+      },
     ]);
   });
 
@@ -265,6 +279,7 @@ describe('collectSessionSetRecords', () => {
       { 0: { weight: '', reps: 'abc' } },
     );
     expect(records[0]).toEqual({
+      exerciseIndex: 0,
       exerciseName: 'Bench',
       setNumber: 1,
       weight: null,
@@ -310,7 +325,7 @@ describe('groupSessionExercises', () => {
     const last = seq.length - 1;
     const records = collectSessionSetRecords(seq, last, dispositions, {}, 'off');
     const summary = summarizeCompletedSets(seq, last, dispositions);
-    expect(summary).toEqual([{ exerciseName: 'Row', setsCompleted: 2 }]);
+    expect(summary).toEqual([{ exerciseIndex: 1, exerciseName: 'Row', setsCompleted: 2 }]);
     const grouped = groupSessionExercises(summary, records);
     expect(grouped.map((g) => [g.exerciseName, g.setsCompleted])).toEqual([
       ['Bench', 0],

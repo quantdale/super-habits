@@ -762,6 +762,12 @@ export type EnteredSetValues = {
 
 /** One recorded active phase, ready to persist as a workout_session_sets row. */
 export type SessionSetRecord = {
+  /**
+   * Stable routine-exercise INSTANCE position (`AUD-SH09-A`). Grouping, payload
+   * assembly and history keep same-named exercises apart by this value, while
+   * `exerciseName` remains the immutable display/legacy snapshot.
+   */
+  exerciseIndex: number;
   exerciseName: string;
   setNumber: number;
   catalogExerciseId?: string | null;
@@ -788,19 +794,40 @@ export function summarizeCompletedSets(
   sequence: TimerPhase[],
   completedUpToIndex: number,
   dispositions?: Readonly<Record<number, PhaseDisposition>>,
-): { exerciseName: string; setsCompleted: number }[] {
-  const map = new Map<string, number>();
+): CompletedExerciseSummary[] {
+  // `AUD-SH09-A`: identity is the routine-exercise INSTANCE (`exerciseIndex`),
+  // never the display name. Two custom exercises may share a name while being
+  // different catalog identities (weighted vs timed), and one routine may
+  // contain the same catalog exercise twice; a name-keyed map merged all of
+  // them into one summary row with colliding set numbers.
+  const map = new Map<number, { exerciseName: string; setsCompleted: number }>();
   for (let i = 0; i <= completedUpToIndex; i++) {
     const phase = sequence[i];
     if (!phase || phase.phase !== 'active') continue;
     if (dispositions?.[i] === 'skipped') continue;
-    map.set(phase.exerciseName, (map.get(phase.exerciseName) ?? 0) + 1);
+    const existing = map.get(phase.exerciseIndex);
+    if (existing) existing.setsCompleted += 1;
+    else map.set(phase.exerciseIndex, { exerciseName: phase.exerciseName, setsCompleted: 1 });
   }
-  return Array.from(map.entries()).map(([exerciseName, setsCompleted]) => ({
-    exerciseName,
-    setsCompleted,
-  }));
+  // Order follows the sequence's first appearance so history stays readable.
+  return [...map.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([exerciseIndex, entry]) => ({ exerciseIndex, ...entry }));
 }
+
+/**
+ * One completed exercise instance in a finished session (`AUD-SH09-A`).
+ *
+ * `exerciseIndex` is the stable ROUTINE-EXERCISE INSTANCE position. It is what
+ * keeps two same-named exercises, and two occurrences of one catalog exercise,
+ * distinct through grouping, persistence and history. `exerciseName` stays as
+ * the immutable display snapshot for legacy free-text exercises.
+ */
+export type CompletedExerciseSummary = {
+  exerciseIndex: number;
+  exerciseName: string;
+  setsCompleted: number;
+};
 
 /** Parse optional free-text numeric entry; empty/invalid/negative → null. */
 export function parseOptionalMeasurement(raw: string | undefined): number | null {
@@ -831,6 +858,7 @@ export function collectSessionSetRecords(
     const entered = enteredValues[i];
     const isExplicitTimed = phase.modality === 'timed' || phase.modality === 'cardio';
     const record: SessionSetRecord = {
+      exerciseIndex: phase.exerciseIndex,
       exerciseName: phase.exerciseName,
       setNumber: phase.setNumber,
       ...(phase.catalogExerciseId !== undefined
@@ -868,6 +896,8 @@ export function collectSessionSetRecords(
 
 /** One exercise's persisted payload: truthful completed count plus its per-set rows. */
 export type SessionExerciseGroup = {
+  /** Instance position that identifies this group (`AUD-SH09-A`). */
+  exerciseIndex: number;
   exerciseName: string;
   setsCompleted: number;
   sets: SessionSetRecord[];
@@ -882,38 +912,50 @@ export type SessionExerciseGroup = {
  * holding. Order follows first appearance in `records` (sequence order).
  */
 export function groupSessionExercises(
-  summary: readonly { exerciseName: string; setsCompleted: number }[],
+  summary: readonly CompletedExerciseSummary[],
   records: readonly SessionSetRecord[],
 ): SessionExerciseGroup[] {
-  const completedByName = new Map<string, number>();
+  // `AUD-SH09-A`: group by the instance position. A name-keyed map merged two
+  // custom exercises that happen to share a name (different catalog identities
+  // and modalities) into one group with two `setNumber = 1` rows, and the same
+  // happened for two occurrences of one catalog exercise in a routine.
+  const completedByInstance = new Map<number, number>();
   for (const entry of summary) {
-    if (!completedByName.has(entry.exerciseName)) {
-      completedByName.set(entry.exerciseName, entry.setsCompleted);
-    }
+    completedByInstance.set(entry.exerciseIndex, entry.setsCompleted);
   }
-  const groups = new Map<string, SessionExerciseGroup>();
+  const groups = new Map<number, SessionExerciseGroup>();
   for (const record of records) {
-    const existing = groups.get(record.exerciseName);
+    const existing = groups.get(record.exerciseIndex);
     if (existing) {
       existing.sets.push(record);
     } else {
-      groups.set(record.exerciseName, {
+      groups.set(record.exerciseIndex, {
+        exerciseIndex: record.exerciseIndex,
         exerciseName: record.exerciseName,
-        setsCompleted: completedByName.get(record.exerciseName) ?? 0,
+        setsCompleted: completedByInstance.get(record.exerciseIndex) ?? 0,
         sets: [record],
       });
     }
   }
+  // A fully-skipped exercise has no summary entry but must still persist, so
+  // any summary instance without records is added with its own name snapshot.
+  const nameByInstance = new Map<number, string>();
   for (const entry of summary) {
-    if (!groups.has(entry.exerciseName)) {
-      groups.set(entry.exerciseName, {
+    if (!nameByInstance.has(entry.exerciseIndex)) {
+      nameByInstance.set(entry.exerciseIndex, entry.exerciseName);
+    }
+  }
+  for (const entry of summary) {
+    if (!groups.has(entry.exerciseIndex)) {
+      groups.set(entry.exerciseIndex, {
+        exerciseIndex: entry.exerciseIndex,
         exerciseName: entry.exerciseName,
         setsCompleted: entry.setsCompleted,
         sets: [],
       });
     }
   }
-  return [...groups.values()];
+  return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([, group]) => group);
 }
 
 // --- Previous-session set lookup (per-set entry defaults) ---

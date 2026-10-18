@@ -896,7 +896,11 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         routineId: routine.id,
         notes: notes.trim() ? notes.trim() : undefined,
         exercises: grouped.map((g) => {
-          const exercise = routine.exercises.find((item) => item.name === g.exerciseName);
+          // AUD-SH09-A: resolve metadata from THIS instance position. Selecting
+          // by display name picked the FIRST routine exercise with that name, so
+          // two same-named exercises (or two occurrences of one catalog exercise)
+          // persisted the wrong catalog identity and modality.
+          const exercise = routine.exercises[g.exerciseIndex];
           const isLegacyFreeText = !exercise?.catalog_exercise_id;
           return {
             exerciseName: g.exerciseName,
