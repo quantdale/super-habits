@@ -15,6 +15,14 @@ import {
   type BackupManifest,
 } from '@/core/backup/backup.types';
 import { canonicalizeSettingsPayload } from '@/core/backup/backupSettings';
+import {
+  chunk,
+  compareVerifiedIds,
+  describeMissingIds,
+  evaluateVerificationPage,
+  verifyPageRows,
+  writeBatchRows,
+} from '@/core/sync/syncBatching';
 
 /**
  * Best-effort PostgREST/transport code from an adapter error (`AUD-SH03-B`).
@@ -65,6 +73,85 @@ function isSyncableEntity(entity: string): entity is SyncableEntity {
 }
 
 export class SupabaseSyncAdapter implements SyncAdapter {
+  /**
+   * @param options.serverRowCap the backend's advertised row cap (`max_rows`).
+   *   Batches and verification pages stay strictly inside it; leaving it unset
+   *   uses the documented defaults, which are already below the 1,000-row
+   *   PostgREST default (`AUD-SH08-A`).
+   */
+  constructor(private readonly options: { serverRowCap?: number } = {}) {}
+
+  /** The declared server row cap, if any. */
+  private get serverRowCap(): number | undefined {
+    return this.options.serverRowCap;
+  }
+
+  /**
+   * Read back the ids a push claims to have stored, in bounded pages.
+   *
+   * Returns every id the remote reported for this owner, or throws when a page
+   * violates its own bound (which would make the result untrustworthy).
+   *
+   * @param client the Supabase client
+   * @param entity the entity being verified
+   * @param ids the ids the push wrote
+   * @param currentUserId the pushing owner
+   */
+  private async verifyEntityRows(
+    client: NonNullable<typeof supabase>,
+    entity: (typeof BACKUP_ENTITIES)[number],
+    ids: string[],
+    currentUserId: string,
+  ): Promise<Set<string>> {
+    const pageSize = verifyPageRows(this.serverRowCap);
+    // AUD-SH08-B: a verification page must never REQUEST more rows than the
+    // server can return. If it did, a short response would be indistinguishable
+    // from genuine absence — which is exactly how the audited 1,001-row push
+    // was misreported as 1,001 unstored rows. Fail before reading rather than
+    // certifying an unknowable result.
+    if (this.serverRowCap !== undefined && pageSize > this.serverRowCap) {
+      throw new Error(
+        `Supabase read-back page size ${pageSize} exceeds the declared ${this.serverRowCap}-row server cap; refusing to verify against a response the server must truncate.`,
+      );
+    }
+    const confirmed = new Set<string>();
+    for (const page of chunk(ids, pageSize)) {
+      const readBack = await client
+        .from(entity)
+        .select('id')
+        .in('id', page)
+        .eq('user_id', currentUserId)
+        // Deterministic ordering is what makes `range` pagination stable.
+        .order('id', { ascending: true })
+        .range(0, pageSize - 1);
+      if (readBack.error) {
+        throw new Error(
+          `Supabase read-back failed for ${entity} (${page.length} row(s) in a ${pageSize}-row page): ${readBack.error.message}`,
+        );
+      }
+      const pageIds = (readBack.data ?? [])
+        .map((row) => (row as { id?: unknown } | null)?.id)
+        .filter((id): id is string => typeof id === 'string');
+      const pageOutcome = evaluateVerificationPage({
+        expectedRows: page.length,
+        receivedIds: pageIds,
+        pageSize,
+      });
+      if (!pageOutcome.ok) {
+        const detail =
+          pageOutcome.reason === 'truncated'
+            ? pageOutcome.detail
+            : `${pageOutcome.missing.length} expected id(s) absent from the page`;
+        throw new Error(
+          `Supabase read-back for ${entity} was unreliable (${detail}). ` +
+            'Lower the verification page size or raise the backend row cap.',
+        );
+      }
+      for (const id of pageIds) confirmed.add(id);
+    }
+    return confirmed;
+  }
+
   async push(records: SyncRecord[]): Promise<void> {
     if (records.length === 0) return;
     if (!supabase) {
@@ -238,43 +325,49 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       return { ...projected, user_id: currentUserId };
     });
 
-    const { error } = await client.from(entity).upsert(payloadRows, {
-      onConflict: 'id',
-    });
-
-    if (error) {
-      throw new Error(`Supabase upsert failed for ${entity}: ${error.message}`);
+    // AUD-SH08-A: bounded write batches. One unbounded statement per entity
+    // approached both the row cap and the request-body budget; splitting keeps
+    // every statement comfortably inside both, and a failure now names only the
+    // batch that failed.
+    const writeBatches = chunk(payloadRows, writeBatchRows(this.serverRowCap));
+    for (const [batchIndex, batch] of writeBatches.entries()) {
+      const { error } = await client.from(entity).upsert(batch, {
+        onConflict: 'id',
+      });
+      if (error) {
+        throw new Error(
+          `Supabase upsert failed for ${entity} (batch ${batchIndex + 1}/${writeBatches.length}, ${batch.length} row(s)): ${error.message}`,
+        );
+      }
     }
 
     // VERIFY THE WRITE BEFORE CALLING IT A PUSH (task 3.1).
     //
-    // `upsert(..., { onConflict: 'id' })` can succeed with HTTP 200 while
-    // affecting ZERO rows: if a row with the same `id` already exists and
-    // belongs to a DIFFERENT owner, the owner's RLS policy makes the statement
-    // a no-op instead of an error. The push then looked successful, the record
-    // was dropped from the outbox, and the manifest went on to certify counts
-    // and checksums for a row the remote never stored. A single read-back of the
-    // ids just written, scoped to the pushing owner, turns that silent skip into
-    // a visible, classifiable push failure.
-    const readBack = await client
-      .from(entity)
-      .select('id')
-      .in('id', ids)
-      .eq('user_id', currentUserId);
-    if (readBack.error) {
+    // `upsert(..., onConflict: 'id')` can succeed with HTTP 200 while affecting
+    // ZERO rows: if a row with the same `id` already exists and belongs to a
+    // DIFFERENT owner, the owner's RLS policy makes the statement a no-op
+    // instead of an error. The push then looked successful, the record was
+    // dropped from the outbox, and the manifest certified counts and checksums
+    // for a row the remote never stored.
+    //
+    // AUD-SH08-A: the read-back is PAGINATED and bounded. A single unpaged
+    // `.in(ids)` was silently truncated by the server's `max_rows` cap (1,000 in
+    // supabase/config.toml), so 1,001 correctly-stored rows verified as 1,000
+    // and the adapter failed the whole entity. Each page now asks for a bounded
+    // `range`, pages are compared against the complete expected id set, and a
+    // page that violates its own bound is reported as truncation rather than
+    // being mistaken for missing data.
+    const confirmedIds = await this.verifyEntityRows(client, entity, ids, currentUserId);
+    const outcome = compareVerifiedIds(ids, confirmedIds, { serverCap: this.serverRowCap });
+    if (!outcome.ok) {
+      if (outcome.reason === 'truncated') {
+        throw new Error(
+          `Supabase push verification for ${entity} was truncated: ${outcome.detail}. ` +
+            'Refusing to certify a read-back the server capped, because it cannot distinguish "not stored" from "not returned".',
+        );
+      }
       throw new Error(
-        `Supabase read-back failed for ${entity} (${ids.length} rows): ${readBack.error.message}`,
-      );
-    }
-    const confirmed = new Set(
-      (readBack.data ?? [])
-        .map((row) => (row as { id?: unknown } | null)?.id)
-        .filter((id): id is string => typeof id === 'string'),
-    );
-    if (confirmed.size !== ids.length) {
-      const missing = ids.filter((id) => !confirmed.has(id));
-      throw new Error(
-        `Supabase push verification failed for ${entity}: ${missing.length} of ${ids.length} row(s) were not stored for this owner (${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ', …' : ''}). ` +
+        `Supabase push verification failed for ${entity}: ${outcome.missing.length} of ${ids.length} row(s) were not stored for this owner (${describeMissingIds(outcome.missing)}). ` +
           `The remote accepted the statement without storing them (a row with the same id owned by another account makes the upsert a no-op), so this push is reported as a failure rather than a success.`,
       );
     }

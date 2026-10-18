@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
+import { chainableQuery } from './helpers/supabaseQueryDouble';
 
 /**
  * Backup Completeness V2 — checkpoint publication against real SQLite with a
@@ -46,14 +47,14 @@ function buildSupabaseMock(
     // and treats a missing row as a push failure.
     select: vi.fn((_columns: string) => ({
       in: vi.fn((_column: string, ids: string[]) => ({
-        eq: vi.fn(async (_eqColumn: string, value: string) => {
+        eq: vi.fn((_eqColumn: string, value: string) => {
           const table = stored.get(entity);
           const data = ids
             .map((id) => table?.get(id))
             .filter((row): row is Record<string, unknown> => row !== undefined)
             .filter((row) => row.user_id === value || row.user_id === undefined)
             .map((row) => ({ id: row.id }));
-          return { data, error: null };
+          return chainableQuery(data);
         }),
       })),
     })),

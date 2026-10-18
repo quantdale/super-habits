@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
+import { chainableQuery } from './helpers/supabaseQueryDouble';
 
 /**
  * Backup V2 closure — saved-meal uniqueness contract at the client/sync
@@ -37,14 +38,15 @@ function buildRecordingSupabase() {
     // Push verification read-back (harden-silent-failure-certification 3.1).
     select: vi.fn((_columns: string) => ({
       in: vi.fn((_column: string, ids: string[]) => ({
-        eq: vi.fn(async (_eqColumn: string, value: string) => ({
-          data: ids
-            .map((id) => stored.get(entity)?.get(id))
-            .filter((row): row is Record<string, unknown> => row !== undefined)
-            .filter((row) => row.user_id === value || row.user_id === undefined)
-            .map((row) => ({ id: row.id })),
-          error: null,
-        })),
+        eq: vi.fn((_eqColumn: string, value: string) =>
+          chainableQuery(
+            ids
+              .map((id) => stored.get(entity)?.get(id))
+              .filter((row): row is Record<string, unknown> => row !== undefined)
+              .filter((row) => row.user_id === value || row.user_id === undefined)
+              .map((row) => ({ id: row.id })),
+          ),
+        ),
       })),
     })),
     delete: vi.fn(() => ({

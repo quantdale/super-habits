@@ -289,14 +289,28 @@ describe('backup completeness v2 backfill', () => {
 
     const outbox = await readOutbox(db);
     const ids = outbox.filter((r) => r.entity === 'saved_meals').map((r) => r.id);
+    // AUD-SH07-A: `smeal_p05` was read by page 1 and then hard-deleted before
+    // the enqueue transaction opened. The backfill re-reads state inside that
+    // transaction, so the deleted row must NOT receive an intent — a stale
+    // `create` for an absent row is the audited defect (the remote keeps a row
+    // the device no longer has, and the missing-local classification stalls
+    // completeness). This is a requirement change, not a relaxed assertion: the
+    // page-skip protection below is unchanged and still asserted.
     const expected = [
       'smeal_1',
       ...Array.from({ length: 24 }, (_, i) => `smeal_p${String(i + 1).padStart(2, '0')}`),
-    ].sort();
-    // All25 originally-read rows enqueued (page 1 was read pre-delete) and —
-    // the regression itself — page 2 still starts at p10, which OFFSET paging
-    // skipped after the shift.
+    ]
+      .filter((id) => id !== 'smeal_p05')
+      .sort();
     expect([...ids].sort()).toEqual(expected);
+    expect(ids).not.toContain('smeal_p05');
+    // The OFFSET-paging regression itself: page 2 still starts at p10.
     expect(ids).toContain('smeal_p10');
+    // And no surviving row was skipped.
+    for (let i = 1; i <= 24; i += 1) {
+      const id = `smeal_p${String(i).padStart(2, '0')}`;
+      if (id === 'smeal_p05') continue;
+      expect(ids, id).toContain(id);
+    }
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { freshDatabase } from './helpers/db';
+import { chainableQuery } from './helpers/supabaseQueryDouble';
 
 /**
  * Push verification (`harden-silent-failure-certification` 3.1-3.4).
@@ -37,10 +38,10 @@ vi.mock('@/lib/supabase', () => ({
       }),
       select: vi.fn((_columns: string) => ({
         in: vi.fn((_column: string, ids: string[]) => ({
-          eq: vi.fn(async (_eqColumn: string, value: string) => {
+          eq: vi.fn((_eqColumn: string, value: string) => {
             readBacks.push({ entity, ids, userId: value });
             const data = ids.filter((id) => storeable(entity, id, value)).map((id) => ({ id }));
-            return { data, error: null };
+            return chainableQuery(data);
           }),
         })),
       })),

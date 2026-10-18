@@ -70,6 +70,48 @@ async function markEntityDone(
   await setAppMetaJson(db, appMetaKeys.backupBackfillDoneEntities, [...done]);
 }
 
+/**
+ * True when the outbox already holds a durable intent for (entity, id) whose
+ * revision is newer than the row state the backfill is about to enqueue.
+ *
+ * `AUD-SH07-A`: the audited race had the backfill read a row, a concurrent
+ * delete commit its intent, and the stale snapshot then enqueue a NEWER
+ * `create` that overwrote the delete. Two guards are needed, and this is the
+ * second: the outbox upsert already refuses a lower revision, so a backfill
+ * intent must not claim a revision above the row state it is derived from.
+ *
+ * The comparison is by OPERATION and updated_at rather than by revision alone,
+ * because the outbox revision is a monotonic queue counter, not a version of
+ * the row. A delete intent for a row that no longer exists (or a delete intent
+ * at all, for a soft-delete entity) is never superseded by a backfill
+ * re-derivation of the same row.
+ *
+ * @param db the enqueue transaction
+ * @param entity the backup entity
+ * @param id the row id
+ * @param current the row state read inside the transaction
+ */
+async function hasNewerDurableIntent(
+  db: SQLite.SQLiteDatabase,
+  entity: BackupEntity,
+  id: string,
+  current: { updated_at: string | null; created_at?: string; deleted_at: string | null },
+): Promise<boolean> {
+  const existing = await db.getFirstAsync<{ operation: string; updated_at: string }>(
+    `SELECT operation, updated_at FROM sync_outbox WHERE entity = ? AND id = ?`,
+    [entity, id],
+  );
+  if (!existing) return false;
+  // A committed delete intent is authoritative: a surviving row cannot be
+  // evidence that the deletion did not happen (it may be a re-create the
+  // product has not enqueued yet, which its own write path will do).
+  if (existing.operation === 'delete') return true;
+  const rowUpdatedAt = current.updated_at ?? current.created_at ?? '';
+  // A newer row timestamp already has, or will have, its own intent from the
+  // write path. Racing it with a backfill re-derivation would rewrite history.
+  return rowUpdatedAt !== '' && existing.updated_at > rowUpdatedAt;
+}
+
 async function enqueueRowsForEntity(
   db: SQLite.SQLiteDatabase,
   entity: BackupEntity,
@@ -108,25 +150,55 @@ async function enqueueRowsForEntity(
     if (rows.length === 0) break;
 
     const hardDelete = BACKUP_HARD_DELETE_ENTITIES.has(entity);
-    const records: SyncRecord[] = rows.map((row) => ({
-      entity,
-      id: row.id,
-      updatedAt: row.updated_at ?? row.created_at ?? '',
-      ownerUserId,
-      // Tombstoned soft-delete rows are authoritative backup rows: they keep
-      // the remote tombstone fresh. Hard-delete tables only ever contain
-      // live rows here (deleted rows are gone).
-      operation:
-        hasSoftDelete && row.deleted_at !== null ? 'delete' : hardDelete ? 'create' : 'update',
-    }));
 
     const preparedList: ReturnType<typeof syncEngine.prepare>[] = [];
     await withSQLiteTransaction(db, async (transactionDb) => {
-      for (const record of records) {
+      for (const row of rows) {
+        // AUD-SH07-A/B: the row snapshot above was read BEFORE this transaction
+        // opened, so it can be stale. Re-read the row's current state INSIDE the
+        // serialized enqueue transaction and skip anything that no longer
+        // exists. Without this the audited race replaced a committed hard-delete
+        // intent with a stale `create`: the local row was gone, the durable
+        // intent said "create", the remote never deleted it, and the missing-row
+        // classification stalled completeness.
+        const current = await transactionDb.getFirstAsync<{
+          updated_at: string | null;
+          created_at?: string;
+          deleted_at: string | null;
+        }>(`SELECT ${selectColumns} FROM ${entity} WHERE id = ?`, [row.id]);
+        if (!current) {
+          // The row was hard-deleted (or never existed) after the snapshot. It
+          // must not receive an intent; a truthful delete intent is produced by
+          // the delete path itself, in its own transaction.
+          continue;
+        }
+
+        // A newer durable intent for this (entity, id) is authoritative. The
+        // outbox upsert already refuses a lower revision, but skipping here
+        // keeps the in-memory queue from re-adding a superseded record.
+        const newer = await hasNewerDurableIntent(transactionDb, entity, row.id, current);
+        if (newer) continue;
+
+        const record: SyncRecord = {
+          entity,
+          id: row.id,
+          updatedAt: current.updated_at ?? current.created_at ?? '',
+          ownerUserId,
+          // Tombstoned soft-delete rows are authoritative backup rows: they keep
+          // the remote tombstone fresh. Hard-delete tables only ever contain
+          // live rows here (deleted rows are gone).
+          operation:
+            hasSoftDelete && current.deleted_at !== null
+              ? 'delete'
+              : hardDelete
+                ? 'create'
+                : 'update',
+        };
         const prepared = syncEngine.prepare(record);
         preparedList.push(prepared);
         await upsertSyncOutboxRecord(transactionDb, prepared, prepared.revision);
       }
+      if (preparedList.length === 0) return;
       await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
     });
     for (const prepared of preparedList) {

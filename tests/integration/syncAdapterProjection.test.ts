@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { freshDatabase } from './helpers/db';
 import { BACKUP_ENTITY_COLUMNS } from '@/core/backup/backup.types';
+import { chainableQuery } from './helpers/supabaseQueryDouble';
 
 /**
  * Sync adapter push projection (audit F5): the adapter must upsert each local
@@ -28,9 +29,12 @@ vi.mock('@/lib/supabase', () => ({
       }),
       // Push verification read-back (harden-silent-failure-certification 3.1):
       // the adapter re-reads the ids it just wrote, scoped to the owner.
+      // AUD-SH08-A: the read-back chain is now
+      // select().in().eq().order().range(), so the double models the full chain
+      // (and slices like a real capped server) instead of stopping at .eq().
       select: vi.fn((_columns: string) => ({
         in: vi.fn((_column: string, ids: string[]) => ({
-          eq: vi.fn(async (_column: string, value: string) => {
+          eq: vi.fn((_column: string, value: string) => {
             const rows = ids
               .map((id) => stored.get(entity)?.get(id))
               .filter(
@@ -38,7 +42,7 @@ vi.mock('@/lib/supabase', () => ({
                   row !== undefined && (row.user_id === undefined || row.user_id === value),
               )
               .map((row) => ({ id: row.id }));
-            return { data: rows, error: null };
+            return chainableQuery(rows);
           }),
         })),
       })),
