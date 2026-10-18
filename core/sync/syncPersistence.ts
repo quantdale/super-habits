@@ -94,6 +94,25 @@ export class SqliteSyncPersistence implements SyncPersistence {
       .filter(isSyncRecord);
   }
 
+  /**
+   * Highest durable revision used to recover the engine's allocation floor
+   * when `loadOutbox()` fails (see `SyncEngine.hydrate`). Deliberately a
+   * separate aggregate query: row-shape/mapping failures that break the full
+   * load still leave this readable.
+   */
+  async loadOutboxMaxRevision(): Promise<number> {
+    const db = await getDatabase();
+    if (typeof db.getFirstAsync !== 'function') {
+      const stored = await getAppMetaJsonOrDefault<unknown>(db, appMetaKeys.syncOutbox, []);
+      const records = Array.isArray(stored) ? stored.filter(isSyncRecord) : [];
+      return records.reduce((max, record) => Math.max(max, Number(record.revision) || 0), 0);
+    }
+    const row = await db.getFirstAsync<{ max_revision: number | null }>(
+      'SELECT MAX(revision) AS max_revision FROM sync_outbox',
+    );
+    return Number(row?.max_revision ?? 0);
+  }
+
   async saveOutbox(records: SyncRecord[]): Promise<void> {
     const db = await getDatabase();
     await withSQLiteTransaction(db, async (transactionDb) => {

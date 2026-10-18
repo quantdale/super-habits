@@ -71,6 +71,13 @@ export const INITIAL_SYNC_STATUS: SyncStatus = {
 /** Durable storage for the outbox/status so a killed process doesn't lose pending records. */
 export interface SyncPersistence {
   loadOutbox(): Promise<SyncRecord[]>;
+  /**
+   * Highest durable outbox revision, used to recover the in-memory revision
+   * floor when `loadOutbox()` fails during hydrate. Optional so simple test
+   * adapters keep working; without it a failed hydrate leaves the floor at 0
+   * (the pre-fix behavior).
+   */
+  loadOutboxMaxRevision?(): Promise<number>;
   /** Legacy snapshot API retained for simple test/adaptor implementations. */
   saveOutbox(records: SyncRecord[]): Promise<void>;
   /** Preferred row-level API used by the SQLite outbox. */
@@ -167,11 +174,27 @@ export class SyncEngine {
 
   /** Loads the persisted outbox/status. Call once during app bootstrap, before the first flush. */
   async hydrate(): Promise<void> {
-    const [outbox, status, ledger] = await Promise.all([
-      this.persistence.loadOutbox(),
-      this.persistence.loadStatus(),
-      this.persistence.loadAttemptLedger?.() ?? Promise.resolve<OutboxAttemptLedger>({}),
-    ]);
+    let outbox: SyncRecord[];
+    let status: SyncStatus | null;
+    let ledger: OutboxAttemptLedger;
+    try {
+      [outbox, status, ledger] = await Promise.all([
+        this.persistence.loadOutbox(),
+        this.persistence.loadStatus(),
+        this.persistence.loadAttemptLedger?.() ?? Promise.resolve<OutboxAttemptLedger>({}),
+      ]);
+    } catch (error) {
+      // A failed hydrate must never leave the revision floor at 0: durable rows
+      // keep high revisions, so every new intent would allocate a lower one
+      // and silently lose the `excluded.revision > sync_outbox.revision`
+      // upsert guard — leaving stale records that exact-revision removal can
+      // never delete (checkpoint starvation / stranded hard deletes). Recover
+      // the floor from the durable table, then rethrow so bootstrap still logs
+      // the degraded start (the rows themselves retry on the next launch).
+      const floor = await this.persistence.loadOutboxMaxRevision?.().catch(() => 0);
+      this.nextRevision = Math.max(this.nextRevision, Number(floor) || 0);
+      throw error;
+    }
     for (const record of outbox) {
       const revision = record.revision ?? ++this.nextRevision;
       this.nextRevision = Math.max(this.nextRevision, revision);
