@@ -28,6 +28,8 @@ type Props = {
   /** Suspend the web portal while destructive confirmation owns the overlay. */
   visible?: boolean;
   checkInError?: string | null;
+  /** Pause/archive lifecycle failure feedback for the detail surface. */
+  lifecycleError?: string | null;
   onClose: () => void;
   onTogglePause: () => void;
   onToggleArchive: () => void;
@@ -49,6 +51,7 @@ export function HabitDetailModal({
   busy = false,
   visible = true,
   checkInError,
+  lifecycleError,
   onClose,
   onTogglePause,
   onToggleArchive,
@@ -113,6 +116,11 @@ export function HabitDetailModal({
         {checkInError ? (
           <Text accessibilityRole="alert" variant="bodyMd" style={{ color: tokens.dangerText }}>
             {checkInError}
+          </Text>
+        ) : null}
+        {lifecycleError ? (
+          <Text accessibilityRole="alert" variant="bodyMd" style={{ color: tokens.dangerText }}>
+            {lifecycleError}
           </Text>
         ) : null}
         {section === 'today' ? (
@@ -206,12 +214,14 @@ export function HabitDetailModal({
                   label={lifecycleState === 'paused' ? 'Resume' : 'Pause'}
                   variant="ghost"
                   onPress={onTogglePause}
+                  disabled={busy}
                 />
               ) : null}
               <Button
                 label={lifecycleState === 'archived' ? 'Restore' : 'Archive'}
                 variant="ghost"
                 onPress={onToggleArchive}
+                disabled={busy}
               />
             </View>
             <View className="border-t pt-4" style={{ borderColor: tokens.border }}>

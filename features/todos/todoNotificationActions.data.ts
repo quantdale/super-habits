@@ -1,7 +1,11 @@
 import { getDatabase } from '@/core/db/client';
 import type { TodoPriority } from '@/core/db/types';
 import { runBackupMutation } from '@/core/sync/syncedMutation';
-import { linkedActionsEngine } from '@/core/linked-actions/linkedActions.engine';
+import {
+  buildTransactionalSourceEvent,
+  linkedActionsEngine,
+} from '@/core/linked-actions/linkedActions.engine';
+import { insertLinkedActionEventInTransaction } from '@/core/linked-actions/linkedActions.data';
 import {
   claimNotificationActionInTransaction,
   setNotificationActionLinkedRequiredInTransaction,
@@ -162,6 +166,34 @@ async function runCompleteTodoFromNotification(input: {
         };
       } else {
         shouldDispatchLinkedActions = true;
+        // Durable dispatch handoff: persist the source event in this same
+        // transaction (marker + completion + event commit atomically), so a
+        // crash after this boundary is recoverable by the startup event-ledger
+        // sweep even if the notification never gets re-tapped.
+        await insertLinkedActionEventInTransaction(
+          transactionDb,
+          buildTransactionalSourceEvent({
+            eventId: claim.linkedEventId,
+            occurredAt: processedAt,
+            feature: 'todos',
+            entityType: 'todo',
+            entityId: input.todoId,
+            triggerType: 'todo.completed',
+            label: todo.title,
+            sourceDateKey: toDateKey(now),
+            sourceRecordId: input.todoId,
+            origin: {
+              originKind: 'user',
+              originRuleId: null,
+              originEventId: null,
+            },
+            payload: {
+              source: 'todo-reminder',
+              actionKey: input.actionKey,
+            },
+          }),
+          processedAt,
+        );
       }
       await setNotificationActionLinkedRequiredInTransaction(
         transactionDb,

@@ -5,6 +5,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
+import { ValidationError } from '@/core/ui/ValidationError';
 import { listRecentDailyPlans, softDeleteDailyPlan } from '@/features/daily-plan/dailyPlan.data';
 import { parseTopTodoIds, parseTopTodoTitles } from '@/features/daily-plan/dailyPlan.domain';
 import { DAILY_PLAN_STATUS_LABELS } from '@/features/daily-plan/dailyPlan.types';
@@ -27,6 +28,7 @@ export function DailyPlanHistoryView({ onPlanDeleted }: { onPlanDeleted?: () => 
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const buildEntries = useCallback(async (): Promise<PlanHistoryEntry[]> => {
     const [plans, todos] = await Promise.all([listRecentDailyPlans(30), listPendingTodos()]);
@@ -73,11 +75,20 @@ export function DailyPlanHistoryView({ onPlanDeleted }: { onPlanDeleted?: () => 
       });
       if (!confirmed) return;
       setDeletingId(entry.id);
+      setDeleteError(null);
       try {
         await softDeleteDailyPlan(entry.id);
         setExpandedId(null);
         await loadEntries();
         onPlanDeleted?.();
+      } catch (e) {
+        // A rejected delete keeps the history row and the retriable button;
+        // the failure surfaces with the review's own message when present.
+        setDeleteError(
+          e instanceof Error && e.message
+            ? e.message
+            : 'Could not delete the plan. Please try again.',
+        );
       } finally {
         setDeletingId(null);
       }
@@ -110,6 +121,7 @@ export function DailyPlanHistoryView({ onPlanDeleted }: { onPlanDeleted?: () => 
 
   return (
     <View className="gap-2">
+      {deleteError ? <ValidationError message={deleteError} /> : null}
       <View className="flex-row gap-2">
         <Card className="flex-1">
           <Text className="text-xs" style={{ color: tokens.textMuted }}>

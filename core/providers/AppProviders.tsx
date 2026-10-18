@@ -39,6 +39,7 @@ import { HabitReminderHost } from '@/core/notifications/HabitReminderHost';
 import { WorkoutReminderHost } from '@/core/notifications/WorkoutReminderHost';
 import { PomodoroCommandBridgeProvider } from '@/features/pomodoro/pomodoroCommandBridge';
 import { migrateLegacySessionMeta } from '@/features/pomodoro/pomodoro.sessionMeta';
+import { recoverPendingLinkedActions } from '@/core/linked-actions/linkedActions.recovery';
 
 export function AppProviders({ children }: PropsWithChildren) {
   const [dbError, setDbError] = useState<string | null>(null);
@@ -149,6 +150,22 @@ export function AppProviders({ children }: PropsWithChildren) {
         await migrateLegacySessionMeta();
       } catch (e) {
         console.error('[pomodoro] legacy session metadata promotion failed', e);
+      }
+
+      // Linked-action crash recovery: replay durable source events whose
+      // dispatch never ran (crash between the source commit — which now
+      // persists the event row — and the post-commit dispatch, or a mid-effect
+      // crash). Runs after hydrate for the same reason as above: replayed
+      // effects enqueue outbox intents that must allocate against the
+      // restored durable revision. Best-effort and exactly-once by the
+      // engine's guards; a failure retries on the next launch.
+      try {
+        const recovery = await recoverPendingLinkedActions();
+        if (recovery.failedEvents > 0) {
+          console.warn('[linked-actions] startup recovery had failures', recovery);
+        }
+      } catch (e) {
+        console.error('[linked-actions] startup recovery failed', e);
       }
 
       try {

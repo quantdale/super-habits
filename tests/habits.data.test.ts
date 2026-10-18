@@ -47,7 +47,8 @@ vi.mock('@/core/db/client', () => ({
   getDatabase,
 }));
 
-vi.mock('@/core/linked-actions/linkedActions.engine', () => ({
+vi.mock('@/core/linked-actions/linkedActions.engine', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/core/linked-actions/linkedActions.engine')>()),
   linkedActionsEngine,
 }));
 
@@ -111,6 +112,7 @@ describe('features/habits/habits.data', () => {
       expect.any(String),
     ]);
     expect(linkedActionsEngine.processSourceAction).toHaveBeenCalledWith({
+      eventId: expect.any(String),
       occurredAt: expect.any(String),
       feature: 'habits',
       entityType: 'habit',

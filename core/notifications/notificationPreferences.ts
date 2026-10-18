@@ -46,6 +46,9 @@ export async function setTodoRemindersEnabled(enabled: boolean): Promise<void> {
     // persistence fails; surface the error to the caller for UI feedback.
     throw error;
   }
+  // Backup enqueue for the new preference lives in the settings caller
+  // (SettingsNotificationsSection): this module is imported by
+  // core/backup/backupSettings, so it must not reach back into the sync graph.
 }
 
 export async function getDailyPlanReminderTime(): Promise<TimeOfDay> {

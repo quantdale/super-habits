@@ -166,8 +166,46 @@ export async function runSyncedMutation<T>(input: {
  */
 export async function enqueueBackupSettingsRecord(db?: SQLite.SQLiteDatabase): Promise<void> {
   const database = db ?? (await getDatabase());
+  const capture = await captureSettingsOutbox(database);
+  let prepared: PreparedSyncRecord | null = null;
+  await withSQLiteTransaction(database, async (transactionDb) => {
+    prepared = await persistSettingsOutboxInTransaction(
+      transactionDb,
+      capture.ownerUserId,
+      capture.snapshot,
+    );
+  });
+  if (prepared === null) {
+    throw new Error('enqueueBackupSettingsRecord: transaction did not run.');
+  }
+  syncEngine.enqueuePrepared(prepared, { durablyPersisted: true });
+}
+
+/**
+ * Capture (owner resolution + snapshot read) is done against the base handle;
+ * the enqueued outbox row, pending-snapshot and dirty markers commit together.
+ */
+type SettingsCaptureSnapshot = Awaited<ReturnType<typeof readRecoverableSettings>>;
+
+type SettingsOutboxCapture = {
+  snapshot: SettingsCaptureSnapshot;
+  ownerUserId: string | null;
+};
+
+async function captureSettingsOutbox(
+  database: SQLite.SQLiteDatabase,
+): Promise<SettingsOutboxCapture> {
   const ownerUserId = await resolveSyncOwnerUserId(database);
   const settingsSnapshot = await readRecoverableSettings(database);
+  return { snapshot: settingsSnapshot, ownerUserId };
+}
+
+/** Write the captured snapshot + durable outbox row inside the CALLER's transaction. */
+async function persistSettingsOutboxInTransaction(
+  transactionDb: SQLite.SQLiteDatabase,
+  ownerUserId: string | null,
+  settingsSnapshot: SettingsCaptureSnapshot,
+): Promise<PreparedSyncRecord> {
   const record = {
     entity: 'user_backup_settings',
     id: BACKUP_SETTINGS_RECORD_ID,
@@ -175,15 +213,70 @@ export async function enqueueBackupSettingsRecord(db?: SQLite.SQLiteDatabase): P
     operation: 'update' as const,
     ...(ownerUserId ? { ownerUserId } : {}),
   };
-  let prepared: ReturnType<typeof syncEngine.prepare> | null = null;
-  await withSQLiteTransaction(database, async (transactionDb) => {
-    prepared = syncEngine.prepare(record);
-    await setAppMetaJson(transactionDb, appMetaKeys.backupPendingSettings, {
-      generation: null,
-      payload: settingsSnapshot,
-    });
-    await upsertSyncOutboxRecord(transactionDb, prepared, prepared.revision);
-    await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
+  const prepared = syncEngine.prepare(record);
+  await setAppMetaJson(transactionDb, appMetaKeys.backupPendingSettings, {
+    generation: null,
+    payload: settingsSnapshot,
   });
-  syncEngine.enqueuePrepared(prepared!, { durablyPersisted: true });
+  // Dirty flag BEFORE the outbox row: if the row insert fails after the marker
+  // and snapshot committed (the caller may swallow that failure to keep the
+  // local value), the next maintenance cycle sees dirt and re-captures instead
+  // of leaving a durable row with no in-memory queue entry.
+  await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
+  await upsertSyncOutboxRecord(transactionDb, prepared, prepared.revision);
+  return prepared;
+}
+
+/**
+ * Apply a SQLite-backed settings mutation and durably enqueue the
+ * recoverable-settings snapshot in the SAME transaction: the app_meta write,
+ * the snapshot capture and the `user_backup_settings` outbox row commit
+ * atomically (the snapshot is read INSIDE the transaction, AFTER the
+ * mutation, so the pending payload always includes the just-written value —
+ * the manifest-staleness check depends on that guarantee).
+ *
+ * Local-first contract: a failure to record the BACKUP intent must never
+ * discard the user's value. If the snapshot/outbox step fails, the setting
+ * still commits (same transaction) and the result reports
+ * `backupEnqueued: false` so the caller can tell the user the value is saved
+ * locally but the backup confirmation is pending. Only a failure of the
+ * mutation itself throws.
+ *
+ * AsyncStorage-backed settings (theme, live notification prefs) cannot join
+ * the SQLite transaction; write them first, then re-capture via
+ * `enqueueBackupSettingsRecord()`.
+ */
+export type RecoverableSettingsWriteResult<T> = {
+  value: T;
+  /** False when the setting committed but its backup intent could not be recorded. */
+  backupEnqueued: boolean;
+};
+
+export async function runRecoverableSettingsMutation<T>(input: {
+  db: SQLite.SQLiteDatabase;
+  mutate: (transactionDb: SQLite.SQLiteDatabase) => Promise<T> | T;
+}): Promise<RecoverableSettingsWriteResult<T>> {
+  const ownerUserId = await resolveSyncOwnerUserId(input.db);
+  let prepared: PreparedSyncRecord | null = null;
+  const value = await withSQLiteTransaction(input.db, async (transactionDb) => {
+    const result = await input.mutate(transactionDb);
+    try {
+      const settingsSnapshot = await readRecoverableSettings(transactionDb);
+      prepared = await persistSettingsOutboxInTransaction(
+        transactionDb,
+        ownerUserId,
+        settingsSnapshot,
+      );
+    } catch (error) {
+      // Backup bookkeeping failed; keep the committed local value and report
+      // the unconfirmed intent instead of rolling the user's setting back.
+      prepared = null;
+      console.warn('[backup] settings intent could not be recorded; local value kept', error);
+    }
+    return result;
+  });
+  if (prepared !== null) {
+    syncEngine.enqueuePrepared(prepared, { durablyPersisted: true });
+  }
+  return { value, backupEnqueued: prepared !== null };
 }

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
+import { describePlanningWriteError } from '@/features/planning-hub/planningWriteError';
 import { setPomodoroSessionMeta } from './pomodoro.data';
 
 type Props = {
@@ -21,12 +22,18 @@ export function SessionNotePrompt({ sessionId, onSaved, onDismiss }: Props) {
   const { tokens } = useAppTheme();
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const save = async () => {
     setSaving(true);
+    setError(null);
     try {
       await setPomodoroSessionMeta({ sessionId, note });
       onSaved();
+    } catch (e) {
+      // A rejected note write must be visible with the typed value intact and
+      // the prompt still open, never an unhandled rejection.
+      setError(describePlanningWriteError(e, 'Could not save the note. Please try again.'));
     } finally {
       setSaving(false);
     }
@@ -59,6 +66,11 @@ export function SessionNotePrompt({ sessionId, onSaved, onDismiss }: Props) {
           <Button label="Skip" variant="ghost" onPress={onDismiss} />
         </View>
       </View>
+      {error ? (
+        <Text accessibilityRole="alert" variant="bodyMd" style={{ color: tokens.dangerText }}>
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }

@@ -202,11 +202,22 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     // presses "Save as default".
     const next = clampRestSeconds((restDefault ?? DEFAULT_REST_SECONDS) + delta);
     setRestDefault(next);
+    setRestPersistError(false);
   };
+
+  const [restPersistError, setRestPersistError] = useState(false);
 
   const handlePersistRestDefault = () => {
     if (restDefault === null) return;
-    void saveRestSecondsDefault(restDefault).then(() => setPersistedRestDefault(restDefault));
+    void saveRestSecondsDefault(restDefault).then((persisted) => {
+      if (persisted) {
+        setPersistedRestDefault(restDefault);
+        setRestPersistError(false);
+      } else {
+        // The write is retriable; the adjustable value stays as-is.
+        setRestPersistError(true);
+      }
+    });
   };
 
   // A resumed session restarts paused at the saved phase cursor, replaying the
@@ -1703,6 +1714,15 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       <Text className="mt-2 text-center text-xs" style={{ color: tokens.textMuted }}>
         Sets at 0s skip rest and run back-to-back.
       </Text>
+      {restPersistError ? (
+        <Text
+          accessibilityRole="alert"
+          className="mt-2 text-center text-xs"
+          style={{ color: tokens.dangerText }}
+        >
+          Could not save the default rest. Try again.
+        </Text>
+      ) : null}
     </Screen>
   );
 }

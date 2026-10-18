@@ -84,8 +84,11 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     setModeState(nextMode);
     void AsyncStorage.setItem(THEME_MODE_STORAGE_KEY, nextMode).catch(() => undefined);
     // Theme preference is recoverable user state; keep the backup snapshot
-    // in the durable queue (best-effort, never blocks the UI).
-    void enqueueBackupSettingsRecord().catch(() => undefined);
+    // in the durable queue (best-effort, never blocks the UI) — failures log
+    // instead of vanishing.
+    void enqueueBackupSettingsRecord().catch((error: unknown) =>
+      console.warn('[backup] settings enqueue after theme change failed', error),
+    );
   }, []);
 
   const resolvedTheme = useMemo(() => resolveTheme(mode, systemTheme), [mode, systemTheme]);
@@ -104,8 +107,10 @@ export function ThemeProvider({ children }: PropsWithChildren) {
         void AsyncStorage.setItem(THEME_SLOTS_STORAGE_KEY, JSON.stringify(next)).catch(
           () => undefined,
         );
-        // Theme preference is recoverable user state.
-        void enqueueBackupSettingsRecord().catch(() => undefined);
+        // Theme preference is recoverable user state; failures log.
+        void enqueueBackupSettingsRecord().catch((error: unknown) =>
+          console.warn('[backup] settings enqueue after theme change failed', error),
+        );
         return next;
       });
       // A fixed mode must flip appearance so the chosen theme becomes visible

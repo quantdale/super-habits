@@ -16,9 +16,13 @@ import { createId } from '@/lib/id';
 import { assertHabitWrite } from '@/lib/validation';
 import { nowIso, timestampToLocalDateKey, toDateKey } from '@/lib/time';
 import { runBackupMutation, runSyncedMutation } from '@/core/sync/syncedMutation';
-import { linkedActionsEngine } from '@/core/linked-actions/linkedActions.engine';
+import {
+  buildTransactionalSourceEvent,
+  linkedActionsEngine,
+} from '@/core/linked-actions/linkedActions.engine';
 import {
   deleteLinkedActionRulesForTargetEntity,
+  insertLinkedActionEventInTransaction,
   listLinkedActionRulesForSourceEntity,
   replaceLinkedActionRulesForSourceEntity,
   updateLinkedActionExecutionInTransaction,
@@ -193,6 +197,11 @@ export async function incrementHabit(
     creationDateKey,
   );
 
+  // Durable dispatch handoff (same contract as setTodoCompletion): the event
+  // id is pre-minted so the source event row can be persisted inside the
+  // completion's transaction when the threshold crossing happens.
+  const linkedEventId = createId('levt');
+
   // Atomic upsert inside a transaction with a durable backup intent: two
   // rapid taps previously either raced the UNIQUE(habit_id, date_key)
   // constraint (crash) or lost an increment. The outbox record carries the
@@ -222,6 +231,38 @@ export async function incrementHabit(
         updatedAt: now,
         operation: 'create',
       });
+      // Durable dispatch handoff: when this increment crosses the day's
+      // target, persist the source event in the SAME transaction as the
+      // completion write, then dispatch after commit with the same event id.
+      // A crash between the two durable boundaries leaves the event row on
+      // disk for the startup recovery sweep.
+      if (row.count >= targetPerDay && row.count - 1 < targetPerDay) {
+        await insertLinkedActionEventInTransaction(
+          transactionDb,
+          buildTransactionalSourceEvent({
+            eventId: linkedEventId,
+            occurredAt: now,
+            feature: 'habits',
+            entityType: 'habit',
+            entityId: habitId,
+            triggerType: 'habit.completed_for_day',
+            label: habit.name,
+            sourceDateKey: dateKey,
+            sourceRecordId: row.id,
+            origin: {
+              originKind: 'user',
+              originRuleId: null,
+              originEventId: null,
+            },
+            payload: {
+              previousCount: row.count - 1,
+              currentCount: row.count,
+              targetPerDay,
+            },
+          }),
+          now,
+        );
+      }
       return { changed: true, value: { completionId: row.id, count: row.count } };
     },
   });
@@ -239,6 +280,7 @@ export async function incrementHabit(
   }
 
   const processResult = await linkedActionsEngine.processSourceAction({
+    eventId: linkedEventId,
     occurredAt: now,
     feature: 'habits',
     entityType: 'habit',
@@ -418,6 +460,37 @@ async function runCompleteHabitFromNotification(input: {
       completionId = updatedCompletion?.id ?? completionId;
       mutationApplied = true;
       shouldDispatchLinkedActions = nextCount >= targetPerDay;
+      if (shouldDispatchLinkedActions) {
+        // Durable dispatch handoff: persist the source event in this same
+        // transaction (marker + completion + event commit atomically), so a
+        // crash after this boundary is recoverable by the startup
+        // event-ledger sweep even if the notification never gets re-tapped.
+        await insertLinkedActionEventInTransaction(
+          transactionDb,
+          buildTransactionalSourceEvent({
+            eventId: claim.linkedEventId,
+            occurredAt: processedAt,
+            feature: 'habits',
+            entityType: 'habit',
+            entityId: input.habitId,
+            triggerType: 'habit.completed_for_day',
+            label: habit.name,
+            sourceDateKey: input.dateKey,
+            sourceRecordId: completionId,
+            origin: {
+              originKind: 'user',
+              originRuleId: null,
+              originEventId: null,
+            },
+            payload: {
+              source: 'habit-reminder',
+              actionKey: input.actionKey,
+              currentCount: nextCount,
+            },
+          }),
+          processedAt,
+        );
+      }
       await setNotificationActionLinkedRequiredInTransaction(
         transactionDb,
         input.actionKey,

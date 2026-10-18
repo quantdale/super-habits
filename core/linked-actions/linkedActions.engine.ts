@@ -26,6 +26,7 @@ import {
   serializeLinkedActionEffectPayload,
   type LinkedActionEffectPlan,
   type LinkedActionEffectResult,
+  type LinkedActionEventRecord,
   type LinkedActionExecutionRecord,
   type LinkedActionOriginMetadata,
   type LinkedActionProcessMode,
@@ -131,6 +132,7 @@ function normalizeSourceAction(input: LinkedActionSourceActionInput): LinkedActi
   const rootEventId = input.chain?.rootEventId ?? eventId;
   const parentEventId = input.chain?.parentEventId ?? origin.originEventId ?? null;
   const depth = input.chain?.depth ?? (origin.originKind === 'linked_action' ? 1 : 0);
+  const occurredAt = input.occurredAt ?? new Date().toISOString();
 
   return {
     eventId,
@@ -140,7 +142,8 @@ function normalizeSourceAction(input: LinkedActionSourceActionInput): LinkedActi
     triggerType: input.triggerType,
     sourceRecordId: input.sourceRecordId ?? null,
     sourceDateKey: input.sourceDateKey ?? null,
-    occurredAt: input.occurredAt ?? new Date().toISOString(),
+    occurredAt,
+    recordedAt: input.recordedAt ?? occurredAt,
     label: input.label ?? null,
     payload: input.payload ?? {},
     origin,
@@ -296,6 +299,21 @@ function mapExecutionToDuplicateResult(
   };
 }
 
+/**
+ * Build the fully normalized source event for the transactional dispatch
+ * handoff. Data layers pre-mint the `eventId`, persist this record inside the
+ * source mutation's SQLite transaction (via
+ * `insertLinkedActionEventInTransaction`), and dispatch
+ * `processSourceAction` after commit with the same id — the engine then reads
+ * the persisted event instead of minting a fresh one, so a crash between the
+ * two durable boundaries is recoverable from the event row alone.
+ */
+export function buildTransactionalSourceEvent(
+  input: Omit<LinkedActionSourceActionInput, 'eventId'> & { eventId: string },
+): LinkedActionEventRecord {
+  return normalizeSourceAction(input);
+}
+
 export class LinkedActionsEngine {
   private readonly effectRegistry: Record<string, LinkedActionEffectExecutor>;
 
@@ -317,7 +335,12 @@ export class LinkedActionsEngine {
           (await createLinkedActionEvent(normalizedEvent)))
         : normalizedEvent;
 
-    const rules = await listMatchingLinkedActionRules(sourceEvent);
+    const rules = await listMatchingLinkedActionRules(sourceEvent, {
+      // Historical eligibility: only rules that existed when the event was
+      // recorded may act on it. Rules authored after the event never gain
+      // retroactive effects, on the dispatch path or during recovery replay.
+      createdNotAfter: sourceEvent.recordedAt,
+    });
     const effects: LinkedActionEffectResult[] = [];
     const notices: AppNotice[] = [];
 
