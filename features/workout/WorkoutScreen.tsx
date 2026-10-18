@@ -26,6 +26,8 @@ import {
   deleteRoutine,
   getRoutineWithExercises,
   getWorkoutSessionDraft,
+  getWorkoutPendingSave,
+  clearWorkoutPendingSave,
   getLastPerformedByRoutine,
   listRoutines,
   listRoutineCounts,
@@ -48,6 +50,8 @@ import {
   saveWorkoutPreferences,
   type WorkoutPerformanceRow,
   type WorkoutSessionDraft,
+  type WorkoutPendingSave,
+  reconcileWorkoutPendingSave,
   type WorkoutPreferences,
 } from '@/features/workout/workout.data';
 import {
@@ -322,6 +326,8 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const createRoutineGuardRef = useRef(createSubmitGuard());
   const quickCompleteGuardRef = useRef(createSubmitGuard());
   const [draft, setDraft] = useState<WorkoutSessionDraft | null>(null);
+  /** Finished-but-unsaved session (`AUD-SH04-A`); cleared only by save or discard. */
+  const [pendingSave, setPendingSave] = useState<WorkoutPendingSave | null>(null);
   const [chooserVisible, setChooserVisible] = useState(false);
   const [lastPerformed, setLastPerformed] = useState<Map<string, string>>(new Map());
   const [todaySchedule, setTodaySchedule] = useState<ScheduleResolution | null>(null);
@@ -382,6 +388,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       totals,
       lastPerformedMap,
       sessionDraft,
+      pendingSaveState,
       resolved,
       plan,
       weightEntries,
@@ -396,6 +403,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       listSessionTotalsForRange(toDateKey(volumeStart), todayKey),
       getLastPerformedByRoutine(),
       getWorkoutSessionDraft(),
+      getWorkoutPendingSave(),
       resolveWorkoutScheduleForDate(todayKey),
       listWeeklyPlan(),
       listBodyWeightEntries(),
@@ -415,6 +423,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     setWeeklyVolume(buildVolumePerWeek(totals, 8));
     setLastPerformed(lastPerformedMap);
     setDraft(sessionDraft);
+    setPendingSave(pendingSaveState);
     setTodaySchedule(resolved);
     setWeeklyPlan(plan);
     setBodyWeightEntries(weightEntries);
@@ -542,6 +551,88 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     });
   }, [draft]);
 
+  /**
+   * Re-open a finished-but-unsaved session on its summary (`AUD-SH04-B`).
+   *
+   * The first step reconciles against committed logs: a crash AFTER the log
+   * committed but BEFORE the pending state was cleared must not insert a second
+   * log (`AUD-SH04-C`), so an already-committed session is reported as saved and
+   * its recovery state is retired instead.
+   */
+  const handleRetryPendingSave = useCallback(async () => {
+    if (!pendingSave) return;
+    const reconciled = await reconcileWorkoutPendingSave(pendingSave);
+    if (reconciled.status === 'saved') {
+      setPendingSave(null);
+      await refresh();
+      return;
+    }
+    const full = await getRoutineWithExercises(pendingSave.routineId);
+    if (!full || full.exercises.length === 0) {
+      Alert.alert(
+        'Workout unavailable',
+        'The routine for this finished session no longer has any exercises, so it cannot be saved. Your entered values are kept until you discard it.',
+        [
+          { text: 'Keep it', style: 'cancel' },
+          {
+            text: 'Discard',
+            style: 'destructive',
+            onPress: () => {
+              void clearWorkoutPendingSave().catch(() => {});
+              setPendingSave(null);
+            },
+          },
+        ],
+      );
+      return;
+    }
+    const dispositions: Record<number, PhaseDisposition> = {};
+    for (const [index, disposition] of Object.entries(pendingSave.dispositions)) {
+      const parsed = Number.parseInt(index, 10);
+      if (Number.isInteger(parsed)) dispositions[parsed] = disposition;
+    }
+    const enteredSets: Record<number, EnteredSetValues> = {};
+    for (const [index, values] of Object.entries(pendingSave.enteredSets)) {
+      const parsed = Number.parseInt(index, 10);
+      if (Number.isInteger(parsed)) enteredSets[parsed] = values;
+    }
+    setCurrentView({
+      type: 'session',
+      routine: full,
+      resume: {
+        phaseIndex: 0,
+        startedAtMs: Date.parse(pendingSave.startedAtIso),
+        elapsedSeconds: pendingSave.elapsedSeconds,
+        alreadyFinished: true,
+        ...(Object.keys(dispositions).length > 0 ? { dispositions } : {}),
+        ...(Object.keys(enteredSets).length > 0 ? { enteredSets } : {}),
+        ...(pendingSave.addedSets
+          ? {
+              addedSets: Object.fromEntries(
+                Object.entries(pendingSave.addedSets)
+                  .map(([index, count]) => [Number.parseInt(index, 10), count] as const)
+                  .filter(([index]) => Number.isInteger(index) && index >= 0),
+              ),
+            }
+          : {}),
+      },
+    });
+  }, [pendingSave, refresh]);
+
+  /** Explicit discard of a finished-but-unsaved session. */
+  const handleDiscardPendingSave = useCallback(async () => {
+    const confirmed = await confirm({
+      title: 'Discard finished workout?',
+      message:
+        'The entered sets from this finished session will be removed and never saved to your history.',
+      confirmLabel: 'Discard',
+      confirmVariant: 'danger',
+    });
+    if (!confirmed) return;
+    await clearWorkoutPendingSave();
+    setPendingSave(null);
+  }, [confirm]);
+
   const handleDiscardDraft = useCallback(async () => {
     const confirmed = await confirm({
       title: 'Discard workout?',
@@ -556,6 +647,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
 
   const draftRoutineName = draft
     ? (routines.find((r) => r.id === draft.routineId)?.name ?? 'Workout')
+    : null;
+  const pendingSaveRoutineName = pendingSave
+    ? (routines.find((r) => r.id === pendingSave.routineId)?.name ?? 'Workout')
     : null;
   const todayKey = toDateKey(new Date());
   const todayWeekdayNum = ((new Date().getDay() + 6) % 7) + 1;
@@ -582,6 +676,10 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     draftRoutineName,
     hasDraft: draft !== null,
     routineCount: routines.length,
+    // A finished-but-unsaved session outranks the draft and the schedule.
+    pendingSave: pendingSave
+      ? { routineName: pendingSaveRoutineName, lastError: pendingSave.lastError ?? null }
+      : null,
   });
 
   const quickStartRows = useMemo(
@@ -705,6 +803,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       case 'resume':
         void handleResumeDraft();
         break;
+      case 'retry-save':
+        void handleRetryPendingSave();
+        break;
       case 'start-scheduled':
         if (trainingState.primaryRoutineId) {
           void startRoutineById(trainingState.primaryRoutineId);
@@ -720,6 +821,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     trainingState.primaryAction,
     trainingState.primaryRoutineId,
     handleResumeDraft,
+    handleRetryPendingSave,
     startRoutineById,
   ]);
 
@@ -1266,6 +1368,16 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                   label="Discard workout"
                   variant="ghost"
                   onPress={() => void handleDiscardDraft()}
+                  fullWidth
+                />
+              </View>
+            ) : null}
+            {trainingState.kind === 'pending-save' ? (
+              <View className="mt-2">
+                <Button
+                  label="Discard finished workout"
+                  variant="ghost"
+                  onPress={() => void handleDiscardPendingSave()}
                   fullWidth
                 />
               </View>

@@ -9,9 +9,10 @@ import type { WorkoutWeeklyPlanEntry, WorkoutRoutine } from '@/core/db/types';
  * draft owns one dominant Resume).
  */
 
-export type TrainingStateKind = 'resume' | 'scheduled' | 'rest' | 'free';
+export type TrainingStateKind = 'resume' | 'pending-save' | 'scheduled' | 'rest' | 'free';
 
-export type TrainingAction = 'resume' | 'start-scheduled' | 'choose-routine' | 'none';
+export type TrainingAction =
+  'resume' | 'retry-save' | 'start-scheduled' | 'choose-routine' | 'none';
 
 export type TrainingState = {
   kind: TrainingStateKind;
@@ -39,6 +40,14 @@ export type TrainingStateInput = {
   draftRoutineName: string | null;
   hasDraft: boolean;
   routineCount: number;
+  /**
+   * A finished session whose save has not committed (`AUD-SH04-A`).
+   *
+   * This outranks the draft and the schedule: a user who completed every set but
+   * whose save failed must see the retry first, or their performed workout is
+   * silently stranded behind a "start today's workout" hero.
+   */
+  pendingSave?: { routineName: string | null; lastError: string | null } | null;
 };
 
 const WEEKDAY_LABELS = [
@@ -66,7 +75,24 @@ export function weekdayShortLabel(weekday: number): string {
  * hero — it is a compact line beside the reachable quick-start rows.
  */
 export function buildTrainingState(input: TrainingStateInput): TrainingState {
-  const { schedule, scheduledRoutine, completedToday, draftRoutineName, hasDraft } = input;
+  const { schedule, scheduledRoutine, completedToday, draftRoutineName, hasDraft, pendingSave } =
+    input;
+
+  if (pendingSave) {
+    const name = pendingSave.routineName ?? 'Your workout';
+    return {
+      kind: 'pending-save',
+      contextLine: `Today · ${name}`,
+      headline: 'Workout finished — not saved yet',
+      detail: pendingSave.lastError
+        ? `${name} is finished. ${pendingSave.lastError}`
+        : `${name} is finished but has not been saved. Its sets, durations and effort are kept until you save it or discard it.`,
+      primaryLabel: 'Save finished workout',
+      primaryAction: 'retry-save',
+      primaryRoutineId: null,
+      completedToday,
+    };
+  }
 
   if (hasDraft) {
     return {

@@ -46,6 +46,7 @@ import {
   type SetRow,
 } from './workoutSessionView';
 import {
+  clearWorkoutPendingSave,
   clearWorkoutSessionDraft,
   listLoggedSetsForExerciseNames,
   listRecentLoggedSets,
@@ -54,6 +55,7 @@ import {
   loadRestSecondsDefault,
   getWorkoutPreferences,
   saveRestSecondsDefault,
+  saveWorkoutPendingSave,
   saveWorkoutSessionDraft,
 } from './workout.data';
 import { cancelScheduledNotification, scheduleTimerEndNotification } from '@/lib/notifications';
@@ -100,6 +102,12 @@ export type SessionResume = {
   remainingSeconds?: number;
   /** Session-local added sets by engine exercise index, replayed on resume. */
   addedSets?: Record<number, number>;
+  /**
+   * Restored from a PENDING-SAVE state rather than a resumable draft
+   * (`AUD-SH04-B`): the session already reached its summary and only the save is
+   * outstanding, so the screen opens on the summary with every value restored.
+   */
+  alreadyFinished?: boolean;
 };
 
 type Props = {
@@ -235,7 +243,11 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       : phase.durationSeconds;
   });
   const [isRunning, setIsRunning] = useState(false);
-  const [isComplete, setIsComplete] = useState(false);
+  // A session whose save did NOT commit re-opens directly on the summary
+  // (`AUD-SH04-B`): the user's finished workout is restored from the durable
+  // pending-save state instead of being lost, and every entered value is back in
+  // the fields the summary re-computes from.
+  const [isComplete, setIsComplete] = useState(resume?.alreadyFinished === true);
   // Active-time tick counter; the persisted duration is this counter for
   // resumed sessions (wall-clock would include time the app was closed) and
   // real timestamps (startedAtMsRef → handleFinish) otherwise.
@@ -629,10 +641,44 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     void flagPersonalRecordForSet(from);
   }, [currentIndex, dispositions, flagPersonalRecordForSet]);
 
-  // Reaching the summary ends the draft — there is no phase left to resume.
+  // Reaching the summary converts the resumable DRAFT into a durable
+  // PENDING-SAVE recovery state (AUD-SH04-A). The previous code cleared the draft
+  // here, so the only remaining copy of the user's entered values was React
+  // state: a failed save, a skipped save or a process kill discarded a workout
+  // the user had actually performed. The pending-save state is cleared only by a
+  // committed log or an explicit discard.
   useEffect(() => {
-    if (isComplete) clearDraft();
-  }, [isComplete, clearDraft]);
+    if (!isComplete) return;
+    const startedAtMs = startedAtMsRef.current;
+    if (startedAtMs === null) return;
+    const pendingDispositions = Object.fromEntries(
+      Object.entries(dispositionsRef.current).map(([index, disposition]) => [
+        String(index),
+        disposition,
+      ]),
+    );
+    const pendingEnteredSets = Object.fromEntries(
+      Object.entries(enteredSetsRef.current).map(([index, values]) => [String(index), values]),
+    );
+    const pendingAddedSets = Object.fromEntries(
+      Object.entries(addedSets).map(([index, count]) => [String(index), count]),
+    );
+    void saveWorkoutPendingSave({
+      routineId: routine.id,
+      startedAtIso: new Date(startedAtMs).toISOString(),
+      elapsedSeconds: Math.max(0, elapsedSecondsRef.current),
+      enteredSets: pendingEnteredSets,
+      dispositions: pendingDispositions,
+      ...(Object.keys(pendingAddedSets).length > 0 ? { addedSets: pendingAddedSets } : {}),
+    }).catch(() => {
+      // Best-effort at this boundary: the save path itself re-persists the
+      // recovery state before attempting the log, so a failure here cannot
+      // leave the summary without recovery data.
+    });
+    // The resumable draft has no phase left to continue, so it is retired —
+    // but only AFTER the recovery payload is written above.
+    clearDraft();
+  }, [isComplete, clearDraft, routine.id, addedSets]);
 
   const updateEnteredValues = (index: number, patch: Partial<EnteredSetValues>) => {
     setEnteredSets((prev) => {
@@ -764,6 +810,41 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     advanceFromCurrent('completed');
   };
 
+  /**
+   * Persist the durable pending-save recovery state (`AUD-SH04-B`).
+   *
+   * Called BEFORE every save attempt and again on failure, so the recovery
+   * payload is never older than the summary the user is looking at. A failed or
+   * skipped save therefore retains every entered value through a restart.
+   *
+   * @param lastError optional user-facing failure reason to record
+   */
+  const persistPendingSave = useCallback(
+    async (lastError?: string) => {
+      const startedAtMs = startedAtMsRef.current;
+      if (startedAtMs === null) return;
+      await saveWorkoutPendingSave({
+        routineId: routine.id,
+        startedAtIso: new Date(startedAtMs).toISOString(),
+        elapsedSeconds: Math.max(0, elapsedSecondsRef.current),
+        enteredSets: Object.fromEntries(
+          Object.entries(enteredSetsRef.current).map(([index, values]) => [String(index), values]),
+        ),
+        dispositions: Object.fromEntries(
+          Object.entries(dispositionsRef.current).map(([index, disposition]) => [
+            String(index),
+            disposition,
+          ]),
+        ),
+        ...(Object.keys(addedSets).length > 0 ? { addedSets } : {}),
+        ...(lastError ? { lastError } : {}),
+      }).catch(() => {
+        // Recording the failure reason is secondary to keeping the payload.
+      });
+    },
+    [routine.id, addedSets],
+  );
+
   const handleFinish = async () => {
     if (!finishGuardRef.current.tryStart()) return;
     setIsRunning(false);
@@ -771,6 +852,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     try {
       const endedAtMs = Date.now();
       const startedAtMs = startedAtMsRef.current;
+      // Re-assert the recovery payload before the write so a stale or missing
+      // pending state cannot cost the user their summary.
+      await persistPendingSave();
       const records = collectSessionSetRecords(
         sequence,
         currentIndex,
@@ -861,6 +945,11 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         let bookkeepingFailed = false;
         try {
           clearDraft();
+          // AUD-SH04-C: only a COMMITTED log clears the recovery state. A kill
+          // between the log commit and this line leaves the pending-save state
+          // intact, so the next mount reconciles against the committed log
+          // instead of inventing a duplicate (see the resume path).
+          await clearWorkoutPendingSave();
           // Reward after the log is durable, attributed to THIS log id:
           // without it the award would fall back to the oldest unrewarded
           // log instead.
@@ -871,16 +960,20 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         setSaveError(null);
         setSavedOutcome({ newRecords, bookkeepingFailed });
       } else {
-        // Not saved: the session, its draft, and every entered value stay
-        // exactly as they are, and the message names the actual cause
-        // instead of promising a retry of the same dead routine.
+        // Not saved: the session and every entered value stay exactly as they
+        // are, and the durable recovery state records the real cause so an
+        // honest message survives a restart.
         setSavedOutcome(null);
         setSaveError(save.message);
+        await persistPendingSave(save.message ?? undefined);
       }
     } catch {
-      // Truthful failure: the session stays, the draft stays, and the user
-      // can retry. No success summary, no XP, no cleared draft.
+      // Truthful failure: the session stays and the recovery payload is
+      // re-persisted, so the user can retry — even after a restart.
       setSaveError('This workout could not be saved. Your progress is still here — try again.');
+      await persistPendingSave(
+        'This workout could not be saved. Your progress is still here — try again.',
+      );
     } finally {
       finishGuardRef.current.finish();
       setIsSaving(false);

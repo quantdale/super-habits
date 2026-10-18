@@ -62,6 +62,17 @@ export const appMetaKeys = {
   /** Durable in-progress workout session draft for resume after restart.
    *  Local operational state — never backed up. */
   workoutActiveSessionDraft: defineJsonKey('workout.active_session_draft', 'workout'),
+  /**
+   * Durable pending-save recovery state (`AUD-SH04-A/B`).
+   *
+   * Reaching the workout summary used to CLEAR the active draft, so a failed or
+   * interrupted save lost every entered value: the user had completed the
+   * workout but the only copy of their numbers was React state. This key holds
+   * the finished session's recovery payload — identity, every entered set,
+   * dispositions, active elapsed time — until a committed log id exists or the
+   * user explicitly discards.
+   */
+  workoutPendingSave: defineJsonKey('workout.pending_save', 'workout'),
   /** Todo/daily-plan/weekly-review reminder preferences (recoverable-settings source). */
   notificationPreferences: defineJsonKey('notification_preferences', 'notifications'),
   backupScopeVersion: defineTextKey('backup.scope_version', 'sync'),

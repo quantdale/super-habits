@@ -1880,6 +1880,139 @@ export async function clearWorkoutSessionDraft(): Promise<void> {
 }
 
 /**
+ * A workout session that reached the summary but has no committed log yet
+ * (`AUD-SH04-A`/`B`).
+ *
+ * This is the recovery payload, not a cache: it carries everything the user
+ * entered so a failed save, a skipped save or a process kill cannot discard a
+ * workout they actually performed. It survives until a committed log identity
+ * exists (`saveWorkoutPendingSave` is cleared only after the log commits) or the
+ * user explicitly discards.
+ */
+export type WorkoutPendingSave = {
+  routineId: string;
+  /** ISO timestamp of the session's first Start press (stable identity). */
+  startedAtIso: string;
+  /** Active-time seconds accumulated when the summary was reached. */
+  elapsedSeconds: number;
+  /** Every entered measurement, keyed by stringified sequence index. */
+  enteredSets: Record<
+    string,
+    {
+      weight: string;
+      reps: string;
+      duration?: string;
+      distance?: string;
+      pace?: string;
+      effort?: string;
+    }
+  >;
+  /** Per-phase outcomes keyed by stringified sequence index. */
+  dispositions: Record<string, 'completed' | 'skipped'>;
+  /** Session-local added sets by stringified engine exercise index. */
+  addedSets?: Record<string, number>;
+  /** Last save error surfaced to the user, for an honest resume message. */
+  lastError?: string;
+  /** When this recovery state was last written. */
+  updatedAt: string;
+};
+
+/**
+ * Reconcile a pending-save state against committed logs (`AUD-SH04-C`).
+ *
+ * A crash can land AFTER `logWorkoutSession` committed but BEFORE the pending
+ * state was cleared. On the next mount, blindly retrying would insert a second
+ * log and a second reward; blindly clearing would silently discard the user's
+ * recovery data. This resolves the ambiguity using the log's own identity:
+ *
+ *   - a committed log for the same routine at the same `started_at` means the
+ *     save already happened, so the pending state is cleared and the caller is
+ *     told the session is already saved (no duplicate insert);
+ *   - otherwise the pending state is still real and must be offered/resaved.
+ *
+ * @param state the pending-save recovery state
+ * @returns `saved` when a matching committed log exists (state already cleared),
+ *   or `pending` when the recovery state still needs a save attempt
+ */
+export async function reconcileWorkoutPendingSave(
+  state: WorkoutPendingSave,
+): Promise<{ status: 'saved'; logId: string } | { status: 'pending' }> {
+  const db = await getDatabase();
+  // Identity, not a time window: `logWorkoutSession` records the session's
+  // original `started_at`, so an exact match on (routine, started_at) is the
+  // only evidence that THIS pending session already committed. A looser window
+  // would silently consume an unrelated later log.
+  const match = await db.getFirstAsync<{ id: string }>(
+    `SELECT id FROM workout_logs WHERE routine_id = ? AND started_at = ? ORDER BY completed_at ASC LIMIT 1`,
+    [state.routineId, state.startedAtIso],
+  );
+  if (match?.id) {
+    // The log committed before the pending state was cleared: finish the
+    // cleanup instead of duplicating work or resurrecting an older draft.
+    await clearWorkoutPendingSave();
+    return { status: 'saved', logId: match.id };
+  }
+  return { status: 'pending' };
+}
+
+/** Read the pending-save recovery state, or null when nothing is pending. */
+export async function getWorkoutPendingSave(): Promise<WorkoutPendingSave | null> {
+  const db = await getDatabase();
+  return getAppMetaJsonOrDefault<WorkoutPendingSave | null>(
+    db,
+    appMetaKeys.workoutPendingSave,
+    null,
+    normalizeWorkoutPendingSave,
+  );
+}
+
+/** Persist the pending-save recovery state (idempotent; invalid input is ignored). */
+export async function saveWorkoutPendingSave(
+  state: Omit<WorkoutPendingSave, 'updatedAt'>,
+): Promise<void> {
+  const normalized = normalizeWorkoutPendingSave({ ...state, updatedAt: nowIso() });
+  if (!normalized) return;
+  const db = await getDatabase();
+  await setAppMetaJson(db, appMetaKeys.workoutPendingSave, normalized);
+}
+
+/**
+ * Clear the pending-save state. Only a committed log or an explicit user
+ * discard may call this — never the mere act of reaching the summary.
+ */
+export async function clearWorkoutPendingSave(): Promise<void> {
+  const db = await getDatabase();
+  await deleteAppMetaKey(db, appMetaKeys.workoutPendingSave);
+}
+
+function normalizeWorkoutPendingSave(value: unknown): WorkoutPendingSave | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const candidate = value as Record<string, unknown>;
+  if (typeof candidate.routineId !== 'string' || candidate.routineId.length === 0) return null;
+  if (typeof candidate.startedAtIso !== 'string') return null;
+  if (Number.isNaN(new Date(candidate.startedAtIso).getTime())) return null;
+  const elapsed = candidate.elapsedSeconds;
+  if (typeof elapsed !== 'number' || !Number.isFinite(elapsed) || elapsed < 0) return null;
+  const enteredSets = normalizeEnteredSetMap(candidate.enteredSets);
+  if (!enteredSets) return null;
+  const dispositions = normalizeDispositionMap(candidate.dispositions) ?? {};
+  return {
+    routineId: candidate.routineId,
+    startedAtIso: candidate.startedAtIso,
+    elapsedSeconds: Math.round(elapsed),
+    enteredSets,
+    dispositions,
+    ...(normalizeAddedSetMap(candidate.addedSets)
+      ? { addedSets: normalizeAddedSetMap(candidate.addedSets) }
+      : {}),
+    ...(typeof candidate.lastError === 'string' && candidate.lastError.length > 0
+      ? { lastError: candidate.lastError }
+      : {}),
+    updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : nowIso(),
+  };
+}
+
+/**
  * Most recent completed_at per routine id — the "Last performed" context on
  * routine cards. Unbounded across history, unlike the 364-day landing queries.
  */
