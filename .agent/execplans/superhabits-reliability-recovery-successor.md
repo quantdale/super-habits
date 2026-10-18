@@ -88,108 +88,79 @@ separate verdicts.
 
 ## Current Checkpoint
 
-- Current milestone: Phase 2 (B) — silent UI write fixes. Phase 1 (A1)
-  COMPLETE and COMMITTED (see Validation Ledger). A1 shipped:
-  - `linkedActions.data.ts`: `insertLinkedActionEventInTransaction()` (in-tx
-    event persist + `ON CONFLICT DO NOTHING`) and
-    `listPendingRecoveryLinkedActionEvents(cutoffIso)` sweep for the recovery
-    module (keeps DB access in the data layer, satisfying lint rule 4).
-  - `linkedActions.engine.ts`: `buildTransactionalSourceEvent()` export
-    (normalized event with caller-supplied stable eventId).
-  - Dispatch paths hand off durably: `todos.data.ts` (setTodoCompletion +
-    bulkSetTodoCompletion — pre-mint `levt` id, in-tx insert, post-commit
-    dispatch with `eventId`), `habits.data.ts` (incrementHabit threshold
-    crossing + runCompleteHabitFromNotification),
-    `todoNotificationActions.data.ts`.
-  - `linkedActions.recovery.ts`: `recoverPendingLinkedActions()` — 7-day
-    lookback, NOT EXISTS terminal execution, per-event try/catch, replay
-    through `processSourceAction` (exactly-once machinery holds), report
-    {replayedEvents, skippedEvents, failedEvents}.
-  - `AppProviders.tsx`: sweeper wired after `migrateLegacySessionMeta()`
-    (post-hydrate so replayed effects' outbox intents allocate against the
-    restored durable revision); failures log only.
-  - `linkedActions.events.types.ts`: input `label` widened to
-    `string | null` so persisted events feed `processSourceAction` directly.
-  - Test-fixture fixes: engine mocks in `tests/todos.data.test.ts` +
-    `tests/habits.data.test.ts` spread `importOriginal` (real
-    `buildTransactionalSourceEvent`); todos data mock adds
-    `insertLinkedActionEventInTransaction`; habits unit expectation adds
-    `eventId: expect.any(String)`.
-  - **A1 confirmed (P2)**: in-app dispatch paths (`todos.data.ts:886/1026`,
-    `habits.data.ts:241`) call `processSourceAction` AFTER the source
-    transaction commits with an event id minted in-memory
-    (`linkedActions.engine.ts:128`) — a crash between commit and the event
-    INSERT (`linkedActions.data.ts:496-552`) permanently loses the effect;
-    no startup sweeper exists (zero linked-action calls in
-    `core/providers/AppProviders.tsx:105-255`). The notification paths
-    (`notificationActions.data.ts:36-55`, `habits.data.ts:279-284`) already
-    implement the fix pattern: pre-minted eventId + marker in the SAME
-    transaction + replay dispatch with recovery branch
-    (`todoNotificationActions.data.ts:108-113`, `habits.data.ts:360-363`).
-    Fix design: (1) persist the source `linked_action_events` row inside the
-    same `runSyncedMutation`/`runBackupMutation` transaction for the three
-    in-app paths, dispatch post-commit with that eventId (engine already
-    resumes from a persisted event at `engine.ts:314-318`); (2) one startup
-    sweeper in AppProviders bootstrap scanning
-    `processed_notification_actions WHERE linked_action_required=1` and
-    events lacking terminal executions; no schema change (tables already at
-    `core/db/client.ts:322-401`; events/executions are local operational
-    state outside backup scope).
-  - **A2 confirmed (P3)**: all settings writers are two-transaction
-    (setting commit → separate `enqueueBackupSettingsRecord` transaction,
-    `core/sync/syncedMutation.ts:167-189`); swallow-points at
-    `pomodoro.data.ts:686`, `workout.data.ts:1971-1973`,
-    `ThemeProvider.tsx:88/108`; AsyncStorage notification prefs NEVER enqueue
-    (`core/notifications/notificationPreferences.ts` — no enqueue path).
-    Checkpoint capture is dirty-gated only (`backupCheckpoint.ts:254,280`).
-  - **A3 confirmed (P3)**: swallowed hydrate failure
-    (`AppProviders.tsx:132-140`) leaves `nextRevision=0` while durable rows
-    hold high revisions → new intents silently no-op at the
-    `excluded.revision > sync_outbox.revision` guard
-    (`syncPersistence.ts:188-198`) → exact-revision removal misses
-    (`syncPersistence.ts:118-124`) + checkpoint starvation
-    (`backupCheckpoint.ts:104-116`); hard-delete edge can strand remote rows.
-  - **B confirmed (P3)**: 8 material silent-failure groups (habit
-    pause/archive worst — modal closes before write;
-    `HabitsScreen.tsx:265-287` + `1347-1354`; todo toggle `TodosScreen.tsx:426-456`;
-    link/unlink named throws; task delete ×2; stop-recurring; pomodoro
-    notes ×2; preset save/delete; daily-plan/weekly-review deletes).
-    Established fix patterns A–D documented (ValidationError inline,
-    InAppNotice, planningWriteError, checkInError).
-  - **C1 confirmed (stronger than reported)**: backdated check-ins older than
-    yesterday ALWAYS receive no XP (reconcile horizon = today+yesterday,
-    `gamification.data.ts:658-661`; fast path refuses backdates,
-    `habits.domain.ts:336-342`). Fix: bounded 7-day lookback in
-    `runGamificationHousekeeping` + per-day cap scoping; dedupe
-    (`UNIQUE(event_kind, source_key)`) makes extra passes no-ops.
-  - **C2 confirmed**: single call site `RoutineDetailScreen.tsx:136-149`;
-    cheapest proof = browser E2E using the worker-SELECT hold pattern
-    (`e2e/habits-w7-audit.spec.ts:288-332`); no component-test framework
-    needed.
-- Completed: Phase 0 (state verified, worktree + branch at `120ab19`,
-  ExecPlan created, npm install done); Phase 0 investigations (4/4 returned);
-  Phase 1 (A1) implemented, validated, committed.
-- In progress: Phase 2 (B) — not started yet; next up habit pause/archive
-  (worst group, `HabitsScreen.tsx:265-287` + `1347-1354`).
-- Important modified files: A1 set (see milestone list); investigation
-  findings unchanged (embedded above).
-- Last successful validation: 2026-10-17 — `qa:fast` exit 0
-  (typecheck + lint + 182 unit files) in the successor worktree after A1.
+- Current milestone: Phase 5 — final validation, adversarial review, stacked PR.
+  Phases 1–4 are COMPLETE and COMMITTED on
+  `superhabits-reliability-recovery-successor`:
+  - `f964cb6` Phase 1 (A1) — durable linked-action dispatch handoff + startup
+    sweep (in-tx source event with stable id at all three in-app dispatch
+    paths, `recoverPendingLinkedActions()` 7-day sweeper in AppProviders,
+    `buildTransactionalSourceEvent`, data-layer recovery query, pinned
+    crash/exactly-once integration tests). 12 files, 930 insertions.
+  - `272343a` execplan checkpoint for A1.
+  - `f964cb6` Campaign B (habits pause/archive) + `b1a5620` (todos, pomodoro,
+    planning deletes): lifecycle handlers surface `lifecycleError` inside the
+    still-open detail modal, close only after the write lands, and guard double
+    taps; pinned by `e2e/journeys/habit-lifecycle-persistence.spec.ts` (4/4
+    green, RAISE(ABORT) injection). To-do toggles/delete + stop-recurring catch
+    and notify; `toggleTodo` gained `noop` for missing/lost-race rows. Pomodoro
+    session note prompt + session meta modal + preset save/delete and the
+    weekly-review/daily-plan history deletes render inline errors.
+  - `6460f0e` Phase 3 (A2) — `runRecoverableSettingsMutation()` applies the
+    app_meta write + snapshot capture (INSIDE the tx, AFTER the mutation) +
+    `user_backup_settings` outbox row atomically; calories goal/targets,
+    pomodoro settings, workout preferences converted. Theme/rest-default
+    enqueue failures log (rest default returns false and the session screen
+    shows a retriable alert); preset-state saves keep local-first but log.
+    Reminder prefs enqueue from `SettingsNotificationsSection` (NOT from
+    `notificationPreferences`, which sits in backupSettings' import graph —
+    a static or lazy enqueue there re-created the adapter-init cycle).
+    Pinned by `tests/integration/settingsOutboxAtomicity.test.ts`.
+  - `5f3726f` Phase 3 (A3) — `SyncEngine.hydrate()` recovers the revision floor
+    from `loadOutboxMaxRevision()` (dedicated MAX(revision) query) before
+    rethrowing, so a failed hydrate can no longer leave `nextRevision=0` and
+    silently lose every new intent at the upsert guard. Pinned by
+    `tests/integration/syncHydrateFailure.test.ts` (control proves the old
+    rejection; recovery proves allocation/removal work).
+  - `c3d204a` Phase 4 (C1) — housekeeping reconciles a bounded
+    `GAMIFICATION_RECONCILE_LOOKBACK_DAYS = 7` window oldest-first with the
+    award cap scoped per day; pinned against real SQLite (backdated days pay,
+    8-day-old does not, replay is free, 25/day cap with a second day paying).
+  - `b92d8da` Phase 4 (C2) — `e2e/workout-snapshot-ordering.spec.ts` delays
+    ONLY the `getAll` response of the prepared `listExercises` statement (rows
+    already read → genuinely stale) while an interleaved add refresh applies
+    the newer list; verified failing with the claim check removed and passing
+    with it restored; stable across repeat runs; workout feature suites green.
+- Decisions recorded in the Decision Log (fail-closed event handoff; sweep
+  after hydrate; recovery queries live in the data layer; reproduction-first
+  gate; per-day cap scoping; notify-from-caller for reminder prefs).
+- Completed: Phase 0, Phase 1 (A1), Phase 2 (B, 8 groups), Phase 3 (A2 + A3),
+  and Phase 4 (C1 + C2) — six commits `f964cb6`..`b92d8da` on the successor
+  branch, each with pinned tests.
+- In progress: Phase 5 — final affected-gate sweep, adversarial self-review,
+  stacked PR publication, final report.
+- Important modified files: the seven commit ranges above; no schema change,
+  no migration.
+- Last successful validation: 2026-10-18 —
+  - `npm run typecheck` 0 · `npm run lint` 0 (`--max-warnings 0`)
+  - `npm run qa:fast` exit 0 — 182 unit files / 2309 tests + parity guards
+  - full integration: 90 files / 451 tests (incl. 5 new pinned suites)
+  - `npm run build:e2e` hermetic export (0 Supabase hosts)
+  - Playwright: habit lifecycle journey 4/4; C2 ordering spec 2/2 repeated;
+    workout + workout-gym-v2 21/21.
 - Current failures: none.
 - Relevant quarantines: none.
 - Blockers: standing externals only — security gate red (release BLOCKED),
   iOS owner-deferred, Android ENVIRONMENT_BLOCKED. None block engineering.
 - Condition required to unblock: none (not blocked).
 - Exact resume action after unblock: N/A.
-- Exact next action: Phase 2 (B) — implement silent-failure fixes starting
-  with habit pause/archive modal (`HabitsScreen.tsx:265-287` + `1347-1354`)
-  using pattern A (ValidationError inline) or B (InAppNotice), then continue
-  down the 8-group list; add pinned tests per fix.
-- Remaining definition of done: every named candidate fixed with
-  reproduction-first evidence, disproven with pinned tests, or explicitly
-  dispositioned; gates green (typecheck 0, lint 0, full Vitest, targeted
-  Playwright, hermetic `build:e2e`); adversarial review round; stacked PR
-  published to the PR #79 branch; final report filed.
+- Exact next action: Phase 5 — run `npm run qa:affected` and execute every
+  required gate it lists (full unit/integration, journey lane, simulation
+  lane, affected e2e), then perform the adversarial self-review of the six
+  commits, then publish the stacked PR against the PR #79 branch (release
+  verdict stays BLOCKED on the red security gate) and write the final report.
+- Remaining definition of done: affected gates and full gates green; adversarial
+  review findings addressed or dispositioned; stacked PR published to the
+  PR #79 branch; final report filed with separate engineering/release verdicts.
 
 ## Progress
 
@@ -200,9 +171,12 @@ separate verdicts.
 - [x] Phase 0 — investigations A1, A2/A3, B, C1/C2 all complete (4/4 confirmed)
 - [x] Phase 1 (A1) — transactional event handoff + startup sweeper + recovery
       tests (committed 2026-10-17; 12 files, 930 insertions)
-- [ ] Phase 2 (B) — silent UI write fixes (8 material groups, patterns A–D)
-- [ ] Phase 3 (A2, A3) — settings dirty-anchor + outbox hydrate-failure recovery
-- [ ] Phase 4 (C1, C2) — bounded reward lookback + sequencer E2E pin
+- [x] Phase 2 (B) — silent UI write fixes (8 material groups, patterns A–D) —
+      committed `f964cb6` (habits) + `b1a5620` (todos/pomodoro/planning)
+- [x] Phase 3 (A2, A3) — single-transaction settings writers + outbox
+      hydrate-failure revision-floor recovery — committed `6460f0e`, `5f3726f`
+- [x] Phase 4 (C1, C2) — bounded 7-day reward lookback + per-day cap; sequencer
+      E2E pin proven failing without the claim — committed `c3d204a`, `b92d8da`
 - [ ] Phase 5 — adversarial review, final validation, stacked PR, final report
 
 ## Surprises & Discoveries
@@ -220,6 +194,19 @@ separate verdicts.
   session and risking a terminal hard-delete push failure.
 - C1 is deterministic, not probabilistic: the production reconcile horizon is
   exactly today+yesterday, so every >1-day backdate is silently unpaid.
+- A2's naive fix created a module cycle: `notificationPreferences` is imported
+  by `backupSettings`, which `supabase.adapter` imports, while
+  `syncedMutation` imports `sync.engine` — enqueueing from the prefs module
+  (static OR lazy dynamic import under Vitest) initialized the adapter
+  mid-cycle. The enqueue belongs to the settings caller.
+- The settings snapshot must be captured INSIDE the transaction AFTER the
+  mutation: capturing before (or outside) it stores a pending payload that
+  misses the just-written value, which the adapter's manifest-staleness
+  checksum then reads as a different generation.
+- C2: delaying only the `prepare` response is NOT a stale snapshot — the
+  query then executes late and reads current rows. The genuine repro needs the
+  `getAll` response (rows already read) delayed, identified by the
+  `nativeStatementId` learned from the matching `prepare`.
 
 ## Decision Log
 
@@ -237,6 +224,15 @@ separate verdicts.
 - 2026-10-17 — Reproduction-or-proof gate before any implementation —
   campaign instruction; prevents speculative rewrites of sound machinery
   (esp. the outbox revision guard and linked-action engine).
+- 2026-10-17 — B: modal closes only after the persisting write resolves
+  (`Promise<boolean>` from the handler), inline `lifecycleError` for failures;
+  row-delete/toggle failures use the existing InAppNotice convention.
+- 2026-10-18 — A2: atomic settings writers read the snapshot inside the same
+  transaction after the mutation; AsyncStorage-backed prefs keep their
+  best-effort local-first write but log instead of swallowing.
+- 2026-10-18 — A3: recover the floor from a dedicated `MAX(revision)` query
+  (not a retried full load) and rethrow so bootstrap still logs the degraded
+  start; allocation stays monotonic.
 
 ## Validation Ledger
 
@@ -255,11 +251,60 @@ separate verdicts.
 - 2026-10-17 — `npm run qa:fast` — PASS — exit 0: typecheck + lint + all
   182 unit test files (initially 10 failures from stale vi.mock factories,
   fixed with importOriginal spreads + updated expectations).
+- 2026-10-18 — habit lifecycle journey
+  (`npx playwright test --project=journeys
+e2e/journeys/habit-lifecycle-persistence.spec.ts`) — PASS 4/4 (25.9s);
+  earlier iterations diagnosed: section switcher is role `tab`, harness
+  round-trips land on Today, paused rows hidden by the default Active filter
+  (fix: Filter and sort → `Filter habits: All`).
+- 2026-10-18 — Campaign B unit/integration — PASS — todos data 30, command
+  executor 12, linked-actions integration 18, 9 planning/focus unit files 217.
+- 2026-10-18 — A2 regression discovery — `tests/integration/backupCheckpoint`
+  failed 11/13 after the first A2 rewrite; root causes: (a) dropped
+  `enqueuePrepared` after the settings outbox tx starved the queue, (b) the
+  snapshot was captured before the mutation, making the pending payload stale
+  against the manifest checksum. Both fixed; suite back to 13/13.
+- 2026-10-18 — A2 module-cycle discovery — `syncAdapterProjection` +
+  `backupPerformance` failed with `SupabaseSyncAdapter is not a constructor`;
+  the notification-prefs enqueue introduced
+  backupSettings→notificationPreferences→syncedMutation→sync.engine→adapter.
+  Enqueue moved to `SettingsNotificationsSection`; suites green.
+- 2026-10-18 — `tests/integration/settingsOutboxAtomicity.test.ts` — PASS 2/2
+  (value + intent + pending payload together; payload carries the new value).
+- 2026-10-18 — `tests/integration/syncHydrateFailure.test.ts` — PASS 3/3
+  (control proves the revision-1 rejection; recovered floor allocates above
+  the durable revision, wins the guard and removes exactly).
+- 2026-10-18 — gamification suites — PASS 58 tests (11 in the data suite
+  incl. 2 new backdate/cap tests).
+- 2026-10-18 — `npm run typecheck` / `npm run lint` — PASS 0/0 after every
+  commit; `npm run qa:fast` — PASS exit 0 (182 files, 2309 tests).
+- 2026-10-18 — full `npx vitest run tests/integration` — PASS 90 files / 451
+  tests (2 skipped).
+- 2026-10-18 — `npm run build:e2e` — PASS hermetic export, 0 Supabase hosts.
 
 ## Changed Files / Areas
 
-- None yet (implementation starting). Investigation reports are embedded in
-  Current Checkpoint findings and the task transcripts.
+- `core/linked-actions/` and tests (`linkedActionsCrashRecovery.test.ts`,
+  `linkedActionEffectsExactlyOnce.test.ts`) — A1 durable handoff + recovery.
+- `features/habits/HabitsScreen.tsx`, `HabitDetailModal.tsx`,
+  `e2e/journeys/habit-lifecycle-persistence.spec.ts` — B habits group.
+- `features/todos/TodosScreen.tsx`, `todos.data.ts`,
+  `features/pomodoro/SessionNotePrompt.tsx`, `SessionMetaEditModal.tsx`,
+  `PomodoroPresetManager.tsx`, `features/weekly-review/ReviewHistoryView.tsx`,
+  `features/daily-plan/DailyPlanHistoryView.tsx` — B sweep.
+- `core/sync/syncedMutation.ts`, `core/providers/ThemeProvider.tsx`,
+  `core/notifications/notificationPreferences.ts`,
+  `features/settings/SettingsNotificationsSection.tsx`,
+  `features/calories/calories.data.ts`, `features/pomodoro/pomodoro.data.ts`,
+  `features/workout/workout.data.ts`, `features/workout/WorkoutSessionScreen.tsx`,
+  `tests/integration/settingsOutboxAtomicity.test.ts`, `tests/caloriesTargets.test.ts`
+  — A2.
+- `core/sync/sync.engine.ts`, `core/sync/syncPersistence.ts`,
+  `tests/integration/syncHydrateFailure.test.ts` — A3.
+- `features/gamification/gamification.data.ts`,
+  `tests/integration/gamification.test.ts` — C1.
+- `e2e/workout-snapshot-ordering.spec.ts` — C2.
+- No schema change; no migration.
 
 ## Recovery / Resume Instructions
 
@@ -272,5 +317,7 @@ separate verdicts.
 ## Outcomes & Retrospective
 
 - Status: Active.
-- Summary: pending.
-- Follow-up: pending.
+- Summary: all five campaigns implemented and committed with
+  reproduction-first pinned tests; final validation/adversarial review/PR
+  remain.
+- Follow-up: affected-gate sweep, adversarial review, stacked PR, final report.
