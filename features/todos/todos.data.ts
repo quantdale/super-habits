@@ -449,6 +449,97 @@ async function resolveTodoProjectGoalAssociation(
   return { nextProjectId, nextGoalId };
 }
 
+/**
+ * The transaction-aware body of `updateTodo` (extracted for `AUD-SH14-B`).
+ *
+ * A composed save (parent edit + rule replacement) must run BOTH writes inside
+ * ONE transaction. Extracting the row-edit logic here — rather than nesting a
+ * top-level `runSyncedMutation` inside another — is what makes that possible
+ * without a nested-transaction deadlock on the single SQLite connection.
+ *
+ * @param transactionDb the caller's open transaction
+ * @param id the Todo to edit
+ * @param updates the same shape `updateTodo` accepts
+ * @param now the mutation timestamp
+ */
+async function updateTodoWithinTransaction(
+  transactionDb: Awaited<ReturnType<typeof getDatabase>>,
+  id: string,
+  updates: {
+    title?: string;
+    notes?: string;
+    dueDate?: string | null;
+    priority?: TodoPriority;
+    projectId?: string | null;
+    goalId?: string | null;
+    recurrence?: TodoRecurrence;
+  },
+  now: string,
+): Promise<{ changed: boolean; value: undefined }> {
+  const fields: string[] = ['updated_at = ?'];
+  const values: (string | null)[] = [now];
+
+  if (updates.title !== undefined) {
+    fields.push('title = ?');
+    values.push(updates.title);
+  }
+  if (updates.notes !== undefined) {
+    fields.push('notes = ?');
+    values.push(updates.notes);
+  }
+  if (updates.dueDate !== undefined) {
+    fields.push('due_date = ?');
+    values.push(updates.dueDate);
+  }
+  if (updates.priority !== undefined) {
+    fields.push('priority = ?');
+    values.push(updates.priority);
+  }
+
+  const current = await transactionDb.getFirstAsync<
+    Pick<Todo, 'project_id' | 'goal_id' | 'recurrence' | 'recurrence_id' | 'due_date'>
+  >(
+    `SELECT project_id, goal_id, recurrence, recurrence_id, due_date
+     FROM todos WHERE id = ? AND deleted_at IS NULL`,
+    [id],
+  );
+  if (!current) {
+    return { changed: false, value: undefined };
+  }
+
+  // Restart: starting recurrence on a non-recurring task begins a NEW series
+  // chain (fresh recurrence id); stopped chains stay ended.
+  if (updates.recurrence === 'daily' && current.recurrence !== 'daily') {
+    fields.push('recurrence = ?', 'recurrence_id = ?');
+    values.push('daily', createId('rec'));
+    if (updates.dueDate === undefined && current.due_date === null) {
+      fields.push('due_date = ?');
+      values.push(toDateKey());
+    }
+  }
+
+  // H9: validate and reconcile project/goal associations via the shared
+  // resolver (includes the F12 clear-project/goal-alignment rule).
+  const resolution = await resolveTodoProjectGoalAssociation(transactionDb, current, updates);
+
+  if (updates.projectId !== undefined || resolution.nextProjectId !== current.project_id) {
+    fields.push('project_id = ?');
+    values.push(resolution.nextProjectId);
+  }
+  if (updates.goalId !== undefined || resolution.nextGoalId !== current.goal_id) {
+    fields.push('goal_id = ?');
+    values.push(resolution.nextGoalId);
+  }
+
+  const result = await transactionDb.runAsync(
+    `UPDATE todos SET ${fields.join(', ')}
+     WHERE id = ?
+       AND deleted_at IS NULL`,
+    [...values, id],
+  );
+  return { changed: result.changes === 1, value: undefined };
+}
+
 export async function updateTodo(
   id: string,
   updates: {
@@ -477,72 +568,10 @@ export async function updateTodo(
   const db = await getDatabase();
   const now = nowIso();
 
-  const fields: string[] = ['updated_at = ?'];
-  const values: (string | null)[] = [now];
-
-  if (updates.title !== undefined) {
-    fields.push('title = ?');
-    values.push(updates.title);
-  }
-  if (updates.notes !== undefined) {
-    fields.push('notes = ?');
-    values.push(updates.notes);
-  }
-  if (updates.dueDate !== undefined) {
-    fields.push('due_date = ?');
-    values.push(updates.dueDate);
-  }
-  if (updates.priority !== undefined) {
-    fields.push('priority = ?');
-    values.push(updates.priority);
-  }
   await runSyncedMutation({
     db,
     record: { entity: 'todos', id, updatedAt: now, operation: 'update' },
-    mutate: async (transactionDb) => {
-      const current = await transactionDb.getFirstAsync<
-        Pick<Todo, 'project_id' | 'goal_id' | 'recurrence' | 'recurrence_id' | 'due_date'>
-      >(
-        `SELECT project_id, goal_id, recurrence, recurrence_id, due_date
-         FROM todos WHERE id = ? AND deleted_at IS NULL`,
-        [id],
-      );
-      if (!current) {
-        return { changed: false, value: undefined };
-      }
-
-      // Restart: starting recurrence on a non-recurring task begins a NEW
-      // series chain (fresh recurrence id); stopped chains stay ended.
-      if (updates.recurrence === 'daily' && current.recurrence !== 'daily') {
-        fields.push('recurrence = ?', 'recurrence_id = ?');
-        values.push('daily', createId('rec'));
-        if (updates.dueDate === undefined && current.due_date === null) {
-          fields.push('due_date = ?');
-          values.push(toDateKey());
-        }
-      }
-
-      // H9: validate and reconcile project/goal associations via the shared
-      // resolver (includes the F12 clear-project/goal-alignment rule).
-      const resolution = await resolveTodoProjectGoalAssociation(transactionDb, current, updates);
-
-      if (updates.projectId !== undefined || resolution.nextProjectId !== current.project_id) {
-        fields.push('project_id = ?');
-        values.push(resolution.nextProjectId);
-      }
-      if (updates.goalId !== undefined || resolution.nextGoalId !== current.goal_id) {
-        fields.push('goal_id = ?');
-        values.push(resolution.nextGoalId);
-      }
-
-      const result = await transactionDb.runAsync(
-        `UPDATE todos SET ${fields.join(', ')}
-         WHERE id = ?
-           AND deleted_at IS NULL`,
-        [...values, id],
-      );
-      return { changed: result.changes === 1, value: undefined };
-    },
+    mutate: async (transactionDb) => updateTodoWithinTransaction(transactionDb, id, updates, now),
   });
 
   // Re-read the row so the reminder reflects the final title/due/completed state.
@@ -760,6 +789,141 @@ export async function setTodoProjectGoal(
         [resolution.nextProjectId, resolution.nextGoalId, now, todoId],
       );
       return { changed: result.changes === 1, value: undefined };
+    },
+  });
+}
+
+/**
+ * Create a Todo AND its linked-action rules in ONE transaction
+ * (`AUD-SH14-A`/`B`).
+ *
+ * The audited defect: the editor called `addTodo` and then
+ * `saveTodoLinkedActionRules` as two independent writes. A failure in the second
+ * left a committed parent with no rules, and retrying the save created a SECOND
+ * parent with the same title (the new identity from the first attempt was
+ * discarded). An inline error alone never established idempotency.
+ *
+ * The composed operation validates the entire proposed rule set BEFORE any write,
+ * then commits the parent row, its sort order, the association resolution and
+ * every rule replacement in one transaction with their durable intents. Any
+ * failure rolls all of it back, so a retry starts from an unchanged state.
+ *
+ * @param input everything the editor knows at submit time
+ * @returns the committed Todo id (stable across a retry of a failed save)
+ */
+export async function addTodoWithLinkedActionRules(input: {
+  title: string;
+  notes?: string;
+  dueDate?: string | null;
+  priority?: TodoPriority;
+  recurrence?: TodoRecurrence;
+  projectId?: string | null;
+  goalId?: string | null;
+  rules: SaveLinkedActionRuleForSourceInput[];
+}): Promise<string> {
+  if (input.recurrence === 'daily' && input.rules.length > 0) {
+    throw new Error('Recurring todos cannot be linked-action sources yet.');
+  }
+  const dueDate =
+    input.dueDate !== undefined ? input.dueDate : input.recurrence === 'daily' ? toDateKey() : null;
+  // Prevalidate the row exactly like `addTodo`, before any write exists.
+  assertTodoWrite({ title: input.title, notes: input.notes, dueDate });
+
+  const db = await getDatabase();
+  const id = createId('todo');
+  const now = nowIso();
+  const recurrenceId = input.recurrence === 'daily' ? createId('rec') : null;
+
+  return runSyncedMutation({
+    db,
+    record: { entity: 'todos', id, updatedAt: now, operation: 'create' },
+    mutate: async (transactionDb, enqueue) => {
+      const maxRow = await transactionDb.getFirstAsync<{ maxOrder: number }>(
+        `SELECT COALESCE(MAX(sort_order), 0) AS maxOrder
+         FROM todos WHERE deleted_at IS NULL AND completed = 0`,
+      );
+      const sortOrder = (maxRow?.maxOrder ?? 0) + 1;
+      await transactionDb.runAsync(
+        `INSERT INTO todos
+           (id, title, notes, completed, completed_at, due_date, priority,
+            sort_order, recurrence, recurrence_id,
+            project_id, goal_id,
+            created_at, updated_at, deleted_at)
+         VALUES (?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+        [
+          id,
+          input.title,
+          input.notes ?? null,
+          dueDate,
+          input.priority ?? 'normal',
+          sortOrder,
+          input.recurrence ?? null,
+          recurrenceId,
+          input.projectId ?? null,
+          input.goalId ?? null,
+          now,
+          now,
+        ],
+      );
+      // The rules commit inside the SAME transaction: they receive the parent's
+      // already-allocated id, so a failure anywhere rolls the parent back too.
+      await replaceLinkedActionRulesForSourceEntity({
+        feature: 'todos',
+        entityType: 'todo',
+        entityId: id,
+        rules: input.rules,
+        db: transactionDb,
+        enqueue,
+      });
+      return { changed: true, value: id };
+    },
+  }).then(async (outcome) => {
+    if (dueDate) {
+      await syncReminderSafely({ id, title: input.title, dueDate, completedAt: null });
+    }
+    return outcome.value ?? id;
+  });
+}
+
+/**
+ * Update an existing Todo AND replace its linked-action rules atomically
+ * (`AUD-SH14-B`). The whole-save contract: either the row edit and the complete
+ * new rule set are both committed, or neither is.
+ *
+ * @param todoId the existing parent
+ * @param updates the row changes (same shape `updateTodo` accepts)
+ * @param rules the complete replacement rule set
+ */
+export async function updateTodoWithLinkedActionRules(
+  todoId: string,
+  updates: Parameters<typeof updateTodo>[1],
+  rules: SaveLinkedActionRuleForSourceInput[],
+): Promise<void> {
+  const db = await getDatabase();
+  const todo = await db.getFirstAsync<Pick<Todo, 'id' | 'recurrence' | 'deleted_at'>>(
+    `SELECT id, recurrence, deleted_at FROM todos WHERE id = ?`,
+    [todoId],
+  );
+  if (!todo) throw new Error('Todo not found.');
+  if (todo.recurrence === 'daily' && rules.length > 0) {
+    throw new Error('Recurring todos cannot be linked-action sources yet.');
+  }
+  const now = nowIso();
+  await runSyncedMutation({
+    db,
+    record: { entity: 'todos', id: todoId, updatedAt: now, operation: 'update' },
+    mutate: async (transactionDb, enqueue) => {
+      const applied = await updateTodoWithinTransaction(transactionDb, todoId, updates, now);
+      if (!applied.changed) return { changed: false, value: undefined };
+      await replaceLinkedActionRulesForSourceEntity({
+        feature: 'todos',
+        entityType: 'todo',
+        entityId: todoId,
+        rules,
+        db: transactionDb,
+        enqueue,
+      });
+      return { changed: true, value: undefined };
     },
   });
 }

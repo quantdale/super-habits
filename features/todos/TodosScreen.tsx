@@ -67,7 +67,8 @@ import {
   listAllActiveTodosForRecurrence,
   listTodos,
   removeTodo,
-  saveTodoLinkedActionRules,
+  addTodoWithLinkedActionRules,
+  updateTodoWithLinkedActionRules,
   stopRecurringSeries,
   toggleTodo,
   updateRecurringSeriesTemplate,
@@ -341,19 +342,49 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
             return;
           }
         }
-        if (!isRecurringLinkedActionSource) {
-          await saveTodoLinkedActionRules(editingId, linkedActionRules);
+        // AUD-SH14-B: the row edit and the complete rule replacement commit in
+        // ONE transaction, so a failing rule save cannot leave a half-applied
+        // edit or a replaced-away rule set.
+        if (isRecurringLinkedActionSource) {
+          await updateTodo(editingId, {
+            title: title.trim(),
+            notes: notes.trim() || undefined,
+            dueDate: dueDate ?? null,
+            priority,
+          });
+        } else {
+          await updateTodoWithLinkedActionRules(
+            editingId,
+            {
+              title: title.trim(),
+              notes: notes.trim() || undefined,
+              dueDate: dueDate ?? null,
+              priority,
+            },
+            linkedActionRules,
+          );
         }
       } else {
-        const todoId = await addTodo({
+        // AUD-SH14-A: the parent and its rules commit together. A failure now
+        // rolls the parent back, so retrying cannot create a second task with
+        // the same title.
+        const payload: {
+          title: string;
+          notes?: string;
+          dueDate: string | null;
+          priority: typeof priority;
+          recurrence: 'daily' | null;
+        } = {
           title: title.trim(),
           notes: notes.trim() || undefined,
           dueDate: dueDate ?? null,
           priority,
           recurrence: isRecurring ? 'daily' : null,
-        });
-        if (!isRecurringLinkedActionSource) {
-          await saveTodoLinkedActionRules(todoId, linkedActionRules);
+        };
+        if (isRecurringLinkedActionSource) {
+          await addTodo(payload);
+        } else {
+          await addTodoWithLinkedActionRules({ ...payload, rules: linkedActionRules });
         }
       }
       setModalVisible(false);

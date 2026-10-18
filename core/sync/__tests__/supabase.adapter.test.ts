@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SyncPushPartialFailureError } from '@/core/sync/syncErrors';
 import type { SyncRecord } from '@/core/sync/sync.engine';
+import { chainableQuery } from '../../../tests/integration/helpers/supabaseQueryDouble';
 
 type AdapterSetupOptions = {
   supabase?: { from: ReturnType<typeof vi.fn> } | null;
@@ -33,10 +34,10 @@ function storingFrom(
   );
   const select = vi.fn(() => ({
     in: vi.fn((_column: string, ids: string[]) => ({
-      eq: vi.fn(async () => ({
-        data: ids.filter((id) => stored.has(id)).map((id) => ({ id })),
-        error: null,
-      })),
+      // AUD-SH08-A: the read-back chain is
+      // select().in().eq().order().range(), so the fake must support the whole
+      // builder and slice like a real capped server.
+      eq: vi.fn(() => chainableQuery(ids.filter((id) => stored.has(id)).map((id) => ({ id })))),
     })),
   }));
   return { upsert, select };
@@ -66,10 +67,7 @@ async function setupAdapter(options: AdapterSetupOptions) {
   });
   const select = vi.fn(() => ({
     in: vi.fn((_column: string, ids: string[]) => ({
-      eq: vi.fn(async () => ({
-        data: ids.filter((id) => storedRows.has(id)).map((id) => ({ id })),
-        error: null,
-      })),
+      eq: vi.fn(() => chainableQuery(ids.filter((id) => storedRows.has(id)).map((id) => ({ id })))),
     })),
   }));
   const from = vi.fn().mockReturnValue({ upsert, select });
@@ -113,7 +111,12 @@ function record(entity: string, id: string, ownerUserId: string | null = 'user_a
 async function expectPartialFailure(
   push: Promise<void>,
   errorClass: typeof SyncPushPartialFailureError,
-  expected: { messageContains: string; failedRecords: SyncRecord[] },
+  expected: {
+    messageContains: string;
+    /** A second required substring, when one assertion must stay split. */
+    messageAlsoContains?: string;
+    failedRecords: SyncRecord[];
+  },
 ) {
   let caught: unknown;
   try {
@@ -124,6 +127,9 @@ async function expectPartialFailure(
   expect(caught).toBeInstanceOf(errorClass);
   const partialFailure = caught as SyncPushPartialFailureError;
   expect(partialFailure.message).toContain(expected.messageContains);
+  if (expected.messageAlsoContains !== undefined) {
+    expect(partialFailure.message).toContain(expected.messageAlsoContains);
+  }
   expect(partialFailure.failedRecords).toEqual(expected.failedRecords);
 }
 
@@ -295,7 +301,11 @@ describe('SupabaseSyncAdapter', () => {
     const upsertRecord = record('todos', 'todo_1');
 
     await expectPartialFailure(adapter.push([upsertRecord]), SyncPushPartialFailureError, {
-      messageContains: 'Supabase upsert failed for todos: timeout',
+      // AUD-SH08-A added batch position/size to the diagnostic, which makes a
+      // partial batch failure attributable; the entity and the cause are still
+      // named, so the assertion keeps its original intent.
+      messageContains: 'Supabase upsert failed for todos',
+      messageAlsoContains: 'timeout',
       failedRecords: [upsertRecord],
     });
   });
@@ -383,7 +393,8 @@ describe('SupabaseSyncAdapter', () => {
       adapter.push([poisonedRecord, healthyRecord]),
       SyncPushPartialFailureError,
       {
-        messageContains: 'Supabase upsert failed for todos: schema drift',
+        messageContains: 'Supabase upsert failed for todos',
+        messageAlsoContains: 'schema drift',
         failedRecords: [poisonedRecord],
       },
     );

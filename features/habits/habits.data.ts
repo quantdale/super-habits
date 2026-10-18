@@ -693,71 +693,12 @@ export async function updateHabit(
   });
   const now = nowIso();
   const db = await getDatabase();
-  const existing = await db.getFirstAsync<{
-    target_per_day: number;
-    reminder_time: string | null;
-    created_at: string;
-    rule_history: string | null;
-  }>(
-    `SELECT target_per_day, reminder_time, created_at, rule_history
-     FROM habits
-     WHERE id = ?
-       AND deleted_at IS NULL`,
-    [habitId],
-  );
-  if (!existing) return;
-
-  const effectiveFromDate = updates.effectiveFromDate ?? timestampToLocalDateKey(now);
-  const fallbackCreationDate = safeTimestampToLocalDateKey(existing.created_at);
-  const history = parseHabitRuleHistory(existing.rule_history);
-  const normalizedHistory =
-    history.length > 0
-      ? history
-      : buildInitialHabitRule(fallbackCreationDate, existing.target_per_day);
-  const currentRule = getHabitRuleForDate(
-    normalizedHistory,
-    effectiveFromDate,
-    existing.target_per_day,
-    fallbackCreationDate,
-  );
-  const nextRule: HabitRule = createHabitRule(
-    effectiveFromDate,
-    updates.weekdays ?? currentRule?.weekdays ?? ALL_HABIT_WEEKDAYS,
-    updates.targetPerDay,
-  );
-  const nextHistory = upsertHabitRule(normalizedHistory, nextRule);
-  // An omitted reminder field means “leave the current setting unchanged” for
-  // existing callers; null is the explicit disable value used by the editor.
-  const nextReminderTime =
-    updates.reminderTime === undefined ? existing.reminder_time : updates.reminderTime;
-  const parsedReminderTime =
-    nextReminderTime === null ? null : parseHabitReminderTime(nextReminderTime);
-  if (nextReminderTime !== null && !parsedReminderTime) {
-    throw new Error('Reminder time must use HH:MM local time.');
-  }
-  const canonicalReminderTime = parsedReminderTime
-    ? formatHabitReminderTime(parsedReminderTime)
-    : null;
-
   const result = await runSyncedMutation({
     db,
     record: { entity: 'habits', id: habitId, updatedAt: now, operation: 'update' },
     mutate: async (transactionDb) => {
-      const mutation = await transactionDb.runAsync(
-        'UPDATE habits SET name = ?, target_per_day = ?, reminder_time = ?, category = ?, icon = ?, color = ?, rule_history = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
-        [
-          updates.name,
-          updates.targetPerDay,
-          canonicalReminderTime,
-          updates.category,
-          updates.icon ?? DEFAULT_HABIT_ICON,
-          updates.color ?? DEFAULT_HABIT_COLOR,
-          serializeHabitRuleHistory(nextHistory),
-          now,
-          habitId,
-        ],
-      );
-      return { changed: mutation.changes === 1, value: undefined };
+      const changed = await applyHabitUpdateWithinTransaction(transactionDb, habitId, updates, now);
+      return { changed, value: undefined };
     },
   });
   if (result.changed) requestHabitReminderReconciliation();
@@ -930,6 +871,217 @@ export async function saveHabitLinkedActionRules(
     entityId: habitId,
     rules,
   });
+}
+
+/**
+ * Create a Habit AND its linked-action rules in ONE transaction
+ * (`AUD-SH14-A`).
+ *
+ * Same audited defect as the Todo editor: `addHabit` committed, then a separate
+ * rule save could throw, so a retry created a duplicate habit while the first
+ * attempt's identity was discarded.
+ *
+ * @param input the editor's full submit payload
+ * @returns the committed Habit id
+ */
+export async function addHabitWithLinkedActionRules(input: {
+  name: string;
+  targetPerDay: number;
+  category?: HabitCategory;
+  icon?: HabitIcon;
+  color?: string;
+  weekdays?: readonly HabitWeekday[];
+  reminderTime?: string | null;
+  projectId?: string | null;
+  goalId?: string | null;
+  rules: SaveLinkedActionRuleForSourceInput[];
+}): Promise<string> {
+  // Prevalidate the row before any write exists (same contract as addHabit).
+  assertHabitWrite({
+    name: input.name,
+    targetPerDay: input.targetPerDay,
+    weekdays: input.weekdays,
+  });
+  const parsedReminderTime =
+    input.reminderTime == null ? null : parseHabitReminderTime(input.reminderTime);
+  if (input.reminderTime != null && !parsedReminderTime) {
+    throw new Error('Reminder time must use HH:MM local time.');
+  }
+  const canonicalReminderTime = parsedReminderTime
+    ? formatHabitReminderTime(parsedReminderTime)
+    : null;
+  const weekdays = input.weekdays ?? ALL_HABIT_WEEKDAYS;
+  const id = createId('habit');
+  const now = nowIso();
+  const ruleHistory = buildInitialHabitRule(
+    timestampToLocalDateKey(now),
+    input.targetPerDay,
+    weekdays,
+  );
+  const db = await getDatabase();
+  await runSyncedMutation({
+    db,
+    record: { entity: 'habits', id, updatedAt: now, operation: 'create' },
+    mutate: async (transactionDb, enqueue) => {
+      await transactionDb.runAsync(
+        'INSERT INTO habits (id, name, target_per_day, reminder_time, category, icon, color, rule_history, project_id, goal_id, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
+        [
+          id,
+          input.name,
+          input.targetPerDay,
+          canonicalReminderTime,
+          input.category ?? 'anytime',
+          input.icon ?? DEFAULT_HABIT_ICON,
+          input.color ?? DEFAULT_HABIT_COLOR,
+          serializeHabitRuleHistory(ruleHistory),
+          input.projectId ?? null,
+          input.goalId ?? null,
+          now,
+          now,
+        ],
+      );
+      await replaceLinkedActionRulesForSourceEntity({
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: id,
+        rules: input.rules,
+        db: transactionDb,
+        enqueue,
+      });
+      return { changed: true, value: undefined };
+    },
+  });
+  requestHabitReminderReconciliation();
+  return id;
+}
+
+/**
+ * Update a Habit AND replace its linked-action rules atomically
+ * (`AUD-SH14-B`): either both commit or neither does.
+ *
+ * @param habitId the existing habit
+ * @param updates the row changes (same shape `updateHabit` accepts)
+ * @param rules the complete replacement rule set
+ */
+export async function updateHabitWithLinkedActionRules(
+  habitId: string,
+  updates: Parameters<typeof updateHabit>[1],
+  rules: SaveLinkedActionRuleForSourceInput[],
+): Promise<void> {
+  const db = await getDatabase();
+  const now = nowIso();
+  let changed = false;
+  await runSyncedMutation({
+    db,
+    record: { entity: 'habits', id: habitId, updatedAt: now, operation: 'update' },
+    mutate: async (transactionDb, enqueue) => {
+      // The row update and the rule replacement share this transaction. Any
+      // failure (an invalid rule, a soft-deleted parent) rolls both back.
+      const applied = await applyHabitUpdateWithinTransaction(transactionDb, habitId, updates, now);
+      if (!applied) return { changed: false, value: undefined };
+      changed = true;
+      await replaceLinkedActionRulesForSourceEntity({
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: habitId,
+        rules,
+        db: transactionDb,
+        enqueue,
+      });
+      return { changed: true, value: undefined };
+    },
+  });
+  if (changed) requestHabitReminderReconciliation();
+}
+
+/**
+ * Transaction-aware body of `updateHabit`.
+ *
+ * Extracted so a composed save can run the row edit and the rule replacement in
+ * ONE transaction without nesting `runSyncedMutation` (which would open a second
+ * transaction on the single SQLite connection).
+ *
+ * @returns whether a row actually changed
+ */
+async function applyHabitUpdateWithinTransaction(
+  transactionDb: Awaited<ReturnType<typeof getDatabase>>,
+  habitId: string,
+  updates: {
+    name: string;
+    targetPerDay: number;
+    category: HabitCategory;
+    icon?: HabitIcon;
+    color?: string;
+    weekdays?: readonly HabitWeekday[];
+    effectiveFromDate?: string;
+    reminderTime?: string | null;
+  },
+  now: string,
+): Promise<boolean> {
+  assertHabitWrite({
+    name: updates.name,
+    targetPerDay: updates.targetPerDay,
+    weekdays: updates.weekdays,
+  });
+  const existing = await transactionDb.getFirstAsync<{
+    target_per_day: number;
+    reminder_time: string | null;
+    created_at: string;
+    rule_history: string | null;
+  }>(
+    `SELECT target_per_day, reminder_time, created_at, rule_history
+     FROM habits
+     WHERE id = ?
+       AND deleted_at IS NULL`,
+    [habitId],
+  );
+  if (!existing) return false;
+
+  const effectiveFromDate = updates.effectiveFromDate ?? timestampToLocalDateKey(now);
+  const fallbackCreationDate = safeTimestampToLocalDateKey(existing.created_at);
+  const history = parseHabitRuleHistory(existing.rule_history);
+  const normalizedHistory =
+    history.length > 0
+      ? history
+      : buildInitialHabitRule(fallbackCreationDate, existing.target_per_day);
+  const currentRule = getHabitRuleForDate(
+    normalizedHistory,
+    effectiveFromDate,
+    existing.target_per_day,
+    fallbackCreationDate,
+  );
+  const nextRule: HabitRule = createHabitRule(
+    effectiveFromDate,
+    updates.weekdays ?? currentRule?.weekdays ?? ALL_HABIT_WEEKDAYS,
+    updates.targetPerDay,
+  );
+  const nextHistory = upsertHabitRule(normalizedHistory, nextRule);
+  const nextReminderTime =
+    updates.reminderTime === undefined ? existing.reminder_time : updates.reminderTime;
+  const parsedReminderTime =
+    nextReminderTime === null ? null : parseHabitReminderTime(nextReminderTime);
+  if (nextReminderTime !== null && !parsedReminderTime) {
+    throw new Error('Reminder time must use HH:MM local time.');
+  }
+  const canonicalReminderTime = parsedReminderTime
+    ? formatHabitReminderTime(parsedReminderTime)
+    : null;
+
+  const mutation = await transactionDb.runAsync(
+    'UPDATE habits SET name = ?, target_per_day = ?, reminder_time = ?, category = ?, icon = ?, color = ?, rule_history = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+    [
+      updates.name,
+      updates.targetPerDay,
+      canonicalReminderTime,
+      updates.category,
+      updates.icon ?? DEFAULT_HABIT_ICON,
+      updates.color ?? DEFAULT_HABIT_COLOR,
+      serializeHabitRuleHistory(nextHistory),
+      now,
+      habitId,
+    ],
+  );
+  return mutation.changes === 1;
 }
 
 export async function deleteHabit(habitId: string): Promise<void> {

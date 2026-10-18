@@ -35,7 +35,6 @@ import { useInAppNotices } from '@/core/providers/inAppNoticeContext';
 import { useGamification } from '@/features/gamification/gamificationContext';
 import type { Habit, HabitCategory, HabitIcon } from './types';
 import {
-  addHabit,
   archiveHabit,
   decrementHabit,
   deleteHabit,
@@ -45,9 +44,9 @@ import {
   listHabits,
   pauseHabit,
   resumeHabit,
-  saveHabitLinkedActionRules,
+  addHabitWithLinkedActionRules,
+  updateHabitWithLinkedActionRules,
   unarchiveHabit,
-  updateHabit,
 } from '@/features/habits/habits.data';
 import {
   ALL_HABIT_WEEKDAYS,
@@ -573,28 +572,22 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
       return;
     }
 
+    // AUD-SH14-A/B: the habit row and its complete rule set commit in ONE
+    // transaction, so a failing rule save cannot leave a committed parent with no
+    // rules and cannot make a retry create a duplicate habit.
+    const habitFields = {
+      name: name.trim(),
+      targetPerDay: targetNum,
+      category,
+      icon,
+      color,
+      weekdays,
+      reminderTime: parsedReminder ? formatHabitReminderTime(parsedReminder) : null,
+    };
     if (editingHabit) {
-      await updateHabit(editingHabit.id, {
-        name: name.trim(),
-        targetPerDay: targetNum,
-        category,
-        icon,
-        color,
-        weekdays,
-        reminderTime: parsedReminder ? formatHabitReminderTime(parsedReminder) : null,
-      });
-      await saveHabitLinkedActionRules(editingHabit.id, linkedActionRules);
+      await updateHabitWithLinkedActionRules(editingHabit.id, habitFields, linkedActionRules);
     } else {
-      const habitId = await addHabit(
-        name.trim(),
-        targetNum,
-        category,
-        icon,
-        color,
-        weekdays,
-        parsedReminder ? formatHabitReminderTime(parsedReminder) : null,
-      );
-      await saveHabitLinkedActionRules(habitId, linkedActionRules);
+      await addHabitWithLinkedActionRules({ ...habitFields, rules: linkedActionRules });
     }
     setEditingHabit(null);
     setName('');
