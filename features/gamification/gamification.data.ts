@@ -78,9 +78,21 @@ const STREAK_HISTORY_LIMIT = 5000;
 
 /**
  * Cap on awards per reconcile pass. A user returning after months offline has
- * today's actions at most, so this only guards against pathological data.
+ * today's actions at most, so this only guards against pathological data. The
+ * housekeeping lookback applies this cap PER DAY (one pass per date key), never
+ * as one shared budget across the window.
  */
 const RECONCILE_AWARD_LIMIT = 25;
+
+/**
+ * Bounded historical lookback for housekeeping reconciliation. The original
+ * today+yesterday horizon silently underpaid every check-in recorded more than
+ * one local day back (offline days, notification completions opened late,
+ * backdated logs). Seven days covers a normal offline stretch while staying
+ * far too small to rewrite ancient history; the ledger's unique
+ * (kind, source key) index makes repeated passes no-ops.
+ */
+export const GAMIFICATION_RECONCILE_LOOKBACK_DAYS = 7;
 
 type HabitScheduleRead = Pick<
   Habit,
@@ -598,6 +610,21 @@ async function loadActivityCandidates(db: Db, todayKey: string): Promise<Activit
   ];
 }
 
+async function reconcileDayAwards(db: Db, dateKey: string): Promise<number> {
+  const candidates = await loadActivityCandidates(db, dateKey);
+  let awarded = 0;
+  for (const candidate of candidates) {
+    if (awarded >= RECONCILE_AWARD_LIMIT) break;
+    const outcome = await awardGamificationAction({
+      kind: candidate.kind,
+      entityId: candidate.entityId,
+      todayKey: dateKey,
+    });
+    if (outcome) awarded += 1;
+  }
+  return awarded;
+}
+
 /**
  * Backfill rewards for today's actions that were never reported.
  *
@@ -609,17 +636,7 @@ export async function reconcileGamificationActivity(
 ): Promise<ReconcileOutcome> {
   const todayKey = options.todayKey ?? toDateKey();
   const db = await getDatabase();
-  const candidates = await loadActivityCandidates(db, todayKey);
-  let awarded = 0;
-  for (const candidate of candidates) {
-    if (awarded >= RECONCILE_AWARD_LIMIT) break;
-    const outcome = await awardGamificationAction({
-      kind: candidate.kind,
-      entityId: candidate.entityId,
-      todayKey,
-    });
-    if (outcome) awarded += 1;
-  }
+  const awarded = await reconcileDayAwards(db, todayKey);
   return { awarded, snapshot: await readGamificationSnapshot({ todayKey }) };
 }
 
@@ -645,19 +662,25 @@ export async function ensureStreakFreeze(
 
 /**
  * One housekeeping pass in the only order that cannot misclassify a real
- * action as a missed day: award unrewarded feature activity for yesterday and
- * today, THEN let freeze planning look at the ledger those awards produced.
+ * action as a missed day: award unrewarded feature activity across the bounded
+ * lookback (oldest first), THEN let freeze planning look at the ledger those
+ * awards produced.
  *
- * The lookback is bounded to the immediately previous local day: a
- * notification completion written before midnight and opened after it is the
- * failure mode, and an unbounded scan would rewrite historical streaks.
+ * The lookback is bounded to GAMIFICATION_RECONCILE_LOOKBACK_DAYS local days.
+ * The original today+yesterday window was the failure mode: a notification
+ * completion written before midnight and opened after it (or any offline day
+ * beyond one) was permanently unpaid. A per-day pass keeps the award cap
+ * scoped to each day and the ledger's unique source key keeps replays cheap;
+ * an unbounded scan would rewrite historical streaks, so the window stays
+ * fixed and small.
  */
 export async function runGamificationHousekeeping(
   options: GamificationReadOptions = {},
 ): Promise<void> {
   const todayKey = options.todayKey ?? toDateKey();
-  const yesterdayKey = shiftDateKey(todayKey, -1);
-  await reconcileGamificationActivity({ todayKey: yesterdayKey });
-  await reconcileGamificationActivity({ todayKey });
+  const db = await getDatabase();
+  for (let offset = GAMIFICATION_RECONCILE_LOOKBACK_DAYS - 1; offset >= 0; offset -= 1) {
+    await reconcileDayAwards(db, shiftDateKey(todayKey, -offset));
+  }
   await ensureStreakFreeze({ todayKey });
 }

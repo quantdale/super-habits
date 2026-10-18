@@ -308,4 +308,98 @@ describe('gamification ledger', () => {
     expect(reconciled.snapshot.totalXp).toBeGreaterThan(0);
     expect(reconciled.snapshot.quests.length).toBe(3);
   });
+
+  it('housekeeping pays backdated check-ins across the bounded lookback window', async () => {
+    const { habits, gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    const day3 = domain.shiftDateKey(today, -3);
+    const day6 = domain.shiftDateKey(today, -6);
+    const day8 = domain.shiftDateKey(today, -8);
+
+    // Seed completion rows directly: incrementHabit() refuses pre-creation
+    // dates, but reconcile consumes durable rows (the real offline/backfill
+    // shape).
+    const habitId = await habits.addHabit('Read', 1);
+    const seedCompletion = async (dateKey: string, suffix: string) => {
+      await db.runAsync(
+        `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+         VALUES (?, ?, ?, 1, ?, ?)`,
+        [
+          `hcmp_bd_${suffix}`,
+          habitId,
+          dateKey,
+          `${dateKey}T09:00:00.000Z`,
+          `${dateKey}T09:00:00.000Z`,
+        ],
+      );
+    };
+    await seedCompletion(day3, 'three');
+    await seedCompletion(day6, 'six');
+    await seedCompletion(day8, 'eight');
+
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+
+    const events = await db.getAllAsync<{ date_key: string; xp: number }>(
+      `SELECT date_key, xp FROM gamification_events WHERE event_kind = 'habit'
+       ORDER BY date_key ASC`,
+    );
+    // Inside the 7-day window both days pay; a day older than the bound stays
+    // unpaid (the window is deliberately small so ancient history is safe).
+    expect(events.map((event) => event.date_key).sort()).toEqual([day3, day6].sort());
+    expect(events.every((event) => event.xp > 0)).toBe(true);
+
+    // The ledger's unique source key keeps repeated passes free.
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+    const afterReplay = await db.getAllAsync<{ id: string }>(
+      `SELECT id FROM gamification_events WHERE event_kind = 'habit'`,
+    );
+    expect(afterReplay).toHaveLength(2);
+  });
+
+  it('applies the award cap per day instead of once across the lookback', async () => {
+    const { habits, gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    const cappedDay = domain.shiftDateKey(today, -2);
+    const otherDay = domain.shiftDateKey(today, -4);
+
+    // 30 completions on one backdated day (more than the 25-award cap) plus one
+    // on a later day: the cap must not consume the window's budget.
+    for (let index = 0; index < 30; index += 1) {
+      const habitId = await habits.addHabit(`Burst ${index}`, 1);
+      await db.runAsync(
+        `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+         VALUES (?, ?, ?, 1, ?, ?)`,
+        [
+          `hcmp_burst_${index}`,
+          habitId,
+          cappedDay,
+          `${cappedDay}T09:00:00.000Z`,
+          `${cappedDay}T09:00:00.000Z`,
+        ],
+      );
+    }
+    const otherHabit = await habits.addHabit('Single', 1);
+    await db.runAsync(
+      `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+       VALUES (?, ?, ?, 1, ?, ?)`,
+      [
+        'hcmp_single',
+        otherHabit,
+        otherDay,
+        `${otherDay}T09:00:00.000Z`,
+        `${otherDay}T09:00:00.000Z`,
+      ],
+    );
+
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+
+    const perDay = await db.getAllAsync<{ date_key: string; count: number }>(
+      `SELECT date_key, COUNT(*) AS count FROM gamification_events
+       WHERE event_kind = 'habit' GROUP BY date_key ORDER BY date_key ASC`,
+    );
+    expect(perDay).toEqual([
+      { date_key: otherDay, count: 1 },
+      { date_key: cappedDay, count: 25 },
+    ]);
+  });
 });
