@@ -411,3 +411,60 @@ the revert-based attribution, and the 3/3 green lane.)
 
 Focused reruns on the final hermetic build: `calories.spec.ts` +
 `workout-snapshot-ordering.spec.ts` 13/13, habit-lifecycle journey 4/4.
+
+## Verification addendum — final independent review (2026-10-18)
+
+Scope: adversarial review of the committed PR #80 diff (`120ab19...HEAD`,
+focused on `6642534...631b005`) in the successor worktree at `33593b8`
+(= `origin/superhabits-reliability-recovery-successor`; working tree clean).
+Unrelated preserved artifacts (`.tmp-ios36423379932/`, `features_tsx_list.txt`,
+foreign stashes/worktrees) were excluded and left untouched.
+
+Invariants re-verified against source, not summaries: rule-level completion
+(one terminal sibling cannot suppress an unfinished one — the `NOT EXISTS` is
+correlated per `rule_id`); exactly-once (terminal sibling duplicates, stable
+execution/produced-id reuse, idempotent adapters, target-table and
+`sync_outbox` counts asserted); historical eligibility (`created_at <=` the
+event row's `created_at`, ISO-string comparable at ms precision, equality
+eligible; engine matching carries the same cutoff via `recordedAt`); leases
+(fresh `running` untouched, stale reclaimed with stable identity); SQL (rule
+probe seeks `idx_linked_action_rules_source_lookup`, per-rule execution probe
+seeks `idx_linked_action_executions_source_rule`; NULL source-entity matching
+is identical to the TypeScript matcher; `EXISTS` cannot duplicate events);
+unsupported/self-noop/identity-deduped events re-scan read-only inside the
+window; crash boundaries before/during/after effect and before finalize all
+covered; source event commits atomically with its source mutation. Broader
+campaign re-verified: A2 keeps the committed value on backup-intent failure
+(`backupEnqueued: false`) and only mutation failures throw; A3's recovered
+floor is monotonic (`Math.max`) and the revision guard is untouched; B's modal
+surfaces `lifecycleError` and disables lifecycle buttons while busy; C1 is
+chronological, bounded to 7 local days with a per-day 25-award cap and a
+unique source key; C2's spec delays the worker `getAll` response of the
+prepared `listExercises` statement (rows already read — genuinely stale) at
+the real call site.
+
+Independent execution: the six linked-action suites were re-run at this head
+— **41/41** (`linkedActionsMultiRuleCrashRecovery` 11, `linkedActions` 10,
+`linkedActionsCrashRecovery` 4, `linkedActionEffectsExactlyOnce` 4,
+`linkedActionLogTargets` 3, `linkedActions.engine` 9). The earlier exact-source
+full-suite qualification (376/0/0-flaky/87-skipped, visual 34/34) remains
+valid; the review introduced no source change, so it was not re-run.
+
+Findings: no P0/P1/P2. One P3 — **a rule paused at event time and re-enabled
+later fires on the historical event at a subsequent startup sweep** (eligibility
+is "existed-then AND active-now"; no status-transition history exists to prove
+the rule was active at the moment of the action). Reproduced deterministically:
+rule paused → source action completes (event commits, zero executions, sweep
+is a no-op while paused) → rule re-enabled → next sweep applies the effect
+exactly once (`replayedEvents: 1`). Impact is one late but rule-consistent
+effect inside the 7-day horizon; no double-apply and no corruption; identical
+behavior existed in the A1 baseline. Disposition: DOCUMENTED, no code change —
+the alternatives (status-history snapshot = new schema; `updated_at` heuristic)
+would break the documented live-configuration semantics for edited rules
+(pinned by `completes an interrupted rule with its current configuration`).
+The contract wording "paused/deleted rules never resurrect" means active at
+sweep time; the pause-AFTER-event case (never fires) is covered by tests.
+
+Verdicts: `INDEPENDENT_REVIEW: PASS_WITH_NONBLOCKING_FINDINGS` ·
+`ENGINEERING_CAMPAIGN: PASS` · `PRODUCT_RELEASE: BLOCKED` (security gate red,
+unchanged).
