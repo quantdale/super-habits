@@ -33,13 +33,20 @@ import path from 'node:path';
 export const PUBLIC_ENV_PREFIX = 'EXPO_PUBLIC_';
 
 /**
- * Prefixes whose presence in the ambient environment means the workstation is
- * pointed at a real remote. Stripping them is correct; failing loudly about
- * them is the caller's decision, because "this developer always exports
- * EXPO_PUBLIC_SUPABASE_URL" is worth a hard stop and "EXPO_PUBLIC_AI_COMMAND_
- * PARSE_MODE is set" is not.
+ * Substrings whose presence in an ambient `EXPO_PUBLIC_*` name means the
+ * workstation is pointed at a real remote. Stripping them is correct; failing
+ * loudly about them is the caller's decision, because "this developer always
+ * exports EXPO_PUBLIC_SUPABASE_URL" is worth a hard stop and
+ * "EXPO_PUBLIC_AI_COMMAND_PARSE_MODE is set" is not.
+ *
+ * `AI_COMMAND` is included because those variables carry the remote-AI backend
+ * host/proxy/function name (`AUD-SH21-A`): a machine configured for the remote
+ * parser is exactly as non-hermetic as one configured for a live Supabase
+ * project, and leaving it unflagged let a "credential-free" build ship a real
+ * backend endpoint. Bare mode/rollout toggles stay unflagged deliberately — they
+ * name no endpoint.
  */
-export const REMOTE_ENV_MARKERS = ['SUPABASE'];
+export const REMOTE_ENV_MARKERS = ['SUPABASE', 'AI_COMMAND_BACKEND', 'AI_COMMAND_PROXY', 'AI_COMMAND_SUPABASE'];
 
 /**
  * Build the hermetic child environment.

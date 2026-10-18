@@ -3,6 +3,7 @@ import type {
   AccountStatus,
   LocalAccountDataState,
 } from '@/core/auth/account.types';
+import { decideImportOriginClaim, importOriginRefusalMessage } from '@/lib/importOrigin';
 import {
   isPortableOwnerFingerprint,
   portableOwnerFingerprint,
@@ -229,6 +230,34 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
   }
 
   if (!local.ownerBinding && local.unownedOutboxCount > 0) {
+    // AUD-SH01-B: the imported-origin restriction is a PRECONDITION on adoption,
+    // not a rule of the populated-dataset branch. Before this guard, one pending
+    // unowned outbox row (produced by any local edit while remote work was
+    // paused) moved execution here and an unrelated temporary account was
+    // adopted as the dataset owner.
+    const pendingClaim = decideImportOriginClaim({
+      importOrigin: importOriginOwnerFingerprint,
+      candidateUserId: auth.verifiedUserId,
+      candidateIsAnonymous: auth.verifiedIsAnonymous === true,
+    });
+    if (!pendingClaim.allowed) {
+      return {
+        status: 'owner_mismatch',
+        bindCurrentUserId: null,
+        bindProvisionalUserId: null,
+        seedOwnerUserId: null,
+        shouldCreateAnonymous: false,
+        canRecoverExisting: false,
+        canRecoverOwner: false,
+        // Only the source account may ever claim it, so offer that recovery
+        // form to a wrong ANONYMOUS session; a verified non-anonymous account is
+        // an outright mismatch (verify signs it out).
+        canRecoverImportedOwner:
+          pendingClaim.reason === 'temporary_session' && auth.verifiedIsAnonymous === true,
+        canProtect: false,
+        message: importOriginRefusalMessage(pendingClaim.reason),
+      };
+    }
     if (
       auth.verifiedUserId &&
       local.outboxOwnerIds.every((ownerUserId) => ownerUserId === auth.verifiedUserId)

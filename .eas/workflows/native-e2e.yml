@@ -10,7 +10,23 @@ on:
       - native-e2e
 
 jobs:
+  # AUD-SH21-A: prove the build is hermetic BY CONFIGURATION before spending a
+  # paid cloud build. The e2e-test profile blanks every public backend/remote-AI
+  # variable and disables dotenv, so an account-level EAS environment value
+  # cannot reach the artifact. This job re-checks that on the exact commit, and
+  # fails before build_android/build_ios start.
+  isolation_preflight:
+    steps:
+      - uses: eas/checkout
+
+      - name: Verify credential-free cloud test configuration
+        run: |
+          set -euo pipefail
+          node scripts/cloud-native-isolation.mjs
+          node scripts/release-profile-guard.mjs
+
   build_android:
+    needs: [isolation_preflight]
     type: build
     params:
       platform: android
@@ -38,6 +54,7 @@ jobs:
         - .maestro/flows/pomodoro-notification-path.yaml
 
   build_ios:
+    needs: [isolation_preflight]
     type: build
     params:
       platform: ios

@@ -8,6 +8,7 @@ import {
   type LocalAccountDataState,
   type LocalTableCount,
 } from '@/core/auth/account.types';
+import { decideImportOriginClaim, type ImportOriginFingerprint } from '@/lib/importOrigin';
 
 const TABLES_WITH_DELETED_AT = new Set<AccountUserTable>([
   'todos',
@@ -139,16 +140,63 @@ export async function adoptUnownedOutboxRows(
   ]);
 }
 
+/**
+ * Read the dataset's recorded portable-import origin fingerprint.
+ *
+ * Read INSIDE the committing transaction so the guard sees the same value the
+ * decision would have, even if a portable import landed while an async decision
+ * was in flight (`AUD-SH01-B`). A storage failure is reported as an unreadable
+ * origin, never as "no origin".
+ */
+export async function readImportOriginFingerprint(
+  db: SQLite.SQLiteDatabase,
+): Promise<ImportOriginFingerprint> {
+  try {
+    const value = await getAppMetaText(db, appMetaKeys.portableLastImportOwnerFingerprint);
+    return value && value !== 'null' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Throw when binding `userId` would let an unrelated account claim a dataset
+ * with a recorded protected origin.
+ *
+ * This is the durable-commit recheck: `decideAccountState` already refuses such
+ * a claim, but a decision computed before another writer changed the device must
+ * not be committable. Callers translate the throw into their own conflict result.
+ */
+async function assertImportOriginAllowsBinding(
+  db: SQLite.SQLiteDatabase,
+  userId: string,
+  options: { candidateIsAnonymous?: boolean } = {},
+): Promise<void> {
+  const importOrigin = await readImportOriginFingerprint(db);
+  const claim = decideImportOriginClaim({
+    importOrigin,
+    candidateUserId: userId,
+    candidateIsAnonymous: options.candidateIsAnonymous === true,
+  });
+  if (!claim.allowed) {
+    throw new Error('IMPORT_ORIGIN_OWNER_CONFLICT');
+  }
+}
+
 export async function bindLocalDatasetOwner(
   db: SQLite.SQLiteDatabase,
   userId: string,
-  options: { adoptUnownedOutbox?: boolean } = {},
+  options: { adoptUnownedOutbox?: boolean; candidateIsAnonymous?: boolean } = {},
 ): Promise<void> {
   try {
     // OTP sign-in also triggers account reconciliation. Serialize this bind so
     // the auth-state refresh and the explicit recovery action cannot start two
     // transactions on the same SQLite connection for the same verified owner.
     await withSQLiteTransaction(db, async (transactionDb) => {
+      // AUD-SH01-B: the imported-origin precondition is enforced at the
+      // committing boundary too, so a stale decision cannot adopt a protected
+      // dataset for an unrelated account.
+      await assertImportOriginAllowsBinding(transactionDb, userId, options);
       await setLocalDatasetOwner(transactionDb, userId);
       if (options.adoptUnownedOutbox) {
         await adoptUnownedOutboxRows(transactionDb, userId);
@@ -175,6 +223,9 @@ export async function bindProvisionalLocalDatasetOwner(
   db: SQLite.SQLiteDatabase,
   userId: string,
 ): Promise<void> {
+  // AUD-SH01-B: a provisional binding is still a binding, so a protected
+  // imported dataset can never be seeded with a temporary session.
+  await assertImportOriginAllowsBinding(db, userId, { candidateIsAnonymous: true });
   const current = await getLocalDatasetOwner(db);
   if (current && current !== userId) {
     throw new Error('LOCAL_DATASET_OWNER_CONFLICT');
@@ -227,6 +278,13 @@ export async function replaceProvisionalLocalDatasetOwner(
   userId: string,
   options: { keepProvisional?: boolean } = {},
 ): Promise<void> {
+  // AUD-SH01-B: replacement is another ownership path, so the same precondition
+  // applies — a protected imported dataset is not claimable by a replacement.
+  // `keepProvisional` marks the temporary-anonymous variant, whose fingerprint
+  // can never match a protected origin.
+  await assertImportOriginAllowsBinding(db, userId, {
+    candidateIsAnonymous: options.keepProvisional === true,
+  });
   const current = await getLocalDatasetOwner(db);
   if (current && current !== userId) {
     const provisional = await getLocalDatasetOwnerProvisional(db);

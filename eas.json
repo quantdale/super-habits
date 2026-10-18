@@ -17,7 +17,13 @@
     "e2e-test": {
       "withoutCredentials": true,
       "env": {
-        "EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST": "true"
+        "EXPO_PUBLIC_HABIT_REMINDER_E2E_TEST": "true",
+        "EXPO_NO_DOTENV": "1",
+        "EXPO_PUBLIC_SUPABASE_URL": "",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "",
+        "EXPO_PUBLIC_AI_COMMAND_BACKEND_HOST": "",
+        "EXPO_PUBLIC_AI_COMMAND_PROXY_URL": "",
+        "EXPO_PUBLIC_AI_COMMAND_SUPABASE_FUNCTION_NAME": ""
       },
       "ios": {
         "simulator": true
