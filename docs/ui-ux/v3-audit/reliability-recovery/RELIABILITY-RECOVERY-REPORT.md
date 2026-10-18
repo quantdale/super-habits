@@ -156,18 +156,31 @@ prepared record after its transaction (dropping it starved the queue).
 
 ## Gates
 
-| Gate                                                  | Result                                             |
-| ----------------------------------------------------- | -------------------------------------------------- |
-| `npm run typecheck`                                   | PASS — 0 errors                                    |
-| `npm run lint` (`--max-warnings 0`)                   | PASS — 0 errors/warnings                           |
-| `npm run qa:fast`                                     | PASS — 182 unit files / 2309 tests + parity guards |
-| `npx vitest run tests/integration`                    | PASS — 90 files / 451 tests (2 skipped)            |
-| `npm run build:e2e` (hermetic)                        | PASS — 0 Supabase hosts in `dist/`                 |
-| `npm run e2e` (feature + journeys + simulation + pwa) | see run log below                                  |
-| `npm run qa:simulation --all --mode deterministic`    | see run log below                                  |
-| `npm run openspec:validate`                           | see run log below                                  |
+| Gate                                                  | Result                                                                                                                                                   |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run typecheck`                                   | PASS — 0 errors                                                                                                                                          |
+| `npm run lint` (`--max-warnings 0`)                   | PASS — 0 errors/warnings                                                                                                                                 |
+| `npm run qa:fast`                                     | PASS — 182 unit files / 2309 tests + parity guards                                                                                                       |
+| `npx vitest run tests/integration`                    | PASS — 90 files / 451 tests (2 skipped)                                                                                                                  |
+| `npm run build:e2e` (hermetic)                        | PASS — 0 Supabase hosts in `dist/`                                                                                                                       |
+| `npm run e2e` (feature + journeys + simulation + pwa) | PASS — 367 passed / 9 failed, all 9 the W15 visual goldens; after the reviewed golden refresh (below) the visual lane is 34/34 across 3 consecutive runs |
+| `npm run qa:simulation --all --mode deterministic`    | PASS — all 23 scenarios                                                                                                                                  |
+| `npm run openspec:validate`                           | PASS — 88 items, 0 failed                                                                                                                                |
 
 ## Residual risks / follow-ups
+
+### Visual golden refresh (C1)
+
+The first full `npm run e2e` run failed exactly nine W15 `visual-regression`
+goldens. Attribution was proven, not assumed: rebuilding with only C1's
+lookback reverted makes all 34 visual tests pass; restoring it reproduces the
+same nine failures. Every non-reward pixel region is identical, and the diffs
+concentrate on reward/level text and the tab band that carries level state —
+the fixture days that were previously unpaid are now paid, which is the
+intended C1 behavior. The goldens were regenerated with the documented reviewed
+path (`npm run visual:update`) plus a `golden-manifest.md` change-log entry;
+`maxDiffPixels` stays 0 and nothing is masked. The lane was then green 3/3
+consecutive runs.
 
 - A failed hydrate still loses the unflushed queue for that session (rows are
   retried next launch; the revision floor is now safe). Not a data-loss path.
@@ -184,3 +197,6 @@ prepared record after its transaction (dropping it starved the queue).
   verification surface.
 - Security gate stays red (`braces` GHSA-vfj7-8cjw-p6xm, `node-forge`
   GHSA-86w9-cpqp-85rv); release remains blocked and neither PR may merge.
+
+Focused reruns on the final hermetic build: `calories.spec.ts` +
+`workout-snapshot-ordering.spec.ts` 13/13, habit-lifecycle journey 4/4.

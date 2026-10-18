@@ -140,24 +140,20 @@ separate verdicts.
   stacked PR publication, final report.
 - Important modified files: the seven commit ranges above; no schema change,
   no migration.
-- Last successful validation: 2026-10-18 —
-  - `npm run typecheck` 0 · `npm run lint` 0 (`--max-warnings 0`)
-  - `npm run qa:fast` exit 0 — 182 unit files / 2309 tests + parity guards
-  - full integration: 90 files / 451 tests (incl. 5 new pinned suites)
-  - `npm run build:e2e` hermetic export (0 Supabase hosts)
-  - Playwright: habit lifecycle journey 4/4; C2 ordering spec 2/2 repeated;
-    workout + workout-gym-v2 21/21.
+- Last successful validation: 2026-10-18 — typecheck 0 · lint 0 · `qa:fast`
+  182 files/2309 tests · integration 90 files/451 tests · hermetic
+  `build:e2e` · `npm run e2e` 367 passed (after the reviewed C1 golden
+  refresh; visual 34/34 ×3) · `qa:simulation` 23/23 · openspec 88/88 · focused
+  reruns 13/13 + journey 4/4.
 - Current failures: none.
 - Relevant quarantines: none.
 - Blockers: standing externals only — security gate red (release BLOCKED),
   iOS owner-deferred, Android ENVIRONMENT_BLOCKED. None block engineering.
 - Condition required to unblock: none (not blocked).
 - Exact resume action after unblock: N/A.
-- Exact next action: Phase 5 — run `npm run qa:affected` and execute every
-  required gate it lists (full unit/integration, journey lane, simulation
-  lane, affected e2e), then perform the adversarial self-review of the six
-  commits, then publish the stacked PR against the PR #79 branch (release
-  verdict stays BLOCKED on the red security gate) and write the final report.
+- Exact next action: push the branch and open the stacked PR against
+  `frontend-v3-post-w17-overnight-successor` using the final report as the
+  body basis; record the PR URL in this plan, then mark Phase 5 complete.
 - Remaining definition of done: affected gates and full gates green; adversarial
   review findings addressed or dispositioned; stacked PR published to the
   PR #79 branch; final report filed with separate engineering/release verdicts.
@@ -281,6 +277,17 @@ e2e/journeys/habit-lifecycle-persistence.spec.ts`) — PASS 4/4 (25.9s);
 - 2026-10-18 — full `npx vitest run tests/integration` — PASS 90 files / 451
   tests (2 skipped).
 - 2026-10-18 — `npm run build:e2e` — PASS hermetic export, 0 Supabase hosts.
+
+- 2026-10-18 — full `npm run e2e` — 367 passed / 9 failed; all nine were W15
+  visual goldens. Attribution proven: rebuild with ONLY C1's lookback
+  reverted → visual 34/34 pass; restored → the same 9 fail. Refreshed via
+  `npm run visual:update` + `golden-manifest.md` change-log row (maxDiffPixels
+  stays 0, no masks); visual lane green 3/3 consecutive runs.
+- 2026-10-18 — focused reruns on the final hermetic build: `calories.spec.ts`
+  - `workout-snapshot-ordering.spec.ts` 13/13; habit-lifecycle journey 4/4.
+- 2026-10-18 — `npm run qa:simulation --all --mode deterministic` — PASS, all
+  23 scenarios.
+- 2026-10-18 — `npm run openspec:validate` — PASS 88/88.
 
 ## Changed Files / Areas
 
