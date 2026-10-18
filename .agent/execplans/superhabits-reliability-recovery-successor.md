@@ -88,6 +88,10 @@ separate verdicts.
 
 ## Current Checkpoint
 
+- Stacked PR: https://github.com/quantdale/super-habits/pull/80 (base
+  `frontend-v3-post-w17-overnight-successor`, open; release BLOCKED on the
+  security gate).
+
 - Current milestone: Phase 5 — final validation, adversarial review, stacked PR.
   Phases 1–4 are COMPLETE and COMMITTED on
   `superhabits-reliability-recovery-successor`:
@@ -328,3 +332,11 @@ e2e/journeys/habit-lifecycle-persistence.spec.ts`) — PASS 4/4 (25.9s);
   reproduction-first pinned tests; final validation/adversarial review/PR
   remain.
 - Follow-up: affected-gate sweep, adversarial review, stacked PR, final report.
+
+## Final disposition
+
+- Phase 5 complete: all campaigns implemented, pinned, gated; stacked PR #80
+  published; final report at
+  `docs/ui-ux/v3-audit/reliability-recovery/RELIABILITY-RECOVERY-REPORT.md`.
+- Engineering verdict: PASS. Release verdict: BLOCKED (unchanged security gate;
+  iOS owner-deferred; Android environment-blocked; neither PR may merge).
