@@ -164,7 +164,23 @@ export type DailyQuestState = {
   unit: string;
   target: number;
   progress: number;
+  /**
+   * ELIGIBLE: the canonical post-action facts meet the target.
+   *
+   * This is a derived statement about today's state, not a payment record
+   * (`AUD-SH16-A`). Conflating the two let a quest that became eligible as a
+   * side effect of another action look "previously paid" and silently skip its
+   * reward.
+   */
   complete: boolean;
+  /**
+   * PAID: this quest's reward was durably recorded for this date.
+   *
+   * Payment identity comes from the persisted quest ledger, never from the
+   * derived eligibility flag, so a quest that becomes eligible after the fact is
+   * still paid exactly once.
+   */
+  paid: boolean;
   /** XP granted when the quest completes. */
   xpReward: number;
 };

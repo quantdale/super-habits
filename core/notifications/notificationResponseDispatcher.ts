@@ -199,8 +199,43 @@ export function classifyNotificationResponse(
   };
 }
 
+/**
+ * Host replay identity for one delivered notification response (`AUD-SH17-A`).
+ *
+ * The audited defect: the fingerprint was request identifier + action only. A
+ * repeating notification keeps ONE fixed identifier across deliveries, so two
+ * weekly review reminders delivered on different dates shared a fingerprint and
+ * the host processed only the first. The cache is per mounted host, so this is a
+ * same-session false suppression, not a durability claim — but it is exactly the
+ * case a repeating reminder hits.
+ *
+ * The fingerprint therefore includes the DELIVERY identity: the request's
+ * delivery timestamp when the platform supplies one, plus the classified
+ * occurrence id. That distinguishes deliveries without changing the ACTION's
+ * durable idempotency key, which lives in the data layer
+ * (`getTodoReminderActionKey` / habit claim namespaces) and is deliberately
+ * untouched here.
+ *
+ * @param response the delivered notification response
+ */
 export function getNotificationResponseFingerprint(response: NotificationResponse): string {
-  return `${response.notification.request.identifier}:${response.actionIdentifier}`;
+  const request = response.notification.request;
+  // `date` is the delivery timestamp the platform attaches to the RESPONSE. It
+  // is the only platform-provided value that changes between deliveries of one
+  // fixed request identifier, so it is the event identity here.
+  const deliveredAt = (response as { date?: unknown }).date;
+  const deliveryIdentity =
+    typeof deliveredAt === 'number' && Number.isFinite(deliveredAt) && deliveredAt !== 0
+      ? String(deliveredAt)
+      : 'no-delivery-date';
+  // The classified occurrence id separates business occurrences (a rescheduled
+  // todo fire time, a snooze cycle) even when the platform reports no date.
+  const classified = classifyNotificationResponse(response);
+  const occurrenceId =
+    'occurrenceId' in classified && typeof classified.occurrenceId === 'string'
+      ? classified.occurrenceId
+      : 'none';
+  return `${request.identifier}:${response.actionIdentifier}:${deliveryIdentity}:${occurrenceId}`;
 }
 
 /** The only response interpreter used by the app's listener and cold-start path. */

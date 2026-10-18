@@ -146,7 +146,7 @@ export function buildDailyQuests(input: {
   facts: DayFacts;
   completedQuestIds: readonly string[];
 }): DailyQuestState[] {
-  const completed = new Set(input.completedQuestIds);
+  const paid = new Set(input.completedQuestIds);
   return selectDailyQuestTemplates(input.dateKey).map((template) => {
     const progress = Math.max(0, Math.floor(questProgressFor(template.metric, input.facts)));
     return {
@@ -157,7 +157,11 @@ export function buildDailyQuests(input: {
       unit: template.unit,
       target: template.target,
       progress,
-      complete: completed.has(template.id) || progress >= template.target,
+      // `AUD-SH16-A`: `complete` is DERIVED eligibility; `paid` is the persisted
+      // payment record. They are deliberately separate values so one can never
+      // stand in for the other.
+      complete: progress >= template.target || paid.has(template.id),
+      paid: paid.has(template.id),
       xpReward: XP_AWARDS.quest,
     };
   });
@@ -577,16 +581,22 @@ export function computeActionReward(input: ActionRewardInput): GamificationAward
     ...input.facts,
     xpEarned: input.facts.xpEarned + actionXp,
   };
-  const previouslyComplete = new Set(
-    input.quests.filter((quest) => quest.complete).map((quest) => quest.id),
+  // `AUD-SH16-A`: payment identity is the PAID set, not the derived `complete`
+  // flag. The audited defect used `complete` for both, so a quest that the
+  // post-action facts made eligible looked already-paid and its XP was never
+  // granted: committing a daily plan produced the plan event (8 XP) but no
+  // quest row and no 15-XP quest award.
+  const previouslyPaid = new Set(
+    input.quests.filter((quest) => quest.paid).map((quest) => quest.id),
   );
   const questsAfter = buildDailyQuests({
     dateKey: input.dateKey,
     facts: factsAfter,
-    completedQuestIds: [...previouslyComplete],
+    completedQuestIds: [...previouslyPaid],
   });
+  // Pay every quest that is now eligible and has no payment record yet.
   const completedQuestIds = questsAfter
-    .filter((quest) => quest.complete && !previouslyComplete.has(quest.id))
+    .filter((quest) => quest.complete && !quest.paid)
     .map((quest) => quest.id);
   for (const questId of completedQuestIds) {
     events.push({
