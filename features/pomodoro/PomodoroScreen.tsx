@@ -56,6 +56,8 @@ import {
   matchPresetBySettings,
   planActiveTimerReconcile,
   planSessionCompletion,
+  computeResumeDeadlineIso,
+  resolveRunningDeadlineMs,
   resolveActivePreset,
   timerEndNotificationCopy,
   type CompletedFocusLogPlan,
@@ -335,9 +337,12 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
           setCompletedFocus(intent.completedFocus);
         } else if (plan.kind === 'complete-unlogged') {
           // The countdown finished while the app was dead — honor the focus.
-          const endedAtIso = new Date(
-            new Date(intent.startedAtIso).getTime() + intent.totalSeconds * 1000,
-          ).toISOString();
+          // `AUD-SH10-A`: the completion moment is the RUNNING deadline (which a
+          // resume recomputed from the frozen remainder), not the original
+          // start plus the configured length. The logged duration stays the
+          // configured length because the session genuinely ran that long, and
+          // the identity (`startedAtIso`) is unchanged for attribution.
+          const endedAtIso = new Date(resolveRunningDeadlineMs(intent)).toISOString();
           setRecoveredNotice({
             title: 'Session recovered',
             body: 'Your focus session finished while the app was closed, so it has been logged for you.',
@@ -758,6 +763,9 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
         totalSeconds,
         completedFocus: completedFocusRef.current,
         notificationId: null,
+        // AUD-SH10-A: paused means the countdown is frozen, so no deadline is
+        // in force. Resume computes and persists the new one.
+        runningDeadlineIso: null,
         pausedRemainingSeconds: remaining,
       }).catch(() => undefined);
     }
@@ -775,14 +783,16 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
     setIsPaused(false);
     setPhaseAnnouncement('Resumed');
     if (startedAtRef.current) {
-      // Keep the durable intent's notification id current across pauses and
-      // clear the paused marker so reconciliation trusts the deadline again.
+      // AUD-SH10-A: resume recomputes the RUNNING deadline from the frozen
+      // remainder measured from NOW, so the paused minutes are never counted as
+      // focus. The session identity (`startedAtIso`) is deliberately unchanged.
       void savePomodoroActiveTimer({
         startedAtIso: startedAtRef.current.toISOString(),
         mode: currentMode,
         totalSeconds,
         completedFocus: completedFocusRef.current,
         notificationId: id,
+        runningDeadlineIso: computeResumeDeadlineIso(Date.now(), remaining),
         pausedRemainingSeconds: null,
       }).catch(() => undefined);
     }

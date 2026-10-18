@@ -194,6 +194,12 @@ export function planTimerStartup(
       mode,
       totalSeconds: durationSeconds,
       completedFocus: config.completedFocus,
+      // `AUD-SH10-A`: the countdown deadline is derived from the moment the
+      // user actually pressed Start. It is persisted separately from the session
+      // identity so a later pause/resume can move it without rewriting identity.
+      runningDeadlineIso: new Date(
+        new Date(startedAtIso).getTime() + durationSeconds * 1000,
+      ).toISOString(),
       // Filled in once scheduling resolves; the intent is only written after.
       notificationId: null,
     },

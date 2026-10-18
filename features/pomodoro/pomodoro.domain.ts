@@ -519,8 +519,17 @@ export function planSessionCompletion(input: {
 
 /** Durable intent persisted at start so a killed process can be reconciled. */
 export type ActiveTimerIntent = {
+  /**
+   * When this session's FIRST Start was pressed. This is the session IDENTITY
+   * used for logging and attribution; it is never rewritten by a pause/resume
+   * (`AUD-SH10-A`).
+   */
   startedAtIso: string;
   mode: PomodoroMode;
+  /**
+   * The session's configured length. Kept for the logged duration; it is NOT
+   * the countdown deadline.
+   */
   totalSeconds: number;
   completedFocus: number;
   notificationId: string | null;
@@ -529,6 +538,22 @@ export type ActiveTimerIntent = {
    * intents persisted before pausing was durable omit the field entirely.
    */
   pausedRemainingSeconds?: number | null;
+  /**
+   * When the RUNNING countdown will reach zero (`AUD-SH10-A`).
+   *
+   * The audited defect: the intent stored only `startedAtIso` plus
+   * `totalSeconds`, so the nominal deadline was always
+   * `startedAt + totalSeconds`. A session started at 01:00, run five minutes,
+   * paused twenty and resumed at 01:25 kept the 01:25 deadline from the
+   * ORIGINAL start — a restart at 01:26 then reconciled as
+   * `complete-unlogged` although only 300 of 1500 seconds had actually run.
+   *
+   * This field separates identity (above) from the deadline (here). Resume
+   * recomputes it from the frozen remainder (`now + pausedRemainingSeconds`), so
+   * paused time is never counted as focus. Absent on legacy intents, which fall
+   * back to the historical `startedAt + totalSeconds` reading.
+   */
+  runningDeadlineIso?: string | null;
 };
 
 export type ActiveTimerReconciliation =
@@ -556,11 +581,43 @@ export function planActiveTimerReconcile(
   if (intent.pausedRemainingSeconds != null) {
     return { kind: 'interrupted', notificationId: intent.notificationId };
   }
-  const endMs = new Date(intent.startedAtIso).getTime() + intent.totalSeconds * 1000;
+  const endMs = resolveRunningDeadlineMs(intent);
   if (intent.mode === 'focus' && nowMs >= endMs) {
     return { kind: 'complete-unlogged', notificationId: intent.notificationId };
   }
   return { kind: 'interrupted', notificationId: intent.notificationId };
+}
+
+/**
+ * The moment this session's RUNNING countdown reaches zero (`AUD-SH10-A`).
+ *
+ * Prefers the durable `runningDeadlineIso` written by start/resume. Legacy
+ * intents (persisted before the deadline was separated from identity) fall back
+ * to the historical `startedAt + totalSeconds`, which is the only reading those
+ * records support.
+ *
+ * @param intent the durable active-timer intent
+ */
+export function resolveRunningDeadlineMs(intent: ActiveTimerIntent): number {
+  if (intent.runningDeadlineIso != null) {
+    const parsed = new Date(intent.runningDeadlineIso).getTime();
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return new Date(intent.startedAtIso).getTime() + intent.totalSeconds * 1000;
+}
+
+/**
+ * The deadline a resume must persist: the frozen remainder measured from `now`.
+ *
+ * Paused time is therefore never counted as focus, and the deadline moves with
+ * each pause/resume instead of staying pinned to the session's first start.
+ *
+ * @param nowMs the resume moment
+ * @param pausedRemainingSeconds the frozen countdown at pause
+ */
+export function computeResumeDeadlineIso(nowMs: number, pausedRemainingSeconds: number): string {
+  const remaining = Math.max(0, Math.round(pausedRemainingSeconds));
+  return new Date(nowMs + remaining * 1000).toISOString();
 }
 
 // ---------------------------------------------------------------------------
