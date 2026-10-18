@@ -2,7 +2,7 @@ import { getDatabase } from '@/core/db/client';
 import { appMetaKeys, getAppMetaJsonOrDefault, setAppMetaText } from '@/core/db/appMeta';
 import { getLocalDatasetOwner } from '@/core/auth/account.data';
 import type { SyncAdapter, SyncRecord } from '@/core/sync/sync.engine';
-import { SyncPushPartialFailureError } from '@/core/sync/syncErrors';
+import { SyncPushPartialFailureError, type SyncRecordFailure } from '@/core/sync/syncErrors';
 import { getSupabaseAuthUserId, supabase } from '@/lib/supabase';
 import {
   BACKUP_ENTITIES,
@@ -15,6 +15,21 @@ import {
   type BackupManifest,
 } from '@/core/backup/backup.types';
 import { canonicalizeSettingsPayload } from '@/core/backup/backupSettings';
+
+/**
+ * Best-effort PostgREST/transport code from an adapter error (`AUD-SH03-B`).
+ *
+ * The code is recorded as SAFE diagnostic metadata next to the per-record error
+ * so a reader can distinguish `PGRST205` from `PGRST204` without re-parsing a
+ * human message. The classifier still reads the message text (it must also work
+ * for errors that carry no code), so this is additive.
+ */
+function postgrestCodeOf(error: Error): string | undefined {
+  const withCode = error as Error & { code?: unknown };
+  if (typeof withCode.code === 'string' && withCode.code.trim() !== '') return withCode.code;
+  const match = /(PGRST\d{3}|\d{5}|\d{4})/.exec(error.message);
+  return match?.[1];
+}
 
 /**
  * SQLite entity names enqueued for remote backup — must match
@@ -90,6 +105,9 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     const client = supabase;
     const byEntity = collectRecordsByEntity(records);
     const failedRecords: SyncRecord[] = [];
+    // AUD-SH03-B: per-record evidence. The engine classifies each record from
+    // ITS OWN error; the joined summary below is diagnostics only.
+    const failures: SyncRecordFailure[] = [];
     const errorMessages: string[] = [];
 
     // One entity's failure (missing rows, a schema-drift upsert rejection,
@@ -166,8 +184,14 @@ export class SupabaseSyncAdapter implements SyncAdapter {
 
         await this.upsertEntityRows(client, db, entity, ids, currentUserId);
       } catch (error) {
-        failedRecords.push(...entityRecords);
-        errorMessages.push(error instanceof Error ? error.message : String(error));
+        const failure = error instanceof Error ? error : new Error(String(error));
+        // Every record in this entity failed for THIS entity's own reason, so
+        // each gets the same record-local evidence (never another entity's).
+        for (const record of entityRecords) {
+          failedRecords.push(record);
+          failures.push({ record, error: failure, code: postgrestCodeOf(failure) });
+        }
+        errorMessages.push(failure.message);
       }
     }
 
@@ -175,6 +199,7 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       throw new SyncPushPartialFailureError(
         `[sync] Push failed for one or more entities: ${errorMessages.join('; ')}`,
         failedRecords,
+        failures,
       );
     }
   }

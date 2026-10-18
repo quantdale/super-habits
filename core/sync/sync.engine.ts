@@ -8,6 +8,7 @@ import {
   classifyOutboxFailure as classifyFailure,
   describeBlockedOutbox,
   outboxAttemptKey,
+  repairLegacyBlockedEntries,
   type OutboxAttemptLedger,
   type OutboxFailureClass,
   type OutboxPersistentFailureClass,
@@ -201,7 +202,15 @@ export class SyncEngine {
       this.replaceOrAppend(record, revision);
     }
     if (status) this.status = { ...status, blockedEntities: status.blockedEntities ?? [] };
-    if (ledger) this.attemptLedger = ledger;
+    if (ledger) {
+      // AUD-SH03-C: a durable ledger written by the pre-fix accounting may hold
+      // verdicts that transient noise produced. Repair them into a bounded
+      // re-probe (never a silent drop, never an unbounded retry) and persist the
+      // repaired ledger so the repair happens once per entry.
+      const repaired = repairLegacyBlockedEntries(ledger, new Date().toISOString());
+      this.attemptLedger = repaired.ledger;
+      if (repaired.reprobedKeys.length > 0) this.persistAttemptLedger();
+    }
     this.refreshBlockedEntities();
   }
 
@@ -378,11 +387,23 @@ export class SyncEngine {
       // (a persistent failure past the attempt bound) are NOT requeued: they
       // can never push, and requeueing them is what froze the completeness
       // checkpoint forever.
-      const failureClass = classifyOutboxFailure(error);
+      // AUD-SH03-B: each record is classified from ITS OWN error. The audited
+      // defect classified the adapter's single JOINED message for every failed
+      // record, so one entity's missing table made an independently-transient
+      // entity look permanently broken — and both were blocked.
       const nowIso = new Date().toISOString();
       let ledger = this.attemptLedger;
       const newlyBlocked: string[] = [];
+      let lastFailureClass: OutboxFailureClass = 'transient';
       for (const failed of failedRecords) {
+        const recordError =
+          error instanceof SyncPushPartialFailureError
+            ? error.failureFor(failed)
+            : error instanceof Error
+              ? error
+              : new Error(String(error));
+        const failureClass = classifyOutboxFailure(recordError);
+        lastFailureClass = failureClass;
         const applied = applyOutboxFailure(ledger, failed, failureClass, nowIso);
         ledger = applied.ledger;
         if (applied.blockedNow) newlyBlocked.push(outboxAttemptKey(failed));
@@ -406,7 +427,7 @@ export class SyncEngine {
       this.refreshBlockedEntities();
       if (terminal.length > 0 || newlyBlocked.length > 0) {
         console.warn(
-          `[sync] ${newlyBlocked.length} outbox record(s) can never push and are now blocked (${failureClass}): ${[...new Set([...newlyBlocked, ...terminal.map(dedupeKey)])].join(', ')}. They stay out of the retry queue and are reported in backup status.`,
+          `[sync] ${newlyBlocked.length} outbox record(s) can never push and are now blocked (${lastFailureClass}): ${[...new Set([...newlyBlocked, ...terminal.map(dedupeKey)])].join(', ')}. They stay out of the retry queue and are reported in backup status.`,
         );
       }
       this.recordFailure(error);
