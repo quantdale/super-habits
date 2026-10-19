@@ -24,7 +24,7 @@
 - [x] Inspect the exact EAS build-profile/environment merge and local/iOS isolation controls for SH-21. Record confirmed affected paths, counterevidence and any unavailable account-side evidence without printing values.
 - [x] Enforce dotenv/backend/remote-AI isolation consistently for Android and iOS cloud test builds using existing hermetic patterns; retain ordinary release behavior.
 - [x] Add hostile synthetic-environment tests and artifact/configuration isolation checks for AUD-SH21-A/B; record any real cloud/device qualification separately rather than triggering paid runs by default.
-- [ ] 1.13 Investigate current compatible advisory fixes and PR #57's relevant dependency paths; apply only a supported justified remediation with lockfile evidence, or leave a precise SH-20 external blocker and continue other packages.
+- [x] 1.13 Investigate current compatible advisory fixes and PR #57's relevant dependency paths; apply only a supported justified remediation with lockfile evidence, or leave a precise SH-20 external blocker and continue other packages.
 
 ## 2. W2 — Protect ownership and reliable pending backup work
 
@@ -42,7 +42,7 @@
 ## 3. W3 — Preserve immutable published recovery generations
 
 - [x] Turn design D5 into a concrete protocol/schema decision record: owner/snapshot identity, chunks, canonical manifest, publication head/conflict contract, capability negotiation, limits, retained generations and old-client behavior. Verify it satisfies the normative spec without weakening legacy guarantees.
-- [ ] 3.2 Implement isolated generation schema and owner RLS/grants with append-only remote migration files created through the CLI; validate privilege/ownership/refusal cases against a fresh local/disposable backend, never the linked production project.
+- [x] 3.2 Implement isolated generation schema and owner RLS/grants with append-only remote migration files created through the CLI; validate privilege/ownership/refusal cases against a fresh local/disposable backend, never the linked production project.
 - [x] Implement the atomic idempotent publication operation with owner checks and expected-head conflict handling; prove lost-response retry, immutable-chunk replacement refusal and pointer rollback prevention.
 - [ ] 3.4 Pass the thin-slice gate before app wiring: publish G1, stage changed/deleted entities and settings for G2, fail every boundary and restore G1 from a second client. Preserve the failed proof if any part remains incorrect.
 - [x] Implement durable coherent local capture/upload identity and bounded payload staging; allocate an append-only local migration only if needed on the actual base, and prove capture rollback/reopen behavior with no network inside SQLite transactions.
@@ -105,7 +105,32 @@
 - [x] Build the hermetic current source and run the full Playwright projects including PWA/visual, full deterministic simulations and required timezone matrix. Do not mask regressions through blanket goldens, skips, threshold changes or retry assembly.
 - [ ] 7.4 Run guarded disposable-backend generation/owner/compatibility certification when authorized resources are available; otherwise retain the specific external gate, evidence and exact resume command.
 - [ ] 7.5 Qualify Android smoke/persistence/lifecycle/notification paths and iOS equivalents on campaign-owned current-source targets when available; keep unavailable/deferred results explicit and avoid foreign devices or unapproved paid workflows.
-- [ ] 7.6 Re-run the dependency security gate and verify genuine remediation on the final graph; if still blocked, retain the release block and exact upstream/governance condition with no waiver by implication.
+- [x] 7.6 Re-run the dependency security gate and verify genuine remediation on the final graph; if still blocked, retain the release block and exact upstream/governance condition with no waiver by implication.
 - [x] Write resolution-report.md containing the full review packet required by validation-matrix.md, including source/base/diff provenance, each regression case, migrations/rollback, skipped/external evidence, and separate engineering/platform/security/release dispositions.
 - [x] Review the actual complete campaign diff and inherited stack for unintentional changes, preserve unrelated paths, stop only owned servers and run web:hygiene; record final Git/process state.
 - [x] Validate the reconciled ExecPlan and choose its honest lifecycle state. Mark COMPLETED only if all required work/evidence is satisfied; otherwise keep open tasks and an exact resumable state for blocked external requirements. Do not archive or claim independent acceptance before the owner's separate review.
+
+## 8. Owner-authorized final review resolution (2026-10-20)
+
+- [x] 8.1 Repair R3-01/02 with strict pending-state inspection and immutable performed-session recovery; verify edited/deleted/same-name routines and transient read errors.
+- [x] 8.2 Repair R3-03 through the actual notification delivery queue; concurrent duplicates dispatch once and failures remain retryable.
+- [x] 8.3 Repair R3-05/06/09 generation metadata restore, safe legacy cutover, explicit capabilities and durable server-sequence reservation; verify full current/legacy restore paths.
+- [x] 8.4 Repair R3-07/08 with additive SQL and real PostgreSQL authenticated-role/negative/content/concurrency qualification.
+- [x] 8.5 Complete R3-11/12 with correct ordinary/simulation artifact routing and strict production API argument fidelity; retain meaningful regressions.
+- [ ] 8.6 Isolate and resolve the visual delta without replacing unexplained goldens; qualify real export/update and affected native lanes.
+- [x] 8.7 Re-evaluate SH-20 using current supported dependency evidence without security-policy waivers.
+- [x] 8.8 Reconcile R3-13 checkpoint, source-specific evidence, dispositions, limitations and remaining gates; complete final source review, validate integration and perform the authorized non-force main push.
+- [ ] 8.9 Obtain the owner's separately requested independent acceptance review after the source/packet handoff; retain external gates and do not archive prematurely.
+
+Current qualification note (2026-10-20): local PostgreSQL17.5 executes the exact
+migrations with67 checks and550 TS-invalid counterexamples. This satisfies the
+local schema/privilege portion of3.2. Tasks3.4/3.12/7.4 remain open for hosted
+Auth/PostgREST/deployed corpus qualification. Strict visual34/34 and actual
+three-case two-export PWA upgrade proof pass after six explained reward
+baselines;8.6/7.5 retain native ENVIRONMENT blockers. Final23/23 scenarios,
+nine live self-tests and dedicated sync52/52 pass with no boundary skips.
+Security investigation/recheck tasks1.13/7.6 are performed with a red release
+gate; checked investigation tasks do not mean the advisories are remediated.
+Source main integration was verified at9cee7718; this packet is committed on top.
+Task8.9 preserves the owner's separate acceptance requirement. The campaign is
+BLOCKED, not archived, until the remaining release gates and acceptance close.
