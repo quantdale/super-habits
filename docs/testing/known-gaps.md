@@ -216,6 +216,27 @@ the `add-user-simulation-platform` disposable-backend round-trip lane.
 
 **Host-unreachability caveat (2026-08-26):** the `journeys-sync` lane is ENVIRONMENT-sensitive on hosts that cannot resolve `dummy.supabase.co`. This campaign's local Windows host returned NXDOMAIN for `*.supabase.co` (nslookup against 8.8.8.8 and 1.1.1.1; `curl` exited `000` in ~0.12s), so the pass-through injection escapes to a dead host and the partial-failure (bad-backend P5 step 5) and recoverable-account-v1 (A step 2) journeys deterministically miss locally. A bisect at the pre-campaign SHA `7a49647` failed identically on this host, while CI run 491 (same SHA) was green on GitHub runners — proving the lane is valid on reachable DNS and the local misses are ENVIRONMENT, not product regressions. Authoritative green for this lane is the CI rerun after push, not a local run on an unreachable dummy host.
 
+### 8a. PWA shell upgrade (real two-build lane) — CLOSED by `e2e:shell-upgrade`
+
+**Gate site:** `e2e/pwa-shell-upgrade.spec.ts`
+
+**Reason for the separate lane:** the audited `AUD-SH05-A` defect can only be
+proven with two ACTUAL exports whose shell content differs, so the cache revision
+changes and a browser genuinely installs the second worker. `pwa-update.spec.ts`
+covers the banner/apply machinery by flipping a synthetic server-side worker
+marker, which by construction cannot prove the production revision step.
+
+**Resolution:** `scripts/prepare-shell-b.mjs` produces `dist-shell-b/` as a
+genuinely different second export and refuses to continue if both builds hash to
+the same revision; `scripts/serve-e2e.js` gained
+`/__e2e__/serve-shell-b` / `/__e2e__/serve-shell-a` so one origin switches builds
+mid-test. `npm run e2e:shell-upgrade` runs the lane.
+
+**Availability caveat:** the lane needs `dist/` (from `npm run build:e2e`) plus
+the prepared `dist-shell-b/`; without them its three cases SKIP with an explicit
+reason rather than passing vacuously. It is not part of the ordinary `e2e`
+aggregate for that reason.
+
 ### 9. Reconnect-push boundary (standard `dist/` build) — CLOSED by the `journeys-sync` lane
 
 **Gate site:** `e2e/journeys/the-commute.spec.ts`

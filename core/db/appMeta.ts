@@ -80,6 +80,21 @@ export const appMetaKeys = {
   backupBackfillDoneEntities: defineJsonKey('backup.backfill_done_entities', 'sync'),
   backupDirty: defineTextKey('backup.dirty', 'sync'),
   backupPendingManifest: defineJsonKey('backup.pending_manifest', 'sync'),
+  /**
+   * Durable generation capture state (`AUD-SH02-A`/`B`).
+   *
+   * Immutable published recovery content lives in a separate namespace from the
+   * mutable staging rows. This key holds the in-flight capture: its snapshot
+   * identity, the captured manifest, the staged chunk ordinals and the upload
+   * position, so a killed process resumes the SAME generation instead of minting
+   * a second one or losing the coherent snapshot it already took.
+   */
+  backupGenerationCapture: defineJsonKey('backup.generation_capture', 'sync'),
+  /**
+   * Highest generation sequence this device has published. Monotonic so a stale
+   * retry can never regress a newer head.
+   */
+  backupGenerationSequence: defineTextKey('backup.generation_sequence', 'sync'),
   backupPendingSettings: defineJsonKey('backup.pending_settings', 'sync'),
   backupPendingThemeApply: defineJsonKey('backup.pending_theme_apply', 'sync'),
   backupLastCompleteGeneration: defineTextKey('backup.last_complete_generation', 'sync'),

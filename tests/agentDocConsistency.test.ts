@@ -119,14 +119,21 @@ describe('agent documentation vs source truth', () => {
     expect(agents).toContain(`\`expo-sqlite\` (\`${expoSqlite}\`)`);
   });
 
-  it('states the real service-worker cache generation', () => {
-    const match = /const CACHE_VERSION = 'v(\d+)'/.exec(read('public/sw.js'));
-    expect(match).not.toBeNull();
-    const cacheVersion = `v${match![1]}`;
-    expect(read('CLAUDE.md')).toContain(`superhabits-shell-${cacheVersion}`);
+  it('states the real service-worker cache generation contract', () => {
+    // AUD-SH05-A: the cache version is GENERATED from shell content, never
+    // hand-maintained. A literal `v<N>` is the audited defect (a forgotten bump
+    // means a byte-identical worker that never installs), so this invariant now
+    // asserts the generation step and the docs that explain it.
+    const swSource = read('public/sw.js');
+    expect(swSource).not.toMatch(/const CACHE_VERSION = 'v\d+';/);
+    expect(swSource).toContain("const CACHE_VERSION = '__SUPERHABITS_CACHE_VERSION__';");
+    const claude = read('CLAUDE.md');
+    expect(claude).toContain('superhabits-shell-<CACHE_VERSION>');
+    expect(claude).toContain('scripts/pwa-shell-revision.mjs');
+    expect(claude).not.toMatch(/superhabits-shell-v\d+/);
     const prePr = read('.cursor/commands/pre-pr.md');
-    expect(prePr).toContain(`superhabits-shell-${cacheVersion}`);
-    expect(prePr).not.toContain('superhabits-shell-v3');
+    expect(prePr).toContain('superhabits-shell-sha-');
+    expect(prePr).not.toMatch(/superhabits-shell-v\d+/);
   });
 
   it('states the real backup entity scope size', () => {
