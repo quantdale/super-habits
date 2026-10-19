@@ -488,12 +488,22 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const startRoutineRef = useRef<(() => void) | null>(null);
   const startRoutineById = useCallback(
     async (routineId: string) => {
-      // `AUD-SH04-A` (review finding 1): a finished workout awaiting save lives in
-      // ONE durable slot. Starting a second session used to overwrite it with the
-      // new session's state, silently destroying a completed-but-unsaved workout
-      // with no history row and no explicit discard. Block the start until the
-      // outstanding session is saved or discarded.
-      if (pendingSave) {
+      // `AUD-SH04-A` (review findings 1 / R3-01): a finished workout awaiting save
+      // lives in ONE durable slot. Starting a second session used to overwrite it
+      // with the new session's state, silently destroying a completed-but-unsaved
+      // workout with no history row and no explicit discard.
+      //
+      // R3-01: the check must read AUTHORITATIVE durable state, not the React
+      // `pendingSave` snapshot. A cancelled session leaves the workout list
+      // reachable before its async refresh finishes, so with `refresh` paused a
+      // second start could slip past the stale React state and reach the slot.
+      // The durable read below is what actually gates the slot.
+      const durablePending = await getWorkoutPendingSave().catch(() => null);
+      if (durablePending || pendingSave) {
+        if (durablePending && !pendingSave) {
+          // The slot changed underneath us: adopt it so the UI reflects reality.
+          setPendingSave(durablePending);
+        }
         const viewIt = await confirm({
           title: 'Finish the workout you have?',
           message:
