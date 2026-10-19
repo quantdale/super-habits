@@ -51,23 +51,21 @@ try {
     label: 'build:e2e',
     command: 'npx',
     args: ['expo', 'export', '-p', 'web', '--clear'],
-    // AUD-SH19-A/B: the ONLY export that enables the simulation data-layer
-    // bridge. Simulation API legs then invoke real `*.data.ts` functions on the
-    // app's singleton connection. `release-profile-guard.mjs` refuses this flag
-    // in every eas.json/app.json config, and `AppProviders` installs nothing
-    // when it is absent, so ordinary/release/verification exports expose no
-    // callable mutation surface. The value is set AFTER the hermetic strip, so
-    // it is deliberate rather than ambient.
     // `AUD-SH19-B`/`AUD-SH05-A`: the simulation bridge is ARMED only when the
     // simulation lane explicitly asks for it (`npm run build:e2e:sim`, which sets
     // EXPO_PUBLIC_SIM_DATA_BRIDGE_BUILD=1). The default `build:e2e` export — the
     // one visual and feature lanes use — must carry no bridge at all, so the
-    // artifact is identical to what a user would see. The `set` map is what the
-    // hermetic builder injects, so the conditional has to live here rather than in
-    // the app: leaving it unconditional armed every build regardless of the flag.
-    ...(process.env.EXPO_PUBLIC_SIM_DATA_BRIDGE_BUILD === '1'
-      ? { EXPO_PUBLIC_SIM_DATA_BRIDGE: 'true' }
-      : {}),
+    // artifact is identical to what a user would see.
+    //
+    // Review finding 11: the flag MUST go through `set`, not be spread as a
+    // top-level option — `runHermeticBuild` only forwards `set` into the child
+    // environment, so a top-level key was silently ignored and `build:e2e:sim`
+    // produced an unarmed bridge while logging `armed=true`.
+    set: {
+      ...(process.env.EXPO_PUBLIC_SIM_DATA_BRIDGE_BUILD === '1'
+        ? { EXPO_PUBLIC_SIM_DATA_BRIDGE: 'true' }
+        : {}),
+    },
   });
 } catch (error) {
   fail(

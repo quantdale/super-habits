@@ -166,7 +166,11 @@ BEGIN
         USING ERRCODE = 'serialization_failure';
     END IF;
     UPDATE public.backup_generation_head
-       SET snapshot_id = p_snapshot_id,\n           sequence = v_generation.sequence,\n           updated_at = now()\n     WHERE user_id = v_user_id\n     RETURNING * INTO v_head;
+       SET snapshot_id = p_snapshot_id,
+           sequence = v_generation.sequence,
+           updated_at = now()
+     WHERE user_id = v_user_id
+     RETURNING * INTO v_head;
     RETURN v_head;
   END IF;
 

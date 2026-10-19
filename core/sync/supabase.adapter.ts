@@ -459,7 +459,28 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       // Verify THIS batch before acknowledging it. Reusing the full-id-set
       // verification here would be wrong — an unverified earlier batch must not
       // be acknowledged just because a later one is fine.
-      const confirmed = await this.verifyEntityRows(client, entity, batchIds, currentUserId);
+      //
+      // Review finding 10: a THROWN read-back must not lose the ids this entity
+      // already verified. `verifyEntityRows` can throw (network error, malformed
+      // response), and letting that escape carried no `acknowledgedIds` — the
+      // outer handler then reported every record as failed, so 250 verified rows
+      // were retried even though they had stored. The throw is converted into the
+      // same `EntityBatchPushError` shape so the verified prefix survives every
+      // later failure path.
+      let confirmed: Set<string>;
+      try {
+        confirmed = await this.verifyEntityRows(client, entity, batchIds, currentUserId);
+      } catch (verifyError) {
+        throw new EntityBatchPushError(
+          `Supabase batch verification errored for ${entity} (batch ${
+            batchIndex + 1
+          }/${writeBatches.length}): ${
+            verifyError instanceof Error ? verifyError.message : String(verifyError)
+          }`,
+          acknowledgedIds,
+          new Set(batchIds),
+        );
+      }
       const outcome = compareVerifiedIds(batchIds, confirmed, { serverCap: this.serverRowCap });
       if (!outcome.ok) {
         const detail =
