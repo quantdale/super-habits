@@ -138,7 +138,7 @@ export function markAssertionOutcome(oracle: Oracle, read: unknown): OracleEvalu
       result: 'failed',
       detail: `${unmatched.length} of ${expectations.length} expectation(s) matched no row (received ${rows.length} row(s)): ${JSON.stringify(
         unmatched,
-      )}`,
+      )}; actual rows: ${JSON.stringify(rows)}`,
     };
   }
   if (unclaimed.length > 0) {

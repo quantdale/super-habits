@@ -6,9 +6,11 @@ import { queryRows, returnToApp } from '../helpers/dbHarness';
 import { expectRows } from '../helpers/oracles';
 import { TAB_LABELS } from '../helpers/navigation';
 import { resetAll } from '../helpers/reset';
+import { GenerationSupabaseMock } from '../helpers/generationSupabaseMock';
 import { handleBackupRestRequest } from '../helpers/accountSupabaseMock';
 
 const SUPABASE_ROUTE = '**/*.supabase.co/**';
+const generationRemote = new GenerationSupabaseMock();
 const ANONYMOUS_USER = {
   id: '00000000-0000-0000-0000-000000000101',
   aud: 'authenticated',
@@ -178,9 +180,15 @@ async function handleAccountMock(route: Route): Promise<void> {
     currentUser.is_anonymous === false && currentUser.id === PERMANENT_USER.id
       ? { todos: { count: 1, rows: [BACKUP_TODO] } }
       : {};
+  if (await generationRemote.handle(route, currentUser.id)) return;
+  if (await generationRemote.handleReadBack(route, currentUser.id)) return;
+  const entity = new URL(request.url()).pathname.match(/^\/rest\/v1\/([a-z_]+)$/)?.[1];
+  if (method === 'POST' && entity && generationRemote.isDataEntity(entity))
+    generationRemote.recordWrite(entity, request.postDataJSON(), currentUser.id);
   const handled = await handleBackupRestRequest(route, {
     entities: entityOverrides,
-    onPostRows: (_entity, rows) => {
+    onPostRows: (entity, rows) => {
+      if (entity !== 'todos') return;
       for (const row of rows) {
         if (row && typeof (row as { user_id?: unknown }).user_id === 'string') {
           pushedTodoUserIds.push((row as { user_id: string }).user_id);
@@ -234,6 +242,7 @@ defineJourney({
       name: 'protect the anonymous backup with email',
       run: async ({ page }) => {
         await installAccountMock(page);
+        generationRemote.reset();
         await resetAll(page);
         await returnToApp(page);
         requireAccountBoundary();
@@ -255,6 +264,7 @@ defineJourney({
         // mock server identity too so the temporary anonymous session cannot
         // expose the permanent account's backup before recovery is chosen.
         currentUser = ANONYMOUS_USER;
+        generationRemote.reset();
         await resetAll(page);
         await returnToApp(page);
         await openSettingsScreen(page);
@@ -324,6 +334,7 @@ defineJourney({
         requireAccountBoundary();
         verifyUserOverride = null;
         pushedTodoUserIds = [];
+        generationRemote.reset();
         await resetAll(page);
         await returnToApp(page);
         await page.getByRole('button', { name: 'Open settings' }).click();
@@ -369,6 +380,7 @@ defineJourney({
         requireAccountBoundary();
         verifyUserOverride = null;
         pushedTodoUserIds = [];
+        generationRemote.reset();
         await resetAll(page);
         await returnToApp(page);
         await openSettingsScreen(page);
@@ -418,6 +430,7 @@ defineJourney({
         requireAccountBoundary();
         verifyUserOverride = null;
         pushedTodoUserIds = [];
+        generationRemote.reset();
         await resetAll(page);
         // Fake clock BEFORE the app's first render so the focus timer can be
         // completed deterministically.

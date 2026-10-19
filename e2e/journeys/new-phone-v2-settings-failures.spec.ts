@@ -3,6 +3,7 @@ import { defineJourney } from '../helpers/journey';
 import { ACTIVE_SECTION_SELECTOR } from '../helpers/oracles';
 import { returnToApp, queryRows } from '../helpers/dbHarness';
 import { resetAll } from '../helpers/reset';
+import { GenerationSupabaseMock } from '../helpers/generationSupabaseMock';
 
 /**
  * J5c — "New phone, settings integrity" (Backup V2 closure).
@@ -18,6 +19,7 @@ import { resetAll } from '../helpers/reset';
  * released as fixme (same protocol as new-phone-v2.spec.ts).
  */
 
+const generationRemote = new GenerationSupabaseMock();
 let remoteBackupDetected = false;
 
 type SettingsFailureMode = 'none' | 'no-metadata' | 'missing-row' | 'checksum-mismatch';
@@ -261,14 +263,24 @@ async function handleDummySupabaseRequest(route: Route): Promise<void> {
     return route.fulfill({ status: 200, headers: REMOTE_HEADERS, body: '{}' });
   }
 
+  if (await generationRemote.handle(route, 'dummy-anon')) return;
+  if (await generationRemote.handleReadBack(route, 'dummy-anon')) return;
   const match = path.match(/^\/rest\/v1\/([a-z_]+)$/);
   if (!match) {
     return route.fulfill({ status: 404, headers: REMOTE_HEADERS, body: '{"error":"not found"}' });
   }
 
   const entity = match[1];
+  if (!generationRemote.isDataEntity(entity)) {
+    return route.fulfill({
+      status: 404,
+      headers: REMOTE_HEADERS,
+      body: '{"error":"unknown table"}',
+    });
+  }
 
   if (method === 'POST' || method === 'PATCH') {
+    generationRemote.recordWrite(entity, request.postDataJSON(), 'dummy-anon');
     return route.fulfill({ status: 201, headers: REMOTE_HEADERS, body: '[]' });
   }
 
@@ -323,6 +335,7 @@ async function handleDummySupabaseRequest(route: Route): Promise<void> {
 }
 
 async function installMockRemoteBackup(page: Page): Promise<void> {
+  generationRemote.reset();
   await page.unroute('**/*.supabase.co/**').catch(() => {});
   await page
     .context()

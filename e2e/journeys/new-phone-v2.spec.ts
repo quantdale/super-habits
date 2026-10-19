@@ -3,6 +3,7 @@ import { defineJourney } from '../helpers/journey';
 import { ACTIVE_SECTION_SELECTOR, expectRows } from '../helpers/oracles';
 import { returnToApp, queryRows } from '../helpers/dbHarness';
 import { resetAll } from '../helpers/reset';
+import { GenerationSupabaseMock } from '../helpers/generationSupabaseMock';
 
 /**
  * J5b — "New phone, complete backup" (Backup Completeness V2).
@@ -20,6 +21,7 @@ import { resetAll } from '../helpers/reset';
  * are released as fixme (same protocol as new-phone.spec.ts).
  */
 
+const generationRemote = new GenerationSupabaseMock();
 let remoteBackupDetected = false;
 
 // ---------------------------------------------------------------------------
@@ -589,16 +591,28 @@ async function handleDummySupabaseRequest(route: Route): Promise<void> {
     return route.fulfill({ status: 200, headers: REMOTE_HEADERS, body: '{}' });
   }
 
+  if (await generationRemote.handle(route, 'dummy-anon')) return;
+  if (await generationRemote.handleReadBack(route, 'dummy-anon')) return;
   const match = path.match(/^\/rest\/v1\/([a-z_]+)$/);
   if (!match) {
     return route.fulfill({ status: 404, headers: REMOTE_HEADERS, body: '{"error":"not found"}' });
   }
 
   const entity = match[1];
+  if (!generationRemote.isDataEntity(entity)) {
+    return route.fulfill({
+      status: 404,
+      headers: REMOTE_HEADERS,
+      body: '{"error":"unknown table"}',
+    });
+  }
   const q = url.searchParams;
 
   if (method === 'POST' || method === 'PATCH') {
-    upsertCount += 1;
+    const posted = generationRemote.recordWrite(entity, request.postDataJSON(), 'dummy-anon');
+    // Generation staging/backfill is not proof that the NEW completed Todo reached the remote.
+    if (entity === 'todos' && posted.some((row) => row.id === TODO_ID && row.completed === 1))
+      upsertCount += 1;
     return route.fulfill({ status: 201, headers: REMOTE_HEADERS, body: '[]' });
   }
 
@@ -639,7 +653,7 @@ async function handleDummySupabaseRequest(route: Route): Promise<void> {
     )[0];
     return route.fulfill({
       status: 200,
-      headers: REMOTE_HEADERS,
+      headers: { ...REMOTE_HEADERS, 'content-range': `0-0/${active.length}` },
       body: JSON.stringify(latest ? [{ updated_at: latest.updated_at }] : []),
     });
   }
@@ -668,6 +682,7 @@ async function handleDummySupabaseRequest(route: Route): Promise<void> {
 }
 
 async function installMockRemoteBackup(page: Page): Promise<void> {
+  generationRemote.reset();
   await page.unroute('**/*.supabase.co/**').catch(() => {});
   await page
     .context()
@@ -701,6 +716,12 @@ defineJourney({
         await resetAll(page);
         await returnToApp(page);
         remoteBackupDetected = await restorePromptVisible(page);
+        if (test.info().project.name === 'journeys-sync') {
+          expect(
+            remoteBackupDetected,
+            'The dedicated sync lane must expose the V2 restore prompt',
+          ).toBe(true);
+        }
         await returnToApp(page);
       },
     },
@@ -863,7 +884,9 @@ defineJourney({
         // DOM-only wait (SQL oracles would navigate away and abort the
         // in-flight toggle transaction): completing the todo moves it into
         // the collapsed "completed" list, so the reveal toggle appears.
-        await expect(activeSection.getByText(/Show completed \(\d+\)/).first()).toBeVisible({
+        await expect(
+          activeSection.getByRole('button', { name: 'Show completed tasks' }),
+        ).toBeVisible({
           timeout: 10_000,
         });
         // Row-level: the restored todo is now completed (the toggle committed).

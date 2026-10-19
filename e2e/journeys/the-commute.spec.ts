@@ -5,6 +5,7 @@ import { defineJourney } from '../helpers/journey';
 import { expectOutbox, expectRows, switchSection, type OutboxRecord } from '../helpers/oracles';
 import { queryRows, returnToApp, discoverWasmName, wasmAssetDirectory } from '../helpers/dbHarness';
 import { resetAll } from '../helpers/reset';
+import { GenerationSupabaseMock } from '../helpers/generationSupabaseMock';
 import { setOffline } from '../helpers/failure';
 import { clickCaloriesAddEntry, fillCaloriesMacros } from '../helpers/forms';
 import { DUMMY_SUPABASE_USER_ID, fulfillDummySupabaseAuth } from '../helpers/supabaseAuth';
@@ -106,6 +107,7 @@ const installedWasmRoute = new WeakSet<Page>();
 // `dist/` build (no EXPO_PUBLIC_SUPABASE_*) the app issues no Supabase request
 // and the flag stays false, while on the `dist-sync/` build (dummy env) the
 // bootstrap's auth/restore calls are observed and the reconnect-push step runs.
+const generationRemote = new GenerationSupabaseMock();
 let supabaseRequestsSeen = 0;
 let remoteBoundaryDetected = false;
 
@@ -140,6 +142,7 @@ async function registerOfflineWasmRoute(page: Page): Promise<void> {
  * online flush cannot drain the outbox before the reconnect assertion.
  */
 async function installWithholdingSupabaseRoute(page: Page): Promise<void> {
+  generationRemote.reset();
   const handler = (route: import('@playwright/test').Route) => {
     supabaseRequestsSeen += 1;
     const method = route.request().method();
@@ -374,6 +377,18 @@ defineJourney({
           if (req.url().includes('/auth/v1/')) {
             return fulfillDummySupabaseAuth(route);
           }
+          if (await generationRemote.handle(route, DUMMY_SUPABASE_USER_ID)) return;
+          if (await generationRemote.handleReadBack(route, DUMMY_SUPABASE_USER_ID)) return;
+          const entity = new URL(req.url()).pathname.match(/^\/rest\/v1\/([a-z_]+)$/)?.[1];
+          if (!entity || !generationRemote.isDataEntity(entity)) {
+            return route.fulfill({
+              status: 404,
+              contentType: 'application/json',
+              body: '{"error":"unknown dummy route"}',
+            });
+          }
+          if (method === 'POST' && entity)
+            generationRemote.recordWrite(entity, req.postDataJSON(), DUMMY_SUPABASE_USER_ID);
           const match = req.url().match(/\/rest\/v1\/(todos|habits|calorie_entries)\?/);
           if (req.method() === 'POST' && match) {
             const body = req.postDataJSON();

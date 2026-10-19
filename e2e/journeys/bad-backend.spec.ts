@@ -1,10 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 import { defineJourney } from '../helpers/journey';
 import { resetAll } from '../helpers/reset';
+import { GenerationSupabaseMock } from '../helpers/generationSupabaseMock';
 import { ensureAppContext, queryRows } from '../helpers/dbHarness';
 import { expectOutbox, switchSection } from '../helpers/oracles';
 import { setOffline, SYNCABLE_ENTITIES } from '../helpers/failure';
-import { fulfillDummySupabaseAuth } from '../helpers/supabaseAuth';
+import { DUMMY_SUPABASE_USER_ID, fulfillDummySupabaseAuth } from '../helpers/supabaseAuth';
 
 /**
  * J4 — "The backend is having a bad day" (P5, offline-user persona).
@@ -48,6 +49,7 @@ const SUPABASE_ROUTE = '**/*.supabase.co/**';
 // dedicated `journeys-sync` project (against `dist-sync/`) the flag is true
 // and the steps run for real; in the standard `journeys` run (against `dist/`)
 // they show as skipped fixmes naming the lane.
+const generationRemote = new GenerationSupabaseMock();
 let supabaseRequestsSeen = 0;
 let remoteBoundaryDetected = false;
 
@@ -238,45 +240,54 @@ async function injectRestTimeout(page: Page, ms = 2500): Promise<void> {
 }
 
 /** Every REST request succeeds (200, empty array) — the "backend recovered" injector. */
-async function injectRestSuccess(page: Page): Promise<void> {
-  await routeSupabase(page, (route) =>
-    route.fulfill({
-      status: 200,
+async function fulfillSuccessfulRest(
+  route: import('@playwright/test').Route,
+  url: string,
+): Promise<void> {
+  if (await generationRemote.handle(route, DUMMY_SUPABASE_USER_ID)) return;
+  if (await generationRemote.handleReadBack(route, DUMMY_SUPABASE_USER_ID)) return;
+  const entity = new URL(url).pathname.match(/^\/rest\/v1\/([a-z_]+)$/)?.[1];
+  if (!entity || !SYNCABLE_ENTITIES.includes(entity as (typeof SYNCABLE_ENTITIES)[number])) {
+    await route.fulfill({
+      status: 404,
       headers: { 'access-control-allow-origin': '*' },
       contentType: 'application/json',
-      body: '[]',
-    }),
-  );
+      body: '{"message":"unknown dummy REST route"}',
+    });
+    return;
+  }
+  if (route.request().method() === 'POST')
+    generationRemote.recordWrite(entity, route.request().postDataJSON(), DUMMY_SUPABASE_USER_ID);
+  await route.fulfill({
+    status: 200,
+    headers: {
+      'access-control-allow-origin': '*',
+      'access-control-expose-headers': 'content-range',
+      'content-range': '0-0/0',
+    },
+    contentType: 'application/json',
+    body: '[]',
+  });
 }
 
-/**
- * Per-entity partial failure: `failEntities` respond 503; every other REST
- * request (including the successful entities' upserts) responds 200 with an
- * empty JSON array so supabase-js parses it as success. Deterministic — no
- * `route.continue()` that would leak toward a real backend.
- */
+async function injectRestSuccess(page: Page): Promise<void> {
+  await routeSupabase(page, fulfillSuccessfulRest);
+}
+
 async function injectRestPartial(page: Page, failEntities: readonly string[]): Promise<void> {
-  const fail = new Set<string>(failEntities);
-  await routeSupabase(page, (route, url) => {
-    const hit = SYNCABLE_ENTITIES.find((e) => url.includes(`/rest/v1/${e}`));
-    if (hit && fail.has(hit)) {
-      return route.fulfill({
+  const fail = new Set(failEntities);
+  await routeSupabase(page, async (route, url) => {
+    const entity = new URL(url).pathname.match(/^\/rest\/v1\/([a-z_]+)$/)?.[1];
+    if (entity && fail.has(entity)) {
+      await route.fulfill({
         status: 503,
         headers: { 'access-control-allow-origin': '*' },
         contentType: 'application/json',
         body: '{"error":"injected partial failure"}',
       });
+      return;
     }
-    return route.fulfill({
-      status: 200,
-      headers: {
-        'access-control-allow-origin': '*',
-        'access-control-expose-headers': 'content-range',
-        'content-range': '0-0/*',
-      },
-      contentType: 'application/json',
-      body: '[]',
-    });
+    await fulfillSuccessfulRest(route, url);
   });
 }
 
@@ -293,6 +304,8 @@ defineJourney({
         // blocking injector BEFORE the app's first render so no real remote is
         // ever hit and no record can silently push. Cross-origin remote
         // requests bypass the app-shell service worker in the product path.
+        generationRemote.reset();
+        generationRemote.seedEmptyPublishedPoint(DUMMY_SUPABASE_USER_ID);
         await resetAll(page);
         await injectRest503(page);
 

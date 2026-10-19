@@ -7,6 +7,7 @@ import { openSettingsScreen } from '../helpers/commandObservation';
 import { queryRows, returnToApp } from '../helpers/dbHarness';
 import { TAB_LABELS } from '../helpers/navigation';
 import { resetAll } from '../helpers/reset';
+import { GenerationSupabaseMock } from '../helpers/generationSupabaseMock';
 import { handleBackupRestRequest } from '../helpers/accountSupabaseMock';
 
 /**
@@ -27,6 +28,7 @@ import { handleBackupRestRequest } from '../helpers/accountSupabaseMock';
  */
 
 const SUPABASE_ROUTE = '**/*.supabase.co/**';
+const generationRemote = new GenerationSupabaseMock();
 const SOURCE_OWNER_ID = '00000000-0000-0000-0000-000000000101';
 const DEST_TEMP_ANON_ID = '00000000-0000-0000-0000-000000000202';
 const WRONG_ACCOUNT_ID = '00000000-0000-0000-0000-000000000303';
@@ -185,6 +187,11 @@ async function handleAccountMock(route: Route): Promise<void> {
   // `weekly_reviews` footprint for T only (design §4) via
   // `tRemoteWeeklyReviewEnabled`. Unknown REST tables fall through to the strict
   // 404 below.
+  if (await generationRemote.handle(route, currentUser.id)) return;
+  if (await generationRemote.handleReadBack(route, currentUser.id)) return;
+  const entity = new URL(request.url()).pathname.match(/^\/rest\/v1\/([a-z_]+)$/)?.[1];
+  if (method === 'POST' && entity && generationRemote.isDataEntity(entity))
+    generationRemote.recordWrite(entity, request.postDataJSON(), currentUser.id);
   const handled = await handleBackupRestRequest(route, {
     entities: tRemoteWeeklyReviewEnabled
       ? { weekly_reviews: { countByOwnerUserId: { [DEST_TEMP_ANON_ID]: 1 } } }
@@ -200,6 +207,7 @@ async function handleAccountMock(route: Route): Promise<void> {
 }
 
 async function installAccountMock(page: Page): Promise<void> {
+  generationRemote.reset();
   currentUser = SOURCE_ANON_USER;
   supabaseRequestsSeen = 0;
   verifyUserOverride = null;

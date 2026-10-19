@@ -217,7 +217,7 @@ async function handleDummySupabaseRequest(route: Route): Promise<void> {
     )[0];
     return route.fulfill({
       status: 200,
-      headers: REMOTE_HEADERS,
+      headers: { ...REMOTE_HEADERS, 'content-range': `0-0/${active.length}` },
       body: JSON.stringify(latest ? [{ updated_at: latest.updated_at }] : []),
     });
   }
@@ -315,6 +315,12 @@ defineJourney({
         // bootstrap (remoteAvailable && empty && not dismissed). Standard
         // dist/ has no Supabase env → no prompt → boundary absent.
         remoteBackupDetected = await restorePromptVisible(page);
+        if (test.info().project.name === 'journeys-sync') {
+          expect(
+            remoteBackupDetected,
+            'The dedicated sync lane must expose the legacy restore prompt',
+          ).toBe(true);
+        }
 
         // Row-level: this is genuinely an empty device (zero rows in every
         // sync-backed table). The schema is bootstrapped by the app load above.
@@ -483,12 +489,13 @@ defineJourney({
         });
 
         // Positive UI: the imported habit survived, but with no completion
-        // history its streak is 0 — the "Best streak" stat reads zero.
+        // history its streak is 0 — the current-streak stat reads zero.
         await returnToApp(page);
         await page.getByRole('button', { name: 'Habits', exact: true }).click();
         await expect(page.getByText('Hydrate').first()).toBeVisible();
-        // Scope the streak value to the StatBlock labelled "Best streak".
-        const bestStreakBlock = page.getByText('Best streak').first().locator('..');
+        // The compact current UI keeps aggregate stats behind Trends.
+        await page.getByRole('button', { name: 'Trends' }).click();
+        const bestStreakBlock = page.getByText('Highest current streak').first().locator('..');
         await expect(bestStreakBlock.getByText('0')).toBeVisible();
       },
     },

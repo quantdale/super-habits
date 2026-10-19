@@ -82,6 +82,7 @@ import {
   runnerExpectAcrossSurfaces,
 } from './actions';
 import { execApiLeg } from './apiLeg';
+import { installClock } from '../../e2e/helpers/clock';
 import {
   markAssertionOutcome,
   selectAttachedOracles,
@@ -680,6 +681,8 @@ export async function executeScenario(
 
   const context = await browser.newContext({
     baseURL: baseUrl,
+    timezoneId: 'Asia/Manila',
+    locale: 'en-US',
     // Simulation scenarios exercise app behavior and SQLite persistence. The
     // PWA service-worker lifecycle has dedicated infrastructure coverage; it
     // must not be active here because repeated DB-harness navigations otherwise
@@ -692,6 +695,11 @@ export async function executeScenario(
   // keep it off for ordinary runs so they pay no listener overhead.
   const networkEvents: NetworkEvent[] = [];
   const page = await context.newPage();
+  // Reproducible seeds also need a reproducible calendar. In particular the
+  // TYPICAL preamble's Monday/Wednesday/Friday habit must not become an illegal
+  // write merely because the host runs the lane on Tuesday. Keep its schedule
+  // and count assertions intact; install before reset/bootstrap reads the date.
+  await installClock(page, '2026-10-19T10:00:00+08:00');
   page.on('pageerror', (error) => {
     pushDiagnostic(browserErrors, `pageerror: ${error.name}: ${error.message}`);
   });

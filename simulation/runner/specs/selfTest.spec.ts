@@ -36,6 +36,47 @@ function expectPassed(label: string, result: Awaited<ReturnType<typeof executeSc
   ).toBe('passed');
 }
 
+test('deterministic runs pin the application calendar before writes', async ({ browser }) => {
+  const result = await executeScenario({
+    scenario: {
+      id: 'calendar-proof',
+      personaId: smoke.personaId,
+      goal: 'Stable local calendar',
+      steps: [
+        {
+          kind: 'apiLeg',
+          functionName: 'createHabit',
+          args: { name: 'Calendar proof', weekdays: [1, 3, 5] },
+          captures: 'calendarHabit',
+          oracles: [
+            {
+              kind: 'rows',
+              sql: "SELECT COUNT(*) AS n FROM habits WHERE name='Calendar proof' AND substr(created_at,1,10)='2026-10-19'",
+              expected: [{ n: 1 }],
+            },
+          ],
+        },
+        {
+          kind: 'apiLeg',
+          functionName: 'incrementHabit',
+          args: { id: '{{capture.calendarHabit.id}}' },
+          oracles: [
+            {
+              kind: 'rows',
+              sql: "SELECT count AS n, date_key FROM habit_completions WHERE habit_id=(SELECT id FROM habits WHERE name='Calendar proof')",
+              expected: [{ n: 1, date_key: '2026-10-19' }],
+            },
+          ],
+        },
+      ],
+    },
+    model: selfTestModel,
+    mode: 'deterministic',
+    browser,
+  });
+  expectPassed('calendar', result);
+});
+
 test('3.5 deterministic mode is reproducible — identical action logs', async ({ browser }) => {
   test.setTimeout(360_000);
   const r1 = await executeScenario({
