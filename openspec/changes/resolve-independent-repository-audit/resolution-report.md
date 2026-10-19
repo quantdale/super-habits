@@ -278,3 +278,44 @@ difference, which is the exact class of change this campaign exists to prevent.
    actually discriminates the audited counterexample.
 4. Re-run the commands in §1 with the pinned toolchain.
 5. Check the three external gates in §5 yourself before any release decision.
+
+## 9. Second review round (after `fe725b35`)
+
+A second independent review rejected the claim that only the visual issue
+remained locally and found 10 more defects. All 10 are fixed at `2fb611fa` with
+regressions. This section records what the review changed about the checkpoint —
+the reviewer specifically asked that local failures be listed alongside the visual
+issue and the external gates.
+
+### Local work that was open and is now fixed (second round)
+
+| #   | Severity | Defect                                                                                            | Fix                                                                                                                                                                                                                                                                                                                                    |
+| --- | -------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | HIGH     | A second workout could overwrite an unsaved completed workout (single durable slot)               | Starting a session while a pending save is outstanding now refuses and routes to its save/recovery                                                                                                                                                                                                                                     |
+| 2   | MEDIUM   | Recovery rebuilt the session from the CURRENT routine while measurements stayed positional        | Pending state snapshots the PERFORMED identity (`exerciseNames`, `routineName`) and recovery attributes by it                                                                                                                                                                                                                          |
+| 3   | MEDIUM   | The Todo composed save dropped reminder reconciliation                                            | `reconcileTodoReminder` is shared and runs after BOTH the plain and composed writes                                                                                                                                                                                                                                                    |
+| 4   | MEDIUM   | A failed notification dispatch recorded its replay key and cleared the response before succeeding | The key is recorded only on success; a failed dispatch stays retryable                                                                                                                                                                                                                                                                 |
+| 5   | LOW      | The quest test depended on the rotating board's date                                              | Its clock is pinned to a date whose rotation includes a plan quest                                                                                                                                                                                                                                                                     |
+| 6   | HIGH     | Restore mixed generations (mutable manifest + generation entities + mutable settings)             | Manifest, settings and entities all come from ONE immutable generation when one is published                                                                                                                                                                                                                                           |
+| 7   | HIGH     | The SQL publication contract was broken three ways on a real PostgreSQL 17                        | `20261019000000_fix_backup_generation_publication.sql`: plain SELECT instead of the RLS-blocking `FOR UPDATE`, owner-scoped UPDATE policy + immutability trigger (retries legal, certified bytes frozen), direct head writes revoked (RPC-only advancement), SECURITY DEFINER RPC pinned to `search_path` with owner from `auth.uid()` |
+| 8   | HIGH     | The adapter uploaded mutable entities before checking generation capability                       | A capability preflight runs BEFORE any mutable upload and refuses rather than destroy the only certified recovery point it cannot recreate                                                                                                                                                                                             |
+| 9   | HIGH     | Partial-batch acknowledgement bypassed verification (250 "successful", 0 read-backs)              | Each batch is verified before its ids are acknowledged; the redundant whole-entity read-back is removed                                                                                                                                                                                                                                |
+| 10  | MEDIUM   | The default E2E build armed the simulation bridge unconditionally                                 | Opt-in via `build:e2e:sim`; the default export carries no bridge                                                                                                                                                                                                                                                                       |
+
+### Where this leaves the campaign
+
+The review was correct that "only the visual issue remains locally" was wrong at
+`fe725b35`. It is now the state at `2fb611fa`:
+
+- **Local defects still open:** the visual-regression delta (§5). It is
+  characterized but not isolated, and no golden was refreshed.
+- **External gates:** SH-20 dependency advisories, SH-02's server-side
+  certification (a disposable backend is still needed for the cross-client
+  atomicity/RLS proof even though the SQL contract defects are fixed), and
+  SH-21's artifact inspection.
+- **Not run:** native Android/iOS lanes, real-backend qualification.
+
+Verification at `2fb611fa`: typecheck 0 errors, lint 0/0, Vitest 288 files /
+2975 passed (2 pre-existing skips). The full suite is green; the visual lane is
+the single remaining local red and is recorded as such in the checkpoint and
+§5 rather than folded into a green claim.
