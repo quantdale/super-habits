@@ -111,6 +111,10 @@ export async function addHabit(
     db,
     record: { entity: 'habits', id, updatedAt: now, operation: 'create' },
     mutate: async (transactionDb, enqueue) => {
+      // `AUD-SH12-A`: creation uses the SAME association contract as every other
+      // path. Writing `projectId`/`goalId` verbatim accepted nonexistent parents
+      // and persisted a Project-backed Goal with `project_id = null`.
+      const resolution = await resolveHabitAssociation(transactionDb, { projectId, goalId });
       await transactionDb.runAsync(
         'INSERT INTO habits (id, name, target_per_day, reminder_time, category, icon, color, rule_history, project_id, goal_id, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
         [
@@ -122,8 +126,8 @@ export async function addHabit(
           icon,
           color,
           serializeHabitRuleHistory(ruleHistory),
-          projectId ?? null,
-          goalId ?? null,
+          resolution.nextProjectId,
+          resolution.nextGoalId,
           now,
           now,
         ],
@@ -133,6 +137,35 @@ export async function addHabit(
   });
   requestHabitReminderReconciliation();
   return id;
+}
+
+/**
+ * Resolve a Habit's Project/Goal pair through the shared association contract
+ * (`AUD-SH12-A`), inside the caller's transaction.
+ *
+ * @param transactionDb the open mutation transaction
+ * @param association the requested pair
+ */
+async function resolveHabitAssociation(
+  transactionDb: Awaited<ReturnType<typeof getDatabase>>,
+  association: { projectId?: string | null; goalId?: string | null },
+): Promise<{ nextProjectId: string | null; nextGoalId: string | null }> {
+  return resolveProjectGoalAssociation({ project_id: null, goal_id: null }, association, {
+    projectExists: async (id) => {
+      const row = await transactionDb.getFirstAsync<{ id: string }>(
+        `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
+        [id],
+      );
+      return row !== null && row !== undefined;
+    },
+    goalProjectId: async (id) => {
+      const row = await transactionDb.getFirstAsync<{ project_id: string | null }>(
+        `SELECT project_id FROM goals WHERE id = ? AND deleted_at IS NULL`,
+        [id],
+      );
+      return row === null || row === undefined ? undefined : row.project_id;
+    },
+  });
 }
 
 export type IncrementHabitResult = {
@@ -917,6 +950,11 @@ export async function addHabitWithLinkedActionRules(input: {
     db,
     record: { entity: 'habits', id, updatedAt: now, operation: 'create' },
     mutate: async (transactionDb, enqueue) => {
+      // `AUD-SH12-A`: the composed creation path uses the same resolver.
+      const resolution = await resolveHabitAssociation(transactionDb, {
+        projectId: input.projectId,
+        goalId: input.goalId,
+      });
       await transactionDb.runAsync(
         'INSERT INTO habits (id, name, target_per_day, reminder_time, category, icon, color, rule_history, project_id, goal_id, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
         [
@@ -928,8 +966,8 @@ export async function addHabitWithLinkedActionRules(input: {
           input.icon ?? DEFAULT_HABIT_ICON,
           input.color ?? DEFAULT_HABIT_COLOR,
           serializeHabitRuleHistory(ruleHistory),
-          input.projectId ?? null,
-          input.goalId ?? null,
+          resolution.nextProjectId,
+          resolution.nextGoalId,
           now,
           now,
         ],

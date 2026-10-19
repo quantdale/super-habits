@@ -220,14 +220,21 @@ export function classifyNotificationResponse(
  */
 export function getNotificationResponseFingerprint(response: NotificationResponse): string {
   const request = response.notification.request;
-  // `date` is the delivery timestamp the platform attaches to the RESPONSE. It
-  // is the only platform-provided value that changes between deliveries of one
-  // fixed request identifier, so it is the event identity here.
-  const deliveredAt = (response as { date?: unknown }).date;
-  const deliveryIdentity =
-    typeof deliveredAt === 'number' && Number.isFinite(deliveredAt) && deliveredAt !== 0
-      ? String(deliveredAt)
-      : 'no-delivery-date';
+  // `AUD-SH17-A`: the delivery timestamp lives on `response.notification.date`
+  // in Expo's shape — NOT on the top-level response. Reading the wrong property
+  // yielded `undefined` for every real response, so two weekly deliveries under
+  // the single fixed weekly request identifier still produced identical
+  // fingerprints and only the first dispatched.
+  //
+  // Both locations are checked so a platform/version that supplies either one is
+  // still distinguished; neither being present is reported as its own identity
+  // rather than silently collapsing deliveries together.
+  const notificationDate = (response.notification as { date?: unknown } | undefined)?.date;
+  const responseDate = (response as { date?: unknown }).date;
+  const deliveredAt = [notificationDate, responseDate].find(
+    (value): value is number => typeof value === 'number' && Number.isFinite(value) && value !== 0,
+  );
+  const deliveryIdentity = deliveredAt !== undefined ? String(deliveredAt) : 'no-delivery-date';
   // The classified occurrence id separates business occurrences (a rescheduled
   // todo fire time, a snooze cycle) even when the platform reports no date.
   const classified = classifyNotificationResponse(response);

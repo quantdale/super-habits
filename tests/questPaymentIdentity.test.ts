@@ -18,7 +18,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { freshDatabase, type TestDatabase } from './integration/helpers/db';
+import { freshDatabase } from './integration/helpers/db';
 
 import type { DayFacts } from '@/features/gamification/gamification.types';
 
@@ -165,52 +165,84 @@ describe('AUD-SH16-A: the audited plan_today scenario pays its quest', () => {
 });
 
 describe('AUD-SH16-B: real pipeline pays once from canonical post-action state', () => {
-  async function seedPlanWorld(db: TestDatabase): Promise<{ todoId: string }> {
-    const todos = await import('@/features/todos/todos.data');
-    const todoId = await todos.addTodo({ title: 'Plan target' });
-    return { todoId };
+  /** Commit a REAL daily plan for today, so the canonical facts are non-zero. */
+  async function commitPlan(db: Awaited<ReturnType<typeof freshDatabase>>): Promise<string> {
+    const { toDateKey } = await import('@/lib/time');
+    const dailyPlan = await import('@/features/daily-plan/dailyPlan.data');
+    const dateKey = toDateKey();
+    await dailyPlan.commitDailyPlan(dateKey);
+    const plan = await dailyPlan.getDailyPlan(dateKey);
+    expect(plan?.status).toBe('committed');
+    return plan!.id;
   }
 
-  it('records exactly one quest row and grants the quest XP once', async () => {
-    const db = await freshDatabase();
-    await seedPlanWorld(db);
+  it('commits a plan, then awards BOTH the action and its quest XP exactly once', async () => {
+    const appDb = await freshDatabase();
+    const planId = await commitPlan(appDb);
+
     const gamification = await import('@/features/gamification/gamification.data');
-    const dailyPlan = await import('@/features/daily-plan/dailyPlan.data');
+    // The award path is ENTITY-KEYED: it must be told which plan it is rewarding.
+    const result = await gamification.awardGamificationAction({
+      kind: 'plan',
+      entityId: planId,
+    });
+    expect(result, 'a committed plan must be awardable').not.toBeNull();
 
-    // Commit a daily plan through the production data API, then award it.
-    // The production award path reads canonical facts itself, so the assertion
-    // here is about the durable ledger it leaves behind.
-    expect(dailyPlan).toBeTruthy();
-    await gamification.awardGamificationAction({ kind: 'plan' });
+    // The award payload is what the caller is told was granted; assert it first,
+    // then confirm the durable ledger agrees.
+    const returnedKinds = result!.result.events.map((event) => event.kind);
+    expect(returnedKinds, 'the award must include the quest event').toContain('quest');
+    const returnedXp = result!.result.events.reduce((sum, event) => sum + event.xp, 0);
+    expect(returnedXp).toBe(result!.result.xpAwarded);
 
-    // Today's key, from the same helper the data layer uses.
-    const { toDateKey } = await import('@/lib/time');
-    const questRows = await db.getAllAsync<{ quest_id: string; date_key: string }>(
-      'SELECT quest_id, date_key FROM gamification_quests WHERE date_key = ?',
-      [toDateKey()],
+    const events = await appDb.getAllAsync<{
+      event_kind: string;
+      xp: number;
+      date_key: string;
+    }>('SELECT event_kind, xp, date_key FROM gamification_events ORDER BY xp ASC');
+    const kindOf = (event: { event_kind: string }) => event.event_kind;
+    // The ACTION event really landed with its XP.
+    const planEvent = events.find((event) => kindOf(event) === 'plan');
+    expect(planEvent, 'the plan action event must exist').toBeTruthy();
+    expect(Number(planEvent!.xp)).toBeGreaterThan(0);
+
+    // The quest row and its quest EVENT exist too — the audited defect paid the
+    // action but silently withheld the quest.
+    const questRows = await appDb.getAllAsync<{ quest_id: string }>(
+      'SELECT quest_id FROM gamification_quests',
     );
-    // Exactly one row per quest — no duplicate payment for one action.
-    expect(new Set(questRows.map((row) => row.quest_id)).size).toBe(questRows.length);
+    // Exactly one quest row, and it is the awarded quest.
+    expect(questRows.map((row) => row.quest_id)).toEqual(result!.result.completedQuestIds);
+    const questEvents = events.filter((event) => kindOf(event) === 'quest');
+    expect(questEvents.length, 'a durable quest event must exist').toBe(questRows.length);
+    expect(Number(questEvents[0].xp)).toBeGreaterThan(0);
 
-    const snapshot = await gamification.readGamificationSnapshot();
-    expect(snapshot).toBeTruthy();
-    await db.closeAsync();
-  }, 60000);
-
-  it('replaying the same source action is idempotent', async () => {
-    const db = await freshDatabase();
-    await seedPlanWorld(db);
-    const gamification = await import('@/features/gamification/gamification.data');
-
-    await gamification.awardGamificationAction({ kind: 'plan' });
-    const before = await db.getAllAsync<{ id: string; xp: number }>(
+    // Replaying the SAME source action changes nothing.
+    const before = await appDb.getAllAsync<{ id: string; xp: number }>(
       'SELECT id, xp FROM gamification_events ORDER BY id',
     );
-    await gamification.awardGamificationAction({ kind: 'plan' });
-    const after = await db.getAllAsync<{ id: string; xp: number }>(
+    await gamification.awardGamificationAction({ kind: 'plan', entityId: planId });
+    const after = await appDb.getAllAsync<{ id: string; xp: number }>(
       'SELECT id, xp FROM gamification_events ORDER BY id',
     );
     expect(after).toEqual(before);
+    await appDb.closeAsync();
+  }, 60000);
+
+  it('a quest paid earlier is never paid twice by a later action', async () => {
+    const db = await freshDatabase();
+    const planId = await commitPlan(db);
+    const gamification = await import('@/features/gamification/gamification.data');
+    await gamification.awardGamificationAction({ kind: 'plan', entityId: planId });
+    const firstQuestRows = await db.getAllAsync<{ quest_id: string; date_key: string }>(
+      'SELECT quest_id, date_key FROM gamification_quests',
+    );
+    // A second, DIFFERENT action on the same day must not duplicate quest rows.
+    await gamification.awardGamificationAction({ kind: 'habit' });
+    const secondQuestRows = await db.getAllAsync<{ quest_id: string; date_key: string }>(
+      'SELECT quest_id, date_key FROM gamification_quests',
+    );
+    expect(secondQuestRows).toEqual(firstQuestRows);
     await db.closeAsync();
   }, 60000);
 });

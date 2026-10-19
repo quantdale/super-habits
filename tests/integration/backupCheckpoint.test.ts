@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
 import { chainableQuery } from './helpers/supabaseQueryDouble';
+import { GenerationRemoteDouble } from './helpers/generationRemoteDouble';
 
 /**
  * Backup Completeness V2 — checkpoint publication against real SQLite with a
@@ -31,8 +32,23 @@ function buildSupabaseMock(
   const stored = new Map<string, Map<string, Record<string, unknown>>>();
   let failUpserts = false;
   const failureMessage = options.upsertErrorMessage ?? 'simulated remote failure';
+  // `AUD-SH02-A`: the production adapter now publishes immutable generation
+  // content and advances an owner head before writing the mutable manifest, so
+  // the fake must model those tables and the publication RPC — otherwise the
+  // real path cannot run here at all.
+  const generationRemote = new GenerationRemoteDouble();
   const from = vi.fn((entity: string) => ({
     upsert: vi.fn(async (rows: Record<string, unknown>[]) => {
+      if (
+        entity === 'backup_generation' ||
+        entity === 'backup_generation_chunk' ||
+        entity === 'backup_generation_head'
+      ) {
+        if (failUpserts) return { error: { message: failureMessage } };
+        const rowList = Array.isArray(rows) ? rows : [rows];
+        upserted.push({ entity, rows: rowList });
+        return generationRemote.upsert(entity, rowList);
+      }
       if (failUpserts) return { error: { message: failureMessage } };
       const rowList = Array.isArray(rows) ? rows : [rows];
       upserted.push({ entity, rows: rowList });
@@ -46,6 +62,16 @@ function buildSupabaseMock(
     // the adapter re-reads the ids it just wrote, scoped to the pushing owner,
     // and treats a missing row as a push failure.
     select: vi.fn((_columns: string) => ({
+      eq: vi.fn((_eqColumn: string, _value: string) => ({
+        limit: vi.fn(async () => ({
+          data: [...generationRemote.heads.entries()].map(([user_id, head]) => ({
+            user_id,
+            snapshot_id: head.snapshot_id,
+            sequence: head.sequence,
+          })),
+          error: null,
+        })),
+      })),
       in: vi.fn((_column: string, ids: string[]) => ({
         eq: vi.fn((_eqColumn: string, value: string) => {
           const table = stored.get(entity);
@@ -65,8 +91,19 @@ function buildSupabaseMock(
     })),
   }));
   return {
-    supabase: { from },
+    supabase: {
+      from,
+      // The publication RPC, mirroring the SQL function's semantics.
+      rpc: vi.fn(async (name: string, args: Record<string, unknown>) => {
+        if (name !== 'publish_backup_generation') {
+          return { data: null, error: { message: `unknown rpc ${name}` } };
+        }
+        if (failUpserts) return { data: null, error: { message: failureMessage } };
+        return generationRemote.publish(args);
+      }),
+    },
     upserted,
+    generationRemote,
     setFailUpserts: (value: boolean) => {
       failUpserts = value;
     },

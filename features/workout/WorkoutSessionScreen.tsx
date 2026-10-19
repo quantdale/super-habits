@@ -642,42 +642,57 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   }, [currentIndex, dispositions, flagPersonalRecordForSet]);
 
   // Reaching the summary converts the resumable DRAFT into a durable
-  // PENDING-SAVE recovery state (AUD-SH04-A). The previous code cleared the draft
-  // here, so the only remaining copy of the user's entered values was React
-  // state: a failed save, a skipped save or a process kill discarded a workout
-  // the user had actually performed. The pending-save state is cleared only by a
-  // committed log or an explicit discard.
+  // PENDING-SAVE recovery state (AUD-SH04-A/B).
+  //
+  // ORDERING IS THE CONTRACT. `AUD-SH04-B` caught the first attempt at this:
+  // the pending-save write was fired without awaiting, its rejection was
+  // swallowed by `.catch()`, and `clearDraft()` then ran unconditionally — so a
+  // failed write plus the cleared draft left the device with NEITHER durable
+  // recovery record. The transition must be acknowledged before the old record
+  // is retired: write first, clear only on a reported success, and otherwise
+  // keep the draft exactly as it is.
   useEffect(() => {
     if (!isComplete) return;
     const startedAtMs = startedAtMsRef.current;
     if (startedAtMs === null) return;
-    const pendingDispositions = Object.fromEntries(
-      Object.entries(dispositionsRef.current).map(([index, disposition]) => [
-        String(index),
-        disposition,
-      ]),
-    );
-    const pendingEnteredSets = Object.fromEntries(
-      Object.entries(enteredSetsRef.current).map(([index, values]) => [String(index), values]),
-    );
-    const pendingAddedSets = Object.fromEntries(
-      Object.entries(addedSets).map(([index, count]) => [String(index), count]),
-    );
-    void saveWorkoutPendingSave({
-      routineId: routine.id,
-      startedAtIso: new Date(startedAtMs).toISOString(),
-      elapsedSeconds: Math.max(0, elapsedSecondsRef.current),
-      enteredSets: pendingEnteredSets,
-      dispositions: pendingDispositions,
-      ...(Object.keys(pendingAddedSets).length > 0 ? { addedSets: pendingAddedSets } : {}),
-    }).catch(() => {
-      // Best-effort at this boundary: the save path itself re-persists the
-      // recovery state before attempting the log, so a failure here cannot
-      // leave the summary without recovery data.
-    });
-    // The resumable draft has no phase left to continue, so it is retired —
-    // but only AFTER the recovery payload is written above.
-    clearDraft();
+    let cancelled = false;
+    const preserveRecovery = async () => {
+      const pendingDispositions = Object.fromEntries(
+        Object.entries(dispositionsRef.current).map(([index, disposition]) => [
+          String(index),
+          disposition,
+        ]),
+      );
+      const pendingEnteredSets = Object.fromEntries(
+        Object.entries(enteredSetsRef.current).map(([index, values]) => [String(index), values]),
+      );
+      const pendingAddedSets = Object.fromEntries(
+        Object.entries(addedSets).map(([index, count]) => [String(index), count]),
+      );
+      try {
+        await saveWorkoutPendingSave({
+          routineId: routine.id,
+          startedAtIso: new Date(startedAtMs).toISOString(),
+          phaseIndex: currentIndexRef.current,
+          elapsedSeconds: Math.max(0, elapsedSecondsRef.current),
+          enteredSets: pendingEnteredSets,
+          dispositions: pendingDispositions,
+          ...(Object.keys(pendingAddedSets).length > 0 ? { addedSets: pendingAddedSets } : {}),
+        });
+      } catch {
+        // The recovery payload could NOT be written. Keep the resumable draft:
+        // retiring it here is exactly the audited data loss.
+        return;
+      }
+      if (cancelled) return;
+      // Acknowledged replacement: the durable recovery state now exists, so the
+      // draft has no phase left to continue and may be retired.
+      clearDraft();
+    };
+    void preserveRecovery();
+    return () => {
+      cancelled = true;
+    };
   }, [isComplete, clearDraft, routine.id, addedSets]);
 
   const updateEnteredValues = (index: number, patch: Partial<EnteredSetValues>) => {
@@ -826,6 +841,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       await saveWorkoutPendingSave({
         routineId: routine.id,
         startedAtIso: new Date(startedAtMs).toISOString(),
+        // The live cursor, so a reopened summary re-collects every exercise the
+        // user actually completed (AUD-SH04-A).
+        phaseIndex: currentIndexRef.current,
         elapsedSeconds: Math.max(0, elapsedSecondsRef.current),
         enteredSets: Object.fromEntries(
           Object.entries(enteredSetsRef.current).map(([index, values]) => [String(index), values]),

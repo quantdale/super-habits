@@ -60,12 +60,24 @@ export const CACHE_VERSION_TOKEN = '__SUPERHABITS_CACHE_VERSION__';
  */
 export function shellRevisionInputs(distDir) {
   const roots = ['index.html', 'manifest.json'];
+  // `AUD-SH05-A`: root-level shell assets count too. The worker's
+  // CORE_SHELL_URLS precaches `/icon-192.png`, `/icon-512.png` and
+  // `/icon-maskable-512.png` from the export ROOT, so omitting them let their
+  // bytes change without changing the revision — an installed client would keep
+  // serving the old icon forever. Every regular file at the export root is
+  // included except the worker itself (already excluded below), so a newly added
+  // root asset cannot silently escape the hash either.
   const directories = ['_expo/static/js/web', '_expo/static/css', 'assets'];
   const files = new Set();
 
   for (const relative of roots) {
     const absolute = path.join(distDir, relative);
     if (fs.existsSync(absolute)) files.add(relative.split(path.sep).join('/'));
+  }
+  for (const entry of fs.readdirSync(distDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    if (entry.name === 'sw.js' || entry.name === 'sw.js.map') continue;
+    files.add(entry.name);
   }
   const walk = (current) => {
     if (!fs.existsSync(current)) return;

@@ -79,6 +79,7 @@ describe('AUD-SH04-A: reaching the summary retains the entered data durably', ()
     await workout.saveWorkoutPendingSave({
       routineId: 'wrk_a',
       startedAtIso,
+      phaseIndex: 2,
       elapsedSeconds: 412,
       enteredSets: ENTERED,
       dispositions: DISPOSITIONS,
@@ -128,6 +129,7 @@ describe('AUD-SH04-A: reaching the summary retains the entered data durably', ()
     await workout.saveWorkoutPendingSave({
       routineId: '',
       startedAtIso: 'not-a-date',
+      phaseIndex: 0,
       elapsedSeconds: -5,
       enteredSets: {},
       dispositions: {},
@@ -147,6 +149,7 @@ describe('AUD-SH04-B: a failed save retains the durable recovery state', () => {
     await workout.saveWorkoutPendingSave({
       routineId: 'wrk_a',
       startedAtIso: '2026-10-18T09:00:00.000Z',
+      phaseIndex: 2,
       elapsedSeconds: 300,
       enteredSets: ENTERED,
       dispositions: DISPOSITIONS,
@@ -203,6 +206,7 @@ describe('AUD-SH04-C: kill after commit never duplicates the log', () => {
     await workout.saveWorkoutPendingSave({
       routineId: 'wrk_a',
       startedAtIso,
+      phaseIndex: 2,
       elapsedSeconds: 400,
       enteredSets: ENTERED,
       dispositions: DISPOSITIONS,
@@ -243,6 +247,7 @@ describe('AUD-SH04-C: kill after commit never duplicates the log', () => {
     await workout.saveWorkoutPendingSave({
       routineId: 'wrk_a',
       startedAtIso: '2026-10-18T09:00:00.000Z',
+      phaseIndex: 2,
       elapsedSeconds: 400,
       enteredSets: ENTERED,
       dispositions: DISPOSITIONS,
@@ -262,6 +267,7 @@ describe('AUD-SH04-C: kill after commit never duplicates the log', () => {
     await workout.saveWorkoutPendingSave({
       routineId: 'wrk_a',
       startedAtIso: '2026-10-18T09:00:00.000Z',
+      phaseIndex: 2,
       elapsedSeconds: 100,
       enteredSets: ENTERED,
       dispositions: DISPOSITIONS,
@@ -282,5 +288,72 @@ describe('AUD-SH04-C: kill after commit never duplicates the log', () => {
     // And the failure branches re-persist rather than clear.
     const failureBranch = source.indexOf('await persistPendingSave(', clearIndex);
     expect(failureBranch).toBeGreaterThan(clearIndex);
+  });
+});
+
+describe('AUD-SH04-A: a reopened summary re-collects EVERY completed exercise', () => {
+  it('the durable cursor, not zero, drives the second save', async () => {
+    // The audited defect: WorkoutScreen reopened a finished session with
+    // `phaseIndex: 0`, and the collectors only walk phases up to that cursor — so
+    // a three-exercise completed workout re-saved ONE record and silently dropped
+    // the rest. This executes the real collectors at both cursors to prove the
+    // difference, then asserts the screen restores the durable cursor.
+    const { buildTimerSequence, collectSessionSetRecords, summarizeCompletedSets } =
+      await import('@/features/workout/workout.domain');
+    const routine = [
+      { name: 'Bench', sets: [{ set_number: 1, active_seconds: 30, rest_seconds: 10 }] },
+      { name: 'Row', sets: [{ set_number: 1, active_seconds: 30, rest_seconds: 10 }] },
+      { name: 'Squat', sets: [{ set_number: 1, active_seconds: 30, rest_seconds: 10 }] },
+    ];
+    const sequence = buildTimerSequence(routine);
+    const finishedCursor = sequence.length - 1;
+    const dispositions = Object.fromEntries(
+      sequence
+        .map((phase, index) => (phase.phase === 'active' ? [index, 'completed' as const] : null))
+        .filter((entry): entry is [number, 'completed'] => entry !== null),
+    );
+
+    const atZero = collectSessionSetRecords(sequence, 0, dispositions, {}, 'off');
+    const atFinished = collectSessionSetRecords(sequence, finishedCursor, dispositions, {}, 'off');
+    expect(atZero).toHaveLength(1);
+    expect(atFinished).toHaveLength(3);
+    expect(summarizeCompletedSets(sequence, finishedCursor, dispositions)).toHaveLength(3);
+
+    // And the screen restores the durable cursor rather than 0.
+    const { readFileSync } = await import('node:fs');
+    const path = await import('node:path');
+    const screen = readFileSync(
+      path.resolve(__dirname, '..', '..', 'features/workout/WorkoutScreen.tsx'),
+      'utf8',
+    );
+    expect(screen).toContain('phaseIndex: pendingSave.phaseIndex');
+    // The audited shape (`phaseIndex: 0` immediately before the pending-save
+    // identity) must not reappear.
+    expect(screen).not.toMatch(/phaseIndex: 0,\s*startedAtMs: Date\.parse\(pendingSave/);
+  });
+});
+
+describe('AUD-SH04-B: a rejected pending-save write keeps the draft', () => {
+  it('the completion effect awaits the write and only then clears the draft', async () => {
+    const { readFileSync } = await import('node:fs');
+    const path = await import('node:path');
+    const source = readFileSync(
+      path.resolve(__dirname, '..', '..', 'features/workout/WorkoutSessionScreen.tsx'),
+      'utf8',
+    );
+    const effectStart = source.indexOf('const preserveRecovery = async () => {');
+    expect(effectStart).toBeGreaterThan(-1);
+    const effect = source.slice(effectStart, source.indexOf('}, [isComplete, clearDraft'));
+    // The write is AWAITED inside a try, its failure RETURNS (leaving the draft),
+    // and the clear comes after the try block.
+    expect(effect).toContain('await saveWorkoutPendingSave({');
+    expect(effect).toContain('catch {');
+    const catchIndex = effect.indexOf('} catch {');
+    const returnIndex = effect.indexOf('return;', catchIndex);
+    const clearIndex = effect.indexOf('clearDraft();');
+    expect(returnIndex).toBeGreaterThan(catchIndex);
+    expect(clearIndex).toBeGreaterThan(returnIndex);
+    // No fire-and-forget write remains on that path.
+    expect(effect).not.toContain('void saveWorkoutPendingSave(');
   });
 });

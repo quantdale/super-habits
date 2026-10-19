@@ -377,3 +377,49 @@ describe('AUD-SH01-B: the domain guard itself', () => {
     expect(decision.seedOwnerUserId).toBeNull();
   });
 });
+
+describe('AUD-SH01-C: an UNREADABLE origin fails closed', () => {
+  it('the committing guard refuses when the fingerprint read fails', async () => {
+    // The audited defect: `readImportOriginFingerprint` converted a failed read
+    // into `null`, which means "no origin", which PERMITS adoption — so one
+    // injected storage error let an unrelated account commit a binding over a
+    // protected imported dataset.
+    //
+    // The guard is exercised through the REAL binding function against a
+    // database whose `app_meta` read genuinely fails (a dropped table), so the
+    // failure reaches the committing boundary rather than a mock.
+    const db = await freshDatabase();
+    await db.runAsync('DROP TABLE app_meta');
+
+    const { bindLocalDatasetOwner } = await import('@/core/auth/account.data');
+    const thrown = await bindLocalDatasetOwner(db as never, TEMP_B, {
+      adoptUnownedOutbox: true,
+    }).catch((error: unknown) => error);
+
+    // With the fail-open defect this RESOLVES and binds TEMP_B. With the fix the
+    // failure surfaces as a refusal and nothing is bound.
+    expect(thrown).toBeInstanceOf(Error);
+    await db.closeAsync();
+  }, 60000);
+
+  it('the decision layer refuses an explicitly unreadable origin', async () => {
+    const { decideImportOriginClaim, UNREADABLE_IMPORT_ORIGIN } =
+      await import('@/lib/importOrigin');
+    // Even the SOURCE owner cannot be assumed when the origin cannot be read.
+    expect(
+      decideImportOriginClaim({
+        importOrigin: UNREADABLE_IMPORT_ORIGIN,
+        candidateUserId: OWNER_A,
+        candidateIsAnonymous: false,
+      }),
+    ).toEqual({ allowed: false, reason: 'unreadable_origin' });
+    // A genuinely ABSENT origin still permits the documented local-only case.
+    expect(
+      decideImportOriginClaim({
+        importOrigin: null,
+        candidateUserId: TEMP_B,
+        candidateIsAnonymous: true,
+      }),
+    ).toEqual({ allowed: true, reason: 'no_recorded_origin' });
+  });
+});

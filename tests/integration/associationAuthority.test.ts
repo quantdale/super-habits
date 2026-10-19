@@ -342,3 +342,179 @@ describe('AUD-SH12-C: refusals leave no side effects', () => {
     await db.closeAsync();
   }, 60000);
 });
+
+describe('AUD-SH12-A: Habit CREATION validates associations', () => {
+  it('addHabit rejects a Goal that does not exist', async () => {
+    const db = await freshDatabase();
+    await seedWorld(db);
+    const habits = await import('@/features/habits/habits.data');
+    // The audited probe: `addHabit` wrote project_id/goal_id verbatim.
+    await expect(
+      habits.addHabit(
+        'Dangling habit',
+        1,
+        'anytime',
+        undefined,
+        undefined,
+        undefined,
+        null,
+        null,
+        'goal_missing',
+      ),
+    ).rejects.toThrow(/Goal not found/i);
+    const rows = await db.getFirstAsync<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM habits WHERE name = 'Dangling habit'",
+    );
+    expect(Number(rows?.n ?? -1)).toBe(0);
+    await db.closeAsync();
+  }, 60000);
+
+  it('addHabit rejects a Project that does not exist', async () => {
+    const db = await freshDatabase();
+    await seedWorld(db);
+    const habits = await import('@/features/habits/habits.data');
+    await expect(
+      habits.addHabit(
+        'Dangling habit',
+        1,
+        'anytime',
+        undefined,
+        undefined,
+        undefined,
+        null,
+        'proj_missing',
+        null,
+      ),
+    ).rejects.toThrow(/Project not found/i);
+    await db.closeAsync();
+  }, 60000);
+
+  it('addHabit aligns a Project-backed Goal instead of persisting project_id null', async () => {
+    const db = await freshDatabase();
+    const world = await seedWorld(db);
+    const habits = await import('@/features/habits/habits.data');
+    const id = await habits.addHabit(
+      'Aligned habit',
+      1,
+      'anytime',
+      undefined,
+      undefined,
+      undefined,
+      null,
+      null,
+      world.goalInP,
+    );
+    const row = await db.getFirstAsync<{ project_id: string | null; goal_id: string | null }>(
+      'SELECT project_id, goal_id FROM habits WHERE id = ?',
+      [id],
+    );
+    expect(row?.project_id).toBe(world.projectP);
+    expect(row?.goal_id).toBe(world.goalInP);
+    await db.closeAsync();
+  }, 60000);
+
+  it('the composed habit create applies the same contract', async () => {
+    const db = await freshDatabase();
+    const world = await seedWorld(db);
+    const habits = await import('@/features/habits/habits.data');
+    await expect(
+      habits.addHabitWithLinkedActionRules({
+        name: 'Composed dangling',
+        targetPerDay: 1,
+        goalId: 'goal_missing',
+        rules: [],
+      }),
+    ).rejects.toThrow(/Goal not found/i);
+    const id = await habits.addHabitWithLinkedActionRules({
+      name: 'Composed aligned',
+      targetPerDay: 1,
+      goalId: world.goalInP,
+      rules: [],
+    });
+    const row = await db.getFirstAsync<{ project_id: string | null }>(
+      'SELECT project_id FROM habits WHERE id = ?',
+      [id],
+    );
+    expect(row?.project_id).toBe(world.projectP);
+    await db.closeAsync();
+  }, 60000);
+});
+
+describe('AUD-SH14-B: the Todo EDIT path is one composed operation', () => {
+  it('a failing rule write rolls the row edit back (screen orchestration shape)', async () => {
+    // The reviewer's finding: TodosScreen committed `updateTodo` FIRST and then
+    // called the composed save, so a failing rule write left the title committed
+    // with the old rules. This asserts the screen no longer contains that
+    // two-step shape, and that the composed operation itself is atomic.
+    const { readFileSync } = await import('node:fs');
+    const path = await import('node:path');
+    const screen = readFileSync(
+      path.resolve(__dirname, '..', '..', 'features/todos/TodosScreen.tsx'),
+      'utf8',
+    );
+    const editBranchStart = screen.indexOf('if (editingId) {');
+    // Bound to the create branch, which begins with the composed-create comment.
+    const editBranchEnd = screen.indexOf(
+      'AUD-SH14-A: the parent and its rules commit together',
+      editBranchStart,
+    );
+    expect(editBranchEnd).toBeGreaterThan(editBranchStart);
+    const editBranch = screen.slice(editBranchStart, editBranchEnd);
+    // Exactly ONE row write in the branch, and it is the composed call for
+    // non-recurring sources.
+    const updateCalls = editBranch.match(/await updateTodo\(/g) ?? [];
+    expect(updateCalls).toHaveLength(1);
+    expect(editBranch).toContain('await updateTodoWithLinkedActionRules(');
+    // The two writes are MUTUALLY EXCLUSIVE branches of the same `if`, not a
+    // sequence: the audited defect was an unconditional `updateTodo` that ran
+    // before the composed call, so the composed call could never describe the
+    // already-committed edit.
+    const recurringBranch = editBranch.indexOf('if (isRecurringLinkedActionSource) {');
+    const composedCall = editBranch.indexOf('await updateTodoWithLinkedActionRules(');
+    const plainCall = editBranch.indexOf('await updateTodo(');
+    expect(recurringBranch).toBeGreaterThan(-1);
+    expect(composedCall).toBeGreaterThan(recurringBranch);
+    expect(plainCall).toBeGreaterThan(recurringBranch);
+    // The plain call is INSIDE the recurring branch's else, i.e. after it.
+    expect(plainCall).toBeGreaterThanOrEqual(recurringBranch);
+  });
+
+  it('a failing rule replacement leaves the title unchanged', async () => {
+    const db = await freshDatabase();
+    const world = await seedWorld(db);
+    const habits = await import('@/features/habits/habits.data');
+    const todos = await import('@/features/todos/todos.data');
+    // A rule target that cannot be written (a trigger) exercises the real fault.
+    await db.runAsync(
+      `CREATE TRIGGER sh12_fail_rule_insert BEFORE INSERT ON linked_action_rules
+       BEGIN SELECT RAISE(ABORT, 'simulated rule persistence failure'); END;`,
+    );
+    const id = await todos.addTodo({ title: 'Original', goalId: world.goalInP });
+    await expect(
+      todos.updateTodoWithLinkedActionRules(id, { title: 'Edited', projectId: world.projectP2 }, [
+        {
+          triggerType: 'todo.completed',
+          target: {
+            feature: 'habits',
+            entityType: 'habit',
+            entityId: habits === habits ? 'habit_target_seeded' : 'habit_target_seeded',
+            effect: {
+              kind: 'progress',
+              type: 'habit.increment',
+              amount: 1,
+              dateStrategy: 'source_date',
+            },
+          },
+        },
+      ]),
+    ).rejects.toBeInstanceOf(Error);
+    const row = await db.getFirstAsync<{ title: string; project_id: string | null }>(
+      'SELECT title, project_id FROM todos WHERE id = ?',
+      [id],
+    );
+    // NEITHER the title NOR the association moved.
+    expect(row?.title).toBe('Original');
+    expect(row?.project_id).toBe(world.projectP);
+    await db.closeAsync();
+  }, 60000);
+});

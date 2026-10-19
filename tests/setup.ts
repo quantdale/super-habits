@@ -4,15 +4,26 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj['ios'] ?? obj['default'] },
 }));
 
-vi.mock('expo-crypto', () => ({
-  getRandomValues: vi.fn((array: Uint8Array) => {
-    for (let i = 0; i < array.length; i++) {
-      // Deterministic but non-repeating enough for test IDs
-      array[i] = (i * 17 + 31) % 256;
-    }
-    return array;
-  }),
-}));
+vi.mock('expo-crypto', () => {
+  // `createId()` is `{prefix}_{Date.now()}_{8 random chars}`. Returning the SAME
+  // bytes on every call makes two ids created in the same millisecond IDENTICAL,
+  // which silently drops rows under a real PRIMARY KEY / UNIQUE constraint — the
+  // audited symptom was a quest event vanishing while its quest row persisted.
+  // The integration setup already used a per-call counter; the unit setup did
+  // not. This matches it: a deterministic per-call byte sequence, so ids stay
+  // reproducible AND unique.
+  let counter = 0;
+  return {
+    getRandomValues: vi.fn((array: Uint8Array) => {
+      counter = (counter + 1) >>> 0;
+      for (let i = 0; i < array.length; i++) {
+        const byte = (counter >>> ((i % 4) * 8)) & 0xff;
+        array[i] = (byte ^ (i * 37)) & 0xff;
+      }
+      return array;
+    }),
+  };
+});
 
 vi.mock('expo-notifications', () => ({
   setNotificationHandler: vi.fn(),

@@ -11,7 +11,7 @@ import { requestWorkoutReminderReconciliation } from '@/core/notifications/worko
 import { getSupabaseAuthUserId, isRemoteEnabled, supabase } from '@/lib/supabase';
 import { syncEngine, type BlockedOutboxSummary } from '@/core/sync/sync.engine';
 import { nowIso } from '@/lib/time';
-import { checksumRows } from '@/lib/checksum';
+import { checksumRows, sha256Hex } from '@/lib/checksum';
 import {
   BACKUP_ENTITIES,
   BACKUP_SCHEMA_VERSION,
@@ -355,6 +355,100 @@ export async function probeV2TablesPresent(ownerUserId: string): Promise<V2Capab
   }
 }
 
+/**
+ * Resolve and read the owner's PUBLISHED generation, when one exists
+ * (`AUD-SH02-A`/`D`).
+ *
+ * Restore must read immutable published content, not the mutable current-row
+ * store: that store is exactly what the audited transport overwrote, so a
+ * generation-1 manifest could certify bytes that no longer existed. This resolves
+ * ONE head generation up front and reads only that snapshot's chunks, so a
+ * concurrent publication cannot mix content and an interrupted upload can never
+ * be mistaken for a complete recovery point.
+ *
+ * Returns `null` when the remote has no generation capability or no published
+ * head — the caller then falls back to the supported legacy/scope-2 path, which
+ * remains readable.
+ *
+ * @param ownerUserId the restoring owner
+ */
+async function fetchPublishedGenerationRows(
+  ownerUserId: string,
+): Promise<{ snapshotId: string; rowsByEntity: Map<string, Record<string, unknown>[]> } | null> {
+  if (!supabase) return null;
+  let head: { data: unknown; error: { message: string } | null };
+  try {
+    head = await supabase
+      .from('backup_generation_head')
+      .select('snapshot_id, sequence')
+      .eq('user_id', ownerUserId)
+      .limit(1);
+  } catch (error) {
+    // A remote without the generation tables cannot serve `.eq().limit()` at
+    // all. That is the documented legacy fallback, not a restore failure.
+    if (isMissingV2RemoteTableError(error)) return null;
+    throw error;
+  }
+  if (!head) {
+    // A chain that resolved nothing means the capability is absent.
+    return null;
+  }
+  if (head.error) {
+    // A pre-migration remote has no generation tables; that is the documented
+    // legacy fallback, not a failure.
+    if (isMissingV2RemoteTableError(new Error(head.error.message))) return null;
+    throw new Error(
+      `[restore] Failed to read the published generation head: ${head.error.message}`,
+    );
+  }
+  const headRow = (head.data as { snapshot_id?: string; sequence?: number }[] | null)?.[0];
+
+  if (!headRow?.snapshot_id) return null;
+  const snapshotId = headRow.snapshot_id;
+
+  const chunks: { entity: string; ordinal: number; payload: string; checksum: string }[] = [];
+  let from = 0;
+  while (true) {
+    const to = from + PAGE_SIZE - 1;
+    const result = await supabase
+      .from('backup_generation_chunk')
+      .select('entity, ordinal, payload, checksum')
+      .eq('user_id', ownerUserId)
+      .eq('snapshot_id', snapshotId)
+      .order('entity', { ascending: true })
+      .order('ordinal', { ascending: true })
+      .range(from, to);
+    if (result.error) {
+      throw new Error(
+        `[restore] Failed to read generation ${snapshotId} chunks: ${result.error.message}`,
+      );
+    }
+    const page = (result.data ?? []) as typeof chunks;
+    for (const entry of page) {
+      // Every chunk must match its own checksum before its bytes are trusted.
+      if (sha256Hex(entry.payload) !== entry.checksum) {
+        throw new Error(
+          `[restore] Generation ${snapshotId} chunk ${entry.entity}#${entry.ordinal} failed its checksum.`,
+        );
+      }
+      chunks.push(entry);
+    }
+    if (page.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  const rowsByEntity = new Map<string, Record<string, unknown>[]>();
+  for (const entry of chunks) {
+    if (entry.entity === 'user_backup_settings') continue;
+    const parsed: unknown = JSON.parse(entry.payload);
+    const rows = Array.isArray(parsed) ? (parsed as Record<string, unknown>[]) : [];
+    const list = rowsByEntity.get(entry.entity) ?? [];
+    list.push(...rows);
+    rowsByEntity.set(entry.entity, list);
+  }
+  return { snapshotId, rowsByEntity };
+}
+
 async function fetchRemoteRows(
   entity: BackupEntity,
   ownerUserId: string,
@@ -558,12 +652,26 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
   // paying ~21 sequential round-trip chains (each paginated).
   const rowsByEntity: Partial<Record<BackupEntity, Record<string, unknown>[]>> = {};
   try {
-    const fetched = await Promise.all(
-      scope.entitySet.map((entity) => fetchRemoteRows(entity, ownerUserId)),
-    );
-    scope.entitySet.forEach((entity, index) => {
-      rowsByEntity[entity] = fetched[index];
-    });
+    // `AUD-SH02-A`/`D`: prefer the owner's PUBLISHED GENERATION. Reading the
+    // mutable rows here is exactly the audited defect — those rows are rewritten
+    // by the next upload, so a retained manifest could certify bytes that no
+    // longer existed. One generation is resolved up front and every row comes
+    // from that immutable snapshot, so a concurrent publication cannot mix
+    // content. A remote with no generation capability falls back to the
+    // supported legacy/scope-2 path below.
+    const generation = await fetchPublishedGenerationRows(ownerUserId);
+    if (generation) {
+      for (const entity of scope.entitySet) {
+        rowsByEntity[entity] = generation.rowsByEntity.get(entity) ?? [];
+      }
+    } else {
+      const fetched = await Promise.all(
+        scope.entitySet.map((entity) => fetchRemoteRows(entity, ownerUserId)),
+      );
+      scope.entitySet.forEach((entity, index) => {
+        rowsByEntity[entity] = fetched[index];
+      });
+    }
   } catch (error) {
     return {
       status: 'invalid',

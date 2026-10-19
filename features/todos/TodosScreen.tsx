@@ -316,7 +316,12 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
       }
 
       if (editingId) {
-        await updateTodo(editingId, {
+        // `AUD-SH14-B`: the edit is ONE composed operation. The first attempt at
+        // this left an unconditional `updateTodo` ahead of the composed call, so
+        // a failing rule write left the title/associations committed while the
+        // OLD rules remained — a half-applied edit the helper tests could not see
+        // because they never executed this screen orchestration.
+        const editFields = {
           title: title.trim(),
           notes: notes.trim() || undefined,
           dueDate: dueDate ?? null,
@@ -326,7 +331,16 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
           ...(isRecurring && editingTodo?.recurrence !== 'daily'
             ? { recurrence: 'daily' as const }
             : {}),
-        });
+        };
+        if (isRecurringLinkedActionSource) {
+          // Recurring sources cannot own rules, so there is no pair to compose.
+          await updateTodo(editingId, editFields);
+        } else {
+          await updateTodoWithLinkedActionRules(editingId, editFields, linkedActionRules);
+        }
+        // The series template is a separate entity with its own identity, so it
+        // is updated after the composed save — its failure is reported without
+        // undoing a committed task edit.
         if (editRecurrenceScope === 'series' && editingTodo?.recurrence_id) {
           try {
             await updateRecurringSeriesTemplate(editingTodo.recurrence_id, {
@@ -341,28 +355,6 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
             void refresh();
             return;
           }
-        }
-        // AUD-SH14-B: the row edit and the complete rule replacement commit in
-        // ONE transaction, so a failing rule save cannot leave a half-applied
-        // edit or a replaced-away rule set.
-        if (isRecurringLinkedActionSource) {
-          await updateTodo(editingId, {
-            title: title.trim(),
-            notes: notes.trim() || undefined,
-            dueDate: dueDate ?? null,
-            priority,
-          });
-        } else {
-          await updateTodoWithLinkedActionRules(
-            editingId,
-            {
-              title: title.trim(),
-              notes: notes.trim() || undefined,
-              dueDate: dueDate ?? null,
-              priority,
-            },
-            linkedActionRules,
-          );
         }
       } else {
         // AUD-SH14-A: the parent and its rules commit together. A failure now

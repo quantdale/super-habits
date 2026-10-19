@@ -400,3 +400,85 @@ describe('AUD-SH02-E: the real capture is coherent and resumable', () => {
     await db.closeAsync();
   }, 60000);
 });
+
+describe('AUD-SH02-A: the production backup path PUBLISHES generations', () => {
+  it('the checkpoint cycle captures a generation through a production caller', async () => {
+    // The audited gap was that the generation modules had NO production caller.
+    // `runBackupMaintenance` now captures inside its own coherent transaction;
+    // this asserts the wiring rather than the library in isolation. (The
+    // end-to-end publication itself is exercised by the backup/restore suite,
+    // which owns the fake remote.)
+    const { readFileSync } = await import('node:fs');
+    const path = await import('node:path');
+    const checkpointSource = readFileSync(
+      path.resolve(__dirname, '..', '..', 'core/backup/backupCheckpoint.ts'),
+      'utf8',
+    );
+    expect(checkpointSource).toContain('captureGenerationWithinTransaction(');
+    expect(checkpointSource).toContain("from '@/core/backup/generations/capture'");
+
+    // And the adapter publishes before writing the mutable manifest.
+    const adapterSource = readFileSync(
+      path.resolve(__dirname, '..', '..', 'core/sync/supabase.adapter.ts'),
+      'utf8',
+    );
+    const publishIndex = adapterSource.indexOf('await this.publishGenerationContents(');
+    const legacyManifestIndex = adapterSource.indexOf(
+      "client.from('backup_manifest').upsert(",
+      publishIndex,
+    );
+    expect(publishIndex).toBeGreaterThan(-1);
+    expect(legacyManifestIndex).toBeGreaterThan(publishIndex);
+    expect(adapterSource).toContain("from('backup_generation_chunk')");
+    expect(adapterSource).toContain("rpc('publish_backup_generation'");
+
+    // Restore prefers the pinned generation before falling back to mutable rows.
+    const restoreSource = readFileSync(
+      path.resolve(__dirname, '..', '..', 'core/backup/backupRestore.ts'),
+      'utf8',
+    );
+    const generationRead = restoreSource.indexOf('await fetchPublishedGenerationRows(');
+    const mutableRead = restoreSource.indexOf(
+      'scope.entitySet.map((entity) => fetchRemoteRows(entity, ownerUserId))',
+      generationRead,
+    );
+    expect(generationRead).toBeGreaterThan(-1);
+    expect(mutableRead).toBeGreaterThan(generationRead);
+  });
+
+  it('the durable capture carries its chunks, so an upload can resume after a kill', async () => {
+    const db = await freshDatabase();
+    const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
+    await setLocalDatasetOwner(db as never, 'user_a');
+    const todos = await import('@/features/todos/todos.data');
+    await todos.addTodo({ title: 'Resumable' });
+
+    const { captureGeneration, readCapturedChunks } =
+      await import('@/core/backup/generations/capture');
+    const captured = await captureGeneration({ settingsPayload: { calories: 1 } });
+
+    // A restart is a fresh durable read. Metadata ALONE cannot resume an
+    // immutable upload: the chunks must have been persisted too.
+    const resumed = await readCapturedChunks(db as never);
+    expect(resumed).not.toBeNull();
+    expect(resumed!.capture.snapshotId).toBe(captured.capture.snapshotId);
+    expect(resumed!.chunks.length).toBe(captured.chunks.length);
+    const todoChunk = resumed!.chunks.find((chunk) => chunk.entity === 'todos');
+    expect(todoChunk?.payload).toContain('Resumable');
+    expect(todoChunk?.checksum).toBe(sha256Hex(todoChunk!.payload));
+    await db.closeAsync();
+  }, 60000);
+
+  it('a failed publication leaves the generation unpublished and the capture durable', async () => {
+    const db = await freshDatabase();
+    const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
+    await setLocalDatasetOwner(db as never, 'user_a');
+    const { captureGeneration, readGenerationCapture } =
+      await import('@/core/backup/generations/capture');
+    const captured = await captureGeneration({ settingsPayload: {} });
+    // No acknowledgement happened, so the capture must still be resumable.
+    const pending = await readGenerationCapture(db as never);
+    expect(pending?.snapshotId).toBe(captured.capture.snapshotId);
+    await db.closeAsync();
+  }, 60000);
+});

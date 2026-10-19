@@ -24,7 +24,6 @@ import * as path from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { resetAll } from '../../e2e/helpers/reset';
 import { seedFixture } from '../../e2e/helpers/seed';
-import { expectUnchanged } from '../../e2e/helpers/oracles';
 import { queryRows, returnToApp, APP_BASE_URL } from '../../e2e/helpers/dbHarness';
 import { clearInjectedFailures, setOffline } from '../../e2e/helpers/failure';
 import type { Oracle, RunMode, Scenario, SemanticStep, SimulationModel } from '../model/types';
@@ -338,6 +337,20 @@ const OUTBOX_SQL = `SELECT entity, id, updated_at AS updatedAt, operation
        ORDER BY revision ASC`;
 
 /** Evaluate the oracles directly attached to a step (rows / across-surfaces / outbox). */
+/** Structural equality for oracle row comparisons (order-sensitive). */
+function rowsEqual(
+  left: readonly Record<string, unknown>[],
+  right: readonly Record<string, unknown>[],
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+/** Enter DB context for a row read (the harness is a separate document). */
+async function ensureDbReadyForOracle(page: Page): Promise<void> {
+  const { ensureDbContext } = await import('../../e2e/helpers/dbHarness');
+  await ensureDbContext(page);
+}
+
 async function evaluateStepOracles(page: Page, step: SemanticStep): Promise<EvaluatedOracle[]> {
   const results: EvaluatedOracle[] = [];
   for (const oracle of selectAttachedOracles(step)) {
@@ -918,13 +931,51 @@ async function runOneStep(
   const injection = ctx.injection ?? null;
 
   try {
-    const unchangedOracle = resolvedStep.oracles?.find((o) => o.kind === 'unchanged');
-    if (unchangedOracle) {
+    const unchangedOracles = (resolvedStep.oracles ?? []).filter((o) => o.kind === 'unchanged');
+    if (unchangedOracles.length > 0) {
       // Negative-oracle pattern: snapshot → action → compare (parent helper).
-      await expectUnchanged(page, unchangedOracle.sql, async (p) => {
-        actionLabel = await dispatchWithInjection(p, resolvedStep, injection, captured);
-      });
-      oracleResults = await evaluateStepOracles(page, { ...resolvedStep, oracles: [] });
+      //
+      // `AUD-SH18`: the first attempt handled ONE `unchanged` oracle and then
+      // replaced the step's oracle list with `[]`, so a sibling `rows`
+      // expectation was silently DISCARDED — a step carrying an impossible rows
+      // expectation alongside `unchanged` reported `passed` without ever running
+      // the rows query.
+      //
+      // `expectUnchanged` takes the action as a callback, so nested wrappers
+      // would run the action once per oracle. Instead the snapshots are taken
+      // for every `unchanged` oracle, the action runs ONCE, and each comparison
+      // is then evaluated for real.
+      const snapshots: { sql: string; rows: Record<string, unknown>[] }[] = [];
+      for (const unchanged of unchangedOracles) {
+        await ensureDbReadyForOracle(page);
+        snapshots.push({ sql: unchanged.sql, rows: await queryRows(page, unchanged.sql) });
+        await returnToApp(page);
+      }
+      actionLabel = await dispatchWithInjection(page, resolvedStep, injection, captured);
+      for (const snapshot of snapshots) {
+        await ensureDbReadyForOracle(page);
+        const after = await queryRows(page, snapshot.sql);
+        await returnToApp(page);
+        oracleResults.push({
+          kind: 'unchanged',
+          sql: snapshot.sql,
+          result: rowsEqual(after, snapshot.rows) ? 'passed' : 'failed',
+          ...(rowsEqual(after, snapshot.rows)
+            ? {}
+            : {
+                detail: `rows changed across the step
+${snapshot.sql}`,
+              }),
+        });
+      }
+      // The sibling oracles (`rows`, `outbox`, `across-surfaces`, `diagnostic`)
+      // are evaluated for real, not discarded.
+      oracleResults.push(
+        ...(await evaluateStepOracles(page, {
+          ...resolvedStep,
+          oracles: (resolvedStep.oracles ?? []).filter((o) => o.kind !== 'unchanged'),
+        })),
+      );
     } else {
       actionLabel = await dispatchWithInjection(page, resolvedStep, injection, captured);
       oracleResults = await evaluateStepOracles(page, resolvedStep);

@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { applyShellRevision, assertRevisionIsContentDerived } from './pwa-shell-revision.mjs';
+import { scanDirectoryForNeedle } from './hermetic-build.mjs';
 
 const root = process.cwd();
 const distDir = path.join(root, 'dist');
@@ -21,6 +22,16 @@ const distDir = path.join(root, 'dist');
 // Resolve the Expo CLI entry directly: the installed Windows `.bin/expo` shim is
 // a POSIX script node cannot parse, and `npx` then fails with no diagnostic at
 // all (see scripts/hermetic-build.mjs for the same fix).
+// `AUD-SH19-B`: a PRODUCTION export must never enable the simulation mutation
+// bridge. The build inherited the ambient environment, so an exported
+// `EXPO_PUBLIC_SIM_DATA_BRIDGE=true` produced a callable `__shDataBridge` in a
+// user-facing build while the release-profile guard (which inspects tracked
+// config declarations, not this process) reported no errors. The flag is removed
+// from the child environment unconditionally, and the built output is scanned so
+// the guarantee does not depend on the mechanism above.
+const productionEnv = { ...process.env };
+delete productionEnv.EXPO_PUBLIC_SIM_DATA_BRIDGE;
+
 execFileSync(
   process.execPath,
   [
@@ -30,8 +41,18 @@ execFileSync(
     'web',
     '--clear',
   ],
-  { cwd: root, stdio: 'inherit' },
+  { cwd: root, stdio: 'inherit', env: productionEnv },
 );
+
+// Fail closed if the bridge installer or flag reached the production artifact.
+const bridgeHits = scanDirectoryForNeedle(distDir, root, '__shdatabridge');
+if (bridgeHits.length > 0) {
+  console.error(
+    `ABORT[build:web]: the simulation data bridge reached a PRODUCTION export (${bridgeHits.slice(0, 3).join(', ')}). ` +
+      'Only the hermetic test export may enable it.',
+  );
+  process.exit(1);
+}
 
 if (!fs.existsSync(path.join(distDir, 'index.html'))) {
   console.error('ABORT[build:web]: dist/index.html missing after export.');

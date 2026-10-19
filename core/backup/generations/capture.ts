@@ -77,6 +77,21 @@ export interface GenerationCapture {
   expectedChunks: Record<string, number>;
   /** Entities whose chunks have been staged locally. */
   stagedEntities: string[];
+  /**
+   * The durable owner this generation belongs to (`AUD-SH02-A`).
+   *
+   * Persisted so a resumed upload cannot publish under a different account, and
+   * so ownership/restore-emptiness safety can see the pending work.
+   */
+  ownerUserId: string;
+  /**
+   * The outbox revisions this capture absorbed.
+   *
+   * Publication acknowledges only these exact revisions, so a newer local write
+   * of the same record stays pending (`AUD-SH02-B` step 5). Persisting them is
+   * what makes that decidable after a process loss.
+   */
+  capturedRevisions: Record<string, number>;
 }
 
 /** The captured payload, returned by `captureGeneration`. */
@@ -107,6 +122,11 @@ function normalizeCapture(value: unknown): GenerationCapture | null {
     stagedEntities: Array.isArray(candidate.stagedEntities)
       ? candidate.stagedEntities.filter((entity): entity is string => typeof entity === 'string')
       : [],
+    ownerUserId: typeof candidate.ownerUserId === 'string' ? candidate.ownerUserId : '',
+    capturedRevisions:
+      candidate.capturedRevisions && typeof candidate.capturedRevisions === 'object'
+        ? (candidate.capturedRevisions as Record<string, number>)
+        : {},
   };
 }
 
@@ -171,6 +191,30 @@ function canonicalizeRows(rows: readonly Record<string, unknown>[]): string {
  *   generation (captured by the caller's own coherent settings path)
  * @returns the capture plus its chunks
  */
+/**
+ * Capture a generation INSIDE a caller-owned transaction (`AUD-SH02-A`).
+ *
+ * The backup maintenance cycle already holds the coherent SQLite boundary where
+ * the manifest snapshot, the settings snapshot and the dirty-clear commit
+ * together. Capturing the immutable generation there — rather than in a second
+ * transaction — is what guarantees the generation describes exactly the state the
+ * manifest certifies.
+ *
+ * @param transactionDb the caller's open transaction
+ * @param settingsPayload the capture-bound settings payload
+ */
+export async function captureGenerationWithinTransaction(
+  transactionDb: Awaited<ReturnType<typeof getDatabase>>,
+  settingsPayload: unknown,
+): Promise<GenerationCapture> {
+  const ownerUserId = await getLocalDatasetOwner(transactionDb);
+  if (!ownerUserId) {
+    throw new Error('captureGenerationWithinTransaction requires durable owner evidence.');
+  }
+  const captured = await captureInto(transactionDb, ownerUserId, settingsPayload);
+  return captured.capture;
+}
+
 export async function captureGeneration(options: {
   settingsPayload: unknown;
 }): Promise<CapturedGeneration> {
@@ -180,7 +224,24 @@ export async function captureGeneration(options: {
     throw new Error('captureGeneration requires durable owner evidence.');
   }
 
-  return withSQLiteTransaction(db, async (transactionDb) => {
+  return withSQLiteTransaction(db, (transactionDb) =>
+    captureInto(transactionDb, ownerUserId, options.settingsPayload),
+  );
+}
+
+/**
+ * The capture body, callable inside a caller-owned transaction.
+ *
+ * @param transactionDb the open transaction
+ * @param ownerUserId the durable owner
+ * @param settingsPayload the capture-bound settings payload
+ */
+async function captureInto(
+  transactionDb: Awaited<ReturnType<typeof getDatabase>>,
+  ownerUserId: string,
+  settingsPayload: unknown,
+): Promise<CapturedGeneration> {
+  {
     const sequence = await nextGenerationSequence(transactionDb);
     const snapshotId = createId('gsnap');
     const capturedAt = nowIso();
@@ -222,13 +283,13 @@ export async function captureGeneration(options: {
     }
 
     // The settings snapshot is part of the generation, addressed the same way.
-    const settingsPayload = JSON.stringify(options.settingsPayload ?? null);
-    const settingsChecksum = sha256Hex(settingsPayload);
+    const settingsJson = JSON.stringify(settingsPayload ?? null);
+    const settingsChecksum = sha256Hex(settingsJson);
     chunks.push({
       snapshotId,
       entity: 'user_backup_settings',
       ordinal: 0,
-      payload: settingsPayload,
+      payload: settingsJson,
       checksum: settingsChecksum,
     });
     expectedChunks.user_backup_settings = 1;
@@ -254,6 +315,18 @@ export async function captureGeneration(options: {
     ]);
     const manifestChecksum = sha256Hex(manifest);
 
+    // Absorb the exact durable revisions this snapshot represents, so an
+    // acknowledgement after publication removes only what was captured.
+    const outboxRows = await transactionDb.getAllAsync<{
+      entity: string;
+      id: string;
+      revision: number;
+    }>(`SELECT entity, id, revision FROM sync_outbox ORDER BY revision ASC`);
+    const capturedRevisions: Record<string, number> = {};
+    for (const row of outboxRows) {
+      capturedRevisions[`${row.entity}:${row.id}`] = Number(row.revision);
+    }
+
     const capture: GenerationCapture = {
       snapshotId,
       sequence,
@@ -263,12 +336,62 @@ export async function captureGeneration(options: {
       manifestChecksum,
       expectedChunks,
       stagedEntities: [],
+      ownerUserId,
+      capturedRevisions,
     };
     // Durable BEFORE any chunk leaves the device: a kill during upload resumes
-    // this exact generation instead of minting a second one.
-    await setAppMetaJson(transactionDb, appMetaKeys.backupGenerationCapture, capture);
+    // this exact generation instead of minting a second one. The CHUNKS are
+    // persisted alongside the metadata — metadata alone cannot resume an
+    // immutable upload, because the mutable entity rows it was derived from may
+    // change (or be deleted) before the process returns.
+    await setAppMetaJson(transactionDb, appMetaKeys.backupGenerationCapture, {
+      ...capture,
+      chunks,
+    });
     return { capture, chunks };
-  });
+  }
+}
+
+/**
+ * The chunks of the in-flight capture, restored from durable state.
+ *
+ * @param db optional database
+ */
+export async function readCapturedChunks(
+  db?: SQLite.SQLiteDatabase,
+): Promise<{ capture: GenerationCapture; chunks: GenerationChunk[] } | null> {
+  const database = db ?? (await getDatabase());
+  const stored = await getAppMetaJsonOrDefault<unknown>(
+    database,
+    appMetaKeys.backupGenerationCapture,
+    null,
+  );
+  const capture = normalizeCapture(stored);
+  if (!capture) return null;
+  const rawChunks = (stored as { chunks?: unknown }).chunks;
+  if (!Array.isArray(rawChunks)) return null;
+  const chunks: GenerationChunk[] = [];
+  for (const entry of rawChunks) {
+    if (!entry || typeof entry !== 'object') continue;
+    const candidate = entry as Record<string, unknown>;
+    if (
+      typeof candidate.snapshotId !== 'string' ||
+      typeof candidate.entity !== 'string' ||
+      typeof candidate.ordinal !== 'number' ||
+      typeof candidate.payload !== 'string' ||
+      typeof candidate.checksum !== 'string'
+    ) {
+      continue;
+    }
+    chunks.push({
+      snapshotId: candidate.snapshotId,
+      entity: candidate.entity,
+      ordinal: candidate.ordinal,
+      payload: candidate.payload,
+      checksum: candidate.checksum,
+    });
+  }
+  return { capture, chunks };
 }
 
 /**

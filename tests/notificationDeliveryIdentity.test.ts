@@ -46,9 +46,12 @@ function response(
     actionIdentifier?: string;
   } = {},
 ) {
+  // EXPO'S ACTUAL SHAPE (`AUD-SH17-A`): the delivery timestamp is
+  // `notification.date`. The first attempt at this fixture ALSO put a copy at the
+  // response root, which is precisely why the wrong-property defect passed: the
+  // test manufactured the property the implementation happened to read.
   return {
     actionIdentifier: options.actionIdentifier ?? DEFAULT_ACTION,
-    date: options.deliveredAt ?? 1,
     notification: {
       date: options.deliveredAt ?? 1,
       request: {

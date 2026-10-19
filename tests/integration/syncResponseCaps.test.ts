@@ -39,6 +39,8 @@ let serverCap = 1000;
 let notStored = new Set<string>();
 /** When set, the fake returns at most this many rows per page regardless of range. */
 let overTruncateAt: number | null = null;
+/** When set, upsert batches at or after this 1-based index fail (`AUD-SH03-B`). */
+let failUpsertBatchFrom: number | null = null;
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -46,6 +48,13 @@ vi.mock('@/lib/supabase', () => ({
       upsert: vi.fn(async (rows: Record<string, unknown>[]) => {
         const rowList = Array.isArray(rows) ? rows : [rows];
         upsertBatches.push({ entity, rowCount: rowList.length });
+        // `AUD-SH03-B`: a later batch can fail AFTER earlier batches stored.
+        // The batch index counts only the batches of THIS entity, and the failure
+        // starts AT the configured index (1 = the first batch fails).
+        const entityBatchIndex = upsertBatches.filter((batch) => batch.entity === entity).length;
+        if (failUpsertBatchFrom !== null && entityBatchIndex >= failUpsertBatchFrom) {
+          return { error: { message: 'simulated permanent rejection (batch failure)' } };
+        }
         const table = stored.get(entity) ?? new Map<string, Record<string, unknown>>();
         for (const row of rowList) table.set(String(row.id), row);
         stored.set(entity, table);
@@ -98,9 +107,14 @@ vi.mock('@/core/auth/account.data', async (importOriginal) => {
   return { ...actual, getLocalDatasetOwner: vi.fn(async () => 'user_a') };
 });
 
+/** The database created by the most recent `seedTodos` call. */
+let currentSeed: { db: Awaited<ReturnType<typeof import('./helpers/db').freshDatabase>> } | null =
+  null;
+
 async function seedTodos(count: number): Promise<string[]> {
   const { freshDatabase } = await import('./helpers/db');
   const db = await freshDatabase();
+  currentSeed = { db: db };
   const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
   await setLocalDatasetOwner(db as never, 'user_a');
   const ids: string[] = [];
@@ -302,4 +316,40 @@ describe('AUD-SH08-A: the batching policy itself', () => {
     expect(described).toContain('id_0, id_1, id_2');
     expect(described).toContain('9 total');
   });
+});
+
+describe('AUD-SH03-B: a failed batch does not implicate a stored batch', () => {
+  it('acknowledges the batches that stored and reports only the failed one', async () => {
+    stored.clear();
+    upsertBatches.length = 0;
+    serverCap = 1000;
+    notStored = new Set();
+    overTruncateAt = null;
+    // The audited probe: the FIRST batch stores 250 Todos, the SECOND batch fails,
+    // and every record — including the 250 that landed — is reported failed.
+    failUpsertBatchFrom = 2;
+
+    const ids = await seedTodos(300);
+    const { db } = currentSeed!;
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    const adapter = new SupabaseSyncAdapter();
+    const thrown = await adapter.push(enqueueAll(ids)).catch((error: unknown) => error);
+    failUpsertBatchFrom = null;
+
+    expect((thrown as Error).name).toBe('SyncPushPartialFailureError');
+    const failure = thrown as {
+      failedRecords: { id: string }[];
+      succeededRecords: { id: string }[];
+    };
+    // Exactly the records of the batches that stored are acknowledged...
+    expect(failure.succeededRecords.length).toBe(SYNC_WRITE_BATCH_ROWS);
+    expect(
+      failure.succeededRecords.every((record) =>
+        ids.slice(0, SYNC_WRITE_BATCH_ROWS).includes(record.id),
+      ),
+    ).toBe(true);
+    // ...and only the rest are reported failed (not all 300).
+    expect(failure.failedRecords.length).toBe(300 - SYNC_WRITE_BATCH_ROWS);
+    await db.closeAsync();
+  }, 60000);
 });

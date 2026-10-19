@@ -1893,6 +1893,15 @@ export type WorkoutPendingSave = {
   routineId: string;
   /** ISO timestamp of the session's first Start press (stable identity). */
   startedAtIso: string;
+  /**
+   * The phase cursor the session had reached when the summary was entered.
+   *
+   * `AUD-SH04-A`: re-opening a finished session MUST restore this cursor. The
+   * per-set collectors only walk phases up to `completedUpToIndex`, so a
+   * reopened session at cursor 0 re-saved only the first exercise and silently
+   * dropped every later one.
+   */
+  phaseIndex: number;
   /** Active-time seconds accumulated when the summary was reached. */
   elapsedSeconds: number;
   /** Every entered measurement, keyed by stringified sequence index. */
@@ -1993,12 +2002,17 @@ function normalizeWorkoutPendingSave(value: unknown): WorkoutPendingSave | null 
   if (Number.isNaN(new Date(candidate.startedAtIso).getTime())) return null;
   const elapsed = candidate.elapsedSeconds;
   if (typeof elapsed !== 'number' || !Number.isFinite(elapsed) || elapsed < 0) return null;
+  const phaseIndex = candidate.phaseIndex;
+  if (typeof phaseIndex !== 'number' || !Number.isInteger(phaseIndex) || phaseIndex < 0) {
+    return null;
+  }
   const enteredSets = normalizeEnteredSetMap(candidate.enteredSets);
   if (!enteredSets) return null;
   const dispositions = normalizeDispositionMap(candidate.dispositions) ?? {};
   return {
     routineId: candidate.routineId,
     startedAtIso: candidate.startedAtIso,
+    phaseIndex,
     elapsedSeconds: Math.round(elapsed),
     enteredSets,
     dispositions,

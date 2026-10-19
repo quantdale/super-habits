@@ -262,3 +262,63 @@ describe('AUD-SH05-B: isolation headers and offline assets are preserved', () =>
     expect(vercel).toContain('require-corp');
   });
 });
+
+describe('AUD-SH05-A: root shell assets participate in the revision', () => {
+  it('changing a precached root icon changes the revision', () => {
+    // The worker's CORE_SHELL_URLS precaches /icon-192.png, /icon-512.png and
+    // /icon-maskable-512.png. Omitting them from the hash let their bytes change
+    // without changing the revision, so an installed client kept the old icon.
+    const a = makeExport();
+    fs.writeFileSync(path.join(a, 'icon-192.png'), 'icon-v1');
+    const base = computeShellRevision(a);
+    fs.writeFileSync(path.join(a, 'icon-192.png'), 'icon-v2');
+    expect(computeShellRevision(a)).not.toBe(base);
+    fs.rmSync(a, { recursive: true, force: true });
+  });
+
+  it('the root icon set is in the hash input', () => {
+    const a = makeExport();
+    fs.writeFileSync(path.join(a, 'icon-512.png'), 'x');
+    fs.writeFileSync(path.join(a, 'favicon.ico'), 'y');
+    const inputs = shellRevisionInputs(a);
+    expect(inputs).toContain('icon-512.png');
+    expect(inputs).toContain('favicon.ico');
+    fs.rmSync(a, { recursive: true, force: true });
+  });
+
+  it('every precached CORE_SHELL_URL asset is hashed', () => {
+    const template = fs.readFileSync(TEMPLATE, 'utf8');
+    const coreBlock = template.slice(
+      template.indexOf('const CORE_SHELL_URLS = ['),
+      template.indexOf('];', template.indexOf('const CORE_SHELL_URLS = [')),
+    );
+    const urls = [...coreBlock.matchAll(/'([^']+)'/g)].map((match) => match[1]);
+    const rootAssets = urls.filter((url) => url !== '/' && !url.includes('index.html'));
+    const a = makeExport();
+    for (const asset of rootAssets) {
+      const name = asset.replace(/^\//, '');
+      fs.writeFileSync(path.join(a, name), `content-${name}`);
+    }
+    const inputs = shellRevisionInputs(a);
+    for (const asset of rootAssets) {
+      expect(inputs, `${asset} must be hashed`).toContain(asset.replace(/^\//, ''));
+    }
+    fs.rmSync(a, { recursive: true, force: true });
+  });
+});
+
+describe('AUD-SH19-B: a production export cannot enable the mutation bridge', () => {
+  it('build-dist-web strips the flag from the child environment', () => {
+    const source = fs.readFileSync(path.join(ROOT, 'scripts/build-dist-web.mjs'), 'utf8');
+    // The audited defect: the build inherited ambient config, so an exported
+    // EXPO_PUBLIC_SIM_DATA_BRIDGE=true shipped a callable mutation surface.
+    expect(source).toContain('delete productionEnv.EXPO_PUBLIC_SIM_DATA_BRIDGE');
+    expect(source).toContain('env: productionEnv');
+  });
+
+  it('build-dist-web fails closed when the bridge reaches the artifact', () => {
+    const source = fs.readFileSync(path.join(ROOT, 'scripts/build-dist-web.mjs'), 'utf8');
+    expect(source).toContain('__shdatabridge');
+    expect(source).toContain('simulation data bridge reached a PRODUCTION export');
+  });
+});

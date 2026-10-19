@@ -27,6 +27,7 @@ import {
 } from '@/core/backup/backup.types';
 import { canonicalizeSettingsPayload, readRecoverableSettings } from '@/core/backup/backupSettings';
 import { ensureBackupBackfill } from '@/core/backup/backupBackfill';
+import { captureGenerationWithinTransaction } from '@/core/backup/generations/capture';
 
 /**
  * Versioned backup completeness checkpoint.
@@ -312,6 +313,14 @@ async function runMaintenanceCycle(options?: {
         settingsVersion: BACKUP_SETTINGS_VERSION,
         settingsMetadata: { version: BACKUP_SETTINGS_VERSION, checksum: settingsChecksum },
       };
+
+      // 5f-1. `AUD-SH02-A`: capture the IMMUTABLE generation in this same
+      //     coherent boundary. The mutable entity rows are what the next upload
+      //     overwrites, so a generation captured here is the only thing that can
+      //     still certify this recovery point later. It runs inside the existing
+      //     transaction (no network, no nested transaction) and persists metadata
+      //     plus the captured chunks so a killed upload can resume.
+      await captureGenerationWithinTransaction(transactionDb, settingsSnapshot);
 
       // 5f. Persist the pending manifest and the generation-bound settings
       //     snapshot, enqueue the settings + manifest outbox records, and clear

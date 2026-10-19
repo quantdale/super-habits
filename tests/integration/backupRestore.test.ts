@@ -110,7 +110,14 @@ function buildRecordingSupabase() {
         const rowList = Array.isArray(rows) ? rows : [rows];
         upserted.push({ entity, rows: rowList });
         const table = stored.get(entity) ?? new Map<string, Record<string, unknown>>();
-        for (const row of rowList) table.set(String(row.id), row);
+        // Generation tables key on (snapshot_id, entity, ordinal), not `id`.
+        for (const row of rowList) {
+          const key =
+            typeof row.id === 'string'
+              ? row.id
+              : `${String(row.snapshot_id)}:${String(row.entity ?? '')}:${String(row.ordinal ?? '')}`;
+          table.set(key, row);
+        }
         stored.set(entity, table);
         return { error: null };
       }),
@@ -121,6 +128,14 @@ function buildRecordingSupabase() {
       // select().in().eq().order().range(), so this fake must model the whole
       // chain (and slice like a capped server) rather than stopping at .eq().
       select: vi.fn((_columns: string) => ({
+        // `AUD-SH02-A`: the publisher reads the owner head with
+        // select().eq().limit(), so this fake must model that chain too.
+        eq: vi.fn(() => ({
+          limit: vi.fn(async () => ({
+            data: [...(stored.get(entity)?.values() ?? [])].slice(0, 1),
+            error: null,
+          })),
+        })),
         in: vi.fn((_column: string, ids: string[]) => ({
           eq: vi.fn((_eqColumn: string, value: string) =>
             chainableQuery(
@@ -140,7 +155,15 @@ function buildRecordingSupabase() {
       })),
     };
   });
-  return { supabase: { from }, upserted };
+  // `AUD-SH02-A`: the recording device publishes immutable generation content
+  // and advances an owner head through the publication RPC.
+  const rpc = vi.fn(async (name: string) => {
+    if (name !== 'publish_backup_generation') {
+      return { data: null, error: { message: `unknown rpc ${name}` } };
+    }
+    return { data: { snapshot_id: 'recorded', sequence: 1 }, error: null };
+  });
+  return { supabase: { from, rpc }, upserted };
 }
 
 function buildServingSupabase(
@@ -277,6 +300,12 @@ const REMOTE_ENTITIES = [
   'body_weight_entries',
   'user_backup_settings',
   'backup_manifest',
+  // `AUD-SH02-A`: the real publication path writes immutable generation content
+  // and an owner head, so the recorded remote must carry those tables too — the
+  // restore under test now reads the pinned generation first.
+  'backup_generation',
+  'backup_generation_chunk',
+  'backup_generation_head',
 ];
 
 function remoteFromUpserts(upserted: UpsertCall[]): Map<string, Record<string, unknown>[]> {

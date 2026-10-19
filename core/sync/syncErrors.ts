@@ -41,6 +41,14 @@ export class SyncPushPartialFailureError extends Error {
     message: string,
     public readonly failedRecords: SyncRecord[],
     public readonly failures: SyncRecordFailure[] = [],
+    /**
+     * Records that DID store within the same entity push (`AUD-SH03-B`).
+     *
+     * A bounded write splits an entity into batches; a later batch failing must
+     * not implicate the earlier ones, so these records are acknowledged (removed
+     * from the outbox) rather than retried or terminally blocked.
+     */
+    public readonly succeededRecords: SyncRecord[] = [],
   ) {
     super(message);
     this.name = 'SyncPushPartialFailureError';
@@ -67,5 +75,26 @@ export class SyncPushPartialFailureError extends Error {
     return this.failures.find(
       (failure) => failure.record.entity === record.entity && failure.record.id === record.id,
     )?.code;
+  }
+}
+
+/**
+ * A bounded-write batch failed after earlier batches of the SAME entity already
+ * stored (`AUD-SH03-B`).
+ *
+ * Carries both sets so the caller can acknowledge the stored ids and report only
+ * the truly-failed ones. Without this the adapter had a single aggregate error
+ * per entity, and every record inherited it.
+ */
+export class EntityBatchPushError extends Error {
+  constructor(
+    message: string,
+    /** Ids whose earlier batch already stored. */
+    public readonly acknowledgedIds: readonly string[],
+    /** Ids in the batch that failed. */
+    public readonly failedIds: ReadonlySet<string>,
+  ) {
+    super(message);
+    this.name = 'EntityBatchPushError';
   }
 }

@@ -600,7 +600,11 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       type: 'session',
       routine: full,
       resume: {
-        phaseIndex: 0,
+        // `AUD-SH04-A`: a finished session must reopen at its FINAL cursor, not
+        // at 0. The collectors only walk phases up to `completedUpToIndex`, so
+        // reopening at 0 re-saved only the first exercise and silently dropped
+        // every later one.
+        phaseIndex: pendingSave.phaseIndex,
         startedAtMs: Date.parse(pendingSave.startedAtIso),
         elapsedSeconds: pendingSave.elapsedSeconds,
         alreadyFinished: true,

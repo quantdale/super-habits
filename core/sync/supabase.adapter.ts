@@ -1,8 +1,13 @@
 import { getDatabase } from '@/core/db/client';
 import { appMetaKeys, getAppMetaJsonOrDefault, setAppMetaText } from '@/core/db/appMeta';
 import { getLocalDatasetOwner } from '@/core/auth/account.data';
+import { readCapturedChunks, recordPublishedGeneration } from '@/core/backup/generations/capture';
 import type { SyncAdapter, SyncRecord } from '@/core/sync/sync.engine';
-import { SyncPushPartialFailureError, type SyncRecordFailure } from '@/core/sync/syncErrors';
+import {
+  EntityBatchPushError,
+  SyncPushPartialFailureError,
+  type SyncRecordFailure,
+} from '@/core/sync/syncErrors';
 import { getSupabaseAuthUserId, supabase } from '@/lib/supabase';
 import {
   BACKUP_ENTITIES,
@@ -195,6 +200,8 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     // AUD-SH03-B: per-record evidence. The engine classifies each record from
     // ITS OWN error; the joined summary below is diagnostics only.
     const failures: SyncRecordFailure[] = [];
+    /** Records whose batch(es) definitely stored (`AUD-SH03-B`). */
+    const succeededRecords: SyncRecord[] = [];
     const errorMessages: string[] = [];
 
     // One entity's failure (missing rows, a schema-drift upsert rejection,
@@ -272,9 +279,25 @@ export class SupabaseSyncAdapter implements SyncAdapter {
         await this.upsertEntityRows(client, db, entity, ids, currentUserId);
       } catch (error) {
         const failure = error instanceof Error ? error : new Error(String(error));
-        // Every record in this entity failed for THIS entity's own reason, so
-        // each gets the same record-local evidence (never another entity's).
+        // `AUD-SH03-B`: only the records whose OWN batch failed are reported. A
+        // batch that already stored is acknowledged, so its records are REMOVED
+        // from the outbox instead of being retried — or terminally blocked — for
+        // a failure they never experienced. The audited probe stored 250 Todos,
+        // failed the second batch, and saw all 251 reported as permanent
+        // failures.
+        const acknowledged =
+          error instanceof EntityBatchPushError
+            ? new Set(error.acknowledgedIds)
+            : new Set<string>();
+        const batchFailed =
+          error instanceof EntityBatchPushError
+            ? error.failedIds
+            : new Set(entityRecords.map((record) => record.id));
         for (const record of entityRecords) {
+          if (acknowledged.has(record.id) && !batchFailed.has(record.id)) {
+            succeededRecords.push(record);
+            continue;
+          }
           failedRecords.push(record);
           failures.push({ record, error: failure, code: postgrestCodeOf(failure) });
         }
@@ -287,6 +310,7 @@ export class SupabaseSyncAdapter implements SyncAdapter {
         `[sync] Push failed for one or more entities: ${errorMessages.join('; ')}`,
         failedRecords,
         failures,
+        succeededRecords,
       );
     }
   }
@@ -330,14 +354,32 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     // every statement comfortably inside both, and a failure now names only the
     // batch that failed.
     const writeBatches = chunk(payloadRows, writeBatchRows(this.serverRowCap));
+    /** Ids whose batch has already stored (`AUD-SH03-B`). */
+    const acknowledgedIds: string[] = [];
     for (const [batchIndex, batch] of writeBatches.entries()) {
       const { error } = await client.from(entity).upsert(batch, {
         onConflict: 'id',
       });
       if (error) {
-        throw new Error(
-          `Supabase upsert failed for ${entity} (batch ${batchIndex + 1}/${writeBatches.length}, ${batch.length} row(s)): ${error.message}`,
+        const failedIds = new Set(
+          batch.flatMap((row) => {
+            // SAFETY: every payload row is a projected entity row plus
+            // `user_id`, so `id` is present as a string for entity tables; the
+            // guard keeps the synthetic records defensive.
+            const id = (row as Record<string, unknown>).id;
+            return typeof id === 'string' ? [id] : [];
+          }),
         );
+        // A failed batch must not implicate the batches that already stored.
+        throw new EntityBatchPushError(
+          `Supabase upsert failed for ${entity} (batch ${batchIndex + 1}/${writeBatches.length}, ${batch.length} row(s)): ${error.message}`,
+          acknowledgedIds,
+          failedIds,
+        );
+      }
+      for (const row of batch) {
+        const id = (row as Record<string, unknown>).id;
+        if (typeof id === 'string') acknowledgedIds.push(id);
       }
     }
 
@@ -418,6 +460,114 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     }
   }
 
+  /**
+   * Publish the in-flight generation's immutable chunks and advance its head
+   * (`AUD-SH02-A`/`B`).
+   *
+   * Reads the DURABLE capture (metadata + chunks + owner + captured revisions)
+   * so a process killed mid-upload resumes the same generation instead of
+   * minting a second one. Publication is idempotent: identical chunks are
+   * accepted as no-ops by the server, and the head advance calls the
+   * `publish_backup_generation` RPC, which re-verifies ownership, completeness,
+   * manifest checksum and the expected previous sequence.
+   *
+   * Failure here is FATAL for the manifest push: publishing the mutable manifest
+   * without a certified generation would restore the audited "manifest pointing
+   * at rewritten bytes" state.
+   *
+   * @param client the Supabase client
+   * @param db the local database
+   * @param currentUserId the pushing owner
+   */
+  private async publishGenerationContents(
+    client: NonNullable<typeof supabase>,
+    db: Awaited<ReturnType<typeof getDatabase>>,
+    currentUserId: string,
+  ): Promise<void> {
+    const captured = await readCapturedChunks(db);
+    if (!captured) {
+      // No generation capture pending (a legacy client, or it was already
+      // acknowledged). Nothing to publish; the legacy path continues.
+      return;
+    }
+    const { capture, chunks } = captured;
+    if (capture.ownerUserId && capture.ownerUserId !== currentUserId) {
+      throw new Error(
+        `Generation ${capture.snapshotId} belongs to a different owner; refusing to publish it as ${currentUserId}.`,
+      );
+    }
+
+    // 1. Generation metadata first: chunks carry an FK to it.
+    const metaResult = await client.from('backup_generation').upsert(
+      {
+        user_id: currentUserId,
+        snapshot_id: capture.snapshotId,
+        sequence: capture.sequence,
+        protocol_version: capture.scope.protocolVersion,
+        backup_schema_version: capture.scope.backupSchemaVersion,
+        scope_version: capture.scope.scopeVersion,
+        settings_version: capture.scope.settingsVersion,
+        manifest: capture.manifest,
+        manifest_checksum: capture.manifestChecksum,
+        captured_at: capture.capturedAt,
+      },
+      { onConflict: 'user_id,snapshot_id' },
+    );
+    if (metaResult.error) {
+      throw new Error(
+        `Supabase upsert failed for backup_generation (${capture.snapshotId}): ${metaResult.error.message}`,
+      );
+    }
+
+    // 2. Chunks in bounded batches. An identical re-upload is a server-side
+    // no-op; different bytes under an existing identity are refused there.
+    for (const batch of chunk(chunks, writeBatchRows(this.serverRowCap))) {
+      const result = await client.from('backup_generation_chunk').upsert(
+        batch.map((entry) => ({
+          user_id: currentUserId,
+          snapshot_id: entry.snapshotId,
+          entity: entry.entity,
+          ordinal: entry.ordinal,
+          payload: entry.payload,
+          checksum: entry.checksum,
+        })),
+        { onConflict: 'user_id,snapshot_id,entity,ordinal' },
+      );
+      if (result.error) {
+        throw new Error(
+          `Supabase upsert failed for backup_generation_chunk (${batch.length} chunk(s)): ${result.error.message}`,
+        );
+      }
+    }
+
+    // 3. Atomic head advance with compare-and-swap on the expected sequence.
+    const head = await client
+      .from('backup_generation_head')
+      .select('sequence')
+      .eq('user_id', currentUserId)
+      .limit(1);
+    if (head.error) {
+      throw new Error(`Supabase read failed for backup_generation_head: ${head.error.message}`);
+    }
+    const previousSequence = Number(
+      (head.data as { sequence?: number }[] | null)?.[0]?.sequence ?? 0,
+    );
+    const publish = await client.rpc('publish_backup_generation', {
+      p_snapshot_id: capture.snapshotId,
+      p_expected_previous_sequence: previousSequence,
+      p_expected_chunk_count: chunks.length,
+      p_manifest_checksum: capture.manifestChecksum,
+    });
+    if (publish.error) {
+      throw new Error(
+        `publish_backup_generation failed for ${capture.snapshotId}: ${publish.error.message}`,
+      );
+    }
+
+    // 4. Acknowledged: retire the durable capture and advance the local floor.
+    await recordPublishedGeneration(capture.snapshotId, capture.sequence);
+  }
+
   private async pushManifestSnapshot(
     client: NonNullable<typeof supabase>,
     db: Awaited<ReturnType<typeof getDatabase>>,
@@ -496,6 +646,14 @@ export class SupabaseSyncAdapter implements SyncAdapter {
         `Supabase upsert failed for user_backup_settings: ${settingsResult.error.message}`,
       );
     }
+    // `AUD-SH02-A`: publish this generation's IMMUTABLE content and advance the
+    // owner head BEFORE the legacy mutable manifest row is overwritten. The
+    // generation namespace is what keeps an earlier complete recovery point
+    // restorable while these mutable rows change; writing the mutable manifest
+    // first would recreate the audited defect (a pointer whose certified bytes no
+    // longer exist).
+    await this.publishGenerationContents(client, db, currentUserId);
+
     const { error } = await client.from('backup_manifest').upsert(
       {
         user_id: currentUserId,

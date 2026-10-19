@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
 import { chainableQuery } from './helpers/supabaseQueryDouble';
+import { GenerationRemoteDouble } from './helpers/generationRemoteDouble';
 
 /**
  * Backup V2 closure — checkpoint/restore performance recording.
@@ -19,10 +20,20 @@ function buildRecordingSupabase() {
   const upserted: UpsertCall[] = [];
   /** Rows the fake remote stored, so the push read-back can verify them. */
   const stored = new Map<string, Map<string, Record<string, unknown>>>();
+  // `AUD-SH02-A`: the real publication path writes generation content and advances
+  // a head through an RPC, so the fake must model both or the cycle cannot run.
+  const generationRemote = new GenerationRemoteDouble();
   const from = vi.fn((entity: string) => ({
     upsert: vi.fn(async (rows: Record<string, unknown>[]) => {
       const rowList = Array.isArray(rows) ? rows : [rows];
       upserted.push({ entity, rows: rowList });
+      if (
+        entity === 'backup_generation' ||
+        entity === 'backup_generation_chunk' ||
+        entity === 'backup_generation_head'
+      ) {
+        return generationRemote.upsert(entity, rowList);
+      }
       const table = stored.get(entity) ?? new Map<string, Record<string, unknown>>();
       for (const row of rowList) table.set(String(row.id), row);
       stored.set(entity, table);
@@ -32,6 +43,16 @@ function buildRecordingSupabase() {
     // This file records round-trip COUNTS, so the read-back requests it makes
     // are counted too rather than hidden.
     select: vi.fn((_columns: string) => ({
+      eq: vi.fn(() => ({
+        limit: vi.fn(async () => ({
+          data: [...generationRemote.heads.entries()].map(([user_id, head]) => ({
+            user_id,
+            snapshot_id: head.snapshot_id,
+            sequence: head.sequence,
+          })),
+          error: null,
+        })),
+      })),
       in: vi.fn((_column: string, ids: string[]) => ({
         eq: vi.fn((_eqColumn: string, value: string) =>
           chainableQuery(
@@ -50,7 +71,13 @@ function buildRecordingSupabase() {
       })),
     })),
   }));
-  return { supabase: { from }, upserted };
+  const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
+    if (name !== 'publish_backup_generation') {
+      return { data: null, error: { message: `unknown rpc ${name}` } };
+    }
+    return generationRemote.publish(args);
+  });
+  return { supabase: { from, rpc }, upserted, generationRemote };
 }
 
 function installSupabaseMock(supabase: { from: ReturnType<typeof vi.fn> }) {

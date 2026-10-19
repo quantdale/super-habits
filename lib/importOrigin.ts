@@ -34,7 +34,17 @@ import {
   portableOwnerFingerprint,
 } from '@/lib/portableOwnerFingerprint';
 
-/** The recorded portable-import owner fingerprint, or `null` when absent. */
+/**
+ * Sentinel for a recorded origin whose read FAILED (`AUD-SH01-C`).
+ *
+ * A storage error is not evidence that no protected origin exists. Collapsing it
+ * into `null` made adoption permitted, so one injected read failure let an
+ * unrelated account commit a binding over a protected imported dataset.
+ */
+export const UNREADABLE_IMPORT_ORIGIN = '__import_origin_unreadable__';
+
+/** The recorded portable-import owner fingerprint, `null` when absent, or the
+ * unreadable sentinel when the read itself failed. */
 export type ImportOriginFingerprint = string | null;
 
 /**
@@ -48,7 +58,11 @@ export type ImportOriginFingerprint = string | null;
  *   fingerprint, so no account may be treated as its source.
  */
 export type ImportOriginRefusal =
-  'unrelated_account' | 'temporary_session' | 'malformed_fingerprint';
+  | 'unrelated_account'
+  | 'temporary_session'
+  | 'malformed_fingerprint'
+  /** The recorded origin exists but could not be READ (fail closed). */
+  | 'unreadable_origin';
 
 export type ImportOriginDecision =
   /** No protected origin: ordinary adoption rules apply. */
@@ -81,6 +95,10 @@ export function decideImportOriginClaim(params: {
   candidateIsAnonymous: boolean;
 }): ImportOriginDecision {
   const { importOrigin, candidateUserId, candidateIsAnonymous } = params;
+  if (importOrigin === UNREADABLE_IMPORT_ORIGIN) {
+    // Fail closed: an unreadable origin is UNKNOWN, never "absent".
+    return { allowed: false, reason: 'unreadable_origin' };
+  }
   if (importOrigin === null || importOrigin === '') {
     return { allowed: true, reason: 'no_recorded_origin' };
   }
@@ -108,6 +126,8 @@ export function importOriginRefusalMessage(reason: ImportOriginRefusal): string 
       return 'This device’s dataset was imported from another backup account, and a temporary session cannot claim it. Sign in with the account that created it.';
     case 'malformed_fingerprint':
       return 'This device records an unreadable import origin, so remote backup is paused until the account that created the dataset is identified.';
+    case 'unreadable_origin':
+      return 'This device’s import origin could not be read, so remote backup is paused rather than risk attaching the dataset to the wrong account.';
     case 'unrelated_account':
       return 'This device’s dataset was imported from another backup account. Only the account that created it can claim it.';
   }

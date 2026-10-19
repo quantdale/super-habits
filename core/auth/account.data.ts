@@ -8,7 +8,11 @@ import {
   type LocalAccountDataState,
   type LocalTableCount,
 } from '@/core/auth/account.types';
-import { decideImportOriginClaim, type ImportOriginFingerprint } from '@/lib/importOrigin';
+import {
+  decideImportOriginClaim,
+  UNREADABLE_IMPORT_ORIGIN,
+  type ImportOriginFingerprint,
+} from '@/lib/importOrigin';
 
 const TABLES_WITH_DELETED_AT = new Set<AccountUserTable>([
   'todos',
@@ -155,7 +159,11 @@ export async function readImportOriginFingerprint(
     const value = await getAppMetaText(db, appMetaKeys.portableLastImportOwnerFingerprint);
     return value && value !== 'null' ? value : null;
   } catch {
-    return null;
+    // `AUD-SH01-C`: a FAILED read is not "no origin". Returning null here made
+    // adoption permitted, so one injected storage error let an unrelated account
+    // commit a binding over a protected imported dataset. The distinction is
+    // carried by a sentinel rather than a bare null.
+    return UNREADABLE_IMPORT_ORIGIN;
   }
 }
 
