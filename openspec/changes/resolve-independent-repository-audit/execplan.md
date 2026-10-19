@@ -1,7 +1,7 @@
 # ExecPlan: Resolve the independent repository audit
 
 Plan-Version: 2
-Status: BLOCKED
+Status: ACTIVE
 
 ## Purpose / User Outcome
 
@@ -23,18 +23,30 @@ No UI redesign, unrelated feature expansion, two-way sync, arbitrary framework u
 
 ## Current Checkpoint
 
-- Current milestone: Implementation and local qualification complete. Campaign is BLOCKED on external gates only.
-- Completed: All 21 findings carried to an evidence-backed disposition (see `resolution-report.md` §2). W0-W7 executed. 16 RESOLVED_VERIFIED, 2 ALREADY_FIXED_VERIFIED (inherited from the successor base, not authored here), 2 IMPLEMENTED_NOT_CERTIFIED, 1 BLOCKED_EXTERNAL.
-- In progress: Nothing local. Every remaining item is an external gate.
-- Important modified files: `lib/importOrigin.ts`, `core/sync/{outboxAttempts,syncErrors,syncBatching,supabase.adapter,sync.engine}.ts`, `core/backup/backupBackfill.ts`, `core/backup/generations/*`, `core/simulation/dataBridge.ts`, `core/auth/account.{domain,data}.ts`, `core/notifications/notificationResponseDispatcher.ts`, `core/db/appMeta.ts`, `core/providers/AppProviders.tsx`, `features/{todos,habits,goals,workout,pomodoro,gamification,shared}/*`, `simulation/*`, `scripts/{pwa-shell-revision,build-dist-web,build-dist-e2e,build-dist-sync,prepare-shell-b,serve-e2e,hermetic-build,cloud-native-isolation,release-profile-guard}.mjs`, `public/sw.js`, `eas.json`, `.eas/workflows/native-e2e.yml`, `playwright.config.ts`, `package.json`, `supabase/migrations/20261018000000_add_backup_generation_protocol.sql`, plus ~15 new test files and the doc updates in `CLAUDE.md`, `.cursor/commands/pre-pr.md`, `docs/testing/known-gaps.md`.
-- Last successful validation: `npx tsc --noEmit` 0 errors; `npx eslint . --max-warnings 0` 0/0; Vitest unit+integration 289 files / 2956 passed (2 pre-existing skips); deterministic simulation 23/23; Playwright chromium 255 passed, journeys+pwa 86 passed, `e2e:shell-upgrade` 3/3; Supabase schema validator, release-profile guard, cloud-isolation guard, quarantine-register parity, OpenSpec `--strict` and this plan validator all PASS.
-- Current failures: `node scripts/audit-runtime-deps.mjs` exits 1 with two undocumented highs (SH-20). This is truthful and intentional; no waiver, allowlist entry or threshold change was made.
-- Relevant quarantines: Existing `docs/testing/known-gaps.md` dispositions remain in force; one new gate site (`pwa-shell-upgrade`) is registered there. No new waiver authorized.
-- Blockers: (1) SH-20 upstream advisories have no published fix; (2) SH-02 server-side atomicity/RLS/cross-client proof needs a disposable Supabase backend; (3) SH-21 artifact inspection and Android/iOS qualification need authorized cloud/device resources.
-- Condition required to unblock: a published `braces > 3.0.3` or `node-forge > 1.4.0` (or parent removal); an authorized disposable Supabase project; a campaign-owned Android emulator / iOS simulator (or explicit owner deferral).
-- Exact resume action after unblock: per `openspec/changes/resolve-braces-security-blocker/final-report.md` §L for SH-20; `simulation/backend/provision.ts` + `certify.ts` for SH-02; `npm run qa:native:provision` / `npm run e2e:shell-upgrade` on the new resources for SH-21.
-- Exact next action: None locally — hand the review packet to the owner for the separate independent review, then re-enter at the unblock condition above.
-- Remaining definition of done: Only the three external gates. No implementation, regression or documentation work remains. The change must NOT be archived before the owner's independent review.
+- Current milestone: Review response. An independent review of the earlier head rejected the earlier completion claim and found 13 reproducible defects; 12 are fixed with discriminating regressions. ONE local defect remains open (the visual lane).
+- Completed:
+  - F1/F2 (SH-04): durable `phaseIndex` restored (a reopened summary re-collects every exercise) and the pending-save write is awaited before the draft is cleared.
+  - F3 (SH-14): the task-edit path is ONE composed operation; the pre-committed `updateTodo` is gone.
+  - F4 (SH-17): the fingerprint reads Expo's real `notification.date`; the test no longer manufactures the property it reads.
+  - F5 (SH-12): both habit-creation paths use the shared association resolver.
+  - F6 (SH-02): generations are INTEGRATED — maintenance captures, the adapter publishes before the mutable manifest, restore reads the pinned generation; capture persists chunks, owner and captured revisions.
+  - F7 (SH-18): an `unchanged` oracle no longer discards its sibling oracles.
+  - F8 (SH-01): an unreadable origin fails closed via an UNREADABLE sentinel.
+  - F9 (SH-03): a failed write batch acknowledges the batches that stored.
+  - F10 (SH-19): the production export strips the bridge flag and scans the artifact; the bridge is scoped to `build:e2e:sim`.
+  - F11/F12 (SH-05): the second build is a REAL second export with changed application JavaScript; root precached icons/favicon are hashed.
+  - F13 (packet): dispositions, provenance, history disclosure and remaining-work sections corrected; the 88 granular tasks are checked off except the 7 genuinely external ones.
+  - Also fixed a REAL harness defect: the unit `expo-crypto` mock returned constant bytes, so `createId` collided and rows were silently dropped — which is why an earlier SH-16 pipeline test "passed" over an empty ledger.
+- In progress: **visual-regression delta** (open local defect, not external).
+- Important modified files: as listed in the review-response commits `4e596d17`, `34e66e9f`, `b981d6e2` plus the report/execplan updates.
+- Last successful validation: typecheck 0 errors; lint 0/0; Vitest unit+integration 288 files / 2975 passed (2 pre-existing skips); timezone matrix PASS (5 zones / 111 tests); deterministic simulation 23/23; Playwright chromium 255 passed; journeys+pwa 86 passed; two-build shell upgrade 3/3; schema/guard/OpenSpec/plan validators PASS.
+- Current failures: `--project=visual` — 7 failed, 27 passed. Stable ~194-pixel single-channel delta at the Today header icons and bottom tab bar; the base passes the same goldens. Root cause NOT isolated; no golden refreshed. Also `audit-runtime-deps.mjs` exits 1 (SH-20, external, truthful).
+- Relevant quarantines: existing `docs/testing/known-gaps.md` dispositions plus the registered `pwa-shell-upgrade` gate site. No new waiver.
+- Blockers: none external blocks the remaining LOCAL work; SH-20, SH-02's server proof and SH-21's artifact inspection remain external.
+- Condition required to unblock: for the local defect, none — it is ordinary debugging. For the external gates: a published `braces > 3.0.3` / `node-forge > 1.4.0`, an authorized disposable Supabase project, and a campaign-owned device.
+- Exact resume action after unblock: for the external gates, per `resolve-braces-security-blocker/final-report.md` §L, `simulation/backend/provision.ts`, and `qa:native:provision`.
+- Exact next action: isolate the visual-regression delta. It reproduces with this branch's built JavaScript and disappears with the base's; the CSS bundle (md5-identical), font assets (identical) and the `data-db-ready` ordering have already been ruled out. Bisect the remaining source changes against `--project=visual --grep "today populated"` on a fresh bridge-free `build:e2e`.
+- Remaining definition of done: fix the visual delta; then the external gates above; then the owner's separate independent review. Do not archive this change before that review.
 
 ## Progress
 
