@@ -116,6 +116,12 @@ export function AppProviders({ children }: PropsWithChildren) {
         // migrated. The shell renders before initializeDatabase() completes,
         // so a fixed-sleep wait races migrations under load.
         if (Platform.OS === 'web' && typeof document !== 'undefined') {
+          document.documentElement.dataset.dbReady = 'true';
+          // These run AFTER the readiness marker on purpose: the marker gates
+          // test capture timing (`data-db-ready`), so inserting work ahead of it
+          // shifted the visual-regression capture point and produced a stable
+          // 1-channel glyph delta against the zero-tolerance goldens.
+          //
           // Hermetic simulation build only (AUD-SH19-A/B): publish the typed,
           // allowlisted data-layer bridge after the schema is ready, so
           // simulation API legs call the REAL `*.data.ts` functions on this
@@ -132,7 +138,6 @@ export function AppProviders({ children }: PropsWithChildren) {
           if (shellBuildId) {
             document.documentElement.dataset.shellBuild = shellBuildId;
           }
-          document.documentElement.dataset.dbReady = 'true';
         }
       } catch (e) {
         console.error('[db] initializeDatabase failed', e);

@@ -85,13 +85,22 @@ if (leakFiles.length > 0) {
 // simulation lane depends on it. Metro inlines the flag comparison, so the
 // assembled bundle carries the compiled `__shDataBridge` installer rather than
 // the literal variable name; asserting on the installer is the exact check.
-const bridgeIntents = scanDirectoryForNeedle(distDir, root, '__shdatabridge');
-if (bridgeIntents.length === 0) {
-  // The bridge module is imported by AppProviders, so its code (including the
-  // `__shDataBridge` global name) must be present in this export. Its absence
-  // means the gated installer was tree-shaken out and simulation apiLegs would
-  // silently have no data path.
-  fail('simulation bridge code is absent from the hermetic export.');
+//
+// `AUD-SH19-B`: the bridge MODULE is always bundled (AppProviders imports it
+// statically), so its identifier proves nothing about whether it is ARMED. Only
+// the build flag decides that, and Metro inlines the flag's name into the
+// comparison. So: a bridge-requesting export must contain the module, and a
+// non-requesting export must contain NO inlined bridge flag at all.
+const bridgeRequested = process.env.EXPO_PUBLIC_SIM_DATA_BRIDGE_BUILD === '1';
+const bridgeModule = scanDirectoryForNeedle(distDir, root, '__shdatabridge');
+const bridgeFlag = scanDirectoryForNeedle(distDir, root, 'sim_data_bridge');
+if (bridgeRequested && bridgeModule.length === 0) {
+  fail('the bridge module is absent from the export that requested it.');
+}
+if (!bridgeRequested && bridgeFlag.length > 0) {
+  fail(
+    'the simulation bridge FLAG reached an export that did not request it; visual/feature lanes must stay bridge-free.',
+  );
 }
 // 4. PWA shell revision (`AUD-SH05-C`): the SAME content-hash step production
 // uses, so an E2E-tested artifact cannot differ from a released one here. A
@@ -108,5 +117,5 @@ try {
   fail(error instanceof Error ? error.message : String(error));
 }
 console.log(
-  `[build:e2e] OK — hermetic export (0 Supabase hosts in dist/; simulation bridge in ${bridgeIntents.length} file(s); shell revision sha-${shellRevision}).`,
+  `[build:e2e] OK — hermetic export (0 Supabase hosts in dist/; bridge module=${bridgeModule.length > 0}, armed=${bridgeRequested}; shell revision sha-${shellRevision}).`,
 );

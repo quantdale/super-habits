@@ -6,6 +6,13 @@ module.exports = {
     './features/**/*.{js,jsx,ts,tsx}',
     './core/**/*.{js,jsx,ts,tsx}',
   ],
+  // Keep the emitted CSS independent of incidental words in source. Tailwind's
+  // extractor treats any bare word in a scanned file as a class candidate, so
+  // backup generation code using the identifier `ordinal` (chunk ordinals) made
+  // it emit an unused `.ordinal` utility. That changed the CSS bundle hash even
+  // though nothing applied the class. Blocking these words keeps the built CSS
+  // stable as source evolves, which the zero-tolerance visual goldens depend on.
+  blocklist: ['ordinal', 'slashed-zero', 'proportional-nums'],
   theme: {
     extend: {
       colors: {
