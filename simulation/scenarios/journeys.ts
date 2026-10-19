@@ -238,12 +238,16 @@ export const j3TheCommute = defineScenario({
     { kind: 'goOnline', note: 'reconnect at the office' },
     {
       kind: 'expectOracle',
-      note: 'AUD-SH18-B: the two offline writes enqueued one durable create intent each, and nothing else is pending. Generated ids are not statically known, so the assertion pins the exact (entity, operation) multiset — an empty or differently-shaped outbox still fails.',
+      note: 'AUD-SH18-B: the ONLINE create earlier in this journey and the two offline writes each enqueued one durable create intent (plus the saved-meal maintenance record the calorie write owns), and nothing else is pending. Generated ids are not statically known, so the assertion pins the exact (entity, operation) multiset — an empty or differently-shaped outbox still fails.',
       oracle: {
         kind: 'outbox',
         expected: [
+          // 'Commute ride' was created while online and has not pushed yet.
+          { entity: 'todos', operation: 'create' },
+          // 'Draft reply' was created offline.
           { entity: 'todos', operation: 'create' },
           { entity: 'calorie_entries', operation: 'create' },
+          { entity: 'saved_meals', operation: 'create' },
         ],
       },
     },

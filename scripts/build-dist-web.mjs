@@ -18,11 +18,20 @@ import { applyShellRevision, assertRevisionIsContentDerived } from './pwa-shell-
 const root = process.cwd();
 const distDir = path.join(root, 'dist');
 
-execFileSync('npx', ['expo', 'export', '-p', 'web', '--clear'], {
-  cwd: root,
-  stdio: 'inherit',
-  shell: process.platform === 'win32',
-});
+// Resolve the Expo CLI entry directly: the installed Windows `.bin/expo` shim is
+// a POSIX script node cannot parse, and `npx` then fails with no diagnostic at
+// all (see scripts/hermetic-build.mjs for the same fix).
+execFileSync(
+  process.execPath,
+  [
+    path.join(root, 'node_modules', '@expo', 'cli', 'build', 'bin', 'cli'),
+    'export',
+    '-p',
+    'web',
+    '--clear',
+  ],
+  { cwd: root, stdio: 'inherit' },
+);
 
 if (!fs.existsSync(path.join(distDir, 'index.html'))) {
   console.error('ABORT[build:web]: dist/index.html missing after export.');

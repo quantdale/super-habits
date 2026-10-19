@@ -138,18 +138,27 @@ const smokeScenario = defineScenario({
     {
       kind: 'expectOracle',
       // AUD-SH18-B: an unspecified outbox read used to pass regardless of what
-      // the app enqueued. By this point the smoke has created one todo, one
-      // habit and one habit completion through the normal write paths, so the
-      // exact pending (entity, operation) set is knowable — pin it.
+      // the app enqueued. By this point the smoke has made exactly these durable
+      // writes:
+      //   * UI create 'Pay rent' + UI toggle it          -> ONE todos UPDATE
+      //     (the engine dedupes by (entity, id), keeping the latest operation)
+      //   * UI create 'Drink water' + UI tick it         -> habits CREATE,
+      //     habit_completions CREATE
+      //   * apiLeg createHabit 'Hydrate from api'        -> habits CREATE
+      //   * apiLeg createTodo 'API task'                 -> todos CREATE
+      // So the exact pending multiset is four records. Pinning all four is what
+      // makes this a real assertion instead of a row count.
       oracle: {
         kind: 'outbox',
         expected: [
           { entity: 'habits', operation: 'create' },
+          { entity: 'habits', operation: 'create' },
           { entity: 'habit_completions', operation: 'create' },
+          { entity: 'todos', operation: 'update' },
           { entity: 'todos', operation: 'create' },
         ],
       },
-      note: 'every ordinary UI write left exactly one durable create intent per entity',
+      note: 'every write left exactly one durable intent, deduped per (entity, id): 2 habits, 1 completion, 1 todo update, 1 todo create',
     },
     // ---- entity: calories ----
     {

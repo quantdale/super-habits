@@ -132,8 +132,28 @@ export function runHermeticBuild({
     error.remoteStripped = remoteStripped;
     throw error;
   }
-  const useWindowsShell = process.platform === 'win32';
-  const result = execFileSync(command, args, {
+  // Resolve the Expo CLI entry directly instead of going through `npx`. On some
+  // Windows shells the installed `.bin/expo` shim is a POSIX script that node
+  // cannot parse, and `npx` then fails with no diagnostic at all — a silent
+  // non-zero exit that looks like a product failure. Running the real CLI entry
+  // with the pinned node is deterministic and gives real output on failure.
+  let effectiveCommand = command;
+  let effectiveArgs = args;
+  if (command === 'npx' && args[0] === 'expo') {
+    const cliEntry = path.resolve(
+      process.cwd(),
+      'node_modules',
+      '@expo',
+      'cli',
+      'build',
+      'bin',
+      'cli',
+    );
+    effectiveCommand = process.execPath;
+    effectiveArgs = [cliEntry, ...args.slice(1)];
+  }
+  const useWindowsShell = process.platform === 'win32' && effectiveCommand !== process.execPath;
+  const result = execFileSync(effectiveCommand, effectiveArgs, {
     cwd,
     env: { ...env, ...extraEnv },
     encoding: 'utf8',
