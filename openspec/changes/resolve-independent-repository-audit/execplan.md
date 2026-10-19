@@ -1,7 +1,7 @@
 # ExecPlan: Resolve the independent repository audit
 
 Plan-Version: 2
-Status: ACTIVE
+Status: BLOCKED
 
 ## Purpose / User Outcome
 
@@ -23,25 +23,18 @@ No UI redesign, unrelated feature expansion, two-way sync, arbitrary framework u
 
 ## Current Checkpoint
 
-- Current milestone: W5 in progress. W0-W2, W4 complete. W5 has SH-09, SH-10 and SH-11 resolved; SH-12/13/16/17 and the SH-05/W6 work remain.
-- Completed:
-  - W0 base selection: fresh worktree `D:/Documents/tryPython/superhabits-audit-resolution`, branch `audit/independent-audit-resolution` created from the coherent successor tip `92a9565` (PR #80, contains PR #79 and `main` `fb10d6c` as merge-base). Planning folder transferred; original `superhabits` checkout is an unmodified snapshot.
-  - W0 toolchain: pinned Node `v22.23.2` / npm `10.9.8` (installed locally; ambient Node 24.3.0/npm 11.4.2 is out of range). `npm ci` from the unchanged lockfile.
-  - W0 baselines: `npm run typecheck` PASS; unit suite 182 files / 2308 passed + 1 skipped PASS.
-  - W1 SH-18 (oracle integrity) RESOLVED: shared `simulation/runner/oracleContract.ts`; `rows`/`outbox` oracles now REQUIRE an executable expectation; explicit `diagnostic` kind can never certify a mutation; standalone dispatch throws on any failed evaluation; outbox expectations are structural partial matches; `{{capture.<name>.<key>}}` binds real generated ids and a capture reference with no matching leg is a runner error. Tests: `tests/simulation.oracleIntegrity.test.ts` (17) + `simulation/runner/specs/oracleIntegrity.spec.ts` (5 live-page cases, all passing).
-  - W1 SH-19 (API-leg fidelity) RESOLVED: `core/simulation/dataBridge.ts` typed allowlisted bridge invokes the REAL `*.data.ts` functions on the app singleton; installed only when `EXPO_PUBLIC_SIM_DATA_BRIDGE=true`, set only by `scripts/build-dist-e2e.mjs`, refused by `scripts/release-profile-guard.mjs` in every eas.json/app.json config, and the hermetic export now fails if the bridge code is absent. Shadow-SQL handlers deleted; Gym V2 fixture shape is an explicitly-labelled `[fixture]` seam. Live proof: the capture→outbox assertion passes, which is impossible without the real enqueue path.
-  - W1 SH-21 (cloud isolation) RESOLVED at the code/configuration level: `eas.json` `e2e-test` now sets `EXPO_NO_DOTENV=1` and explicitly blanks 5 public backend/remote-AI variables; `scripts/cloud-native-isolation.mjs` (in `qa:fast`) fails closed on regressions; `.eas/workflows/native-e2e.yml` gained a gating `isolation_preflight` job; `REMOTE_ENV_MARKERS` now also treats remote-AI backend/proxy/function variables as non-hermetic. Tests: `tests/cloudNativeIsolation.test.ts` (15).
-  - W1 SH-20 re-verified and retained as BLOCKED_EXTERNAL: `braces` 3.0.3 is the registry latest with `first_patched_version: null` and vulnerable range `<= 3.0.3`; `node-forge` 1.4.0 is latest with `<= 1.4.0` and no patch. `node scripts/audit-runtime-deps.mjs` still exits 1 with exactly those two undocumented highs. No waiver, allowlist edit or threshold change was made.
-- In progress: W2 ownership/outbox/backfill. SH-01 reproduced on this base (domain returns `anonymous_ready` + binds temporary B once a single unowned outbox row exists, instead of `owner_mismatch`).
-- Important modified files: `simulation/model/{types,steps,validate}.ts`, `simulation/runner/{execute,apiLeg,oracleContract}.ts`, `simulation/fixtures/seeders.ts`, `simulation/scenarios/*`, `simulation/workflows/workflows.ts`, `core/simulation/dataBridge.ts`, `core/providers/AppProviders.tsx`, `e2e/helpers/oracles.ts`, `scripts/{build-dist-e2e,release-profile-guard,cloud-native-isolation,hermetic-build}.mjs`, `eas.json`, `.eas/workflows/native-e2e.yml`, `package.json`, and the new tests listed above.
-- Last successful validation: commit `1de7e64` (W1 SH-18/SH-19) — typecheck 0 errors, lint 0 warnings, unit 183 files / 2328 passed, hermetic `build:e2e` PASS with the bridge present, `oracleIntegrity.spec.ts` 5/5 passing, `cloud-native-isolation` and `release-profile-guard` PASS.
-- Current failures: `node scripts/audit-runtime-deps.mjs` exits 1 (SH-20, external blocker — truthfully red by policy). No other known failure on this base.
-- Relevant quarantines: Existing `docs/testing/known-gaps.md` dispositions remain in force; no new waiver authorized.
-- Blockers: SH-20 (upstream advisory fix), SH-02 real-backend certification (disposable Supabase + RLS/transaction proof), Android/iOS qualification (device/toolchain), and cloud native lane execution (paid EAS). None blocks the remaining local work.
-- Condition required to unblock: a published `braces > 3.0.3` or `node-forge > 1.4.0` (or parent removal); authorized disposable Supabase project; a campaign-owned Android emulator / iOS simulator.
-- Exact resume action after unblock: per `openspec/changes/resolve-braces-security-blocker/final-report.md` §L resume matrix for SH-20; `simulation/backend/provision.ts` + `certify.ts` for SH-02.
-- Exact next action: W5 task 5.3 — centralize transactional Project/Goal association resolution across every create, update, bulk, command and assignment entrypoint, then the SH-12 regression cases and the SH-13 creation-field wiring.
-- Remaining definition of done: Execute W2 through W7, reconcile all 21 finding dispositions with regression evidence, retain the external gates above, and produce `resolution-report.md` (independent-review packet). Planning readiness does not resolve the findings.
+- Current milestone: Implementation and local qualification complete. Campaign is BLOCKED on external gates only.
+- Completed: All 21 findings carried to an evidence-backed disposition (see `resolution-report.md` §2). W0-W7 executed. 16 RESOLVED_VERIFIED, 2 ALREADY_FIXED_VERIFIED (inherited from the successor base, not authored here), 2 IMPLEMENTED_NOT_CERTIFIED, 1 BLOCKED_EXTERNAL.
+- In progress: Nothing local. Every remaining item is an external gate.
+- Important modified files: `lib/importOrigin.ts`, `core/sync/{outboxAttempts,syncErrors,syncBatching,supabase.adapter,sync.engine}.ts`, `core/backup/backupBackfill.ts`, `core/backup/generations/*`, `core/simulation/dataBridge.ts`, `core/auth/account.{domain,data}.ts`, `core/notifications/notificationResponseDispatcher.ts`, `core/db/appMeta.ts`, `core/providers/AppProviders.tsx`, `features/{todos,habits,goals,workout,pomodoro,gamification,shared}/*`, `simulation/*`, `scripts/{pwa-shell-revision,build-dist-web,build-dist-e2e,build-dist-sync,prepare-shell-b,serve-e2e,hermetic-build,cloud-native-isolation,release-profile-guard}.mjs`, `public/sw.js`, `eas.json`, `.eas/workflows/native-e2e.yml`, `playwright.config.ts`, `package.json`, `supabase/migrations/20261018000000_add_backup_generation_protocol.sql`, plus ~15 new test files and the doc updates in `CLAUDE.md`, `.cursor/commands/pre-pr.md`, `docs/testing/known-gaps.md`.
+- Last successful validation: `npx tsc --noEmit` 0 errors; `npx eslint . --max-warnings 0` 0/0; Vitest unit+integration 289 files / 2956 passed (2 pre-existing skips); deterministic simulation 23/23; Playwright chromium 255 passed, journeys+pwa 86 passed, `e2e:shell-upgrade` 3/3; Supabase schema validator, release-profile guard, cloud-isolation guard, quarantine-register parity, OpenSpec `--strict` and this plan validator all PASS.
+- Current failures: `node scripts/audit-runtime-deps.mjs` exits 1 with two undocumented highs (SH-20). This is truthful and intentional; no waiver, allowlist entry or threshold change was made.
+- Relevant quarantines: Existing `docs/testing/known-gaps.md` dispositions remain in force; one new gate site (`pwa-shell-upgrade`) is registered there. No new waiver authorized.
+- Blockers: (1) SH-20 upstream advisories have no published fix; (2) SH-02 server-side atomicity/RLS/cross-client proof needs a disposable Supabase backend; (3) SH-21 artifact inspection and Android/iOS qualification need authorized cloud/device resources.
+- Condition required to unblock: a published `braces > 3.0.3` or `node-forge > 1.4.0` (or parent removal); an authorized disposable Supabase project; a campaign-owned Android emulator / iOS simulator (or explicit owner deferral).
+- Exact resume action after unblock: per `openspec/changes/resolve-braces-security-blocker/final-report.md` §L for SH-20; `simulation/backend/provision.ts` + `certify.ts` for SH-02; `npm run qa:native:provision` / `npm run e2e:shell-upgrade` on the new resources for SH-21.
+- Exact next action: None locally — hand the review packet to the owner for the separate independent review, then re-enter at the unblock condition above.
+- Remaining definition of done: Only the three external gates. No implementation, regression or documentation work remains. The change must NOT be archived before the owner's independent review.
 
 ## Progress
 
@@ -49,12 +42,12 @@ No UI redesign, unrelated feature expansion, two-way sync, arbitrary framework u
 - [x] Complete and validate the self-contained planning handoff.
 - [x] W0: Select/revalidate implementation base and reproduce the remaining defects.
 - [x] W1: Correct evidence boundaries and isolate native test configuration.
-- [ ] W2: Close ownership, failure accounting, capped verification and backfill races.
-- [ ] W3: Prove and implement immutable published backup recovery.
-- [ ] W4: Close durable session/automation/composed-save boundaries.
-- [ ] W5: Correct identity, associations, timers, rewards and notification delivery identity.
-- [ ] W6: Complete PWA/simulation integration and compatibility checks.
-- [ ] W7: Run campaign regression, resolve external dispositions and prepare independent review.
+- [x] W2: Close ownership, failure accounting, capped verification and backfill races.
+- [x] W3: Prove and implement immutable published backup recovery.
+- [x] W4: Close durable session/automation/composed-save boundaries.
+- [x] W5: Correct identity, associations, timers, rewards and notification delivery identity.
+- [x] W6: Complete PWA/simulation integration and compatibility checks.
+- [x] W7: Run campaign regression, resolve external dispositions and prepare independent review.
 
 ## Surprises & Discoveries
 

@@ -49,25 +49,33 @@ test.describe('Infrastructure', () => {
     expect(swActive).toBe(true);
   });
 
-  test('served /sw.js is fresh (matches public/sw.js)', async ({ page }) => {
+  test('served /sw.js carries a generated content revision', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('load');
-    // Freshness invariant (audit AREA 9 F2): the served worker must carry the
-    // same CACHE_VERSION as public/sw.js in the repo. A literal version pin
-    // here passed against a stale dist/ build and broke on the next rebuild;
-    // this fails loudly with the remedy instead.
+    // Freshness invariant, `AUD-SH05-A`. The served worker's CACHE_VERSION is
+    // GENERATED from the exported shell content, so it must NOT equal the
+    // tracked template's placeholder — a worker byte-identical to the template
+    // cannot update an existing client. This replaced an equality assertion that
+    // encoded the old hand-versioned contract and would now pin the defect.
     const swSource = await page.evaluate(async () => {
       const r = await fetch('/sw.js', { cache: 'no-store' });
       return r.text();
     });
     expect(swSource).toContain('superhabits-shell-');
-    const publicSource = fs.readFileSync(PUBLIC_SW_PATH, 'utf8');
     const servedVersion = cacheVersionOf(swSource);
-    const publicVersion = cacheVersionOf(publicSource);
+    const templateVersion = cacheVersionOf(fs.readFileSync(PUBLIC_SW_PATH, 'utf8'));
+    expect(servedVersion, 'the served worker must carry a generated revision').toMatch(
+      /^sha-[0-9a-f]{8,}$/,
+    );
+    expect(templateVersion, 'the template must keep the substitution token').toContain(
+      '__SUPERHABITS_CACHE_VERSION__',
+    );
     expect(
       servedVersion,
-      `dist/sw.js (CACHE_VERSION=${servedVersion}) is stale vs public/sw.js (${publicVersion}) — run \`npm run build:e2e\`.`,
-    ).toEqual(publicVersion);
+      'the served worker still equals the template placeholder — run `npm run build:e2e`.',
+    ).not.toEqual(templateVersion);
+    // No hand-maintained literal version may survive in the served worker.
+    expect(swSource).not.toMatch(/CACHE_VERSION\s*=\s*'v\d+'/);
   });
 
   test('stale v1 cache is not present', async ({ page }) => {
