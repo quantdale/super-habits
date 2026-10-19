@@ -62,22 +62,68 @@ function writeBuildAsset(distDir, marker) {
   fs.writeFileSync(assetPath, `build=${marker}\n`, 'utf8');
 }
 
-// --- Build A: tag the existing export so the spec can identify the document.
+// --- Build A: the export `build:e2e` already produced, tagged with its identity
+// marker so the spec can prove which document the browser is serving.
 tagBuildMarker(distA, 'shell-a');
 writeBuildAsset(distA, 'shell-a');
-const revisionA = applyShellRevision({ distDir: distA, templatePath: path.join(root, 'public', 'sw.js') });
+const revisionA = applyShellRevision({
+  distDir: distA,
+  templatePath: path.join(root, 'public', 'sw.js'),
+});
 assertRevisionIsContentDerived(distA);
 
-// --- Build B: a copy with a DIFFERENT shell content set.
+// --- Build B: a REAL SECOND EXPORT, not a copy (`AUD-SH05-A`).
+//
+// The earlier version of this script copied dist/ and edited one HTML marker.
+// Review correctly rejected that: it exercised the update plumbing but did not
+// satisfy the plan's requirement of a second real export with changed
+// APPLICATION content and changed offline assets.
+//
+// This runs the full `expo export` again with EXPO_PUBLIC_SHELL_BUILD_ID set to
+// a different value, which Metro inlines into the built JavaScript (see
+// `AppProviders`), so the shell's actual code differs. It is hermetic: dotenv
+// disabled and every ambient EXPO_PUBLIC_* stripped, exactly like build:e2e.
 fs.rmSync(distB, { recursive: true, force: true });
-fs.cpSync(distA, distB, { recursive: true });
+const { runHermeticBuild } = await import('./hermetic-build.mjs');
+try {
+  runHermeticBuild({
+    label: 'build:shell-b',
+    command: 'npx',
+    args: ['expo', 'export', '-p', 'web', '--clear', '--output-dir', 'dist-shell-b'],
+    set: { EXPO_PUBLIC_SHELL_BUILD_ID: 'shell-b' },
+  });
+} catch (error) {
+  fail(
+    `the second real export failed: ${error instanceof Error ? error.message : String(error)}`,
+  );
+}
+if (!fs.existsSync(path.join(distB, 'index.html'))) {
+  fail('the second export produced no dist-shell-b/index.html.');
+}
+
+// Prove the two builds' APPLICATION code genuinely differs before relying on it.
+const entryFiles = (dir) =>
+  fs
+    .readdirSync(path.join(dir, '_expo', 'static', 'js', 'web'))
+    .filter((name) => name.endsWith('.js'));
+const entryA = entryFiles(distA).map((name) => fs.readFileSync(path.join(distA, '_expo/static/js/web', name)));
+const entryB = entryFiles(distB).map((name) => fs.readFileSync(path.join(distB, '_expo/static/js/web', name)));
+const joinedA = Buffer.concat(entryA).toString('utf8');
+const joinedB = Buffer.concat(entryB).toString('utf8');
+if (joinedA === joinedB) {
+  fail(
+    'the two exports produced IDENTICAL application JavaScript; the upgrade proof would be vacuous.',
+  );
+}
+if (!joinedB.includes('shell-b')) {
+  fail('the second export does not carry its inlined build identity.');
+}
+
 tagBuildMarker(distB, 'shell-b');
-writeBuildAsset(distB, 'shell-b');
-// The copy carries build A's injected worker; re-injecting derives B's revision
-// from B's own bytes strictly (so the value is not inherited).
-const workerTemplate = fs.readFileSync(path.join(distB, 'sw.js'), 'utf8');
-fs.writeFileSync(path.join(distB, 'sw.js'), workerTemplate, 'utf8');
-const revisionB = applyShellRevision({ distDir: distB, templatePath: path.join(distB, 'sw.js') });
+const revisionB = applyShellRevision({
+  distDir: distB,
+  templatePath: path.join(root, 'public', 'sw.js'),
+});
 assertRevisionIsContentDerived(distB);
 
 if (revisionA === revisionB) {
@@ -87,5 +133,5 @@ if (revisionA === revisionB) {
 }
 
 console.log(
-  `[prepare-shell-b] OK — build A revision sha-${revisionA}, build B revision sha-${revisionB} (distinct).`,
+  `[prepare-shell-b] OK — two REAL exports. Build A revision sha-${revisionA}, build B revision sha-${revisionB} (distinct application bytes).`,
 );

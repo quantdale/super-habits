@@ -122,6 +122,16 @@ export function AppProviders({ children }: PropsWithChildren) {
           // singleton connection instead of replaying hand-written SQL. Every
           // other build inlines the flag as absent and installs nothing.
           installSimulationDataBridge();
+          // Build identity marker. `AUD-SH05-A` requires the two-build upgrade
+          // proof to use two REAL exports whose application content differs, not
+          // one export copied twice. The build that produces `dist-shell-b/` sets
+          // EXPO_PUBLIC_SHELL_BUILD_ID, which Metro inlines here as a string
+          // literal — so the built JavaScript genuinely changes and the generated
+          // shell revision changes with it. Ordinary builds carry no marker.
+          const shellBuildId = process.env.EXPO_PUBLIC_SHELL_BUILD_ID;
+          if (shellBuildId) {
+            document.documentElement.dataset.shellBuild = shellBuildId;
+          }
           document.documentElement.dataset.dbReady = 'true';
         }
       } catch (e) {

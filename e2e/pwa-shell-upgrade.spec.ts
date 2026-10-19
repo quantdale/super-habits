@@ -142,7 +142,11 @@ test.describe('real two-build shell upgrade', () => {
     await waitForDbReady(page);
     expect(await installedWorkerRevision(page)).toBe(revisionB);
 
-    // The new shell serves the build-B document, and the data survived.
+    // The new shell serves build B's REAL application code, not just a changed
+    // HTML marker: `AppProviders` stamps the inlined build identity on the
+    // document element, which only a genuine second export can produce.
+    const shellBuild = await page.evaluate(() => document.documentElement.dataset.shellBuild ?? '');
+    expect(shellBuild, 'the running JavaScript must be build B').toBe('shell-b');
     const shellMarker = await page.evaluate(
       () => document.querySelector('meta[name="sh-build"]')?.getAttribute('content') ?? '',
     );
@@ -185,6 +189,12 @@ test.describe('real two-build shell upgrade', () => {
       await page.getByRole('button', { name: 'Today', exact: true }).first().waitFor({
         timeout: 60_000,
       });
+      // The offline boot is build B's real JavaScript, verified by the inlined
+      // build identity rather than only the HTML marker.
+      const shellBuild = await page.evaluate(
+        () => document.documentElement.dataset.shellBuild ?? '',
+      );
+      expect(shellBuild).toBe('shell-b');
       const shellMarker = await page.evaluate(
         () => document.querySelector('meta[name="sh-build"]')?.getAttribute('content') ?? '',
       );
