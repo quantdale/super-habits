@@ -1,7 +1,25 @@
 import { getDatabase } from '@/core/db/client';
-import { appMetaKeys, getAppMetaJsonOrDefault, setAppMetaText } from '@/core/db/appMeta';
+import {
+  appMetaKeys,
+  getAppMetaJson,
+  getAppMetaJsonOrDefault,
+  setAppMetaJson,
+  setAppMetaText,
+} from '@/core/db/appMeta';
 import { getLocalDatasetOwner } from '@/core/auth/account.data';
-import { readCapturedChunks, recordPublishedGeneration } from '@/core/backup/generations/capture';
+import {
+  captureCurrentGeneration,
+  captureVerifiedRows,
+  readCapturedChunks,
+  recordPublishedGeneration,
+  withReservedGenerationSequence,
+  type CapturedGeneration,
+} from '@/core/backup/generations/capture';
+import { readVerifiedLegacySnapshot } from '@/core/backup/legacySnapshot';
+import {
+  boundedBackupRequests,
+  boundedBackupRecord,
+} from '@/core/backup/generations/requestBudget';
 import type { SyncAdapter, SyncRecord } from '@/core/sync/sync.engine';
 import {
   EntityBatchPushError,
@@ -17,6 +35,8 @@ import {
   BACKUP_NEVER_DELETED_ENTITIES,
   BACKUP_SETTINGS_RECORD_ID,
   BACKUP_SETTINGS_VERSION,
+  BACKUP_SCHEMA_VERSION,
+  BACKUP_SCOPE_VERSION,
   type BackupManifest,
 } from '@/core/backup/backup.types';
 import { canonicalizeSettingsPayload } from '@/core/backup/backupSettings';
@@ -30,21 +50,6 @@ import {
 } from '@/core/sync/syncBatching';
 
 /**
- * True when the entity is one of the mutable current-row tables whose overwrite
- * destroys an earlier recovery point (`AUD-SH02-A`, review finding 8).
- *
- * The synthetic manifest/settings records and the generation namespace are not in
- * this set: publishing them is the safe path, not the destructive one.
- */
-export function isMutableEntity(entity: string): boolean {
-  return (
-    entity !== 'backup_manifest' &&
-    entity !== 'user_backup_settings' &&
-    !entity.startsWith('backup_generation')
-  );
-}
-
-/**
  * Best-effort PostgREST/transport code from an adapter error (`AUD-SH03-B`).
  *
  * The code is recorded as SAFE diagnostic metadata next to the per-record error
@@ -55,7 +60,7 @@ export function isMutableEntity(entity: string): boolean {
 function postgrestCodeOf(error: Error): string | undefined {
   const withCode = error as Error & { code?: unknown };
   if (typeof withCode.code === 'string' && withCode.code.trim() !== '') return withCode.code;
-  const match = /(PGRST\d{3}|\d{5}|\d{4})/.exec(error.message);
+  const match = /\b(PGRST\d{3}|\d{5}|\d{4})\b/.exec(error.message);
   return match?.[1];
 }
 
@@ -106,54 +111,62 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     return this.options.serverRowCap;
   }
 
-  /**
-   * Read back the ids a push claims to have stored, in bounded pages.
-   *
-   * Returns every id the remote reported for this owner, or throws when a page
-   * violates its own bound (which would make the result untrustworthy).
-   *
-   * @param client the Supabase client
-   * @param entity the entity being verified
-   * @param ids the ids the push wrote
-   * @param currentUserId the pushing owner
-   */
-  /**
-   * Does this remote support publishing an immutable generation?
-   *
-   * Reads the owner's generation head. Three outcomes:
-   *   - a head exists (or the table is readable) => generation storage is
-   *     available, so mutable rows can be replaced safely;
-   *   - the table is absent (pre-migration remote) => NOT supported, so mutable
-   *     uploads must be refused rather than destroy legacy recovery;
-   *   - any other read failure => treated as NOT supported, because refusing to
-   *     overwrite a certified recovery point is the safe direction.
-   *
-   * @param client the Supabase client
-   * @param ownerUserId the pushing owner
-   */
-  private async checkGenerationCapability(
+  /** Establish a versioned protocol and a durable recovery point before any
+   * mutable entity/settings/manifest write. Existing supported legacy content is
+   * fully verified and published first; new accounts publish a local capture. */
+  private async ensureRecoveryPoint(
     client: NonNullable<typeof supabase>,
+    db: Awaited<ReturnType<typeof getDatabase>>,
     ownerUserId: string,
-  ): Promise<{ supported: boolean; evidence: string }> {
-    try {
-      const probe = await client
-        .from('backup_generation_head')
-        .select('sequence')
-        .eq('user_id', ownerUserId)
-        .limit(1);
-      if (probe.error) {
-        // A readable-but-errored probe is ambiguous; refuse the unsafe direction.
-        return { supported: false, evidence: probe.error.message };
-      }
-      // The table exists and answered: generation storage is available (a head
-      // may or may not exist yet — either way publishing is possible).
-      return { supported: true, evidence: 'generation storage available' };
-    } catch (error) {
-      return {
-        supported: false,
-        evidence: error instanceof Error ? error.message : String(error),
-      };
+  ): Promise<void> {
+    const capability = await client.rpc('backup_generation_capabilities');
+    const versions = capability.data as Record<string, unknown> | null;
+    if (
+      capability.error ||
+      !versions ||
+      versions.protocol_version !== 1 ||
+      versions.content_verification_version !== 1 ||
+      versions.sequence_reservation_version !== 1 ||
+      versions.backup_schema_version !== BACKUP_SCHEMA_VERSION ||
+      versions.scope_version !== BACKUP_SCOPE_VERSION ||
+      versions.settings_version !== BACKUP_SETTINGS_VERSION
+    ) {
+      throw new Error(
+        'Backup publication paused: this remote does not advertise the verified generation protocol. Apply the current backup migrations and retry; existing recovery content and local pending changes are preserved.',
+      );
     }
+    const head = await client
+      .from('backup_generation_head')
+      .select('snapshot_id, sequence')
+      .eq('user_id', ownerUserId)
+      .limit(1);
+    if (head.error)
+      throw new Error(
+        `Backup publication paused: cannot inspect the previous recovery point (${head.error.message}).`,
+      );
+    const legacyCapture = await getAppMetaJson<CapturedGeneration>(
+      db,
+      appMetaKeys.backupLegacyGenerationCapture,
+    );
+    // A retry after a lost acknowledgement resumes the SAME legacy content even
+    // if the head now exists. An old reservation cannot regress a newer head.
+    if (legacyCapture) {
+      await this.uploadGeneration(client, db, ownerUserId, legacyCapture, true);
+      return;
+    }
+    if (head.data?.[0]) return;
+    const legacy = await readVerifiedLegacySnapshot(client, ownerUserId);
+    if (legacy) {
+      const captured = captureVerifiedRows({ ownerUserId, ...legacy });
+      await setAppMetaJson(db, appMetaKeys.backupLegacyGenerationCapture, captured);
+      await this.uploadGeneration(client, db, ownerUserId, captured, true);
+      return;
+    }
+    // Truly new accounts have no recovery point to destroy. Still publish a
+    // coherent immutable local snapshot BEFORE writing their first mutable row.
+    let captured = await readCapturedChunks(db);
+    if (!captured) captured = await captureCurrentGeneration();
+    await this.uploadGeneration(client, db, ownerUserId, captured, false);
   }
 
   private async verifyEntityRows(
@@ -265,14 +278,8 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     // was destroyed before a safe replacement existed. When the capability is
     // absent this push refuses and keeps the local work durable, rather than
     // silently taking away a recovery point it cannot recreate.
-    const generationReady = await this.checkGenerationCapability(client, currentUserId);
-    if (!generationReady.supported && records.some((r) => isMutableEntity(r.entity))) {
-      throw new Error(
-        'Refusing to push mutable rows: this remote cannot publish an immutable ' +
-          'generation, so writing them would destroy the only certified recovery ' +
-          'point without replacing it. Publication is paused until the remote ' +
-          'supports generation storage.',
-      );
+    if (records.some((record) => isSyncableEntity(record.entity))) {
+      await this.ensureRecoveryPoint(client, db, currentUserId);
     }
 
     // One entity's failure (missing rows, a schema-drift upsert rejection,
@@ -424,7 +431,7 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     // approached both the row cap and the request-body budget; splitting keeps
     // every statement comfortably inside both, and a failure now names only the
     // batch that failed.
-    const writeBatches = chunk(payloadRows, writeBatchRows(this.serverRowCap));
+    const writeBatches = boundedBackupRequests(payloadRows, writeBatchRows(this.serverRowCap));
     /**
      * Ids whose batch stored AND was read back (`AUD-SH03-B`, review finding 9).
      *
@@ -545,12 +552,12 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       .map((record) => record.updatedAt)
       .sort((a, b) => b.localeCompare(a))[0];
     const { error } = await client.from('user_backup_settings').upsert(
-      {
+      boundedBackupRecord({
         user_id: currentUserId,
         settings_version: BACKUP_SETTINGS_VERSION,
         payload,
         updated_at: latestUpdatedAt ?? new Date().toISOString(),
-      },
+      }),
       { onConflict: 'user_id' },
     );
     if (error) {
@@ -588,7 +595,34 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       // acknowledged). Nothing to publish; the legacy path continues.
       return;
     }
-    const { capture, chunks } = captured;
+    await this.uploadGeneration(client, db, currentUserId, captured, false);
+  }
+
+  private async uploadGeneration(
+    client: NonNullable<typeof supabase>,
+    db: Awaited<ReturnType<typeof getDatabase>>,
+    currentUserId: string,
+    captured: CapturedGeneration,
+    isLegacyCutover: boolean,
+  ): Promise<void> {
+    if (captured.capture.ownerUserId !== currentUserId)
+      throw new Error('Captured generation owner mismatch.');
+    const reservation = await client.rpc('reserve_backup_generation_sequence', {
+      p_snapshot_id: captured.capture.snapshotId,
+    });
+    if (reservation.error)
+      throw new Error(`Backup sequence reservation failed: ${reservation.error.message}`);
+    const reserved = withReservedGenerationSequence(captured, Number(reservation.data));
+    // Persist the server's idempotent reservation BEFORE metadata leaves the
+    // device. Rebuilding from live rows here would rewrite a resumed snapshot.
+    await setAppMetaJson(
+      db,
+      isLegacyCutover
+        ? appMetaKeys.backupLegacyGenerationCapture
+        : appMetaKeys.backupGenerationCapture,
+      isLegacyCutover ? reserved : { ...reserved.capture, chunks: reserved.chunks },
+    );
+    const { capture, chunks } = reserved;
     if (capture.ownerUserId && capture.ownerUserId !== currentUserId) {
       throw new Error(
         `Generation ${capture.snapshotId} belongs to a different owner; refusing to publish it as ${currentUserId}.`,
@@ -597,7 +631,7 @@ export class SupabaseSyncAdapter implements SyncAdapter {
 
     // 1. Generation metadata first: chunks carry an FK to it.
     const metaResult = await client.from('backup_generation').upsert(
-      {
+      boundedBackupRecord({
         user_id: currentUserId,
         snapshot_id: capture.snapshotId,
         sequence: capture.sequence,
@@ -608,7 +642,7 @@ export class SupabaseSyncAdapter implements SyncAdapter {
         manifest: capture.manifest,
         manifest_checksum: capture.manifestChecksum,
         captured_at: capture.capturedAt,
-      },
+      }),
       { onConflict: 'user_id,snapshot_id' },
     );
     if (metaResult.error) {
@@ -619,18 +653,18 @@ export class SupabaseSyncAdapter implements SyncAdapter {
 
     // 2. Chunks in bounded batches. An identical re-upload is a server-side
     // no-op; different bytes under an existing identity are refused there.
-    for (const batch of chunk(chunks, writeBatchRows(this.serverRowCap))) {
-      const result = await client.from('backup_generation_chunk').upsert(
-        batch.map((entry) => ({
-          user_id: currentUserId,
-          snapshot_id: entry.snapshotId,
-          entity: entry.entity,
-          ordinal: entry.ordinal,
-          payload: entry.payload,
-          checksum: entry.checksum,
-        })),
-        { onConflict: 'user_id,snapshot_id,entity,ordinal' },
-      );
+    const chunkRows = chunks.map((entry) => ({
+      user_id: currentUserId,
+      snapshot_id: entry.snapshotId,
+      entity: entry.entity,
+      ordinal: entry.ordinal,
+      payload: entry.payload,
+      checksum: entry.checksum,
+    }));
+    for (const batch of boundedBackupRequests(chunkRows, writeBatchRows(this.serverRowCap))) {
+      const result = await client
+        .from('backup_generation_chunk')
+        .upsert(batch, { onConflict: 'user_id,snapshot_id,entity,ordinal' });
       if (result.error) {
         throw new Error(
           `Supabase upsert failed for backup_generation_chunk (${batch.length} chunk(s)): ${result.error.message}`,
@@ -657,13 +691,34 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       p_manifest_checksum: capture.manifestChecksum,
     });
     if (publish.error) {
-      throw new Error(
-        `publish_backup_generation failed for ${capture.snapshotId}: ${publish.error.message}`,
-      );
+      // A lost acknowledgement followed by another device's publication is
+      // still success for this capture. The immutable publication journal is
+      // authoritative; metadata presence alone proves only a staged upload.
+      const journal = await client
+        .from('backup_generation_publication')
+        .select('sequence')
+        .eq('user_id', currentUserId)
+        .eq('snapshot_id', capture.snapshotId)
+        .limit(1);
+      if (journal.error)
+        throw new Error(`Cannot reconcile generation publication: ${journal.error.message}`);
+      if (Number(journal.data?.[0]?.sequence) !== capture.sequence) {
+        // Keep this exact identity and its bytes pending. Reassigning an old
+        // capture a newer sequence would overwrite another device's recovery
+        // point with stale content, bypassing the server's conflict contract.
+        throw new Error(
+          `Backup publication paused for ${capture.snapshotId}: ${publish.error.message}. ` +
+            'The captured recovery data remains pending; a newer backup from another device must be reviewed before replacing it.',
+        );
+      }
     }
 
     // 4. Acknowledged: retire the durable capture and advance the local floor.
-    await recordPublishedGeneration(capture.snapshotId, capture.sequence);
+    if (isLegacyCutover) {
+      await setAppMetaText(db, appMetaKeys.backupLegacyGenerationCapture, 'null');
+    } else {
+      await recordPublishedGeneration(capture.snapshotId, capture.sequence);
+    }
   }
 
   private async pushManifestSnapshot(
@@ -731,12 +786,12 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     // checksum when the manifest becomes authoritative. Idempotent with the
     // settings record push that precedes this entity in the same batch.
     const settingsResult = await client.from('user_backup_settings').upsert(
-      {
+      boundedBackupRecord({
         user_id: currentUserId,
         settings_version: manifest.settingsMetadata.version,
         payload: pendingSettings?.payload ?? null,
         updated_at: updatedAt,
-      },
+      }),
       { onConflict: 'user_id' },
     );
     if (settingsResult.error) {
@@ -753,7 +808,7 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     await this.publishGenerationContents(client, db, currentUserId);
 
     const { error } = await client.from('backup_manifest').upsert(
-      {
+      boundedBackupRecord({
         user_id: currentUserId,
         backup_schema_version: manifest.backupSchemaVersion,
         backup_scope_version: manifest.backupScopeVersion,
@@ -763,7 +818,7 @@ export class SupabaseSyncAdapter implements SyncAdapter {
         settings_version: manifest.settingsVersion,
         settings_metadata: manifest.settingsMetadata,
         updated_at: updatedAt,
-      },
+      }),
       { onConflict: 'user_id' },
     );
     if (error) {

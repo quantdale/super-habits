@@ -28,6 +28,17 @@ let storeable: (entity: string, id: string, userId: string) => boolean = () => t
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
+    rpc: vi.fn(async () => ({
+      data: {
+        protocol_version: 1,
+        content_verification_version: 1,
+        sequence_reservation_version: 1,
+        backup_schema_version: 2,
+        scope_version: 7,
+        settings_version: 5,
+      },
+      error: null,
+    })),
     from: vi.fn((entity: string) => ({
       upsert: vi.fn(async (rows: Record<string, unknown>[]) => {
         const rowList = Array.isArray(rows) ? rows : [rows];
@@ -42,7 +53,14 @@ vi.mock('@/lib/supabase', () => ({
       // makes the probe look like "no capability" and refuses every push.
       select: vi.fn((_columns: string) =>
         entity === 'backup_generation_head'
-          ? { eq: vi.fn(() => ({ limit: vi.fn(async () => ({ data: [], error: null })) })) }
+          ? {
+              eq: vi.fn(() => ({
+                limit: vi.fn(async () => ({
+                  data: [{ snapshot_id: 'existing', sequence: 1 }],
+                  error: null,
+                })),
+              })),
+            }
           : {
               in: vi.fn((_column: string, ids: string[]) => ({
                 eq: vi.fn((_eqColumn: string, value: string) => {

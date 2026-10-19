@@ -147,7 +147,7 @@ describe('workout session draft persistence', () => {
     const db = makeDb(JSON.stringify({ routineId: '', startedAtIso: 'nope', phaseIndex: -1 }));
     getDatabase.mockResolvedValue(db);
 
-    expect(await getWorkoutSessionDraft()).toBeNull();
+    await expect(getWorkoutSessionDraft()).rejects.toThrow('could not be read');
 
     const dbEmpty = makeDb(null);
     getDatabase.mockResolvedValue(dbEmpty);
@@ -158,11 +158,13 @@ describe('workout session draft persistence', () => {
     const db = makeDb(null);
     getDatabase.mockResolvedValue(db);
 
-    await saveWorkoutSessionDraft({
-      routineId: '',
-      startedAtIso: 'not-a-date',
-      phaseIndex: -2,
-    });
+    await expect(
+      saveWorkoutSessionDraft({
+        routineId: '',
+        startedAtIso: 'not-a-date',
+        phaseIndex: -2,
+      }),
+    ).rejects.toThrow('Invalid workout draft');
     expect(db.runAsync).not.toHaveBeenCalled();
   });
 

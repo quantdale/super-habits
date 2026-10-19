@@ -41,7 +41,14 @@ function buildRecordingSupabase() {
     // remote can publish an immutable generation.
     select: vi.fn((_columns: string) =>
       entity === 'backup_generation_head'
-        ? { eq: vi.fn(() => ({ limit: vi.fn(async () => ({ data: [], error: null })) })) }
+        ? {
+            eq: vi.fn(() => ({
+              limit: vi.fn(async () => ({
+                data: [{ snapshot_id: 'existing', sequence: 1 }],
+                error: null,
+              })),
+            })),
+          }
         : {
             in: vi.fn((_column: string, ids: string[]) => ({
               eq: vi.fn((_eqColumn: string, value: string) =>
@@ -67,7 +74,24 @@ function buildRecordingSupabase() {
       })),
     })),
   }));
-  return { supabase: { from }, upserted, deleted };
+  return {
+    supabase: {
+      from,
+      rpc: vi.fn(async () => ({
+        data: {
+          protocol_version: 1,
+          content_verification_version: 1,
+          sequence_reservation_version: 1,
+          backup_schema_version: 2,
+          scope_version: 7,
+          settings_version: 5,
+        },
+        error: null,
+      })),
+    },
+    upserted,
+    deleted,
+  };
 }
 
 function installSupabaseMock(supabase: { from: ReturnType<typeof vi.fn> }) {

@@ -72,9 +72,7 @@ function buildRecordingSupabase() {
     })),
   }));
   const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
-    if (name !== 'publish_backup_generation') {
-      return { data: null, error: { message: `unknown rpc ${name}` } };
-    }
+    if (name !== 'publish_backup_generation') return generationRemote.rpc(name, args);
     return generationRemote.publish(args);
   });
   return { supabase: { from, rpc }, upserted, generationRemote };

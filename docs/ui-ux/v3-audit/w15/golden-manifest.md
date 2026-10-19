@@ -63,3 +63,27 @@ their behavioural specs rather than frozen screenshots.
 | 2026-10-18 | `achievements-390-light`, `plan-hub-projects-768-light`, `settings-top-1280-dark`, `shell-today-1280-light`, `shell-today-390-dark`, `shell-today-390-light`, `shell-today-768-light`, `timeline-1280-light` | `superhabits-reliability-recovery-successor` (C1, `c3d204a`) | Reward-truth update: housekeeping now pays backdated activity across a bounded 7-day lookback (C1). Fixture days that were previously unpaid now earn XP/streak/level, so reward-derived text and unlocked-badge state differ. Attribution verified by rebuilding with only the lookback reverted (34/34 goldens pass) and restored (the same 9 fail); every other UI region is pixel-identical, and diff concentrations are reward/level text and the tab band that carries the level state. `maxDiffPixels` stays 0; no region is masked |
 
 Future changes append a row with the source revision and the reason.
+
+## Independent audit resolution � explained quest XP change (2026-10-20)
+
+The SH-16 repair pays eligible unpaid quests during historical reconciliation.
+For the fixed TYPICAL fixture at 2026-10-13, the old domain implementation
+produced 230 total XP (level 3, 48/233); the repaired implementation produces
+275 total XP (level 3, 93/233, 140 to level 4). The 45 XP are exactly three
+15-XP quests: log_meals on October 7 and 9, and move_body on October 12.
+`tests/integration/questVisualFixture.test.ts` seeds the same fixture, asserts
+those exact ledger rows and totals, and verifies a second pass pays nothing.
+The old visual difference was misclassified as glyph rasterization: its changed
+pixels are the XP text/progress behind the navigation bar, not an unexplained
+font or layout change. The four populated Today goldens are regenerated for this
+intended semantic correction; capture now waits for the reconciled XP text.
+No pixel tolerance or mask is changed. Any other golden change must receive its
+own inspected explanation; do not refresh the entire set indiscriminately.
+
+The same proven reward correction also updates `achievements-390-light.png` and
+`plan-hub-projects-768-light.png`. The original strict Playwright diff has1090
+changed pixels confined to the Achievements XP ring/text/total and302 pixels
+confined to the background level ring behind Projects (x93–116,y750–791).
+Sub-threshold antialiasing differences elsewhere are excluded by the existing
+comparator; no threshold or mask changed. Together these are six explained
+baseline updates; the full strict34-case lane is rerun after regeneration.

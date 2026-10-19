@@ -363,10 +363,11 @@ describe('AUD-SH02-E: the real capture is coherent and resumable', () => {
     const db = await freshDatabase();
     const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
     await setLocalDatasetOwner(db as never, 'user_a');
-    const { captureGeneration, markEntityStaged, readGenerationCapture } =
+    const { captureGeneration, markEntityStaged, readGenerationCapture, readCapturedChunks } =
       await import('@/core/backup/generations/capture');
     const captured = await captureGeneration({ settingsPayload: {} });
     await markEntityStaged(captured.capture.snapshotId, 'todos');
+    expect((await readCapturedChunks(db as never))?.chunks).toEqual(captured.chunks);
 
     // A "restart" is a fresh read of durable state.
     const resumed = await readGenerationCapture(db as never);

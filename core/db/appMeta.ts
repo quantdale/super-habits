@@ -90,6 +90,7 @@ export const appMetaKeys = {
    * a second one or losing the coherent snapshot it already took.
    */
   backupGenerationCapture: defineJsonKey('backup.generation_capture', 'sync'),
+  backupLegacyGenerationCapture: defineJsonKey('backup.legacy_generation_capture', 'sync'),
   /**
    * Highest generation sequence this device has published. Monotonic so a stale
    * retry can never regress a newer head.

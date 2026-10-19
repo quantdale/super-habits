@@ -95,9 +95,7 @@ function buildSupabaseMock(
       from,
       // The publication RPC, mirroring the SQL function's semantics.
       rpc: vi.fn(async (name: string, args: Record<string, unknown>) => {
-        if (name !== 'publish_backup_generation') {
-          return { data: null, error: { message: `unknown rpc ${name}` } };
-        }
+        if (name !== 'publish_backup_generation') return generationRemote.rpc(name, args);
         if (failUpserts) return { data: null, error: { message: failureMessage } };
         return generationRemote.publish(args);
       }),

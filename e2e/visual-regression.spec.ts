@@ -220,6 +220,14 @@ async function openWithFixture(
   await expect(page.getByRole('tablist', { name: 'Section tabs' })).toBeVisible({
     timeout: 20_000,
   });
+  if (fixture === 'TYPICAL') {
+    // The repaired quest ledger adds three previously unpaid 15-XP rewards.
+    // Await the actual reconciled view, not an intermediate startup snapshot.
+    // questVisualFixture.test.ts derives these values from this exact fixture.
+    await expect(page.getByText('93/233 XP · 140 to level 4', { exact: true })).toBeVisible({
+      timeout: 20_000,
+    });
+  }
 }
 
 /**

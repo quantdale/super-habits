@@ -6,6 +6,7 @@ node_modules/
 # Expo
 .expo/
 dist/
+dist-sim/
 web-build/
 expo-env.d.ts
 
@@ -97,3 +98,4 @@ supabase/.temp/
 # false because of these files).
 /gym-v2-custom-exercise-submit.png
 /gym-v2-session-custom-exercise-submit.png
+

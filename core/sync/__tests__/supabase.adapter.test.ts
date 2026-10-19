@@ -4,7 +4,7 @@ import type { SyncRecord } from '@/core/sync/sync.engine';
 import { chainableQuery } from '../../../tests/integration/helpers/supabaseQueryDouble';
 
 type AdapterSetupOptions = {
-  supabase?: { from: ReturnType<typeof vi.fn> } | null;
+  supabase?: { from: ReturnType<typeof vi.fn>; rpc?: ReturnType<typeof vi.fn> } | null;
   authUserId?: string | null;
   authError?: Error;
   localOwnerUserId?: string | null;
@@ -39,7 +39,12 @@ function storingFrom(
     // makes the probe look like "no capability" and refuses every push.
     if (entity === 'backup_generation_head') {
       return {
-        eq: vi.fn(() => ({ limit: vi.fn(async () => ({ data: [], error: null })) })),
+        eq: vi.fn(() => ({
+          limit: vi.fn(async () => ({
+            data: [{ snapshot_id: 'existing', sequence: 1 }],
+            error: null,
+          })),
+        })),
       };
     }
     return {
@@ -61,8 +66,12 @@ async function setupAdapter(options: AdapterSetupOptions) {
     getAllAsync: vi.fn(),
     getFirstAsync: vi
       .fn()
-      .mockResolvedValue(
-        options.localOwnerUserId === null ? null : { value: options.localOwnerUserId ?? 'user_a' },
+      .mockImplementation(async (_sql: string, params?: string[]) =>
+        params?.[0] === 'backup.legacy_generation_capture'
+          ? null
+          : options.localOwnerUserId === null
+            ? null
+            : { value: options.localOwnerUserId ?? 'user_a' },
       ),
   };
   const getDatabase = vi.fn().mockResolvedValue(db);
@@ -81,7 +90,14 @@ async function setupAdapter(options: AdapterSetupOptions) {
   // verification uses select().in().eq().order().range().
   const select = vi.fn((_columns: string, entity?: string) => {
     if (entity === 'backup_generation_head') {
-      return { eq: vi.fn(() => ({ limit: vi.fn(async () => ({ data: [], error: null })) })) };
+      return {
+        eq: vi.fn(() => ({
+          limit: vi.fn(async () => ({
+            data: [{ snapshot_id: 'existing', sequence: 1 }],
+            error: null,
+          })),
+        })),
+      };
     }
     return {
       in: vi.fn((_column: string, ids: string[]) => ({
@@ -102,7 +118,23 @@ async function setupAdapter(options: AdapterSetupOptions) {
     getDatabase,
   }));
 
-  const supabase = options.supabase === undefined ? { from } : options.supabase;
+  const supplied = options.supabase === undefined ? { from } : options.supabase;
+  const supabase = supplied
+    ? {
+        rpc: vi.fn(async () => ({
+          data: {
+            protocol_version: 1,
+            content_verification_version: 1,
+            sequence_reservation_version: 1,
+            backup_schema_version: 2,
+            scope_version: 7,
+            settings_version: 5,
+          },
+          error: null,
+        })),
+        ...supplied,
+      }
+    : supplied;
   const getSupabaseAuthUserId = options.authError
     ? vi.fn().mockRejectedValue(options.authError)
     : vi.fn().mockResolvedValue(options.authUserId === undefined ? 'user_a' : options.authUserId);
@@ -326,7 +358,14 @@ describe('SupabaseSyncAdapter', () => {
         upsert: vi.fn().mockResolvedValue({ error: upsertError }),
         select: () =>
           entity === 'backup_generation_head'
-            ? { eq: () => ({ limit: async () => ({ data: [], error: null }) }) }
+            ? {
+                eq: () => ({
+                  limit: async () => ({
+                    data: [{ snapshot_id: 'existing', sequence: 1 }],
+                    error: null,
+                  }),
+                }),
+              }
             : { in: () => ({ eq: () => chainableQuery([]) }) },
       })),
     };
@@ -351,7 +390,14 @@ describe('SupabaseSyncAdapter', () => {
         upsert: vi.fn().mockRejectedValue(timeoutError),
         select: () =>
           entity === 'backup_generation_head'
-            ? { eq: () => ({ limit: async () => ({ data: [], error: null }) }) }
+            ? {
+                eq: () => ({
+                  limit: async () => ({
+                    data: [{ snapshot_id: 'existing', sequence: 1 }],
+                    error: null,
+                  }),
+                }),
+              }
             : { in: () => ({ eq: () => chainableQuery([]) }) },
       })),
     };
@@ -430,7 +476,14 @@ describe('SupabaseSyncAdapter', () => {
       entity === 'todos'
         ? {
             upsert: todosUpsert,
-            select: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }),
+            select: () => ({
+              eq: () => ({
+                limit: async () => ({
+                  data: [{ snapshot_id: 'existing', sequence: 1 }],
+                  error: null,
+                }),
+              }),
+            }),
           }
         : {
             upsert: healthyStore.upsert,
@@ -468,7 +521,14 @@ describe('SupabaseSyncAdapter', () => {
       // The capability preflight (AUD-SH02-A) probes the generation head first.
       if (entity === 'backup_generation_head') {
         return {
-          select: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }),
+          select: () => ({
+            eq: () => ({
+              limit: async () => ({
+                data: [{ snapshot_id: 'existing', sequence: 1 }],
+                error: null,
+              }),
+            }),
+          }),
         };
       }
       return entity === 'saved_meals'
@@ -509,7 +569,14 @@ describe('SupabaseSyncAdapter', () => {
       // The capability preflight (AUD-SH02-A) probes the generation head first.
       if (entity === 'backup_generation_head') {
         return {
-          select: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }),
+          select: () => ({
+            eq: () => ({
+              limit: async () => ({
+                data: [{ snapshot_id: 'existing', sequence: 1 }],
+                error: null,
+              }),
+            }),
+          }),
         };
       }
       return entity === 'saved_meals'

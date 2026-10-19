@@ -1,5 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const exportDirectory = process.env.E2E_DIST_DIR ?? 'dist';
+if (!['dist', 'dist-sim', 'dist-sync', 'dist-live', 'dist-shell-b'].includes(exportDirectory)) {
+  throw new Error(`Unsupported E2E_DIST_DIR: ${exportDirectory}`);
+}
 const e2ePort =
   process.env.E2E_PORT ?? (process.env.E2E_DIST_DIR === 'dist-sync' ? '8082' : '8081');
 if (!/^\d+$/.test(e2ePort)) {
@@ -170,13 +174,13 @@ export default defineConfig({
     {
       name: 'simulation',
       // The runner's own integration specs (task 3.4): the scenario executor
-      // under Playwright against the served dist/ export. Each spec drives the
+      // under Playwright against the separately served dist-sim/ export. Each spec drives the
       // full runner (executeScenario) — the smoke scenario twice in
       // deterministic mode (3.5) and the cross-lane reports (4.4). The specs
       // launch their own contexts through the injected `browser` fixture;
       // `workers: 1` because OPFS holds one lock per origin. CI wiring for the
       // simulation lanes is task 9.x — this project is opt-in via
-      // `--project=simulation` and also participates in the default `e2e` run.
+      // `npm run e2e:simulation` after `npm run build:e2e:sim`.
       testDir: 'simulation/runner/specs',
       timeout: 300_000,
       expect: { timeout: 10_000 },
@@ -224,10 +228,7 @@ export default defineConfig({
   // reuse is opt-in because a stale dev server can silently become the system
   // under test.
   webServer: {
-    command:
-      process.env.E2E_DIST_DIR === 'dist-sync'
-        ? `node scripts/serve-e2e.js --port ${e2ePort} --dist dist-sync`
-        : `node scripts/serve-e2e.js --port ${e2ePort}`,
+    command: `node scripts/serve-e2e.js --port ${e2ePort} --dist ${exportDirectory}`,
     url: e2eBaseUrl,
     reuseExistingServer,
     timeout: 180_000,

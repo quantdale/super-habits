@@ -148,14 +148,11 @@ describe('features/workout/workout.data', () => {
 
   it('persists wall-clock timing and per-set rows for a timed session', async () => {
     const db = {
-      getFirstAsync: vi
-        .fn()
-        .mockResolvedValueOnce({
-          id: 'routine_4',
-          name: 'Push day',
-          deleted_at: null,
-        })
-        .mockResolvedValueOnce(null),
+      getFirstAsync: vi.fn(async (sql: string) =>
+        sql.includes('FROM workout_routines')
+          ? { id: 'routine_4', name: 'Push day', deleted_at: null }
+          : null,
+      ),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
     getDatabase.mockResolvedValue(db);

@@ -27,7 +27,9 @@ import { runHermeticBuild, scanDirectoryForNeedle } from './hermetic-build.mjs';
 import { applyShellRevision, assertRevisionIsContentDerived } from './pwa-shell-revision.mjs';
 
 const root = process.cwd();
-const distDir = path.join(root, 'dist');
+const bridgeRequested = process.env.EXPO_PUBLIC_SIM_DATA_BRIDGE_BUILD === '1';
+const outputDirectory = bridgeRequested ? 'dist-sim' : 'dist';
+const distDir = path.join(root, outputDirectory);
 const SUPABASE_HOST = 'supabase.co';
 
 function fail(message) {
@@ -44,17 +46,17 @@ function fail(message) {
 fs.rmSync(distDir, { recursive: true, force: true });
 
 console.log(
-  '[build:e2e] exporting dist/ with EXPO_NO_DOTENV=1 (no .env, no ambient Supabase env)…',
+  `[build:e2e] exporting ${outputDirectory}/ with EXPO_NO_DOTENV=1 (no .env, no ambient Supabase env)…`,
 );
 try {
   runHermeticBuild({
     label: 'build:e2e',
     command: 'npx',
-    args: ['expo', 'export', '-p', 'web', '--clear'],
+    args: ['expo', 'export', '-p', 'web', '--clear', '--output-dir', outputDirectory],
     // `AUD-SH19-B`/`AUD-SH05-A`: the simulation bridge is ARMED only when the
     // simulation lane explicitly asks for it (`npm run build:e2e:sim`, which sets
     // EXPO_PUBLIC_SIM_DATA_BRIDGE_BUILD=1). The default `build:e2e` export — the
-    // one visual and feature lanes use — must carry no bridge at all, so the
+    // one visual and feature lanes use — must not arm the bridge, so the
     // artifact is identical to what a user would see.
     //
     // Review finding 11: the flag MUST go through `set`, not be spread as a
@@ -98,7 +100,6 @@ if (leakFiles.length > 0) {
 // the build flag decides that, and Metro inlines the flag's name into the
 // comparison. So: a bridge-requesting export must contain the module, and a
 // non-requesting export must contain NO inlined bridge flag at all.
-const bridgeRequested = process.env.EXPO_PUBLIC_SIM_DATA_BRIDGE_BUILD === '1';
 const bridgeModule = scanDirectoryForNeedle(distDir, root, '__shdatabridge');
 const bridgeFlag = scanDirectoryForNeedle(distDir, root, 'sim_data_bridge');
 if (bridgeRequested && bridgeModule.length === 0) {
@@ -124,5 +125,5 @@ try {
   fail(error instanceof Error ? error.message : String(error));
 }
 console.log(
-  `[build:e2e] OK — hermetic export (0 Supabase hosts in dist/; bridge module=${bridgeModule.length > 0}, armed=${bridgeRequested}; shell revision sha-${shellRevision}).`,
+  `[build:e2e] OK — hermetic export (0 Supabase hosts in ${outputDirectory}/; bridge module=${bridgeModule.length > 0}, armed=${bridgeRequested}; shell revision sha-${shellRevision}).`,
 );

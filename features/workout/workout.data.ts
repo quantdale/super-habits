@@ -3,9 +3,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   appMetaKeys,
   deleteAppMetaKey,
+  getAppMetaText,
   getAppMetaJsonOrDefault,
   setAppMetaJson,
 } from '@/core/db/appMeta';
+import { withSQLiteTransaction } from '@/core/db/transactions';
 import {
   BodyWeightEntry,
   CustomExercise,
@@ -82,6 +84,7 @@ async function insertWorkoutLogRecord(input: {
   endedAtIso: string | null;
   durationSeconds: number | null;
   requireActiveRoutine: boolean;
+  routineNameSnapshot?: string;
   enqueue: (record: SyncRecord) => void;
 }): Promise<{
   status: 'applied' | 'skipped';
@@ -130,7 +133,7 @@ async function insertWorkoutLogRecord(input: {
     // after a routine rename/delete. The separate update preserves the
     // legacy insert contract used by existing callers/tests.
     await input.db.runAsync('UPDATE workout_logs SET routine_name = ? WHERE id = ?', [
-      routine?.name ?? null,
+      input.routineNameSnapshot ?? routine?.name ?? null,
       input.logId,
     ]);
     input.enqueue({
@@ -147,7 +150,7 @@ async function insertWorkoutLogRecord(input: {
   return {
     status: 'applied',
     reason: null,
-    routineName: routine?.name ?? null,
+    routineName: input.routineNameSnapshot ?? routine?.name ?? null,
   };
 }
 
@@ -1044,6 +1047,25 @@ export async function logWorkoutSession(input: {
   const outcome = await runBackupMutation<LogWorkoutSessionResult>({
     db,
     mutate: async (transactionDb, enqueue) => {
+      // A retry after a committed save (including concurrent/restarted callers)
+      // returns the original log rather than generating a second history row.
+      if (input.startedAt) {
+        const existing = await transactionDb.getFirstAsync<{ id: string }>(
+          'SELECT id FROM workout_logs WHERE routine_id = ? AND started_at = ? LIMIT 1',
+          [input.routineId, input.startedAt],
+        );
+        if (existing) {
+          return {
+            changed: false,
+            value: { status: 'applied', logId: existing.id } satisfies LogWorkoutSessionResult,
+          };
+        }
+      }
+      const pending = input.startedAt ? await readWorkoutPendingSave(transactionDb) : null;
+      const performedRoutine =
+        pending?.routineId === input.routineId && pending.startedAtIso === input.startedAt
+          ? pending.routineSnapshot
+          : undefined;
       const record = await insertWorkoutLogRecord({
         db: transactionDb,
         logId,
@@ -1054,7 +1076,11 @@ export async function logWorkoutSession(input: {
         startedAtIso: input.startedAt ?? null,
         endedAtIso: input.endedAt ?? null,
         durationSeconds,
-        requireActiveRoutine: true,
+        // Completed sessions retain their performed routine even if its live
+        // template was subsequently soft-deleted. Ordinary/legacy writes retain
+        // the active-routine requirement.
+        requireActiveRoutine: !performedRoutine,
+        ...(performedRoutine ? { routineNameSnapshot: performedRoutine.name } : {}),
         enqueue,
       });
 
@@ -1718,6 +1744,10 @@ export async function duplicateRoutine(routineId: string): Promise<string | null
  *  counted as completed and their measurements unrecorded. */
 export type WorkoutSessionDraft = {
   routineId: string;
+  /** Template as performed; absent only in legacy drafts whose identity is ambiguous. */
+  routineSnapshot?: RoutineWithExercises;
+  notes?: string;
+  effortScale?: WorkoutEffortScale;
   /** ISO timestamp of the session's first Start press. */
   startedAtIso: string;
   /** Index into the routine's timer-phase sequence. */
@@ -1836,8 +1866,18 @@ function normalizeWorkoutSessionDraft(value: unknown): WorkoutSessionDraft | nul
   const enteredSets = normalizeEnteredSetMap(candidate.enteredSets);
   const remainingSeconds = candidate.remainingSeconds;
   const addedSets = normalizeAddedSetMap(candidate.addedSets);
+  const routineSnapshot = normalizePendingRoutineSnapshot(candidate.routineSnapshot);
+  if (candidate.routineSnapshot !== undefined && !routineSnapshot) return null;
+  if (routineSnapshot && routineSnapshot.id !== candidate.routineId) return null;
   return {
     routineId: candidate.routineId,
+    ...(routineSnapshot ? { routineSnapshot } : {}),
+    ...(typeof candidate.notes === 'string' ? { notes: candidate.notes } : {}),
+    ...(candidate.effortScale === 'off' ||
+    candidate.effortScale === 'rir' ||
+    candidate.effortScale === 'rpe'
+      ? { effortScale: candidate.effortScale }
+      : {}),
     startedAtIso: candidate.startedAtIso,
     phaseIndex: candidate.phaseIndex,
     ...(typeof elapsed === 'number' && Number.isFinite(elapsed) && elapsed >= 0
@@ -1857,26 +1897,54 @@ function normalizeWorkoutSessionDraft(value: unknown): WorkoutSessionDraft | nul
 /** Read the resumable workout draft, or null when no session is in flight. */
 export async function getWorkoutSessionDraft(): Promise<WorkoutSessionDraft | null> {
   const db = await getDatabase();
-  return getAppMetaJsonOrDefault<WorkoutSessionDraft | null>(
-    db,
-    appMetaKeys.workoutActiveSessionDraft,
-    null,
-    normalizeWorkoutSessionDraft,
-  );
+  return readWorkoutSessionDraft(db);
 }
 
-/** Persist the in-progress workout draft; invalid drafts are rejected silently. */
+async function readWorkoutSessionDraft(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+): Promise<WorkoutSessionDraft | null> {
+  const encoded = await getAppMetaText(db, appMetaKeys.workoutActiveSessionDraft);
+  if (encoded === null) return null;
+  const draft = normalizeWorkoutSessionDraft(JSON.parse(encoded) as unknown);
+  if (!draft) throw new Error('The workout draft could not be read.');
+  return draft;
+}
+
+/** Persist this session without replacing another unfinished session. */
 export async function saveWorkoutSessionDraft(draft: WorkoutSessionDraft): Promise<void> {
   const normalized = normalizeWorkoutSessionDraft(draft);
-  if (!normalized) return;
+  if (!normalized) throw new Error('Invalid workout draft.');
   const db = await getDatabase();
-  await setAppMetaJson(db, appMetaKeys.workoutActiveSessionDraft, normalized);
+  await withSQLiteTransaction(db, async (transactionDb) => {
+    const existing = await readWorkoutSessionDraft(transactionDb);
+    if (
+      existing &&
+      (existing.routineId !== normalized.routineId ||
+        existing.startedAtIso !== normalized.startedAtIso)
+    ) {
+      throw new Error('Resume or discard the existing workout before starting another.');
+    }
+    await setAppMetaJson(transactionDb, appMetaKeys.workoutActiveSessionDraft, normalized);
+  });
 }
 
 /** Clear the draft on finish, abandon, or discard. */
-export async function clearWorkoutSessionDraft(): Promise<void> {
+export async function clearWorkoutSessionDraft(
+  expected?: Pick<WorkoutSessionDraft, 'routineId' | 'startedAtIso'>,
+): Promise<void> {
   const db = await getDatabase();
-  await deleteAppMetaKey(db, appMetaKeys.workoutActiveSessionDraft);
+  await withSQLiteTransaction(db, async (transactionDb) => {
+    if (expected) {
+      const current = await readWorkoutSessionDraft(transactionDb);
+      if (
+        !current ||
+        current.routineId !== expected.routineId ||
+        current.startedAtIso !== expected.startedAtIso
+      )
+        return;
+    }
+    await deleteAppMetaKey(transactionDb, appMetaKeys.workoutActiveSessionDraft);
+  });
 }
 
 /**
@@ -1934,6 +2002,12 @@ export type WorkoutPendingSave = {
   exerciseNames: string[];
   /** Display name of the routine as performed (a snapshot, not a live lookup). */
   routineName: string;
+  /** Immutable template as performed. Added sets remain in `addedSets`, so
+   * replaying this base snapshot reconstructs the identical phase indices.
+   * Absent only for older payloads that did not retain enough identity. */
+  routineSnapshot?: RoutineWithExercises;
+  notes?: string;
+  effortScale?: WorkoutEffortScale;
   /** Last save error surfaced to the user, for an honest resume message. */
   lastError?: string;
   /** When this recovery state was last written. */
@@ -1972,40 +2046,95 @@ export async function reconcileWorkoutPendingSave(
   if (match?.id) {
     // The log committed before the pending state was cleared: finish the
     // cleanup instead of duplicating work or resurrecting an older draft.
-    await clearWorkoutPendingSave();
+    await clearWorkoutPendingSave(state);
     return { status: 'saved', logId: match.id };
   }
   return { status: 'pending' };
 }
 
-/** Read the pending-save recovery state, or null when nothing is pending. */
-export async function getWorkoutPendingSave(): Promise<WorkoutPendingSave | null> {
-  const db = await getDatabase();
-  return getAppMetaJsonOrDefault<WorkoutPendingSave | null>(
-    db,
-    appMetaKeys.workoutPendingSave,
-    null,
-    normalizeWorkoutPendingSave,
-  );
+async function readWorkoutPendingSave(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+): Promise<WorkoutPendingSave | null> {
+  // Safety state must distinguish an absent record from an unreadable or
+  // malformed one. The general best-effort app_meta getter erases that fact.
+  const encoded = await getAppMetaText(db, appMetaKeys.workoutPendingSave);
+  if (encoded === null) return null;
+  const pending = normalizeWorkoutPendingSave(JSON.parse(encoded) as unknown);
+  if (!pending) throw new Error('The finished workout recovery record could not be read.');
+  return pending;
 }
 
-/** Persist the pending-save recovery state (idempotent; invalid input is ignored). */
+/** Null means absence only; read/parse/validation errors intentionally reject. */
+export async function getWorkoutPendingSave(): Promise<WorkoutPendingSave | null> {
+  const db = await getDatabase();
+  return readWorkoutPendingSave(db);
+}
+
+/** The start boundary always inspects durable state before loading a template. */
+export async function prepareWorkoutSessionStart(
+  routineId: string,
+): Promise<
+  | { status: 'pending'; pending: WorkoutPendingSave }
+  | { status: 'draft'; draft: WorkoutSessionDraft }
+  | { status: 'ready'; routine: RoutineWithExercises }
+  | { status: 'unavailable' }
+> {
+  const pending = await getWorkoutPendingSave();
+  if (pending) return { status: 'pending', pending };
+  const draft = await getWorkoutSessionDraft();
+  if (draft) return { status: 'draft', draft };
+  const routine = await getRoutineWithExercises(routineId);
+  return routine && routine.exercises.length > 0
+    ? { status: 'ready', routine }
+    : { status: 'unavailable' };
+}
+
+/** Persist one session idempotently; never replace another unsaved session. */
 export async function saveWorkoutPendingSave(
   state: Omit<WorkoutPendingSave, 'updatedAt'>,
 ): Promise<void> {
   const normalized = normalizeWorkoutPendingSave({ ...state, updatedAt: nowIso() });
-  if (!normalized) return;
+  if (!normalized) throw new Error('Invalid finished workout recovery state.');
   const db = await getDatabase();
-  await setAppMetaJson(db, appMetaKeys.workoutPendingSave, normalized);
+  await withSQLiteTransaction(db, async (transactionDb) => {
+    const existing = await readWorkoutPendingSave(transactionDb);
+    if (
+      existing &&
+      (existing.routineId !== normalized.routineId ||
+        existing.startedAtIso !== normalized.startedAtIso)
+    ) {
+      throw new Error('Save or discard the existing finished workout before starting another.');
+    }
+    await setAppMetaJson(transactionDb, appMetaKeys.workoutPendingSave, normalized);
+  });
 }
 
 /**
  * Clear the pending-save state. Only a committed log or an explicit user
  * discard may call this — never the mere act of reaching the summary.
  */
-export async function clearWorkoutPendingSave(): Promise<void> {
+export async function clearWorkoutPendingSave(
+  expected?: Pick<WorkoutPendingSave, 'routineId' | 'startedAtIso'>,
+): Promise<void> {
   const db = await getDatabase();
-  await deleteAppMetaKey(db, appMetaKeys.workoutPendingSave);
+  await withSQLiteTransaction(db, async (transactionDb) => {
+    if (expected) {
+      const current = await readWorkoutPendingSave(transactionDb);
+      if (
+        !current ||
+        current.routineId !== expected.routineId ||
+        current.startedAtIso !== expected.startedAtIso
+      )
+        return;
+    }
+    await deleteAppMetaKey(transactionDb, appMetaKeys.workoutPendingSave);
+    if (expected) {
+      const draft = await readWorkoutSessionDraft(transactionDb);
+      if (draft?.routineId === expected.routineId && draft.startedAtIso === expected.startedAtIso) {
+        await deleteAppMetaKey(transactionDb, appMetaKeys.workoutActiveSessionDraft);
+      }
+    }
+  });
 }
 
 function normalizeWorkoutPendingSave(value: unknown): WorkoutPendingSave | null {
@@ -2020,23 +2149,29 @@ function normalizeWorkoutPendingSave(value: unknown): WorkoutPendingSave | null 
   if (typeof phaseIndex !== 'number' || !Number.isInteger(phaseIndex) || phaseIndex < 0) {
     return null;
   }
-  const enteredSets = normalizeEnteredSetMap(candidate.enteredSets);
-  if (!enteredSets) return null;
+  if (typeof candidate.enteredSets !== 'object' || candidate.enteredSets === null) return null;
+  const enteredSets = normalizeEnteredSetMap(candidate.enteredSets) ?? {};
   const dispositions = normalizeDispositionMap(candidate.dispositions) ?? {};
-  // The performed identity is required: without it recovery cannot tell which
-  // exercise a measurement belongs to once the routine changes.
-  if (!Array.isArray(candidate.exerciseNames) || candidate.exerciseNames.length === 0) {
-    return null;
-  }
-  const exerciseNames = candidate.exerciseNames.filter(
-    (name): name is string => typeof name === 'string' && name.length > 0,
-  );
-  if (exerciseNames.length === 0) return null;
+  // Older payloads may lack identity. Preserve their values and block unsafe
+  // remapping in the consumer rather than silently treating the slot as empty.
+  const exerciseNames = (
+    Array.isArray(candidate.exerciseNames) ? candidate.exerciseNames : []
+  ).filter((name): name is string => typeof name === 'string' && name.length > 0);
+  const routineSnapshot = normalizePendingRoutineSnapshot(candidate.routineSnapshot);
+  if (candidate.routineSnapshot !== undefined && !routineSnapshot) return null;
+  if (routineSnapshot && routineSnapshot.id !== candidate.routineId) return null;
   return {
     routineId: candidate.routineId,
     startedAtIso: candidate.startedAtIso,
     phaseIndex,
     exerciseNames,
+    ...(routineSnapshot ? { routineSnapshot } : {}),
+    ...(typeof candidate.notes === 'string' ? { notes: candidate.notes } : {}),
+    ...(candidate.effortScale === 'off' ||
+    candidate.effortScale === 'rir' ||
+    candidate.effortScale === 'rpe'
+      ? { effortScale: candidate.effortScale }
+      : {}),
     routineName:
       typeof candidate.routineName === 'string' && candidate.routineName.length > 0
         ? candidate.routineName
@@ -2052,6 +2187,45 @@ function normalizeWorkoutPendingSave(value: unknown): WorkoutPendingSave | null 
       : {}),
     updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : nowIso(),
   };
+}
+
+function normalizePendingRoutineSnapshot(value: unknown): RoutineWithExercises | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const routine = value as RoutineWithExercises;
+  if (typeof routine.id !== 'string' || typeof routine.name !== 'string') return null;
+  if (!Array.isArray(routine.exercises) || routine.exercises.length === 0) return null;
+  for (const exercise of routine.exercises) {
+    if (
+      !exercise ||
+      typeof exercise.id !== 'string' ||
+      exercise.routine_id !== routine.id ||
+      typeof exercise.name !== 'string' ||
+      !Array.isArray(exercise.sets)
+    )
+      return null;
+    if (
+      exercise.modality !== undefined &&
+      !['weighted_strength', 'bodyweight', 'timed', 'cardio'].includes(exercise.modality)
+    )
+      return null;
+    for (const set of exercise.sets) {
+      if (!set || typeof set.id !== 'string' || set.exercise_id !== exercise.id) return null;
+      if (!Number.isInteger(set.set_number) || set.set_number < 1) return null;
+      if (!Number.isFinite(set.active_seconds) || set.active_seconds < 0) return null;
+      if (!Number.isFinite(set.rest_seconds) || set.rest_seconds < 0) return null;
+      for (const key of [
+        'target_reps_min',
+        'target_reps_max',
+        'target_load',
+        'target_duration_seconds',
+        'target_distance',
+        'target_pace',
+      ] as const) {
+        if (set[key] != null && !Number.isFinite(set[key])) return null;
+      }
+    }
+  }
+  return JSON.parse(JSON.stringify(routine)) as RoutineWithExercises;
 }
 
 /**

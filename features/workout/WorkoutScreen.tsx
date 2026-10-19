@@ -27,6 +27,7 @@ import {
   getRoutineWithExercises,
   getWorkoutSessionDraft,
   getWorkoutPendingSave,
+  prepareWorkoutSessionStart,
   clearWorkoutPendingSave,
   getLastPerformedByRoutine,
   listRoutines,
@@ -55,6 +56,8 @@ import {
   type WorkoutPreferences,
 } from '@/features/workout/workout.data';
 import {
+  getPendingWorkoutRoutine,
+  getDraftWorkoutRoutine,
   buildVolumePerWeek,
   buildWorkoutActivityDays,
   buildWorkoutHeatmapDays,
@@ -485,7 +488,8 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     [confirm, refresh, routineModal],
   );
 
-  const startRoutineRef = useRef<(() => void) | null>(null);
+  const startRoutineRef = useRef<((state: WorkoutPendingSave) => void) | null>(null);
+  const resumeDraftRef = useRef<((state: WorkoutSessionDraft) => void) | null>(null);
   const startRoutineById = useCallback(
     async (routineId: string) => {
       // `AUD-SH04-A` (review findings 1 / R3-01): a finished workout awaiting save
@@ -498,9 +502,19 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       // reachable before its async refresh finishes, so with `refresh` paused a
       // second start could slip past the stale React state and reach the slot.
       // The durable read below is what actually gates the slot.
-      const durablePending = await getWorkoutPendingSave().catch(() => null);
+      let admission: Awaited<ReturnType<typeof prepareWorkoutSessionStart>>;
+      try {
+        admission = await prepareWorkoutSessionStart(routineId);
+      } catch {
+        Alert.alert(
+          'Could not check finished workouts',
+          'Your saved recovery state could not be checked. Try starting again when it can be read; the existing workout has been kept.',
+        );
+        return;
+      }
+      const durablePending = admission.status === 'pending' ? admission.pending : null;
       if (durablePending || pendingSave) {
-        if (durablePending && !pendingSave) {
+        if (durablePending) {
           // The slot changed underneath us: adopt it so the UI reflects reality.
           setPendingSave(durablePending);
         }
@@ -511,75 +525,91 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
           confirmLabel: 'View it',
           cancelLabel: 'Not now',
         });
-        if (viewIt) startRoutineRef.current?.();
+        if (viewIt) startRoutineRef.current?.(durablePending ?? pendingSave!);
         return;
       }
-      const full = await getRoutineWithExercises(routineId);
-      if (!full || full.exercises.length === 0) {
+      if (admission.status === 'draft') {
+        setDraft(admission.draft);
+        const resumeIt = await confirm({
+          title: 'Unfinished workout',
+          message:
+            'You have a workout in progress. Resume it, or keep it until you are ready to resume or discard it.',
+          confirmLabel: 'Resume',
+          cancelLabel: 'Keep it',
+        });
+        if (resumeIt) resumeDraftRef.current?.(admission.draft);
+        return;
+      }
+      if (admission.status !== 'ready') {
         Alert.alert('No exercises', 'Add exercises to this routine before starting.');
         return;
       }
-      setCurrentView({ type: 'session', routine: full });
+      setCurrentView({ type: 'session', routine: admission.routine });
     },
     [pendingSave, confirm],
   );
 
-  const handleResumeDraft = useCallback(async () => {
-    if (!draft) return;
-    const full = await getRoutineWithExercises(draft.routineId);
-    if (!full || full.exercises.length === 0) {
-      Alert.alert(
-        'Workout unavailable',
-        'The routine for this saved session no longer has any exercises.',
-        [
-          { text: 'Keep it', style: 'cancel' },
-          {
-            text: 'Discard draft',
-            style: 'destructive',
-            onPress: () => {
-              void clearWorkoutSessionDraft().catch(() => {});
-              setDraft(null);
-            },
-          },
-        ],
-      );
-      return;
-    }
-    const startedAtMs = Date.parse(draft.startedAtIso);
-    const dispositions: Record<number, PhaseDisposition> = {};
-    for (const [index, disposition] of Object.entries(draft.dispositions ?? {})) {
-      const parsed = Number.parseInt(index, 10);
-      if (Number.isInteger(parsed)) dispositions[parsed] = disposition;
-    }
-    const enteredSets: Record<number, EnteredSetValues> = {};
-    for (const [index, values] of Object.entries(draft.enteredSets ?? {})) {
-      const parsed = Number.parseInt(index, 10);
-      if (Number.isInteger(parsed)) enteredSets[parsed] = values;
-    }
-    setCurrentView({
-      type: 'session',
-      routine: full,
-      resume: {
-        phaseIndex: draft.phaseIndex,
-        startedAtMs: Number.isFinite(startedAtMs) ? startedAtMs : Date.now(),
-        elapsedSeconds: draft.elapsedAdjustSeconds ?? 0,
-        ...(Object.keys(dispositions).length > 0 ? { dispositions } : {}),
-        ...(Object.keys(enteredSets).length > 0 ? { enteredSets } : {}),
-        ...(typeof draft.remainingSeconds === 'number'
-          ? { remainingSeconds: draft.remainingSeconds }
-          : {}),
-        ...(draft.addedSets
-          ? {
-              addedSets: Object.fromEntries(
-                Object.entries(draft.addedSets)
-                  .map(([index, count]) => [Number.parseInt(index, 10), count] as const)
-                  .filter(([index]) => Number.isInteger(index) && index >= 0),
-              ),
-            }
-          : {}),
-      },
-    });
-  }, [draft]);
+  const handleResumeDraft = useCallback(
+    (state: WorkoutSessionDraft | null = draft) => {
+      if (!state) return;
+      let full: RoutineWithExercises;
+      try {
+        full = getDraftWorkoutRoutine(state);
+      } catch (error) {
+        Alert.alert(
+          'Workout recovery unavailable',
+          error instanceof Error ? error.message : 'Your entered values have been kept. Try again.',
+        );
+        return;
+      }
+      const startedAtMs = Date.parse(state.startedAtIso);
+      const dispositions: Record<number, PhaseDisposition> = {};
+      for (const [index, disposition] of Object.entries(state.dispositions ?? {})) {
+        const parsed = Number.parseInt(index, 10);
+        if (Number.isInteger(parsed)) dispositions[parsed] = disposition;
+      }
+      const enteredSets: Record<number, EnteredSetValues> = {};
+      for (const [index, values] of Object.entries(state.enteredSets ?? {})) {
+        const parsed = Number.parseInt(index, 10);
+        if (Number.isInteger(parsed)) enteredSets[parsed] = values;
+      }
+      setCurrentView({
+        type: 'session',
+        routine: full,
+        resume: {
+          phaseIndex: state.phaseIndex,
+          startedAtMs: Number.isFinite(startedAtMs) ? startedAtMs : Date.now(),
+          elapsedSeconds: state.elapsedAdjustSeconds ?? 0,
+          notes: state.notes,
+          effortScale: state.effortScale,
+          ...(Object.keys(dispositions).length > 0 ? { dispositions } : {}),
+          ...(Object.keys(enteredSets).length > 0 ? { enteredSets } : {}),
+          ...(typeof state.remainingSeconds === 'number'
+            ? { remainingSeconds: state.remainingSeconds }
+            : {}),
+          ...(state.addedSets
+            ? {
+                addedSets: Object.fromEntries(
+                  Object.entries(state.addedSets)
+                    .map(([index, count]) => [Number.parseInt(index, 10), count] as const)
+                    .filter(([index]) => Number.isInteger(index) && index >= 0),
+                ),
+              }
+            : {}),
+        },
+      });
+    },
+    [draft],
+  );
+
+  useEffect(() => {
+    resumeDraftRef.current = (state) => {
+      void handleResumeDraft(state);
+    };
+    return () => {
+      resumeDraftRef.current = null;
+    };
+  }, [handleResumeDraft]);
 
   /**
    * Re-open a finished-but-unsaved session on its summary (`AUD-SH04-B`).
@@ -589,75 +619,71 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
    * log (`AUD-SH04-C`), so an already-committed session is reported as saved and
    * its recovery state is retired instead.
    */
-  const handleRetryPendingSave = useCallback(async () => {
-    if (!pendingSave) return;
-    const reconciled = await reconcileWorkoutPendingSave(pendingSave);
-    if (reconciled.status === 'saved') {
-      setPendingSave(null);
-      await refresh();
-      return;
-    }
-    const full = await getRoutineWithExercises(pendingSave.routineId);
-    if (!full || full.exercises.length === 0) {
-      Alert.alert(
-        'Workout unavailable',
-        'The routine for this finished session no longer has any exercises, so it cannot be saved. Your entered values are kept until you discard it.',
-        [
-          { text: 'Keep it', style: 'cancel' },
-          {
-            text: 'Discard',
-            style: 'destructive',
-            onPress: () => {
-              void clearWorkoutPendingSave().catch(() => {});
-              setPendingSave(null);
-            },
-          },
-        ],
-      );
-      return;
-    }
-    const dispositions: Record<number, PhaseDisposition> = {};
-    for (const [index, disposition] of Object.entries(pendingSave.dispositions)) {
-      const parsed = Number.parseInt(index, 10);
-      if (Number.isInteger(parsed)) dispositions[parsed] = disposition;
-    }
-    const enteredSets: Record<number, EnteredSetValues> = {};
-    for (const [index, values] of Object.entries(pendingSave.enteredSets)) {
-      const parsed = Number.parseInt(index, 10);
-      if (Number.isInteger(parsed)) enteredSets[parsed] = values;
-    }
-    setCurrentView({
-      type: 'session',
-      routine: full,
-      resume: {
-        // `AUD-SH04-A`: a finished session must reopen at its FINAL cursor, not
-        // at 0. The collectors only walk phases up to `completedUpToIndex`, so
-        // reopening at 0 re-saved only the first exercise and silently dropped
-        // every later one.
-        phaseIndex: pendingSave.phaseIndex,
-        startedAtMs: Date.parse(pendingSave.startedAtIso),
-        elapsedSeconds: pendingSave.elapsedSeconds,
-        alreadyFinished: true,
-        ...(Object.keys(dispositions).length > 0 ? { dispositions } : {}),
-        ...(Object.keys(enteredSets).length > 0 ? { enteredSets } : {}),
-        ...(pendingSave.addedSets
-          ? {
-              addedSets: Object.fromEntries(
-                Object.entries(pendingSave.addedSets)
-                  .map(([index, count]) => [Number.parseInt(index, 10), count] as const)
-                  .filter(([index]) => Number.isInteger(index) && index >= 0),
-              ),
-            }
-          : {}),
-      },
-    });
-  }, [pendingSave, refresh]);
+  const handleRetryPendingSave = useCallback(
+    async (state: WorkoutPendingSave | null = pendingSave) => {
+      if (!state) return;
+      let full: RoutineWithExercises;
+      try {
+        const reconciled = await reconcileWorkoutPendingSave(state);
+        if (reconciled.status === 'saved') {
+          setPendingSave(null);
+          await refresh();
+          return;
+        }
+        full = getPendingWorkoutRoutine(state);
+      } catch (error) {
+        Alert.alert(
+          'Workout recovery unavailable',
+          error instanceof Error ? error.message : 'Your entered values have been kept. Try again.',
+        );
+        return;
+      }
+      const dispositions: Record<number, PhaseDisposition> = {};
+      for (const [index, disposition] of Object.entries(state.dispositions)) {
+        const parsed = Number.parseInt(index, 10);
+        if (Number.isInteger(parsed)) dispositions[parsed] = disposition;
+      }
+      const enteredSets: Record<number, EnteredSetValues> = {};
+      for (const [index, values] of Object.entries(state.enteredSets)) {
+        const parsed = Number.parseInt(index, 10);
+        if (Number.isInteger(parsed)) enteredSets[parsed] = values;
+      }
+      setCurrentView({
+        type: 'session',
+        routine: full,
+        resume: {
+          // `AUD-SH04-A`: a finished session must reopen at its FINAL cursor, not
+          // at 0. The collectors only walk phases up to `completedUpToIndex`, so
+          // reopening at 0 re-saved only the first exercise and silently dropped
+          // every later one.
+          phaseIndex: state.phaseIndex,
+          startedAtMs: Date.parse(state.startedAtIso),
+          elapsedSeconds: state.elapsedSeconds,
+          alreadyFinished: true,
+          notes: state.notes,
+          effortScale: state.effortScale,
+          ...(Object.keys(dispositions).length > 0 ? { dispositions } : {}),
+          ...(Object.keys(enteredSets).length > 0 ? { enteredSets } : {}),
+          ...(state.addedSets
+            ? {
+                addedSets: Object.fromEntries(
+                  Object.entries(state.addedSets)
+                    .map(([index, count]) => [Number.parseInt(index, 10), count] as const)
+                    .filter(([index]) => Number.isInteger(index) && index >= 0),
+                ),
+              }
+            : {}),
+        },
+      });
+    },
+    [pendingSave, refresh],
+  );
 
   // `startRoutineById` is declared before `handleRetryPendingSave`; the handler is
   // reachable through this ref so the declaration order does not need reshuffling.
   useEffect(() => {
-    startRoutineRef.current = () => {
-      void handleRetryPendingSave();
+    startRoutineRef.current = (state) => {
+      void handleRetryPendingSave(state);
     };
     return () => {
       startRoutineRef.current = null;
@@ -674,9 +700,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       confirmVariant: 'danger',
     });
     if (!confirmed) return;
-    await clearWorkoutPendingSave();
+    if (pendingSave) await clearWorkoutPendingSave(pendingSave);
     setPendingSave(null);
-  }, [confirm]);
+  }, [confirm, pendingSave]);
 
   const handleDiscardDraft = useCallback(async () => {
     const confirmed = await confirm({
@@ -686,16 +712,14 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       confirmVariant: 'danger',
     });
     if (!confirmed) return;
-    await clearWorkoutSessionDraft();
+    if (draft) await clearWorkoutSessionDraft(draft);
     setDraft(null);
-  }, [confirm]);
+  }, [confirm, draft]);
 
   const draftRoutineName = draft
     ? (routines.find((r) => r.id === draft.routineId)?.name ?? 'Workout')
     : null;
-  const pendingSaveRoutineName = pendingSave
-    ? (routines.find((r) => r.id === pendingSave.routineId)?.name ?? 'Workout')
-    : null;
+  const pendingSaveRoutineName = pendingSave ? pendingSave.routineName : null;
   const todayKey = toDateKey(new Date());
   const todayWeekdayNum = ((new Date().getDay() + 6) % 7) + 1;
   const completedWorkoutToday = allLogs.some(

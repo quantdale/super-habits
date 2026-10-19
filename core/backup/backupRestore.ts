@@ -11,7 +11,13 @@ import { requestWorkoutReminderReconciliation } from '@/core/notifications/worko
 import { getSupabaseAuthUserId, isRemoteEnabled, supabase } from '@/lib/supabase';
 import { syncEngine, type BlockedOutboxSummary } from '@/core/sync/sync.engine';
 import { nowIso } from '@/lib/time';
-import { checksumRows, sha256Hex } from '@/lib/checksum';
+import { checksumRows } from '@/lib/checksum';
+import { parseManifestRow } from './legacySnapshot';
+import {
+  parseGenerationManifest,
+  decodeGenerationContents,
+  type RemoteGenerationMetadata,
+} from './generations/generationFormat';
 import {
   BACKUP_ENTITIES,
   BACKUP_SCHEMA_VERSION,
@@ -80,6 +86,8 @@ import {
 } from '@/features/workout/workout.data';
 import { applyRemoteLinkedActionRules } from '@/core/linked-actions/linkedActions.data';
 import { applyRemoteWeeklyReviews } from '@/features/weekly-review/weeklyReview.data';
+
+export { parseManifestRow } from './legacySnapshot';
 
 /**
  * The complete V2 import sequence, keyed by entity in dependency order
@@ -193,60 +201,6 @@ export type BackupStateSummary = {
 };
 
 const PAGE_SIZE = 1_000;
-
-export function parseManifestRow(row: unknown): BackupManifest | null {
-  if (!row || typeof row !== 'object') return null;
-  const candidate = row as Record<string, unknown>;
-  if (
-    typeof candidate.backup_schema_version !== 'number' ||
-    typeof candidate.generation !== 'number' ||
-    typeof candidate.completed_at !== 'string' ||
-    typeof candidate.entity_metadata !== 'object' ||
-    candidate.entity_metadata === null ||
-    typeof candidate.settings_version !== 'number'
-  ) {
-    return null;
-  }
-  const entityMetadata = candidate.entity_metadata as Record<string, unknown>;
-  const metadata: BackupManifest['entityMetadata'] = {};
-  for (const [entity, value] of Object.entries(entityMetadata)) {
-    if (!value || typeof value !== 'object') return null;
-    const meta = value as Record<string, unknown>;
-    if (typeof meta.count !== 'number' || !Number.isInteger(meta.count) || meta.count < 0) {
-      return null;
-    }
-    if (typeof meta.checksum !== 'string' || !/^[0-9a-f]{64}$/.test(meta.checksum)) {
-      return null;
-    }
-    // Unknown/future entity keys are not cast into the BackupEntity type:
-    // they are excluded here so scope resolution downstream still classifies
-    // the manifest honestly (unknown scopes fail closed) instead of this
-    // parser inventing entity names it does not understand.
-    if (!(BACKUP_ENTITIES as readonly string[]).includes(entity)) continue;
-    metadata[entity as BackupEntity] = { count: meta.count, checksum: meta.checksum };
-  }
-  // Settings integrity metadata (closure contract). A v2 manifest without it
-  // cannot certify the settings payload — the caller treats it as incomplete.
-  let settingsMetadata: BackupManifest['settingsMetadata'];
-  const rawSettingsMetadata = candidate.settings_metadata;
-  if (rawSettingsMetadata !== null && rawSettingsMetadata !== undefined) {
-    if (typeof rawSettingsMetadata !== 'object') return null;
-    const meta = rawSettingsMetadata as Record<string, unknown>;
-    if (typeof meta.version !== 'number' || typeof meta.checksum !== 'string') return null;
-    if (!/^[0-9a-f]{64}$/.test(meta.checksum)) return null;
-    settingsMetadata = { version: meta.version, checksum: meta.checksum };
-  }
-  return {
-    backupSchemaVersion: candidate.backup_schema_version,
-    backupScopeVersion:
-      typeof candidate.backup_scope_version === 'number' ? candidate.backup_scope_version : -1,
-    generation: candidate.generation,
-    completedAt: candidate.completed_at,
-    entityMetadata: metadata,
-    settingsVersion: candidate.settings_version,
-    settingsMetadata,
-  };
-}
 
 async function fetchManifestRow(ownerUserId: string): Promise<RemoteBackupManifestRow | null> {
   if (!supabase) return null;
@@ -375,13 +329,11 @@ export async function probeV2TablesPresent(ownerUserId: string): Promise<V2Capab
 async function fetchPublishedGenerationRows(ownerUserId: string): Promise<{
   snapshotId: string;
   rowsByEntity: Map<string, Record<string, unknown>[]>;
-  /** Manifest read from the same generation (not the mutable row). */
-  manifest: RemoteBackupManifestRow | null;
-  /** Settings read from the same generation (not the mutable row). */
-  settingsRow: RemoteUserBackupSettingsRow | null;
+  manifest: BackupManifest;
+  settingsRow: RemoteUserBackupSettingsRow;
 } | null> {
   if (!supabase) return null;
-  let head: { data: unknown; error: { message: string } | null };
+  let head;
   try {
     head = await supabase
       .from('backup_generation_head')
@@ -389,90 +341,89 @@ async function fetchPublishedGenerationRows(ownerUserId: string): Promise<{
       .eq('user_id', ownerUserId)
       .limit(1);
   } catch (error) {
-    // A remote without the generation tables cannot serve `.eq().limit()` at
-    // all. That is the documented legacy fallback, not a restore failure.
     if (isMissingV2RemoteTableError(error)) return null;
     throw error;
   }
-  if (!head) {
-    // A chain that resolved nothing means the capability is absent.
-    return null;
-  }
+  if (!head) throw new Error('[restore] Published-head inspection returned no response.');
   if (head.error) {
-    // A pre-migration remote has no generation tables; that is the documented
-    // legacy fallback, not a failure.
     if (isMissingV2RemoteTableError(new Error(head.error.message))) return null;
-    throw new Error(
-      `[restore] Failed to read the published generation head: ${head.error.message}`,
-    );
+    throw new Error(`[restore] Published-head inspection failed: ${head.error.message}`);
   }
-  const headRow = (head.data as { snapshot_id?: string; sequence?: number }[] | null)?.[0];
-
-  if (!headRow?.snapshot_id) return null;
-  const snapshotId = headRow.snapshot_id;
-
-  const chunks: { entity: string; ordinal: number; payload: string; checksum: string }[] = [];
-  let from = 0;
-  while (true) {
-    const to = from + PAGE_SIZE - 1;
+  const headRow = head.data?.[0] as { snapshot_id: string; sequence: number } | undefined;
+  if (!headRow) return null;
+  // Once a head exists every later error is fatal. No legacy fallback can hide
+  // a corrupt/missing published snapshot or mix mutable rows with its content.
+  const metadataResult = await supabase
+    .from('backup_generation')
+    .select('*')
+    .eq('user_id', ownerUserId)
+    .eq('snapshot_id', headRow.snapshot_id)
+    .limit(1);
+  if (metadataResult.error || !metadataResult.data?.[0])
+    throw new Error(
+      `[restore] Published generation metadata unavailable: ${metadataResult.error?.message ?? 'missing snapshot'}`,
+    );
+  const metadata = metadataResult.data[0] as RemoteGenerationMetadata;
+  const parsedManifest = parseGenerationManifest(metadata, headRow, ownerUserId);
+  const chunks = [];
+  for (let from = 0; ; from += 250) {
     const result = await supabase
       .from('backup_generation_chunk')
       .select('entity, ordinal, payload, checksum')
       .eq('user_id', ownerUserId)
-      .eq('snapshot_id', snapshotId)
+      .eq('snapshot_id', headRow.snapshot_id)
       .order('entity', { ascending: true })
       .order('ordinal', { ascending: true })
-      .range(from, to);
-    if (result.error) {
-      throw new Error(
-        `[restore] Failed to read generation ${snapshotId} chunks: ${result.error.message}`,
-      );
-    }
-    const page = (result.data ?? []) as typeof chunks;
-    for (const entry of page) {
-      // Every chunk must match its own checksum before its bytes are trusted.
-      if (sha256Hex(entry.payload) !== entry.checksum) {
-        throw new Error(
-          `[restore] Generation ${snapshotId} chunk ${entry.entity}#${entry.ordinal} failed its checksum.`,
-        );
-      }
-      chunks.push(entry);
-    }
-    if (page.length < PAGE_SIZE) break;
-    from += PAGE_SIZE;
+      .range(from, from + 249);
+    if (result.error)
+      throw new Error(`[restore] Published generation chunks unavailable: ${result.error.message}`);
+    const page = (result.data ?? []) as {
+      entity: string;
+      ordinal: number;
+      payload: string;
+      checksum: string;
+    }[];
+    chunks.push(...page.map((entry) => ({ ...entry, snapshotId: headRow.snapshot_id })));
+    if (page.length < 250) break;
   }
-
-  const rowsByEntity = new Map<string, Record<string, unknown>[]>();
-  let settingsPayload: unknown = undefined;
-  for (const entry of chunks) {
-    const parsed: unknown = JSON.parse(entry.payload);
-    if (entry.entity === 'user_backup_settings') {
-      // `AUD-SH02-D` (review finding 6): the settings snapshot is read from the
-      // SAME immutable generation as the entities and the manifest. Reading it
-      // from the mutable row meant a newer settings upload could be paired with
-      // an older generation's entities, and restore reported integrity_mismatch
-      // for a backup that was internally consistent when it was published.
-      settingsPayload = parsed;
-      continue;
-    }
-    const rows = Array.isArray(parsed) ? (parsed as Record<string, unknown>[]) : [];
-    const list = rowsByEntity.get(entry.entity) ?? [];
-    list.push(...rows);
-    rowsByEntity.set(entry.entity, list);
-  }
-
-  // The manifest and settings metadata come from the generation's own manifest
-  // chunk, so all three describe one coherent snapshot.
-  const manifestChunk = chunks.find((entry) => entry.entity === 'backup_manifest');
-  const generationManifest = manifestChunk
-    ? (JSON.parse(manifestChunk.payload) as RemoteBackupManifestRow)
-    : null;
-  const settingsRow =
-    settingsPayload === undefined
-      ? null
-      : ({ user_id: ownerUserId, payload: settingsPayload } as RemoteUserBackupSettingsRow);
-
-  return { snapshotId, rowsByEntity, manifest: generationManifest, settingsRow };
+  const decoded = decodeGenerationContents(parsedManifest, chunks);
+  if (!isValidRecoverableSettings(decoded.settingsPayload))
+    throw new Error('[restore] Published settings payload is malformed.');
+  const settingsPayload = normalizeRecoverableSettings(decoded.settingsPayload);
+  // The new protocol was verified above against its own frozen byte contract.
+  // Adapt its verified content to the common row/graph/import pipeline; legacy
+  // manifests continue using their original checksums, unchanged.
+  const manifest: BackupManifest = {
+    backupSchemaVersion: parsedManifest.backupSchemaVersion,
+    backupScopeVersion: parsedManifest.scopeVersion,
+    generation: parsedManifest.sequence,
+    completedAt: parsedManifest.capturedAt,
+    entityMetadata: Object.fromEntries(
+      BACKUP_ENTITIES.map((entity) => [
+        entity,
+        checksumRows(
+          decoded.rowsByEntity.get(entity) ?? [],
+          backupEntityColumnsForScope(BACKUP_SCOPE_VERSION)[entity],
+        ),
+      ]),
+    ),
+    settingsVersion: parsedManifest.settingsVersion,
+    settingsMetadata: {
+      version: parsedManifest.settingsVersion,
+      checksum: canonicalizeSettingsPayload(settingsPayload),
+    },
+  };
+  return {
+    snapshotId: headRow.snapshot_id,
+    rowsByEntity: decoded.rowsByEntity,
+    manifest,
+    settingsRow: {
+      user_id: ownerUserId,
+      settings_version: parsedManifest.settingsVersion,
+      payload: settingsPayload,
+      updated_at: parsedManifest.capturedAt,
+    },
+  };
 }
 
 async function fetchRemoteRows(
@@ -564,9 +515,20 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     };
   }
 
-  let manifestRow: RemoteBackupManifestRow | null;
+  let published: Awaited<ReturnType<typeof fetchPublishedGenerationRows>>;
   try {
-    manifestRow = await fetchManifestRow(ownerUserId);
+    published = await fetchPublishedGenerationRows(ownerUserId);
+  } catch (error) {
+    return {
+      status: 'invalid',
+      reason: 'fetch_failed',
+      message: error instanceof Error ? error.message : String(error),
+      diagnostics: ['Published generation could not be verified; legacy fallback refused.'],
+    };
+  }
+  let manifestRow: RemoteBackupManifestRow | null = null;
+  try {
+    if (!published) manifestRow = await fetchManifestRow(ownerUserId);
   } catch (error) {
     // A server without the V2 tables yet (pre-migration) has no manifest
     // endpoint: treat that as a legacy-only backup instead of failing the
@@ -622,12 +584,12 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
       diagnostics: [notDowngraded],
     };
   }
-  if (!manifestRow) {
+  if (!published && !manifestRow) {
     // Legacy V1 backup (or no backup): the V1 coordinator path handles it.
     return { status: 'legacy' };
   }
 
-  const manifest = parseManifestRow(manifestRow);
+  const manifest = published?.manifest ?? parseManifestRow(manifestRow);
   if (!manifest) {
     return {
       status: 'invalid',
@@ -678,29 +640,11 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
   // paying ~21 sequential round-trip chains (each paginated).
   const rowsByEntity: Partial<Record<BackupEntity, Record<string, unknown>[]>> = {};
   /** Supplied by a published generation, when one exists (review finding 6). */
-  let generationSettingsRow: RemoteUserBackupSettingsRow | null = null;
+  const generationSettingsRow = published?.settingsRow ?? null;
   try {
-    // `AUD-SH02-A`/`D`: prefer the owner's PUBLISHED GENERATION. Reading the
-    // mutable rows here is exactly the audited defect — those rows are rewritten
-    // by the next upload, so a retained manifest could certify bytes that no
-    // longer existed. One generation is resolved up front and every row comes
-    // from that immutable snapshot, so a concurrent publication cannot mix
-    // content. A remote with no generation capability falls back to the
-    // supported legacy/scope-2 path below.
-    const generation = await fetchPublishedGenerationRows(ownerUserId);
-    if (generation) {
-      for (const entity of scope.entitySet) {
-        rowsByEntity[entity] = generation.rowsByEntity.get(entity) ?? [];
-      }
-      // `AUD-SH02-D` (review finding 6): the manifest and settings MUST come from
-      // the same immutable generation as the entities. If they disagree the
-      // restore is refused rather than reported as integrity_mismatch later.
-      if (generation.manifest) {
-        manifestRow = generation.manifest;
-      }
-      if (generation.settingsRow) {
-        generationSettingsRow = generation.settingsRow;
-      }
+    if (published) {
+      for (const entity of scope.entitySet)
+        rowsByEntity[entity] = published.rowsByEntity.get(entity) ?? [];
     } else {
       const fetched = await Promise.all(
         scope.entitySet.map((entity) => fetchRemoteRows(entity, ownerUserId)),
@@ -1097,9 +1041,11 @@ export async function getBackupStateSummary(
   }
 
   let manifestRow: RemoteBackupManifestRow | null = null;
+  let published: Awaited<ReturnType<typeof fetchPublishedGenerationRows>> = null;
   let manifestError = false;
   try {
-    manifestRow = await fetchManifestRow(ownerUserId);
+    published = await fetchPublishedGenerationRows(ownerUserId);
+    if (!published) manifestRow = await fetchManifestRow(ownerUserId);
   } catch {
     manifestError = true;
   }
@@ -1133,7 +1079,7 @@ export async function getBackupStateSummary(
     };
   }
 
-  if (!manifestRow) {
+  if (!published && !manifestRow) {
     if (backfill === 'running' || pendingChangeCount > 0) {
       return {
         state: 'in_progress',
@@ -1156,7 +1102,7 @@ export async function getBackupStateSummary(
     };
   }
 
-  const manifest = parseManifestRow(manifestRow);
+  const manifest = published?.manifest ?? parseManifestRow(manifestRow);
   if (
     !manifest ||
     manifest.backupSchemaVersion !== BACKUP_SCHEMA_VERSION ||

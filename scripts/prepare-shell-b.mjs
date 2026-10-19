@@ -7,18 +7,10 @@
  * different generated revisions, so a browser actually installs the second
  * worker. This script:
  *
- *   1. copies the already-built `dist/` (build A) to `dist-shell-b/`,
- *   2. tags build A and build B documents with a distinguishing build marker,
- *   3. re-injects the content-derived revision into BOTH, so the revision is a
- *      function of the real bytes rather than of the copy,
- *   4. records build A's marker in `dist/` too, so the spec can prove which
- *      document the browser served.
- *
- * The copy is a legitimate second build for this purpose: the revision is
- * derived from the boot-critical BYTES, so any content difference (here the
- * marker plus a new hashed asset) is a real shell revision change. No product
- * code is mutated by the exported test artifacts, because the marker is inserted
- * into the STATIC HTML of an export, never into tracked source.
+ * It tags build A, runs a separate hermetic Expo export for build B with a
+ * different inlined application build identity, then derives revisions from
+ * both exports. It asserts that actual application JavaScript differs.
+ * No tracked product source is changed.
  *
  * Usage: `node scripts/prepare-shell-b.mjs` then serve `dist-shell-b/` on the
  * same origin/port mid-test (see `scripts/serve-e2e.js`).
@@ -93,9 +85,7 @@ try {
     set: { EXPO_PUBLIC_SHELL_BUILD_ID: 'shell-b' },
   });
 } catch (error) {
-  fail(
-    `the second real export failed: ${error instanceof Error ? error.message : String(error)}`,
-  );
+  fail(`the second real export failed: ${error instanceof Error ? error.message : String(error)}`);
 }
 if (!fs.existsSync(path.join(distB, 'index.html'))) {
   fail('the second export produced no dist-shell-b/index.html.');
@@ -106,8 +96,12 @@ const entryFiles = (dir) =>
   fs
     .readdirSync(path.join(dir, '_expo', 'static', 'js', 'web'))
     .filter((name) => name.endsWith('.js'));
-const entryA = entryFiles(distA).map((name) => fs.readFileSync(path.join(distA, '_expo/static/js/web', name)));
-const entryB = entryFiles(distB).map((name) => fs.readFileSync(path.join(distB, '_expo/static/js/web', name)));
+const entryA = entryFiles(distA).map((name) =>
+  fs.readFileSync(path.join(distA, '_expo/static/js/web', name)),
+);
+const entryB = entryFiles(distB).map((name) =>
+  fs.readFileSync(path.join(distB, '_expo/static/js/web', name)),
+);
 const joinedA = Buffer.concat(entryA).toString('utf8');
 const joinedB = Buffer.concat(entryB).toString('utf8');
 if (joinedA === joinedB) {

@@ -1,4 +1,4 @@
-import type { WorkoutLog } from './types';
+import type { RoutineWithExercises, WorkoutLog } from './types';
 import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
 import type {
   BodyWeightEntry,
@@ -112,6 +112,65 @@ export type TimerPhase = {
   targetDistance?: number | null;
   targetPace?: number | null;
 };
+
+/** Recover from performed identity, never the current editable template. */
+export function getPendingWorkoutRoutine(state: {
+  routineSnapshot?: RoutineWithExercises;
+}): RoutineWithExercises {
+  if (!state.routineSnapshot) {
+    throw new Error(
+      'This older finished workout did not store its exercise structure. Your entered values are kept, but recovery cannot safely assign them to the current routine. Keep this record or explicitly discard it.',
+    );
+  }
+  return JSON.parse(JSON.stringify(state.routineSnapshot)) as RoutineWithExercises;
+}
+
+/** Active drafts also retain positional measurements against performed identity. */
+export function getDraftWorkoutRoutine(state: {
+  routineSnapshot?: RoutineWithExercises;
+}): RoutineWithExercises {
+  if (!state.routineSnapshot) {
+    throw new Error(
+      'This older workout draft did not store its exercise structure. Your entered values are kept, but cannot safely be assigned to the current routine. Keep this draft or explicitly discard it.',
+    );
+  }
+  return JSON.parse(JSON.stringify(state.routineSnapshot)) as RoutineWithExercises;
+}
+
+/** One mapping shared by live entry and immutable pending-save recovery. */
+export function buildSessionExerciseInputs(
+  routine: RoutineWithExercises,
+): Parameters<typeof buildTimerSequence>[0] {
+  return routine.exercises.map((exercise) => {
+    const legacy = !exercise.catalog_exercise_id;
+    return {
+      name: exercise.name,
+      ...(legacy
+        ? {}
+        : {
+            catalog_exercise_id: exercise.catalog_exercise_id,
+            modality: exercise.modality ?? 'timed',
+            unilateral: exercise.unilateral === 1,
+            supports_external_load:
+              exercise.supports_external_load === undefined
+                ? exercise.modality === 'weighted_strength'
+                : exercise.supports_external_load === 1,
+          }),
+      ...(exercise.superset_group !== undefined ? { superset_group: exercise.superset_group } : {}),
+      sets: exercise.sets.map((set) => ({
+        set_number: set.set_number,
+        active_seconds: set.active_seconds,
+        rest_seconds: set.rest_seconds,
+        target_reps_min: set.target_reps_min,
+        target_reps_max: set.target_reps_max,
+        target_load: set.target_load,
+        target_duration_seconds: set.target_duration_seconds,
+        target_distance: set.target_distance,
+        target_pace: set.target_pace,
+      })),
+    };
+  });
+}
 
 export function buildTimerSequence(
   exercises: {
@@ -956,6 +1015,45 @@ export function groupSessionExercises(
     }
   }
   return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([, group]) => group);
+}
+
+/** Resolve logging metadata from the performed instance, including on recovery. */
+export function buildSessionLogExercises(
+  routine: RoutineWithExercises,
+  summary: readonly CompletedExerciseSummary[],
+  records: readonly SessionSetRecord[],
+) {
+  return groupSessionExercises(summary, records).map((group) => {
+    const exercise = routine.exercises[group.exerciseIndex];
+    const legacy = !exercise?.catalog_exercise_id;
+    return {
+      exerciseName: group.exerciseName,
+      setsCompleted: group.setsCompleted,
+      ...(legacy
+        ? {}
+        : {
+            catalogExerciseId: exercise.catalog_exercise_id ?? null,
+            modality: exercise.modality ?? 'timed',
+            unilateral: exercise.unilateral === 1,
+            supportsExternalLoad:
+              exercise.supports_external_load === undefined
+                ? exercise.modality === 'weighted_strength'
+                : exercise.supports_external_load === 1,
+          }),
+      sets: group.sets.map((set) => ({
+        setNumber: set.setNumber,
+        weight: set.weight,
+        reps: set.reps,
+        completed: set.completed,
+        weightUnit: set.weight !== null ? ('kg' as const) : null,
+        durationSeconds: set.durationSeconds,
+        distance: set.distance,
+        pace: set.pace,
+        effortValue: set.effortValue,
+        effortScale: set.effortScale,
+      })),
+    };
+  });
 }
 
 // --- Previous-session set lookup (per-set entry defaults) ---

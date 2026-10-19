@@ -130,16 +130,18 @@ describe('AUD-SH04-A: reaching the summary retains the entered data durably', ()
   it('rejects an invalid pending-save payload instead of storing garbage', async () => {
     const db = await freshDatabase();
     const workout = await import('@/features/workout/workout.data');
-    await workout.saveWorkoutPendingSave({
-      routineId: '',
-      routineName: 'X',
-      exerciseNames: ['A'],
-      startedAtIso: 'not-a-date',
-      phaseIndex: 0,
-      elapsedSeconds: -5,
-      enteredSets: {},
-      dispositions: {},
-    });
+    await expect(
+      workout.saveWorkoutPendingSave({
+        routineId: '',
+        routineName: 'X',
+        exerciseNames: ['A'],
+        startedAtIso: 'not-a-date',
+        phaseIndex: 0,
+        elapsedSeconds: -5,
+        enteredSets: {},
+        dispositions: {},
+      }),
+    ).rejects.toThrow('Invalid finished workout');
     expect(await workout.getWorkoutPendingSave()).toBeNull();
     expect(await pendingCount(db, 'workout.pending_save')).toBe(0);
     await db.closeAsync();
@@ -297,7 +299,7 @@ describe('AUD-SH04-C: kill after commit never duplicates the log', () => {
     // The clear must sit inside the committed branch (`save.saved && save.logId`).
     const committedBranch = source.indexOf('if (save.saved && save.logId) {');
     expect(committedBranch).toBeGreaterThan(-1);
-    const clearIndex = source.indexOf('await clearWorkoutPendingSave();', committedBranch);
+    const clearIndex = source.indexOf('await clearWorkoutPendingSave({', committedBranch);
     expect(clearIndex).toBeGreaterThan(committedBranch);
     // And the failure branches re-persist rather than clear.
     const failureBranch = source.indexOf('await persistPendingSave(', clearIndex);
@@ -340,7 +342,7 @@ describe('AUD-SH04-A: a reopened summary re-collects EVERY completed exercise', 
       path.resolve(__dirname, '..', '..', 'features/workout/WorkoutScreen.tsx'),
       'utf8',
     );
-    expect(screen).toContain('phaseIndex: pendingSave.phaseIndex');
+    expect(screen).toContain('phaseIndex: state.phaseIndex');
     // The audited shape (`phaseIndex: 0` immediately before the pending-save
     // identity) must not reappear.
     expect(screen).not.toMatch(/phaseIndex: 0,\s*startedAtMs: Date\.parse\(pendingSave/);

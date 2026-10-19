@@ -110,13 +110,44 @@ function requireString(args: BridgeArgs, key: string, operation: BridgeOperation
 /** Read an optional string argument. */
 function optionalString(args: BridgeArgs, key: string): string | undefined {
   const value = args[key];
-  return typeof value === 'string' ? value : undefined;
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string') {
+    throw new BridgeCallError(`'${key}' must be a string`, 'invalid_args');
+  }
+  return value;
 }
 
 /** Read an optional finite number argument. */
 function optionalNumber(args: BridgeArgs, key: string): number | undefined {
   const value = args[key];
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  if (value === undefined) return undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new BridgeCallError(`'${key}' must be a finite number`, 'invalid_args');
+  }
+  return value;
+}
+
+function optionalBoolean(args: BridgeArgs, key: string): boolean | undefined {
+  const value = args[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'boolean') {
+    throw new BridgeCallError(`'${key}' must be a boolean`, 'invalid_args');
+  }
+  return value;
+}
+
+function optionalWeekdays(args: BridgeArgs): HabitWeekday[] | undefined {
+  const value = args.weekdays;
+  if (value === undefined) return undefined;
+  if (
+    !Array.isArray(value) ||
+    value.some(
+      (day: unknown) => typeof day !== 'number' || !Number.isInteger(day) || day < 1 || day > 7,
+    )
+  ) {
+    throw new BridgeCallError("'weekdays' must be an array of weekday numbers", 'invalid_args');
+  }
+  return value as HabitWeekday[];
 }
 
 /**
@@ -133,6 +164,9 @@ export async function invokeBridgeOperation(
   operation: string,
   args: BridgeArgs,
 ): Promise<BridgeResult> {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) {
+    throw new BridgeCallError('Arguments must be an object', 'invalid_args');
+  }
   switch (operation) {
     case 'createTodo': {
       // The REAL data-layer write: createId('todo'), SQL NULL notes, title
@@ -147,7 +181,10 @@ export async function invokeBridgeOperation(
     }
     case 'setTodoCompletion': {
       const id = requireString(args, 'id', 'setTodoCompletion');
-      const completed = args.completed === 0 ? 0 : 1;
+      if (args.completed !== 0 && args.completed !== 1) {
+        throw new BridgeCallError("'completed' must be 0 or 1", 'invalid_args');
+      }
+      const completed = args.completed;
       const result = await setTodoCompletionState(id, completed);
       return { operation, value: result, captures: { id } };
     }
@@ -170,7 +207,7 @@ export async function invokeBridgeOperation(
         // the same presets the app uses so the bridge cannot invent a value.
         (optionalString(args, 'icon') ?? DEFAULT_HABIT_ICON) as HabitIcon,
         optionalString(args, 'color') ?? DEFAULT_HABIT_COLOR,
-        Array.isArray(args.weekdays) ? (args.weekdays as HabitWeekday[]) : undefined,
+        optionalWeekdays(args),
         optionalString(args, 'reminderTime') ?? null,
       );
       return { operation, value: { id }, captures: { id } };
@@ -191,9 +228,13 @@ export async function invokeBridgeOperation(
       return { operation, value: { id }, captures: { id } };
     }
     case 'logCalories': {
+      const calories = optionalNumber(args, 'calories');
+      if (calories === undefined) {
+        throw new BridgeCallError("logCalories requires 'calories'", 'invalid_args');
+      }
       const id = await addCalorieEntry({
         foodName: requireString(args, 'foodName', 'logCalories'),
-        calories: optionalNumber(args, 'calories') ?? 0,
+        calories,
         protein: optionalNumber(args, 'protein'),
         carbs: optionalNumber(args, 'carbs'),
         fats: optionalNumber(args, 'fats'),
@@ -213,8 +254,8 @@ export async function invokeBridgeOperation(
         primaryArea: requireString(args, 'primaryArea', 'createCatalogExercise'),
         equipment: optionalString(args, 'equipment') ?? null,
         modality: (optionalString(args, 'modality') ?? 'weighted_strength') as WorkoutModality,
-        unilateral: args.unilateral === true,
-        supportsExternalLoad: args.supportsExternalLoad === true,
+        unilateral: optionalBoolean(args, 'unilateral'),
+        supportsExternalLoad: optionalBoolean(args, 'supportsExternalLoad'),
       });
       return { operation, value: { id }, captures: { id } };
     }

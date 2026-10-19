@@ -16,6 +16,7 @@ import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { useGamification } from '@/features/gamification/gamificationContext';
 import {
   buildPreviousSetLookup,
+  buildSessionExerciseInputs,
   buildTimerSequence,
   collectSessionSetRecords,
   computeSessionTotalSets,
@@ -23,7 +24,7 @@ import {
   estimate1RM,
   findNewPersonalRecords,
   formatWorkoutTime,
-  groupSessionExercises,
+  buildSessionLogExercises,
   lookupPreviousSet,
   parseOptionalMeasurement,
   recommendProgression,
@@ -108,6 +109,8 @@ export type SessionResume = {
    * outstanding, so the screen opens on the summary with every value restored.
    */
   alreadyFinished?: boolean;
+  notes?: string;
+  effortScale?: WorkoutEffortScale;
 };
 
 type Props = {
@@ -128,44 +131,10 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   // local until explicitly saved ("Save as default").
   const [restDefault, setRestDefault] = useState<number | null>(null);
   const [persistedRestDefault, setPersistedRestDefault] = useState<number | null>(null);
-  const [effortScale, setEffortScale] = useState<WorkoutEffortScale>('off');
+  const [effortScale, setEffortScale] = useState<WorkoutEffortScale>(resume?.effortScale ?? 'off');
   // The engine exercises, mapped once. The live sequence composes these
   // with any session-local added sets — the routine template is never written.
-  const baseExercises = useMemo(
-    () =>
-      routine.exercises.map((ex) => {
-        const isLegacyFreeText = !ex.catalog_exercise_id;
-        return {
-          name: ex.name,
-          // Keep the old missing-catalog path modality-less so historic
-          // free-text exercises continue to offer weight/reps and PRs.
-          ...(isLegacyFreeText ? {} : { catalog_exercise_id: ex.catalog_exercise_id }),
-          ...(isLegacyFreeText ? {} : { modality: ex.modality ?? 'timed' }),
-          ...(isLegacyFreeText ? {} : { unilateral: ex.unilateral === 1 }),
-          ...(isLegacyFreeText
-            ? {}
-            : {
-                supports_external_load:
-                  ex.supports_external_load === undefined
-                    ? ex.modality === 'weighted_strength'
-                    : ex.supports_external_load === 1,
-              }),
-          ...(ex.superset_group !== undefined ? { superset_group: ex.superset_group } : {}),
-          sets: ex.sets.map((s) => ({
-            set_number: s.set_number,
-            active_seconds: s.active_seconds,
-            rest_seconds: s.rest_seconds,
-            target_reps_min: s.target_reps_min,
-            target_reps_max: s.target_reps_max,
-            target_load: s.target_load,
-            target_duration_seconds: s.target_duration_seconds,
-            target_distance: s.target_distance,
-            target_pace: s.target_pace,
-          })),
-        };
-      }),
-    [routine.exercises],
-  );
+  const baseExercises = useMemo(() => buildSessionExerciseInputs(routine), [routine]);
 
   // Session-local added sets, keyed by engine exercise index. Persisted with
   // the draft so a resumed session reconstructs the identical sequence.
@@ -185,7 +154,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         if (!cancelled) {
           setRestDefault(seconds);
           setPersistedRestDefault(seconds);
-          setEffortScale(preferences.effortScale);
+          if (!resume?.effortScale) setEffortScale(preferences.effortScale);
         }
       },
     );
@@ -203,7 +172,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [resume?.effortScale]);
 
   const handleAdjustRestDefault = (delta: number) => {
     // Session-local only: future workouts are unaffected until the user
@@ -263,7 +232,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   const [enteredSets, setEnteredSets] = useState<Record<number, EnteredSetValues>>(() => ({
     ...(resume?.enteredSets ?? {}),
   }));
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(resume?.notes ?? '');
   const [isSaving, setIsSaving] = useState(false);
   // Synchronous re-entry guard for the async finish path: React state updates
   // are async, so two taps in the same tick would both pass an `isSaving`
@@ -469,6 +438,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       );
       void saveWorkoutSessionDraft({
         routineId: routine.id,
+        routineSnapshot: routine,
+        notes,
+        effortScale,
         startedAtIso: new Date(startedAtMs).toISOString(),
         phaseIndex,
         elapsedAdjustSeconds: elapsedSecondsRef.current,
@@ -485,11 +457,14 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
           // the newer act, so re-assert it instead of leaving a resurrected
           // draft behind.
           if (draftClearGenerationRef.current !== clearGenerationAtWrite) {
-            void clearWorkoutSessionDraft().catch(() => {});
+            void clearWorkoutSessionDraft({
+              routineId: routine.id,
+              startedAtIso: new Date(startedAtMs).toISOString(),
+            }).catch(() => {});
           }
         });
     },
-    [routine.id, addedSets],
+    [routine, addedSets, notes, effortScale],
   );
 
   const clearDraft = useCallback(() => {
@@ -497,10 +472,15 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     // resurrect the draft after this clear lands (the write re-asserts the
     // delete below).
     draftClearGenerationRef.current += 1;
-    void clearWorkoutSessionDraft().catch(() => {
+    const startedAtMs = startedAtMsRef.current;
+    if (startedAtMs === null) return;
+    void clearWorkoutSessionDraft({
+      routineId: routine.id,
+      startedAtIso: new Date(startedAtMs).toISOString(),
+    }).catch(() => {
       // A stale draft only offers a resume that re-validates the routine.
     });
-  }, []);
+  }, [routine.id]);
 
   // Keep the draft's phase cursor in step with every transition once the
   // timer has started (no-op before Start; harmless rewrite on resume mount).
@@ -672,10 +652,12 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       try {
         await saveWorkoutPendingSave({
           routineId: routine.id,
-          // `AUD-SH09-A` (review finding 2): the PERFORMED identity, snapshotted
-          // from the live sequence. Recovery attributes measurements by these
-          // names, so a later routine edit cannot reassign or drop them.
+          // Retain the complete performed structure. Names alone cannot map
+          // positional measurements after same-name exercises are reordered.
           routineName: routine.name,
+          routineSnapshot: routine,
+          notes,
+          effortScale,
           exerciseNames: sequence.map((phase) => phase.exerciseName),
           startedAtIso: new Date(startedAtMs).toISOString(),
           phaseIndex: currentIndexRef.current,
@@ -698,7 +680,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     return () => {
       cancelled = true;
     };
-  }, [isComplete, clearDraft, routine.id, routine.name, sequence, addedSets]);
+  }, [isComplete, clearDraft, routine, sequence, addedSets, notes, effortScale]);
 
   const updateEnteredValues = (index: number, patch: Partial<EnteredSetValues>) => {
     setEnteredSets((prev) => {
@@ -847,6 +829,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         routineId: routine.id,
         // `AUD-SH09-A` (review finding 2): the performed identity snapshot.
         routineName: routine.name,
+        routineSnapshot: routine,
+        notes,
+        effortScale,
         exerciseNames: sequence.map((phase) => phase.exerciseName),
         startedAtIso: new Date(startedAtMs).toISOString(),
         // The live cursor, so a reopened summary re-collects every exercise the
@@ -864,11 +849,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         ),
         ...(Object.keys(addedSets).length > 0 ? { addedSets } : {}),
         ...(lastError ? { lastError } : {}),
-      }).catch(() => {
-        // Recording the failure reason is secondary to keeping the payload.
       });
     },
-    [routine.id, routine.name, sequence, addedSets],
+    [routine, sequence, addedSets, notes, effortScale],
   );
 
   const handleFinish = async () => {
@@ -917,45 +900,10 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         newRecords = findNewPersonalRecords(sessionSets, historySets);
       }
 
-      const grouped = groupSessionExercises(summary, records);
       const logResult = await logWorkoutSession({
         routineId: routine.id,
         notes: notes.trim() ? notes.trim() : undefined,
-        exercises: grouped.map((g) => {
-          // AUD-SH09-A: resolve metadata from THIS instance position. Selecting
-          // by display name picked the FIRST routine exercise with that name, so
-          // two same-named exercises (or two occurrences of one catalog exercise)
-          // persisted the wrong catalog identity and modality.
-          const exercise = routine.exercises[g.exerciseIndex];
-          const isLegacyFreeText = !exercise?.catalog_exercise_id;
-          return {
-            exerciseName: g.exerciseName,
-            setsCompleted: g.setsCompleted,
-            ...(isLegacyFreeText
-              ? {}
-              : {
-                  catalogExerciseId: exercise?.catalog_exercise_id ?? null,
-                  modality: exercise?.modality ?? 'timed',
-                  unilateral: exercise?.unilateral === 1,
-                  supportsExternalLoad:
-                    exercise?.supports_external_load === undefined
-                      ? exercise?.modality === 'weighted_strength'
-                      : exercise.supports_external_load === 1,
-                }),
-            sets: g.sets.map((r) => ({
-              setNumber: r.setNumber,
-              weight: r.weight,
-              reps: r.reps,
-              completed: r.completed,
-              weightUnit: r.weight !== null ? ('kg' as const) : null,
-              durationSeconds: r.durationSeconds,
-              distance: r.distance,
-              pace: r.pace,
-              effortValue: r.effortValue,
-              effortScale: r.effortScale,
-            })),
-          };
-        }),
+        exercises: buildSessionLogExercises(routine, summary, records),
         startedAt: startedAtMs !== null ? new Date(startedAtMs).toISOString() : null,
         endedAt: new Date(endedAtMs).toISOString(),
         // Resumed sessions log active time, not wall-clock: the gap between the
@@ -979,7 +927,12 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
           // between the log commit and this line leaves the pending-save state
           // intact, so the next mount reconciles against the committed log
           // instead of inventing a duplicate (see the resume path).
-          await clearWorkoutPendingSave();
+          if (startedAtMs !== null) {
+            await clearWorkoutPendingSave({
+              routineId: routine.id,
+              startedAtIso: new Date(startedAtMs).toISOString(),
+            });
+          }
           // Reward after the log is durable, attributed to THIS log id:
           // without it the award would fall back to the oldest unrewarded
           // log instead.
@@ -1003,7 +956,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       setSaveError('This workout could not be saved. Your progress is still here — try again.');
       await persistPendingSave(
         'This workout could not be saved. Your progress is still here — try again.',
-      );
+      ).catch(() => {
+        // Keep the live summary and any earlier durable draft when storage is unavailable.
+      });
     } finally {
       finishGuardRef.current.finish();
       setIsSaving(false);
@@ -1028,7 +983,18 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     });
     if (!leave) return;
     setIsRunning(false);
-    persistDraft(currentIndexRef.current);
+    if (isComplete) {
+      try {
+        await persistPendingSave();
+      } catch {
+        setSaveError(
+          'Your finished workout could not be kept for recovery. Stay here and try again.',
+        );
+        return;
+      }
+    } else {
+      persistDraft(currentIndexRef.current);
+    }
     onCancel();
   };
 

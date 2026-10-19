@@ -23,8 +23,48 @@ export class GenerationRemoteDouble {
   readonly chunks = new Map<string, Record<string, unknown>>();
   /** owner head, one row per user. */
   readonly heads = new Map<string, { snapshot_id: string; sequence: number }>();
+  readonly publications = new Map<
+    string,
+    { user_id: string; snapshot_id: string; sequence: number }
+  >();
   /** Every RPC call, for assertions. */
   readonly rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
+
+  readonly reservations = new Map<string, number>();
+
+  rpc(
+    name: string,
+    args: Record<string, unknown> = {},
+  ): { data: unknown; error: { message: string } | null } {
+    if (name === 'backup_generation_capabilities')
+      return {
+        data: {
+          protocol_version: 1,
+          content_verification_version: 1,
+          sequence_reservation_version: 1,
+          backup_schema_version: 2,
+          scope_version: 7,
+          settings_version: 5,
+        },
+        error: null,
+      };
+    if (name === 'reserve_backup_generation_sequence') {
+      const key = this.key('user_a', String(args.p_snapshot_id));
+      const previous = this.reservations.get(key) ?? this.generations.get(key)?.sequence;
+      const sequence = Number(
+        previous ??
+          Math.max(
+            0,
+            ...this.reservations.values(),
+            ...[...this.generations.values()].map((row) => Number(row.sequence)),
+          ) + (previous === undefined ? 1 : 0),
+      );
+      this.reservations.set(key, sequence);
+      return { data: sequence, error: null };
+    }
+    if (name === 'publish_backup_generation') return this.publish(args);
+    return { data: null, error: { message: `unknown rpc ${name}` } };
+  }
 
   private key(userId: string, snapshotId: string): string {
     return `${userId}:${snapshotId}`;
@@ -104,6 +144,7 @@ export class GenerationRemoteDouble {
     }
     const next = { snapshot_id: snapshotId, sequence };
     this.heads.set(userId, next);
+    this.publications.set(this.key(userId, snapshotId), { user_id: userId, ...next });
     return { data: next, error: null };
   }
 

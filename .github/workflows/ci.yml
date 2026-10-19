@@ -283,10 +283,21 @@ jobs:
         if: always() && steps.playwright-main.outcome != 'skipped'
         run: node scripts/e2e-retry-report.mjs
 
-      # ---- scenario lane (deterministic; needs the served dist/) ----
+      - name: Build isolated simulation export
+        run: npm run build:e2e:sim
+
+      - name: Run simulation API and oracle self-tests
+        id: playwright-simulation
+        run: npm run e2e:simulation
+
+      - name: Retry-report gate — simulation self-tests
+        if: always() && steps.playwright-simulation.outcome != 'skipped'
+        run: node scripts/e2e-retry-report.mjs
+
+      # ---- scenario lane (deterministic; needs the served dist-sim/) ----
       - name: Start static server for the scenario lane
         run: |
-          node scripts/serve-e2e.js > /tmp/serve-e2e.log 2>&1 &
+          node scripts/serve-e2e.js --dist dist-sim > /tmp/serve-e2e.log 2>&1 &
           echo $! > /tmp/serve-e2e.pid
 
       - name: Run deterministic scenario subset (lane scenarios-pr, ≤ 10 min budget)
@@ -408,9 +419,22 @@ jobs:
         if: always() && steps.playwright-nightly.outcome != 'skipped'
         run: node scripts/e2e-retry-report.mjs
 
+      - name: Build isolated nightly simulation export
+        run: npm run build:e2e:sim
+
+      - name: Run nightly simulation API and oracle self-tests
+        id: playwright-simulation-nightly
+        continue-on-error: true
+        run: npm run e2e:simulation
+
+      - name: Retry-report gate — nightly simulation self-tests
+        continue-on-error: true
+        if: always() && steps.playwright-simulation-nightly.outcome != 'skipped'
+        run: node scripts/e2e-retry-report.mjs
+
       - name: Start static server for the scenario lanes
         run: |
-          node scripts/serve-e2e.js > /tmp/serve-e2e.log 2>&1 &
+          node scripts/serve-e2e.js --dist dist-sim > /tmp/serve-e2e.log 2>&1 &
           echo $! > /tmp/serve-e2e.pid
 
       - name: Run seeded scenario lane (lane scenarios-seeded)

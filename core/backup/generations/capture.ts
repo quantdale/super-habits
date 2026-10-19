@@ -26,7 +26,7 @@
 import type * as SQLite from 'expo-sqlite';
 import {
   appMetaKeys,
-  getAppMetaJsonOrDefault,
+  getAppMetaJson,
   getAppMetaText,
   setAppMetaJson,
   setAppMetaText,
@@ -37,6 +37,9 @@ import { withSQLiteTransaction } from '@/core/db/transactions';
 import { createId } from '@/lib/id';
 import { nowIso } from '@/lib/time';
 import { sha256Hex } from '@/lib/checksum';
+import { readRecoverableSettings } from '@/core/backup/backupSettings';
+import { canonicalGenerationRows, generationRowPayloads } from './generationFormat';
+import { GENERATION_PAYLOAD_BYTES, utf8Bytes } from './requestBudget';
 import {
   BACKUP_ENTITY_COLUMNS,
   BACKUP_ENTITIES,
@@ -63,7 +66,7 @@ export const GENERATION_CHUNK_ROWS = 250;
 export interface GenerationCapture {
   /** Owner-scoped snapshot identity (`gsnap_…`). */
   snapshotId: string;
-  /** Monotonic publication sequence for this owner. */
+  /** Provisional floor, replaced by the owner's server reservation before upload. */
   sequence: number;
   /** The captured scope. */
   scope: GenerationScope;
@@ -135,12 +138,12 @@ export async function readGenerationCapture(
   db?: SQLite.SQLiteDatabase,
 ): Promise<GenerationCapture | null> {
   const database = db ?? (await getDatabase());
-  return getAppMetaJsonOrDefault<GenerationCapture | null>(
-    database,
-    appMetaKeys.backupGenerationCapture,
-    null,
-    normalizeCapture,
-  );
+  const stored = await getAppMetaJson<unknown>(database, appMetaKeys.backupGenerationCapture);
+  if (stored === null) return null;
+  const capture = normalizeCapture(stored);
+  if (!capture)
+    throw new Error('The durable generation capture is malformed; publication is paused.');
+  return capture;
 }
 
 /** Clear the in-flight capture (after an acknowledged publication). */
@@ -169,28 +172,6 @@ async function nextGenerationSequence(db: SQLite.SQLiteDatabase): Promise<number
   return Math.max(publishedFloor, inFlightFloor) + 1;
 }
 
-/** Canonical serialization for a chunk's rows (sorted keys, stable order). */
-function canonicalizeRows(rows: readonly Record<string, unknown>[]): string {
-  return JSON.stringify(
-    rows.map((row) => {
-      const sorted: Record<string, unknown> = {};
-      for (const key of Object.keys(row).sort()) sorted[key] = row[key];
-      return sorted;
-    }),
-  );
-}
-
-/**
- * Capture ONE coherent generation of the complete recoverable scope.
- *
- * Reads every backup entity and the certified settings payload inside a single
- * transaction, so the snapshot cannot straddle a concurrent write. Returns the
- * chunks to upload and persists the durable capture state.
- *
- * @param options.settingsPayload the already-captured settings payload for this
- *   generation (captured by the caller's own coherent settings path)
- * @returns the capture plus its chunks
- */
 /**
  * Capture a generation INSIDE a caller-owned transaction (`AUD-SH02-A`).
  *
@@ -229,6 +210,16 @@ export async function captureGeneration(options: {
   );
 }
 
+/** Initial publication uses the same SQLite boundary for settings and rows. */
+export async function captureCurrentGeneration(): Promise<CapturedGeneration> {
+  const db = await getDatabase();
+  return withSQLiteTransaction(db, async (transactionDb) => {
+    const ownerUserId = await getLocalDatasetOwner(transactionDb);
+    if (!ownerUserId) throw new Error('Generation capture requires durable owner evidence.');
+    return captureInto(transactionDb, ownerUserId, await readRecoverableSettings(transactionDb));
+  });
+}
+
 /**
  * The capture body, callable inside a caller-owned transaction.
  *
@@ -263,9 +254,7 @@ async function captureInto(
       });
 
       let ordinal = 0;
-      for (let index = 0; index < projected.length; index += GENERATION_CHUNK_ROWS) {
-        const slice = projected.slice(index, index + GENERATION_CHUNK_ROWS);
-        const payload = canonicalizeRows(slice);
+      for (const payload of generationRowPayloads(projected)) {
         chunks.push({
           snapshotId,
           entity,
@@ -278,12 +267,14 @@ async function captureInto(
       expectedChunks[entity] = ordinal;
       manifestEntities[entity] = {
         rows: projected.length,
-        checksum: sha256Hex(canonicalizeRows(projected)),
+        checksum: sha256Hex(canonicalGenerationRows(projected)),
       };
     }
 
     // The settings snapshot is part of the generation, addressed the same way.
     const settingsJson = JSON.stringify(settingsPayload ?? null);
+    if (utf8Bytes(settingsJson) > GENERATION_PAYLOAD_BYTES)
+      throw new Error('Backup capture paused: settings exceed the generation payload budget.');
     const settingsChecksum = sha256Hex(settingsJson);
     chunks.push({
       snapshotId,
@@ -300,7 +291,7 @@ async function captureInto(
       scopeVersion: BACKUP_SCOPE_VERSION,
       settingsVersion: BACKUP_SETTINGS_VERSION,
     });
-    const manifest = canonicalizeRows([
+    const manifest = canonicalGenerationRows([
       {
         protocolVersion: scope.protocolVersion,
         backupSchemaVersion: scope.backupSchemaVersion,
@@ -361,18 +352,17 @@ export async function readCapturedChunks(
   db?: SQLite.SQLiteDatabase,
 ): Promise<{ capture: GenerationCapture; chunks: GenerationChunk[] } | null> {
   const database = db ?? (await getDatabase());
-  const stored = await getAppMetaJsonOrDefault<unknown>(
-    database,
-    appMetaKeys.backupGenerationCapture,
-    null,
-  );
+  const stored = await getAppMetaJson<unknown>(database, appMetaKeys.backupGenerationCapture);
+  if (stored === null) return null;
   const capture = normalizeCapture(stored);
-  if (!capture) return null;
+  if (!capture)
+    throw new Error('The durable generation capture is malformed; publication is paused.');
   const rawChunks = (stored as { chunks?: unknown }).chunks;
-  if (!Array.isArray(rawChunks)) return null;
+  if (!Array.isArray(rawChunks))
+    throw new Error('The durable generation chunks are missing; publication is paused.');
   const chunks: GenerationChunk[] = [];
   for (const entry of rawChunks) {
-    if (!entry || typeof entry !== 'object') continue;
+    if (!entry || typeof entry !== 'object') throw new Error('Malformed durable generation chunk.');
     const candidate = entry as Record<string, unknown>;
     if (
       typeof candidate.snapshotId !== 'string' ||
@@ -381,7 +371,7 @@ export async function readCapturedChunks(
       typeof candidate.payload !== 'string' ||
       typeof candidate.checksum !== 'string'
     ) {
-      continue;
+      throw new Error('Malformed durable generation chunk.');
     }
     chunks.push({
       snapshotId: candidate.snapshotId,
@@ -402,11 +392,13 @@ export async function readCapturedChunks(
  */
 export async function markEntityStaged(snapshotId: string, entity: string): Promise<void> {
   const db = await getDatabase();
-  const capture = await readGenerationCapture(db);
-  if (!capture || capture.snapshotId !== snapshotId) return;
+  const captured = await readCapturedChunks(db);
+  if (!captured || captured.capture.snapshotId !== snapshotId) return;
+  const { capture, chunks } = captured;
   if (capture.stagedEntities.includes(entity)) return;
   await setAppMetaJson(db, appMetaKeys.backupGenerationCapture, {
     ...capture,
+    chunks,
     stagedEntities: [...capture.stagedEntities, entity],
   });
 }
@@ -434,4 +426,98 @@ export async function recordPublishedGeneration(
   const current = stored === null ? 0 : Number.parseInt(stored, 10);
   const next = Number.isFinite(current) ? Math.max(current, sequence) : sequence;
   await setAppMetaText(db, appMetaKeys.backupGenerationSequence, String(next));
+}
+
+/** Build a new protocol capture from an already verified legacy recovery point. */
+export function captureVerifiedRows(input: {
+  ownerUserId: string;
+  rowsByEntity: Partial<Record<(typeof BACKUP_ENTITIES)[number], Record<string, unknown>[]>>;
+  settingsPayload: unknown;
+}): CapturedGeneration {
+  const snapshotId = createId('gsnap');
+  const capturedAt = nowIso();
+  const chunks: GenerationChunk[] = [];
+  const expectedChunks: Record<string, number> = {};
+  const entities: Record<string, { rows: number; checksum: string }> = {};
+  for (const entity of BACKUP_ENTITIES) {
+    // IDs use ASCII. Match SQLite BINARY / PostgreSQL C ordering; localeCompare
+    // orders punctuation differently and can invalidate a supported old backup.
+    const rows = [...(input.rowsByEntity[entity] ?? [])].sort((a, b) =>
+      String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0,
+    );
+    const projected = rows.map((row) =>
+      Object.fromEntries(
+        BACKUP_ENTITY_COLUMNS[entity]
+          .filter((column) => row[column] !== undefined)
+          .map((column) => [column, row[column]]),
+      ),
+    );
+    let ordinal = 0;
+    for (const payload of generationRowPayloads(projected)) {
+      chunks.push({
+        snapshotId,
+        entity,
+        ordinal: ordinal++,
+        payload,
+        checksum: sha256Hex(payload),
+      });
+    }
+    expectedChunks[entity] = ordinal;
+    entities[entity] = {
+      rows: projected.length,
+      checksum: sha256Hex(canonicalGenerationRows(projected)),
+    };
+  }
+  const settingsPayload = JSON.stringify(input.settingsPayload);
+  if (utf8Bytes(settingsPayload) > GENERATION_PAYLOAD_BYTES)
+    throw new Error('Backup capture paused: settings exceed the generation payload budget.');
+  const settingsChecksum = sha256Hex(settingsPayload);
+  chunks.push({
+    snapshotId,
+    entity: 'user_backup_settings',
+    ordinal: 0,
+    payload: settingsPayload,
+    checksum: settingsChecksum,
+  });
+  expectedChunks.user_backup_settings = 1;
+  entities.user_backup_settings = { rows: 1, checksum: settingsChecksum };
+  const scope = currentGenerationScope({
+    backupSchemaVersion: BACKUP_SCHEMA_VERSION,
+    scopeVersion: BACKUP_SCOPE_VERSION,
+    settingsVersion: BACKUP_SETTINGS_VERSION,
+  });
+  const sequence = 1; // Provisional only; the authenticated server reserves the authoritative value.
+  const manifest = canonicalGenerationRows([
+    { ...scope, snapshotId, sequence, capturedAt, entities, settingsChecksum },
+  ]);
+  return {
+    capture: {
+      snapshotId,
+      sequence,
+      scope,
+      capturedAt,
+      manifest,
+      manifestChecksum: sha256Hex(manifest),
+      expectedChunks,
+      stagedEntities: [],
+      ownerUserId: input.ownerUserId,
+      capturedRevisions: {},
+    },
+    chunks,
+  };
+}
+
+/** Reserve-before-upload rebasing never rereads or changes captured recovery bytes. */
+export function withReservedGenerationSequence(
+  captured: CapturedGeneration,
+  sequence: number,
+): CapturedGeneration {
+  if (!Number.isSafeInteger(sequence) || sequence < 1)
+    throw new Error('Invalid reserved generation sequence.');
+  const parsed = JSON.parse(captured.capture.manifest) as Record<string, unknown>[];
+  const manifest = canonicalGenerationRows([{ ...parsed[0], sequence }]);
+  return {
+    chunks: captured.chunks,
+    capture: { ...captured.capture, sequence, manifest, manifestChecksum: sha256Hex(manifest) },
+  };
 }

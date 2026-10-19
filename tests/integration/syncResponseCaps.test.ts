@@ -46,6 +46,17 @@ let generationSupport = true;
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
+    rpc: vi.fn(async () => ({
+      data: {
+        protocol_version: 1,
+        content_verification_version: 1,
+        sequence_reservation_version: 1,
+        backup_schema_version: 2,
+        scope_version: 7,
+        settings_version: 5,
+      },
+      error: null,
+    })),
     from: vi.fn((entity: string) => ({
       upsert: vi.fn(async (rows: Record<string, unknown>[]) => {
         const rowList = Array.isArray(rows) ? rows : [rows];
@@ -98,7 +109,7 @@ vi.mock('@/lib/supabase', () => ({
         builder.limit = vi.fn(async () => {
           if (entity === 'backup_generation_head') {
             return generationSupport
-              ? { data: [], error: null }
+              ? { data: [{ snapshot_id: 'existing', sequence: 1 }], error: null }
               : { data: null, error: { message: 'relation does not exist' } };
           }
           return { data: [], error: null };

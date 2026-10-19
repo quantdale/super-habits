@@ -1,3 +1,4 @@
+import { GenerationRemoteDouble } from './helpers/generationRemoteDouble';
 import { describe, expect, it, vi } from 'vitest';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
@@ -99,6 +100,7 @@ type UpsertCall = { entity: string; rows: Record<string, unknown>[] };
 
 function buildRecordingSupabase() {
   const upserted: UpsertCall[] = [];
+  const generationRemote = new GenerationRemoteDouble();
   /** Rows this fake remote stores, so the push read-back can verify them. */
   const stored = new Map<string, Map<string, Record<string, unknown>>>();
   const from = vi.fn((entity: string) => {
@@ -109,6 +111,7 @@ function buildRecordingSupabase() {
       upsert: vi.fn(async (rows: Record<string, unknown>[]) => {
         const rowList = Array.isArray(rows) ? rows : [rows];
         upserted.push({ entity, rows: rowList });
+        if (entity.startsWith('backup_generation')) return generationRemote.upsert(entity, rowList);
         const table = stored.get(entity) ?? new Map<string, Record<string, unknown>>();
         // Generation tables key on (snapshot_id, entity, ordinal), not `id`.
         for (const row of rowList) {
@@ -132,7 +135,13 @@ function buildRecordingSupabase() {
         // select().eq().limit(), so this fake must model that chain too.
         eq: vi.fn(() => ({
           limit: vi.fn(async () => ({
-            data: [...(stored.get(entity)?.values() ?? [])].slice(0, 1),
+            data:
+              entity === 'backup_generation_head'
+                ? [...generationRemote.heads.entries()].map(([user_id, head]) => ({
+                    user_id,
+                    ...head,
+                  }))
+                : [...(stored.get(entity)?.values() ?? [])].slice(0, 1),
             error: null,
           })),
         })),
@@ -157,12 +166,9 @@ function buildRecordingSupabase() {
   });
   // `AUD-SH02-A`: the recording device publishes immutable generation content
   // and advances an owner head through the publication RPC.
-  const rpc = vi.fn(async (name: string) => {
-    if (name !== 'publish_backup_generation') {
-      return { data: null, error: { message: `unknown rpc ${name}` } };
-    }
-    return { data: { snapshot_id: 'recorded', sequence: 1 }, error: null };
-  });
+  const rpc = vi.fn(async (name: string, args: Record<string, unknown>) =>
+    generationRemote.rpc(name, args),
+  );
   return { supabase: { from, rpc }, upserted };
 }
 
