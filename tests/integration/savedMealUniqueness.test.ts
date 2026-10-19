@@ -36,19 +36,26 @@ function buildRecordingSupabase() {
       return { error: null };
     }),
     // Push verification read-back (harden-silent-failure-certification 3.1).
-    select: vi.fn((_columns: string) => ({
-      in: vi.fn((_column: string, ids: string[]) => ({
-        eq: vi.fn((_eqColumn: string, value: string) =>
-          chainableQuery(
-            ids
-              .map((id) => stored.get(entity)?.get(id))
-              .filter((row): row is Record<string, unknown> => row !== undefined)
-              .filter((row) => row.user_id === value || row.user_id === undefined)
-              .map((row) => ({ id: row.id })),
-          ),
-        ),
-      })),
-    })),
+    // AUD-SH02-A (review finding 8): the adapter probes the generation head
+    // (select().eq().limit()) before any mutable upload to decide whether the
+    // remote can publish an immutable generation.
+    select: vi.fn((_columns: string) =>
+      entity === 'backup_generation_head'
+        ? { eq: vi.fn(() => ({ limit: vi.fn(async () => ({ data: [], error: null })) })) }
+        : {
+            in: vi.fn((_column: string, ids: string[]) => ({
+              eq: vi.fn((_eqColumn: string, value: string) =>
+                chainableQuery(
+                  ids
+                    .map((id) => stored.get(entity)?.get(id))
+                    .filter((row): row is Record<string, unknown> => row !== undefined)
+                    .filter((row) => row.user_id === value || row.user_id === undefined)
+                    .map((row) => ({ id: row.id })),
+                ),
+              ),
+            })),
+          },
+    ),
     delete: vi.fn(() => ({
       in: vi.fn((column: string, values: string[]) => ({
         eq: vi.fn(async (_column2: string, _value2: string) => {

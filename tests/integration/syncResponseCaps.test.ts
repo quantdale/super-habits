@@ -41,6 +41,8 @@ let notStored = new Set<string>();
 let overTruncateAt: number | null = null;
 /** When set, upsert batches at or after this 1-based index fail (`AUD-SH03-B`). */
 let failUpsertBatchFrom: number | null = null;
+/** Whether the fake remote advertises immutable generation storage (`AUD-SH02-A`). */
+let generationSupport = true;
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -61,13 +63,13 @@ vi.mock('@/lib/supabase', () => ({
         return { error: null };
       }),
       select: vi.fn(() => {
-        // A PostgREST builder: .in().eq().order().range()
-        const builder = {
+        // A PostgREST builder: .in().eq().order().range().limit()
+        const builder: Record<string, unknown> = {
           in: vi.fn((_column: string, ids: string[]) => builder),
           eq: vi.fn((_column: string, _value: string) => builder),
           order: vi.fn(() => builder),
           range: vi.fn(async (from: number, to: number) => {
-            const ids = [...(builder.__ids ?? [])];
+            const ids = [...((builder.__ids as string[] | undefined) ?? [])];
             const table = stored.get(entity) ?? new Map();
             const rows = ids
               .filter((id) => !notStored.has(id))
@@ -87,6 +89,19 @@ vi.mock('@/lib/supabase', () => ({
         builder.in = vi.fn((_column: string, ids: string[]) => {
           builder.__ids = ids;
           return builder;
+        });
+        // `AUD-SH02-A` (review finding 8): the adapter probes the generation head
+        // before any mutable upload to decide whether generation storage exists.
+        // A fake that cannot answer it would report the capability as absent and
+        // refuse every push. `generationSupport` lets a case declare a remote that
+        // HAS generation storage (default) or one that does not.
+        builder.limit = vi.fn(async () => {
+          if (entity === 'backup_generation_head') {
+            return generationSupport
+              ? { data: [], error: null }
+              : { data: null, error: { message: 'relation does not exist' } };
+          }
+          return { data: [], error: null };
         });
         return builder;
       }),
@@ -226,7 +241,9 @@ describe('AUD-SH08-B: genuine absence and truncation stay distinguishable', () =
     const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
     const adapter = new SupabaseSyncAdapter();
     const thrown = await adapter.push(enqueueAll(ids)).catch((error: unknown) => error);
-    expect((thrown as Error).message).toMatch(/push verification failed/i);
+    expect((thrown as Error).message).toMatch(
+      /batch verification failed|push verification failed/i,
+    );
     expect((thrown as Error).message).toContain('1 of 3');
     notStored = new Set();
   });
@@ -263,7 +280,9 @@ describe('AUD-SH08-B: genuine absence and truncation stay distinguishable', () =
     const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
     const adapter = new SupabaseSyncAdapter();
     const thrown = await adapter.push(enqueueAll(ids)).catch((error: unknown) => error);
-    expect(String((thrown as Error).message)).toMatch(/push verification failed/i);
+    expect(String((thrown as Error).message)).toMatch(
+      /batch verification failed|push verification failed/i,
+    );
     expect(String((thrown as Error).message)).toMatch(/not stored for this owner/);
     overTruncateAt = null;
   });
@@ -335,6 +354,7 @@ describe('AUD-SH03-B: a failed batch does not implicate a stored batch', () => {
     const adapter = new SupabaseSyncAdapter();
     const thrown = await adapter.push(enqueueAll(ids)).catch((error: unknown) => error);
     failUpsertBatchFrom = null;
+    generationSupport = true;
 
     expect((thrown as Error).name).toBe('SyncPushPartialFailureError');
     const failure = thrown as {

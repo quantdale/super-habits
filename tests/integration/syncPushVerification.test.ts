@@ -36,15 +36,25 @@ vi.mock('@/lib/supabase', () => ({
         // silent no-op, not an error. That is the whole defect.
         return { error: null };
       }),
-      select: vi.fn((_columns: string) => ({
-        in: vi.fn((_column: string, ids: string[]) => ({
-          eq: vi.fn((_eqColumn: string, value: string) => {
-            readBacks.push({ entity, ids, userId: value });
-            const data = ids.filter((id) => storeable(entity, id, value)).map((id) => ({ id }));
-            return chainableQuery(data);
-          }),
-        })),
-      })),
+      // AUD-SH02-A (review finding 8): the adapter probes the generation head
+      // (select().eq().limit()) before any mutable upload to decide whether the
+      // remote can publish an immutable generation. A fake that cannot answer it
+      // makes the probe look like "no capability" and refuses every push.
+      select: vi.fn((_columns: string) =>
+        entity === 'backup_generation_head'
+          ? { eq: vi.fn(() => ({ limit: vi.fn(async () => ({ data: [], error: null })) })) }
+          : {
+              in: vi.fn((_column: string, ids: string[]) => ({
+                eq: vi.fn((_eqColumn: string, value: string) => {
+                  readBacks.push({ entity, ids, userId: value });
+                  const data = ids
+                    .filter((id) => storeable(entity, id, value))
+                    .map((id) => ({ id }));
+                  return chainableQuery(data);
+                }),
+              })),
+            },
+      ),
       delete: vi.fn(() => ({
         in: vi.fn(() => ({
           eq: vi.fn(async () => ({ error: null })),

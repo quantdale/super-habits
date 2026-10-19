@@ -672,6 +672,11 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       try {
         await saveWorkoutPendingSave({
           routineId: routine.id,
+          // `AUD-SH09-A` (review finding 2): the PERFORMED identity, snapshotted
+          // from the live sequence. Recovery attributes measurements by these
+          // names, so a later routine edit cannot reassign or drop them.
+          routineName: routine.name,
+          exerciseNames: sequence.map((phase) => phase.exerciseName),
           startedAtIso: new Date(startedAtMs).toISOString(),
           phaseIndex: currentIndexRef.current,
           elapsedSeconds: Math.max(0, elapsedSecondsRef.current),
@@ -693,7 +698,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     return () => {
       cancelled = true;
     };
-  }, [isComplete, clearDraft, routine.id, addedSets]);
+  }, [isComplete, clearDraft, routine.id, routine.name, sequence, addedSets]);
 
   const updateEnteredValues = (index: number, patch: Partial<EnteredSetValues>) => {
     setEnteredSets((prev) => {
@@ -840,6 +845,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       if (startedAtMs === null) return;
       await saveWorkoutPendingSave({
         routineId: routine.id,
+        // `AUD-SH09-A` (review finding 2): the performed identity snapshot.
+        routineName: routine.name,
+        exerciseNames: sequence.map((phase) => phase.exerciseName),
         startedAtIso: new Date(startedAtMs).toISOString(),
         // The live cursor, so a reopened summary re-collects every exercise the
         // user actually completed (AUD-SH04-A).
@@ -860,7 +868,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         // Recording the failure reason is secondary to keeping the payload.
       });
     },
-    [routine.id, addedSets],
+    [routine.id, routine.name, sequence, addedSets],
   );
 
   const handleFinish = async () => {

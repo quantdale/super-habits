@@ -1,5 +1,5 @@
 import { Text } from '@/core/ui/Text';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, View, useWindowDimensions } from 'react-native';
 import { layout, spacing } from '@/core/theme/designTokens';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -485,14 +485,34 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     [confirm, refresh, routineModal],
   );
 
-  const startRoutineById = useCallback(async (routineId: string) => {
-    const full = await getRoutineWithExercises(routineId);
-    if (!full || full.exercises.length === 0) {
-      Alert.alert('No exercises', 'Add exercises to this routine before starting.');
-      return;
-    }
-    setCurrentView({ type: 'session', routine: full });
-  }, []);
+  const startRoutineRef = useRef<(() => void) | null>(null);
+  const startRoutineById = useCallback(
+    async (routineId: string) => {
+      // `AUD-SH04-A` (review finding 1): a finished workout awaiting save lives in
+      // ONE durable slot. Starting a second session used to overwrite it with the
+      // new session's state, silently destroying a completed-but-unsaved workout
+      // with no history row and no explicit discard. Block the start until the
+      // outstanding session is saved or discarded.
+      if (pendingSave) {
+        const viewIt = await confirm({
+          title: 'Finish the workout you have?',
+          message:
+            'A finished workout is still waiting to be saved. Save or discard it before starting another one.',
+          confirmLabel: 'View it',
+          cancelLabel: 'Not now',
+        });
+        if (viewIt) startRoutineRef.current?.();
+        return;
+      }
+      const full = await getRoutineWithExercises(routineId);
+      if (!full || full.exercises.length === 0) {
+        Alert.alert('No exercises', 'Add exercises to this routine before starting.');
+        return;
+      }
+      setCurrentView({ type: 'session', routine: full });
+    },
+    [pendingSave, confirm],
+  );
 
   const handleResumeDraft = useCallback(async () => {
     if (!draft) return;
@@ -622,6 +642,17 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       },
     });
   }, [pendingSave, refresh]);
+
+  // `startRoutineById` is declared before `handleRetryPendingSave`; the handler is
+  // reachable through this ref so the declaration order does not need reshuffling.
+  useEffect(() => {
+    startRoutineRef.current = () => {
+      void handleRetryPendingSave();
+    };
+    return () => {
+      startRoutineRef.current = null;
+    };
+  }, [handleRetryPendingSave]);
 
   /** Explicit discard of a finished-but-unsaved session. */
   const handleDiscardPendingSave = useCallback(async () => {

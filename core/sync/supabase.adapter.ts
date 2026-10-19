@@ -30,6 +30,21 @@ import {
 } from '@/core/sync/syncBatching';
 
 /**
+ * True when the entity is one of the mutable current-row tables whose overwrite
+ * destroys an earlier recovery point (`AUD-SH02-A`, review finding 8).
+ *
+ * The synthetic manifest/settings records and the generation namespace are not in
+ * this set: publishing them is the safe path, not the destructive one.
+ */
+export function isMutableEntity(entity: string): boolean {
+  return (
+    entity !== 'backup_manifest' &&
+    entity !== 'user_backup_settings' &&
+    !entity.startsWith('backup_generation')
+  );
+}
+
+/**
  * Best-effort PostgREST/transport code from an adapter error (`AUD-SH03-B`).
  *
  * The code is recorded as SAFE diagnostic metadata next to the per-record error
@@ -102,6 +117,45 @@ export class SupabaseSyncAdapter implements SyncAdapter {
    * @param ids the ids the push wrote
    * @param currentUserId the pushing owner
    */
+  /**
+   * Does this remote support publishing an immutable generation?
+   *
+   * Reads the owner's generation head. Three outcomes:
+   *   - a head exists (or the table is readable) => generation storage is
+   *     available, so mutable rows can be replaced safely;
+   *   - the table is absent (pre-migration remote) => NOT supported, so mutable
+   *     uploads must be refused rather than destroy legacy recovery;
+   *   - any other read failure => treated as NOT supported, because refusing to
+   *     overwrite a certified recovery point is the safe direction.
+   *
+   * @param client the Supabase client
+   * @param ownerUserId the pushing owner
+   */
+  private async checkGenerationCapability(
+    client: NonNullable<typeof supabase>,
+    ownerUserId: string,
+  ): Promise<{ supported: boolean; evidence: string }> {
+    try {
+      const probe = await client
+        .from('backup_generation_head')
+        .select('sequence')
+        .eq('user_id', ownerUserId)
+        .limit(1);
+      if (probe.error) {
+        // A readable-but-errored probe is ambiguous; refuse the unsafe direction.
+        return { supported: false, evidence: probe.error.message };
+      }
+      // The table exists and answered: generation storage is available (a head
+      // may or may not exist yet — either way publishing is possible).
+      return { supported: true, evidence: 'generation storage available' };
+    } catch (error) {
+      return {
+        supported: false,
+        evidence: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
   private async verifyEntityRows(
     client: NonNullable<typeof supabase>,
     entity: (typeof BACKUP_ENTITIES)[number],
@@ -203,6 +257,23 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     /** Records whose batch(es) definitely stored (`AUD-SH03-B`). */
     const succeededRecords: SyncRecord[] = [];
     const errorMessages: string[] = [];
+
+    // `AUD-SH02-A` (review finding 8): BEFORE any mutable entity row is written,
+    // establish that this remote can publish an immutable generation. The audited
+    // order uploaded mutable entities first, so a remote without generation
+    // capability had its rows overwritten and the previously valid recovery point
+    // was destroyed before a safe replacement existed. When the capability is
+    // absent this push refuses and keeps the local work durable, rather than
+    // silently taking away a recovery point it cannot recreate.
+    const generationReady = await this.checkGenerationCapability(client, currentUserId);
+    if (!generationReady.supported && records.some((r) => isMutableEntity(r.entity))) {
+      throw new Error(
+        'Refusing to push mutable rows: this remote cannot publish an immutable ' +
+          'generation, so writing them would destroy the only certified recovery ' +
+          'point without replacing it. Publication is paused until the remote ' +
+          'supports generation storage.',
+      );
+    }
 
     // One entity's failure (missing rows, a schema-drift upsert rejection,
     // network blip) must not block every other entity's records behind it —
@@ -354,65 +425,71 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     // every statement comfortably inside both, and a failure now names only the
     // batch that failed.
     const writeBatches = chunk(payloadRows, writeBatchRows(this.serverRowCap));
-    /** Ids whose batch has already stored (`AUD-SH03-B`). */
+    /**
+     * Ids whose batch stored AND was read back (`AUD-SH03-B`, review finding 9).
+     *
+     * A write must not be acknowledged merely because the statement returned no
+     * error: `upsert` can report success while storing nothing for this owner,
+     * and a LATER batch failing must not short-circuit verification of the
+     * earlier ones. So each batch is verified immediately after it is written,
+     * and only a verified batch contributes acknowledged ids.
+     */
     const acknowledgedIds: string[] = [];
     for (const [batchIndex, batch] of writeBatches.entries()) {
       const { error } = await client.from(entity).upsert(batch, {
         onConflict: 'id',
       });
+      const batchIds = batch.flatMap((row) => {
+        // SAFETY: every payload row is a projected entity row plus `user_id`, so
+        // `id` is present as a string for entity tables; the guard keeps the
+        // synthetic records defensive.
+        const id = (row as Record<string, unknown>).id;
+        return typeof id === 'string' ? [id] : [];
+      });
       if (error) {
-        const failedIds = new Set(
-          batch.flatMap((row) => {
-            // SAFETY: every payload row is a projected entity row plus
-            // `user_id`, so `id` is present as a string for entity tables; the
-            // guard keeps the synthetic records defensive.
-            const id = (row as Record<string, unknown>).id;
-            return typeof id === 'string' ? [id] : [];
-          }),
-        );
-        // A failed batch must not implicate the batches that already stored.
+        const failedIds = new Set(batchIds);
+        // A failed batch must not implicate the batches that already stored AND
+        // verified.
         throw new EntityBatchPushError(
           `Supabase upsert failed for ${entity} (batch ${batchIndex + 1}/${writeBatches.length}, ${batch.length} row(s)): ${error.message}`,
           acknowledgedIds,
           failedIds,
         );
       }
-      for (const row of batch) {
-        const id = (row as Record<string, unknown>).id;
-        if (typeof id === 'string') acknowledgedIds.push(id);
-      }
-    }
-
-    // VERIFY THE WRITE BEFORE CALLING IT A PUSH (task 3.1).
-    //
-    // `upsert(..., onConflict: 'id')` can succeed with HTTP 200 while affecting
-    // ZERO rows: if a row with the same `id` already exists and belongs to a
-    // DIFFERENT owner, the owner's RLS policy makes the statement a no-op
-    // instead of an error. The push then looked successful, the record was
-    // dropped from the outbox, and the manifest certified counts and checksums
-    // for a row the remote never stored.
-    //
-    // AUD-SH08-A: the read-back is PAGINATED and bounded. A single unpaged
-    // `.in(ids)` was silently truncated by the server's `max_rows` cap (1,000 in
-    // supabase/config.toml), so 1,001 correctly-stored rows verified as 1,000
-    // and the adapter failed the whole entity. Each page now asks for a bounded
-    // `range`, pages are compared against the complete expected id set, and a
-    // page that violates its own bound is reported as truncation rather than
-    // being mistaken for missing data.
-    const confirmedIds = await this.verifyEntityRows(client, entity, ids, currentUserId);
-    const outcome = compareVerifiedIds(ids, confirmedIds, { serverCap: this.serverRowCap });
-    if (!outcome.ok) {
-      if (outcome.reason === 'truncated') {
-        throw new Error(
-          `Supabase push verification for ${entity} was truncated: ${outcome.detail}. ` +
-            'Refusing to certify a read-back the server capped, because it cannot distinguish "not stored" from "not returned".',
+      // Verify THIS batch before acknowledging it. Reusing the full-id-set
+      // verification here would be wrong — an unverified earlier batch must not
+      // be acknowledged just because a later one is fine.
+      const confirmed = await this.verifyEntityRows(client, entity, batchIds, currentUserId);
+      const outcome = compareVerifiedIds(batchIds, confirmed, { serverCap: this.serverRowCap });
+      if (!outcome.ok) {
+        const detail =
+          outcome.reason === 'truncated'
+            ? `read-back was truncated: ${outcome.detail}`
+            : `${outcome.missing.length} of ${batchIds.length} row(s) were not stored for this owner (${describeMissingIds(outcome.missing)})`;
+        throw new EntityBatchPushError(
+          `Supabase batch verification failed for ${entity} (batch ${batchIndex + 1}/${writeBatches.length}): ${detail}`,
+          acknowledgedIds,
+          new Set(batchIds),
         );
       }
-      throw new Error(
-        `Supabase push verification failed for ${entity}: ${outcome.missing.length} of ${ids.length} row(s) were not stored for this owner (${describeMissingIds(outcome.missing)}). ` +
-          `The remote accepted the statement without storing them (a row with the same id owned by another account makes the upsert a no-op), so this push is reported as a failure rather than a success.`,
-      );
+      acknowledgedIds.push(...batchIds);
     }
+
+    // Verification happens PER BATCH, inside the loop above, before any batch is
+    // acknowledged. That replaced the single whole-entity read-back this method
+    // used to run at the end:
+    //
+    //   - a whole-entity read-back of 1,001 rows is silently truncated by the
+    //     server's `max_rows` cap (AUD-SH08-A), which produced the audited false
+    //     failure of 1,001 correctly-stored rows;
+    //   - acknowledging earlier batches BEFORE verifying them meant a later
+    //     batch failure skipped verification entirely and silently removed
+    //     unstored work from the outbox (review finding 9).
+    //
+    // Both are avoided by verifying each batch with its own bounded, paginated
+    // read-back and only then contributing its ids to the acknowledged set. There
+    // is deliberately NO second whole-entity verification here: it would re-read
+    // rows already proven and would reintroduce the unbounded query.
   }
 
   private async pushSettingsSnapshot(

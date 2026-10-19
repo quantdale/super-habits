@@ -32,14 +32,25 @@ function storingFrom(
       return upsertImpl ? await upsertImpl(rows, options) : { error: null };
     },
   );
-  const select = vi.fn(() => ({
-    in: vi.fn((_column: string, ids: string[]) => ({
-      // AUD-SH08-A: the read-back chain is
-      // select().in().eq().order().range(), so the fake must support the whole
-      // builder and slice like a real capped server.
-      eq: vi.fn(() => chainableQuery(ids.filter((id) => stored.has(id)).map((id) => ({ id })))),
-    })),
-  }));
+  const select = vi.fn((_columns: string, entity?: string) => {
+    // `AUD-SH02-A` (review finding 8): the adapter probes the generation head
+    // (select().eq().limit()) before any mutable upload to decide whether the
+    // remote can publish an immutable generation. A fake that cannot answer it
+    // makes the probe look like "no capability" and refuses every push.
+    if (entity === 'backup_generation_head') {
+      return {
+        eq: vi.fn(() => ({ limit: vi.fn(async () => ({ data: [], error: null })) })),
+      };
+    }
+    return {
+      in: vi.fn((_column: string, ids: string[]) => ({
+        // AUD-SH08-A: the read-back chain is
+        // select().in().eq().order().range(), so the fake must support the whole
+        // builder and slice like a real capped server.
+        eq: vi.fn(() => chainableQuery(ids.filter((id) => stored.has(id)).map((id) => ({ id })))),
+      })),
+    };
+  });
   return { upsert, select };
 }
 
@@ -65,12 +76,27 @@ async function setupAdapter(options: AdapterSetupOptions) {
     for (const row of Array.isArray(rows) ? rows : [rows]) storedRows.add(String(row.id));
     return { error: null };
   });
-  const select = vi.fn(() => ({
-    in: vi.fn((_column: string, ids: string[]) => ({
-      eq: vi.fn(() => chainableQuery(ids.filter((id) => storedRows.has(id)).map((id) => ({ id })))),
-    })),
+  // `select` must answer two distinct shapes (AUD-SH02-A vs AUD-SH08-A): the
+  // generation-capability probe uses select().eq().limit(), while push
+  // verification uses select().in().eq().order().range().
+  const select = vi.fn((_columns: string, entity?: string) => {
+    if (entity === 'backup_generation_head') {
+      return { eq: vi.fn(() => ({ limit: vi.fn(async () => ({ data: [], error: null })) })) };
+    }
+    return {
+      in: vi.fn((_column: string, ids: string[]) => ({
+        eq: vi.fn(() =>
+          chainableQuery(ids.filter((id) => storedRows.has(id)).map((id) => ({ id }))),
+        ),
+      })),
+    };
+  });
+  // `from(entity)` binds the entity so `select` can answer the generation-capability
+  // probe (AUD-SH02-A) distinctly from the read-back chain (AUD-SH08-A).
+  const from = vi.fn((entity: string) => ({
+    upsert,
+    select: (columns: string) => select(columns, entity),
   }));
-  const from = vi.fn().mockReturnValue({ upsert, select });
 
   vi.doMock('@/core/db/client', () => ({
     getDatabase,
@@ -175,7 +201,9 @@ describe('SupabaseSyncAdapter', () => {
     });
 
     expect(db.getAllAsync).not.toHaveBeenCalled();
-    expect(from).not.toHaveBeenCalled();
+    // The generation-capability preflight (AUD-SH02-A) runs before the entity
+    // loop; no ENTITY access happened beyond it.
+    expect(from.mock.calls.filter(([name]) => name !== 'backup_generation_head')).toEqual([]);
   });
 
   it('deduplicates IDs per entity when building the SQL query', async () => {
@@ -228,7 +256,7 @@ describe('SupabaseSyncAdapter', () => {
     );
 
     expect(db.getAllAsync).not.toHaveBeenCalled();
-    expect(from).not.toHaveBeenCalled();
+    expect(from.mock.calls.filter(([name]) => name !== 'backup_generation_head')).toEqual([]);
   });
 
   it('fails closed when a pending intent belongs to a different Auth user', async () => {
@@ -240,7 +268,7 @@ describe('SupabaseSyncAdapter', () => {
 
     await expect(adapter.push([pending])).rejects.toThrow('Local dataset owner does not match');
 
-    expect(from).not.toHaveBeenCalled();
+    expect(from.mock.calls.filter(([name]) => name !== 'backup_generation_head')).toEqual([]);
   });
 
   it('fails closed when the local owner binding is missing', async () => {
@@ -249,7 +277,7 @@ describe('SupabaseSyncAdapter', () => {
     await expect(adapter.push([record('todos', 'todo_1')])).rejects.toThrow(
       'Local dataset owner is unavailable',
     );
-    expect(from).not.toHaveBeenCalled();
+    expect(from.mock.calls.filter(([name]) => name !== 'backup_generation_head')).toEqual([]);
   });
 
   it('keeps the batch retryable when current Auth verification fails', async () => {
@@ -262,7 +290,7 @@ describe('SupabaseSyncAdapter', () => {
     );
 
     expect(db.getAllAsync).not.toHaveBeenCalled();
-    expect(from).not.toHaveBeenCalled();
+    expect(from.mock.calls.filter(([name]) => name !== 'backup_generation_head')).toEqual([]);
   });
 
   it('reports missing local rows as a failed record for that entity', async () => {
@@ -275,7 +303,7 @@ describe('SupabaseSyncAdapter', () => {
       failedRecords: [missingRecord],
     });
 
-    expect(from).not.toHaveBeenCalled();
+    expect(from.mock.calls.filter(([name]) => name !== 'backup_generation_head')).toEqual([]);
   });
 
   it('reports the whole entity batch as failed when only part of it loads locally', async () => {
@@ -288,13 +316,19 @@ describe('SupabaseSyncAdapter', () => {
       failedRecords: records,
     });
 
-    expect(from).not.toHaveBeenCalled();
+    expect(from.mock.calls.filter(([name]) => name !== 'backup_generation_head')).toEqual([]);
   });
 
   it('reports Supabase upsert errors as a failed record for that entity', async () => {
     const upsertError = new Error('timeout');
     const supabase = {
-      from: vi.fn().mockReturnValue({ upsert: vi.fn().mockResolvedValue({ error: upsertError }) }),
+      from: vi.fn((entity: string) => ({
+        upsert: vi.fn().mockResolvedValue({ error: upsertError }),
+        select: () =>
+          entity === 'backup_generation_head'
+            ? { eq: () => ({ limit: async () => ({ data: [], error: null }) }) }
+            : { in: () => ({ eq: () => chainableQuery([]) }) },
+      })),
     };
     const { adapter, db, SyncPushPartialFailureError } = await setupAdapter({ supabase });
     db.getAllAsync.mockResolvedValue([{ id: 'todo_1' }]);
@@ -313,7 +347,13 @@ describe('SupabaseSyncAdapter', () => {
   it('reports transport failures (like network timeout) as a failed record', async () => {
     const timeoutError = new Error('network timeout');
     const supabase = {
-      from: vi.fn().mockReturnValue({ upsert: vi.fn().mockRejectedValue(timeoutError) }),
+      from: vi.fn((entity: string) => ({
+        upsert: vi.fn().mockRejectedValue(timeoutError),
+        select: () =>
+          entity === 'backup_generation_head'
+            ? { eq: () => ({ limit: async () => ({ data: [], error: null }) }) }
+            : { in: () => ({ eq: () => chainableQuery([]) }) },
+      })),
     };
     const { adapter, db, SyncPushPartialFailureError } = await setupAdapter({ supabase });
     db.getAllAsync.mockResolvedValue([{ id: 'habit_1' }]);
@@ -335,7 +375,7 @@ describe('SupabaseSyncAdapter', () => {
       messageContains: 'db read failed',
       failedRecords: [todoRecord],
     });
-    expect(from).not.toHaveBeenCalled();
+    expect(from.mock.calls.filter(([name]) => name !== 'backup_generation_head')).toEqual([]);
   });
 
   it('processes each known entity in the same batch separately', async () => {
@@ -346,9 +386,14 @@ describe('SupabaseSyncAdapter', () => {
     // The shared store is returned for every entity, and its upsert spy is
     // cleared per entity so call-order assertions stay meaningful across the
     // read-back's re-entry into `from()`.
-    const entities = vi.fn((_entity: string) => {
+    const entities = vi.fn((entity: string) => {
       store.upsert.mockClear();
-      return store;
+      return {
+        upsert: store.upsert,
+        // Bind the entity so `select` can distinguish the generation-capability
+        // probe (AUD-SH02-A) from the push-verification read-back (AUD-SH08-A).
+        select: (columns: string) => store.select(columns, entity),
+      };
     });
     const supabase = { from: entities };
     const { adapter, db } = await setupAdapter({ supabase });
@@ -361,7 +406,11 @@ describe('SupabaseSyncAdapter', () => {
     expect(db.getAllAsync).toHaveBeenCalledTimes(2);
     // The read-back re-enters `from()` for each entity, so the distinct
     // entities pushed are asserted in first-seen order rather than by call index.
-    const pushedEntities = entities.mock.calls.map(([entity]) => entity);
+    // The capability preflight (AUD-SH02-A) also re-enters `from()`; only the
+    // ENTITY accesses describe what was pushed.
+    const pushedEntities = entities.mock.calls
+      .map(([entity]) => entity)
+      .filter((entity) => entity !== 'backup_generation_head');
     expect([...new Set(pushedEntities)]).toEqual(['todos', 'calorie_entries']);
   });
 
@@ -378,7 +427,15 @@ describe('SupabaseSyncAdapter', () => {
     // test asserts on.
     const healthyStore = storingFrom(habitsUpsert);
     const from = vi.fn((entity: string) =>
-      entity === 'todos' ? { upsert: todosUpsert } : healthyStore,
+      entity === 'todos'
+        ? {
+            upsert: todosUpsert,
+            select: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }),
+          }
+        : {
+            upsert: healthyStore.upsert,
+            select: (columns: string) => healthyStore.select(columns, entity),
+          },
     );
     const supabase = { from };
     const { adapter, db, SyncPushPartialFailureError } = await setupAdapter({ supabase });
@@ -407,8 +464,14 @@ describe('SupabaseSyncAdapter', () => {
 
   it('batches hard-delete intents into one remote delete round trip per entity', async () => {
     const deleteIntents: { ids: string[]; userId: string }[] = [];
-    const from = vi.fn((entity: string) =>
-      entity === 'saved_meals'
+    const from = vi.fn((entity: string) => {
+      // The capability preflight (AUD-SH02-A) probes the generation head first.
+      if (entity === 'backup_generation_head') {
+        return {
+          select: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }),
+        };
+      }
+      return entity === 'saved_meals'
         ? {
             delete: vi.fn(() => ({
               in: vi.fn((_column: string, ids: string[]) => ({
@@ -419,8 +482,8 @@ describe('SupabaseSyncAdapter', () => {
               })),
             })),
           }
-        : {},
-    );
+        : {};
+    });
     const { adapter, db } = await setupAdapter({ supabase: { from } });
 
     const deleted = (id: string): SyncRecord => ({
@@ -442,8 +505,14 @@ describe('SupabaseSyncAdapter', () => {
     const deleteIntents: string[][] = [];
     const store = storingFrom();
     const upsert = store.upsert;
-    const from = vi.fn((entity: string) =>
-      entity === 'saved_meals'
+    const from = vi.fn((entity: string) => {
+      // The capability preflight (AUD-SH02-A) probes the generation head first.
+      if (entity === 'backup_generation_head') {
+        return {
+          select: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }),
+        };
+      }
+      return entity === 'saved_meals'
         ? {
             delete: vi.fn(() => ({
               in: vi.fn((_column: string, ids: string[]) => ({
@@ -453,10 +522,11 @@ describe('SupabaseSyncAdapter', () => {
                 }),
               })),
             })),
-            ...store,
+            upsert: store.upsert,
+            select: (columns: string) => store.select(columns, entity),
           }
-        : store,
-    );
+        : { upsert: store.upsert, select: (columns: string) => store.select(columns, entity) };
+    });
     const { adapter, db } = await setupAdapter({ supabase: { from } });
     db.getAllAsync.mockResolvedValue([{ id: 'smeal_2', food_name: 'Keep' }]);
 

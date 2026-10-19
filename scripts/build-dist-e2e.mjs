@@ -58,7 +58,16 @@ try {
     // when it is absent, so ordinary/release/verification exports expose no
     // callable mutation surface. The value is set AFTER the hermetic strip, so
     // it is deliberate rather than ambient.
-    set: { EXPO_PUBLIC_SIM_DATA_BRIDGE: 'true' },
+    // `AUD-SH19-B`/`AUD-SH05-A`: the simulation bridge is ARMED only when the
+    // simulation lane explicitly asks for it (`npm run build:e2e:sim`, which sets
+    // EXPO_PUBLIC_SIM_DATA_BRIDGE_BUILD=1). The default `build:e2e` export — the
+    // one visual and feature lanes use — must carry no bridge at all, so the
+    // artifact is identical to what a user would see. The `set` map is what the
+    // hermetic builder injects, so the conditional has to live here rather than in
+    // the app: leaving it unconditional armed every build regardless of the flag.
+    ...(process.env.EXPO_PUBLIC_SIM_DATA_BRIDGE_BUILD === '1'
+      ? { EXPO_PUBLIC_SIM_DATA_BRIDGE: 'true' }
+      : {}),
   });
 } catch (error) {
   fail(

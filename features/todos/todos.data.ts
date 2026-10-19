@@ -439,6 +439,36 @@ async function resolveTodoProjectGoalAssociation(
 }
 
 /**
+ * Reconcile the device-local due-date reminder after a committed Todo edit
+ * (`AUD-SH14-B`).
+ *
+ * `updateTodo` scheduled or cancelled the reminder from its post-commit row read.
+ * When the row edit moved into the composed path (`updateTodoWithLinkedActionRules`)
+ * that side effect was dropped, so a changed due date committed without ever
+ * scheduling — or cancelling — the reminder. This runs the identical
+ * reconciliation for BOTH write paths, so the composed save cannot lose it.
+ *
+ * @param todoId the edited todo
+ */
+async function reconcileTodoReminder(todoId: string): Promise<void> {
+  const db = await getDatabase();
+  // Re-read the row so the reminder reflects the final title/due/completed state.
+  const updated = await db.getFirstAsync<{
+    title: string;
+    due_date: string | null;
+    completed: 0 | 1;
+  }>(`SELECT title, due_date, completed FROM todos WHERE id = ? AND deleted_at IS NULL`, [todoId]);
+  if (!updated) return;
+  if (updated.completed === 1) {
+    await cancelTodoReminderSafely(todoId);
+  } else if (updated.due_date) {
+    await syncReminderSafely({ id: todoId, title: updated.title, dueDate: updated.due_date });
+  } else {
+    await cancelTodoReminderSafely(todoId);
+  }
+}
+
+/**
  * The transaction-aware body of `updateTodo` (extracted for `AUD-SH14-B`).
  *
  * A composed save (parent edit + rule replacement) must run BOTH writes inside
@@ -564,20 +594,7 @@ export async function updateTodo(
   });
 
   // Re-read the row so the reminder reflects the final title/due/completed state.
-  const updated = await db.getFirstAsync<{
-    title: string;
-    due_date: string | null;
-    completed: 0 | 1;
-  }>(`SELECT title, due_date, completed FROM todos WHERE id = ? AND deleted_at IS NULL`, [id]);
-  if (updated) {
-    if (updated.completed === 1) {
-      await cancelTodoReminderSafely(id);
-    } else if (updated.due_date) {
-      await syncReminderSafely({ id, title: updated.title, dueDate: updated.due_date });
-    } else {
-      await cancelTodoReminderSafely(id);
-    }
-  }
+  await reconcileTodoReminder(id);
 }
 
 /**
@@ -922,6 +939,11 @@ export async function updateTodoWithLinkedActionRules(
       return { changed: true, value: undefined };
     },
   });
+
+  // AUD-SH14-B: the composed write must carry the SAME post-commit reminder
+  // reconciliation as the plain `updateTodo`, or a due-date change commits
+  // without ever scheduling — or cancelling — the device reminder.
+  await reconcileTodoReminder(todoId);
 }
 
 export async function saveTodoLinkedActionRules(

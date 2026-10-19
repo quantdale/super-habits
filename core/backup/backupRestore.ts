@@ -372,9 +372,14 @@ export async function probeV2TablesPresent(ownerUserId: string): Promise<V2Capab
  *
  * @param ownerUserId the restoring owner
  */
-async function fetchPublishedGenerationRows(
-  ownerUserId: string,
-): Promise<{ snapshotId: string; rowsByEntity: Map<string, Record<string, unknown>[]> } | null> {
+async function fetchPublishedGenerationRows(ownerUserId: string): Promise<{
+  snapshotId: string;
+  rowsByEntity: Map<string, Record<string, unknown>[]>;
+  /** Manifest read from the same generation (not the mutable row). */
+  manifest: RemoteBackupManifestRow | null;
+  /** Settings read from the same generation (not the mutable row). */
+  settingsRow: RemoteUserBackupSettingsRow | null;
+} | null> {
   if (!supabase) return null;
   let head: { data: unknown; error: { message: string } | null };
   try {
@@ -438,15 +443,36 @@ async function fetchPublishedGenerationRows(
   }
 
   const rowsByEntity = new Map<string, Record<string, unknown>[]>();
+  let settingsPayload: unknown = undefined;
   for (const entry of chunks) {
-    if (entry.entity === 'user_backup_settings') continue;
     const parsed: unknown = JSON.parse(entry.payload);
+    if (entry.entity === 'user_backup_settings') {
+      // `AUD-SH02-D` (review finding 6): the settings snapshot is read from the
+      // SAME immutable generation as the entities and the manifest. Reading it
+      // from the mutable row meant a newer settings upload could be paired with
+      // an older generation's entities, and restore reported integrity_mismatch
+      // for a backup that was internally consistent when it was published.
+      settingsPayload = parsed;
+      continue;
+    }
     const rows = Array.isArray(parsed) ? (parsed as Record<string, unknown>[]) : [];
     const list = rowsByEntity.get(entry.entity) ?? [];
     list.push(...rows);
     rowsByEntity.set(entry.entity, list);
   }
-  return { snapshotId, rowsByEntity };
+
+  // The manifest and settings metadata come from the generation's own manifest
+  // chunk, so all three describe one coherent snapshot.
+  const manifestChunk = chunks.find((entry) => entry.entity === 'backup_manifest');
+  const generationManifest = manifestChunk
+    ? (JSON.parse(manifestChunk.payload) as RemoteBackupManifestRow)
+    : null;
+  const settingsRow =
+    settingsPayload === undefined
+      ? null
+      : ({ user_id: ownerUserId, payload: settingsPayload } as RemoteUserBackupSettingsRow);
+
+  return { snapshotId, rowsByEntity, manifest: generationManifest, settingsRow };
 }
 
 async function fetchRemoteRows(
@@ -651,6 +677,8 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
   // the device is guaranteed empty, so they fetch concurrently instead of
   // paying ~21 sequential round-trip chains (each paginated).
   const rowsByEntity: Partial<Record<BackupEntity, Record<string, unknown>[]>> = {};
+  /** Supplied by a published generation, when one exists (review finding 6). */
+  let generationSettingsRow: RemoteUserBackupSettingsRow | null = null;
   try {
     // `AUD-SH02-A`/`D`: prefer the owner's PUBLISHED GENERATION. Reading the
     // mutable rows here is exactly the audited defect — those rows are rewritten
@@ -663,6 +691,15 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     if (generation) {
       for (const entity of scope.entitySet) {
         rowsByEntity[entity] = generation.rowsByEntity.get(entity) ?? [];
+      }
+      // `AUD-SH02-D` (review finding 6): the manifest and settings MUST come from
+      // the same immutable generation as the entities. If they disagree the
+      // restore is refused rather than reported as integrity_mismatch later.
+      if (generation.manifest) {
+        manifestRow = generation.manifest;
+      }
+      if (generation.settingsRow) {
+        generationSettingsRow = generation.settingsRow;
       }
     } else {
       const fetched = await Promise.all(
@@ -740,16 +777,22 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
       diagnostics: ['missing settings_metadata (settings integrity) in backup_manifest'],
     };
   }
-  let settingsRow: RemoteUserBackupSettingsRow | null;
-  try {
-    settingsRow = await fetchRemoteRecoverableSettings(ownerUserId);
-  } catch (error) {
-    return {
-      status: 'invalid',
-      reason: 'fetch_failed',
-      message: error instanceof Error ? error.message : String(error),
-      diagnostics: [],
-    };
+  // When a published generation exists it supplies BOTH the settings row and the
+  // manifest, so nothing below can mix generations.
+  let settingsRow: RemoteUserBackupSettingsRow | null = generationSettingsRow;
+  if (!settingsRow) {
+    // Only when no published generation supplied it (review finding 6): the
+    // mutable settings row must never be paired with a generation's entities.
+    try {
+      settingsRow = await fetchRemoteRecoverableSettings(ownerUserId);
+    } catch (error) {
+      return {
+        status: 'invalid',
+        reason: 'fetch_failed',
+        message: error instanceof Error ? error.message : String(error),
+        diagnostics: [],
+      };
+    }
   }
   if (!settingsRow) {
     return {

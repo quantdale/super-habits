@@ -17,7 +17,7 @@
  * once, and a genuinely paid quest is never paid twice.
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { freshDatabase } from './integration/helpers/db';
 
 import type { DayFacts } from '@/features/gamification/gamification.types';
@@ -165,6 +165,20 @@ describe('AUD-SH16-A: the audited plan_today scenario pays its quest', () => {
 });
 
 describe('AUD-SH16-B: real pipeline pays once from canonical post-action state', () => {
+  // The quest board rotates with the local date, so this test MUST pin the clock:
+  // it asserts a PLAN quest is awarded, and 2026-10-20's rotation (for example)
+  // contains no plan quest at all. Without a fixed date the test would fail on a
+  // correct implementation depending only on the calendar.
+  const PINNED = new Date(2026, 9, 2, 12, 0, 0); // 2026-10-02 — plan_today is in the rotation
+
+  beforeEach(async () => {
+    vi.useFakeTimers({ now: PINNED, toFake: ['Date'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   /** Commit a REAL daily plan for today, so the canonical facts are non-zero. */
   async function commitPlan(db: Awaited<ReturnType<typeof freshDatabase>>): Promise<string> {
     const { toDateKey } = await import('@/lib/time');

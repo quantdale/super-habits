@@ -162,8 +162,6 @@ function NotificationResponseHost() {
       if (!response) return;
       const fingerprint = getNotificationResponseFingerprint(response);
       if (handledFingerprints.current.includes(fingerprint)) return;
-      handledFingerprints.current.push(fingerprint);
-      if (handledFingerprints.current.length > 64) handledFingerprints.current.shift();
 
       const task = responseQueue.current.then(async () => {
         try {
@@ -197,14 +195,24 @@ function NotificationResponseHost() {
               setActiveSection('workout');
             },
           });
-        } catch (error) {
-          console.error('[notifications] response dispatch failed', error);
-        } finally {
+          // `AUD-SH17-B` (review finding 4): the replay key is recorded only
+          // AFTER a successful dispatch. Recording it up front — and clearing the
+          // native response on failure — meant one failed write permanently
+          // swallowed every later retry of that delivery.
+          handledFingerprints.current.push(fingerprint);
+          if (handledFingerprints.current.length > 64) handledFingerprints.current.shift();
           try {
             Notifications.clearLastNotificationResponse();
           } catch {
             // The response may already have been cleared by the native runtime.
           }
+        } catch (error) {
+          // A failed dispatch must NOT record the replay key or clear the native
+          // response: both are what allow the next delivery or cold start to
+          // retry the action. The durable business idempotency key (the action's
+          // own occurrence key) still prevents a double-apply when the retry
+          // succeeds.
+          console.error('[notifications] response dispatch failed; leaving it retryable', error);
         }
       });
       responseQueue.current = task.catch(() => undefined);

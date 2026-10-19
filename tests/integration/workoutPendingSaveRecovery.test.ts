@@ -78,6 +78,8 @@ describe('AUD-SH04-A: reaching the summary retains the entered data durably', ()
     const startedAtIso = '2026-10-18T09:00:00.000Z';
     await workout.saveWorkoutPendingSave({
       routineId: 'wrk_a',
+      routineName: 'Push day',
+      exerciseNames: ['Bench', 'Row', 'Squat'],
       startedAtIso,
       phaseIndex: 2,
       elapsedSeconds: 412,
@@ -91,6 +93,8 @@ describe('AUD-SH04-A: reaching the summary retains the entered data durably', ()
     expect(restored).not.toBeNull();
     expect(restored).toMatchObject({
       routineId: 'wrk_a',
+      routineName: 'Push day',
+      exerciseNames: ['Bench', 'Row', 'Squat'],
       startedAtIso,
       elapsedSeconds: 412,
       addedSets: { '0': 2 },
@@ -128,6 +132,8 @@ describe('AUD-SH04-A: reaching the summary retains the entered data durably', ()
     const workout = await import('@/features/workout/workout.data');
     await workout.saveWorkoutPendingSave({
       routineId: '',
+      routineName: 'X',
+      exerciseNames: ['A'],
       startedAtIso: 'not-a-date',
       phaseIndex: 0,
       elapsedSeconds: -5,
@@ -148,6 +154,8 @@ describe('AUD-SH04-B: a failed save retains the durable recovery state', () => {
 
     await workout.saveWorkoutPendingSave({
       routineId: 'wrk_a',
+      routineName: 'Push day',
+      exerciseNames: ['Bench', 'Row', 'Squat'],
       startedAtIso: '2026-10-18T09:00:00.000Z',
       phaseIndex: 2,
       elapsedSeconds: 300,
@@ -205,6 +213,8 @@ describe('AUD-SH04-C: kill after commit never duplicates the log', () => {
 
     await workout.saveWorkoutPendingSave({
       routineId: 'wrk_a',
+      routineName: 'Push day',
+      exerciseNames: ['Bench', 'Row', 'Squat'],
       startedAtIso,
       phaseIndex: 2,
       elapsedSeconds: 400,
@@ -246,6 +256,8 @@ describe('AUD-SH04-C: kill after commit never duplicates the log', () => {
     );
     await workout.saveWorkoutPendingSave({
       routineId: 'wrk_a',
+      routineName: 'Push day',
+      exerciseNames: ['Bench', 'Row', 'Squat'],
       startedAtIso: '2026-10-18T09:00:00.000Z',
       phaseIndex: 2,
       elapsedSeconds: 400,
@@ -266,6 +278,8 @@ describe('AUD-SH04-C: kill after commit never duplicates the log', () => {
     const workout = await import('@/features/workout/workout.data');
     await workout.saveWorkoutPendingSave({
       routineId: 'wrk_a',
+      routineName: 'Push day',
+      exerciseNames: ['Bench', 'Row', 'Squat'],
       startedAtIso: '2026-10-18T09:00:00.000Z',
       phaseIndex: 2,
       elapsedSeconds: 100,

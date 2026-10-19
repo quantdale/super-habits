@@ -1920,6 +1920,20 @@ export type WorkoutPendingSave = {
   dispositions: Record<string, 'completed' | 'skipped'>;
   /** Session-local added sets by stringified engine exercise index. */
   addedSets?: Record<string, number>;
+  /**
+   * The PERFORMED routine's exercise identity, in sequence order
+   * (`AUD-SH09-A`, review finding 2).
+   *
+   * Recovery used to rebuild the sequence from the CURRENT routine's exercise
+   * list while measurements stayed indexed by the old positions. Reordering,
+   * adding or removing exercises before retrying the save then misattributed or
+   * dropped the user's measurements. Persisting the performed identity lets
+   * recovery attribute each measurement to the exercise the user actually did,
+   * and lets the summary name it even when the routine has since changed.
+   */
+  exerciseNames: string[];
+  /** Display name of the routine as performed (a snapshot, not a live lookup). */
+  routineName: string;
   /** Last save error surfaced to the user, for an honest resume message. */
   lastError?: string;
   /** When this recovery state was last written. */
@@ -2009,10 +2023,24 @@ function normalizeWorkoutPendingSave(value: unknown): WorkoutPendingSave | null 
   const enteredSets = normalizeEnteredSetMap(candidate.enteredSets);
   if (!enteredSets) return null;
   const dispositions = normalizeDispositionMap(candidate.dispositions) ?? {};
+  // The performed identity is required: without it recovery cannot tell which
+  // exercise a measurement belongs to once the routine changes.
+  if (!Array.isArray(candidate.exerciseNames) || candidate.exerciseNames.length === 0) {
+    return null;
+  }
+  const exerciseNames = candidate.exerciseNames.filter(
+    (name): name is string => typeof name === 'string' && name.length > 0,
+  );
+  if (exerciseNames.length === 0) return null;
   return {
     routineId: candidate.routineId,
     startedAtIso: candidate.startedAtIso,
     phaseIndex,
+    exerciseNames,
+    routineName:
+      typeof candidate.routineName === 'string' && candidate.routineName.length > 0
+        ? candidate.routineName
+        : 'Workout',
     elapsedSeconds: Math.round(elapsed),
     enteredSets,
     dispositions,
