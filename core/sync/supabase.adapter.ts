@@ -7,19 +7,32 @@ import {
   setAppMetaText,
 } from '@/core/db/appMeta';
 import { getLocalDatasetOwner } from '@/core/auth/account.data';
+import { withSQLiteTransaction } from '@/core/db/transactions';
 import {
   captureCurrentGeneration,
   captureVerifiedRows,
   readCapturedChunks,
+  readVerifiedGenerationBaseHead,
   recordPublishedGeneration,
+  setVerifiedGenerationBaseHead,
   withReservedGenerationSequence,
   type CapturedGeneration,
+  type VerifiedGenerationBaseHead,
 } from '@/core/backup/generations/capture';
 import { readVerifiedLegacySnapshot } from '@/core/backup/legacySnapshot';
+import {
+  BackupGenerationConflictError,
+  readActiveBackupGenerationConflict,
+  recordBackupGenerationConflict,
+} from '@/core/backup/generations/conflict';
 import {
   boundedBackupRequests,
   boundedBackupRecord,
 } from '@/core/backup/generations/requestBudget';
+import {
+  GENERATION_CAPABILITY_VERSION,
+  PUBLICATION_PROVENANCE_VERSION,
+} from '@/core/backup/generations/generationProtocol';
 import type { SyncAdapter, SyncRecord } from '@/core/sync/sync.engine';
 import {
   EntityBatchPushError,
@@ -97,6 +110,51 @@ function isSyncableEntity(entity: string): entity is SyncableEntity {
   return SYNCABLE_TABLES.has(entity);
 }
 
+type OwnerHead = { snapshotId: string; sequence: number };
+
+/** Read the authoritative owner head, refusing malformed or unreadable evidence. */
+async function readOwnerHead(
+  client: NonNullable<typeof supabase>,
+  ownerUserId: string,
+): Promise<OwnerHead | null> {
+  const result = await client
+    .from('backup_generation_head')
+    .select('snapshot_id, sequence')
+    .eq('user_id', ownerUserId)
+    .limit(1);
+  if (result.error)
+    throw new Error(
+      `Backup publication paused: cannot inspect the previous recovery point (${result.error.message}).`,
+    );
+  const row = result.data?.[0] as { snapshot_id?: unknown; sequence?: unknown } | undefined;
+  if (!row) return null;
+  if (typeof row.snapshot_id !== 'string' || row.snapshot_id === '') {
+    throw new Error('Backup publication paused: the remote recovery head is malformed.');
+  }
+  if (typeof row.sequence !== 'number' || !Number.isSafeInteger(row.sequence)) {
+    throw new Error('Backup publication paused: the remote recovery head is malformed.');
+  }
+  return { snapshotId: row.snapshot_id, sequence: row.sequence };
+}
+
+/** True when the immutable publication journal says this snapshot published. */
+async function isGenerationPublished(
+  client: NonNullable<typeof supabase>,
+  ownerUserId: string,
+  snapshotId: string,
+): Promise<boolean> {
+  const journal = await client
+    .from('backup_generation_publication')
+    .select('user_id, snapshot_id, sequence')
+    .eq('snapshot_id', snapshotId)
+    .limit(1);
+  if (journal.error)
+    throw new Error(`Cannot reconcile generation publication: ${journal.error.message}`);
+  return (journal.data ?? []).some(
+    (row) => row.user_id === ownerUserId && row.snapshot_id === snapshotId,
+  );
+}
+
 export class SupabaseSyncAdapter implements SyncAdapter {
   /**
    * @param options.serverRowCap the backend's advertised row cap (`max_rows`).
@@ -111,9 +169,6 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     return this.options.serverRowCap;
   }
 
-  /** Establish a versioned protocol and a durable recovery point before any
-   * mutable entity/settings/manifest write. Existing supported legacy content is
-   * fully verified and published first; new accounts publish a local capture. */
   private async ensureRecoveryPoint(
     client: NonNullable<typeof supabase>,
     db: Awaited<ReturnType<typeof getDatabase>>,
@@ -124,7 +179,8 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     if (
       capability.error ||
       !versions ||
-      versions.protocol_version !== 1 ||
+      versions.protocol_version !== GENERATION_CAPABILITY_VERSION ||
+      versions.publication_provenance_version !== PUBLICATION_PROVENANCE_VERSION ||
       versions.content_verification_version !== 1 ||
       versions.sequence_reservation_version !== 1 ||
       versions.backup_schema_version !== BACKUP_SCHEMA_VERSION ||
@@ -135,38 +191,183 @@ export class SupabaseSyncAdapter implements SyncAdapter {
         'Backup publication paused: this remote does not advertise the verified generation protocol. Apply the current backup migrations and retry; existing recovery content and local pending changes are preserved.',
       );
     }
-    const head = await client
-      .from('backup_generation_head')
-      .select('snapshot_id, sequence')
-      .eq('user_id', ownerUserId)
-      .limit(1);
-    if (head.error)
-      throw new Error(
-        `Backup publication paused: cannot inspect the previous recovery point (${head.error.message}).`,
-      );
+    const activeConflict = await readActiveBackupGenerationConflict(db);
+    if (activeConflict) throw new BackupGenerationConflictError(activeConflict);
+    const head = await readOwnerHead(client, ownerUserId);
+    // Informational only. This value is NOT provenance and must never be used as
+    // a capture base (`AUD-F1`): another device may have published it while this
+    // device was offline.
+    await setAppMetaJson(db, appMetaKeys.backupObservedGenerationHead, head);
+    const verifiedBase = await this.resolveVerifiedGenerationBaseHead(db, ownerUserId, head);
+
     const legacyCapture = await getAppMetaJson<CapturedGeneration>(
       db,
       appMetaKeys.backupLegacyGenerationCapture,
     );
-    // A retry after a lost acknowledgement resumes the SAME legacy content even
-    // if the head now exists. An old reservation cannot regress a newer head.
+    const pending = await readCapturedChunks(db);
+    if (legacyCapture && pending) {
+      // Upgrade ambiguity: old clients could leave both keys populated. Never
+      // let the legacy branch authorize mutable writes while a normal capture
+      // is still unevaluated (`AUD-F2`).
+      if (head) {
+        await this.failGenerationConflict(db, ownerUserId, head, pending.capture, 'generation');
+      }
+      throw new Error(
+        'Backup publication paused: both legacy and normal recovery captures are pending; review the backup state.',
+      );
+    }
     if (legacyCapture) {
+      const legacySnapshotId = legacyCapture.capture.snapshotId;
+      if (head && head.snapshotId !== legacySnapshotId) {
+        // A legacy capture is only safe to publish when it is already the head or
+        // when the remote has no recovery point. Even an already-published
+        // legacy snapshot is stale if a newer head has since appeared.
+        await this.failGenerationConflict(
+          db,
+          ownerUserId,
+          head,
+          legacyCapture.capture,
+          'legacy_cutover',
+        );
+      }
+      if (!head && legacyCapture.capture.baseHeadSnapshotId !== null) {
+        throw new Error(
+          'Backup publication paused: the remote recovery head is absent but the legacy capture has a recorded base; review the backup state.',
+        );
+      }
       await this.uploadGeneration(client, db, ownerUserId, legacyCapture, true);
       return;
     }
-    if (head.data?.[0]) return;
-    const legacy = await readVerifiedLegacySnapshot(client, ownerUserId);
-    if (legacy) {
-      const captured = captureVerifiedRows({ ownerUserId, ...legacy });
-      await setAppMetaJson(db, appMetaKeys.backupLegacyGenerationCapture, captured);
-      await this.uploadGeneration(client, db, ownerUserId, captured, true);
+
+    if (pending) {
+      if (pending.capture.ownerUserId !== ownerUserId) {
+        throw new Error('Captured generation owner mismatch.');
+      }
+      if (head) {
+        if (head.snapshotId === pending.capture.snapshotId) {
+          // The capture is already the visible head (lost acknowledgement). The
+          // authoritative head retires the local retry without touching mutable
+          // rows; the capture bytes are already published.
+          await setVerifiedGenerationBaseHead(db, {
+            ownerUserId,
+            snapshotId: head.snapshotId,
+            sequence: head.sequence,
+          });
+          await recordPublishedGeneration(pending.capture.snapshotId, head.sequence);
+          return;
+        }
+        const baseMatches =
+          pending.capture.baseHeadProof === 'verified' &&
+          pending.capture.baseHeadSnapshotId === head.snapshotId &&
+          pending.capture.baseHeadSequence === head.sequence;
+        if (!baseMatches) {
+          // F2: reject BEFORE any mutable entity/settings/manifest write. An old
+          // capture whose base came from an observed head is unverified and is
+          // reviewed exactly like a provably stale capture.
+          await this.failGenerationConflict(db, ownerUserId, head, pending.capture, 'generation');
+        }
+        // Publish the coherent capture FIRST. The server re-checks the base
+        // against the live head atomically, so a concurrent publisher makes this
+        // call fail before the caller can write mutable staging rows.
+        await this.uploadGeneration(client, db, ownerUserId, pending, false);
+        return;
+      }
+
+      // No remote head exists. Only a capture with no claimed base is a safe
+      // initial publication; a capture that claims to continue a now-missing
+      // recovery point needs review rather than silent re-creation.
+      if (pending.capture.baseHeadSnapshotId !== null) {
+        throw new Error(
+          'Backup publication paused: the remote recovery head is absent but the pending capture has a recorded base; review the backup state.',
+        );
+      }
+      await this.uploadGeneration(client, db, ownerUserId, pending, false);
       return;
     }
-    // Truly new accounts have no recovery point to destroy. Still publish a
-    // coherent immutable local snapshot BEFORE writing their first mutable row.
-    let captured = await readCapturedChunks(db);
-    if (!captured) captured = await captureCurrentGeneration();
-    await this.uploadGeneration(client, db, ownerUserId, captured, false);
+
+    if (!head) {
+      // A genuinely empty remote account has no recovery point to destroy. Clear
+      // any stale local provenance before capturing the first local baseline.
+      if (verifiedBase) await setVerifiedGenerationBaseHead(db, null);
+      const legacy = await readVerifiedLegacySnapshot(client, ownerUserId);
+      if (legacy) {
+        const captured = captureVerifiedRows({ ownerUserId, ...legacy, baseHead: null });
+        await setAppMetaJson(db, appMetaKeys.backupLegacyGenerationCapture, captured);
+        await this.uploadGeneration(client, db, ownerUserId, captured, true);
+        return;
+      }
+      const captured = await captureCurrentGeneration();
+      await this.uploadGeneration(client, db, ownerUserId, captured, false);
+      return;
+    }
+
+    // A head exists but no capture is pending. Only a device whose local dataset
+    // is proven to derive from that exact head may proceed with mutable writes.
+    // The old behavior silently adopted the observed head here, allowing a stale
+    // dirty device to publish A3 above B2 (`AUD-F1`).
+    const headMatches =
+      verifiedBase !== null &&
+      verifiedBase.snapshotId === head.snapshotId &&
+      verifiedBase.sequence === head.sequence;
+    if (headMatches) return;
+
+    // Preserve the divergent local dataset as a durable capture based on the
+    // device's VERIFIED base (which may be null), then stop before any remote
+    // mutation. The owner must explicitly keep local or recover elsewhere.
+    const captured = await captureCurrentGeneration();
+    await this.failGenerationConflict(db, ownerUserId, head, captured.capture, 'generation');
+  }
+
+  /**
+   * Resolve the head this device can prove its local dataset derives from.
+   *
+   * There is deliberately no fallback promotion from the device-global
+   * `backup.generation_sequence` counter: it survives an owner replacement, so a
+   * sequence match alone would let a new owner's observed head become
+   * publication authority (`AUD-F1`). Pre-provenance devices that have no
+   * verified base are treated as unverified and require owner review.
+   */
+  private async resolveVerifiedGenerationBaseHead(
+    db: Awaited<ReturnType<typeof getDatabase>>,
+    ownerUserId: string,
+    _head: OwnerHead | null,
+  ): Promise<VerifiedGenerationBaseHead | null> {
+    return readVerifiedGenerationBaseHead(db, ownerUserId);
+  }
+
+  private async failGenerationConflict(
+    db: Awaited<ReturnType<typeof getDatabase>>,
+    ownerUserId: string,
+    head: OwnerHead,
+    capture: CapturedGeneration['capture'],
+    localKind: 'legacy_cutover' | 'generation',
+  ): Promise<never> {
+    const conflict = await withSQLiteTransaction(db, async (transactionDb) => {
+      // Re-read durable evidence inside the transaction. A concurrent capture
+      // may have replaced the caller's in-memory snapshot after it was read; a
+      // conflict must never point at a snapshot that no longer exists (`F6`).
+      const legacy = await getAppMetaJson<CapturedGeneration>(
+        transactionDb,
+        appMetaKeys.backupLegacyGenerationCapture,
+      );
+      const pending = await readCapturedChunks(transactionDb);
+      const current =
+        localKind === 'legacy_cutover'
+          ? (legacy?.capture ?? pending?.capture ?? capture)
+          : (pending?.capture ?? legacy?.capture ?? capture);
+      return recordBackupGenerationConflict(
+        {
+          ownerUserId,
+          localSnapshotId: current.snapshotId,
+          localCapturedAt: current.capturedAt,
+          localKind,
+          remoteSnapshotId: head.snapshotId,
+          remoteSequence: head.sequence,
+        },
+        transactionDb,
+      );
+    });
+    throw new BackupGenerationConflictError(conflict);
   }
 
   private async verifyEntityRows(
@@ -607,8 +808,56 @@ export class SupabaseSyncAdapter implements SyncAdapter {
   ): Promise<void> {
     if (captured.capture.ownerUserId !== currentUserId)
       throw new Error('Captured generation owner mismatch.');
+    const activeConflict = await readActiveBackupGenerationConflict(db);
+    if (activeConflict) throw new BackupGenerationConflictError(activeConflict);
+    const head = await readOwnerHead(client, currentUserId);
+    await setAppMetaJson(db, appMetaKeys.backupObservedGenerationHead, head);
+
+    if (head && head.snapshotId === captured.capture.snapshotId) {
+      // This exact snapshot is already the visible head. A lost response is
+      // success; retire the retry without republishing or touching mutable rows.
+      await setVerifiedGenerationBaseHead(db, {
+        ownerUserId: currentUserId,
+        snapshotId: head.snapshotId,
+        sequence: head.sequence,
+      });
+      await recordPublishedGeneration(captured.capture.snapshotId, head.sequence);
+      if (isLegacyCutover) {
+        await setAppMetaText(db, appMetaKeys.backupLegacyGenerationCapture, 'null');
+      }
+      return;
+    }
+
+    if (!head) {
+      if (
+        captured.capture.baseHeadSnapshotId !== null ||
+        captured.capture.baseHeadSequence !== null
+      ) {
+        throw new Error(
+          'Backup publication paused: the remote recovery head is absent but the capture has a recorded base; review the backup state.',
+        );
+      }
+    } else {
+      const baseMatches =
+        captured.capture.baseHeadProof === 'verified' &&
+        captured.capture.baseHeadSnapshotId === head.snapshotId &&
+        captured.capture.baseHeadSequence === head.sequence;
+      if (!baseMatches) {
+        await this.failGenerationConflict(
+          db,
+          currentUserId,
+          head,
+          captured.capture,
+          isLegacyCutover ? 'legacy_cutover' : 'generation',
+        );
+      }
+    }
+
     const reservation = await client.rpc('reserve_backup_generation_sequence', {
       p_snapshot_id: captured.capture.snapshotId,
+      p_base_head_snapshot_id: captured.capture.baseHeadSnapshotId,
+      p_base_head_sequence: captured.capture.baseHeadSequence,
+      p_provenance_version: PUBLICATION_PROVENANCE_VERSION,
     });
     if (reservation.error)
       throw new Error(`Backup sequence reservation failed: ${reservation.error.message}`);
@@ -629,7 +878,10 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       );
     }
 
-    // 1. Generation metadata first: chunks carry an FK to it.
+    // 1. Generation metadata first: chunks carry an FK to it. The base-head
+    // columns are part of the reserved provenance record, not client-supplied
+    // publication authority: the server checks them against the live head at
+    // reservation AND publication.
     const metaResult = await client.from('backup_generation').upsert(
       boundedBackupRecord({
         user_id: currentUserId,
@@ -642,6 +894,9 @@ export class SupabaseSyncAdapter implements SyncAdapter {
         manifest: capture.manifest,
         manifest_checksum: capture.manifestChecksum,
         captured_at: capture.capturedAt,
+        base_head_snapshot_id: capture.baseHeadSnapshotId,
+        base_head_sequence: capture.baseHeadSequence,
+        publication_provenance_version: PUBLICATION_PROVENANCE_VERSION,
       }),
       { onConflict: 'user_id,snapshot_id' },
     );
@@ -672,40 +927,54 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       }
     }
 
-    // 3. Atomic head advance with compare-and-swap on the expected sequence.
-    const head = await client
-      .from('backup_generation_head')
-      .select('sequence')
-      .eq('user_id', currentUserId)
-      .limit(1);
-    if (head.error) {
-      throw new Error(`Supabase read failed for backup_generation_head: ${head.error.message}`);
-    }
-    const previousSequence = Number(
-      (head.data as { sequence?: number }[] | null)?.[0]?.sequence ?? 0,
-    );
+    // 3. Atomic head advance. The server REQUIRES `p_provenance_version` and
+    // verifies the generation's stored base head against the live head under its
+    // advisory lock. Old clients that call the previous RPC signature are
+    // rejected rather than allowed to publish stale captures.
+    const previousSequence = head?.sequence ?? 0;
     const publish = await client.rpc('publish_backup_generation', {
       p_snapshot_id: capture.snapshotId,
       p_expected_previous_sequence: previousSequence,
       p_expected_chunk_count: chunks.length,
       p_manifest_checksum: capture.manifestChecksum,
+      p_provenance_version: PUBLICATION_PROVENANCE_VERSION,
     });
+    let acknowledgedHead: OwnerHead | null = null;
     if (publish.error) {
-      // A lost acknowledgement followed by another device's publication is
-      // still success for this capture. The immutable publication journal is
-      // authoritative; metadata presence alone proves only a staged upload.
-      const journal = await client
-        .from('backup_generation_publication')
-        .select('sequence')
-        .eq('user_id', currentUserId)
-        .eq('snapshot_id', capture.snapshotId)
-        .limit(1);
-      if (journal.error)
-        throw new Error(`Cannot reconcile generation publication: ${journal.error.message}`);
-      if (Number(journal.data?.[0]?.sequence) !== capture.sequence) {
-        // Keep this exact identity and its bytes pending. Reassigning an old
-        // capture a newer sequence would overwrite another device's recovery
-        // point with stale content, bypassing the server's conflict contract.
+      const latestHead = await readOwnerHead(client, currentUserId);
+      if (latestHead && latestHead.snapshotId === capture.snapshotId) {
+        // The RPC committed and the response was lost. The visible head is the
+        // authoritative acknowledgement.
+        acknowledgedHead = latestHead;
+      } else if (await isGenerationPublished(client, currentUserId, capture.snapshotId)) {
+        // The snapshot published but a newer head is visible. This device's
+        // local data derives from the older snapshot, so mutable writes would be
+        // stale. Preserve the capture and require owner review.
+        if (latestHead) {
+          await this.failGenerationConflict(
+            db,
+            currentUserId,
+            latestHead,
+            capture,
+            isLegacyCutover ? 'legacy_cutover' : 'generation',
+          );
+        }
+        throw new Error(
+          `Backup publication paused for ${capture.snapshotId}: the publication journal exists but no current head could be resolved.`,
+        );
+      } else if (
+        latestHead &&
+        (latestHead.snapshotId !== capture.baseHeadSnapshotId ||
+          latestHead.sequence !== capture.baseHeadSequence)
+      ) {
+        await this.failGenerationConflict(
+          db,
+          currentUserId,
+          latestHead,
+          capture,
+          isLegacyCutover ? 'legacy_cutover' : 'generation',
+        );
+      } else {
         throw new Error(
           `Backup publication paused for ${capture.snapshotId}: ${publish.error.message}. ` +
             'The captured recovery data remains pending; a newer backup from another device must be reviewed before replacing it.',
@@ -713,11 +982,19 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       }
     }
 
-    // 4. Acknowledged: retire the durable capture and advance the local floor.
+    const publishedHead = acknowledgedHead ?? {
+      snapshotId: capture.snapshotId,
+      sequence: capture.sequence,
+    };
+    await setAppMetaJson(db, appMetaKeys.backupObservedGenerationHead, publishedHead);
+    await setVerifiedGenerationBaseHead(db, {
+      ownerUserId: currentUserId,
+      snapshotId: publishedHead.snapshotId,
+      sequence: publishedHead.sequence,
+    });
+    await recordPublishedGeneration(publishedHead.snapshotId, publishedHead.sequence);
     if (isLegacyCutover) {
       await setAppMetaText(db, appMetaKeys.backupLegacyGenerationCapture, 'null');
-    } else {
-      await recordPublishedGeneration(capture.snapshotId, capture.sequence);
     }
   }
 

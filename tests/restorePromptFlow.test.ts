@@ -51,6 +51,7 @@ function buildBlockedPreview(message: string): RestorePreview {
     recoverableAreas: [],
     pendingChangeCount: 0,
     backfillInProgress: false,
+    backupConflict: null,
   };
 }
 

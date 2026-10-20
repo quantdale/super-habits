@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures';
 import { goToTab, openNewTodoModal, submitTodoModal } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
-import { queryRows } from './helpers/dbHarness';
+import { queryRows, returnToApp, runSql } from './helpers/dbHarness';
 import { clickSwipeDeleteAction, swipeLeftToRevealRowActions } from './helpers/gestures';
 
 test.describe('Todos', () => {
@@ -144,6 +144,73 @@ test.describe('Todos', () => {
       { title: 'Linked target task', completed: 1 },
       { title: 'Linked source task', completed: 1 },
     ]);
+  });
+
+  test('todo project and goal associations survive create, reload, cancelled edit, and edit', async ({
+    page,
+  }) => {
+    // Seed the two parents directly so the test exercises the Todo create/edit
+    // orchestration rather than the Project/Goal authoring flows.
+    await runSql(
+      page,
+      `INSERT INTO projects (id, name, description, color, status, target_date, completed_at, sort_order, created_at, updated_at, deleted_at)
+       VALUES ('proj_e2e_assoc', 'Alpha project', NULL, '#4F46E5', 'active', NULL, NULL, 1, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', NULL);
+       INSERT INTO goals (id, project_id, title, description, horizon, target_date, status, completed_at, progress_percent, created_at, updated_at, deleted_at)
+       VALUES ('goal_e2e_assoc', 'proj_e2e_assoc', 'Ship release', NULL, 'quarter', NULL, 'active', NULL, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', NULL);`,
+    );
+    await returnToApp(page);
+    await goToTab(page, 'todos');
+
+    await openNewTodoModal(page);
+    await page.getByPlaceholder(/Add a task/i).fill('Association task');
+    const projectChip = page.getByRole('button', { name: 'Alpha project', exact: true });
+    const goalChip = page.getByRole('button', { name: 'Ship release', exact: true });
+    await expect(projectChip).toBeVisible();
+    await expect(goalChip).toBeVisible();
+    await projectChip.click();
+    await goalChip.click();
+    await expect(projectChip).toHaveAttribute('aria-pressed', 'true');
+    await expect(goalChip).toHaveAttribute('aria-pressed', 'true');
+    await submitTodoModal(page);
+    await expect(page.getByText('Association task').filter({ visible: true }).last()).toBeVisible();
+
+    const created = await queryRows(
+      page,
+      `SELECT project_id, goal_id FROM todos WHERE title = 'Association task' AND deleted_at IS NULL`,
+    );
+    expect(created).toEqual([{ project_id: 'proj_e2e_assoc', goal_id: 'goal_e2e_assoc' }]);
+
+    await returnToApp(page);
+    await goToTab(page, 'todos');
+    await expect(page.getByText('Association task').filter({ visible: true }).last()).toBeVisible();
+
+    // A cancelled edit must not silently clear or rewrite the associations.
+    await page.getByLabel('More actions for Association task').first().click({ force: true });
+    await page.getByRole('button', { name: 'Edit', exact: true }).click({ force: true });
+    await expect(projectChip).toHaveAttribute('aria-pressed', 'true');
+    await expect(goalChip).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'None', exact: true }).last().click();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+
+    const afterCancel = await queryRows(
+      page,
+      `SELECT project_id, goal_id FROM todos WHERE title = 'Association task' AND deleted_at IS NULL`,
+    );
+    expect(afterCancel).toEqual([{ project_id: 'proj_e2e_assoc', goal_id: 'goal_e2e_assoc' }]);
+
+    await returnToApp(page);
+    await goToTab(page, 'todos');
+    await page.getByLabel('More actions for Association task').first().click({ force: true });
+    await page.getByRole('button', { name: 'Edit', exact: true }).click({ force: true });
+    await page.getByRole('button', { name: 'None', exact: true }).last().click();
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click({ force: true });
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    const afterSave = await queryRows(
+      page,
+      `SELECT project_id, goal_id FROM todos WHERE title = 'Association task' AND deleted_at IS NULL`,
+    );
+    expect(afterSave).toEqual([{ project_id: 'proj_e2e_assoc', goal_id: null }]);
   });
 
   test('recurring todos show linked-actions disabled message', async ({ page }) => {

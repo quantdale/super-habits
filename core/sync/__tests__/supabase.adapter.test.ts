@@ -64,15 +64,26 @@ async function setupAdapter(options: AdapterSetupOptions) {
 
   const db = {
     getAllAsync: vi.fn(),
-    getFirstAsync: vi
-      .fn()
-      .mockImplementation(async (_sql: string, params?: string[]) =>
-        params?.[0] === 'backup.legacy_generation_capture'
+    runAsync: vi.fn(async () => ({ lastInsertRowId: 1, changes: 1 })),
+    getFirstAsync: vi.fn().mockImplementation(async (_sql: string, params?: string[]) => {
+      if (params?.[0] === 'backup.verified_generation_base_head') {
+        const owner = options.localOwnerUserId ?? 'user_a';
+        return owner === null
           ? null
-          : options.localOwnerUserId === null
-            ? null
-            : { value: options.localOwnerUserId ?? 'user_a' },
-      ),
+          : {
+              value: JSON.stringify({
+                ownerUserId: owner,
+                snapshotId: 'existing',
+                sequence: 1,
+              }),
+            };
+      }
+      if (params?.[0] === 'backup.generation_sequence') return { value: '1' };
+      if (params?.[0]?.startsWith('backup.')) return null;
+      return options.localOwnerUserId === null
+        ? null
+        : { value: options.localOwnerUserId ?? 'user_a' };
+    }),
   };
   const getDatabase = vi.fn().mockResolvedValue(db);
   // The adapter verifies each push by reading the ids it just wrote back,
@@ -123,7 +134,8 @@ async function setupAdapter(options: AdapterSetupOptions) {
     ? {
         rpc: vi.fn(async () => ({
           data: {
-            protocol_version: 1,
+            protocol_version: 2,
+            publication_provenance_version: 1,
             content_verification_version: 1,
             sequence_reservation_version: 1,
             backup_schema_version: 2,

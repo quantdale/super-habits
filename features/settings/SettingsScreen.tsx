@@ -8,6 +8,7 @@ import { getRestorePreview, restoreFromRemoteBackup } from '@/core/sync/restore.
 import type { RestorePreview } from '@/core/sync/restore.types';
 import { syncEngine } from '@/core/sync/sync.engine';
 import { describeRestoredCounts } from '@/core/backup/backupRestore';
+import { resolveBackupGenerationConflictKeepLocal } from '@/core/backup/backupConflictResolution';
 import { Screen } from '@/core/ui/Screen';
 import { spacing, radius, size } from '@/core/theme/designTokens';
 import { DEFAULT_GOAL, getCalorieGoal, setCalorieGoal } from '@/features/calories/calories.data';
@@ -73,6 +74,8 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
   const [restoreLoading, setRestoreLoading] = useState(true);
   const [restoreRunning, setRestoreRunning] = useState(false);
   const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [resolvingBackupConflict, setResolvingBackupConflict] = useState(false);
+  const [backupConflictError, setBackupConflictError] = useState<string | null>(null);
   // A restore that says only "done" cannot be distinguished from one that
   // restored three entities, so the per-entity counts ride the success message
   // (harden-silent-failure-certification 1.6).
@@ -126,6 +129,23 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
       setRestoreLoading(false);
     }
   }, []);
+
+  const handleResolveBackupConflict = useCallback(async () => {
+    setResolvingBackupConflict(true);
+    setBackupConflictError(null);
+    try {
+      await resolveBackupGenerationConflictKeepLocal();
+      await loadRestorePreview();
+      setOutboxSummary(describeOutboxStatus(syncEngine.getPendingCount(), syncEngine.getStatus()));
+    } catch (err) {
+      console.error('[SettingsScreen] backup conflict resolution failed', err);
+      setBackupConflictError(
+        err instanceof Error ? err.message : 'Unable to resolve the backup conflict right now.',
+      );
+    } finally {
+      setResolvingBackupConflict(false);
+    }
+  }, [loadRestorePreview]);
 
   const loadCommandRolloutPreference = useCallback(async () => {
     if (!commandInternalRolloutAvailable) {
@@ -383,6 +403,9 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
         restoreError={restoreError}
         restoredCounts={restoredCounts}
         onRestore={handleRestore}
+        onResolveBackupConflict={handleResolveBackupConflict}
+        resolvingBackupConflict={resolvingBackupConflict}
+        backupConflictError={backupConflictError}
         accountState={accountState}
         onProtectAccount={protectAccount}
         onVerifyAccountProtection={verifyAccountProtection}

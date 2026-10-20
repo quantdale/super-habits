@@ -1,4 +1,5 @@
 import type { CalorieEntry, Habit, Todo } from '@/core/db/types';
+import type { BackupGenerationConflict } from '@/core/backup/generations/conflict';
 
 export const RESTORE_SCOPED_ENTITIES = ['todos', 'habits', 'calorie_entries'] as const;
 
@@ -75,6 +76,8 @@ export type RestorePreview = {
   recoverableAreas: string[];
   pendingChangeCount: number;
   backfillInProgress: boolean;
+  /** Unresolved stale-capture conflict; publication stays paused until reviewed. */
+  backupConflict: BackupGenerationConflict | null;
 };
 
 export type RestoreExecutionResult =

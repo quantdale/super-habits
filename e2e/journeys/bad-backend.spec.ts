@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { defineJourney } from '../helpers/journey';
 import { resetAll } from '../helpers/reset';
 import { GenerationSupabaseMock } from '../helpers/generationSupabaseMock';
-import { ensureAppContext, queryRows } from '../helpers/dbHarness';
+import { ensureAppContext, queryRows, runSql } from '../helpers/dbHarness';
 import { expectOutbox, switchSection } from '../helpers/oracles';
 import { setOffline, SYNCABLE_ENTITIES } from '../helpers/failure';
 import { DUMMY_SUPABASE_USER_ID, fulfillDummySupabaseAuth } from '../helpers/supabaseAuth';
@@ -307,6 +307,20 @@ defineJourney({
         generationRemote.reset();
         generationRemote.seedEmptyPublishedPoint(DUMMY_SUPABASE_USER_ID);
         await resetAll(page);
+        // Boot once so the real schema exists before seeding the provenance row.
+        await ensureAppContext(page);
+        // This scenario models an ESTABLISHED device: the remote empty point is
+        // its verified baseline. Seed that local provenance explicitly; a device
+        // with only an observed remote head is correctly treated as unverified
+        // (`AUD-F1`) and would conflict before the failure injectors run.
+        await runSql(
+          page,
+          `INSERT OR REPLACE INTO app_meta (key, value) VALUES
+             ('backup.verified_generation_base_head',
+              '{"ownerUserId":"${DUMMY_SUPABASE_USER_ID}","snapshotId":"e2e_empty_generation","sequence":1}'),
+             ('backup.observed_generation_head',
+              '{"snapshotId":"e2e_empty_generation","sequence":1}')`,
+        );
         await injectRest503(page);
 
         await addTodoViaUi(page, 'J4 todo');

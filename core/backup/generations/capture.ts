@@ -27,6 +27,7 @@ import type * as SQLite from 'expo-sqlite';
 import {
   appMetaKeys,
   getAppMetaJson,
+  getAppMetaJsonOrDefault,
   getAppMetaText,
   setAppMetaJson,
   setAppMetaText,
@@ -38,6 +39,10 @@ import { createId } from '@/lib/id';
 import { nowIso } from '@/lib/time';
 import { sha256Hex } from '@/lib/checksum';
 import { readRecoverableSettings } from '@/core/backup/backupSettings';
+import {
+  BackupGenerationConflictError,
+  readActiveBackupGenerationConflict,
+} from '@/core/backup/generations/conflict';
 import { canonicalGenerationRows, generationRowPayloads } from './generationFormat';
 import { GENERATION_PAYLOAD_BYTES, utf8Bytes } from './requestBudget';
 import {
@@ -95,7 +100,28 @@ export interface GenerationCapture {
    * what makes that decidable after a process loss.
    */
   capturedRevisions: Record<string, number>;
+  /**
+   * The VERIFIED local baseline this snapshot was captured from. This is not
+   * merely the head seen during a push: it is a head the device has successfully
+   * published, restored from, or explicitly chosen to replace. If the remote
+   * head later differs, the capture cannot be proven newer and needs review.
+   */
+  baseHeadSnapshotId: string | null;
+  baseHeadSequence: number | null;
+  /**
+   * How the base was established. Captures written before provenance tracking
+   * normalize to `unverified` and must be reviewed before publication over an
+   * existing remote head (`AUD-F1`).
+   */
+  baseHeadProof: 'verified' | 'unverified';
 }
+
+/** A remote head this device has proven its local dataset derives from. */
+export type VerifiedGenerationBaseHead = {
+  ownerUserId: string;
+  snapshotId: string;
+  sequence: number;
+};
 
 /** The captured payload, returned by `captureGeneration`. */
 export interface CapturedGeneration {
@@ -130,6 +156,14 @@ function normalizeCapture(value: unknown): GenerationCapture | null {
       candidate.capturedRevisions && typeof candidate.capturedRevisions === 'object'
         ? (candidate.capturedRevisions as Record<string, number>)
         : {},
+    baseHeadSnapshotId:
+      typeof candidate.baseHeadSnapshotId === 'string' ? candidate.baseHeadSnapshotId : null,
+    baseHeadSequence:
+      typeof candidate.baseHeadSequence === 'number' &&
+      Number.isSafeInteger(candidate.baseHeadSequence)
+        ? candidate.baseHeadSequence
+        : null,
+    baseHeadProof: candidate.baseHeadProof === 'verified' ? 'verified' : 'unverified',
   };
 }
 
@@ -150,6 +184,48 @@ export async function readGenerationCapture(
 export async function clearGenerationCapture(db?: SQLite.SQLiteDatabase): Promise<void> {
   const database = db ?? (await getDatabase());
   await setAppMetaText(database, appMetaKeys.backupGenerationCapture, 'null');
+}
+
+function normalizeVerifiedBaseHead(value: unknown): VerifiedGenerationBaseHead | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Record<string, unknown>;
+  if (typeof candidate.ownerUserId !== 'string' || candidate.ownerUserId === '') return null;
+  if (typeof candidate.snapshotId !== 'string' || candidate.snapshotId === '') return null;
+  if (typeof candidate.sequence !== 'number' || !Number.isSafeInteger(candidate.sequence))
+    return null;
+  return {
+    ownerUserId: candidate.ownerUserId,
+    snapshotId: candidate.snapshotId,
+    sequence: candidate.sequence,
+  };
+}
+
+/**
+ * The remote head this local dataset is proven to derive from.
+ *
+ * A missing value is not the same as an empty remote: a device with local data
+ * and an existing remote head must be reviewed before it can publish over that
+ * head (`AUD-F1`).
+ */
+export async function readVerifiedGenerationBaseHead(
+  db: SQLite.SQLiteDatabase,
+  ownerUserId: string,
+): Promise<VerifiedGenerationBaseHead | null> {
+  const stored = await getAppMetaJsonOrDefault<VerifiedGenerationBaseHead | null>(
+    db,
+    appMetaKeys.backupVerifiedGenerationBaseHead,
+    null,
+    normalizeVerifiedBaseHead,
+  );
+  return stored && stored.ownerUserId === ownerUserId ? stored : null;
+}
+
+/** Record the head this device's local dataset is proven to derive from. */
+export async function setVerifiedGenerationBaseHead(
+  db: SQLite.SQLiteDatabase,
+  head: VerifiedGenerationBaseHead | null,
+): Promise<void> {
+  await setAppMetaJson(db, appMetaKeys.backupVerifiedGenerationBaseHead, head);
 }
 
 /**
@@ -233,6 +309,11 @@ async function captureInto(
   settingsPayload: unknown,
 ): Promise<CapturedGeneration> {
   {
+    // `AUD-F6`: never replace a durable capture while an owner review is active.
+    // The normal flush path rejects before this point; this is the
+    // transaction-level guard that keeps maintenance from overwriting the evidence.
+    const activeConflict = await readActiveBackupGenerationConflict(transactionDb);
+    if (activeConflict) throw new BackupGenerationConflictError(activeConflict);
     const sequence = await nextGenerationSequence(transactionDb);
     const snapshotId = createId('gsnap');
     const capturedAt = nowIso();
@@ -317,6 +398,7 @@ async function captureInto(
     for (const row of outboxRows) {
       capturedRevisions[`${row.entity}:${row.id}`] = Number(row.revision);
     }
+    const verifiedBase = await readVerifiedGenerationBaseHead(transactionDb, ownerUserId);
 
     const capture: GenerationCapture = {
       snapshotId,
@@ -329,6 +411,9 @@ async function captureInto(
       stagedEntities: [],
       ownerUserId,
       capturedRevisions,
+      baseHeadSnapshotId: verifiedBase?.snapshotId ?? null,
+      baseHeadSequence: verifiedBase?.sequence ?? null,
+      baseHeadProof: 'verified',
     };
     // Durable BEFORE any chunk leaves the device: a kill during upload resumes
     // this exact generation instead of minting a second one. The CHUNKS are
@@ -433,6 +518,7 @@ export function captureVerifiedRows(input: {
   ownerUserId: string;
   rowsByEntity: Partial<Record<(typeof BACKUP_ENTITIES)[number], Record<string, unknown>[]>>;
   settingsPayload: unknown;
+  baseHead?: { snapshotId: string; sequence: number } | null;
 }): CapturedGeneration {
   const snapshotId = createId('gsnap');
   const capturedAt = nowIso();
@@ -502,6 +588,9 @@ export function captureVerifiedRows(input: {
       stagedEntities: [],
       ownerUserId: input.ownerUserId,
       capturedRevisions: {},
+      baseHeadSnapshotId: input.baseHead?.snapshotId ?? null,
+      baseHeadSequence: input.baseHead?.sequence ?? null,
+      baseHeadProof: 'verified',
     },
     chunks,
   };

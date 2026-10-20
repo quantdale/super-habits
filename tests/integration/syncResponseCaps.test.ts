@@ -48,7 +48,8 @@ vi.mock('@/lib/supabase', () => ({
   supabase: {
     rpc: vi.fn(async () => ({
       data: {
-        protocol_version: 1,
+        protocol_version: 2,
+        publication_provenance_version: 1,
         content_verification_version: 1,
         sequence_reservation_version: 1,
         backup_schema_version: 2,
@@ -143,6 +144,8 @@ async function seedTodos(count: number): Promise<string[]> {
   currentSeed = { db: db };
   const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
   await setLocalDatasetOwner(db as never, 'user_a');
+  const { seedVerifiedGenerationBaseHead } = await import('./helpers/generationBaseline');
+  await seedVerifiedGenerationBaseHead(db, 'user_a');
   const ids: string[] = [];
   for (let index = 0; index < count; index += 1) {
     ids.push(`todo_sh08_${String(index).padStart(5, '0')}`);

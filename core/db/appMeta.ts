@@ -96,6 +96,33 @@ export const appMetaKeys = {
    * retry can never regress a newer head.
    */
   backupGenerationSequence: defineTextKey('backup.generation_sequence', 'sync'),
+  /**
+   * The remote owner head this device last observed. A local capture records this
+   * value, so a later upload can tell whether the remote has advanced since the
+   * snapshot was taken (`AUD-SH02-A` stale-cutover reconciliation).
+   */
+  backupObservedGenerationHead: defineJsonKey('backup.observed_generation_head', 'sync'),
+  /**
+   * The remote head this device can prove its LOCAL data is based on.
+   *
+   * A remote head merely observed during a push is not provenance: another
+   * device may have published it while this device was offline. This key is
+   * written only after a successful publication, a verified restore, or an
+   * explicit keep-local decision. Captures use it as their base, never the
+   * observed value above (`AUD-F1`).
+   */
+  backupVerifiedGenerationBaseHead: defineJsonKey('backup.verified_generation_base_head', 'sync'),
+  /**
+   * A durable, explicit reconciliation state for a capture that conflicts with a
+   * newer remote head. The capture is never discarded or republished until the
+   * owner reviews it.
+   */
+  backupGenerationConflict: defineJsonKey('backup.generation_conflict', 'sync'),
+  /** Durable in-progress marker for an explicit keep-local resolution. */
+  backupGenerationResolutionInProgress: defineJsonKey(
+    'backup.generation_resolution_in_progress',
+    'sync',
+  ),
   backupPendingSettings: defineJsonKey('backup.pending_settings', 'sync'),
   backupPendingThemeApply: defineJsonKey('backup.pending_theme_apply', 'sync'),
   backupLastCompleteGeneration: defineTextKey('backup.last_complete_generation', 'sync'),

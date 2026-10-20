@@ -1003,4 +1003,62 @@ describe('core/sync/restore.coordinator', () => {
     expect(loaded.db.getMeta()).not.toHaveProperty('last_restore_at');
     expect(loaded.db.getMeta()).not.toHaveProperty('last_restore_signature');
   });
+
+  it('surfaces an active backup generation conflict in the preview', async () => {
+    const conflict = {
+      ownerUserId: 'user_a',
+      localSnapshotId: 'gsnap_local',
+      localCapturedAt: '2026-04-20T12:00:00.000Z',
+      localKind: 'generation',
+      remoteSnapshotId: 'gsnap_remote',
+      remoteSequence: 2,
+      detectedAt: '2026-04-21T12:00:00.000Z',
+      resolution: null,
+      resolvedAt: null,
+    };
+    const loaded = await loadCoordinator({
+      localCounts: { todos: 0, habits: 0, calorie_entries: 0, workout_routines: 0 },
+      remoteRowsByEntity: {
+        todos: [
+          {
+            id: 'todo_1',
+            updated_at: '2026-04-20T12:00:00.000Z',
+            created_at: '2026-04-19T12:00:00.000Z',
+          },
+        ],
+      },
+      initialMeta: { 'backup.generation_conflict': JSON.stringify(conflict) },
+    });
+
+    const preview = await loaded.getRestorePreview();
+
+    expect(preview.backupConflict).toMatchObject({
+      localSnapshotId: 'gsnap_local',
+      remoteSnapshotId: 'gsnap_remote',
+      remoteSequence: 2,
+    });
+  });
+
+  it('loads the preview with a null conflict state when the durable conflict record is malformed', async () => {
+    // W-3: one malformed app_meta record must not blank the whole backup panel;
+    // publication still fails closed on the same state at push time.
+    const loaded = await loadCoordinator({
+      localCounts: { todos: 0, habits: 0, calorie_entries: 0, workout_routines: 0 },
+      remoteRowsByEntity: {
+        todos: [
+          {
+            id: 'todo_1',
+            updated_at: '2026-04-20T12:00:00.000Z',
+            created_at: '2026-04-19T12:00:00.000Z',
+          },
+        ],
+      },
+      initialMeta: { 'backup.generation_conflict': '{not-json' },
+    });
+
+    const preview = await loaded.getRestorePreview();
+
+    expect(preview.backupConflict).toBeNull();
+    expect(preview.freshnessSignature).toBeTruthy();
+  });
 });

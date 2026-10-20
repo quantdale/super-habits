@@ -91,7 +91,12 @@ export function parseGenerationManifest(
   ) {
     return fail('manifest checksum mismatch');
   }
-  const parsed: unknown = JSON.parse(metadata.manifest);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(metadata.manifest);
+  } catch {
+    return fail('manifest is not valid JSON');
+  }
   if (
     !Array.isArray(parsed) ||
     parsed.length !== 1 ||
@@ -101,8 +106,13 @@ export function parseGenerationManifest(
     return fail('manifest must contain exactly one object');
   }
   const manifest = parsed[0] as GenerationManifest;
+  // Content protocol 1 generations are already published history and must stay
+  // restorable. GENERATION_PROTOCOL_VERSION is the current CONTENT format (also
+  // 1 today — capability/provenance versioning is transport-only, see
+  // generationProtocol.ts); a newer unknown content version is still refused.
+  const supportedWriteProtocols = [1, GENERATION_PROTOCOL_VERSION];
   if (
-    manifest.protocolVersion !== GENERATION_PROTOCOL_VERSION ||
+    !supportedWriteProtocols.includes(manifest.protocolVersion) ||
     manifest.backupSchemaVersion !== BACKUP_SCHEMA_VERSION ||
     manifest.scopeVersion !== BACKUP_SCOPE_VERSION ||
     manifest.settingsVersion !== BACKUP_SETTINGS_VERSION
@@ -196,12 +206,21 @@ export function decodeGenerationContents(
       return fail(`missing/duplicate ordinals for ${entity}`);
     if (entity === 'user_backup_settings') {
       if (entries[0].checksum !== expected.checksum) return fail('settings checksum mismatch');
-      settingsPayload = JSON.parse(entries[0].payload) as unknown;
+      try {
+        settingsPayload = JSON.parse(entries[0].payload) as unknown;
+      } catch {
+        return fail('settings payload is not valid JSON');
+      }
       continue;
     }
     const rows: Record<string, unknown>[] = [];
     for (const entry of entries) {
-      const parsed: unknown = JSON.parse(entry.payload);
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(entry.payload);
+      } catch {
+        return fail(`malformed JSON rows for ${entity}`);
+      }
       if (
         !Array.isArray(parsed) ||
         parsed.length < 1 ||

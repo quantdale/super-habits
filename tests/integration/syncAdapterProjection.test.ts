@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { freshDatabase } from './helpers/db';
+import { seedVerifiedGenerationBaseHead } from './helpers/generationBaseline';
 import { BACKUP_ENTITY_COLUMNS } from '@/core/backup/backup.types';
 import { chainableQuery } from './helpers/supabaseQueryDouble';
 
@@ -22,7 +23,8 @@ vi.mock('@/lib/supabase', () => ({
   supabase: {
     rpc: vi.fn(async () => ({
       data: {
-        protocol_version: 1,
+        protocol_version: 2,
+        publication_provenance_version: 1,
         content_verification_version: 1,
         sequence_reservation_version: 1,
         backup_schema_version: 2,
@@ -94,6 +96,7 @@ describe('SupabaseSyncAdapter push projection', () => {
     const db = await freshDatabase();
     const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
     await setLocalDatasetOwner(db as never, 'user_a');
+    await seedVerifiedGenerationBaseHead(db, 'user_a');
 
     const todos = await import('@/features/todos/todos.data');
     const todoId = await todos.addTodo({ title: 'Projected row', priority: 'normal' });
@@ -146,6 +149,7 @@ describe('SupabaseSyncAdapter push projection', () => {
     const db = await freshDatabase();
     const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
     await setLocalDatasetOwner(db as never, 'user_a');
+    await seedVerifiedGenerationBaseHead(db, 'user_a');
 
     const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
     const adapter = new SupabaseSyncAdapter();
@@ -189,6 +193,7 @@ describe('SupabaseSyncAdapter push projection', () => {
     const db = await freshDatabase();
     const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
     await setLocalDatasetOwner(db as never, 'user_a');
+    await seedVerifiedGenerationBaseHead(db, 'user_a');
 
     const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
     const adapter = new SupabaseSyncAdapter();

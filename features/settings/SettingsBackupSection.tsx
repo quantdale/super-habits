@@ -178,6 +178,9 @@ type SettingsBackupSectionProps = {
   /** Per-entity counts from the last successful restore, or null. */
   restoredCounts: { entity: string; count: number }[] | null;
   onRestore: () => void;
+  onResolveBackupConflict: () => void;
+  resolvingBackupConflict: boolean;
+  backupConflictError: string | null;
   accountState: AccountState;
   onProtectAccount: (email: string) => Promise<AccountActionResult>;
   onVerifyAccountProtection: (token: string) => Promise<AccountActionResult>;
@@ -195,6 +198,9 @@ export function SettingsBackupSection({
   restoreError,
   restoredCounts,
   onRestore,
+  onResolveBackupConflict,
+  resolvingBackupConflict,
+  backupConflictError,
   accountState,
   onProtectAccount,
   onVerifyAccountProtection,
@@ -316,6 +322,41 @@ export function SettingsBackupSection({
             }
             accentColor={BACKUP_ACCENT}
           />
+          {restorePreview?.backupConflict ? (
+            <View
+              className="mt-3 rounded-2xl border px-4 py-3"
+              style={{
+                borderColor: tokens.warningBorder,
+                backgroundColor: tokens.warningBackground,
+              }}
+            >
+              <Text className="text-sm font-semibold" style={{ color: tokens.warningText }}>
+                Backup conflict needs review
+              </Text>
+              <Text className="mt-2 text-sm leading-6" style={{ color: tokens.warningText }}>
+                This device has a pending recovery point{' '}
+                {restorePreview.backupConflict.localSnapshotId} that predates the newer remote
+                recovery point {restorePreview.backupConflict.remoteSnapshotId} (sequence{' '}
+                {restorePreview.backupConflict.remoteSequence}). Publication is paused so neither
+                recovery point is overwritten silently.
+              </Text>
+              <Text className="mt-2 text-sm leading-6" style={{ color: tokens.warningText }}>
+                Keeping this device&apos;s data replaces the remote recovery point with a fresh
+                snapshot of this device. The previous remote generation stays retained. To use the
+                remote backup instead, export this device&apos;s data and restore on an empty
+                device; restore does not merge into non-empty local data.
+              </Text>
+              <Button
+                label={
+                  resolvingBackupConflict ? 'Keeping local data...' : "Keep this device's data"
+                }
+                onPress={onResolveBackupConflict}
+                disabled={resolvingBackupConflict || restoreLoading || restoreRunning}
+                color={tokens.warningText}
+              />
+              <ValidationError message={backupConflictError} />
+            </View>
+          ) : null}
           <SettingsRow
             label="Current backup model"
             value="Backups push synced rows to the remote account."
@@ -514,6 +555,9 @@ function SettingsAccountCard({
   | 'restoreError'
   | 'restoredCounts'
   | 'onRestore'
+  | 'onResolveBackupConflict'
+  | 'resolvingBackupConflict'
+  | 'backupConflictError'
 >) {
   const { tokens } = useAppTheme();
   const [protectEmail, setProtectEmail] = useState('');

@@ -22,12 +22,28 @@ function remote() {
   const requests: { entity: string; bytes: number }[] = [];
   let failPublish = false;
   let capabilities = true;
+  let capabilityProtocol = 2;
   let failManifestRead = false;
   let raceNextPublish = false;
   let loseAcknowledgement = false;
+  let loseAcknowledgementThenNewerHead = false;
   const client = {
     rpc: vi.fn(async (name: string, args: Record<string, unknown> = {}) => {
       if (!capabilities) return { data: null, error: { message: 'missing capability RPC' } };
+      if (name === 'backup_generation_capabilities' && capabilityProtocol !== 2) {
+        return {
+          data: {
+            protocol_version: capabilityProtocol,
+            publication_provenance_version: 1,
+            content_verification_version: 1,
+            sequence_reservation_version: 1,
+            backup_schema_version: 2,
+            scope_version: 7,
+            settings_version: 5,
+          },
+          error: null,
+        };
+      }
       if (name === 'publish_backup_generation' && failPublish)
         return { data: null, error: { message: 'publication interrupted' } };
       if (name === 'publish_backup_generation' && raceNextPublish) {
@@ -38,12 +54,17 @@ function remote() {
         generations.heads.set('user_a', { snapshot_id: 'concurrent', sequence });
         return { data: null, error: { message: 'stale sequence' } };
       }
-      if (name === 'publish_backup_generation' && loseAcknowledgement) {
-        loseAcknowledgement = false;
+      if (name === 'publish_backup_generation' && loseAcknowledgementThenNewerHead) {
+        loseAcknowledgementThenNewerHead = false;
         generations.rpc(name, args);
         const sequence = generations.heads.get('user_a')!.sequence + 1;
         generations.generations.set('user_a:later', { sequence });
         generations.heads.set('user_a', { snapshot_id: 'later', sequence });
+        return { data: null, error: { message: 'response lost after commit' } };
+      }
+      if (name === 'publish_backup_generation' && loseAcknowledgement) {
+        loseAcknowledgement = false;
+        generations.rpc(name, args);
         return { data: null, error: { message: 'response lost after commit' } };
       }
       return generations.rpc(name, args);
@@ -123,6 +144,9 @@ function remote() {
     setCapabilities: (value: boolean) => {
       capabilities = value;
     },
+    setCapabilityProtocol: (value: number) => {
+      capabilityProtocol = value;
+    },
     setFailManifestRead: (value: boolean) => {
       failManifestRead = value;
     },
@@ -131,6 +155,9 @@ function remote() {
     },
     loseAcknowledgement: () => {
       loseAcknowledgement = true;
+    },
+    loseAcknowledgementThenNewerHead: () => {
+      loseAcknowledgementThenNewerHead = true;
     },
   };
 }
@@ -358,6 +385,117 @@ describe('review R3: actual capture → publication → restore contracts', () =
     await db.closeAsync();
   });
 
+  it('does not overwrite a newer published head with an unreserved stale legacy capture', async () => {
+    const target = remote();
+    const deviceA = await device(target.client);
+    await seedLegacy(deviceA, target);
+    const { readRecoverableSettings } = await import('@/core/backup/backupSettings');
+    const { captureVerifiedRows } = await import('@/core/backup/generations/capture');
+    const { appMetaKeys, setAppMetaJson, getAppMetaJson } = await import('@/core/db/appMeta');
+    const rowsByEntity: Record<string, Record<string, unknown>[]> = {};
+    for (const entity of BACKUP_ENTITIES) rowsByEntity[entity] = target.tables.get(entity) ?? [];
+    const stale = captureVerifiedRows({
+      ownerUserId: 'user_a',
+      rowsByEntity,
+      settingsPayload: await readRecoverableSettings(deviceA as never),
+    });
+    await setAppMetaJson(deviceA as never, appMetaKeys.backupLegacyGenerationCapture, stale);
+
+    // Another device published a newer immutable generation while A was
+    // interrupted. Keep A as the active local database so its retry is what the
+    // real adapter path exercises (a second freshDatabase would replace the
+    // module-level singleton and silently drop A's pending capture).
+    const newerHead = { snapshot_id: 'snap_from_b', sequence: 2 };
+    target.generations.generations.set('user_a:snap_from_b', {
+      user_id: 'user_a',
+      snapshot_id: 'snap_from_b',
+      sequence: 2,
+      manifest_checksum: 'checksum_from_b',
+    });
+    target.generations.publications.set('user_a:snap_from_b', {
+      user_id: 'user_a',
+      snapshot_id: 'snap_from_b',
+      sequence: 2,
+    });
+    target.generations.heads.set('user_a', newerHead);
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    expect(newerHead.snapshot_id).not.toBe(stale.capture.snapshotId);
+
+    await expect(new SupabaseSyncAdapter().push([todoRecord])).rejects.toThrow(/conflict|review/i);
+    expect(target.generations.heads.get('user_a')).toEqual(newerHead);
+    const retained = await getAppMetaJson<{ capture: { snapshotId: string } }>(
+      deviceA as never,
+      appMetaKeys.backupLegacyGenerationCapture,
+    );
+    expect(retained?.capture.snapshotId).toBe(stale.capture.snapshotId);
+    await deviceA.closeAsync();
+  });
+
+  it('does not reassign a pending capture after another device publishes a newer head', async () => {
+    const target = remote();
+    const db = await device(target.client);
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    await new SupabaseSyncAdapter().push([todoRecord]);
+    const { captureGeneration, readCapturedChunks } =
+      await import('@/core/backup/generations/capture');
+    const { readRecoverableSettings } = await import('@/core/backup/backupSettings');
+    await captureGeneration({ settingsPayload: await readRecoverableSettings(db as never) });
+    const pending = await readCapturedChunks(db as never);
+    expect(pending).not.toBeNull();
+
+    const newerHead = { snapshot_id: 'snap_from_b_pending', sequence: 2 };
+    target.generations.generations.set('user_a:snap_from_b_pending', {
+      user_id: 'user_a',
+      snapshot_id: 'snap_from_b_pending',
+      sequence: 2,
+      manifest_checksum: 'checksum_from_b_pending',
+    });
+    target.generations.publications.set('user_a:snap_from_b_pending', {
+      user_id: 'user_a',
+      snapshot_id: 'snap_from_b_pending',
+      sequence: 2,
+    });
+    target.generations.heads.set('user_a', newerHead);
+
+    const adapter = new SupabaseSyncAdapter();
+    const writesBefore = target.writes.length;
+    await expect(adapter.push([todoRecord])).rejects.toThrow(/conflict|review/i);
+    expect(target.writes.slice(writesBefore)).toEqual([]);
+    expect(target.generations.heads.get('user_a')).toEqual(newerHead);
+    expect((await readCapturedChunks(db as never))?.capture.snapshotId).toBe(
+      pending!.capture.snapshotId,
+    );
+    await db.closeAsync();
+  });
+
+  it('does not promote the device-global sequence counter into publication authority', async () => {
+    const target = remote();
+    const db = await device(target.client);
+    const { setAppMetaText, appMetaKeys } = await import('@/core/db/appMeta');
+    await setAppMetaText(db as never, appMetaKeys.backupGenerationSequence, '1');
+    const head = { snapshot_id: 'snap_existing_f1', sequence: 1 };
+    target.generations.heads.set('user_a', head);
+    const writesBefore = target.writes.length;
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    await expect(new SupabaseSyncAdapter().push([todoRecord])).rejects.toThrow(/conflict|review/i);
+    expect(target.generations.heads.get('user_a')).toEqual(head);
+    expect(target.writes.slice(writesBefore)).toEqual([]);
+    await db.closeAsync();
+  });
+
+  it('F4: a capability-protocol-1 server response pauses before any mutable write', async () => {
+    const target = remote();
+    const db = await device(target.client);
+    target.setCapabilityProtocol(1);
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    await expect(new SupabaseSyncAdapter().push([todoRecord])).rejects.toThrow(
+      'does not advertise',
+    );
+    expect(target.writes).toEqual([]);
+    expect(target.generations.heads.size).toBe(0);
+    await db.closeAsync();
+  });
+
   it('restored devices reserve above remote history and keep the same reservation on retry', async () => {
     const target = remote();
     const db = await device(target.client);
@@ -444,7 +582,10 @@ describe('review R3: actual capture → publication → restore contracts', () =
         expect(retained?.chunks).toEqual(original.chunks);
       } else {
         expect(await readCapturedChunks(db as never)).toBeNull();
-        expect(head).toEqual({ snapshot_id: 'later', sequence: 3 });
+        expect(head).toEqual({
+          snapshot_id: original.capture.snapshotId,
+          sequence: original.capture.sequence,
+        });
         expect(target.generations.publications.has(`user_a:${original.capture.snapshotId}`)).toBe(
           true,
         );
@@ -455,6 +596,105 @@ describe('review R3: actual capture → publication → restore contracts', () =
       await db.closeAsync();
     },
   );
+
+  it('treats a lost acknowledgement followed by a newer head as a conflict, not success', async () => {
+    const target = remote();
+    const db = await device(target.client);
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    const adapter = new SupabaseSyncAdapter();
+    await adapter.push([todoRecord]);
+    const { captureGeneration, readCapturedChunks } =
+      await import('@/core/backup/generations/capture');
+    const { readRecoverableSettings } = await import('@/core/backup/backupSettings');
+    const original = await captureGeneration({
+      settingsPayload: await readRecoverableSettings(db as never),
+    });
+    target.loseAcknowledgementThenNewerHead();
+    await expect(
+      (
+        adapter as unknown as {
+          publishGenerationContents: (client: unknown, db: unknown, owner: string) => Promise<void>;
+        }
+      ).publishGenerationContents(target.client, db, 'user_a'),
+    ).rejects.toThrow(/conflict|review/i);
+    expect(target.generations.heads.get('user_a')).toMatchObject({ snapshot_id: 'later' });
+    expect((await readCapturedChunks(db as never))?.capture.snapshotId).toBe(
+      original.capture.snapshotId,
+    );
+    await db.closeAsync();
+  });
+
+  it('F1: stale dirty device without a capture conflicts before any remote mutation', async () => {
+    const target = remote();
+    const db = await device(target.client);
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    const adapter = new SupabaseSyncAdapter();
+    await adapter.push([todoRecord]);
+    const firstHead = { ...target.generations.heads.get('user_a')! };
+
+    await db.runAsync("UPDATE todos SET title='Stale local edit'");
+    const writesBefore = target.writes.length;
+    const newerHead = { snapshot_id: 'snap_from_b_f1', sequence: 2 };
+    target.generations.generations.set('user_a:snap_from_b_f1', {
+      user_id: 'user_a',
+      snapshot_id: 'snap_from_b_f1',
+      sequence: 2,
+      manifest_checksum: 'checksum_from_b_f1',
+    });
+    target.generations.publications.set('user_a:snap_from_b_f1', {
+      user_id: 'user_a',
+      snapshot_id: 'snap_from_b_f1',
+      sequence: 2,
+    });
+    target.generations.heads.set('user_a', newerHead);
+
+    await expect(adapter.push([todoRecord])).rejects.toThrow(/conflict|review/i);
+    expect(target.generations.heads.get('user_a')).toEqual(newerHead);
+    expect(target.writes.slice(writesBefore)).toEqual([]);
+    const { readCapturedChunks } = await import('@/core/backup/generations/capture');
+    const retained = await readCapturedChunks(db as never);
+    expect(retained?.capture.baseHeadSnapshotId).toBe(firstHead.snapshot_id);
+    expect(retained?.capture.baseHeadSequence).toBe(firstHead.sequence);
+    await db.closeAsync();
+  });
+
+  it('F2: stale normal pending capture rejects before any mutable write', async () => {
+    const target = remote();
+    const db = await device(target.client);
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    const adapter = new SupabaseSyncAdapter();
+    await adapter.push([todoRecord]);
+    const { captureGeneration, readCapturedChunks } =
+      await import('@/core/backup/generations/capture');
+    const { readRecoverableSettings } = await import('@/core/backup/backupSettings');
+    const pendingBefore = await captureGeneration({
+      settingsPayload: await readRecoverableSettings(db as never),
+    });
+    await db.runAsync("UPDATE todos SET title='Stale pending capture edit'");
+    const writesBefore = target.writes.length;
+
+    const newerHead = { snapshot_id: 'snap_from_b_f2', sequence: 2 };
+    target.generations.generations.set('user_a:snap_from_b_f2', {
+      user_id: 'user_a',
+      snapshot_id: 'snap_from_b_f2',
+      sequence: 2,
+      manifest_checksum: 'checksum_from_b_f2',
+    });
+    target.generations.publications.set('user_a:snap_from_b_f2', {
+      user_id: 'user_a',
+      snapshot_id: 'snap_from_b_f2',
+      sequence: 2,
+    });
+    target.generations.heads.set('user_a', newerHead);
+
+    await expect(adapter.push([todoRecord])).rejects.toThrow(/conflict|review/i);
+    expect(target.generations.heads.get('user_a')).toEqual(newerHead);
+    expect(target.writes.slice(writesBefore)).toEqual([]);
+    expect((await readCapturedChunks(db as never))?.capture.snapshotId).toBe(
+      pendingBefore.capture.snapshotId,
+    );
+    await db.closeAsync();
+  });
 
   it('preserves binary ID ordering when cutting over supported legacy identifiers', async () => {
     const target = remote();

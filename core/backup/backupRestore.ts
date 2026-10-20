@@ -13,6 +13,7 @@ import { syncEngine, type BlockedOutboxSummary } from '@/core/sync/sync.engine';
 import { nowIso } from '@/lib/time';
 import { checksumRows } from '@/lib/checksum';
 import { parseManifestRow } from './legacySnapshot';
+import { setVerifiedGenerationBaseHead } from './generations/capture';
 import {
   parseGenerationManifest,
   decodeGenerationContents,
@@ -878,6 +879,18 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     await setAppMetaJson(transactionDb, appMetaKeys.backupBackfillDoneEntities, [
       ...BACKUP_ENTITIES,
     ]);
+    // The restored local dataset IS the published generation. Record that
+    // provenance so later local edits may publish above this exact head; without
+    // it, a restored device would be forced into an unnecessary conflict.
+    if (published) {
+      await setVerifiedGenerationBaseHead(transactionDb, {
+        ownerUserId,
+        snapshotId: published.snapshotId,
+        sequence: manifest.generation,
+      });
+    } else {
+      await setVerifiedGenerationBaseHead(transactionDb, null);
+    }
     if (!transactionOwner) {
       await setLocalDatasetOwner(transactionDb, ownerUserId);
     }

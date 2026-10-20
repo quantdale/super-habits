@@ -31,6 +31,11 @@ export class GenerationRemoteDouble {
   readonly rpcCalls: { name: string; args: Record<string, unknown> }[] = [];
 
   readonly reservations = new Map<string, number>();
+  /** Base-head provenance keyed by `${user_id}:${snapshot_id}`. */
+  readonly reservationProvenance = new Map<
+    string,
+    { baseHeadSnapshotId: string | null; baseHeadSequence: number | null }
+  >();
 
   rpc(
     name: string,
@@ -39,7 +44,8 @@ export class GenerationRemoteDouble {
     if (name === 'backup_generation_capabilities')
       return {
         data: {
-          protocol_version: 1,
+          protocol_version: 2,
+          publication_provenance_version: 1,
           content_verification_version: 1,
           sequence_reservation_version: 1,
           backup_schema_version: 2,
@@ -50,7 +56,45 @@ export class GenerationRemoteDouble {
       };
     if (name === 'reserve_backup_generation_sequence') {
       const key = this.key('user_a', String(args.p_snapshot_id));
-      const previous = this.reservations.get(key) ?? this.generations.get(key)?.sequence;
+      if (Number(args.p_provenance_version) !== 1) {
+        return { data: null, error: { message: 'unsupported provenance version' } };
+      }
+      const baseHeadSnapshotId =
+        args.p_base_head_snapshot_id === null || args.p_base_head_snapshot_id === undefined
+          ? null
+          : String(args.p_base_head_snapshot_id);
+      const baseHeadSequence =
+        args.p_base_head_sequence === null || args.p_base_head_sequence === undefined
+          ? null
+          : Number(args.p_base_head_sequence);
+      const existingGeneration = this.generations.get(key);
+      if (existingGeneration) {
+        const matches =
+          Number(existingGeneration.publication_provenance_version) === 1 &&
+          (existingGeneration.base_head_snapshot_id ?? null) === baseHeadSnapshotId &&
+          (existingGeneration.base_head_sequence ?? null) === baseHeadSequence;
+        return matches
+          ? { data: Number(existingGeneration.sequence), error: null }
+          : { data: null, error: { message: 'snapshot provenance mismatch' } };
+      }
+      const existingProvenance = this.reservationProvenance.get(key);
+      if (existingProvenance) {
+        const matches =
+          existingProvenance.baseHeadSnapshotId === baseHeadSnapshotId &&
+          existingProvenance.baseHeadSequence === baseHeadSequence;
+        return matches
+          ? { data: this.reservations.get(key), error: null }
+          : { data: null, error: { message: 'snapshot reservation provenance mismatch' } };
+      }
+      const head = this.heads.get('user_a');
+      if (head) {
+        if (head.snapshot_id !== baseHeadSnapshotId || head.sequence !== baseHeadSequence) {
+          return { data: null, error: { message: 'capture base head is not current' } };
+        }
+      } else if (baseHeadSnapshotId !== null || baseHeadSequence !== null) {
+        return { data: null, error: { message: 'capture claims a missing base head' } };
+      }
+      const previous = this.reservations.get(key);
       const sequence = Number(
         previous ??
           Math.max(
@@ -60,6 +104,7 @@ export class GenerationRemoteDouble {
           ) + (previous === undefined ? 1 : 0),
       );
       this.reservations.set(key, sequence);
+      this.reservationProvenance.set(key, { baseHeadSnapshotId, baseHeadSequence });
       return { data: sequence, error: null };
     }
     if (name === 'publish_backup_generation') return this.publish(args);
@@ -117,10 +162,16 @@ export class GenerationRemoteDouble {
     this.rpcCalls.push({ name: 'publish_backup_generation', args });
     const userId = 'user_a';
     const snapshotId = String(args.p_snapshot_id);
+    if (Number(args.p_provenance_version) !== 1) {
+      return { data: null, error: { message: 'unsupported provenance version' } };
+    }
     const generation = this.generations.get(this.key(userId, snapshotId));
     if (!generation) return { data: null, error: { message: 'generation does not exist' } };
     if (generation.manifest_checksum !== args.p_manifest_checksum) {
       return { data: null, error: { message: 'manifest checksum mismatch' } };
+    }
+    if (Number(generation.publication_provenance_version) !== 1) {
+      return { data: null, error: { message: 'generation has no publication provenance' } };
     }
     const staged = [...this.chunks.values()].filter(
       (chunk) => chunk.user_id === userId && chunk.snapshot_id === snapshotId,
@@ -136,10 +187,20 @@ export class GenerationRemoteDouble {
         return { data: null, error: { message: 'sequence already published' } };
       }
       if (sequence === head.sequence) return { data: head, error: null };
+      if (
+        (generation.base_head_snapshot_id ?? null) !== head.snapshot_id ||
+        (generation.base_head_sequence ?? null) !== head.sequence
+      ) {
+        return { data: null, error: { message: 'base head is not current' } };
+      }
       if (head.sequence !== Number(args.p_expected_previous_sequence)) {
         return { data: null, error: { message: 'head advanced concurrently' } };
       }
-    } else if (Number(args.p_expected_previous_sequence) !== 0) {
+    } else if (
+      Number(args.p_expected_previous_sequence) !== 0 ||
+      (generation.base_head_snapshot_id ?? null) !== null ||
+      (generation.base_head_sequence ?? null) !== null
+    ) {
       return { data: null, error: { message: 'expected previous sequence but no head' } };
     }
     const next = { snapshot_id: snapshotId, sequence };

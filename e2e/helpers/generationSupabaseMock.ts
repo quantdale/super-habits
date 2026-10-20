@@ -39,6 +39,10 @@ export class GenerationSupabaseMock {
   private heads = new Map<string, Row>();
   private journal = new Map<string, Row>();
   private reservations = new Map<string, number>();
+  private reservationProvenance = new Map<
+    string,
+    { baseHeadSnapshotId: string | null; baseHeadSequence: number | null }
+  >();
   private stored = new Map<string, Map<string, Row>>();
 
   isDataEntity(entity: string): boolean {
@@ -51,6 +55,7 @@ export class GenerationSupabaseMock {
     this.heads.clear();
     this.journal.clear();
     this.reservations.clear();
+    this.reservationProvenance.clear();
     this.stored.clear();
   }
 
@@ -97,6 +102,9 @@ export class GenerationSupabaseMock {
       manifest,
       manifest_checksum: sha(manifest),
       captured_at: capturedAt,
+      base_head_snapshot_id: null,
+      base_head_sequence: null,
+      publication_provenance_version: 1,
     });
     this.chunks.set(`${owner}:${snapshot}:user_backup_settings:0`, {
       user_id: owner,
@@ -154,7 +162,8 @@ export class GenerationSupabaseMock {
       if (rpc) {
         if (rpc === 'backup_generation_capabilities')
           return respond({
-            protocol_version: 1,
+            protocol_version: 2,
+            publication_provenance_version: 1,
             content_verification_version: 1,
             sequence_reservation_version: 1,
             backup_schema_version: 2,
@@ -164,7 +173,42 @@ export class GenerationSupabaseMock {
         const args = request.postDataJSON() as Row;
         const snapshot = String(args.p_snapshot_id);
         const key = `${owner}:${snapshot}`;
+        const baseHeadSnapshotId =
+          args.p_base_head_snapshot_id == null ? null : String(args.p_base_head_snapshot_id);
+        const baseHeadSequence =
+          args.p_base_head_sequence == null ? null : Number(args.p_base_head_sequence);
         if (rpc === 'reserve_backup_generation_sequence') {
+          if (Number(args.p_provenance_version) !== 1)
+            throw new Error('Unsupported publication provenance version');
+          const existingMetadata = this.metadata.get(key);
+          if (existingMetadata) {
+            if (
+              Number(existingMetadata.publication_provenance_version) !== 1 ||
+              (existingMetadata.base_head_snapshot_id ?? null) !== baseHeadSnapshotId ||
+              (existingMetadata.base_head_sequence ?? null) !== baseHeadSequence
+            )
+              throw new Error('Snapshot provenance mismatch');
+            return respond(Number(existingMetadata.sequence));
+          }
+          const existingProvenance = this.reservationProvenance.get(key);
+          if (existingProvenance) {
+            if (
+              existingProvenance.baseHeadSnapshotId !== baseHeadSnapshotId ||
+              existingProvenance.baseHeadSequence !== baseHeadSequence
+            )
+              throw new Error('Reservation provenance mismatch');
+            return respond(this.reservations.get(key));
+          }
+          const currentHead = this.heads.get(owner);
+          if (currentHead) {
+            if (
+              currentHead.snapshot_id !== baseHeadSnapshotId ||
+              currentHead.sequence !== baseHeadSequence
+            )
+              throw new Error('Capture base head is not current');
+          } else if (baseHeadSnapshotId !== null || baseHeadSequence !== null) {
+            throw new Error('Capture claims a missing base head');
+          }
           let sequence = Number(this.metadata.get(key)?.sequence ?? this.reservations.get(key));
           if (!Number.isSafeInteger(sequence)) {
             sequence =
@@ -178,13 +222,17 @@ export class GenerationSupabaseMock {
                   .map(([, n]) => n),
               ) + 1;
             this.reservations.set(key, sequence);
+            this.reservationProvenance.set(key, { baseHeadSnapshotId, baseHeadSequence });
           }
           return respond(sequence);
         }
         if (rpc !== 'publish_backup_generation') return false;
+        if (Number(args.p_provenance_version) !== 1)
+          throw new Error('Unsupported publication provenance version');
         const metadata = this.metadata.get(key);
         if (
           !metadata ||
+          Number(metadata.publication_provenance_version) !== 1 ||
           sha(String(metadata.manifest)) !== metadata.manifest_checksum ||
           args.p_manifest_checksum !== metadata.manifest_checksum
         )
@@ -236,6 +284,18 @@ export class GenerationSupabaseMock {
         const previous = this.heads.get(owner);
         if (previous?.snapshot_id === snapshot && previous.sequence === metadata.sequence)
           return respond(previous);
+        if (previous) {
+          if (
+            (metadata.base_head_snapshot_id ?? null) !== previous.snapshot_id ||
+            (metadata.base_head_sequence ?? null) !== previous.sequence
+          )
+            throw new Error('Generation base head is not current');
+        } else if (
+          (metadata.base_head_snapshot_id ?? null) !== null ||
+          (metadata.base_head_sequence ?? null) !== null
+        ) {
+          throw new Error('Generation claims a missing base head');
+        }
         if (
           Number(metadata.sequence) <= Number(previous?.sequence ?? 0) ||
           Number(args.p_expected_previous_sequence) !== Number(previous?.sequence ?? 0)

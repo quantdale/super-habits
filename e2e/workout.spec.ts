@@ -1,7 +1,7 @@
 import { test, expect, type Page } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
-import { queryRows, returnToApp } from './helpers/dbHarness';
+import { queryRows, returnToApp, runSql } from './helpers/dbHarness';
 import { fillRoutineName } from './helpers/forms';
 import { ACTIVE_SECTION_SELECTOR } from './helpers/oracles';
 import {
@@ -177,6 +177,88 @@ test.describe('Workout', () => {
       "SELECT COUNT(*) AS n FROM workout_logs WHERE routine_id IN (SELECT id FROM workout_routines WHERE name = 'Double tap day')",
     );
     expect(Number(rows[0]?.n)).toBe(1);
+  });
+
+  test('failed save keeps a durable recovery payload and a remount retry logs once', async ({
+    page,
+  }) => {
+    // Force the first workout_logs insert to fail, without adding a production
+    // failure hook. The screen must retain the completed session durably; after
+    // a remount the landing must offer to finish saving it, and the retry must
+    // commit exactly one log.
+    await runSql(
+      page,
+      `CREATE TRIGGER e2e_fail_workout_log_insert
+       BEFORE INSERT ON workout_logs
+       BEGIN SELECT RAISE(ABORT, 'forced e2e save failure'); END;`,
+    );
+    await returnToApp(page);
+    await goToTab(page, 'workout');
+
+    await fillRoutineName(page, 'Recovery day');
+    await page.getByText('Add routine', { exact: true }).click();
+    await expect(page.getByText('Recovery day')).toBeVisible();
+    await page.getByText('Recovery day', { exact: true }).first().click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByPlaceholder(/e\.g\. Rows, Curls, Push-ups/i).fill('Bench Press');
+    await dialog.getByText('Add', { exact: true }).click({ force: true });
+    await expect(dialog.getByText('Start workout', { exact: true })).toBeVisible();
+    await dialog.getByRole('textbox', { name: 'Active (seconds)' }).fill('8');
+    await expect(dialog.getByRole('textbox', { name: 'Active (seconds)' })).toHaveValue('8', {
+      timeout: 10_000,
+    });
+    await dialog.getByText('Start workout', { exact: true }).click({ force: true });
+
+    await expect(page.getByRole('button', { name: 'Complete set 1' })).toBeVisible();
+    await page.getByText('Start', { exact: true }).first().click();
+    await page.getByRole('textbox', { name: 'Weight' }).fill('80');
+    await page.getByRole('textbox', { name: 'Reps' }).fill('8');
+    await expect(page.getByText('Workout complete!')).toBeVisible({ timeout: 20_000 });
+
+    await page.getByText('Save and finish', { exact: true }).click();
+    await expect(
+      page.getByText('This workout could not be saved. Your progress is still here — try again.', {
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Try saving again', { exact: true })).toBeVisible();
+
+    const pendingRows = await queryRows(
+      page,
+      `SELECT value FROM app_meta WHERE key = 'workout.pending_save'`,
+    );
+    expect(pendingRows).toHaveLength(1);
+    const pending = JSON.parse(String(pendingRows[0]?.value)) as {
+      routineName?: string;
+      enteredSets?: Record<string, { weight?: string; reps?: string }>;
+    };
+    expect(pending.routineName).toBe('Recovery day');
+    expect(pending.enteredSets?.['0']).toMatchObject({ weight: '80', reps: '8' });
+    const before = await queryRows(
+      page,
+      "SELECT COUNT(*) AS n FROM workout_logs WHERE routine_id IN (SELECT id FROM workout_routines WHERE name = 'Recovery day')",
+    );
+    expect(Number(before[0]?.n)).toBe(0);
+
+    await runSql(page, 'DROP TRIGGER e2e_fail_workout_log_insert');
+    await returnToApp(page);
+    await goToTab(page, 'workout');
+    await expect(page.getByText('Workout finished — not saved yet')).toBeVisible();
+    await page.getByText('Save finished workout', { exact: true }).click();
+    await expect(page.getByText('Workout complete!')).toBeVisible({ timeout: 10_000 });
+    await page.getByText('Save and finish', { exact: true }).click();
+    await expect(page.getByText('Workout saved')).toBeVisible({ timeout: 10_000 });
+
+    const after = await queryRows(
+      page,
+      "SELECT COUNT(*) AS n FROM workout_logs WHERE routine_id IN (SELECT id FROM workout_routines WHERE name = 'Recovery day')",
+    );
+    expect(Number(after[0]?.n)).toBe(1);
+    const cleared = await queryRows(
+      page,
+      `SELECT value FROM app_meta WHERE key = 'workout.pending_save'`,
+    );
+    expect(cleared).toHaveLength(0);
   });
 
   test('double-tapping Complete workout logs exactly one workout', async ({ page }) => {

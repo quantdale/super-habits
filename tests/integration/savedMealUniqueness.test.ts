@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
+import { seedVerifiedGenerationBaseHead } from './helpers/generationBaseline';
 import { chainableQuery } from './helpers/supabaseQueryDouble';
 
 /**
@@ -79,7 +80,8 @@ function buildRecordingSupabase() {
       from,
       rpc: vi.fn(async () => ({
         data: {
-          protocol_version: 1,
+          protocol_version: 2,
+          publication_provenance_version: 1,
           content_verification_version: 1,
           sequence_reservation_version: 1,
           backup_schema_version: 2,
@@ -109,6 +111,7 @@ async function installOwner(owner: string): Promise<TestDatabase> {
   const db = await freshDatabase();
   const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
   await setLocalDatasetOwner(db as never, owner);
+  await seedVerifiedGenerationBaseHead(db, owner);
   return db;
 }
 
@@ -225,6 +228,7 @@ describe('saved-meal owner-scoped uniqueness — client contract', () => {
     const dbB = await freshDatabase();
     const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
     await setLocalDatasetOwner(dbB as never, 'user_b');
+    await seedVerifiedGenerationBaseHead(dbB, 'user_b');
     installSupabaseMock(recording.supabase);
     const second = await saveMeal(dbB, 'Chicken Breast');
     const { syncEngine: engineB } = await import('@/core/sync/sync.engine');

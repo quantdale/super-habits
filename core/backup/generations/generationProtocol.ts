@@ -33,8 +33,18 @@
  * disposable backend and remain an explicit external gate.
  */
 
-/** Current generation protocol version. Distinct from backup schema 2. */
+/** Generation CONTENT format version. Distinct from backup schema 2. */
 export const GENERATION_PROTOCOL_VERSION = 1;
+
+/**
+ * Transport/capability version. Version 2 requires server-verified base-head
+ * provenance at reservation and publication. The content format stays protocol
+ * 1 so already-published generations remain readable.
+ */
+export const GENERATION_CAPABILITY_VERSION = 2;
+
+/** Version of the server-verified publication provenance contract. */
+export const PUBLICATION_PROVENANCE_VERSION = 1;
 
 /** The recovery-scope version this protocol publishes. */
 export interface GenerationScope {

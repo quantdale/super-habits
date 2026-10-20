@@ -19,6 +19,10 @@ import {
   restoreFromRemoteBackupV2,
 } from '@/core/backup/backupRestore';
 import { validateBackupRow } from '@/core/backup/backupValidators';
+import {
+  readActiveBackupGenerationConflict,
+  type BackupGenerationConflict,
+} from '@/core/backup/generations/conflict';
 import type {
   BackupFreshnessSignature,
   LocalSyncBackedCounts,
@@ -376,6 +380,14 @@ async function buildRestorePreview(ownerUserId: string | null): Promise<RestoreP
       const status = entityStatuses[entity];
       return status.remoteState === 'available' && (status.remoteRowCount ?? 0) > 0;
     });
+  // A malformed durable conflict state must not blank the whole backup panel;
+  // publication itself still fails closed on the same state at push time (`W-3`).
+  let backupConflict: BackupGenerationConflict | null = null;
+  try {
+    backupConflict = await readActiveBackupGenerationConflict(db);
+  } catch {
+    backupConflict = null;
+  }
   const freshnessSignature = computeFreshnessSignature(entityStatuses);
   const dismissedSignature =
     freshnessSignature === null
@@ -411,6 +423,7 @@ async function buildRestorePreview(ownerUserId: string | null): Promise<RestoreP
     recoverableAreas: buildRecoverableAreas(),
     pendingChangeCount: backupSummary.pendingChangeCount,
     backfillInProgress: backupSummary.backfillInProgress,
+    backupConflict,
   };
 }
 
