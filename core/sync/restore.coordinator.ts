@@ -382,11 +382,14 @@ async function buildRestorePreview(ownerUserId: string | null): Promise<RestoreP
     });
   // A malformed durable conflict state must not blank the whole backup panel;
   // publication itself still fails closed on the same state at push time (`W-3`).
+  const warnings = buildWarnings(entityStatuses);
   let backupConflict: BackupGenerationConflict | null = null;
   try {
     backupConflict = await readActiveBackupGenerationConflict(db);
   } catch {
-    backupConflict = null;
+    warnings.push(
+      'Backup conflict state could not be read; publication remains paused. No recovery data was changed.',
+    );
   }
   const freshnessSignature = computeFreshnessSignature(entityStatuses);
   const dismissedSignature =
@@ -413,7 +416,7 @@ async function buildRestorePreview(ownerUserId: string | null): Promise<RestoreP
       remoteAvailable && eligibility.kind === 'empty_device' && !dismissedForCurrentBackup,
     eligibility,
     entityStatuses,
-    warnings: buildWarnings(entityStatuses),
+    warnings,
     disclosures: buildDisclosures(),
     backupState: backupSummary.state,
     lastCompleteBackupAt: backupSummary.lastCompleteAt,

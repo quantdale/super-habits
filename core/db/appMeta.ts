@@ -112,6 +112,8 @@ export const appMetaKeys = {
    * observed value above (`AUD-F1`).
    */
   backupVerifiedGenerationBaseHead: defineJsonKey('backup.verified_generation_base_head', 'sync'),
+  /** Owner-scoped content proof written only by a verified legacy V2 restore. */
+  backupVerifiedLegacyRestore: defineJsonKey('backup.verified_legacy_restore', 'sync'),
   /**
    * A durable, explicit reconciliation state for a capture that conflicts with a
    * newer remote head. The capture is never discarded or republished until the

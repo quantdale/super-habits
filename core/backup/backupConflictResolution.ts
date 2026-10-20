@@ -5,6 +5,7 @@ import { withSQLiteTransaction } from '@/core/db/transactions';
 import type { CapturedGeneration } from '@/core/backup/generations/capture';
 import {
   clearGenerationCapture,
+  captureGenerationWithinTransaction,
   readCapturedChunks,
   setVerifiedGenerationBaseHead,
 } from '@/core/backup/generations/capture';
@@ -15,6 +16,7 @@ import {
   setBackupGenerationResolutionInProgress,
 } from '@/core/backup/generations/conflict';
 import { runBackupMaintenance } from '@/core/backup/backupCheckpoint';
+import { readRecoverableSettings } from '@/core/backup/backupSettings';
 import { nowIso } from '@/lib/time';
 
 /**
@@ -25,11 +27,12 @@ import { nowIso } from '@/lib/time';
  *   1. persist an in-progress marker and keep the conflict ACTIVE;
  *   2. retire the conflicting capture and its pending settings/manifest;
  *   3. record the chosen base + dirty flag;
- *   4. mark the conflict resolved LAST.
+ *   4. mark resolved and capture fresh local bytes in the SAME transaction.
  *
- * A reader can therefore never observe "resolved" while stale evidence is still
- * present. If the process dies after step 1, the next review resumes with the
- * marker; ordinary entity outbox work is never deleted.
+ * A failed replacement capture rolls back the whole decision, preserving the
+ * conflicted bytes and metadata. After commit, a durable fresh capture is ready
+ * for publication even if the process stops before maintenance runs. Ordinary
+ * entity outbox work is never deleted.
  */
 export async function resolveBackupGenerationConflictKeepLocal(): Promise<void> {
   const db = await getDatabase();
@@ -82,8 +85,12 @@ export async function resolveBackupGenerationConflictKeepLocal(): Promise<void> 
       appMetaKeys.backupLegacyGenerationCapture,
     );
     const pending = await readCapturedChunks(transactionDb);
-    const localSnapshotId = legacy?.capture.snapshotId ?? pending?.capture.snapshotId ?? null;
-    if (!resuming && localSnapshotId !== transactionConflict.localSnapshotId) {
+    // A mixed-version device can retain BOTH capture kinds. Match the actual
+    // conflicted identity, not whichever storage key happens to be read first.
+    const hasConflictedCapture = [legacy?.capture.snapshotId, pending?.capture.snapshotId].includes(
+      transactionConflict.localSnapshotId,
+    );
+    if (!resuming && !hasConflictedCapture) {
       throw new Error(
         'The pending recovery point changed since the conflict was recorded. Review the backup state again.',
       );
@@ -128,9 +135,14 @@ export async function resolveBackupGenerationConflictKeepLocal(): Promise<void> 
     });
     await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
 
-    // LAST: no reader may see a resolved conflict while any stale evidence or
-    // pending synthetic record is still present.
+    // Resolve only inside this transaction so the capture guard can admit the
+    // replacement. No reader can observe a committed resolved state without
+    // its fresh durable bytes; a capture/settings failure rolls everything back.
     await markBackupGenerationConflictResolved(transactionConflict, transactionDb);
+    await captureGenerationWithinTransaction(
+      transactionDb,
+      await readRecoverableSettings(transactionDb),
+    );
     await setBackupGenerationResolutionInProgress(null, transactionDb);
   });
 

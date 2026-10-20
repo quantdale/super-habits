@@ -20,6 +20,7 @@ import {
   type VerifiedGenerationBaseHead,
 } from '@/core/backup/generations/capture';
 import { readVerifiedLegacySnapshot } from '@/core/backup/legacySnapshot';
+import { isVerifiedLegacyRestoreBase } from '@/core/backup/generations/legacyProvenance';
 import {
   BackupGenerationConflictError,
   readActiveBackupGenerationConflict,
@@ -205,7 +206,23 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       appMetaKeys.backupLegacyGenerationCapture,
     );
     const pending = await readCapturedChunks(db);
-    if (legacyCapture && pending) {
+    if (!head && !legacyCapture) {
+      // A pending LOCAL capture does not prove the remote is empty. Preserve
+      // supported legacy recovery first, even when local work was captured
+      // offline before this device first inspected the remote.
+      const legacy = await readVerifiedLegacySnapshot(client, ownerUserId);
+      if (legacy) {
+        const captured = captureVerifiedRows({ ownerUserId, ...legacy, baseHead: null });
+        await setAppMetaJson(db, appMetaKeys.backupLegacyGenerationCapture, captured);
+        await this.uploadGeneration(client, db, ownerUserId, captured, true);
+        // Publishing remote bytes is preservation, not proof about LOCAL rows.
+        // Re-enter admission against the new head; unverified local data needs
+        // explicit owner review before any mutable rows can be overwritten.
+        await this.ensureRecoveryPoint(client, db, ownerUserId);
+        return;
+      }
+    }
+    if (head && legacyCapture && pending) {
       // Upgrade ambiguity: old clients could leave both keys populated. Never
       // let the legacy branch authorize mutable writes while a normal capture
       // is still unevaluated (`AUD-F2`).
@@ -230,12 +247,17 @@ export class SupabaseSyncAdapter implements SyncAdapter {
           'legacy_cutover',
         );
       }
-      if (!head && legacyCapture.capture.baseHeadSnapshotId !== null) {
+      if (
+        !head &&
+        (legacyCapture.capture.baseHeadSnapshotId != null ||
+          legacyCapture.capture.baseHeadSequence != null)
+      ) {
         throw new Error(
           'Backup publication paused: the remote recovery head is absent but the legacy capture has a recorded base; review the backup state.',
         );
       }
       await this.uploadGeneration(client, db, ownerUserId, legacyCapture, true);
+      await this.ensureRecoveryPoint(client, db, ownerUserId);
       return;
     }
 
@@ -289,13 +311,6 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       // A genuinely empty remote account has no recovery point to destroy. Clear
       // any stale local provenance before capturing the first local baseline.
       if (verifiedBase) await setVerifiedGenerationBaseHead(db, null);
-      const legacy = await readVerifiedLegacySnapshot(client, ownerUserId);
-      if (legacy) {
-        const captured = captureVerifiedRows({ ownerUserId, ...legacy, baseHead: null });
-        await setAppMetaJson(db, appMetaKeys.backupLegacyGenerationCapture, captured);
-        await this.uploadGeneration(client, db, ownerUserId, captured, true);
-        return;
-      }
       const captured = await captureCurrentGeneration();
       await this.uploadGeneration(client, db, ownerUserId, captured, false);
       return;
@@ -810,17 +825,21 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       throw new Error('Captured generation owner mismatch.');
     const activeConflict = await readActiveBackupGenerationConflict(db);
     if (activeConflict) throw new BackupGenerationConflictError(activeConflict);
+    const provesLocalBase =
+      !isLegacyCutover || (await isVerifiedLegacyRestoreBase(db, currentUserId, captured));
     const head = await readOwnerHead(client, currentUserId);
     await setAppMetaJson(db, appMetaKeys.backupObservedGenerationHead, head);
 
     if (head && head.snapshotId === captured.capture.snapshotId) {
       // This exact snapshot is already the visible head. A lost response is
       // success; retire the retry without republishing or touching mutable rows.
-      await setVerifiedGenerationBaseHead(db, {
-        ownerUserId: currentUserId,
-        snapshotId: head.snapshotId,
-        sequence: head.sequence,
-      });
+      if (provesLocalBase) {
+        await setVerifiedGenerationBaseHead(db, {
+          ownerUserId: currentUserId,
+          snapshotId: head.snapshotId,
+          sequence: head.sequence,
+        });
+      }
       await recordPublishedGeneration(captured.capture.snapshotId, head.sequence);
       if (isLegacyCutover) {
         await setAppMetaText(db, appMetaKeys.backupLegacyGenerationCapture, 'null');
@@ -987,11 +1006,16 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       sequence: capture.sequence,
     };
     await setAppMetaJson(db, appMetaKeys.backupObservedGenerationHead, publishedHead);
-    await setVerifiedGenerationBaseHead(db, {
-      ownerUserId: currentUserId,
-      snapshotId: publishedHead.snapshotId,
-      sequence: publishedHead.sequence,
-    });
+    // Remote legacy preservation alone is NOT local provenance. Only an exact
+    // content proof from this owner's verified legacy restore can bridge that
+    // base to its new immutable head (later local edits remain legitimate).
+    if (provesLocalBase) {
+      await setVerifiedGenerationBaseHead(db, {
+        ownerUserId: currentUserId,
+        snapshotId: publishedHead.snapshotId,
+        sequence: publishedHead.sequence,
+      });
+    }
     await recordPublishedGeneration(publishedHead.snapshotId, publishedHead.sequence);
     if (isLegacyCutover) {
       await setAppMetaText(db, appMetaKeys.backupLegacyGenerationCapture, 'null');

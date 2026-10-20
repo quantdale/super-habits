@@ -221,6 +221,93 @@ describe('AUD-F3: keep-local resolution uses real maintenance ordering', () => {
     await db.closeAsync();
   });
 
+  it('resolves a normal-capture conflict when a separate legacy capture is also pending', async () => {
+    const target = remote();
+    install(target.client);
+    const db = await freshDatabase();
+    const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
+    await setLocalDatasetOwner(db as never, 'user_a');
+    await seedVerifiedGenerationBaseHead(db, 'user_a', 'snap_a1_dual', 1);
+    await seedConflictFixture(db, target);
+    const { captureVerifiedRows } = await import('@/core/backup/generations/capture');
+    const { appMetaKeys, setAppMetaJson, getAppMetaJson } = await import('@/core/db/appMeta');
+    await setAppMetaJson(
+      db as never,
+      appMetaKeys.backupLegacyGenerationCapture,
+      captureVerifiedRows({ ownerUserId: 'user_a', rowsByEntity: {}, settingsPayload: {} }),
+    );
+    const { resolveBackupGenerationConflictKeepLocal } =
+      await import('@/core/backup/backupConflictResolution');
+
+    await expect(resolveBackupGenerationConflictKeepLocal()).resolves.toBeUndefined();
+
+    expect(target.generations.heads.get('user_a')?.sequence).toBeGreaterThan(2);
+    expect(staleSettingsWrites(target.writes)).toEqual([]);
+    expect(await getAppMetaJson(db as never, appMetaKeys.backupLegacyGenerationCapture)).toBeNull();
+    await db.closeAsync();
+  });
+
+  it('rolls back the owner decision and retains old bytes when the replacement capture fails', async () => {
+    const target = remote();
+    install(target.client);
+    const db = await freshDatabase();
+    const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
+    await setLocalDatasetOwner(db as never, 'user_a');
+    await seedVerifiedGenerationBaseHead(db, 'user_a', 'snap_a1_atomic', 1);
+    const { captured, readCapturedChunks } = await seedConflictFixture(db, target);
+    await db.execAsync(`CREATE TRIGGER fail_replacement_capture BEFORE INSERT ON app_meta
+      WHEN NEW.key = 'backup.generation_capture'
+      BEGIN SELECT RAISE(ABORT, 'forced replacement capture failure'); END;`);
+    const { resolveBackupGenerationConflictKeepLocal } =
+      await import('@/core/backup/backupConflictResolution');
+
+    await expect(resolveBackupGenerationConflictKeepLocal()).rejects.toThrow(
+      'forced replacement capture failure',
+    );
+
+    const { readActiveBackupGenerationConflict } =
+      await import('@/core/backup/generations/conflict');
+    expect((await readActiveBackupGenerationConflict(db as never))?.localSnapshotId).toBe(
+      captured.capture.snapshotId,
+    );
+    expect(await readCapturedChunks(db as never)).toEqual(captured);
+    expect(target.writes).toEqual([]);
+    await db.execAsync('DROP TRIGGER fail_replacement_capture');
+    await resolveBackupGenerationConflictKeepLocal();
+    expect(target.generations.heads.get('user_a')?.sequence).toBeGreaterThan(2);
+    await db.closeAsync();
+  });
+
+  it('keeps a durable replacement and reports the committed decision when maintenance throws', async () => {
+    const target = remote();
+    install(target.client);
+    const db = await freshDatabase();
+    const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
+    await setLocalDatasetOwner(db as never, 'user_a');
+    await seedVerifiedGenerationBaseHead(db, 'user_a', 'snap_a1_maintenance', 1);
+    const { captured, readCapturedChunks } = await seedConflictFixture(db, target);
+    const maintenance = await import('@/core/backup/backupCheckpoint');
+    const failure = vi
+      .spyOn(maintenance, 'runBackupMaintenance')
+      .mockRejectedValueOnce(new Error('forced post-commit maintenance failure'));
+    const { resolveBackupGenerationConflictKeepLocal } =
+      await import('@/core/backup/backupConflictResolution');
+    try {
+      await expect(resolveBackupGenerationConflictKeepLocal()).resolves.toBeUndefined();
+      expect(failure).toHaveBeenCalledTimes(1);
+      const pending = await readCapturedChunks(db as never);
+      expect(pending).not.toBeNull();
+      expect(pending?.capture.snapshotId).not.toBe(captured.capture.snapshotId);
+      expect(pending?.capture.baseHeadSnapshotId).toBe('snap_from_b_f3');
+      const { readActiveBackupGenerationConflict } =
+        await import('@/core/backup/generations/conflict');
+      expect(await readActiveBackupGenerationConflict(db as never)).toBeNull();
+    } finally {
+      failure.mockRestore();
+      await db.closeAsync();
+    }
+  });
+
   it('does not write stale state when the fresh publication fails, then retries safely', async () => {
     const target = remote();
     install(target.client);

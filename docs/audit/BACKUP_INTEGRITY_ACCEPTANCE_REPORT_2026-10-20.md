@@ -295,3 +295,18 @@ flake classified); W-3/W-4/W-5 fixed with 2 new preview tests; full gates
 re-run (typecheck, lint, unit, integration, both qualify lanes green — unit
 retains the classified W-2 flake); the package committed as one controlled
 change. Hosted/native/release gates (Section I) remain external.
+
+**Second reconciliation addendum (same session, operator-authorized):** a
+follow-up audit of that committed state against Git and executable evidence
+found four further defects the first pass missed — W-9 (legacy-cutover
+publication granted false local authority over divergent rows), W-10 (keep-local
+refused valid conflicts when both capture kinds were present), W-11 (portable
+import inherited prior-dataset publication lineage), and W-12 (an E2E mock
+authenticated in-flight requests with global mutable state). Each was reproduced
+with a failing test before its fix; W-9's strict guard was then refined so a
+genuine verified-legacy restore can still continue local publication through an
+owner/content-bound proof. The complete record, corrected ledgers, and full
+re-validation are in
+`docs/audit/SESSION_RECONCILIATION_AND_MAIN_INTEGRATION_2026-10-20.md`. The
+package was subsequently committed again and integrated to `main` as
+instructed.

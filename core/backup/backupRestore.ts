@@ -14,6 +14,7 @@ import { nowIso } from '@/lib/time';
 import { checksumRows } from '@/lib/checksum';
 import { parseManifestRow } from './legacySnapshot';
 import { setVerifiedGenerationBaseHead } from './generations/capture';
+import { recordVerifiedLegacyRestore } from './generations/legacyProvenance';
 import {
   parseGenerationManifest,
   decodeGenerationContents,
@@ -888,8 +889,13 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
         snapshotId: published.snapshotId,
         sequence: manifest.generation,
       });
+      await setAppMetaJson(transactionDb, appMetaKeys.backupVerifiedLegacyRestore, null);
     } else {
       await setVerifiedGenerationBaseHead(transactionDb, null);
+      await recordVerifiedLegacyRestore(transactionDb, ownerUserId, {
+        rowsByEntity,
+        settingsPayload: normalizedSettings,
+      });
     }
     if (!transactionOwner) {
       await setLocalDatasetOwner(transactionDb, ownerUserId);

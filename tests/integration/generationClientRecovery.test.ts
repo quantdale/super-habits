@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { freshDatabase, type TestDatabase } from './helpers/db';
 import { GenerationRemoteDouble } from './helpers/generationRemoteDouble';
 import {
@@ -171,9 +174,13 @@ function install(client: ReturnType<typeof remote>['client']) {
   }));
 }
 
-async function device(client: ReturnType<typeof remote>['client'], populated = true) {
+async function device(
+  client: ReturnType<typeof remote>['client'],
+  populated = true,
+  filename?: string,
+) {
   install(client);
-  const db = await freshDatabase();
+  const db = await freshDatabase(filename);
   const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
   await setLocalDatasetOwner(db as never, 'user_a');
   if (populated)
@@ -324,6 +331,21 @@ describe('review R3: actual capture → publication → restore contracts', () =
     const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
     expect((await restoreFromRemoteBackupV2()).status).toBe('restored');
     expect(await empty.getFirstAsync('SELECT title FROM todos')).toEqual({ title: 'Original' });
+    const { readVerifiedGenerationBaseHead, captureCurrentGeneration } =
+      await import('@/core/backup/generations/capture');
+    expect(await readVerifiedGenerationBaseHead(empty as never, 'user_a')).toEqual({
+      ownerUserId: 'user_a',
+      snapshotId: head.snapshot_id,
+      sequence: head.sequence,
+    });
+    await empty.runAsync("UPDATE todos SET title='Edited after restore'");
+    const continued = await captureCurrentGeneration();
+    const { SupabaseSyncAdapter: RestoredAdapter } = await import('@/core/sync/supabase.adapter');
+    await new RestoredAdapter().push([todoRecord]);
+    expect(target.generations.heads.get('user_a')).toEqual({
+      snapshot_id: continued.capture.snapshotId,
+      sequence: 2,
+    });
     expect(
       target.client.from.mock.calls.filter(([entity]) => entity === 'backup_manifest'),
     ).toHaveLength(1); // cutover inspection only
@@ -331,7 +353,7 @@ describe('review R3: actual capture → publication → restore contracts', () =
   });
 
   it.each([6, 7])(
-    'preserves a verified scope-%s legacy point through a failed newer publication',
+    'preserves a verified scope-%s legacy point through cutover interruption and owner review',
     async (scope) => {
       const target = remote();
       const db = await device(target.client);
@@ -339,26 +361,23 @@ describe('review R3: actual capture → publication → restore contracts', () =
       await db.runAsync("UPDATE todos SET title='Changed'");
       const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
       const adapter = new SupabaseSyncAdapter();
-      await adapter.push([todoRecord]);
+      target.setFailPublish(true);
+      await expect(adapter.push([todoRecord])).rejects.toThrow('publication interrupted');
+      expect(target.generations.heads.get('user_a')).toBeUndefined();
+      expect(target.tables.get('todos')?.[0].title).toBe('Original');
+
+      target.setFailPublish(false);
+      await expect(adapter.push([todoRecord])).rejects.toThrow(/conflict|review/i);
       const retained = target.generations.heads.get('user_a')!;
       expect(retained.sequence).toBe(1);
-      expect(target.tables.get('todos')?.[0].title).toBe('Changed');
-      const { captureGeneration } = await import('@/core/backup/generations/capture');
-      const { readRecoverableSettings } = await import('@/core/backup/backupSettings');
-      await captureGeneration({ settingsPayload: await readRecoverableSettings(db as never) });
-      target.setFailPublish(true);
-      await expect(
-        (
-          adapter as unknown as {
-            publishGenerationContents: (
-              client: unknown,
-              db: unknown,
-              owner: string,
-            ) => Promise<void>;
-          }
-        ).publishGenerationContents(target.client, db, 'user_a'),
-      ).rejects.toThrow('publication interrupted');
-      expect(target.generations.heads.get('user_a')).toEqual(retained);
+      expect(target.tables.get('todos')?.[0].title).toBe('Original');
+      expect(target.writes.filter((entity) => !entity.startsWith('backup_generation'))).toEqual([]);
+      const { readCapturedChunks } = await import('@/core/backup/generations/capture');
+      expect((await readCapturedChunks(db as never))?.chunks).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ payload: expect.stringContaining('Changed') }),
+        ]),
+      );
       await db.closeAsync();
       const empty = await device(target.client, false);
       const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
@@ -367,6 +386,115 @@ describe('review R3: actual capture → publication → restore contracts', () =
       await empty.closeAsync();
     },
   );
+
+  it.each(['unchanged', 'changed remotely', 'other owner'] as const)(
+    'continues from a verified legacy restore only for the same owner and %s baseline',
+    async (scenario) => {
+      const target = remote();
+      const source = await device(target.client);
+      await seedLegacy(source, target);
+      await source.closeAsync();
+      const db = await device(target.client, false);
+      const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+      expect((await restoreFromRemoteBackupV2()).status).toBe('restored');
+      await db.runAsync("UPDATE todos SET title='Edit after legacy restore'");
+      if (scenario === 'changed remotely') {
+        target.tables.get('todos')![0].title = 'Newer legacy remote';
+        const { BACKUP_ENTITY_COLUMNS } = await import('@/core/backup/backup.types');
+        const metadata = target.tables.get('backup_manifest')![0].entity_metadata as Record<
+          string,
+          unknown
+        >;
+        metadata.todos = checksumRows(target.tables.get('todos')!, BACKUP_ENTITY_COLUMNS.todos);
+      }
+      if (scenario === 'other owner') {
+        const { appMetaKeys, getAppMetaJson, setAppMetaJson } = await import('@/core/db/appMeta');
+        const proof = await getAppMetaJson<Record<string, unknown>>(
+          db as never,
+          appMetaKeys.backupVerifiedLegacyRestore,
+        );
+        await setAppMetaJson(db as never, appMetaKeys.backupVerifiedLegacyRestore, {
+          ...proof,
+          ownerUserId: 'user_b',
+        });
+      }
+      const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+      const pushing = new SupabaseSyncAdapter().push([todoRecord]);
+      if (scenario === 'unchanged') {
+        await expect(pushing).resolves.toBeUndefined();
+        expect(target.tables.get('todos')?.[0].title).toBe('Edit after legacy restore');
+        const { readVerifiedGenerationBaseHead, captureCurrentGeneration } =
+          await import('@/core/backup/generations/capture');
+        const base = await readVerifiedGenerationBaseHead(db as never, 'user_a');
+        expect(base?.snapshotId).toBe(target.generations.heads.get('user_a')?.snapshot_id);
+        await captureCurrentGeneration();
+        await new SupabaseSyncAdapter().push([todoRecord]);
+        expect(target.generations.heads.get('user_a')?.sequence).toBe(2);
+      } else {
+        await expect(pushing).rejects.toThrow(/conflict|review/i);
+        expect(target.writes.filter((entity) => !entity.startsWith('backup_generation'))).toEqual(
+          [],
+        );
+        expect(target.tables.get('todos')?.[0].title).toBe(
+          scenario === 'changed remotely' ? 'Newer legacy remote' : 'Original',
+        );
+      }
+      await db.closeAsync();
+    },
+  );
+
+  it('does not adopt a preserved remote legacy snapshot as the divergent local baseline', async () => {
+    const target = remote();
+    const db = await device(target.client);
+    await seedLegacy(db, target);
+    await db.runAsync("UPDATE todos SET title='Divergent local data'");
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+
+    await expect(new SupabaseSyncAdapter().push([todoRecord])).rejects.toThrow(/conflict|review/i);
+
+    const head = target.generations.heads.get('user_a')!;
+    expect(target.generations.generationRows('user_a', head.snapshot_id, 'todos')).toMatchObject([
+      { title: 'Original' },
+    ]);
+    expect(target.tables.get('todos')?.[0].title).toBe('Original');
+    expect(target.writes.filter((entity) => !entity.startsWith('backup_generation'))).toEqual([]);
+    const { readVerifiedGenerationBaseHead, readCapturedChunks } =
+      await import('@/core/backup/generations/capture');
+    expect(await readVerifiedGenerationBaseHead(db as never, 'user_a')).toBeNull();
+    const pending = await readCapturedChunks(db as never);
+    expect(pending?.capture.baseHeadSnapshotId).toBeNull();
+    expect(pending?.chunks.find((entry) => entry.entity === 'todos')?.payload).toContain(
+      'Divergent local data',
+    );
+    await db.closeAsync();
+  });
+
+  it('preserves remote legacy recovery before a previously captured local first upload', async () => {
+    const target = remote();
+    const db = await device(target.client);
+    await seedLegacy(db, target);
+    await db.runAsync("UPDATE todos SET title='Previously captured local data'");
+    const { captureGeneration, readCapturedChunks } =
+      await import('@/core/backup/generations/capture');
+    const { readRecoverableSettings } = await import('@/core/backup/backupSettings');
+    const local = await captureGeneration({
+      settingsPayload: await readRecoverableSettings(db as never),
+    });
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+
+    await expect(new SupabaseSyncAdapter().push([todoRecord])).rejects.toThrow(/conflict|review/i);
+
+    const head = target.generations.heads.get('user_a')!;
+    expect(head.snapshot_id).not.toBe(local.capture.snapshotId);
+    expect(target.generations.generationRows('user_a', head.snapshot_id, 'todos')).toMatchObject([
+      { title: 'Original' },
+    ]);
+    expect(target.writes.filter((entity) => !entity.startsWith('backup_generation'))).toEqual([]);
+    expect((await readCapturedChunks(db as never))?.capture.snapshotId).toBe(
+      local.capture.snapshotId,
+    );
+    await db.closeAsync();
+  });
 
   it('fails closed before any write for unsupported capability or corrupt legacy content', async () => {
     const target = remote();
@@ -510,12 +638,7 @@ describe('review R3: actual capture → publication → restore contracts', () =
       settingsPayload: await readRecoverableSettings(db as never),
     });
     target.setFailPublish(true);
-    const publish = () =>
-      (
-        adapter as unknown as {
-          publishGenerationContents: (client: unknown, db: unknown, owner: string) => Promise<void>;
-        }
-      ).publishGenerationContents(target.client, db, 'user_a');
+    const publish = () => adapter.push([todoRecord]);
     await expect(publish()).rejects.toThrow('publication interrupted');
     const reserved = await readCapturedChunks(db as never);
     expect(reserved?.capture.sequence).toBe(41);
@@ -525,6 +648,50 @@ describe('review R3: actual capture → publication → restore contracts', () =
     await publish();
     expect(target.generations.heads.get('user_a')?.sequence).toBe(41);
     await db.closeAsync();
+  });
+
+  it('reopens the durable pending generation and retries the same reservation after restart', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'superhabits-generation-restart-'));
+    const filename = join(directory, 'backup.sqlite');
+    const target = remote();
+    let db = await device(target.client, true, filename);
+    let closed = false;
+    try {
+      const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+      const adapter = new SupabaseSyncAdapter();
+      await adapter.push([todoRecord]);
+      await db.runAsync("UPDATE todos SET title='Captured before restart'");
+      const { captureCurrentGeneration, readCapturedChunks } =
+        await import('@/core/backup/generations/capture');
+      await captureCurrentGeneration();
+      target.setFailPublish(true);
+      await expect(adapter.push([todoRecord])).rejects.toThrow('publication interrupted');
+      const reserved = await readCapturedChunks(db as never);
+      expect(reserved).not.toBeNull();
+      await db.closeAsync();
+      closed = true;
+
+      db = await freshDatabase(filename);
+      closed = false;
+      const { readCapturedChunks: reloadedCapture } =
+        await import('@/core/backup/generations/capture');
+      expect(await reloadedCapture(db as never)).toEqual(reserved);
+      target.setFailPublish(false);
+      const { SupabaseSyncAdapter: RestartedAdapter } =
+        await import('@/core/sync/supabase.adapter');
+      await new RestartedAdapter().push([todoRecord]);
+      expect(target.generations.heads.get('user_a')).toEqual({
+        snapshot_id: reserved!.capture.snapshotId,
+        sequence: reserved!.capture.sequence,
+      });
+      expect(await reloadedCapture(db as never)).toBeNull();
+      expect(await db.getFirstAsync('SELECT title FROM todos')).toEqual({
+        title: 'Captured before restart',
+      });
+    } finally {
+      if (!closed) await db.closeAsync();
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it('refuses a corrupt pinned generation without consulting mutable fallback content', async () => {
@@ -566,11 +733,7 @@ describe('review R3: actual capture → publication → restore contracts', () =
       await db.runAsync("UPDATE todos SET title='Newer local write'");
       if (failure === 'racing writer') target.raceNextPublish();
       else target.loseAcknowledgement();
-      const publishing = (
-        adapter as unknown as {
-          publishGenerationContents: (client: unknown, db: unknown, owner: string) => Promise<void>;
-        }
-      ).publishGenerationContents(target.client, db, 'user_a');
+      const publishing = adapter.push([todoRecord]);
       if (failure === 'racing writer')
         await expect(publishing).rejects.toThrow('publication paused');
       else await publishing;
@@ -610,13 +773,11 @@ describe('review R3: actual capture → publication → restore contracts', () =
       settingsPayload: await readRecoverableSettings(db as never),
     });
     target.loseAcknowledgementThenNewerHead();
-    await expect(
-      (
-        adapter as unknown as {
-          publishGenerationContents: (client: unknown, db: unknown, owner: string) => Promise<void>;
-        }
-      ).publishGenerationContents(target.client, db, 'user_a'),
-    ).rejects.toThrow(/conflict|review/i);
+    const writesBefore = target.writes.length;
+    await expect(adapter.push([todoRecord])).rejects.toThrow(/conflict|review/i);
+    expect(
+      target.writes.slice(writesBefore).filter((entity) => !entity.startsWith('backup_generation')),
+    ).toEqual([]);
     expect(target.generations.heads.get('user_a')).toMatchObject({ snapshot_id: 'later' });
     expect((await readCapturedChunks(db as never))?.capture.snapshotId).toBe(
       original.capture.snapshotId,
@@ -655,6 +816,70 @@ describe('review R3: actual capture → publication → restore contracts', () =
     const retained = await readCapturedChunks(db as never);
     expect(retained?.capture.baseHeadSnapshotId).toBe(firstHead.snapshot_id);
     expect(retained?.capture.baseHeadSequence).toBe(firstHead.sequence);
+    await db.closeAsync();
+  });
+
+  it('rejects an unverified migrated capture even when its base values equal the head', async () => {
+    const target = remote();
+    const db = await device(target.client);
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    const adapter = new SupabaseSyncAdapter();
+    await adapter.push([todoRecord]);
+    const head = { ...target.generations.heads.get('user_a')! };
+    const { captureCurrentGeneration, readCapturedChunks } =
+      await import('@/core/backup/generations/capture');
+    const pending = await captureCurrentGeneration();
+    const { baseHeadProof: _proof, ...migrated } = pending.capture;
+    const { setAppMetaJson, appMetaKeys } = await import('@/core/db/appMeta');
+    await setAppMetaJson(db as never, appMetaKeys.backupGenerationCapture, {
+      ...migrated,
+      chunks: pending.chunks,
+    });
+    const before = target.writes.length;
+
+    await expect(adapter.push([todoRecord])).rejects.toThrow(/conflict|review/i);
+
+    expect(target.writes.slice(before)).toEqual([]);
+    expect(target.generations.heads.get('user_a')).toEqual(head);
+    expect((await readCapturedChunks(db as never))?.capture.baseHeadProof).toBe('unverified');
+    await db.closeAsync();
+  });
+
+  it('records the current durable capture when it changes before conflict persistence', async () => {
+    const target = remote();
+    const db = await device(target.client);
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    const adapter = new SupabaseSyncAdapter();
+    await adapter.push([todoRecord]);
+    const { captureCurrentGeneration } = await import('@/core/backup/generations/capture');
+    const old = await captureCurrentGeneration();
+    const replacement = await captureCurrentGeneration();
+    const { setAppMetaJson, appMetaKeys } = await import('@/core/db/appMeta');
+    await setAppMetaJson(db as never, appMetaKeys.backupGenerationCapture, {
+      ...old.capture,
+      chunks: old.chunks,
+    });
+    target.generations.heads.set('user_a', { snapshot_id: 'other_device', sequence: 3 });
+    const transaction = db.withTransactionAsync.bind(db);
+    vi.spyOn(db, 'withTransactionAsync').mockImplementationOnce(async (task) => {
+      // The replacement commits after push read its capture, before conflict's
+      // transaction opens. The conflict must refer to the durable replacement.
+      await setAppMetaJson(db as never, appMetaKeys.backupGenerationCapture, {
+        ...replacement.capture,
+        chunks: replacement.chunks,
+      });
+      await transaction(task);
+    });
+    const before = target.writes.length;
+
+    await expect(adapter.push([todoRecord])).rejects.toThrow(/conflict|review/i);
+
+    const { readActiveBackupGenerationConflict } =
+      await import('@/core/backup/generations/conflict');
+    expect((await readActiveBackupGenerationConflict(db as never))?.localSnapshotId).toBe(
+      replacement.capture.snapshotId,
+    );
+    expect(target.writes.slice(before)).toEqual([]);
     await db.closeAsync();
   });
 
@@ -705,7 +930,9 @@ describe('review R3: actual capture → publication → restore contracts', () =
     );
     await seedLegacy(db, target);
     const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
-    await new SupabaseSyncAdapter().push([{ ...todoRecord, id: 'todo_1_a' }]);
+    await expect(
+      new SupabaseSyncAdapter().push([{ ...todoRecord, id: 'todo_1_a' }]),
+    ).rejects.toThrow(/conflict|review/i);
     const chunk = [...target.generations.chunks.values()].find(
       (entry) => entry.entity === 'todos',
     )!;

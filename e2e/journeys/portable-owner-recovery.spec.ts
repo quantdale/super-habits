@@ -82,6 +82,7 @@ let supabaseRequestsSeen = 0;
 let verifyUserOverride: typeof SOURCE_PROTECTED_USER | typeof WRONG_USER | null = null;
 let portableFileText: string | null = null;
 let tRemoteWeeklyReviewEnabled = false;
+const bearerOwners = new Map<string, string>();
 
 function sessionBody(
   user:
@@ -91,8 +92,10 @@ function sessionBody(
     | typeof WRONG_USER,
 ) {
   const now = Math.floor(Date.now() / 1_000);
+  const token = `portable-owner-recovery-${user.id}-${user.is_anonymous ? 'anonymous' : 'permanent'}-token`;
+  bearerOwners.set(token, user.id);
   return {
-    access_token: `portable-owner-recovery-${user.is_anonymous ? 'anonymous' : 'permanent'}-token`,
+    access_token: token,
     token_type: 'bearer',
     expires_in: 3_600,
     expires_at: now + 3_600,
@@ -187,11 +190,34 @@ async function handleAccountMock(route: Route): Promise<void> {
   // `weekly_reviews` footprint for T only (design §4) via
   // `tRemoteWeeklyReviewEnabled`. Unknown REST tables fall through to the strict
   // 404 below.
-  if (await generationRemote.handle(route, currentUser.id)) return;
-  if (await generationRemote.handleReadBack(route, currentUser.id)) return;
+  // Auth identity belongs to the bearer SENT with this request. An in-flight
+  // source-account write must not be reinterpreted as the destination account
+  // merely because the journey has since changed currentUser.
+  const owner = bearerOwners.get(request.headers().authorization?.replace(/^Bearer /i, '') ?? '');
+  if (!owner) {
+    await route.fulfill({
+      status: 401,
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ message: 'Auth session missing' }),
+    });
+    return;
+  }
+  if (await generationRemote.handle(route, owner)) return;
+  if (await generationRemote.handleReadBack(route, owner)) return;
   const entity = new URL(request.url()).pathname.match(/^\/rest\/v1\/([a-z_]+)$/)?.[1];
-  if (method === 'POST' && entity && generationRemote.isDataEntity(entity))
-    generationRemote.recordWrite(entity, request.postDataJSON(), currentUser.id);
+  if (method === 'POST' && entity && generationRemote.isDataEntity(entity)) {
+    const posted = request.postDataJSON() as unknown;
+    const rows = Array.isArray(posted) ? posted : [posted];
+    if (rows.some((row) => !row || typeof row !== 'object' || row.user_id !== owner)) {
+      await route.fulfill({
+        status: 403,
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ code: '42501', message: 'row-level security owner mismatch' }),
+      });
+      return;
+    }
+    generationRemote.recordWrite(entity, posted, owner);
+  }
   const handled = await handleBackupRestRequest(route, {
     entities: tRemoteWeeklyReviewEnabled
       ? { weekly_reviews: { countByOwnerUserId: { [DEST_TEMP_ANON_ID]: 1 } } }
@@ -208,6 +234,7 @@ async function handleAccountMock(route: Route): Promise<void> {
 
 async function installAccountMock(page: Page): Promise<void> {
   generationRemote.reset();
+  bearerOwners.clear();
   currentUser = SOURCE_ANON_USER;
   supabaseRequestsSeen = 0;
   verifyUserOverride = null;

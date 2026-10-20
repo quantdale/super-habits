@@ -17,7 +17,7 @@ function buildSupabaseMock(
       const entityErrors = remoteErrorsByEntity[entity] ?? {};
 
       return {
-        select: vi.fn((columns: string, options?: { head?: boolean; count?: string }) => {
+        select: vi.fn((_columns: string, options?: { head?: boolean; count?: string }) => {
           const state = {
             onlyActiveRows: false,
           };
@@ -1060,5 +1060,8 @@ describe('core/sync/restore.coordinator', () => {
 
     expect(preview.backupConflict).toBeNull();
     expect(preview.freshnessSignature).toBeTruthy();
+    expect(preview.warnings).toContain(
+      'Backup conflict state could not be read; publication remains paused. No recovery data was changed.',
+    );
   });
 });

@@ -309,6 +309,8 @@ export async function confirmPortableImport(input: {
       // exercises). Rows were runtime-validated and integrity-verified in
       // `preparePortableImport`; the casts apply the validated shapes.
       const entities = input.file.entities;
+      // SAFETY: preparePortableImport validated each row with the entity's
+      // runtime validator before producing this typed, owner-compatible file.
       const typed = <T>(entity: BackupEntity): T => (entities[entity] ?? []) as unknown as T;
       await applyRemoteProjects(transactionDb, typed<Project[]>('projects'));
       await applyRemoteGoals(transactionDb, typed<Goal[]>('goals'));
@@ -401,6 +403,11 @@ export async function confirmPortableImport(input: {
       await deleteAppMetaKey(transactionDb, appMetaKeys.backupScopeVersion);
       await deleteAppMetaKey(transactionDb, appMetaKeys.backupPendingManifest);
       await deleteAppMetaKey(transactionDb, appMetaKeys.backupPendingSettings);
+      // A file import replaces this device's dataset; it does not inherit an
+      // earlier dataset's cloud lineage, even for the same authenticated owner.
+      await deleteAppMetaKey(transactionDb, appMetaKeys.backupVerifiedGenerationBaseHead);
+      await deleteAppMetaKey(transactionDb, appMetaKeys.backupVerifiedLegacyRestore);
+      await deleteAppMetaKey(transactionDb, appMetaKeys.backupObservedGenerationHead);
       await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
       return null;
     },

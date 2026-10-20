@@ -753,8 +753,28 @@ describe('portable import — cloud backup interaction', () => {
     await setAppMetaText(targetDb as never, appMetaKeys.backupScopeVersion, '2');
     await setAppMetaText(targetDb as never, appMetaKeys.backupBackfillStatus, 'complete');
     await setAppMetaJson(targetDb as never, appMetaKeys.backupBackfillDoneEntities, ['todos']);
+    // Empty-device imports replace the dataset, not its lineage. Provenance
+    // from an earlier dataset on this same owner/device cannot authorize the
+    // imported file to replace a current remote generation without review.
+    const provenanceKeys = [
+      appMetaKeys.backupVerifiedGenerationBaseHead,
+      appMetaKeys.backupVerifiedLegacyRestore,
+      appMetaKeys.backupObservedGenerationHead,
+    ];
+    for (const key of provenanceKeys) {
+      await setAppMetaJson(targetDb as never, key, {
+        ownerUserId: ownerId,
+        snapshotId: 'older_device_dataset',
+        sequence: 8,
+        contentChecksum: 'a'.repeat(64),
+      });
+    }
 
     expect((await confirmPortableImport({ file: outcome.file })).status).toBe('restored');
+    const { getAppMetaJson } = await import('@/core/db/appMeta');
+    for (const key of provenanceKeys) {
+      expect(await getAppMetaJson(targetDb as never, key)).toBeNull();
+    }
 
     // Imported rows were durably enqueued for the owner (backfill reset +
     // re-run) — outbox covers every imported row + the settings record.
