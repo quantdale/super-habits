@@ -1,6 +1,6 @@
 ---
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 ---
 
 # Session reconciliation and main integration
@@ -39,8 +39,7 @@ explicit deployment, destructive Git operation, or unrelated feature work.
 ## Current Checkpoint
 
 - Current milestone: Complete. Second-pass defects fixed and verified; full QA
-  green on pinned Node 22.23.2/npm 10.9.8; ready for controlled commit and
-  fast-forward push to origin/main.
+  green on pinned Node 22.23.2/npm 10.9.8; committed and pushed to origin/main.
 - Completed: Reproduced legacy-cutover false-baseline and pending-local bypass
   (2 failing production-path tests before the fix), plus dual-capture resolver
   identity mismatch (failing test before fix). Remote legacy preservation no
@@ -50,8 +49,7 @@ explicit deployment, destructive Git operation, or unrelated feature work.
   an explicit warning instead of silently hiding paused publication. Added
   restore→publish, unverified-proof, durable re-read, file-backed restart and
   maintenance-failure tests; converted private publication tests to full push.
-- In progress: Final browser/simulation coverage after compatibility fixes,
-  historical/current report reconciliation, then controlled main integration.
+- In progress: None.
 - Important modified files: `core/sync/supabase.adapter.ts`,
   `core/sync/restore.coordinator.ts`, `core/backup/backupConflictResolution.ts`,
   `tests/integration/generationClientRecovery.test.ts`,
@@ -69,14 +67,14 @@ explicit deployment, destructive Git operation, or unrelated feature work.
   controls retained. Incomplete TEMP npm distribution caused no-output exits;
   switched to the complete already-installed Node 22 distribution.
 - Relevant quarantines: No changes authorized to quarantines.
-- Blockers: None identified yet; hosted/native release qualifications remain
-  external and cannot be relabeled as locally certified.
-- Exact next action: Commit the reconciliation fixes + session report as one
-  controlled change, then push `fix/post-acceptance-defects` and fast-forward
-  `origin/main` (explicitly operator-requested), verifying the remote tip.
-- Remaining definition of done: Source/report issues fixed and tested, required
-  local gates recorded, plan validated, corrections committed, verified normal
-  push to `origin/main`, and honest final integration/release handoff.
+- Blockers: None. Hosted/native release qualifications remain external and
+  cannot be relabeled as locally certified.
+- Exact next action: None — task complete.
+- Remaining definition of done: Complete. Source/report issues fixed and
+  tested, all required local gates recorded green, plan validated,
+  corrections committed, and a verified non-forced push to `origin/main`
+  completed. Hosted/native release certification remains an explicitly
+  separate, still-outstanding external release gate (not this task's scope).
 
 ## Progress
 
@@ -84,8 +82,8 @@ explicit deployment, destructive Git operation, or unrelated feature work.
 - [x] Reproduce and correct confirmed source defects.
 - [x] Reconcile the historical and current report/plan claims.
 - [x] Execute sufficient pinned-toolchain QA and record external gaps.
-- [ ] Validate plans and commit corrections.
-- [ ] Push non-forced to main and verify the exact remote tip.
+- [x] Validate plans and commit corrections.
+- [x] Push non-forced to main and verify the exact remote tip.
 
 ## Surprises & Discoveries
 
@@ -159,4 +157,9 @@ its checkpoint, then continue from Exact next action.
 
 ## Outcomes & Retrospective
 
-Active. No new source fixes, validation passes, commits or pushes claimed yet.
+Complete. Three controlled commits landed and pushed: `c8700bc0` (Phase B
+acceptance response), `3477cdb1` (this session's second-pass W-9…W-12 fixes
+plus the session report), and the plan-completion marker. `origin/main`
+fast-forwarded `85599dfb` → `3477cdb1` and was verified before/after. All
+local gates green on the pinned toolchain; hosted/native/release certification
+remains the same external set as before.
