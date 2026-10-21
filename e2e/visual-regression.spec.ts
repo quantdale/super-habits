@@ -349,7 +349,7 @@ test.describe('W15 primary destinations', () => {
     // title and no-ops, and the row never appears (the historical flake).
     // Per-key events keep the value flowing to whichever node is live.
     await quickAdd.click();
-    await quickAdd.pressSequentially(longTitle, { delay: 10 });
+    await quickAdd.pressSequentially(longTitle);
     // Observable readiness contract: the add button's `disabled` flag is
     // derived from React state (`canSubmit = trimmed.length > 0`), so its
     // enabled state is the honest signal that the typed title is submittable.
