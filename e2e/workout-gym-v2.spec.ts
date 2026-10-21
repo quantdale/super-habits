@@ -285,6 +285,13 @@ test.describe('Workout Gym V2', () => {
     await page.getByRole('textbox', { name: 'Weight' }).fill('70');
     await page.getByRole('textbox', { name: 'Reps' }).fill('8');
     await page.getByText('Start', { exact: true }).first().click();
+    // Durability readiness contract: `handleStart` presents the running state
+    // only after the resume draft write settles, and the Work timer line is
+    // rendered solely from that running state (`isRunning && isActive`) —
+    // waiting for it proves the draft is durable before the reload below.
+    // ('Skip set' is NOT such a signal: it renders on `isActive` alone — the
+    // current phase kind — and is visible before Start is ever pressed.)
+    await expect(page.getByText(/Work timer/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Skip set' })).toBeVisible();
 
     // Durability contract: the running UI is presented only after the resume
