@@ -15,105 +15,160 @@ recovery durability and honest security-gate behavior are preserved throughout.
 
 - Branch: `e2e-stabilization-visual-fidelity` (successor to
   `ci/independent-e2e-qualification` = PR #82 head `a70026ec`, base `e6cf0d34`
-  = `origin/main`). PR #82 scope (CI decoupling) is verified correct and is
-  left untouched; this branch carries the bounded engineering fixes.
-- Hosted evidence preserved under `.agent/evidence/e2e-stab-2026/hosted/`
-  (artifact zips for runs 39541914477 [workout failure] and 39545583888
-  [visual failures]; zip SHA-256 recorded in report).
+  = `origin/main`). PR #82 scope (CI decoupling) is verified correct and left
+  untouched; this branch carries the bounded engineering fixes.
+- Hosted evidence preserved as artifact archives under
+  `C:/Users/Michael Roy/pi-evidence/super-habits-e2e-stab-2026/hosted/`
+  (runs 39541914477 [workout failure] and 39545583888 [visual failures];
+  SHA-256 recorded in the final report).
 - Run A (39541914477, head 64dc72df): functional Chromium 257 passed / 1
-  failed / 47 skipped; `e2e/workout-gym-v2.spec.ts:265` "resumes an
-  interrupted guided session with entered measurements" failed 3/3 attempts.
+  failed / 47 skipped; `e2e/workout-gym-v2.spec.ts:265` failed 3/3 attempts.
 - Run B (39545583888, head a70026ec): functional Chromium green (255/47/0);
-  visual lane `31 failed / 3 passed` at `maxDiffPixels: 0`. The 3 passes are
-  the non-screenshot readiness self-checks; every screenshot comparison failed.
+  visual lane 31 failed / 3 passed at `maxDiffPixels: 0`.
 
-## Findings so far (evidence-backed)
+## Scope
 
-### Track A — Workout reload/resume (ROOT CAUSE ESTABLISHED, fix pending)
+- Workout reload/resume durability defect + regression evidence.
+- Visual baseline provenance / cross-environment fidelity.
+- Minimal test-synchronization fixes discovered en route.
+- Read-only governance investigation + owner-actionable configuration text.
+- Validation gates and evidence preservation.
 
-Trace timeline (attempt 0, `test.trace`):
+## Non-Goals
 
-- `fill(Weight, 70)` @1208259 → `fill(Reps, 8)` @1208279 → click `Start`
-  @1208293 → `expect(Skip set)` resolves @1208328 → `page.reload()`
-  @1208334 (**~41 ms after Start**).
-- `handleStart()` calls `persistDraft()` which fires
-  `void saveWorkoutSessionDraft(...)` — fire-and-forget across the async
-  expo-sqlite/OPFS bridge. The page teardown at +41 ms kills the in-flight
-  transaction; the draft never commits.
-- Failure snapshot shows the Workout landing fully hydrated (dashboard, quick
-  start, weekly plan all rendered) with hero "Today · Rest scheduled / Rest
-  day" — i.e. `getWorkoutSessionDraft()` returned **null**, not a slow-read
-  race. The session record genuinely did not exist.
-- Classification: **CONFIRMED_PRODUCT_DEFECT** (narrow durability race: the
-  running UI is presented before the resume draft is durable) **+
-  CONFIRMED_TEST_DEFECT** (test interrupts without observing any persistence
-  signal). Failures 3/3 in Run A but green in Run B = runner-speed-sensitive
-  race, NOT a harmless flake.
-
-### Track B — Visual regression (ROOT CAUSE PATTERN ESTABLISHED)
-
-- All 31 failures are `toHaveScreenshot` mismatches with pixel ratios
-  0.01–0.04; per-image row profiling shows differing pixels confined to text
-  bands (e.g. rows 15–56 date heading, 85–101 greeting) across every surface,
-  theme and viewport. Layout/bboxes identical; glyph rasterization differs
-  (crop comparison: same letterforms, different stroke weight/antialiasing).
-- The 3 passing visual tests are the readiness negative controls (no goldens).
-  The strict-comparison control failed at its FIRST assertion (unperturbed
-  capture must match golden) — consistent with baseline-environment mismatch.
-- Baseline provenance: goldens authored on the Windows dev host
-  (`42d1c20d` 2026-10-14, refreshed `2ea6bd33`, `2eafa777`); hosted lane runs
-  Ubuntu Chromium. `snapshotPathTemplate` is deliberately platform-NEUTRAL
-  (`{testDir}/__screenshots__/{testFilePath}/{arg}{ext}`), forcing
-  Windows-rendered goldens to be compared against Linux rendering. Fonts are
-  bundled (`@expo-google-fonts/nunito` via `expo-font`) so this is
-  rasterization drift (DirectWrite vs FreeType), not font fallback.
-- Classification (pending final proof): **CONFIRMED_ENVIRONMENT_DRIFT** with a
-  baseline-provenance defect (platform-neutral names bind one OS's rendering to
-  another OS's gate). NOT to be "fixed" by thresholds or masks.
-
-## Implementation plan
-
-1. Track A fix: make `handleStart` await the draft write before presenting the
-   running state (observable readiness contract: running UI ⇒ resume draft
-   durable). Failure path keeps best-effort semantics (session still starts;
-   a conflicting durable draft owns the slot).
-2. Track A regression evidence: pre-reload durable-row assertion via DB
-   harness; no-premature-log assertion; single-log-after-save; duplicate
-   session guards (negative tests per campaign §2.5). Demonstrate the new test
-   detects the original defect via deterministic fault injection (delayed
-   draft write) BEFORE the fix.
-3. Track B correction: platform-scoped snapshot names (Playwright `{platform}`
-   token) + Linux goldens derived from the hosted Run B actuals (every
-   candidate compared against the Windows golden and classified before
-   commit), `maxDiffPixels: 0` retained, no masks. Windows goldens kept for
-   local dev. Manifest updated with change-log rows + environment contract.
-4. Track C: verify CI lane integrity (security gate untouched, independent E2E
-   execution, no bypass introduced); minimal workflow improvement only if it
-   materially improves evidence capture.
-5. Track D: read-only governance investigation (rulesets, branch protection,
-   deployment triggers); produce owner-actionable target config; DO NOT apply.
-6. Validation: typecheck, lint, focused + full workout E2E, visual lane,
-   ciLaneIntegrity tests, security audit preserved red.
-7. Independent adversarial review of final diff (Track E), then push branch +
-   open non-merged PR.
+- No merges to main; no deployments; no ruleset/environment changes; no
+  dependency or security-policy changes; no screenshot tolerance changes; no
+  broad CI refactoring.
 
 ## Current Checkpoint
 
-- Status: ACTIVE. Root causes for A and B established from hosted artifacts.
-- Exact next action: build `dist/` (`npm run build:e2e`), then reproduce the
-  workout failure locally with deterministic fault injection (injected delay in
-  the draft-write path in a scratch reproduction), before applying the fix.
-- Decisions: successor branch created (PR #82 branch left clean); evidence
-  archived as zips (extracted trees removed — lint flagged vendored Playwright
-  Trace Viewer code inside them; archives verified entry-complete before
-  removal). Visual fix direction: platform-scoped goldens, strict comparison
-  retained.
-- Blockers: none local. WSL/Docker unavailable (cross-env proof relies on
-  hosted artifacts + hosted re-run).
-- Remaining: items 2–7 above.
+- Current Milestone: hosted verification + adversarial review (milestone 7 of 7)
+- Completed: root causes A+B established from hosted artifacts; Track A fix
+  (handleStart awaits draft write before running state) + strengthened
+  regression + discriminating fault-injection demo; Track B platform-scoped
+  goldens (win32 = original reviewed corpus, linux = hosted Run B actuals,
+  each classified as rasterization-only drift); long-title To Do snapshot
+  remount race fixed; golden-manifest provenance + table-column fix;
+  lint-scope exclusion for derived QA evidence; Track C ciLaneIntegrity
+  13/13; Track D governance read-only investigation (Protect Main ruleset
+  15001092 enforcement=disabled; classic branch protection 404; 7
+  environments all can_admins_bypass=true with zero protection rules;
+  vercel.json has no branch pinning beyond Vercel defaults).
+- In Progress: hosted CI verification of pushed SHA 39597143130 (quality job
+  red on ExecPlan validation before this rewrite — being corrected here; e2e
+  job correctly gated to PR/main/dispatch events, so a bare branch push shows
+  it skipped by design, not bypassed).
+- Important Modified Files: `.gitignore`, `eslint.config.mjs`, `playwright.config.ts`,
+  `features/workout/WorkoutSessionScreen.tsx`, `e2e/workout-gym-v2.spec.ts`,
+  `e2e/visual-regression.spec.ts`, `e2e/__screenshots__/visual-regression.spec.ts/*`
+  (30 renamed `-win32`, 30 new `-linux`), `docs/ui-ux/v3-audit/w15/golden-manifest.md`,
+  `.agent/execplans/e2e-stabilization-visual-release-gates.md`.
+- Last Successful Validation: typecheck clean; eslint clean (0/0); unit 2436/2436; unit
+  ciLaneIntegrity 13/13; integration workout suites 33/33; workout E2E 7/7;
+  visual 34/34 (post-fix, platform-scoped goldens); audit-runtime-deps
+  honestly red (braces + node-forge) — 2026-10-21.
+- failures: hosted quality step "Validate versioned ExecPlans" failed on this
+  plan's missing sections — corrected in this rewrite; re-verify hosted.
+- quarantines: none.
+- blockers: none local. WSL/Docker unavailable (cross-env proof = hosted
+  artifacts + hosted re-run). Vercel API access unavailable — deployment
+  review is repository-configuration-based only.
+- Exact next action: commit this ExecPlan rewrite, re-run hosted CI, confirm
+  the audit stays red and the ExecPlan gate passes, then run the independent
+  adversarial review and publish the final report.
+- Remaining Definition of Done: hosted re-verification; Track E adversarial review; final
+  report with sections A–M.
 
-## Validation Log
+## Progress
 
-- (pending) npm run typecheck / lint / test
-- (pending) focused workout E2E pre/post fix with fault injection
-- (pending) full visual lane hosted
+- [x] Phase 0: repo/PR state recovered; worktree clean; PR #82 head verified.
+- [x] Phase 1: failure matrix from hosted artifacts (trace-level evidence).
+- [x] Phase 2: workout root cause (fire-and-forget draft write raced reload).
+- [x] Phase 2 fix + regression + negative controls + fault-injection demo.
+- [x] Phase 3: visual forensics (31/31 classified: rasterization drift).
+- [x] Phase 3 fix: platform-scoped goldens; strict comparison retained.
+- [x] Phase 4: lane evidence re-run (workout 7/7, visual 34/34 local).
+- [x] Phase 5: governance read-only investigation + target config prepared.
+- [x] Phase 6: security gate verified unchanged and honestly red.
+- [x] Phase 9: quality gates run (see Validation Ledger).
+- [ ] Hosted verification of pushed SHA.
+- [ ] Phase 10: independent adversarial review.
+- [ ] Phase 11: final report.
+
+## Surprises & Discoveries
+
+- The hosted workout failure is a durability race, not a hydration race: the
+  failure snapshot showed the landing fully rendered with hero "Rest day" —
+  `getWorkoutSessionDraft()` returned null because the write never committed.
+- The visual suite's 3 "passes" are the readiness negative controls; every
+  screenshot comparison failed — one root cause (cross-OS text rasterization).
+- `snapshotPathTemplate` was deliberately platform-NEUTRAL, binding Windows
+  goldens to an Ubuntu gate — the provenance defect behind all 31 failures.
+- A pre-existing remount race in the long-title To Do snapshot: the
+  `TodoQuickCapture` subtree swaps when `totallyEmpty` flips, discarding a
+  bulk `fill()`; `scrollIntoViewIfNeeded` fails hard (no retry) on the
+  missing row. Fixed with per-key typing + canSubmit-derived enabled gate +
+  retry-capable visibility assertion.
+- pi-lens lint replayed stale findings on extracted Playwright Trace Viewer
+  vendored code (`snapshot.html`) held in evidence archives; resolved by
+  preserving archives outside the workspace and excluding derived evidence
+  from lint scope per repo convention. No product code was involved.
+
+## Decision Log
+
+- Successor branch (not PR #82's branch): the fixes are outside PR #82's
+  decoupling scope; keeping PR #82 review-clean. — settled 2026-10-21.
+- Track A fix location: `handleStart` gates the running UI on the draft write
+  (observable readiness contract) rather than test-side sleeps or timeout
+  inflation; write failure keeps best-effort semantics so a storage failure
+  never blocks a workout. — settled 2026-10-21.
+- Track B approach: platform-scoped goldens (`{-platform}` token), not
+  tolerance changes, masks, or blind regeneration. linux corpus derived from
+  hosted actual captures after per-image classification; win32 corpus keeps
+  the reviewed goldens byte-identical. — settled 2026-10-21.
+- Evidence archives live outside the repo workspace (pi-evidence) with
+  SHA-256 checksums; extracted trees deleted after entry-complete zips
+  verified. — settled 2026-10-21.
+- Governance findings recorded, not applied (owner authorization required).
+
+## Validation Ledger
+
+- `npm run typecheck` — clean (0 errors). 2026-10-21.
+- `npm run lint` — clean (0 errors, 0 warnings). 2026-10-21.
+- `npm run test:unit` — 194 files / 2436 tests passed. 2026-10-21.
+- `npx vitest run tests/ciLaneIntegrity.test.ts` — 13/13. 2026-10-21.
+- integration `workoutRecoveryIdentity` + `workoutPendingSaveRecovery` —
+  33/33. 2026-10-21.
+- `npx playwright test e2e/workout-gym-v2.spec.ts --project=chromium` — 7/7.
+  2026-10-21.
+- `npm run visual` — 34/34 (strict maxDiffPixels: 0 retained). 2026-10-21.
+- Fault-injection discrimination: delayed draft write + reverted gate →
+  test fails with exact hosted signature; fix restored → 3/3 pass. 2026-10-21.
+- `node scripts/audit-runtime-deps.mjs` — FAILS (2 undocumented high:
+  braces GHSA-vfj7-8cjw-p6xm, node-forge GHSA-86w9-cpqp-85rv) — expected,
+  unchanged. 2026-10-21.
+
+## Changed Files / Areas
+
+- `features/workout/WorkoutSessionScreen.tsx` — durability readiness at Start.
+- `e2e/workout-gym-v2.spec.ts` — durability row oracles + negative controls.
+- `e2e/visual-regression.spec.ts` — long-title remount-race fix.
+- `playwright.config.ts` — platform-scoped snapshot template.
+- `e2e/__screenshots__/visual-regression.spec.ts/` — 30 renamed `-win32`,
+  30 added `-linux`.
+- `docs/ui-ux/v3-audit/w15/golden-manifest.md` — provenance contract +
+  change-log fix.
+- `.gitignore`, `eslint.config.mjs` — derived evidence out of lint scope.
+- Git is authoritative for the actual diff.
+
+## Recovery / Resume Instructions
+
+1. Read `AGENTS.md`, `.agent/PLANS.md`, this plan.
+2. `git status --short`, `git log --oneline -3` on
+   `e2e-stabilization-visual-fidelity`.
+3. `npm run agent:resume -- --plan .agent/execplans/e2e-stabilization-visual-release-gates.md`.
+4. Resume from `Exact next action` in Current Checkpoint.
+
+## Outcomes & Retrospective
+
+(pending final milestone — filled at completion)
