@@ -53,8 +53,19 @@ controlled local commit. No push, merge, deployment, or production migration.
   (post-fix, incl. hijack/idempotency/preservation cases); targeted 23/23 unit +
   30/30 integration; typecheck/lint/prettier PASS; integration 103/1.
 - Current failures: none task-caused; W-2 flake classified and documented.
+- Relevant quarantines: None — this plan created no quarantines and skipped no
+  tests; the inherited W-2 flake (`tests/portableExportSize.test.ts`, 5s
+  timeout under full parallel load) stayed in the suite and is classified
+  FLAKY_TEST/environment, not quarantined.
 - Blockers: none locally; hosted/native gates external.
 - Exact next action: None — task complete.
+- Remaining definition of done: None — all authorized plan work (W-1 fix and
+  re-qualification, F7 report amendments, W-3/W-4/W-5 hardening, full gate
+  re-run, one controlled local commit) is complete and evidenced in the
+  Validation Ledger above. External release qualifications (hosted Supabase,
+  production migration authorization, native/SH-11, browser lanes on pinned
+  Node 22, SH-20/SH-21) remain outside this plan's authorized scope and are
+  not claimed as complete.
 
 ## Progress
 
