@@ -1,7 +1,7 @@
 # E2E Stabilization, Visual Fidelity & Release-Gate Hardening
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -54,10 +54,11 @@ recovery durability and honest security-gate behavior are preserved throughout.
   15001092 enforcement=disabled; classic branch protection 404; 7
   environments all can_admins_bypass=true with zero protection rules;
   vercel.json has no branch pinning beyond Vercel defaults).
-- In Progress: hosted CI verification of pushed SHA 39597143130 (quality job
-  red on ExecPlan validation before this rewrite — being corrected here; e2e
-  job correctly gated to PR/main/dispatch events, so a bare branch push shows
-  it skipped by design, not bypassed).
+- In Progress: None — task complete. Hosted verification finished on run
+  39634540721 (SHA 8dcffd1f): e2e job SUCCESS (feature 258/258 with
+  retriedThenPassed=0, visual 34/34, P0 25/25, sim self-tests 9/9,
+  deterministic scenarios all passed); quality stays honestly red on the
+  dependency audit only.
 - Important Modified Files: `.gitignore`, `eslint.config.mjs`, `playwright.config.ts`,
   `features/workout/WorkoutSessionScreen.tsx`, `e2e/workout-gym-v2.spec.ts`,
   `e2e/visual-regression.spec.ts`, `e2e/__screenshots__/visual-regression.spec.ts/*`
@@ -73,11 +74,11 @@ recovery durability and honest security-gate behavior are preserved throughout.
 - blockers: none local. WSL/Docker unavailable (cross-env proof = hosted
   artifacts + hosted re-run). Vercel API access unavailable — deployment
   review is repository-configuration-based only.
-- Exact next action: commit this ExecPlan rewrite, re-run hosted CI, confirm
-  the audit stays red and the ExecPlan gate passes, then run the independent
-  adversarial review and publish the final report.
-- Remaining Definition of Done: hosted re-verification; Track E adversarial review; final
-  report with sections A–M.
+- Exact next action: None — task complete. PR #83 is open for owner review
+  with the final report published. Remaining items are external gates only.
+- Remaining Definition of Done: None — hosted re-verification green
+  (39634540721, retriedThenPassed=0), Track E adversarial review complete
+  (4 P2 findings: 1 fixed in-repo, 3 documented), final report published.
 
 ## Progress
 
@@ -91,9 +92,9 @@ recovery durability and honest security-gate behavior are preserved throughout.
 - [x] Phase 5: governance read-only investigation + target config prepared.
 - [x] Phase 6: security gate verified unchanged and honestly red.
 - [x] Phase 9: quality gates run (see Validation Ledger).
-- [ ] Hosted verification of pushed SHA.
-- [ ] Phase 10: independent adversarial review.
-- [ ] Phase 11: final report.
+- [x] Hosted verification of pushed SHA (39634540721: e2e SUCCESS, 0 retries).
+- [x] Phase 10: independent adversarial review (reviewer agent; findings triaged).
+- [x] Phase 11: final report published.
 
 ## Surprises & Discoveries
 
@@ -171,4 +172,12 @@ recovery durability and honest security-gate behavior are preserved throughout.
 
 ## Outcomes & Retrospective
 
-(pending final milestone — filled at completion)
+Completed 2026-10-21. Workout durability defect fixed with a true
+readiness gate (Work timer signal after an initially insufficient Skip-set
+gate was caught by the hosted retry-report and re-fixed); visual baselines
+platform-scoped with strict comparison intact (hosted 34/34 on linux);
+long-title remount race fixed; security gate preserved honestly red.
+Adversarial review accepted all areas (no P0/P1). Retrospective: the first
+gating signal (Skip set) was phase-derived, not running-state-derived —
+hosted retry evidence caught it; the fault-injection discipline made each
+fix independently verifiable.
