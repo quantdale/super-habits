@@ -65,8 +65,12 @@ try {
     // produced an unarmed bridge while logging `armed=true`.
     set: {
       ...(process.env.EXPO_PUBLIC_SIM_DATA_BRIDGE_BUILD === '1'
-        ? { EXPO_PUBLIC_SIM_DATA_BRIDGE: 'true' }
-        : {}),
+        ? // Authorized hermetic simulation build: arm the app bridge AND tell the
+          // Metro resolver to include the real mutation module (module isolation).
+          { EXPO_PUBLIC_SIM_DATA_BRIDGE: 'true', SH_SIM_BRIDGE: 'armed' }
+        : // Standard E2E export: keep the artifact identical to a user-facing
+          // build — the resolver substitutes the no-op bridge stub.
+          { SH_SIM_BRIDGE: 'disabled' }),
     },
   });
 } catch (error) {
@@ -95,15 +99,22 @@ if (leakFiles.length > 0) {
 // assembled bundle carries the compiled `__shDataBridge` installer rather than
 // the literal variable name; asserting on the installer is the exact check.
 //
-// `AUD-SH19-B`: the bridge MODULE is always bundled (AppProviders imports it
-// statically), so its identifier proves nothing about whether it is ARMED. Only
-// the build flag decides that, and Metro inlines the flag's name into the
-// comparison. So: a bridge-requesting export must contain the module, and a
-// non-requesting export must contain NO inlined bridge flag at all.
+// `AUD-SH19-B`: with build-time module isolation (metro.config.js resolver),
+// the real bridge MODULE is included ONLY in the authorized sim export
+// (SH_SIM_BRIDGE='armed'); every other export resolves the specifier to the
+// no-op stub, so `__shDataBridge` is absent from the artifact entirely. So: a
+// bridge-requesting export must contain the module (and it is live/armed), and
+// a non-requesting export must contain NO bridge identifier at all — proving
+// isolation held, not merely that the flag string is missing.
 const bridgeModule = scanDirectoryForNeedle(distDir, root, '__shdatabridge');
 const bridgeFlag = scanDirectoryForNeedle(distDir, root, 'sim_data_bridge');
 if (bridgeRequested && bridgeModule.length === 0) {
   fail('the bridge module is absent from the export that requested it.');
+}
+if (!bridgeRequested && bridgeModule.length > 0) {
+  fail(
+    'the simulation bridge module reached an export that did not request it; module isolation failed and visual/feature lanes must stay bridge-free.',
+  );
 }
 if (!bridgeRequested && bridgeFlag.length > 0) {
   fail(

@@ -31,6 +31,14 @@ const distDir = path.join(root, 'dist');
 // the guarantee does not depend on the mechanism above.
 const productionEnv = { ...process.env };
 delete productionEnv.EXPO_PUBLIC_SIM_DATA_BRIDGE;
+// `AUD-SH19-B`: force the Metro resolver to substitute the no-op bridge stub,
+// so the simulation mutation module is excluded from the production artifact
+// entirely (not merely left unarmed). Setting this explicitly (rather than
+// relying on the flag being absent) means an ambient/`.env` simulation flag
+// cannot arm the module: `.env` loading does not overwrite an already-set env
+// var, and the resolver keys module inclusion on SH_SIM_BRIDGE. The `__shdatabridge`
+// scan below remains the fail-closed backstop.
+productionEnv.SH_SIM_BRIDGE = 'disabled';
 
 execFileSync(
   process.execPath,
