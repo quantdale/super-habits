@@ -1,7 +1,7 @@
 # ExecPlan: security-blocked CI qualification recovery (independent hosted E2E)
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -68,35 +68,29 @@ status to green: the run stays red while the security gate is red.
 
 ## Current Checkpoint
 
-- Current milestone: local validation complete; publishing to feature branch.
-- Completed: full discovery (workflow graph, contract tests, governance
-  surfaces, hosted run 39529457743 step-level evidence); upstream recheck
-  (no fix for either advisory); design decision (remove the unnecessary
-  `needs: quality` edge; keep the audit in `quality` untouched); ci.yml
-  decoupling applied; 3 new contract tests added (mutation-checked: they fail
-  when `needs: quality` is restored); AGENTS.md + superhabits-rules.mdc CI
-  sections updated; local gates green.
-- In progress: feature-branch commit + PR, then hosted verification.
+- Current milestone: COMPLETE — hosted verification at final head done;
+  final report delivered.
+- Completed: discovery; upstream recheck; design; ci.yml decoupling; contract
+  tests (incl. review-round hardening); doc updates; local gates; PR #82
+  (unmerged); hosted verification at both heads; independent adversarial
+  review with all SHOULD-FIX items corrected and mutation-verified.
+- In progress: None.
 - Important modified files: `.github/workflows/ci.yml`,
-  `tests/ciLaneIntegrity.test.ts`, `AGENTS.md`,
-  `.cursor/rules/superhabits-rules.mdc`, this plan.
-- Last successful validation: full Vitest 3059 passed / 2 skipped; typecheck
-  0 errors; lint 0/0; agent:plan:validate:all PASS; openspec:validate 89/89;
-  validate:themes 140/140; journey-label + quarantine-register parity OK;
-  release-profile-guard + cloud-native-isolation OK; ciLaneIntegrity 13/13
-  (2026-10-21). Audit exits 1 with exactly the two known UNDOCUMENTED highs
-  (expected red).
-- Current failures: None local. Hosted `quality` is expected-red at the audit.
-- Relevant quarantines: None.
+  `tests/ciLaneIntegrity.test.ts`, `.github/workflows/web-e2e-validation.yml`,
+  `AGENTS.md`, `.cursor/rules/superhabits-rules.mdc`, this plan.
+- Last successful validation: hosted run 39541914477 (PR #82, head 64dc72df):
+  quality FAILURE at `Audit runtime dependencies` only; e2e EXECUTED and
+  reported its real result (257 passed / 1 failed / 47 skipped / 0 flaky,
+  24 min); nightly correctly skipped; run-level status FAILURE; no deploy.
+- Current failures: none in scope. ONE pre-existing functional E2E failure
+  surfaced by the restored evidence (see Outcomes) — preserved for a follow-up
+  triage task, not caused by this change.
+- Relevant quarantines: none added.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: commit the independent-review corrections
-  (contract-test vacuity fix, web-e2e-validation.yml rationale) and push to
-  the PR branch; observe the exact-head hosted run; then finalize the report.
-- Remaining definition of done: hosted run at the FINAL head observed showing
-  e2e EXECUTED with quality red at the audit; final report produced; this
-  plan COMPLETED.
+- Exact next action: None — task complete.
+- Remaining definition of done: None.
 
 Environment-repair note (not repo changes): local `node_modules` was stale
 (expo 55.0.28 vs ~55.0.31; expo-haptics/expo-audio missing) — repaired with
@@ -113,10 +107,13 @@ regenerable intermediates restored the documented fresh-clone behavior
 - [x] Design decision (smallest change: drop the unnecessary `needs` edge)
 - [x] Implement ci.yml decoupling + contract tests + doc updates
 - [x] Local validation gates
-- [ ] Feature branch push + PR (unmerged)
-- [ ] Hosted verification of exact-head run
-- [ ] Adversarial review of the change
-- [ ] Final report + this plan COMPLETED
+- [x] Feature branch push + PR (unmerged) — PR #82, commits 2963ce4d + 64dc72df
+- [x] Hosted verification of exact-head run — 39540003485 (2963ce4d,
+      superseded/cancelled mid-e2e by the review-fix push) and 39541914477
+      (64dc72df, complete evidence)
+- [x] Adversarial review of the change — reviewer subagent VERIFIED-OK +
+      2 SHOULD-FIX corrected and mutation-verified
+- [x] Final report + this plan COMPLETED
 
 ## Surprises & Discoveries
 
@@ -226,7 +223,42 @@ regenerable intermediates restored the documented fresh-clone behavior
 
 ## Outcomes & Retrospective
 
-Pending completion.
+Delivered: the `e2e` and `nightly` jobs of `.github/workflows/ci.yml` no
+longer declare `needs: quality`, so hosted E2E executes and reports its real
+result while the production-dependency audit stays red — verified live on
+PR #82 (run 39541914477, head 64dc72df): quality FAILURE at exactly `Audit
+runtime dependencies` (the two UNDOCUMENTED highs), e2e EXECUTED in parallel
+(257 passed / 1 failed / 47 skipped / 0 flaky), nightly skipped (schedule-
+only), run-level FAILURE, no deployment. The security gate is byte-identical
+to the pre-change gate: same step, same script, same allowlist, same fail-
+closed boundary, still the last gating step of `quality`.
+
+Proof: mutation battery (scalar + block-sequence `needs:`, job-level
+`continue-on-error`, audit-step `if:`) all caught by the contract tests;
+independent read-only adversarial review found no bypass (its two SHOULD-FIX
+guard defects were corrected before the final head).
+
+Handoff — one NEW finding surfaced by the restored E2E evidence (not caused
+by this change; app code is byte-identical to main e6cf0d34):
+`e2e/workout-gym-v2.spec.ts:265 "resumes an interrupted guided session with
+entered measurements"` fails deterministically on the hosted runner (3/3
+attempts: `getByText('Session in progress', { exact: true })` not visible
+within 5s after an interrupted-session reload) but passes locally isolated
+and in full-file order (7/7). Candidate slow-host durability race in the
+guided-session resume path. Follow-up: focused triage task reproducing under
+full-suite/hosted conditions, then classify PRODUCT_BUG vs TEST_BUG. Do NOT
+weaken the test; evidence preserved in the run's `e2e-report` artifact.
+
+Also handed off as owner-level follow-ups (pre-existing, out of scope here):
+enforce required checks (enable ruleset "Protect Main" with `quality`
+required — `main` is currently unprotected, so release-blocking is policy-
+only); pin `permissions: contents: read` on ci.yml / web-e2e-validation.yml;
+zizmor `uses:`-pinning hardening.
+
+Lessons: decoupling test execution from security enforcement restored
+visibility into a real latent failure within one run; guards against
+re-coupling must cover YAML block forms and job-level failure absorption,
+not just the scalar form the diff removed.
 
 ## Appendix: future advisory recheck procedure (lightweight, reproducible)
 
