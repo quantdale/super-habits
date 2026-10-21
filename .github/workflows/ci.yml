@@ -128,7 +128,31 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    needs: quality
+    # NO `needs: quality` — deliberately independent of the dependency-security
+    # audit (change `security-blocked-ci-qualification-recovery`, 2026-10-21).
+    # This job consumes NO output and NO artifact of `quality`: it checks out
+    # its own source, runs its own `npm ci`, and builds its own `build:e2e` /
+    # `build:e2e:sim` / `build:sync` artifacts. The old `needs: quality` edge
+    # bought nothing but coupling to the audit step at the end of `quality`,
+    # so while the two upstream HIGH advisories (braces GHSA-vfj7-8cjw-p6xm,
+    # node-forge GHSA-86w9-cpqp-85rv) kept that audit correctly red, every
+    # hosted E2E lane was skipped and the functional state of main was
+    # unverifiable.
+    #
+    # SECURITY POSTURE IS UNCHANGED: the audit remains the last gating step of
+    # `quality`, still fails the workflow run whenever policy requires, and a
+    # red security gate still means NOT release-qualified even when every E2E
+    # lane here is green. Executing tests independently is not release
+    # authorization; the run-level status stays red while `quality` is red.
+    # The trigger below (PR / main push / dispatch) also still keeps this job
+    # off ordinary branch pushes.
+    #
+    # Trade-off accepted: E2E now also runs when application checks genuinely
+    # fail (its own build is its genuine prerequisite and fails with it). The
+    # alternative — a failure-classification output plus a guarded job
+    # condition — reintroduced exactly the coupling and `always()`-style
+    # fragility this separation removes.
+    #
     # Lanes (see simulation/matrix.ts):
     #   - PR: journeys@pr (chromium feature suite + @p0 journey subset) and
     #     scenarios-pr (deterministic scenario subset, gates, ≤ 10 min budget).
@@ -370,7 +394,11 @@ jobs:
 
   nightly:
     runs-on: ubuntu-latest
-    needs: quality
+    # NO `needs: quality` (same rationale as the `e2e` job above): these lanes
+    # are schedule-only, report-only, and consume no `quality` output. Behind
+    # `needs: quality` they never ran at all while the security gate was red
+    # (verified: scheduled run 39490330427 skipped them). The audit's verdict
+    # is unchanged and remains in `quality`.
     # Schedule-only superset of the e2e job: full journeys + seeded scenario
     # mode (scenarios-seeded) + dist-sync + the disposable-backend lane.
     # Non-gating by design (everything here is report-only).

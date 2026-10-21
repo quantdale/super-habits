@@ -463,9 +463,17 @@ eas build -p android --profile preview
 
 1. **quality** — `npm run typecheck` + `npm run lint` + `npm run test` (Vitest
    runs **both** projects — unit **and** integration — under `TZ=Asia/Manila`).
-   Runs on every trigger (PR, push, schedule, dispatch).
-2. **e2e** — runs after `quality`, on PRs and on `push` to `main` (and manual
-   `workflow_dispatch`); skipped on `schedule` (the `nightly` job covers it).
+   Runs on every trigger (PR, push, schedule, dispatch). Its final gate step is
+   the production-dependency advisory gate (`node scripts/audit-runtime-deps.mjs`),
+   which stays in this job deliberately and fails the job (and the run) whenever
+   policy requires.
+2. **e2e** — runs **independently of `quality`** (no `needs:` edge — it consumes
+   no quality output and builds its own artifacts), on PRs and on `push` to
+   `main` (and manual `workflow_dispatch`); skipped on `schedule` (the `nightly`
+   job covers it). Independence is **test execution only**: while the dependency
+   audit in `quality` is red, this job still executes and reports its real
+   result, the run stays red, and release stays blocked — green E2E is not
+   release authorization.
    - **PR lane:** `npx playwright test --project=chromium` (feature suite) +
      `npm run e2e:journeys:p0` (P0 journeys) + `npm run sim:validate` +
      `npm run sim:run -- --mode deterministic --scenario @p0` (deterministic
@@ -481,7 +489,8 @@ as a hard step in the gating e2e job`). It runs in the `nightly` job below,
      report-only.
    - Uploads `e2e-report`, `simulation-output/` (run reports, digests, traces,
      repro bundles), and `dist-sync/` — all 7-day retention.
-3. **nightly** — `schedule`-only, after `quality`: full `npm run e2e` (full
+3. **nightly** — `schedule`-only (also independent of `quality`): full
+   `npm run e2e` (full
    journeys) + seeded scenario lane (`sim:run -- --mode seeded`) + `dist-sync/`
    build + `npm run e2e:sync` (the `journeys-sync` project runs the remote-boundary
    journey steps, including the restore-prompt branches, against `dist-sync/` on

@@ -33,6 +33,10 @@ interface WorkflowStep {
 
 interface WorkflowJob {
   name: string;
+  /** Job-level `needs:` scalar (absent when the job declares no dependency). */
+  needs?: string;
+  /** Job-level `if:` scalar (absent when the job has no trigger guard). */
+  if?: string;
   steps: WorkflowStep[];
   /** The whole job block, for slice-level assertions. */
   text: string;
@@ -104,7 +108,13 @@ function buildJob(name: string, lines: string[]): WorkflowJob {
     return step;
   });
 
-  return { name, steps, text: lines.join('\n') };
+  const whole = lines.join('\n');
+  const jobResult: WorkflowJob = { name, steps, text: whole };
+  const needs = scalar(whole, 'needs', 4);
+  const condition = scalar(whole, 'if', 4);
+  if (needs !== undefined) jobResult.needs = needs;
+  if (condition !== undefined) jobResult.if = condition;
+  return jobResult;
 }
 
 function readWorkflow(workflowFile: string): Workflow {
@@ -211,6 +221,59 @@ describe('CI lane integrity: the quality job runs every guard qa:fast runs', () 
     // A documented "must be zero" severity policy cannot sit behind
     // continue-on-error, and the step must not absorb its own failure.
     expect(auditSteps[0]?.continueOnError).toBe(false);
+  });
+});
+
+describe('CI lane integrity: test execution is independent of the security gate', () => {
+  // The dependency-security audit (scripts/audit-runtime-deps.mjs) lives in the
+  // quality job and is legitimately red while upstream HIGH advisories have no
+  // published fix. A `needs: quality` edge on the test lanes turns that correct
+  // red into SKIPPED hosted E2E — functional evidence silently disappears
+  // behind an unrelated security finding. The test lanes consume no quality
+  // output or artifact (own checkout, own npm ci, own build:e2e / build:sync),
+  // so they must stay independent of the audit's outcome. Independence is
+  // TEST EXECUTION ONLY: the audit remains a quality-job gate (pinned above)
+  // and a red security gate still blocks release even when every lane is green.
+  it('declares no needs dependency on the quality job for the e2e or nightly lanes', () => {
+    for (const name of ['e2e', 'nightly']) {
+      const target = job(ci, name);
+      expect(
+        target.needs ?? '',
+        `${name} depends on the quality job, so a correctly-red security audit skips it`,
+      ).not.toMatch(/\bquality\b/);
+    }
+  });
+
+  it('keeps the dependency-security audit in the quality job and out of the test lanes', () => {
+    // The audit must not be relocated into (or duplicated in) a test lane,
+    // where it could be mistaken for — or silently substituted by — a
+    // test-execution result. The gating copy in quality is pinned exactly-once
+    // and non-continue-on-error by the test above.
+    for (const name of ['e2e', 'nightly']) {
+      expect(
+        stepsRunning(job(ci, name), 'scripts/audit-runtime-deps.mjs'),
+        `${name} runs the dependency audit; it belongs to the quality gate only`,
+      ).toEqual([]);
+    }
+  });
+
+  it('keeps the gating e2e lane off ordinary branch pushes and nightly schedule-only', () => {
+    // Independence must not become "run expensive lanes everywhere": the
+    // e2e trigger guard (PR / main push / dispatch) and the schedule-only
+    // nightly are part of the lane contract.
+    const e2e = job(ci, 'e2e');
+    expect(e2e.if, 'e2e lost its pull_request trigger guard').toContain(
+      "github.event_name == 'pull_request'",
+    );
+    expect(e2e.if, 'e2e lost its main-push trigger guard').toContain(
+      "github.ref == 'refs/heads/main'",
+    );
+    expect(e2e.if, 'e2e lost its workflow_dispatch trigger guard').toContain(
+      "github.event_name == 'workflow_dispatch'",
+    );
+    expect(job(ci, 'nightly').if, 'nightly is no longer schedule-only').toBe(
+      "github.event_name == 'schedule'",
+    );
   });
 });
 

@@ -148,9 +148,9 @@ E2E tests live in `e2e/` at the project root. They run against the **static web 
 
 Three jobs (see `.github/workflows/ci.yml`; lane matrix enforced by `validateMatrix()` in `simulation/matrix.ts`):
 
-- **quality** — typecheck + lint + unit tests (runs first, on every trigger)
-- **e2e** — runs after **quality** on PRs and main pushes (and manual `workflow_dispatch`): the PR lane runs the chromium suite + P0 journeys + simulation validation/deterministic subset; the main lane runs the full `npm run e2e`, the full deterministic simulation library, a `dist-sync/` build, and `npm run e2e:sync` (the `journeys-sync` project)
-- **nightly** — schedule-only, non-gating: full `npm run e2e` + seeded simulation lane + `dist-sync/` build (+ optional disposable-backend lane when `SUPABASE_ACCESS_TOKEN` is configured)
+- **quality** — typecheck + edge-function check + lint + guards + unit/integration tests (runs on every trigger); ends with the GATING `scripts/audit-runtime-deps.mjs` production-dependency advisory gate — a red audit fails this job and the run
+- **e2e** — runs **independently of quality** (no `needs:` edge; builds its own artifacts) on PRs and main pushes (and manual `workflow_dispatch`): the PR lane runs the chromium suite + P0 journeys + simulation validation/deterministic subset; the main lane runs the full `npm run e2e`, the full deterministic simulation library, and a `dist-sync/` build (the `journeys-sync`/`e2e:sync` lane stays nightly-only). A red security audit does NOT skip this lane — test execution is independent of, and never a substitute for, release authorization
+- **nightly** — schedule-only, non-gating, also independent of quality: full `npm run e2e` + seeded simulation lane + `dist-sync/` build + `npm run e2e:sync` remote-boundary lane (+ optional disposable-backend lane when `SUPABASE_ACCESS_TOKEN` is configured)
 
 ## Current known bugs (do not silently fix — coordinate first)
 
