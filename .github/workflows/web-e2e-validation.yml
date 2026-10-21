@@ -2,13 +2,16 @@ name: Web E2E Validation (non-release)
 
 # NON-RELEASE VALIDATION LANE — evidence only.
 #
-# Why this exists: the `e2e` and `nightly` jobs of ci.yml sit behind
-# `needs: quality`, and the `quality` job's hard release gate
-# (`scripts/audit-runtime-deps.mjs`) is red on two unremediated HIGH
-# advisories with no published fix (see SECURITY-DISPOSITION.md). While that
-# gate is red, no hosted browser evidence is produced at all, which makes the
-# functional state of a release candidate unverifiable by anyone reviewing the
-# PR without a local multi-hour run.
+# Why this exists: this lane predates the `security-blocked-ci-qualification-
+# recovery` change (2026-10-21), when the `e2e`/`nightly` jobs of ci.yml sat
+# behind `needs: quality` and the `quality` job's hard release gate
+# (`scripts/audit-runtime-deps.mjs`, red on two unremediated HIGH advisories
+# with no published fix — see SECURITY-DISPOSITION.md) skipped all hosted
+# browser evidence. That coupling is gone: ci.yml's `e2e` job now runs on PRs
+# and main pushes regardless of the audit's state. This lane remains useful as
+# the on-demand, exact-SHA full-suite evidence path OUTSIDE the normal trigger
+# schedule — arbitrary SHAs, re-runs of the full suite without pushing a
+# commit, or runs when no PR/main-push event exists.
 #
 # What this lane is: the SAME hosted E2E configuration as ci.yml's `e2e` job
 # (same checked-out source, same npm ci, same Playwright projects and

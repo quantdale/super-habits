@@ -216,11 +216,21 @@ describe('CI lane integrity: the quality job runs every guard qa:fast runs', () 
   });
 
   it('gates the dependency audit step on a new high/critical advisory', () => {
-    const auditSteps = stepsRunning(job(ci, 'quality'), 'scripts/audit-runtime-deps.mjs');
+    const quality = job(ci, 'quality');
+    const auditSteps = stepsRunning(quality, 'scripts/audit-runtime-deps.mjs');
     expect(auditSteps).toHaveLength(1);
     // A documented "must be zero" severity policy cannot sit behind
     // continue-on-error, and the step must not absorb its own failure.
     expect(auditSteps[0]?.continueOnError).toBe(false);
+    // The audit must also run unconditionally: a step-level `if:` could skip
+    // it on exactly the runs where it would fail, and a job-level
+    // `continue-on-error` or `if:` on quality could absorb its failure into a
+    // green run — both invisible to the step-level checks above.
+    expect(auditSteps[0]?.if, 'audit step must declare no if: guard').toBeUndefined();
+    expect(quality.text, 'quality must declare no job-level continue-on-error').not.toMatch(
+      /^ {4}continue-on-error:/m,
+    );
+    expect(quality.text, 'quality must declare no job-level if: guard').not.toMatch(/^ {4}if:/m);
   });
 });
 
@@ -241,6 +251,10 @@ describe('CI lane integrity: test execution is independent of the security gate'
         target.needs ?? '',
         `${name} depends on the quality job, so a correctly-red security audit skips it`,
       ).not.toMatch(/\bquality\b/);
+      // The scalar form alone is not enough: a block-sequence `needs:`
+      // (`needs:` + `- quality`) parses as an empty scalar, so the job block
+      // must not carry a job-level `needs:` key in ANY form.
+      expect(target.text, `${name} declares a job-level needs: key`).not.toMatch(/^ {4}needs:/m);
     }
   });
 

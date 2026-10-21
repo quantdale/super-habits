@@ -91,11 +91,12 @@ status to green: the run stays red while the security gate is red.
 - Blockers: None.
 - Condition required to unblock: None.
 - Exact resume action after unblock: None.
-- Exact next action: create branch `ci/independent-e2e-qualification`, commit,
-  push (non-force), open PR, observe the exact-head hosted run.
-- Remaining definition of done: PR opened and hosted run observed showing e2e
-  EXECUTED with quality red at the audit; adversarial review completed; final
-  report produced; this plan COMPLETED.
+- Exact next action: commit the independent-review corrections
+  (contract-test vacuity fix, web-e2e-validation.yml rationale) and push to
+  the PR branch; observe the exact-head hosted run; then finalize the report.
+- Remaining definition of done: hosted run at the FINAL head observed showing
+  e2e EXECUTED with quality red at the audit; final report produced; this
+  plan COMPLETED.
 
 Environment-repair note (not repo changes): local `node_modules` was stale
 (expo 55.0.28 vs ~55.0.31; expo-haptics/expo-audio missing) — repaired with
@@ -157,6 +158,17 @@ regenerable intermediates restored the documented fresh-clone behavior
 - Rejected alternatives: generic `always()` on e2e (cancellation/correctness
   risk), moving the audit to its own workflow (breaks the pinned contract and
   the mandatory-path requirement), allowlisting the advisories (forbidden).
+- Independent review round (2026-10-21): accept and fix the reviewer's two
+  SHOULD-FIX findings and the #10(a) blind spots before the final head —
+  (1) the independence test now also rejects block-sequence `needs:` (a
+  job-level `needs:` key in ANY form), (2) `web-e2e-validation.yml`'s stale
+  pre-decoupling rationale rewritten, (3) the audit-gate test now rejects a
+  step `if:`, job-level `continue-on-error`, and job-level `if:` on quality.
+  All three mutations verified caught. Reviewer OBSERVATIONS (pre-existing,
+  owner-level follow-ups, deliberately out of scope here): enforce required
+  checks (enable the "Protect Main" ruleset with `quality` required); pin
+  `permissions: contents: read` on ci.yml / web-e2e-validation.yml; zizmor
+  unpinned-`uses:` hardening.
 
 ## Validation Ledger
 
@@ -164,10 +176,13 @@ regenerable intermediates restored the documented fresh-clone behavior
   UNDOCUMENTED highs (expected red) — 2026-10-21.
 - Registry/advisory recheck (npm view + GitHub advisory GraphQL) → no patched
   release for either GHSA id — 2026-10-21.
-- `npx vitest run tests/ciLaneIntegrity.test.ts` → 13/13 (mutation-checked:
-  restoring `needs: quality` fails the new contract) — 2026-10-21.
-- `npm run typecheck` → 0 errors; `npm run lint` → 0 errors/0 warnings —
+- `npx vitest run tests/ciLaneIntegrity.test.ts` → 13/13 — 2026-10-21.
+- Mutation battery (all CAUGHT, ci.yml restored byte-identical after each):
+  scalar `needs: quality` on e2e; block-sequence `needs:` on e2e; job-level
+  `continue-on-error: true` on quality; step `if:` on the audit step —
   2026-10-21.
+- `npm run typecheck` → 0 errors; `npm run lint` → 0 errors/0 warnings;
+  `npx prettier --check` on all changed files → clean — 2026-10-21.
 - `npm run test` (unit + integration) → 3059 passed / 2 skipped / 0 failed
   (298 files) — 2026-10-21.
 - `npm run agent:plan:validate -- --plan <this>` + `agent:plan:validate:all`
@@ -178,13 +193,27 @@ regenerable intermediates restored the documented fresh-clone behavior
 - `npm run qa:affected` → rule `agent-workflow-and-documentation`, gates
   `qa:fast → qa:full`; focused `tests/agent-execplan.test.ts` +
   `tests/ciLaneIntegrity.test.ts` → 22/22 — 2026-10-21.
+- Local E2E smoke on the hermetic export: `e2e/infrastructure.spec.ts` →
+  10/10 passed — 2026-10-21.
+- Hosted run 39540003485 (PR #82, head 2963ce4d): quality FAILURE at the
+  audit step only; e2e EXECUTING in parallel (decoupling verified live);
+  nightly correctly skipped — 2026-10-21.
+- Independent read-only adversarial review (reviewer subagent): workflow
+  VERIFIED-OK on bypass/false-aggregate/cancellation/credentials/deploy/
+  naming/resource findings; SHOULD-FIX #3 (block-form `needs:` vacuity), #4
+  (stale web-e2e-validation.yml rationale) + #10(a) blind spots — all three
+  corrected and mutation-verified — 2026-10-21.
 
 ## Changed Files / Areas
 
 - `.github/workflows/ci.yml` — remove `needs: quality` from `e2e` + `nightly`;
   comments documenting the deliberate separation. Audit step untouched.
 - `tests/ciLaneIntegrity.test.ts` — new contract assertions: e2e/nightly have
-  no `needs` on quality; gating e2e stays off ordinary branch pushes.
+  no job-level `needs:` (any form); the audit stays in quality with no step
+  `if:` and no job-level `continue-on-error`/`if:`; gating e2e stays off
+  ordinary branch pushes. (Review-round hardening included.)
+- `.github/workflows/web-e2e-validation.yml` — header rationale rewritten to
+  post-decoupling reality (review finding #4). No functional change.
 - `AGENTS.md`, `.cursor/rules/superhabits-rules.mdc` — CI wiring truth.
 - `.agent/execplans/security-blocked-ci-qualification-recovery.md` — this plan.
 
