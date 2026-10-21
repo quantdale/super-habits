@@ -94,6 +94,10 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
   const reducedMotion = useReducedMotion();
   const settleDuration = useMotionDuration('feedback');
   const [title, setTitle] = useState('');
+  // Quick Add draft: owned here (not inside TodoQuickCapture) so unsaved text
+  // survives the empty<->populated transition, which swaps Screen's scrolling
+  // container and recreates the Quick Capture subtree.
+  const [quickDraft, setQuickDraft] = useState('');
   const [notes, setNotes] = useState('');
   const [dueDate, setDueDate] = useState<string | null>(null);
   const [priority, setPriority] = useState<TodoPriority>('normal');
@@ -1007,17 +1011,21 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     <View className="flex-1">
       <Screen scroll={totallyEmpty} hero={hero}>
         <View className="flex-1">
-          {totallyEmpty ? (
-            <ScreenSection>
-              <TodoQuickCapture onSubmit={handleQuickAdd} />
-              {noPendingTasksCard}
-            </ScreenSection>
-          ) : null}
+          {/* Single stable Quick Capture (Quick-Add durability): rendered ONCE,
+              outside the empty/populated conditional, so its draft text and
+              input focus survive an empty<->populated transition without the
+              subtree unmounting and discarding unsaved input. Previously one
+              instance lived in each branch and the swap discarded the draft. */}
+          <TodoQuickCapture
+            title={quickDraft}
+            onTitleChange={setQuickDraft}
+            onSubmit={handleQuickAdd}
+          />
+          {totallyEmpty ? <ScreenSection>{noPendingTasksCard}</ScreenSection> : null}
 
           {!totallyEmpty ? (
             <>
               <View>
-                <TodoQuickCapture onSubmit={handleQuickAdd} />
                 <TodoListToolbar
                   search={search}
                   onSearchChange={setSearch}

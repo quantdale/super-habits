@@ -8,6 +8,15 @@ import { createSubmitGuard } from '@/lib/submitGuard';
 import { submitInlineQuickAdd } from '@/features/todos/todoQuickCapture.submit';
 
 type Props = {
+  /**
+   * Controlled draft text. Owned by the section (TodosScreen) rather than this
+   * component so it survives remounts — e.g. the empty<->populated transition
+   * swaps Screen's ScrollView/View container and recreates this subtree. Keeping
+   * the draft up a level is what makes "never lose unsaved input" hold.
+   */
+  title: string;
+  /** Updates the controlled draft text. */
+  onTitleChange: (text: string) => void;
   /** Creates the task; resolves after persistence so the input only clears on success. */
   onSubmit: (title: string) => Promise<void>;
 };
@@ -25,10 +34,9 @@ type Props = {
  * alone cannot do this job). `isSubmitting` here is only the button's loading
  * presentation.
  */
-export function TodoQuickCapture({ onSubmit }: Props) {
+export function TodoQuickCapture({ title, onTitleChange, onSubmit }: Props) {
   const { tokens, sectionAccents } = useAppTheme();
   const reducedMotion = useReducedMotion();
-  const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pressScale] = useState(() => new Animated.Value(1));
   const submitGuard = useRef(createSubmitGuard());
@@ -50,7 +58,7 @@ export function TodoQuickCapture({ onSubmit }: Props) {
       title: trimmed,
       persist: onSubmit,
       onSubmittingChange: setIsSubmitting,
-      onPersisted: () => setTitle(''),
+      onPersisted: () => onTitleChange(''),
     });
   };
 
@@ -70,7 +78,7 @@ export function TodoQuickCapture({ onSubmit }: Props) {
           paddingVertical: spacing.sm,
         }}
         value={title}
-        onChangeText={setTitle}
+        onChangeText={onTitleChange}
         placeholder="Quick add"
         placeholderTextColor={tokens.textMuted}
         returnKeyType="done"
