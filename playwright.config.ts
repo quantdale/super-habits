@@ -123,9 +123,13 @@ export default defineConfig({
       // disabled at capture time, so entrance springs cannot race a snapshot.
       //
       // `snapshotPathTemplate` keeps goldens next to the spec under
-      // `e2e/__screenshots__/` with platform-neutral names (the supported
-      // capture environment is the pinned Chromium served by
-      // scripts/serve-e2e.js; other renderers are documented exclusions).
+      // `e2e/__screenshots__/` with PLATFORM-SCOPED names. Text rasterization
+      // is an OS rendering-stack property (DirectWrite on Windows vs FreeType
+      // on Linux): at `maxDiffPixels: 0` a single shared corpus cannot span
+      // both hosts, so each platform owns its own baseline and is compared
+      // strictly within its own environment (W15 forensics: 31/31 hosted
+      // failures were glyph-edge drift at ratios 0.01–0.04 with identical
+      // layout). Regenerate per platform with `npm run visual:update`.
       name: 'visual',
       testMatch: /visual-regression\.spec\.ts/,
       timeout: 120_000,
@@ -133,7 +137,7 @@ export default defineConfig({
       workers: 1,
       fullyParallel: false,
       retries: 0,
-      snapshotPathTemplate: '{testDir}/__screenshots__/{testFilePath}/{arg}{ext}',
+      snapshotPathTemplate: '{testDir}/__screenshots__/{testFilePath}/{arg}{-platform}{ext}',
       use: {
         ...devices['Desktop Chrome'],
         serviceWorkers: 'block',

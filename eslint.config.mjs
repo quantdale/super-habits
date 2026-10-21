@@ -75,6 +75,7 @@ export default [
       // above). Diagnostic tooling kept there is the same lint-exempt class
       // as scripts/*.mjs; typed rules crash on it without project options.
       'simulation-output/**',
+      '.agent/evidence/**',
     ],
   },
 

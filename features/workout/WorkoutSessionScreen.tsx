@@ -419,9 +419,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   // that write was in flight.
   const draftClearGenerationRef = useRef(0);
   const persistDraft = useCallback(
-    (phaseIndex: number) => {
+    (phaseIndex: number): Promise<void> => {
       const startedAtMs = startedAtMsRef.current;
-      if (startedAtMs === null) return;
+      if (startedAtMs === null) return Promise.resolve();
       const clearGenerationAtWrite = draftClearGenerationRef.current;
       // JSON keys are strings; the normalizer keeps only valid entries.
       const draftDispositions = Object.fromEntries(
@@ -436,7 +436,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       const draftAddedSets = Object.fromEntries(
         Object.entries(addedSets).map(([index, count]) => [String(index), count]),
       );
-      void saveWorkoutSessionDraft({
+      return saveWorkoutSessionDraft({
         routineId: routine.id,
         routineSnapshot: routine,
         notes,
@@ -450,7 +450,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         ...(Object.keys(draftAddedSets).length > 0 ? { addedSets: draftAddedSets } : {}),
       })
         .catch(() => {
-          // Best-effort: the live session never depends on the draft.
+          // Best-effort: the live session never depends on the draft. The
+          // resolved promise still gates the Start readiness contract — a
+          // failed write is surfaced as "not durable", not as a hang.
         })
         .then(() => {
           // A clear happened while this write was in flight: the clear is
@@ -486,7 +488,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   // timer has started (no-op before Start; harmless rewrite on resume mount).
   useEffect(() => {
     if (startedAtMsRef.current === null) return;
-    persistDraft(currentIndex);
+    void persistDraft(currentIndex);
   }, [currentIndex, persistDraft]);
 
   // Seed the entry fields for a newly-current active phase from the most
@@ -694,7 +696,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   // avoiding a database write on every countdown tick.
   useEffect(() => {
     if (startedAtMsRef.current === null || isComplete) return;
-    const id = setTimeout(() => persistDraft(currentIndexRef.current), 250);
+    const id = setTimeout(() => {
+      void persistDraft(currentIndexRef.current);
+    }, 250);
     return () => clearTimeout(id);
   }, [enteredSets, isComplete, persistDraft]);
 
@@ -752,8 +756,17 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
 
   const handleStart = () => {
     if (startedAtMsRef.current === null) startedAtMsRef.current = Date.now();
-    persistDraft(currentIndexRef.current);
-    setIsRunning(true);
+    // Durability readiness contract: the running state (which is what makes
+    // the session resumable after a reload) is presented only after the
+    // resume draft has been written. A reload that lands before this write
+    // commits used to destroy the session record while the UI already
+    // promised it was in progress — the exact durability defect exercised by
+    // e2e/workout-gym-v2.spec.ts ("resumes an interrupted guided session").
+    // Failed writes stay best-effort (session starts anyway) but the user's
+    // measurements are re-persisted on every later edit/transition.
+    void persistDraft(currentIndexRef.current).finally(() => {
+      setIsRunning(true);
+    });
   };
 
   const phaseRunsOnTimer = (phase: TimerPhase | undefined): boolean =>
@@ -993,7 +1006,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         return;
       }
     } else {
-      persistDraft(currentIndexRef.current);
+      void persistDraft(currentIndexRef.current);
     }
     onCancel();
   };

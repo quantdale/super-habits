@@ -332,15 +332,34 @@ test.describe('W15 primary destinations', () => {
   test('to do long title (phone, light)', async ({ page }) => {
     await openWithFixture(page, PHONE, 'TYPICAL');
     await goToTab(page, 'todos');
+    // Observable readiness (same contract the sibling To Do snapshots use):
+    // the quick-add input lives in a branch that REMOUNTS when the fixture
+    // list finishes loading (`totallyEmpty` swaps the tree). Filling before
+    // the populated branch is stable discards the typed value on that remount
+    // and the submit silently no-ops — an empty-title skip, not a data loss.
+    await expect(page.getByText(/^\d+ open$/).first()).toBeVisible({ timeout: 20_000 });
     const longTitle =
       'Call the insurance company about the renewed policy premium schedule before the end of the quarterly billing window';
     const quickAdd = page.getByPlaceholder('Quick add', { exact: true });
     await expect(quickAdd).toBeVisible({ timeout: 20_000 });
-    await quickAdd.fill(longTitle);
-    await page.getByLabel('Quick add task title').press('Enter');
+    // Type the title instead of bulk-`fill()`: this input is a controlled
+    // component that can be REMOUNTED while the fixture list finishes loading
+    // (the `totallyEmpty` branch swaps the subtree), and a value landing on the
+    // soon-replaced node is silently discarded — the submit then reads an empty
+    // title and no-ops, and the row never appears (the historical flake).
+    // Per-key events keep the value flowing to whichever node is live.
+    await quickAdd.click();
+    await quickAdd.pressSequentially(longTitle, { delay: 10 });
+    // Observable readiness contract: the add button's `disabled` flag is
+    // derived from React state (`canSubmit = trimmed.length > 0`), so its
+    // enabled state is the honest signal that the typed title is submittable.
+    await expect(page.getByRole('button', { name: 'Add task', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Add task', exact: true }).click();
+    // Retry-capable assertion first (scrollIntoViewIfNeeded fails hard on a
+    // not-yet-rendered row), then normalize scroll for a deterministic capture.
     const row = page.getByRole('button', { name: `Edit task: ${longTitle}`, exact: true });
+    await expect(row).toBeVisible({ timeout: 20_000 });
     await row.scrollIntoViewIfNeeded();
-    await expect(row).toBeVisible();
     await capture(page, 'todos-long-title-390-light');
   });
 

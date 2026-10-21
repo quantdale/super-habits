@@ -43,6 +43,10 @@ yarn-error.*
 .cursor/playwright-output/*
 !.cursor/playwright-output/.gitkeep
 
+# Derived campaign/QA evidence archives (preserved on disk, never committed;
+# same lint-exempt class as the output dirs above)
+/.agent/evidence/
+
 # Maestro/native + SQLite inspection output from agent QA sessions (dev tooling only)
 .cursor/maestro-debug/
 .cursor/db-inspect/

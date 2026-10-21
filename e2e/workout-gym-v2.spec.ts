@@ -287,8 +287,35 @@ test.describe('Workout Gym V2', () => {
     await page.getByText('Start', { exact: true }).first().click();
     await expect(page.getByRole('button', { name: 'Skip set' })).toBeVisible();
 
+    // Durability contract: the running UI is presented only after the resume
+    // draft is committed, so this reload (the interruption) can no longer
+    // destroy an in-flight write. Before the fix the page tore down ~40ms
+    // after Start while the draft write was still crossing the async SQLite
+    // bridge, silently losing the session and its entered measurements.
     await page.reload();
     await page.waitForLoadState('load');
+    await goToTab(page, 'workout');
+    await expect(page.getByText('Session in progress', { exact: true })).toBeVisible();
+
+    // Row-level oracle at the reload boundary: the recovered draft carries
+    // the entered measurements, and no completed log exists yet.
+    const draftRows = await queryRows(
+      page,
+      `SELECT value FROM app_meta WHERE key = 'workout.active_session_draft'`,
+    );
+    expect(draftRows).toHaveLength(1);
+    const draft = JSON.parse(String(draftRows[0]?.value)) as {
+      enteredSets?: Record<string, { weight: string; reps: string }>;
+    };
+    expect(draft.enteredSets?.['0']?.weight).toBe('70');
+    expect(draft.enteredSets?.['0']?.reps).toBe('8');
+    // `workout_logs` is a hard-delete table with no `deleted_at` column.
+    const prematureLogs = await queryRows(page, `SELECT COUNT(*) AS count FROM workout_logs`);
+    expect(prematureLogs).toEqual([{ count: 0 }]);
+
+    // The harness navigation above is itself a second interruption of the
+    // live session: coming back must offer the same recoverable session
+    // (slow initialization must not claim an empty state).
     await goToTab(page, 'workout');
     await expect(page.getByText('Session in progress', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Resume workout · Draft Resume' }).click();
@@ -298,6 +325,24 @@ test.describe('Workout Gym V2', () => {
     await expect(page.getByText('Workout complete!')).toBeVisible();
     await page.getByText('Save and finish', { exact: true }).click();
     await expect(page.getByText('Workout saved')).toBeVisible({ timeout: 10_000 });
+
+    // Exactly one completed log, the entered measurements preserved on the
+    // durable set row, and the resume draft retired (no duplicate session can
+    // be created from a stale draft).
+    const logs = await queryRows(page, `SELECT COUNT(*) AS count FROM workout_logs`);
+    expect(logs).toEqual([{ count: 1 }]);
+    const sets = await queryRows(
+      page,
+      `SELECT s.weight, s.reps, s.completed
+       FROM workout_session_sets s
+       ORDER BY s.set_number ASC`,
+    );
+    expect(sets).toEqual([{ weight: 70, reps: 8, completed: 0 }]);
+    const draftAfterSave = await queryRows(
+      page,
+      `SELECT COUNT(*) AS count FROM app_meta WHERE key = 'workout.active_session_draft'`,
+    );
+    expect(draftAfterSave).toEqual([{ count: 0 }]);
   });
 
   test('runs bodyweight, timed, and cardio modalities with typed results', async ({ page }) => {
