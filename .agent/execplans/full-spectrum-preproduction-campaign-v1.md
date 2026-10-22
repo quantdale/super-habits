@@ -1,7 +1,7 @@
 # Full-Spectrum Pre-Production Campaign v1
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -61,44 +61,62 @@ WS-05 native · WS-06 governance, plus WS-07 independent adversarial review.
 
 ## Current Checkpoint
 
-- Current Milestone: PASS A reconnaissance complete; executing PASS B
-  (minimum meaningful progress in every workstream).
-- Completed: Repository truth established (branch/PR/ruleset/advisory/
-  emulator/cloud-access state verified). Baseline `typecheck` and `lint` green.
-- In Progress: WS-02 production-tree scope reduction for `braces`; WS-01
-  PR #85 ExecPlan schema repair.
-- Modified files: `.agent/execplans/full-spectrum-preproduction-campaign-v1.md`
-  (this plan). Production source files are added as workstreams land.
-- Last validation: `npm run typecheck` → 0 errors; `npm run lint` → clean,
-  both on `0259c2a7` (2026-10-22).
-- Current failures: `node scripts/audit-runtime-deps.mjs` exits 1 with two
-  undocumented HIGH advisories (`braces`, `node-forge`); PR #85 `quality` fails
-  on ExecPlan schema validation.
-- Relevant quarantines: No new quarantine added or removed by this campaign. The
-  existing `docs/testing/known-gaps.md` register is unchanged so far.
-- Blockers: Hosted Supabase certification — no Supabase CLI/credentials in
-  this environment (EXTERNAL). Vercel project inspection — no Vercel CLI/token
-  (EXTERNAL). iOS certification — no Apple hardware (EXTERNAL, owner-deferred).
-  GitHub ruleset enablement — administrator authorization (EXTERNAL).
-- Exact next action: Prove empirically whether `tailwindcss`/`nativewind` are
-  build-time-only (grep the production web export and the Metro bundle for
-  runtime `braces`/`tailwindcss` code); if proven, relocate them to
-  `devDependencies` so `braces` leaves the `npm audit --omit=dev` production
-  tree, and verify with `npm ci` + `audit-runtime-deps` + `build:web`.
-- Remaining definition of done: Six workstream reports written; every workstream advanced
-  past investigation; safe corrections committed on owned branches; draft PRs
-  opened or updated; validation ledger with exact commands/SHAs/outcomes;
-  independent adversarial review recorded; correction backlog (Campaigns A–D)
-  written; campaign report at
-  `docs/reports/full-spectrum-preproduction-campaign-report.md`; no unauthorized
-  production or destructive action taken.
+- Current Milestone: Complete. Six workstreams investigated; five committed
+  increments plus the branding PR repair; five draft PRs published (#86-#90) and
+  PR #85 unblocked; campaign report written.
+- Completed: PASS A reconnaissance across all six workstreams (four parallel
+  read-only scout lanes plus direct verification). PASS B/C implementation:
+  WS-02 brace-expansion remediation + migration-6 data-loss fix; WS-01 classified
+  legacy-name inventory + live brand copy + PR #85 ExecPlan repair; WS-04 bounded
+  local DB bootstrap; WS-03 backup-generation schema guard; WS-05 upload-key
+  provenance guard; WS-06 release-readiness verdict. PASS D integration, self
+  adversarial review (L1-L8), campaign report and correction backlog.
+- In Progress: Nothing. Remaining work is owner-gated or scheduled into the
+  correction campaigns A-D.
+- Modified files: core/db/client.ts; core/providers/AppProviders.tsx;
+  core/providers/localDbPhase.ts; scripts/audit-runtime-deps.mjs;
+  scripts/legacy-name-inventory.mjs; scripts/release-readiness.mjs;
+  scripts/validate-supabase-schema.mjs; package.json; package-lock.json;
+  .github/workflows/ci.yml; 8 live brand-copy files;
+  docs/branding/canonical-name-migration.md;
+  docs/release/release-signing-posture.md;
+  docs/release/store-data-declarations.md;
+  docs/reports/full-spectrum-preproduction-campaign-report.md;
+  tests/auditRuntimeDeps.test.ts; tests/integration/migrations.test.ts;
+  tests/localDbPhase.test.ts; tests/backupGenerationSchemaGuard.test.ts;
+  tests/releaseReadiness.test.ts; tests/legacyNameInventory.test.ts;
+  tests/releaseBuildPosture.test.ts; tests/play-listing-copy.test.ts;
+  e2e/journeys/two-tabs.spec.ts; and this plan.
+- Last successful validation: npm run typecheck 0 errors; npm run lint 0/0;
+  npx vitest run 3074 passed / 3 skipped / 0 failed; npm ci PASS from the patched
+  lockfile; hosted Linux CI confirms brace-expansion absent from the tree;
+  hosted Validate versioned ExecPlans PASS on PR #85; npm run web:hygiene PASS
+  (8081/8082 free).
+- Current failures: The dependency-advisory gate is red on braces
+  GHSA-vfj7-8cjw-p6xm and node-forge GHSA-86w9-cpqp-85rv. Both report
+  first_patched_version null for every affected range, verified against the
+  advisory API, and reach only build-time tooling. They stay red by design; no
+  waiver was added.
+- Relevant quarantines: None added or removed. docs/testing/known-gaps.md was not
+  modified.
+- Blockers: Hosted Supabase/Vercel access absent (EXTERNAL). GitHub ruleset
+  enablement needs administrator authorization (EXTERNAL). Signing custody and
+  store/legal actions are owner work (EXTERNAL). iOS has no Apple hardware
+  (EXTERNAL, owner-deferred).
+- Exact next action: None for this campaign. The next unit of work is
+  Correction Campaign A, starting with CORR-A-02 (storage quota/eviction is
+  entirely unhandled and can lose OPFS data silently), and is tracked in
+  docs/reports/full-spectrum-preproduction-campaign-report.md section M.
+- Remaining definition of done: None for this campaign. The six workstreams each
+  carry a PARTIAL_* or INVESTIGATION_COMPLETE status in the report, with explicit
+  next actions; no production readiness is claimed and main is not release-ready.
 
 ## Progress
 
 - [x] PASS A — repository truth established for all six workstreams
-- [ ] PASS B — one meaningful increment per workstream
-- [ ] PASS C — targeted expansion on highest-value unblocked work
-- [ ] PASS D — integration, adversarial review, campaign report
+- [x] PASS B — one meaningful increment per workstream (all six)
+- [x] PASS C — targeted expansion on highest-value unblocked work
+- [x] PASS D — integration, adversarial review, campaign report
 
 ## Surprises & Discoveries
 
@@ -152,4 +170,35 @@ Populated per workstream as changes land; Git remains authoritative.
 
 ## Outcomes & Retrospective
 
-Completed at the end of the campaign.
+Delivered across six workstreams, nothing merged to `main`, no production action:
+
+- **Two real defects corrected.** Migration 6 ran its `sort_order` ALTER outside
+  `applyMigration`, so a crash in that window permanently collapsed a user's
+  manual task ordering to `DEFAULT 0`; the new integration test fails against the
+  old placement. And `initializeDatabase()` was the one unbounded bootstrap phase,
+  so a stalled OPFS open (another tab holding the origin-wide lock) hung the
+  startup gate forever with no retry affordance.
+- **A false security premise corrected.** Three `brace-expansion` advisories were
+  allowlisted for six weeks on the claim that no fix existed. Every affected range
+  publishes a patched release. Fixed by overrides inside the caret ranges the
+  parents already declare; the allowlist is now empty so a regression is visible.
+- **Three previously unguarded surfaces now gated**: the backup-generation
+  protocol (zero prior coverage), release-readiness as a computed verdict, and
+  upload-key provenance. Four of the new guards are backed by tests that mutate
+  real inputs and assert rejection, so they cannot pass vacuously.
+- **PR #85 unblocked** — its `quality` failure was its own ExecPlan schema, now
+  hosted-green.
+
+Lessons worth carrying forward:
+
+- A dependency allowlist that asserts "no fix exists" is a claim like any other
+  and must be re-verified against `first_patched_version`, not trusted.
+- Test suites that assert a policy's CONTENTS break when the policy correctly
+  changes; they should assert the mechanism against a fixture.
+- On Windows, `npm install` silently prunes other platforms' optional binaries
+  from the lockfile. Always diff the resolved package set before committing.
+- A detected emulator is not evidence: the installed APK predated current source.
+
+Honest incompleteness: hosted Supabase/Vercel, all native runtime behavior, and
+the E2E/visual/simulation lanes were never executed and are recorded as
+UNEXECUTED, not passed. `main` is not release-ready.
