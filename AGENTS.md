@@ -600,3 +600,9 @@ Because Expo public env vars are bundled into the client, never put real secrets
 Use this in a new chat session:
 
 `Read AGENTS.md and follow it before making changes.`
+
+## Cross-project UX, DX, and AX principles
+
+Cut taglines, helper text and secondary labels. If a screen needs them to make sense, fix the layout.
+
+Make the best decision that will elevate all three: the user experience (UX), developer experience (DX), and agent experience (AX) always, without breaking anything.
