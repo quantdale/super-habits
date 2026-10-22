@@ -1,6 +1,6 @@
 {
-  "name": "SuperHabits",
-  "short_name": "Habits",
+  "name": "super-habits",
+  "short_name": "super-habits",
   "description": "Offline-first productivity: Todos, Habits, Focus, Workout, Calories.",
   "start_url": "/",
   "scope": "/",
