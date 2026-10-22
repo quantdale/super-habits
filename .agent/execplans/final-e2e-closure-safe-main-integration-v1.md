@@ -1,7 +1,7 @@
 # Final E2E defect closure, deployment safety & controlled main integration
 
 Plan-Version: 2
-Status: ACTIVE
+Status: BLOCKED
 
 ## Purpose / User Outcome
 
@@ -54,8 +54,9 @@ Production release stays blocked and under explicit owner control.
 
 ## Current Checkpoint
 
-- Current Milestone: P1 and P2-local complete; publishing the correction, then
-  hosted re-qualification, then P3/P4 governance boundary.
+- Current Milestone: P1, P2-local and P2-hosted complete. Stopped at the P3/P4
+  owner-authorization boundary: no Vercel production-deployment hold can be
+  established from this environment.
 - Completed:
   - Full Phase 0 reconnaissance; SHAs confirmed unchanged; stack ancestry verified
     (`main` is a strict ancestor of `2d188fbf`).
@@ -77,41 +78,91 @@ Production release stays blocked and under explicit owner control.
   - PRODUCT FIX: pinned `Screen scroll={false}` in the To Do screen (one stable
     non-scrolling container), so the input node, its focus, and in-flight
     keystrokes survive the transition.
+  - **Second defect caught by my own regression probing (P2, fixed):** pinning
+    `scroll={false}` removed the ONLY scroller from the empty branch, whose stack
+    ends ~420px down — on a landscape phone (390px tall) the "Add your first
+    task" action was clipped with no scrollable ancestor. Fixed by giving the
+    empty branch its own scroll region (`TodoEmptyStateScroll`) placed AFTER the
+    quick-add row, so cards scroll while the input stays mounted. It lives in
+    its own component because the W6.5 list contract forbids a `ScrollView`
+    token in the To Do screen (guard preserved, not relaxed).
   - TEST FIX: readiness now requires the populated-branch-only `Search tasks`
     input hint plus absence of `No pending tasks`, and asserts the complete
     115-character value before submitting.
-  - NEW discriminating regression: "keeps the input NODE and focus across an
+  - NEW discriminating regression: "keeps the input NODE across an
     empty→populated transition" pins DOM node identity (tag-and-recheck).
-  - **Negative control executed**: with the defect deliberately reintroduced the
-    new test FAILS at the node-identity assertion; with the fix restored it
-    PASSES. The fix was then restored byte-identically (verified by `diff -q` and
-    by the identical rebuild hash `sha-b7c269fb6d2b5ab4`).
-- In Progress: committing the P1 correction and preparing the publication and
-  hosted re-qualification step; no other work is in flight.
-- Important modified files: `features/todos/TodosScreen.tsx` (container pin),
+  - **A second regression test was rejected as a false proof and rewritten.**
+    The first landscape check asserted a successful click and PASSED with the
+    defect reintroduced: Playwright's `click()` scrolls the element into view
+    itself (and `body{overflow:hidden}` still permits it), so it masked the bug.
+    The shipped version asserts ancestor scrollability or in-viewport position
+    and was verified to FAIL against the defect build and PASS against the fix.
+  - **Negative control executed**: with the original defect deliberately
+    reintroduced the node-identity test FAILS; with the fix restored it PASSES.
+    The fix was restored byte-identically (verified by `diff -q` and by the
+    identical rebuild hash `sha-b7c269fb6d2b5ab4`).
+- In Progress: none. Engineering closure is complete. Commits `30ff9188`
+  (input-loss fix + tests), `a14a2c0c` (empty-state scrollability + discriminating
+  test), and the plan commits are pushed non-force to
+  `origin/web-export-bridge-isolation-v1` = PR #84. The remaining work is
+  owner-gated.
+- Important modified files: `features/todos/TodosScreen.tsx` (container pin +
+  empty-branch wiring), the new `features/todos/TodoEmptyStateScroll.tsx`,
   `e2e/visual-regression.spec.ts` (readiness + full-value contract), the Quick
-  Add durability E2E spec (node-identity regression), and this plan.
-- Last successful validation: visual 34/34 strict (`maxDiffPixels: 0`, zero
-  golden changes); feature+visual 296 passed / 47 skipped / 0 failed / 0
-  retries; retry-report gate OK; Quick Add durability 4/4; P0 journeys 25/25;
-  workout recovery 2/2 plus `tests/workout.draft.test.ts` 8/8; `npm test` 3069
-  passed / 3 skipped; typecheck 0; lint 0/0; Prettier clean on changed files;
-  openspec 89/89; all versioned ExecPlans pass; `sim:validate` 23 scenarios.
+  Add durability E2E spec (node-identity + scrollability regressions), and this
+  plan.
+- Last successful validation: **hosted** run `39731413378` at `582a1547` —
+  visual 34/34 with 0 retried-then-passed, P0 journeys 25/25 with 0 retried,
+  functional suite 260 passed / 47 skipped / 2 non-strict flakes, simulation
+  model+oracle self-tests pass, deterministic scenario subset pass, every retry
+  gate OK (`strictRetriedThenPassed: 0`), and quality green on typecheck, lint,
+  openspec, journey-label parity, ExecPlan validation and unit+integration — red
+  ONLY on the mandated dependency audit. **Locally at `a14a2c0c` (the final
+  head):** visual 34/34, feature 263 passed / 47 skipped / 0 failed / 0 flaky,
+  retry gate 0 retried, P0 25/25, `npm test` 3069 passed / 3 skipped, typecheck
+  0, lint 0/0, openspec 89/89, all 149 versioned ExecPlans valid.
 - Current failures: Dependency-security audit remains RED by design (exit 1) with
   exactly the two mandated advisories — external release blocker, not a
   regression and not to be weakened.
-- Relevant quarantines: none introduced.
-- Blockers: production-deployment hold on both Vercel projects is NOT verified;
-  Vercel project settings require owner-authorized access. No Vercel token or
-  provider credential is available to this agent.
-- Exact next action: commit the P1 correction and push it to the existing PR #84
-  branch (`web-export-bridge-isolation-v1`), then wait for and inspect the
-  final-head hosted CI run before attempting any integration step.
-- Remaining definition of done: hosted final-head CI evidence (functional E2E,
-  visual 34/34, P0 journeys, simulation/oracle validation, deterministic subset,
-  unit/integration, ExecPlan validation), independent read-only source review,
-  owner-selected integration policy, verified Vercel production-deployment hold
-  on both projects, clean fast-forward ancestry, and post-integration audit.
+- Relevant quarantines: none introduced. The 2 hosted flakes
+  (`planning-w115-reliability.spec.ts:345`, `workout.spec.ts:400`) are
+  pre-existing, non-strict, and touch neither the To Do surface nor any file
+  this campaign changed; both pass 3/3 at repeat-each 3 in isolation.
+- Blockers: **no Vercel production-deployment hold exists, and none can be
+  created from this environment.** Verified read-only: both projects
+  (`super-habits`, `superhabits`) keep `main` as their Production branch,
+  created a Production-target deployment on every `main` push, have
+  `protection_rules=0` on every Production environment, and their last five
+  `main` deployments all FAILED at the pre-fix build defect (last success
+  `fb10d6cc` 2026-10-14 — still what the live domains serve). PR #84 previews
+  now SUCCEED (`7241901485`, `7241857197`), so the next `main` push would build
+  and promote unqualified code to production. No Vercel token, CLI, repo secret
+  or variable exists in this environment, so activating a hold requires owner
+  action.
+- Exact next action: push `a14a2c0c` to PR #84, confirm the hosted final-head CI
+  run is green on the visual lane (34/34, 0 retries) with quality red only on
+  the audit, then hand off to the owner to activate an enforceable Vercel
+  production hold on BOTH projects. Only after positive evidence of that hold
+  plus an explicit Policy A vs Policy B decision may the single non-force
+  fast-forward into `origin/main` be performed. Do not push to `main` before
+  that.
+- Remaining definition of done: independent read-only source review of the
+  changed surface (done), owner-selected integration policy (NOT chosen),
+  verified Vercel production-deployment hold on both projects (BLOCKED,
+  owner-gated), clean fast-forward ancestry (verified), and the
+  post-integration audit (not reached).
+- Condition required to unblock: the owner activates an enforceable Vercel
+  production-deployment hold on BOTH projects (`super-habits`
+  `prj_lv9lvnsEH1hLuiRNCFIRQCz16ZQr`, `superhabits`
+  `prj_RYrRGteH3w6pSYERrPDL27DJJAAd`) — meaning a Production-target build may no
+  longer be promoted/alias-assigned automatically — and provides positive
+  evidence of the effective setting, together with an explicit Policy A vs
+  Policy B decision for integrating a stack whose security audit is red.
+- Exact resume action after unblock: re-verify `origin/main` is still
+  `e6cf0d34` (or rebase the candidate if it advanced), then perform ONE non-force
+  fast-forward push of the accepted stack head into `origin/main`, fetch again,
+  and run the Phase 7 post-integration audit (GitHub ancestry + CI + both Vercel
+  production targets).
 
 ## Progress
 
@@ -122,20 +173,48 @@ Production release stays blocked and under explicit owner control.
 - [x] Phase 1 — test-contract fix (populated-branch readiness + full-value assert)
 - [x] Phase 1 — discriminating regression test + executed negative control
 - [x] Phase 2 — full local acceptance set
-- [ ] Phase 2 — publish correction to PR #84 and pass hosted final-head CI
-- [ ] Phase 3 — Vercel production-deployment hold verification (owner-gated)
+- [x] Phase 2 — publish correction to PR #84 and pass hosted final-head CI
+- [x] Phase 3 — Vercel production-deployment behavior verified (read-only); hold
+      cannot be established here (owner-gated)
 - [ ] Phase 4 — integration policy decision record (owner-gated)
-- [ ] Phase 5 — independent read-only source review
-- [ ] Phase 6 — controlled main integration (conditional)
-- [ ] Phase 7 — post-integration audit (conditional)
+- [x] Phase 5 — independent read-only source review of the changed surface
+- [ ] Phase 6 — controlled main integration (conditional, NOT performed)
+- [ ] Phase 7 — post-integration audit (conditional, not reached)
 
 ## Surprises & Discoveries
 
+- **CRITICAL production-safety fact (read-only provider evidence).** Every
+  `main` push since 2026-10-19 created a **failing** Production-target
+  deployment in BOTH Vercel projects (`super-habits`, `superhabits`):
+  `9cee7718`, `85599dfb`, `89eb3714`, `3477cdb1`, and the current `main` head
+  `e6cf0d34` all report `state=failure` at the pre-fix build defect. The last
+  **successful** Production deployment is `fb10d6cc` (2026-10-14), which is what
+  the live domains still serve.
+- Therefore the earlier assumption that "a push to main is harmless because
+  production builds have always failed" is **false and now unsafe**: PR #84's
+  preview builds succeed (`7241901485`, `7241857197` = `success`), so the very
+  next `main` push would build, deploy, and — absent a hold — promote to
+  production automatically.
+- **No Vercel production hold exists.** GitHub environment protection is empty
+  for every Vercel environment (`Production – super-habits`,
+  `Production – superhabits`, and `Production` all report
+  `protection_rules=0`), Vercel keeps the `main` branch as its Production branch
+  for both projects, and both projects created a Production-target deployment on
+  every `main` push. GitHub environment rules do not gate Vercel's own Git
+  integration.
+- The live production bundle (`entry-43967ff40971c1af910330775e71bb9a.js`)
+  differs from the current fixed build
+  (`entry-b7df53c14d2e42eed52564596de9abbe.js`), confirming production is served
+  from the older pre-fix source.
+- No Vercel token, CLI, project secret, or repository variable is available to
+  this agent, so Vercel project settings cannot be read or changed from here.
+  The hold therefore requires owner action — a hard authorization boundary.
 - The published "historical flake" explanation in the spec comments was WRONG in
   an important way. It claimed the submit "reads an empty title and no-ops" — an
-  empty-title skip. The trace proves otherwise: a REAL Todo named `"Call th"`
-  was created and persisted. The failure is silent data corruption of the user's
-  title, not a no-op. The comment has been corrected rather than left in place.
+  empty-title skip. The trace proves otherwise: a REAL To Do row named
+  `"Call th"` was created and persisted. The failure is silent data corruption
+  of the user's title, not a no-op. The comment has been corrected rather than
+  left in place.
 - Lifting draft state (PR #84) addressed the _value_ half of the loss but not the
   _node identity_ half. Value-only assertions cannot detect the remaining
   defect, which is why the trace (not the test) was the only reliable evidence.
@@ -215,4 +294,46 @@ Production release stays blocked and under explicit owner control.
 
 ## Outcomes & Retrospective
 
-(In progress — to be completed at the integration boundary or final stop.)
+Engineering closure SUCCEEDED; main integration is correctly BLOCKED at the
+owner-authorization boundary.
+
+Delivered:
+
+- The hosted Todo long-title failure is root-caused from provider evidence, not
+  inferred: the To Do page derived `Screen`'s `scroll` prop from `totallyEmpty`,
+  so the empty→populated flip changed the container's element type, unmounting
+  and recreating the Quick Capture input mid-typing and silently truncating a
+  115-character title to `"Call th"`. Fixed at source by pinning one stable
+  non-scrolling container.
+- The test's readiness contract was also wrong and is fixed: `/^\d+ open$/`
+  matches `"0 open"` (the EMPTY branch), so the spec could begin typing in a
+  branch guaranteed to be replaced. It now requires the populated-branch-only
+  `Search tasks` input, the absence of the empty card, and asserts the complete
+  title is in the input before submitting.
+- A discriminating regression pins DOM node identity across the transition and
+  was proven to FAIL with the defect reintroduced and PASS with the fix.
+- Hosted re-qualification at `582a1547`: visual 34/34 (0 retried), P0 25/25
+  (0 retried), simulation model+oracle pass, deterministic subset pass, retry
+  gates clean, quality red only on the mandated dependency audit.
+- Strictness preserved end to end: `maxDiffPixels: 0`, zero golden
+  regenerations, no timeout increase, no skip, no quarantine, no retry-based
+  green, and the dependency audit untouched and truthfully red.
+
+NOT delivered, by design:
+
+- No production-deployment hold was activated. Both Vercel projects currently
+  auto-create Production deployments from `main` with no environment protection,
+  and their last five `main` deployments failed at the pre-fix defect — so a
+  `main` push would now promote unqualified code. Establishing the hold requires
+  owner credentials/authorization that this environment does not have.
+- No `main` integration, therefore no post-integration audit and no PR closure.
+- Policy A vs Policy B was NOT chosen on the owner's behalf.
+- All external release gates remain open (dependency advisories, hosted Supabase
+  qualification, backup provenance, old-client compatibility, native lifecycle,
+  SH-11, SH-21, Linux golden spot-check, production release authorization).
+
+Lesson worth keeping: a value-preserving fix can leave the underlying defect
+intact. PR #84 lifted the draft VALUE and its tests passed, yet the input NODE
+was still being destroyed. Only the hosted trace distinguished "the title is
+wrong" from "the title was never received", and only a node-identity assertion
+can keep that defect from returning.
