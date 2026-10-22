@@ -16,7 +16,7 @@ bridge security boundary is strengthened, never weakened.
 - Branch: `web-export-bridge-isolation-v1` (successor to PR #83 head
   `caace05a`), published as PR #84 (stacked on #83). Ancestry:
   `main` `e6cf0d34` → PR #82 `a70026ec` → PR #83 `caace05a` → PR #84
-  `d5fa162e`. PR #82/#83 left unchanged. This campaign's engineering is confined
+  `fcfdb2e8`. PR #82/#83 left unchanged. This campaign's engineering is confined
   to the successor branch.
 - Predecessor ExecPlans (`security-blocked-ci-qualification-recovery.md`, PR #82;
   `e2e-stabilization-visual-release-gates.md`, PR #83) are COMPLETED.
@@ -90,7 +90,8 @@ NOT weakened, deleted, or made to ignore the mutation API.
 
 - Current Milestone: Complete — PR #84 engineering (production web-export bridge
   isolation + To Do Quick Add durability) implemented, independently verified,
-  and published on successor head `d5fa162e`.
+  and published on the PR #84 successor head (engineering landed through
+  `d5fa162e`, finalized at `fcfdb2e8`).
 - Completed: state + stacking verified; production abort reproduced locally with
   the exact Vercel message; unarmed-vs-armed minified ground truth captured; root
   cause proven to be an over-broad guard matching the always-bundled inert module
@@ -211,14 +212,15 @@ NOT weakened, deleted, or made to ignore the mutation API.
 1. `git -C <repo> status --short` (expect clean on the successor branch).
 2. Read this plan's `Current Checkpoint` and `Outcomes & Retrospective`.
 3. Verify SHAs: main `e6cf0d34`, PR82 `a70026ec`, PR83 `caace05a`, PR84
-   `d5fa162e`.
+   `fcfdb2e8`.
 4. This campaign's engineering is COMPLETED. Do not repeat it. Any further work is
    the separate owner-directed source integration / release-governance effort
    (see the acceptance report and the new integration report), not this plan.
 
 ## Outcomes & Retrospective
 
-Delivered and independently verified on successor head `d5fa162e` (PR #84):
+Delivered and independently verified on the PR #84 successor head (engineering
+through `d5fa162e`, finalized `fcfdb2e8`):
 
 - Production web-export abort resolved by BUILD-TIME MODULE ISOLATION: the
   simulation mutation module is excluded from ordinary exports (no-op stub), so
