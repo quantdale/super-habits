@@ -17,15 +17,23 @@ import { fileURLToPath } from 'node:url';
  * was established empirically before being relied on, using a throwaway branch
  * keyed to itself:
  *
- *   - commit that excludes its own branch (`branch: false`): 0 deployments
- *     on BOTH projects, for 90s+ after the push;
- *   - the same commit with that exclusion reverted out: 1 Preview deployment
- *     on BOTH projects.
+ *   - commit that excludes its own branch (`branch: false`): 0 Vercel commit
+ *     statuses at all on the pushed SHA (no deployment record created), for 90s+
+ *     after the push;
+ *   - a follow-up commit on the same branch with that exclusion reverted out:
+ *     Vercel statuses present and 1 Preview deployment on BOTH projects.
  *
- * That isolates the exclusion as the cause (not an unrelated webhook failure)
- * and shows the rule is honored at webhook ingestion, including for the commit
- * that introduces it. Production was never touched: the probe keyed only a
- * throwaway branch and every resulting deployment was a Preview.
+ * That control argues against "unrelated webhook failure" and shows the rule is
+ * evaluated at webhook ingestion, including for the commit that introduces it.
+ *
+ * SCOPE OF THAT EVIDENCE — do not overclaim it: the probe arms were both
+ * PREVIEW branch events, so on their own they do not demonstrate the
+ * production-branch path. The production case was proven separately, by
+ * observation instead of experiment: every pre-hold `main` push produced TWO
+ * Production deployments (one per project), while the `main` push that carried
+ * this hold produced ZERO Production deployments and left both Production
+ * environments serving `e6cf0d34`. See `docs/reports/web-export-todo-durability-
+ * acceptance-report.md` for the recorded figures.
  *
  * These assertions exist because the whole hold is one small JSON object. A
  * well-meaning refactor that drops `git`, renames the key, or adds a wildcard
@@ -34,6 +42,13 @@ import { fileURLToPath } from 'node:url';
  * "If a branch matches multiple rules and at least one rule is `true`, a
  * deployment will occur" — so an added `true` rule is a hold bypass, not a
  * harmless extra.
+ *
+ * IMPORTANT LIMIT: this is a configuration-shape test. It cannot detect Vercel
+ * ignoring the setting (a dashboard Root Directory, a dashboard Git toggle, or
+ * a production-branch behavior change all pass it). It also does not cover
+ * non-Git release paths: `vercel --prod`, dashboard "Promote to Production" of
+ * an existing Preview, and "Create Deployment" are outside this mechanism and
+ * remain open by design under Policy B.
  */
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -68,17 +83,21 @@ describe('Vercel production-release hold', () => {
     const enabled = readVercelConfig().git?.deploymentEnabled;
     expect(typeof enabled).toBe('object');
     const rules = enabled as Record<string, boolean>;
+    // Two layers, because a hand-rolled minimatch is easy to get wrong:
+    //
+    // 1. The PRIMARY guard is the exact-key assertion in the next test
+    //    (`Object.keys(...)` equals `['main']`). Any added rule, `true` or
+    //    `false`, fails it — so no pattern can be smuggled in at all.
+    // 2. This scan is a readable, targeted statement of intent for the common
+    //    bypass shapes. It is deliberately NOT a general minimatch
+    //    implementation (it would miss `mai*`, `**`, `[m]ain`, `{main}`), which
+    //    is exactly why the exact-key assertion is the load-bearing one.
+    //
     // Vercel: "If a branch matches multiple rules and at least one rule is
-    // `true`, a deployment will occur." Any `true` whose pattern matches `main`
-    // therefore re-opens auto-release and defeats the hold.
-    const matchesMain = (pattern: string): boolean => {
-      if (pattern === 'main') return true;
-      if (pattern === '*') return true;
-      // Conservative reading of the minimatch patterns actually plausible here.
-      if (pattern === 'm*' || pattern === '*ain' || pattern === 'ma*' || pattern === '*')
-        return true;
-      return false;
-    };
+    // `true`, a deployment will occur." A `true` rule matching `main` therefore
+    // re-opens auto-release and defeats the hold.
+    const matchesMain = (pattern: string): boolean =>
+      ['main', '*', 'm*', '*ain', 'ma*'].includes(pattern);
     const bypasses = Object.entries(rules)
       .filter(([, value]) => value === true)
       .map(([pattern]) => pattern)
@@ -105,6 +124,11 @@ describe('Vercel production-release hold', () => {
   it('does not disable preview deployments for non-main branches', () => {
     // The hold must be scoped to main only: PR previews are how a change gets
     // reviewed and verified before integration.
+    //
+    // This exact-key assertion is ALSO the primary bypass guard for the rule
+    // scan above: any added rule (true or false, any pattern) fails here, so a
+    // pattern that the scan's limited matcher would miss cannot be introduced
+    // without a deliberate edit to this test.
     const enabled = readVercelConfig().git?.deploymentEnabled as Record<string, boolean>;
     expect(Object.keys(enabled)).toEqual(['main']);
     expect(enabled['main']).toBe(false);

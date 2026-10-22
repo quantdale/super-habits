@@ -1,7 +1,7 @@
 # Final E2E defect closure, deployment safety & controlled main integration
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -54,10 +54,10 @@ Production release stays blocked and under explicit owner control.
 
 ## Current Checkpoint
 
-- Current Milestone: P1/P2 complete; the production-deployment hold is
-  IMPLEMENTED and EMPIRICALLY PROVEN on both Vercel projects (`7ff88e2a`).
-  Awaiting hosted CI on the hold commit, then the controlled non-force main
-  integration (Policy B, owner-authorized).
+- Current Milestone: COMPLETE. The Vercel production hold is implemented and
+  verified on the production branch; Policy B was owner-authorized; `origin/main`
+  was integrated by one non-force fast-forward to `558d3e3c`; both Vercel
+  Production environments remain unchanged at `e6cf0d34`.
 - Completed:
   - Full Phase 0 reconnaissance; SHAs confirmed unchanged; stack ancestry verified
     (`main` is a strict ancestor of `2d188fbf`).
@@ -102,12 +102,10 @@ Production release stays blocked and under explicit owner control.
     reintroduced the node-identity test FAILS; with the fix restored it PASSES.
     The fix was restored byte-identically (verified by `diff -q` and by the
     identical rebuild hash `sha-b7c269fb6d2b5ab4`).
-- In Progress: hosted CI on `7ff88e2a` (the hold commit), then Phase 6 preflight
-  and the single non-force fast-forward of the stack into `origin/main`.
-  Commits `30ff9188` (input-loss fix + tests), `a14a2c0c` (empty-state
-  scrollability + discriminating test), `7ff88e2a` (Vercel production hold +
-  contract test), plus plan commits, are on
-  `origin/web-export-bridge-isolation-v1` = PR #84.
+- In Progress: none. Integration is complete. Commits `30ff9188` (input-loss
+  fix + tests), `a14a2c0c` (empty-state scrollability + discriminating test),
+  `7ff88e2a` (Vercel production hold + contract test) and the plan commits are
+  all in `origin/main` at `558d3e3c`.
 - Important modified files: `vercel.json` (main-scoped deployment hold),
   `tests/vercelProductionHold.test.ts` (hold + preserved-settings contract),
   `features/todos/TodosScreen.tsx` (container pin + empty-branch wiring), the
@@ -141,14 +139,14 @@ Production release stays blocked and under explicit owner control.
   RELEASE remains blocked by the unresolved dependency advisories and the other
   external gates listed in Outcomes — that is the intended state, not a blocker
   to source integration.
-- Exact next action: confirm hosted CI at `7ff88e2a` is green on `e2e` and red
-  only on the dependency audit, then run the Phase 6 preflight and perform ONE
-  non-force fast-forward push of the stack head into `origin/main`.
-- Remaining definition of done: hosted CI at the hold commit (in flight),
-  independent read-only review of the hold design (done; empirically controlled),
-  Policy B recorded (owner-authorized), verified production hold on both
-  projects (DONE), clean fast-forward ancestry (verified), and the
-  post-integration audit of GitHub + both Vercel projects (after the push).
+- Exact next action: none — the campaign's work is complete. The remaining
+  steps are owner-controlled (production release authorization and the external
+  certification gates), not further agent integration work.
+- Remaining definition of done: none for this campaign. Hosted CI at the hold
+  commit passed (`e2e` green, quality red only on the audit); independent review
+  done and its P1/P2 wording findings applied; Policy B recorded; production
+  hold verified on both projects including the production branch; fast-forward
+  ancestry clean; post-integration audit of GitHub + both Vercel projects done.
 - Condition required to unblock: not applicable — the previous blocker (no
   verifiable production hold) is resolved. Production RELEASE still requires the
   dependency advisories to be remediated plus the external certification gates.
@@ -167,12 +165,17 @@ Production release stays blocked and under explicit owner control.
 - [x] Phase 1 — discriminating regression test + executed negative control
 - [x] Phase 2 — full local acceptance set
 - [x] Phase 2 — publish correction to PR #84 and pass hosted final-head CI
-- [x] Phase 3 — Vercel production-deployment behavior verified (read-only); hold
-      cannot be established here (owner-gated)
-- [ ] Phase 4 — integration policy decision record (owner-gated)
-- [x] Phase 5 — independent read-only source review of the changed surface
-- [ ] Phase 6 — controlled main integration (conditional, NOT performed)
-- [ ] Phase 7 — post-integration audit (conditional, not reached)
+- [x] Phase 3 — Vercel production-deployment behavior verified; repository-controlled
+      hold implemented, controlled-experimented, and confirmed on the production
+      branch (0 Production deployments for the held `main` push)
+- [x] Phase 4 — integration policy: Policy B selected by explicit owner
+      authorization (source integration permitted, production release blocked)
+- [x] Phase 5 — independent read-only source review of the changed surface; its
+      P1/P2 findings about over-claimed hold wording were applied
+- [x] Phase 6 — controlled main integration: single non-force fast-forward
+      `e6cf0d34` → `558d3e3c`
+- [x] Phase 7 — post-integration audit: remote main SHA, ancestry, CI, and BOTH
+      Vercel projects verified (Production unchanged at `e6cf0d34`)
 
 ## Surprises & Discoveries
 
@@ -257,6 +260,40 @@ Production release stays blocked and under explicit owner control.
 
 ## Validation Ledger
 
+### Final integration campaign (hold + main integration)
+
+- `npx vitest run tests/vercelProductionHold.test.ts` — pass (4/4): main-scoped
+  hold present, no `true` bypass rule, all load-bearing settings preserved,
+  previews not disabled. Verified to fail (3/4) when the hold is weakened.
+- `npm test` — pass (3073 passed, 3 skipped, 0 failed; includes the 4 new hold
+  tests).
+- `npm run typecheck` — pass (0 errors).
+- `npm run lint` (--max-warnings 0) — pass (0 errors, 0 warnings).
+- `npm run openspec:validate` — pass (89/89).
+- `npm run agent:plan:validate:all` — pass (all versioned plans valid).
+- `npm run build:web` — pass (production export; 0 simulation-bridge identifiers,
+  0 Supabase hosts, with the hold present in vercel.json).
+- Hosted CI run `39766865757` at `7ff88e2a` — `e2e` job **pass** (263 passed /
+  47 skipped / **0 flaky**, `retriedThenPassed: 0`; visual 34/34, P0 25/25,
+  simulation 9/9); `quality` job pass on every step except the mandated
+  dependency audit (red by design).
+- Production-branch hold proof (read-only provider evidence) — **pass**: every
+  pre-hold `main` push (`9cee7718`, `85599dfb`, `89eb3714`, `3477cdb1`,
+  `e6cf0d34`) created **2** Production deployments; the held `main` push
+  `558d3e3c` created **0**, while Previews continued normally (2). Both
+  Production environments still serve `e6cf0d34`; the live bundle is unchanged
+  (`entry-43967ff4…`).
+- Controlled experiment establishing webhook-ingestion behavior — **pass**: a
+  commit excluding its own throwaway branch produced 0 Vercel statuses on the
+  pushed SHA; the same branch with the exclusion reverted out produced Vercel
+  statuses and 1 Preview deployment on both projects.
+- Integration — **pass**: `git push origin 558d3e3c:main` (plain, non-force)
+  fast-forwarded `e6cf0d34` → `558d3e3c`; `origin/main` re-fetched and confirmed
+  byte-equal to the candidate, with `a70026ec`, `caace05a`, `30ff9188`,
+  `a14a2c0c`, `7ff88e2a` all present in ancestry and 0 merge commits.
+
+### Final E2E defect closure (preceding milestone)
+
 - Hosted artifact analysis (run 39708815790) — trace frame snapshots prove the
   input held `"Call th"` after mid-typing remount and a Todo with that title was
   created; failure classified INPUT_LOST.
@@ -313,7 +350,7 @@ owner-authorization boundary.
 
 Delivered:
 
-- The hosted Todo long-title failure is root-caused from provider evidence, not
+- The hosted long-title test failure is root-caused from provider evidence, not
   inferred: the To Do page derived `Screen`'s `scroll` prop from `totallyEmpty`,
   so the empty→populated flip changed the container's element type, unmounting
   and recreating the Quick Capture input mid-typing and silently truncating a
@@ -326,6 +363,10 @@ Delivered:
   title is in the input before submitting.
 - A discriminating regression pins DOM node identity across the transition and
   was proven to FAIL with the defect reintroduced and PASS with the fix.
+- A second real defect was caught by my own probing while fixing the first: the
+  pinned non-scrolling container removed the only scroller from the empty
+  branch, clipping the primary empty-state action on a landscape phone. Fixed
+  with a dedicated empty-branch scroll region placed after the quick-add row.
 - Hosted re-qualification at `582a1547`: visual 34/34 (0 retried), P0 25/25
   (0 retried), simulation model+oracle pass, deterministic subset pass, retry
   gates clean, quality red only on the mandated dependency audit.
@@ -333,15 +374,26 @@ Delivered:
   regenerations, no timeout increase, no skip, no quarantine, no retry-based
   green, and the dependency audit untouched and truthfully red.
 
-NOT delivered, by design:
+DELIVERED in the follow-on integration campaign (supersedes the earlier
+"blocked on governance" state):
 
-- No production-deployment hold was activated. Both Vercel projects currently
-  auto-create Production deployments from `main` with no environment protection,
-  and their last five `main` deployments failed at the pre-fix defect — so a
-  `main` push would now promote unqualified code. Establishing the hold requires
-  owner credentials/authorization that this environment does not have.
-- No `main` integration, therefore no post-integration audit and no PR closure.
-- Policy A vs Policy B was NOT chosen on the owner's behalf.
+- **The Vercel production-deployment hold IS activated and verified.**
+  `vercel.json` carries `git.deploymentEnabled: { main: false }`, additive to
+  every load-bearing setting, pinned by `tests/vercelProductionHold.test.ts`.
+  Proof on the production branch itself: every pre-hold `main` push created TWO
+  Production deployments (one per project), while the `main` push carrying the
+  hold created ZERO, and both Production environments still serve `e6cf0d34`.
+- **Policy B was selected by the owner** (explicit authorization to integrate
+  source while production release stays technically blocked).
+- **`origin/main` was integrated** by a single non-force fast-forward
+  `e6cf0d34` → `558d3e3c`, preserving the full stack ancestry.
+
+STILL NOT delivered, by design (unchanged and NOT closed by integration):
+
+- No production RELEASE. The hold blocks Git-triggered creation only; promotion
+  of an existing Preview, `vercel --prod`, and dashboard "Create Deployment"
+  remain open non-Git paths and require owner action.
+- No PR closure for #82/#83/#84 (the stack landed via fast-forward, not merges).
 - All external release gates remain open (dependency advisories, hosted Supabase
   qualification, backup provenance, old-client compatibility, native lifecycle,
   SH-11, SH-21, Linux golden spot-check, production release authorization).
