@@ -51,7 +51,7 @@ export function BootSplash() {
   return (
     <View
       accessibilityRole="progressbar"
-      accessibilityLabel="SuperHabits is starting"
+      accessibilityLabel="super-habits is starting"
       style={{
         flex: 1,
         alignItems: 'center',
@@ -62,7 +62,7 @@ export function BootSplash() {
     >
       <View style={{ alignItems: 'center', gap: spacing.xs }}>
         <Text variant="titleLg" style={{ fontSize: 34, letterSpacing: -0.8 }}>
-          SuperHabits
+          super-habits
         </Text>
         <Text variant="label" tone="muted">
           TODAY · HABITS · FOCUS · TRAIN · FOOD
