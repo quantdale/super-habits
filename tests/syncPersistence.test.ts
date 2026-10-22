@@ -8,6 +8,9 @@ vi.mock('@/core/db/client', () => ({
 }));
 
 const db = {
+  withTransactionAsync: async (task: () => Promise<void>) => {
+    await task();
+  },
   getFirstAsync: vi.fn(),
   runAsync: vi.fn(),
 };

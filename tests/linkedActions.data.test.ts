@@ -29,6 +29,9 @@ describe('core/linked-actions/linkedActions.data', () => {
 
   it('creates a linked action rule with serialized effect payload', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValue({ owner_user_id: null }),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
@@ -72,6 +75,9 @@ describe('core/linked-actions/linkedActions.data', () => {
 
   it('creates todo.completed -> habit.increment with the fixed +1 source-date payload', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValue({ owner_user_id: null }),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
@@ -183,6 +189,9 @@ describe('core/linked-actions/linkedActions.data', () => {
 
   it('updates status and soft deletes without changing other runtime behavior', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValue({ owner_user_id: null }),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
@@ -205,6 +214,9 @@ describe('core/linked-actions/linkedActions.data', () => {
 
   it('soft deletes rules when a linked target entity is removed', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValue({ owner_user_id: null }),
       // The soft-delete now also reads the touched rule ids (post-update
       // SELECT) so it can enqueue one tombstone intent per rule.
@@ -424,6 +436,9 @@ describe('core/linked-actions/linkedActions.data', () => {
       target_entity_id: 'todo_removed',
     };
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValue({ owner_user_id: null }),
       getAllAsync: vi.fn().mockResolvedValue([existingRow, removedRow]),
       runAsync: vi.fn().mockResolvedValue(undefined),
@@ -514,6 +529,9 @@ describe('core/linked-actions/linkedActions.data', () => {
 
   it('refuses to overwrite an unsupported existing rule', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getAllAsync: vi.fn().mockResolvedValue([
         {
           id: 'link_legacy',

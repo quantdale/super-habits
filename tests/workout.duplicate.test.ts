@@ -24,6 +24,9 @@ function makeDb() {
   const inserted: { sql: string; params: unknown[] }[] = [];
 
   const db = {
+    withTransactionAsync: async (task: () => Promise<void>) => {
+      await task();
+    },
     getFirstAsync: vi.fn(async (sql: string, params: unknown[] = []) => {
       if (sql.includes('FROM routine_exercises')) {
         // Join lookup from addSet/addExercise for a freshly inserted exercise.

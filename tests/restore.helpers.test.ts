@@ -94,6 +94,9 @@ vi.mock('@/features/calories/calories.domain', () => ({
 
 function buildDb() {
   return {
+    withTransactionAsync: async (task: () => Promise<void>) => {
+      await task();
+    },
     runAsync: vi.fn().mockResolvedValue(undefined),
   };
 }

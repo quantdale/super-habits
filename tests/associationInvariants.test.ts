@@ -66,7 +66,17 @@ vi.mock('@/lib/time', async () => {
 });
 
 function makeDb(getFirstAsync: ReturnType<typeof vi.fn>, runAsync: ReturnType<typeof vi.fn>) {
-  return { getFirstAsync, runAsync, getAllAsync: vi.fn().mockResolvedValue([]) };
+  return {
+    getFirstAsync,
+    runAsync,
+    getAllAsync: vi.fn().mockResolvedValue([]),
+    // Fail-closed transactions (CORR-A-04): production `withSQLiteTransaction`
+    // refuses adapters without this API, so every double must declare it. The
+    // passthrough keeps SQL-call assertions unchanged.
+    withTransactionAsync: vi.fn(async (task: () => Promise<void>) => {
+      await task();
+    }),
+  };
 }
 
 describe('H9: Project/Goal association invariants', () => {

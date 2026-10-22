@@ -34,6 +34,9 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 const db = {
+  withTransactionAsync: async (task: () => Promise<void>) => {
+    await task();
+  },
   runAsync: vi.fn(),
   getFirstAsync: vi.fn(),
   getAllAsync: vi.fn(),

@@ -66,6 +66,9 @@ vi.mock('@/lib/time', async (importOriginal) => ({
 }));
 
 const db = {
+  withTransactionAsync: async (task: () => Promise<void>) => {
+    await task();
+  },
   runAsync: vi.fn(),
   getFirstAsync: vi.fn(),
   getAllAsync: vi.fn(),

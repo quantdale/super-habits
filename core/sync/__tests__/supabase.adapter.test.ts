@@ -63,6 +63,9 @@ async function setupAdapter(options: AdapterSetupOptions) {
   vi.resetModules();
 
   const db = {
+    withTransactionAsync: async (task: () => Promise<void>) => {
+      await task();
+    },
     getAllAsync: vi.fn(),
     runAsync: vi.fn(async () => ({ lastInsertRowId: 1, changes: 1 })),
     getFirstAsync: vi.fn().mockImplementation(async (_sql: string, params?: string[]) => {

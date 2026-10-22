@@ -32,6 +32,9 @@ vi.mock('@/core/db/client', () => ({
 function makeMetaDb() {
   const meta = new Map<string, string>();
   const db = {
+    withTransactionAsync: async (task: () => Promise<void>) => {
+      await task();
+    },
     meta,
     getFirstAsync: vi.fn(async (_sql: string, params?: readonly unknown[]) => {
       const value = meta.get(params?.[0] as string);

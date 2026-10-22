@@ -17,6 +17,9 @@ function makeDb(storedValue: string | null) {
   return {
     getFirstAsync: vi.fn().mockResolvedValue(storedValue === null ? null : { value: storedValue }),
     runAsync: vi.fn().mockResolvedValue(undefined),
+    withTransactionAsync: vi.fn(async (task: () => Promise<void>) => {
+      await task();
+    }),
   };
 }
 
