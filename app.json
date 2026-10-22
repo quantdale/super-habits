@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "SuperHabits",
-    "slug": "superhabits",
+    "name": "super-habits",
+    "slug": "super-habits",
     "scheme": "superhabits",
     "version": "1.0.0",
     "orientation": "portrait",
