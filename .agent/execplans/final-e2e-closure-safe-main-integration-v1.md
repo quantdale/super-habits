@@ -111,23 +111,27 @@ Production release stays blocked and under explicit owner control.
   `e2e/visual-regression.spec.ts` (readiness + full-value contract), the Quick
   Add durability E2E spec (node-identity + scrollability regressions), and this
   plan.
-- Last successful validation: **hosted** run `39731413378` at `582a1547` —
-  visual 34/34 with 0 retried-then-passed, P0 journeys 25/25 with 0 retried,
-  functional suite 260 passed / 47 skipped / 2 non-strict flakes, simulation
-  model+oracle self-tests pass, deterministic scenario subset pass, every retry
-  gate OK (`strictRetriedThenPassed: 0`), and quality green on typecheck, lint,
-  openspec, journey-label parity, ExecPlan validation and unit+integration — red
-  ONLY on the mandated dependency audit. **Locally at `a14a2c0c` (the final
-  head):** visual 34/34, feature 263 passed / 47 skipped / 0 failed / 0 flaky,
-  retry gate 0 retried, P0 25/25, `npm test` 3069 passed / 3 skipped, typecheck
-  0, lint 0/0, openspec 89/89, all 149 versioned ExecPlans valid.
+- Last successful validation: **hosted FINAL HEAD run `39749716950` at
+  `d83a9ae8`** — the entire `e2e` job is GREEN: feature suite 262 passed /
+  47 skipped / 1 non-strict flake, visual **34/34** with 0 retried-then-passed
+  (`to do long title (phone, light)` ✓ on its first attempt), P0 journeys 25/25
+  with 0 retried, simulation model+oracle 9/9, deterministic scenario subset
+  pass, and every retry gate reports `strictRetriedThenPassed: 0`. The `quality`
+  job is green on typecheck, lint, edge-function typecheck, theme tokens,
+  openspec, journey-label/quarantine parity, ExecPlan validation and
+  unit+integration, and red ONLY on the mandated dependency audit. **Locally at
+  `a14a2c0c`:** visual 34/34, feature 263 passed / 47 skipped / 0 failed /
+  0 flaky, P0 25/25, `npm test` 3069 passed / 3 skipped, typecheck 0, lint 0/0,
+  openspec 89/89, all 149 versioned ExecPlans valid.
 - Current failures: Dependency-security audit remains RED by design (exit 1) with
-  exactly the two mandated advisories — external release blocker, not a
-  regression and not to be weakened.
-- Relevant quarantines: none introduced. The 2 hosted flakes
-  (`planning-w115-reliability.spec.ts:345`, `workout.spec.ts:400`) are
-  pre-existing, non-strict, and touch neither the To Do surface nor any file
-  this campaign changed; both pass 3/3 at repeat-each 3 in isolation.
+  exactly the two mandated advisories (`braces` GHSA-vfj7-8cjw-p6xm,
+  `node-forge` GHSA-86w9-cpqp-85rv) — external release blocker, not a regression
+  and not to be weakened.
+- Relevant quarantines: none introduced. The single hosted flake at the final
+  head (`workout.spec.ts:400`, non-strict, failed→passed) recurs intermittently
+  and also flaked on the previous head; it touches neither the To Do surface nor
+  any file this campaign changed, and passes 3/3 at repeat-each 3 in isolation.
+  It is reported, not hidden or quarantined.
 - Blockers: **no Vercel production-deployment hold exists, and none can be
   created from this environment.** Verified read-only: both projects
   (`super-habits`, `superhabits`) keep `main` as their Production branch,
@@ -139,13 +143,11 @@ Production release stays blocked and under explicit owner control.
   and promote unqualified code to production. No Vercel token, CLI, repo secret
   or variable exists in this environment, so activating a hold requires owner
   action.
-- Exact next action: push `a14a2c0c` to PR #84, confirm the hosted final-head CI
-  run is green on the visual lane (34/34, 0 retries) with quality red only on
-  the audit, then hand off to the owner to activate an enforceable Vercel
+- Exact next action: hand off to the owner to activate an enforceable Vercel
   production hold on BOTH projects. Only after positive evidence of that hold
   plus an explicit Policy A vs Policy B decision may the single non-force
-  fast-forward into `origin/main` be performed. Do not push to `main` before
-  that.
+  fast-forward of `d83a9ae8` into `origin/main` be performed. Do not push to
+  `main` before that.
 - Remaining definition of done: independent read-only source review of the
   changed surface (done), owner-selected integration policy (NOT chosen),
   verified Vercel production-deployment hold on both projects (BLOCKED,
