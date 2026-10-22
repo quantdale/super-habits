@@ -89,6 +89,7 @@ export function getDbBootstrapTimeoutMessage(input: { platformOs: string }): str
   return (
     'The local database is taking longer than expected to open. This usually means ' +
     'another tab still holds it — close other super-habits tabs, then try again. ' +
+    'If it keeps happening, reload this page. ' +
     'Your data is still safe on this device.'
   );
 }

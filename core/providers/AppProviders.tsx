@@ -152,6 +152,12 @@ export function AppProviders({ children }: PropsWithChildren) {
         // unbounded phase left in bootstrap. The task keeps running — only the
         // await is bounded — and a later success is still adopted.
         await withLocalDbTimeout(initializeDatabase(), 'local database');
+        // F3 (adversarial review): retryBootstrap clears dbError at tap time,
+        // but the superseded run's late timeout rejection can re-set it before
+        // its cleanup flips `cancelled`. The success path must clear any stale
+        // error or the gate sticks on "Unable to start" while the database is
+        // actually open.
+        if (!cancelled) setDbError(null);
         // Web only: expose a boot-readiness marker so test harnesses (and
         // future boot-gated code) can observe that the schema is fully
         // migrated. The shell renders before initializeDatabase() completes,
@@ -206,6 +212,10 @@ export function AppProviders({ children }: PropsWithChildren) {
         console.error('[sync] hydrate failed', e);
       });
       if (!cancelled) setSyncHydrated(true);
+      // F4 (adversarial review): an abandoned run (superseded by a retry) must
+      // not keep executing side-effectful pipeline stages — and must never
+      // claim a fresh account-task token the live run then sees as stale.
+      if (cancelled) return;
 
       // Promote pre-migration-20 device-local Pomodoro session notes and
       // associations into the durable `pomodoro_sessions` columns. Best-effort
@@ -218,6 +228,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       } catch (e) {
         console.error('[pomodoro] legacy session metadata promotion failed', e);
       }
+      if (cancelled) return;
 
       // Linked-action crash recovery: replay durable source events whose
       // dispatch never ran (crash between the source commit — which now
@@ -240,6 +251,7 @@ export function AppProviders({ children }: PropsWithChildren) {
         // remote wait so local use stays available. The settled result is
         // adopted only while its task is still the newest account task, so
         // a late settlement can never overwrite newer state.
+        if (cancelled) return;
         const taskId = beginAccountTask();
         const coordinatorTask = accountCoordinator.bootstrap();
         void awaitAccountTask(taskId, coordinatorTask, 'account bootstrap').then((state) => {
@@ -262,6 +274,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       }
 
       try {
+        if (cancelled) return;
         const taskId = beginAccountTask();
         const coordinatorTask = accountCoordinator.refresh();
         void awaitAccountTask(taskId, coordinatorTask, 'account refresh after sync hydrate').then(
@@ -301,6 +314,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       // second full preview would just repeat ~dozens of local scans and
       // remote meta requests for identical data).
       try {
+        if (cancelled) return;
         const maintenance = await runBackupMaintenance({ skipFlush: true });
         if (!cancelled && maintenance.capturedManifest) {
           const refreshedPreviewId = beginPreviewTask();
@@ -318,6 +332,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       // applied to AsyncStorage. Retry the staged application until it
       // succeeds; the marker is cleared only on success.
       try {
+        if (cancelled) return;
         await applyPendingThemeApplication();
       } catch (e) {
         console.error('[backup] pending theme application failed during bootstrap', e);
