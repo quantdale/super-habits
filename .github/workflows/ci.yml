@@ -82,6 +82,16 @@ jobs:
       - name: Validate journey-label and quarantine-register parity
         run: node scripts/journey-label-parity.mjs && node scripts/quarantine-register-parity.mjs
 
+      # Canonical-naming gate: fails when live brand copy or npm package metadata
+      # still carries the legacy `superhabits` token. It deliberately does NOT
+      # fail on the durable identifiers (native package/bundle id, deep-link
+      # scheme, storage keys, PWA cache prefixes, portable-backup protocol, cloud
+      # project names) or on preserved historical evidence — renaming those would
+      # orphan installed data, reject existing backups, or falsify provenance.
+      # See docs/branding/canonical-name-migration.md for the class ledger.
+      - name: Validate canonical naming (legacy token inventory)
+        run: npm run brand:inventory
+
       # Historical ExecPlans predate the versioned lifecycle and remain
       # discoverable without being CI-enforced. New Plan-Version: 2 plans must
       # be structurally valid before the quality tests run.
