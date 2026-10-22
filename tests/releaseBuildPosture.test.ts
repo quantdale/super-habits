@@ -90,6 +90,49 @@ describe('release signing posture', () => {
     }
   });
 
+  it('pins where the production upload key comes from, or records that it is unpinned', () => {
+    // `credentialsSource` decides where EAS reads the Android upload key and the
+    // iOS distribution certificate. When a profile omits it, the source is the
+    // EAS ACCOUNT's remote state — invisible in the repository and unverifiable
+    // by any reviewer or by this gate. That is not a build failure, but it must
+    // be a RECORDED decision: otherwise "which key signed this?" has no answer
+    // that can be audited from source, and a later profile edit can silently
+    // change it.
+    const easJson = readJson('eas.json') as {
+      build?: Record<string, { credentialsSource?: string }>;
+    };
+    const posture = readFileSync(posturePath, 'utf8');
+    const profiles = Object.keys(easJson.build ?? {});
+
+    // Every profile that can produce an installable artifact either pins its
+    // credential source explicitly or is documented as account-managed.
+    for (const profile of profiles) {
+      const source = easJson.build?.[profile]?.credentialsSource;
+      if (source !== undefined) {
+        expect(['local', 'remote']).toContain(source);
+      }
+    }
+
+    // The production profile specifically: either it pins a source, or the
+    // record must state that the upload key lives in EAS account state.
+    const productionSource = easJson.build?.production?.credentialsSource;
+    if (productionSource === undefined) {
+      expect(posture).toMatch(/credentialsSource|upload key.*EAS account|EAS[- ]managed/i);
+    }
+
+    // The record must name the real verification step regardless, because a
+    // pinned source still does not prove the ARTIFACT was signed by it.
+    expect(posture).toMatch(/apksigner verify/i);
+  });
+
+  it('never claims a store-signed artifact exists', () => {
+    // The single most dangerous drift here is a document that starts asserting
+    // readiness. Absence must stay explicit and greppable.
+    const posture = readFileSync(posturePath, 'utf8');
+    expect(posture).not.toMatch(/signed with the (?:production|upload|release) (?:key|keystore)/i);
+    expect(posture).toMatch(/No production keystore|no production|does not exist/i);
+  });
+
   it('release builds are neither shrunk nor obfuscated by default', () => {
     const gradle = generatedAndroidGradle();
     const posture = readFileSync(posturePath, 'utf8');
