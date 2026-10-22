@@ -51,6 +51,8 @@ import { Card } from '@/core/ui/Card';
 import { HabitReminderHost } from '@/core/notifications/HabitReminderHost';
 import { WorkoutReminderHost } from '@/core/notifications/WorkoutReminderHost';
 import { PomodoroCommandBridgeProvider } from '@/features/pomodoro/pomodoroCommandBridge';
+// Bootstrap step 5: one-time promotion of pre-v20 device-local Pomodoro
+// session metadata into the durable columns (see the pipeline call site).
 import { migrateLegacySessionMeta } from '@/features/pomodoro/pomodoro.sessionMeta';
 import { recoverPendingLinkedActions } from '@/core/linked-actions/linkedActions.recovery';
 
@@ -618,8 +620,9 @@ export function AppProviders({ children }: PropsWithChildren) {
 
 function BootstrapGate({
   dbError,
-  // Intentionally unused: kept in the gate's contract so the decision NOT to
-  // gate on local sync hydration stays explicit (see the comment below).
+  // Intentionally unused (name-prefixed per lint convention): kept in the
+  // gate's contract so the decision NOT to gate on local sync hydration stays
+  // explicit (see the comment below).
   syncHydrated: _syncHydrated,
   authBootstrapReady,
   onRetryDbBootstrap,

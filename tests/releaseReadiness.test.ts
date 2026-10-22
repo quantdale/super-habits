@@ -17,6 +17,7 @@ import {
   checkNativeSigning,
   checkProductionHold,
   checkSubmitCredentials,
+  computeVerdict,
   evaluateReleaseReadiness,
 } from '../scripts/release-readiness.mjs';
 
@@ -174,7 +175,7 @@ describe('release-readiness verdict', () => {
       writeFileSync(target, JSON.stringify(parsed, null, 2));
       const blockers = checkProductionHold();
       expect(blockers).toHaveLength(1);
-      expect(blockers[0].detail).toMatch(/wildcard/);
+      expect(blockers[0].detail).toMatch(/wildcard|pattern-shaped/);
 
       // And the plain removal case.
       parsed.git = { deploymentEnabled: {} };
@@ -200,7 +201,67 @@ describe('release-readiness verdict', () => {
         'PROD-HOLD',
         'NATIVE-SIGNING',
         'SUBMIT-CREDENTIALS',
+        'OWNER-ACTION-SCAN',
       ]).toContain(id);
     }
+  });
+
+  it('NC-1: a pattern-shaped deployment key with a truthy value is a hold bypass', () => {
+    const target = resolve(repoRoot, 'vercel.json');
+    const original = readFileSync(target, 'utf8');
+    const dir = mkdtempSync(join(tmpdir(), 'sh-readiness-glob-'));
+    const backup = join(dir, 'vercel.bak');
+    copyFileSync(target, backup);
+    try {
+      // The old check only noticed literal `*`/`**` keys with strictly `true`,
+      // so `"ma*": true` (or a string-truthy value) certified a possibly
+      // bypassed hold as safe. Glob semantics are Vercel-side and unobservable
+      // here; the conservative reading must block.
+      const parsed = JSON.parse(original) as {
+        git?: { deploymentEnabled?: Record<string, unknown> };
+      };
+      parsed.git = { deploymentEnabled: { main: false, 'ma*': true } };
+      writeFileSync(target, JSON.stringify(parsed, null, 2));
+      const blockers = checkProductionHold();
+      expect(blockers).toHaveLength(1);
+      expect(blockers[0].detail).toMatch(/pattern-shaped/);
+    } finally {
+      copyFileSync(backup, target);
+      unlinkSync(backup);
+      rmSync(dir, { recursive: true, force: true });
+    }
+    expect(checkProductionHold()).toEqual([]);
+  });
+
+  it('NC-2: an owner-action marker outside docs/release still counts', () => {
+    const target = resolve(repoRoot, 'docs', 'testing', 'known-gaps.md');
+    const original = readFileSync(target, 'utf8');
+    const dir = mkdtempSync(join(tmpdir(), 'sh-readiness-marker-'));
+    const backup = join(dir, 'known-gaps.bak');
+    copyFileSync(target, backup);
+    try {
+      writeFileSync(target, `${original}\n- \`[OWNER ACTION]\` file the Play data-safety form\n`);
+      const result = evaluateReleaseReadiness();
+      const markerBlocker = result.blockers.find((b) => b.id === 'OWNER-ACTION-MARKERS');
+      expect(markerBlocker).toBeDefined();
+      expect(markerBlocker!.detail).toMatch(/known-gaps/);
+    } finally {
+      copyFileSync(backup, target);
+      unlinkSync(backup);
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('NEVER reports release-ready from repository-local checks alone', () => {
+    // The verdict is named for what it can prove. Even a hypothetical zero-
+    // blocker state must not produce a release-readiness claim: the decisive
+    // conditions (hosted certifications, device runs, store/legal actions,
+    // release authorization) are external and unobservable from the repo.
+    expect(computeVerdict(0)).toBe('REPO_CHECKS_CLEAR');
+    expect(computeVerdict(0)).not.toMatch(/READY|RELEASE/i);
+    expect(computeVerdict(3)).toBe('BLOCKED');
+    const result = evaluateReleaseReadiness();
+    expect(result.releaseAuthorized).toBe(false);
+    expect(result.verdict).not.toMatch(/RELEASE_READY/i);
   });
 });

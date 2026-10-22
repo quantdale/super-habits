@@ -31,6 +31,27 @@ function generatedAndroidGradle(): string | null {
   return existsSync(path) ? readFileSync(path, 'utf8') : null;
 }
 
+/**
+ * Two-sided `credentialsSource` record check (review P1: the old gate was
+ * one-sided — merely MENTIONING `credentialsSource` satisfied it, so a false
+ * "pinned in eas.json" claim passed). When the profile does not pin a source,
+ * the record must assert the UNPINNED reality and must NOT claim a pin; when
+ * the profile pins one, the record must contain the actual value.
+ */
+function assertProductionSourceRecorded(
+  posture: string,
+  productionSource: string | undefined,
+): void {
+  if (productionSource === undefined) {
+    // The unpinned reality is stated (heading/§5 say so today).
+    expect(posture).toMatch(/unpinned|EAS account state|EAS[- ]managed/i);
+    // And no sentence claims credentialsSource is pinned.
+    expect(posture).not.toMatch(/credentialsSource[^\n]{0,80}(?:is |stays |are )?pinned/i);
+  } else {
+    expect(posture).toMatch(new RegExp(`credentialsSource[^\\n]{0,80}${productionSource}`, 'i'));
+  }
+}
+
 describe('release signing posture', () => {
   it('keeps the E2E seam on the E2E test profile and nowhere else', () => {
     const easJson = readJson('eas.json');
@@ -113,23 +134,49 @@ describe('release signing posture', () => {
       }
     }
 
-    // The production profile specifically: either it pins a source, or the
-    // record must state that the upload key lives in EAS account state.
+    // The production profile specifically: either it pins a source and the
+    // record names that exact value, or the record asserts the unpinned
+    // reality without any false pin claim.
     const productionSource = easJson.build?.production?.credentialsSource;
-    if (productionSource === undefined) {
-      expect(posture).toMatch(/credentialsSource|upload key.*EAS account|EAS[- ]managed/i);
-    }
+    assertProductionSourceRecorded(posture, productionSource);
 
     // The record must name the real verification step regardless, because a
     // pinned source still does not prove the ARTIFACT was signed by it.
     expect(posture).toMatch(/apksigner verify/i);
   });
 
+  it('rejects a FALSE claim that credentialsSource is pinned (M4 falsification regression)', () => {
+    const easJson = readJson('eas.json') as {
+      build?: Record<string, { credentialsSource?: string }>;
+    };
+    const productionSource = easJson.build?.production?.credentialsSource;
+    // The adversarial mutation: a record asserting the source is pinned in
+    // eas.json. Whether or not the profile actually pins one, the claim must
+    // match REALITY — so at least one shape of false claim must throw.
+    const falsifiedUnpinnedClaim =
+      '## 5. Where the production upload key would come from\n\n' +
+      '`credentialsSource` is pinned in `eas.json` to `remote`.\n';
+    const falsifiedValueClaim =
+      '## 5. Where the production upload key would come from\n\n' +
+      '`credentialsSource` is pinned in `eas.json` to `never-actually-set`.\n';
+    if (productionSource === undefined) {
+      expect(() =>
+        assertProductionSourceRecorded(falsifiedUnpinnedClaim, productionSource),
+      ).toThrow();
+    } else {
+      expect(() => assertProductionSourceRecorded(falsifiedValueClaim, productionSource)).toThrow();
+    }
+  });
+
   it('never claims a store-signed artifact exists', () => {
     // The single most dangerous drift here is a document that starts asserting
-    // readiness. Absence must stay explicit and greppable.
+    // readiness. Absence must stay explicit and greppable. The fabrication
+    // family is intentionally broad (review P2: paraphrases like
+    // "production-signed" must not slip past).
     const posture = readFileSync(posturePath, 'utf8');
-    expect(posture).not.toMatch(/signed with the (?:production|upload|release) (?:key|keystore)/i);
+    expect(posture).not.toMatch(
+      /(?:signed with|signed by) the (?:production|upload|release)[^\n]{0,40}(?:key|keystore|certificate)|production-signed\b/i,
+    );
     expect(posture).toMatch(/No production keystore|no production|does not exist/i);
   });
 
