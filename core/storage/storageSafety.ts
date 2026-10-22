@@ -130,6 +130,45 @@ export function getSaveFailureMessage(error: unknown, fallback: string): string 
 }
 
 /**
+ * Copy for a storage-classified BOOTSTRAP failure (the database could not be
+ * opened). Different from a failed save: nothing was at stake in a write, so
+ * the message talks about opening the local database, keeps the data-safe
+ * promise honest, and returns `null` for unrecognized errors so the caller can
+ * use its existing bootstrap copy.
+ */
+export function describeStorageBootstrapFailure(error: unknown): string | null {
+  switch (classifyStorageError(error)) {
+    case 'quota':
+      return (
+        "The local database could not be opened because this site's storage is full. " +
+        'Free up space, then try again. Your data is still on this device — do not ' +
+        'clear site data.'
+      );
+    case 'storage-access':
+      return (
+        'This browser is blocking local storage, so the database could not be opened. ' +
+        'Allow storage for this site in your browser settings, then try again.'
+      );
+    case 'unavailable':
+      return (
+        'This browser can not provide the durable storage super-habits needs. ' +
+        'Try a recent version of Chrome, Edge, or Firefox.'
+      );
+    case 'unknown':
+      return null;
+  }
+}
+
+/** Backup recommendation copy for storage-pressure warnings. */
+export function describeStoragePressure(status: 'warn' | 'critical'): string {
+  return status === 'critical'
+    ? 'Local storage is almost full. Export a backup from Settings → Portable data ' +
+        'soon — a browser storage cleanup could otherwise cost you your data.'
+    : 'Local storage is filling up. Export a backup from Settings → Portable data to ' +
+        'protect your data.';
+}
+
+/**
  * Classified wrapper for a failed durable write. Non-storage failures are
  * rethrown UNWRAPPED (the exact original error) so ordinary error handling and
  * any test asserting a specific message are unaffected.

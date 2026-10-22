@@ -27,6 +27,12 @@ export const appMetaKeys = {
   dbSchemaVersion: defineTextKey('db_schema_version', 'system'),
   dateKeyFormat: defineTextKey('date_key_format', 'system'),
   dateKeyCutover: defineTextKey('date_key_cutover', 'system'),
+  /** First-open identity marker for cross-store storage-reset detection
+   *  (CORR-A-02). Lives INSIDE the database so a sentinel that survives in
+   *  localStorage while this marker disappears proves the DB store was reset
+   *  or evicted while the rest of the origin survived. Local operational
+   *  state — never backed up, never synced. */
+  dbIdentityMarker: defineJsonKey('db.identity_marker', 'system'),
   guestProfile: defineJsonKey('guest_profile', 'auth'),
   accountOwnerUserId: defineTextKey('account.owner_user_id', 'auth'),
   accountOwnerBindingState: defineTextKey('account.owner_binding_state', 'auth'),

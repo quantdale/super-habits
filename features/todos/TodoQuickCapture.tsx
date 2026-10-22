@@ -19,6 +19,13 @@ type Props = {
   onTitleChange: (text: string) => void;
   /** Creates the task; resolves after persistence so the input only clears on success. */
   onSubmit: (title: string) => Promise<void>;
+  /**
+   * Surfaces a failed write (mandatory CORR-A-02 scenario 8: a write that
+   * rejects after the optimistic loading presentation). The typed input is
+   * preserved either way; this slot exists so the failure is reported instead
+   * of disappearing into an unhandled rejection.
+   */
+  onPersistError?: (error: unknown) => void;
 };
 
 /**
@@ -34,7 +41,7 @@ type Props = {
  * alone cannot do this job). `isSubmitting` here is only the button's loading
  * presentation.
  */
-export function TodoQuickCapture({ title, onTitleChange, onSubmit }: Props) {
+export function TodoQuickCapture({ title, onTitleChange, onSubmit, onPersistError }: Props) {
   const { tokens, sectionAccents } = useAppTheme();
   const reducedMotion = useReducedMotion();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,6 +66,7 @@ export function TodoQuickCapture({ title, onTitleChange, onSubmit }: Props) {
       persist: onSubmit,
       onSubmittingChange: setIsSubmitting,
       onPersisted: () => onTitleChange(''),
+      onPersistFailed: (error) => onPersistError?.(error),
     });
   };
 

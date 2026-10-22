@@ -248,6 +248,9 @@ export default [
   //    AppProviders (bootstrap), data layers, domain layers, lib/, and
   //    tests. Domain/lib files are excluded so that rules 2 and 3 above
   //    are not shadowed (in flat config the last config for a rule wins).
+  //    `core/storage/**` (CORR-A-02) is DB-durability infrastructure in the
+  //    same sense as core/sync and core/backup: its host reads the singleton
+  //    handle to reconcile storage-safety state after bootstrap.
   {
     files: ['**/*.ts', '**/*.tsx'],
     ignores: [
@@ -257,6 +260,7 @@ export default [
       'core/backup/**',
       'core/portable/**',
       'core/providers/AppProviders.tsx',
+      'core/storage/**',
       'core/linked-actions/linkedActions.data.ts',
       'core/**/__tests__/**',
       'features/**/*.data.ts',

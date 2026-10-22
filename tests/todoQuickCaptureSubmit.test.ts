@@ -86,17 +86,47 @@ describe('submitInlineQuickAdd', () => {
     expect(onPersisted).toHaveBeenCalledTimes(1);
   });
 
-  it('releases the guard when persistence fails so the input is not locked', async () => {
-    const { guard, persist, onSubmittingChange, call } = harness();
-    persist.mockRejectedValueOnce(new Error('disk full'));
+  it('releases the guard when persistence fails and reports the failure without clearing input', async () => {
+    const { guard, persist, onSubmittingChange, onPersisted, call } = harness();
+    const failure = new Error('disk full');
+    persist.mockRejectedValueOnce(failure);
 
-    await expect(call()).rejects.toThrow('disk full');
+    // The failure contract is total and observable: no throw (so `void
+    // handleSubmit()` can never become an unhandled rejection) and the typed
+    // input is preserved because onPersisted never runs.
+    await expect(call()).resolves.toBe('failed');
+    expect(onPersisted).not.toHaveBeenCalled();
     expect(onSubmittingChange).toHaveBeenLastCalledWith(false);
 
     // A retry after the failure is accepted, and the guard is released again
     // once that attempt settles.
     await call();
     expect(persist).toHaveBeenCalledTimes(2);
+    expect(guard.tryStart()).toBe(true);
+    guard.finish();
+  });
+
+  it('delivers the rejection to onPersistFailed when the write fails', async () => {
+    const guard: SubmitGuard = createSubmitGuard();
+    const failure = new Error('quota exceeded');
+    const onPersistFailed = vi.fn();
+    const onPersisted = vi.fn();
+
+    const result = await submitInlineQuickAdd({
+      guard,
+      canSubmit: true,
+      title: 'Buy milk',
+      persist: vi.fn().mockRejectedValue(failure),
+      onSubmittingChange: vi.fn(),
+      onPersisted,
+      onPersistFailed,
+    });
+
+    expect(result).toBe('failed');
+    expect(onPersistFailed).toHaveBeenCalledTimes(1);
+    expect(onPersistFailed).toHaveBeenCalledWith(failure);
+    expect(onPersisted).not.toHaveBeenCalled();
+    // Retry is possible immediately.
     expect(guard.tryStart()).toBe(true);
     guard.finish();
   });

@@ -21,6 +21,13 @@ import {
   isLocalDbPhaseTimeout,
   withLocalDbTimeout,
 } from '@/core/providers/localDbPhase';
+import { describeStorageBootstrapFailure } from '@/core/storage/storageSafety';
+import {
+  getDbOwnedByOtherTabMessage,
+  tryAcquireDbOwnership,
+  type DbOwnership,
+} from '@/core/storage/dbOwnership';
+import { StorageSafetyHost } from '@/core/storage/StorageSafetyHost';
 import { withRemoteTimeout } from '@/core/providers/remotePhase';
 import {
   createPreviewAdoptionGuard,
@@ -78,6 +85,12 @@ export function AppProviders({ children }: PropsWithChildren) {
    * overwrite fresher account state (stale-async overwrite class).
    */
   const accountTaskSeqRef = useRef(0);
+  /**
+   * Cross-tab database ownership (CORR-A-03): held for the app's session and
+   * REUSED across bootstrap retries — re-probing while holding our own lock
+   * would report ourselves as a competing tab.
+   */
+  const dbOwnershipRef = useRef<DbOwnership | null>(null);
   const beginAccountTask = useCallback(() => ++accountTaskSeqRef.current, []);
   const applyAccountStateIfCurrent = useCallback((taskId: number, state: AccountState) => {
     if (taskId === accountTaskSeqRef.current) setAccountState(state);
@@ -115,6 +128,21 @@ export function AppProviders({ children }: PropsWithChildren) {
 
     const bootstrap = async () => {
       try {
+        // CORR-A-03: claim the per-origin database writer role BEFORE the
+        // OPFS open. A second tab's open does not fail — it stalls behind the
+        // first tab's write lock, so contention must be detected up front and
+        // answered with recovery UX instead of a 30-second silent hang. Where
+        // Web Locks is unavailable this degrades to the bounded-open path.
+        if (dbOwnershipRef.current?.status !== 'acquired') {
+          const ownership = await tryAcquireDbOwnership();
+          dbOwnershipRef.current = ownership;
+          if (ownership.status === 'contended') {
+            if (!cancelled) {
+              setDbError(getDbOwnedByOtherTabMessage());
+            }
+            return;
+          }
+        }
         // Bounded (AUD-WS04-P1): `initializeDatabase()` can STALL rather than
         // reject on web when another tab holds the origin-wide OPFS write lock
         // (or a WASM worker wedges). Unbounded, that left the startup gate on
@@ -153,14 +181,17 @@ export function AppProviders({ children }: PropsWithChildren) {
           // A stall is NOT evidence the browser is incapable, and it is not a
           // network problem. Routing it through the generic failure copy would
           // wrongly tell a capable browser it is unsupported; it must offer the
-          // same retry with a message that names the real cause.
+          // same retry with a message that names the real cause. Storage-caused
+          // bootstrap failures (quota, blocked storage) get their own honest
+          // copy first (CORR-A-02).
           setDbError(
             isLocalDbPhaseTimeout(e)
               ? getDbBootstrapTimeoutMessage({ platformOs: Platform.OS })
-              : getDbBootstrapErrorMessage({
-                  platformOs: Platform.OS,
-                  hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
-                }),
+              : (describeStorageBootstrapFailure(e) ??
+                  getDbBootstrapErrorMessage({
+                    platformOs: Platform.OS,
+                    hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
+                  })),
           );
         }
         return;
@@ -551,6 +582,7 @@ export function AppProviders({ children }: PropsWithChildren) {
                   {children}
                   <HabitReminderHost />
                   <WorkoutReminderHost />
+                  <StorageSafetyHost />
                   <RestorePrompt
                     preview={restorePreview}
                     visible={showRestorePrompt}
@@ -571,7 +603,9 @@ export function AppProviders({ children }: PropsWithChildren) {
 
 function BootstrapGate({
   dbError,
-  syncHydrated,
+  // Intentionally unused: kept in the gate's contract so the decision NOT to
+  // gate on local sync hydration stays explicit (see the comment below).
+  syncHydrated: _syncHydrated,
   authBootstrapReady,
   onRetryDbBootstrap,
   children,
