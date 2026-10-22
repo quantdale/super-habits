@@ -24,6 +24,7 @@ import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { IconButton } from '@/core/ui/IconButton';
 import { PageHeader } from '@/core/ui/PageHeader';
 import { ScreenSection } from '@/core/ui/ScreenSection';
+import { TodoEmptyStateScroll } from './TodoEmptyStateScroll';
 import { TextField } from '@/core/ui/TextField';
 import { Button } from '@/core/ui/Button';
 import { PillChip } from '@/core/ui/PillChip';
@@ -1021,8 +1022,12 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
           Keeping one stable, non-scrolling container means the input node is
           never recreated, so value, focus and in-flight keystrokes all survive.
           The populated branch already required a non-scrolling parent (its
-          `DraggableFlatList`/`SectionList` own scrolling), and the empty branch
-          is short enough to fit without page scrolling. */}
+          `DraggableFlatList`/`SectionList` own scrolling). The empty branch is
+          NOT short enough to fit on a short viewport — measured: its stack ends
+          ~440px down, so on a landscape phone (~390px tall) the "Add your first
+          task" action was clipped with no scroller at all. It therefore owns a
+          separate child scroll region (`TodoEmptyStateScroll`) placed AFTER the
+          quick-add row, which keeps the input mounted while the cards scroll. */}
       <Screen scroll={false} hero={hero}>
         <View className="flex-1">
           {/* Single stable Quick Capture (Quick-Add durability): rendered ONCE,
@@ -1035,7 +1040,17 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
             onTitleChange={setQuickDraft}
             onSubmit={handleQuickAdd}
           />
-          {totallyEmpty ? <ScreenSection>{noPendingTasksCard}</ScreenSection> : null}
+          {/* The empty branch supplies its own scroll region: the page-level
+              scroller is pinned off (see the comment above) so the quick-add
+              input node survives the transition, and this stack is tall enough
+              to clip the "Add your first task" action on a landscape phone
+              without one. It sits AFTER the quick-add row, so the input stays
+              mounted and in place while only the cards scroll. */}
+          {totallyEmpty ? (
+            <TodoEmptyStateScroll>
+              <ScreenSection>{noPendingTasksCard}</ScreenSection>
+            </TodoEmptyStateScroll>
+          ) : null}
 
           {!totallyEmpty ? (
             <>

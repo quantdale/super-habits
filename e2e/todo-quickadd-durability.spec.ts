@@ -160,6 +160,70 @@ test.describe('Todos Quick Add durability', () => {
     await returnToApp(page);
   });
 
+  test('keeps the empty state scrollable on a landscape phone viewport', async ({ page }) => {
+    // Regression for a real defect introduced while fixing the input-loss bug.
+    //
+    // Pinning `Screen scroll={false}` removed the page-level scroller in order
+    // to keep the quick-add input node alive. That also removed the ONLY
+    // scroller from the empty branch, whose stack ends ~420px down — so on a
+    // landscape phone (390px tall) the "Add your first task" action sat below
+    // the fold with no scroller anywhere. The empty branch now owns a child
+    // scroll region (`TodoEmptyStateScroll`) after the quick-add row, so the
+    // cards scroll while the input stays mounted.
+    //
+    // The assertion is deliberately about ANCESTOR SCROLLABILITY rather than
+    // about a successful click: Playwright's click() scrolls the element into
+    // view itself (and `body { overflow: hidden }` still lets it do so), so a
+    // click-only check passes even when the branch has NO scroller. That was
+    // verified by reintroducing the defect and watching the click-based
+    // version of this test pass — i.e. it was a false proof. This version fails
+    // in that state because the button has no scrollable ancestor and rests
+    // below the viewport.
+    //
+    // A portrait-only check would not catch this either: the stack fits at
+    // 390x844, which is why every existing visual golden stayed green.
+    await page.setViewportSize({ width: 844, height: 390 });
+    await goToTab(page, 'todos');
+    await clearDatabase(page);
+    await goToTab(page, 'todos');
+    await expect(page.getByText('No pending tasks', { exact: true }).last()).toBeVisible();
+    // The quick-add input must remain present in the empty branch.
+    await expect(page.getByLabel('Quick add task title')).toHaveCount(1);
+
+    const reach = await page.evaluate(() => {
+      const isInactive = (el: Element) => !!el.closest('[aria-hidden="true"]');
+      const btn = Array.from(
+        document.querySelectorAll<HTMLElement>('button[aria-label="Add your first task"]'),
+      ).find((b) => !isInactive(b));
+      if (!btn) return null;
+      const rect = btn.getBoundingClientRect();
+      let scrollableAncestor = false;
+      let node: HTMLElement | null = btn.parentElement;
+      while (node) {
+        const style = getComputedStyle(node);
+        if (/(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 1) {
+          scrollableAncestor = true;
+          break;
+        }
+        node = node.parentElement;
+      }
+      return {
+        bottom: Math.round(rect.bottom),
+        viewportHeight: window.innerHeight,
+        scrollableAncestor,
+      };
+    });
+
+    expect(reach).not.toBeNull();
+    // Either the action is already inside the viewport, or there is a scroller
+    // that can bring it into view. Never neither.
+    expect(reach!.scrollableAncestor || reach!.bottom <= reach!.viewportHeight).toBe(true);
+    // And it must actually be reachable through normal scrolling.
+    if (!reach!.scrollableAncestor) {
+      expect(reach!.bottom).toBeLessThanOrEqual(reach!.viewportHeight);
+    }
+  });
+
   test('reload clears the draft — an app restart is not an in-screen remount', async ({ page }) => {
     // Documents the deliberate boundary: the draft is in-memory UI state, kept
     // across an in-screen empty/populated remount (tests above) but intentionally
