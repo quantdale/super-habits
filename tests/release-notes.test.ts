@@ -43,7 +43,7 @@ describe('release notes store readiness', () => {
 
   it('keeps the full 1.0.0 draft as the source of truth', () => {
     const notes = readNotes();
-    expect(notes).toContain('# SuperHabits 1.0.0');
+    expect(notes).toContain('# super-habits 1.0.0');
     expect(notes).toContain('Today dashboard');
     expect(notes).toContain('52-week heatmap');
     expect(notes).toContain('Gym V2');
