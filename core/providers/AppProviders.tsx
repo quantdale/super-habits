@@ -2,7 +2,7 @@ import { type PropsWithChildren, useCallback, useEffect, useMemo, useRef, useSta
 import NetInfo from '@react-native-community/netinfo';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppState, Modal, Platform, Text, View } from 'react-native';
-import { initializeDatabase } from '@/core/db/client';
+import { getDatabase, initializeDatabase } from '@/core/db/client';
 import { installSimulationDataBridge } from '@/core/simulation/dataBridge';
 import { accountCoordinator } from '@/core/auth/accountCoordinator';
 import type { AccountActionResult, AccountState } from '@/core/auth/account.types';
@@ -582,7 +582,7 @@ export function AppProviders({ children }: PropsWithChildren) {
                   {children}
                   <HabitReminderHost />
                   <WorkoutReminderHost />
-                  <StorageSafetyHost />
+                  <StorageSafetyHost getDatabase={getDatabase} />
                   <RestorePrompt
                     preview={restorePreview}
                     visible={showRestorePrompt}

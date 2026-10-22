@@ -16,7 +16,7 @@
  * never break startup (all callees are non-throwing or guarded here).
  */
 import { useEffect } from 'react';
-import { getDatabase } from '@/core/db/client';
+import type * as SQLite from 'expo-sqlite';
 import { createLinkedActionsNotice } from '@/core/linked-actions/linkedActionsNotice';
 import { useInAppNotices } from '@/core/providers/inAppNoticeContext';
 import { useAppNavigation } from '@/core/providers/navigationContext';
@@ -28,7 +28,15 @@ import {
 import { getStorageResetMessage, reconcileStorageSentinel } from '@/core/storage/storageSentinel';
 import { nowIso } from '@/lib/time';
 
-export function StorageSafetyHost() {
+export function StorageSafetyHost({
+  getDatabase,
+}: {
+  /**
+   * Dependency-injected database accessor (owned by the bootstrap orchestrator
+   * in AppProviders). The host stays UI-layer: it never imports the DB client.
+   */
+  getDatabase: () => Promise<SQLite.SQLiteDatabase>;
+}) {
   const { showNotice } = useInAppNotices();
   const { openSettings } = useAppNavigation();
 
@@ -79,7 +87,7 @@ export function StorageSafetyHost() {
     return () => {
       cancelled = true;
     };
-  }, [openSettings, showNotice]);
+  }, [getDatabase, openSettings, showNotice]);
 
   return null;
 }

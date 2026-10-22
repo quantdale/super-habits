@@ -187,6 +187,9 @@ export class StorageWriteError extends Error {
 }
 
 export function wrapDurableWriteError(error: unknown, action: string): unknown {
+  // Idempotent: nested transactional layers must not re-wrap an already
+  // classified failure (its message already carries the storage copy).
+  if (error instanceof StorageWriteError) return error;
   const kind = classifyStorageError(error);
   if (kind === 'unknown') return error;
   return new StorageWriteError(kind, action, error);

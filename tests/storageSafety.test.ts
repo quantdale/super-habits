@@ -97,6 +97,12 @@ describe('wrapDurableWriteError', () => {
     expect(storageError.cause).toBe(cause);
     expect(storageError.message).toMatch(/Storage is full/);
   });
+
+  it('is idempotent: nested transactional layers never double-wrap', () => {
+    const once = wrapDurableWriteError(quotaError(), 'inner') as StorageWriteError;
+    const twice = wrapDurableWriteError(once, 'outer');
+    expect(twice).toBe(once);
+  });
 });
 
 describe('estimateStoragePressure (mandatory scenario 5)', () => {

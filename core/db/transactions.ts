@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import type * as SQLite from 'expo-sqlite';
+import { wrapDurableWriteError } from '@/core/storage/storageSafety';
 
 const transactionTails = new WeakMap<object, Promise<void>>();
 
@@ -46,6 +47,9 @@ export async function withSQLiteTransaction<T>(
     throw new SQLiteTransactionUnavailableError();
   }
 
+  // SAFETY: `db` is typed as the class but keyed here purely by object
+  // identity for the per-connection serialization tail; the WeakMap<object>
+  // imposes no structural requirement, so erasing to `object` is sound.
   const key = db as unknown as object;
   const previous = transactionTails.get(key) ?? Promise.resolve();
   let result!: T;
@@ -68,6 +72,16 @@ export async function withSQLiteTransaction<T>(
       () => undefined,
     ),
   );
-  await current;
-  return result;
+  try {
+    await current;
+    return result;
+  } catch (error) {
+    // Central durable-write failure classification (CORR-A-02): EVERY
+    // transactional write (data-layer mutations, backup capture, portable
+    // import/export, account ownership) funnels through this gate, so a
+    // storage-caused rejection is classified once and surfaces as actionable
+    // copy at any UI catch site that reads `error.message`. Non-storage errors
+    // are rethrown UNWRAPPED — the exact original error.
+    throw wrapDurableWriteError(error, 'transactional write');
+  }
 }
