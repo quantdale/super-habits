@@ -187,17 +187,26 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     });
   }
   if (version < 6) {
-    // The backfill REWRITES user-authored todo ordering, so it must run only
-    // when the ordering column is actually being added. Without this guard a
-    // re-run of the chain would collapse a user's manual sort back to creation
-    // order. This mirrors the `addedSortOrder` guard migration 24 already uses.
-    const addedSortOrder = await addColumnIfMissing(
-      db,
-      'todos',
-      'sort_order',
-      'INTEGER NOT NULL DEFAULT 0',
-    );
     await applyMigration(db, 6, async () => {
+      // The backfill REWRITES user-authored todo ordering, so it must run only
+      // when the ordering column is actually being added. Without this guard a
+      // re-run of the chain would collapse a user's manual sort back to creation
+      // order. This mirrors the `addedSortOrder` guard migration 24 already uses.
+      //
+      // CRASH-SAFETY (fixed 2026-10-22): the ALTER and the version bump MUST
+      // share one transaction. This call previously ran OUTSIDE `applyMigration`,
+      // so a crash between the ALTER and the version bump left the column present
+      // with `db_schema_version` still at 5; the re-run then saw
+      // `addedSortOrder === false`, skipped the backfill, and permanently
+      // collapsed the user's manual ordering to `sort_order = 0`. Inside the
+      // transaction the ALTER rolls back with the block, so the retry re-observes
+      // the pre-migration shape and the backfill still fires.
+      const addedSortOrder = await addColumnIfMissing(
+        db,
+        'todos',
+        'sort_order',
+        'INTEGER NOT NULL DEFAULT 0',
+      );
       await addColumnIfMissing(db, 'todos', 'due_date', 'TEXT');
       await addColumnIfMissing(db, 'todos', 'priority', "TEXT NOT NULL DEFAULT 'normal'");
       if (addedSortOrder) {
