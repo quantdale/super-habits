@@ -54,31 +54,54 @@ const PINNED_PRODUCER_OFFLINE_REPORT = {
 
 describe('audit-runtime-deps gate policy', () => {
   it('matches a documented finding on advisory id, package, and every reported path', () => {
-    // The allowlist entry must exist for the live tree's three advisories.
-    for (const advisory of ['GHSA-q2hr-2g5m-vwhr', 'GHSA-qhr7-859c-m2p7', 'GHSA-6j4f-fj2g-mc7p']) {
-      expect(script).toContain(`advisory: '${advisory}'`);
-    }
-    // ...and the matcher must require every reported node to be covered, so a
-    // new path for a known advisory is still a failure.
+    // Driven through the real matcher with a FIXTURE allowlist, so this asserts
+    // the matching RULE instead of today's live policy contents. Coupling the
+    // rule's test to a live allowlist entry meant that correctly REMEDIATING an
+    // advisory broke the tests for the mechanism (found 2026-10-22).
+    const allowlist = [
+      {
+        advisory: 'GHSA-fixture-0001',
+        packageName: 'brace-expansion',
+        nodes: ['node_modules/a/brace-expansion', 'node_modules/b/brace-expansion'],
+        reason: 'fixture',
+      },
+    ];
+    const finding = {
+      advisory: 'GHSA-fixture-0001',
+      name: 'brace-expansion',
+      nodes: allowlist[0].nodes,
+    };
+    expect(isDocumented(finding, allowlist)).toBeTruthy();
+    // A new path for a known advisory is still a failure.
+    expect(
+      isDocumented(
+        { ...finding, nodes: [...finding.nodes, 'node_modules/new/brace-expansion'] },
+        allowlist,
+      ),
+    ).toBeNull();
     expect(script).toContain('finding.nodes.every((node) => entry.nodes.includes(node))');
   });
 
-  it('documents the build-time-only reason and its date beside every entry', () => {
-    for (const entry of script.match(/const DOCUMENTED_BUILD_TIME_ADVISORIES = \[[\s\S]*?\n\];/) ??
-      []) {
-      const reasonMatches = entry.match(/reason:/g) ?? [];
-      expect(reasonMatches.length).toBeGreaterThanOrEqual(3);
-      // The date lives in the block's own header comment, next to the entries.
-      expect(script).toContain('allowlist dated 2026-09-29');
-      expect(entry).toContain('coverage/glob tooling only');
-    }
+  it('treats an empty allowlist as valid policy rather than a failure', () => {
+    // The allowlist documents findings that CANNOT be fixed. Once every finding
+    // is fixed, "empty" is the correct state and must still gate correctly: a
+    // clean report passes, and any new high/critical finding fails.
+    expect(evaluateAudit(cleanReport(), []).exitCode).toBe(0);
+    const withFinding = evaluateAudit(ok(asResult(documentedBraceReport(), 1)), []);
+    expect(withFinding.exitCode).toBe(1);
+    expect(withFinding.undocumented).toHaveLength(1);
   });
 
-  it('keeps the 5.x brace-expansion copy fixed by an overrides entry, not allowlisted', () => {
+  it('pins every brace-expansion copy to a patched release via overrides', () => {
+    // The 1.x/2.x lines were allowlisted 2026-09-29 on the claim that they had no
+    // non-breaking fix. That claim was wrong: each affected range publishes a
+    // patched version, so the real fix is overrides inside the caret ranges the
+    // parents already declare. No allowlist entry remains for this package,
+    // which is why a regression now surfaces as a NEW finding instead.
     const pkg = JSON.parse(readFileSync(resolve(__dirname, '..', 'package.json'), 'utf8'));
     expect(pkg.overrides['brace-expansion@^5.0.0']).toBe('^5.0.12');
-    // The allowlist names only the 1.x/2.x paths, never the 5.x copy.
-    expect(script).not.toContain('node_modules/brace-expansion"');
+    expect(pkg.overrides['brace-expansion@^2.0.0']).toBe('2.1.7');
+    expect(pkg.overrides['test-exclude']).toEqual({ 'brace-expansion': '1.1.21' });
   });
 
   it('fails the run on an undocumented finding rather than reporting it', () => {
@@ -157,6 +180,83 @@ const forgeHighReport = () =>
     },
     { high: 1, total: 1 },
   );
+
+/** Combine captured output lines without embedding a raw newline literal. */
+const NEWLINE = () => String.fromCharCode(10);
+
+/**
+ * Run the REAL CLI entrypoint body (`main()`, the exact function the executable
+ * block calls before `process.exit`) with an explicit fixture allowlist, and
+ * capture its stdout/stderr/exit code.
+ *
+ * WHY NOT `runCli` HERE: the subprocess form loads the LIVE policy at module
+ * load. That is the right thing for transport tests (exit codes, npm invocation,
+ * offline normalization), but it makes policy-CLASSIFICATION tests depend on
+ * today's allowlist contents — which is how remediating an advisory broke the
+ * tests for the mechanism on 2026-10-22. Testing `main()` in-process covers the
+ * identical classification code and reporting lines without inheriting live
+ * policy.
+ */
+const runMain = (
+  fixture: Record<string, unknown> | string,
+  allowlist: object[] = FIXTURE_BRACE_ALLOWLIST,
+  status = 1,
+) => {
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const exitCode = main({
+    runCommand: () => ({
+      status,
+      stdout: typeof fixture === 'string' ? fixture : JSON.stringify(fixture),
+      stderr: '',
+    }),
+    out: (line: string) => stdout.push(line),
+    err: (line: string) => stderr.push(line),
+    allowlist,
+  });
+  return { exitCode, stdout: stdout.join(NEWLINE()), stderr: stderr.join(NEWLINE()) };
+};
+
+/**
+ * A FIXTURE allowlist describing the brace-expansion findings the historical
+ * reports below carry.
+ *
+ * These fixtures exist to pin the gate's MECHANISM (documented-vs-undocumented
+ * classification, multi-advisory visibility, meta-reference propagation). They
+ * must not depend on today's live policy: the live allowlist legitimately went
+ * EMPTY on 2026-10-22 when every brace-expansion copy was pinned to a patched
+ * release via `overrides`. Passing this fixture explicitly keeps the mechanism
+ * under test while letting the real policy change.
+ */
+const FIXTURE_BRACE_ALLOWLIST = [
+  {
+    advisory: 'GHSA-q2hr-2g5m-vwhr',
+    packageName: 'brace-expansion',
+    nodes: [
+      'node_modules/glob/node_modules/brace-expansion',
+      'node_modules/test-exclude/node_modules/brace-expansion',
+    ],
+    reason: 'fixture: brace-expansion quadratic expansion',
+  },
+  {
+    advisory: 'GHSA-qhr7-859c-m2p7',
+    packageName: 'brace-expansion',
+    nodes: [
+      'node_modules/glob/node_modules/brace-expansion',
+      'node_modules/test-exclude/node_modules/brace-expansion',
+    ],
+    reason: 'fixture: brace-expansion recursion',
+  },
+  {
+    advisory: 'GHSA-6j4f-fj2g-mc7p',
+    packageName: 'brace-expansion',
+    nodes: [
+      'node_modules/glob/node_modules/brace-expansion',
+      'node_modules/test-exclude/node_modules/brace-expansion',
+    ],
+    reason: 'fixture: brace-expansion comma-part recursion',
+  },
+];
 
 const documentedBraceReport = () =>
   report(
@@ -771,20 +871,33 @@ describe('audit command/report seam (fail closed)', () => {
         'node_modules/test-exclude/node_modules/brace-expansion',
       ],
     };
-    expect(isDocumented(documentedFinding)).toBeTruthy();
+    expect(isDocumented(documentedFinding, FIXTURE_BRACE_ALLOWLIST)).toBeTruthy();
     // A subset of the documented paths stays documented…
     expect(
-      isDocumented({ ...documentedFinding, nodes: [documentedFinding.nodes[0]] }),
+      isDocumented(
+        { ...documentedFinding, nodes: [documentedFinding.nodes[0]] },
+        FIXTURE_BRACE_ALLOWLIST,
+      ),
     ).toBeTruthy();
     // …but a new path, a new advisory id, or a new package never is.
     expect(
-      isDocumented({
-        ...documentedFinding,
-        nodes: [...documentedFinding.nodes, 'node_modules/new/brace-expansion'],
-      }),
+      isDocumented(
+        {
+          ...documentedFinding,
+          nodes: [...documentedFinding.nodes, 'node_modules/new/brace-expansion'],
+        },
+        FIXTURE_BRACE_ALLOWLIST,
+      ),
     ).toBeNull();
-    expect(isDocumented({ ...documentedFinding, advisory: 'GHSA-aaaa-bbbb-cccc' })).toBeNull();
-    expect(isDocumented({ ...documentedFinding, name: 'other-package' })).toBeNull();
+    expect(
+      isDocumented(
+        { ...documentedFinding, advisory: 'GHSA-aaaa-bbbb-cccc' },
+        FIXTURE_BRACE_ALLOWLIST,
+      ),
+    ).toBeNull();
+    expect(
+      isDocumented({ ...documentedFinding, name: 'other-package' }, FIXTURE_BRACE_ALLOWLIST),
+    ).toBeNull();
   });
 
   it('accepts a valid clean report and evaluates it as zero high/critical', () => {
@@ -796,7 +909,7 @@ describe('audit command/report seam (fail closed)', () => {
 
   it('accepts a valid report with documented findings and keeps them visible', () => {
     const audit = ok(asResult(documentedBraceReport(), 1));
-    const verdict = evaluateAudit(audit);
+    const verdict = evaluateAudit(audit, FIXTURE_BRACE_ALLOWLIST);
     expect(verdict.exitCode).toBe(0);
     expect(verdict.lines.join('\n')).toContain('[DOCUMENTED 2026-09-29');
     expect(verdict.lines.join('\n')).toContain('brace-expansion');
@@ -1064,7 +1177,10 @@ describe('invalid or incoherent audit reports fail closed (2026-10-02 review cor
     // ...and the allowlist matcher itself refuses the vacuous every-path match
     // an empty path list would otherwise produce.
     expect(
-      isDocumented({ advisory: 'GHSA-q2hr-2g5m-vwhr', name: 'brace-expansion', nodes: [] }),
+      isDocumented(
+        { advisory: 'GHSA-q2hr-2g5m-vwhr', name: 'brace-expansion', nodes: [] },
+        FIXTURE_BRACE_ALLOWLIST,
+      ),
     ).toBeNull();
   });
 
@@ -1077,7 +1193,7 @@ describe('invalid or incoherent audit reports fail closed (2026-10-02 review cor
 
   it('keeps every advisory of a valid multi-advisory finding visible and documented', () => {
     const audit = ok(asResult(multiAdvisoryReport(), 1));
-    const verdict = evaluateAudit(audit);
+    const verdict = evaluateAudit(audit, FIXTURE_BRACE_ALLOWLIST);
     expect(verdict.exitCode).toBe(0);
     expect(verdict.documented).toHaveLength(2);
     expect(verdict.lines.join('\n')).toContain('GHSA-q2hr-2g5m-vwhr');
@@ -1166,10 +1282,10 @@ describe('report identity/severity coherence fails closed (2026-10-03 review cor
 
   it('keeps a documented high reached through a meta reference documented', () => {
     const audit = ok(asResult(documentedGroupedMetaControlReport(), 1));
-    const verdict = evaluateAudit(audit);
+    const verdict = evaluateAudit(audit, FIXTURE_BRACE_ALLOWLIST);
     expect(verdict.exitCode).toBe(0);
     expect(verdict.documented).toHaveLength(1);
-    expect(verdict.lines.join('\n')).toContain('[DOCUMENTED 2026-09-29');
+    expect(verdict.lines.join(NEWLINE())).toContain('[DOCUMENTED');
   });
 
   it('keeps reference cycles with real advisory evidence valid and gates the leaf advisory', () => {
@@ -1243,17 +1359,18 @@ describe('multi-hop evidence coherence fails closed (2026-10-03 third review cor
 
   it('accepts the producer-faithful two-hop subset control (high → moderate → moderate)', () => {
     const audit = ok(asResult(producerTwoHopSubsetControlReport(), 1));
-    const verdict = evaluateAudit(audit);
+    const verdict = evaluateAudit(audit, FIXTURE_BRACE_ALLOWLIST);
     expect(verdict.exitCode).toBe(0);
     expect(verdict.undocumented).toHaveLength(0);
     expect(verdict.documented).toHaveLength(2);
-    expect(verdict.lines.join('\n')).toContain('every high/critical finding is documented');
+    expect(verdict.lines.join(NEWLINE())).toContain('every high/critical finding is documented');
     const outLines: string[] = [];
     const errLines: string[] = [];
     const exitCode = main({
       runCommand: () => asResult(producerTwoHopSubsetControlReport(), 1),
       out: (line: string) => outLines.push(line),
       err: (line: string) => errLines.push(line),
+      allowlist: FIXTURE_BRACE_ALLOWLIST,
     });
     expect(exitCode).toBe(0);
     expect(errLines.join('\n')).toBe('');
@@ -1452,9 +1569,9 @@ describe('audit-runtime-deps CLI contract', () => {
   });
 
   it('still surfaces documented findings visibly and passes them', () => {
-    const result = runCli({ status: 1, stdout: JSON.stringify(documentedBraceReport()) });
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('[DOCUMENTED 2026-09-29');
+    const result = runMain(documentedBraceReport());
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('[DOCUMENTED');
     expect(result.stdout).toContain('brace-expansion');
   });
 
@@ -1559,13 +1676,10 @@ describe('audit-runtime-deps CLI contract', () => {
     },
   );
 
-  it('still passes a documented high reached through a meta reference at the CLI', () => {
-    const result = runCli({
-      status: 1,
-      stdout: JSON.stringify(documentedGroupedMetaControlReport()),
-    });
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('[DOCUMENTED 2026-09-29');
+  it('still passes a documented high reached through a meta reference', () => {
+    const result = runMain(documentedGroupedMetaControlReport());
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('[DOCUMENTED');
   });
 
   // 2026-10-03 third review corrections (P1): the producer-faithful multi-hop
@@ -1595,13 +1709,10 @@ describe('audit-runtime-deps CLI contract', () => {
     },
   );
 
-  it('still passes the producer-faithful two-hop subset control at the CLI', () => {
-    const result = runCli({
-      status: 1,
-      stdout: JSON.stringify(producerTwoHopSubsetControlReport()),
-    });
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('[DOCUMENTED 2026-09-29');
+  it('still passes the producer-faithful two-hop subset control', () => {
+    const result = runMain(producerTwoHopSubsetControlReport());
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain('[DOCUMENTED');
     expect(result.stdout).toContain('every high/critical finding is documented');
     expect(result.stderr).toBe('');
   });

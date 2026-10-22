@@ -77,47 +77,31 @@ import { pathToFileURL } from 'node:url';
  * Build-time-only advisories behind a deliberately pinned tooling chain
  * (allowlist dated 2026-09-29).
  *
- * `brace-expansion` 1.x/2.x are reached through `test-exclude`
- * (`babel-plugin-istanbul`, coverage only) and `glob@9` -> `minimatch@8`.
- * Neither chain has a non-breaking fixed version: the 1.x and 2.x release lines
- * are themselves the vulnerable ranges, and npm's only offered resolution is
- * `react-native@0.87.1` — a major bump the repository must decide on
- * deliberately (same policy as the framework-owned moderate findings). Neither
- * module is loaded by the web or native bundle.
+ * EMPTY ON PURPOSE (purged 2026-10-22, campaign/ws02-dependency-scope).
  *
- * The 5.x `brace-expansion` copy IS fixed by an `overrides` entry
- * (`brace-expansion@^5.0.0` -> `^5.0.12`, added 2026-09-29) and is therefore
- * NOT allowlisted.
+ * The three dated `brace-expansion` entries added 2026-09-29 claimed the 1.x and
+ * 2.x release lines had no non-breaking fixed version. That claim was WRONG:
+ * GHSA-q2hr-2g5m-vwhr / GHSA-qhr7-859c-m2p7 / GHSA-6j4f-fj2g-mc7p all publish
+ * patched releases for every affected line (1.1.19 / 1.1.20 / 1.1.21,
+ * 2.1.5 / 2.1.6 / 2.1.7, 3.x, 4.x and 5.0.10+). The real fix is a set of
+ * `overrides` entries in package.json that pin each RESOLVED copy inside the
+ * caret range its parent already declares:
+ *
+ *   - `brace-expansion@^2.0.0`  -> 2.1.7   (glob@9 -> minimatch@8)
+ *   - `test-exclude`            -> brace-expansion 1.1.21 (minimatch@3.1.5)
+ *   - `brace-expansion@^5.0.0`  -> ^5.0.12 (minimatch@10, unchanged)
+ *
+ * No allowlist entry remains for this package, so a future regression to a
+ * vulnerable copy fails the gate as a NEW finding instead of hiding behind a
+ * stale "no fix exists" rationale. Adding an entry back requires the same
+ * evidence standard: re-check `first_patched_version` on every affected range
+ * before asserting that no fix exists.
+ *
+ * The two remaining HIGH advisories (`braces`, `node-forge`) are NOT
+ * allowlisted: both genuinely report `first_patched_version: null` for every
+ * affected range, so they stay visibly red until upstream publishes a fix.
  */
-const DOCUMENTED_BUILD_TIME_ADVISORIES = [
-  {
-    advisory: 'GHSA-q2hr-2g5m-vwhr',
-    packageName: 'brace-expansion',
-    nodes: [
-      'node_modules/glob/node_modules/brace-expansion',
-      'node_modules/test-exclude/node_modules/brace-expansion',
-    ],
-    reason: 'coverage/glob tooling only; no non-breaking fix (npm offers react-native@0.87.1)',
-  },
-  {
-    advisory: 'GHSA-qhr7-859c-m2p7',
-    packageName: 'brace-expansion',
-    nodes: [
-      'node_modules/glob/node_modules/brace-expansion',
-      'node_modules/test-exclude/node_modules/brace-expansion',
-    ],
-    reason: 'coverage/glob tooling only; no non-breaking fix (npm offers react-native@0.87.1)',
-  },
-  {
-    advisory: 'GHSA-6j4f-fj2g-mc7p',
-    packageName: 'brace-expansion',
-    nodes: [
-      'node_modules/glob/node_modules/brace-expansion',
-      'node_modules/test-exclude/node_modules/brace-expansion',
-    ],
-    reason: 'coverage/glob tooling only; no non-breaking fix (npm offers react-native@0.87.1)',
-  },
-];
+const DOCUMENTED_BUILD_TIME_ADVISORIES = [];
 
 /** High/critical findings, one entry per advisory per vulnerable package. */
 export function findings(audit) {
@@ -147,8 +131,8 @@ export function findings(audit) {
  * documented: it would satisfy "every path" vacuously while carrying no
  * verifiable dependency path at all.
  */
-export function isDocumented(finding) {
-  const entry = DOCUMENTED_BUILD_TIME_ADVISORIES.find(
+export function isDocumented(finding, allowlist = DOCUMENTED_BUILD_TIME_ADVISORIES) {
+  const entry = allowlist.find(
     (candidate) =>
       candidate.advisory === finding.advisory && candidate.packageName === finding.name,
   );
@@ -527,7 +511,7 @@ export function validateAuditCommandResult(result) {
  * Apply the advisory policy to a VALIDATED audit report. Pure decision seam:
  * returns the exit code and the report lines; performs no I/O and never exits.
  */
-export function evaluateAudit(audit) {
+export function evaluateAudit(audit, allowlist = DOCUMENTED_BUILD_TIME_ADVISORIES) {
   const highOrCritical = findings(audit);
   const lines = [];
   const errorLines = [];
@@ -544,7 +528,7 @@ export function evaluateAudit(audit) {
   const undocumented = [];
   const documented = [];
   for (const finding of highOrCritical) {
-    const entry = isDocumented(finding);
+    const entry = isDocumented(finding, allowlist);
     if (entry) {
       documented.push(finding);
       lines.push(
@@ -645,12 +629,17 @@ export function runAuditCommand() {
  * @param {() => object} [options.runCommand] raw command-result provider
  * @param {(line: string) => void} [options.out] report logger
  * @param {(line: string) => void} [options.err] diagnostic logger
+ * @param {object[]} [options.allowlist] documented-finding policy; defaults to the
+ *   live `DOCUMENTED_BUILD_TIME_ADVISORIES`. Injectable so tests can exercise the
+ *   classification mechanism against a fixture policy without depending on (or
+ *   mutating) the live one.
  * @returns {number} process exit code
  */
 export function main({
   runCommand = runAuditCommand,
   out = console.log,
   err = console.error,
+  allowlist = DOCUMENTED_BUILD_TIME_ADVISORIES,
 } = {}) {
   let audit;
   try {
@@ -664,7 +653,7 @@ export function main({
     );
     return 1;
   }
-  const verdict = evaluateAudit(audit);
+  const verdict = evaluateAudit(audit, allowlist);
   for (const line of verdict.lines) out(line);
   for (const line of verdict.errorLines) err(line);
   return verdict.exitCode;

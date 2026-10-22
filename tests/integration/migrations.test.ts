@@ -36,6 +36,17 @@ import { timestampToLocalDateKey } from '@/lib/time';
 const appMetaFailures = vi.hoisted(() => ({
   /** When true, the next `db_schema_version` write targeting version '7' throws. */
   failVersionSevenBump: false,
+  /**
+   * When true, the next `db_schema_version` write targeting version '6' throws.
+   *
+   * This simulates a crash *after* migration 6's DDL but *before* its version
+   * bump. It is the exact interruption window that used to silently collapse a
+   * legacy user's manual todo ordering: the `sort_order` ALTER ran outside
+   * `applyMigration`, so it survived the abort while the version stayed at 5,
+   * and the retry then saw the column already present, skipped the backfill,
+   * and left every row at the `DEFAULT 0`.
+   */
+  failVersionSixBump: false,
 }));
 
 vi.mock('@/core/db/appMeta', async (importOriginal) => {
@@ -55,6 +66,14 @@ vi.mock('@/core/db/appMeta', async (importOriginal) => {
         ) {
           appMetaFailures.failVersionSevenBump = false;
           throw new Error('simulated migration failure');
+        }
+        if (
+          appMetaFailures.failVersionSixBump &&
+          key === real.appMetaKeys.dbSchemaVersion &&
+          String(value) === '6'
+        ) {
+          appMetaFailures.failVersionSixBump = false;
+          throw new Error('simulated migration-6 failure');
         }
         return real.setAppMetaText(db, key, value);
       },
@@ -639,6 +658,102 @@ describe('tests/integration/migrations', () => {
       await db.closeAsync();
     } finally {
       appMetaFailures.failVersionSevenBump = false;
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    }
+  });
+
+  it("rolls back migration 6's sort_order ALTER with the failed version bump, so a retry still backfills manual ordering", async () => {
+    // Regression guard for a real data-loss window (fixed 2026-10-22).
+    //
+    // Migration 6 used to run `addColumnIfMissing(todos, 'sort_order')` OUTSIDE
+    // `applyMigration`, so the ALTER committed immediately while the version
+    // bump was still transactional. A crash in that window left `sort_order`
+    // present with `db_schema_version` at 5. The retry then re-ran block 6,
+    // observed `addedSortOrder === false`, skipped the creation-order backfill,
+    // and left EVERY row at `DEFAULT 0` — silently collapsing the user's manual
+    // ordering into creation order.
+    //
+    // The test drives the exact window: a legacy v5 database with user data and
+    // no sort_order column, plus a fault injected ONLY on the '6' version write.
+    // The assertion that distinguishes fixed from broken code is the column's
+    // ABSENCE after the abort — inside the transaction it rolls back with the
+    // block; with the old placement it survived.
+    const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-m6-crash-'));
+    const file = path.join(dir, 'superhabits.db');
+    appMetaFailures.failVersionSixBump = true;
+    try {
+      const { createTestDatabase } = await import('./helpers/db');
+      const legacy = createTestDatabase(file);
+      legacy.raw.exec(`
+        CREATE TABLE app_meta (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+        INSERT INTO app_meta (key, value) VALUES ('db_schema_version', '5');
+        CREATE TABLE todos (
+          id TEXT PRIMARY KEY NOT NULL,
+          title TEXT NOT NULL,
+          completed INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          deleted_at TEXT
+        );
+        -- Deliberately NOT in creation order: a correct block-6 backfill must
+        -- rank by created_at, not by insertion/rowid order.
+        INSERT INTO todos (id, title, completed, created_at, updated_at, deleted_at)
+          VALUES ('todo_b', 'B', 0, '2026-01-02T10:00:00.000Z', '2026-01-02T10:00:00.000Z', NULL);
+        INSERT INTO todos (id, title, completed, created_at, updated_at, deleted_at)
+          VALUES ('todo_a', 'A', 0, '2026-01-01T10:00:00.000Z', '2026-01-01T10:00:00.000Z', NULL);
+      `);
+      await legacy.closeAsync();
+
+      // Session 1: migration 6's version bump fails.
+      vi.resetModules();
+      vi.doMock('expo-sqlite', async () => {
+        const { createTestDatabase: make } = await import('./helpers/db');
+        return { openDatabaseAsync: vi.fn(() => make(file)) };
+      });
+      const { getDatabase } = await import('@/core/db/client');
+      await expect(getDatabase()).rejects.toThrow('simulated migration-6 failure');
+
+      // The interruption window must be EMPTY: no version advance, no column.
+      const inspector = new Database(file);
+      try {
+        const version = inspector
+          .prepare("SELECT value FROM app_meta WHERE key = 'db_schema_version'")
+          .get() as { value: string };
+        expect(version.value).toBe('5');
+
+        const columns = (
+          inspector.prepare('PRAGMA table_info(todos)').all() as { name: string }[]
+        ).map((c) => c.name);
+        expect(columns).not.toContain('sort_order');
+        expect(columns).not.toContain('due_date');
+        expect(columns).not.toContain('priority');
+      } finally {
+        inspector.close();
+      }
+
+      // Session 2: no fault. The chain completes AND the backfill still fires,
+      // because the column is genuinely absent at retry time.
+      vi.resetModules();
+      vi.doMock('expo-sqlite', async () => {
+        const { createTestDatabase: make } = await import('./helpers/db');
+        return { openDatabaseAsync: vi.fn(() => make(file)) };
+      });
+      const retried = await (await import('@/core/db/client')).getDatabase();
+      const orders = await retried.getAllAsync<{ id: string; sort_order: number }>(
+        'SELECT id, sort_order FROM todos ORDER BY id',
+      );
+      expect(orders).toEqual([
+        { id: 'todo_a', sort_order: 1 },
+        { id: 'todo_b', sort_order: 2 },
+      ]);
+      const finalVersion = await retried.getFirstAsync<{ value: string }>(
+        'SELECT value FROM app_meta WHERE key = ?',
+        ['db_schema_version'],
+      );
+      expect(finalVersion?.value).toBe('25');
+      await retried.closeAsync();
+    } finally {
+      appMetaFailures.failVersionSixBump = false;
       rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     }
   });
