@@ -1,5 +1,5 @@
 {
-  "name": "superhabits",
+  "name": "super-habits",
   "version": "1.0.0",
   "main": "expo-router/entry",
   "engines": {
@@ -36,6 +36,7 @@
     "openspec:validate": "openspec validate --all",
     "release:profiles:guard": "node scripts/release-profile-guard.mjs",
     "native:isolation:guard": "node scripts/cloud-native-isolation.mjs",
+    "brand:inventory": "node scripts/legacy-name-inventory.mjs --check",
     "doctor": "npx expo-doctor",
     "e2e": "playwright test --project=chromium --project=journeys --project=pwa --project=visual",
     "e2e:simulation": "cross-env E2E_DIST_DIR=dist-sim playwright test --project=simulation",

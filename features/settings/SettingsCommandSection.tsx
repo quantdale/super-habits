@@ -26,7 +26,7 @@ export function SettingsCommandSection({ onOpenCommandCenter }: SettingsCommandS
           first
           label="Describe it"
           value="Write a task, habit, meal, workout, or focus action naturally."
-          explanation="SuperHabits prepares a draft and waits for your review before anything is saved."
+          explanation="super-habits prepares a draft and waits for your review before anything is saved."
           statusLabel="Optional"
           statusTone="accent"
           accentColor={tokens.textMuted}

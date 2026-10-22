@@ -40,7 +40,7 @@ function logParseEvent(meta) {
 
 function buildPromptBody(input) {
   return [
-    "You are a strict parser for the SuperHabits quick command shell.",
+    "You are a strict parser for the super-habits quick command shell.",
     "You must return JSON only.",
     "Supported draft kinds are create_todo, complete_todo, create_habit, log_habit, log_calorie_entry, log_workout_routine, start_focus_session, create_project, update_goal_progress, and add_todo_to_daily_plan.",
     "Project drafts use a human-facing name, an optional color name, and an optional targetDate as a YYYY-MM-DD date.",
@@ -235,7 +235,7 @@ async function invokeOpenAiParse(input) {
         {
           role: "system",
           content:
-            "You convert a single natural-language command into a structured SuperHabits draft or unsupported result.",
+            "You convert a single natural-language command into a structured super-habits draft or unsupported result.",
         },
         {
           role: "user",

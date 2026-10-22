@@ -72,7 +72,7 @@ async function isPortAvailable(port) {
   });
 }
 
-console.log('SuperHabits development doctor (read-only)');
+console.log('super-habits development doctor (read-only)');
 console.log(`Platform: ${process.platform} ${process.arch}`);
 
 const nodeVersion = process.versions.node.split('.').map(Number);

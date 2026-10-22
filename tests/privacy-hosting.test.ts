@@ -16,7 +16,7 @@ describe('privacy hosting artifact', () => {
     const html = readHtml();
     expect(html).toContain('<!doctype html>');
     expect(html).toContain('<html lang="en">');
-    expect(html).toContain('SuperHabits — Privacy Policy');
+    expect(html).toContain('super-habits — Privacy Policy');
     // No external fetches: offline-safe under COEP require-corp.
     expect(html).not.toMatch(/src="https?:\/\//i);
     expect(html).not.toMatch(/href="https?:\/\//i);

@@ -104,7 +104,7 @@ manifest (`android:allowBackup` and the permission list in
 
 **Full description (draft, ≤ 4000 chars):**
 
-> SuperHabits is a calm, offline-first companion for your whole day: a Today
+> super-habits is a calm, offline-first companion for your whole day: a Today
 > dashboard, To Do with projects and recurring tasks, Habits with streaks and
 > a 52-week heatmap, a Focus timer with presets, a full Gym workout workspace
 > with planning and guided sessions, and Calories with Form/Diary views,

@@ -1,4 +1,4 @@
-# SuperHabits 1.0.0 — release notes (store-ready)
+# super-habits 1.0.0 — release notes (store-ready)
 
 > Source of truth for `1.0.0` store copy. The paste-ready blocks in
 > "Store What's New" fit their store limits (Apple ≤ 4000 chars, Play
@@ -10,7 +10,7 @@
 ### Apple App Store — What's New (≤ 4000 chars)
 
 ```text
-Welcome to SuperHabits 1.0.0 — your calm, offline-first companion for habits, tasks, focus, workouts, and nutrition.
+Welcome to super-habits 1.0.0 — your calm, offline-first companion for habits, tasks, focus, workouts, and nutrition.
 
 • Today dashboard, To Do with projects and recurring tasks, Habits with streaks and 52-week heatmap
 • Focus timer with presets, Gym workout workspace with guided sessions, Calories with Form/Diary views
@@ -23,12 +23,12 @@ First public release. English UI.
 ### Google Play — Release notes (≤ 500 chars)
 
 ```text
-SuperHabits 1.0.0 — first release. Offline-first habits, tasks, focus timer, gym workouts & calories. Local database, no signup, no ads. One-way backup when configured and portable export. English UI.
+super-habits 1.0.0 — first release. Offline-first habits, tasks, focus timer, gym workouts & calories. Local database, no signup, no ads. One-way backup when configured and portable export. English UI.
 ```
 
 ## What it is
 
-SuperHabits is a calm, offline-first companion for daily habits, tasks, focus
+super-habits is a calm, offline-first companion for daily habits, tasks, focus
 sessions, workouts, and nutrition. It runs as a Progressive Web App and as a
 native Android/iOS app from one codebase. Local use needs no signup; a
 configured build can establish anonymous backup Auth automatically. There
@@ -106,5 +106,5 @@ Confirm these before tagging `v1.0.0` (all values current at this draft):
 - [ ] `[OWNER ACTION]` hosted privacy URL: deploy `/privacy.html` with the
       production web build and paste that URL in both store listings.
 - [ ] Tag only with explicit release intent:
-      `git tag -a v1.0.0 -m "SuperHabits 1.0.0" && git push origin v1.0.0`.
+      `git tag -a v1.0.0 -m "super-habits 1.0.0" && git push origin v1.0.0`.
       Do not create the tag in a routine readiness pass.

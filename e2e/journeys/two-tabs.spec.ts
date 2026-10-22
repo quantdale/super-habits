@@ -62,7 +62,7 @@ defineJourney({
         });
         // The actionable copy (exact web message from getDbBootstrapErrorMessage).
         await expect(second.getByText(/could not start its local database/i)).toBeVisible();
-        await expect(second.getByText(/close other SuperHabits tabs/i)).toBeVisible();
+        await expect(second.getByText(/close other super-habits tabs/i)).toBeVisible();
         await expect(second.getByText(/Your data is still safe on this device/i)).toBeVisible();
         // The app shell is gated away — nothing silently half-renders.
         await expect(second.getByRole('button', { name: 'Today', exact: true })).toHaveCount(0);
