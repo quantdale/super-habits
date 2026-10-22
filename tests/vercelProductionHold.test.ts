@@ -1,0 +1,112 @@
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * Production-release hold (Vercel Git deployment control).
+ *
+ * Two Vercel projects (`super-habits`, `superhabits`) are connected to this
+ * repository and both track `main` as their Production branch. Historically
+ * every `main` push created a Production-target deployment, which failed at the
+ * web-export simulation-bridge defect; once that defect was fixed, an
+ * unprotected `main` push would have built and released unqualified source.
+ *
+ * `git.deploymentEnabled` is Vercel's documented, repository-controlled control
+ * for this. Its behavior for the *introducing* commit is not documented, so it
+ * was established empirically before being relied on, using a throwaway branch
+ * keyed to itself:
+ *
+ *   - commit that excludes its own branch (`branch: false`): 0 deployments
+ *     on BOTH projects, for 90s+ after the push;
+ *   - the same commit with that exclusion reverted out: 1 Preview deployment
+ *     on BOTH projects.
+ *
+ * That isolates the exclusion as the cause (not an unrelated webhook failure)
+ * and shows the rule is honored at webhook ingestion, including for the commit
+ * that introduces it. Production was never touched: the probe keyed only a
+ * throwaway branch and every resulting deployment was a Preview.
+ *
+ * These assertions exist because the whole hold is one small JSON object. A
+ * well-meaning refactor that drops `git`, renames the key, or adds a wildcard
+ * `true` rule would silently re-open production auto-release, and nothing else
+ * in the suite would notice. Note the precedence rule from Vercel's docs:
+ * "If a branch matches multiple rules and at least one rule is `true`, a
+ * deployment will occur" — so an added `true` rule is a hold bypass, not a
+ * harmless extra.
+ */
+
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const vercelConfigPath = resolve(repositoryRoot, 'vercel.json');
+
+type VercelConfig = {
+  $schema?: string;
+  buildCommand?: string;
+  outputDirectory?: string;
+  git?: { deploymentEnabled?: boolean | Record<string, boolean> };
+  rewrites?: { source: string; destination: string }[];
+  headers?: { source: string; headers: { key: string; value: string }[] }[];
+};
+
+function readVercelConfig(): VercelConfig {
+  return JSON.parse(readFileSync(vercelConfigPath, 'utf8')) as VercelConfig;
+}
+
+describe('Vercel production-release hold', () => {
+  it('disables Git-triggered deployments for main', () => {
+    const config = readVercelConfig();
+    expect(config.git).toBeDefined();
+    const enabled = config.git?.deploymentEnabled;
+    // The boolean `false` form would also disable previews for every branch,
+    // which the project does not want; the per-branch form is deliberate.
+    expect(typeof enabled).toBe('object');
+    expect(enabled).not.toBe(true);
+    expect((enabled as Record<string, boolean>)['main']).toBe(false);
+  });
+
+  it('contains no rule that can re-enable main deployments', () => {
+    const enabled = readVercelConfig().git?.deploymentEnabled;
+    expect(typeof enabled).toBe('object');
+    const rules = enabled as Record<string, boolean>;
+    // Vercel: "If a branch matches multiple rules and at least one rule is
+    // `true`, a deployment will occur." Any `true` whose pattern matches `main`
+    // therefore re-opens auto-release and defeats the hold.
+    const matchesMain = (pattern: string): boolean => {
+      if (pattern === 'main') return true;
+      if (pattern === '*') return true;
+      // Conservative reading of the minimatch patterns actually plausible here.
+      if (pattern === 'm*' || pattern === '*ain' || pattern === 'ma*' || pattern === '*')
+        return true;
+      return false;
+    };
+    const bypasses = Object.entries(rules)
+      .filter(([, value]) => value === true)
+      .map(([pattern]) => pattern)
+      .filter(matchesMain);
+    expect(bypasses).toEqual([]);
+  });
+
+  it('preserves the build, output, SPA rewrite and COOP/COEP configuration', () => {
+    // The hold is an additive change. These settings are load-bearing:
+    // `build:web` is the guarded production export, and COOP/COEP are required
+    // for SQLite WASM (`crossOriginIsolated`) on the deployed PWA.
+    const config = readVercelConfig();
+    expect(config.$schema).toBe('https://openapi.vercel.sh/vercel.json');
+    expect(config.buildCommand).toBe('npm run build:web');
+    expect(config.outputDirectory).toBe('dist');
+    expect(config.rewrites).toEqual([{ source: '/(.*)', destination: '/index.html' }]);
+    const headers = config.headers?.[0]?.headers ?? [];
+    const byKey = new Map(headers.map((entry) => [entry.key, entry.value]));
+    expect(byKey.get('Cross-Origin-Embedder-Policy')).toBe('require-corp');
+    expect(byKey.get('Cross-Origin-Opener-Policy')).toBe('same-origin');
+    expect(config.headers?.[0]?.source).toBe('/(.*)');
+  });
+
+  it('does not disable preview deployments for non-main branches', () => {
+    // The hold must be scoped to main only: PR previews are how a change gets
+    // reviewed and verified before integration.
+    const enabled = readVercelConfig().git?.deploymentEnabled as Record<string, boolean>;
+    expect(Object.keys(enabled)).toEqual(['main']);
+    expect(enabled['main']).toBe(false);
+  });
+});
