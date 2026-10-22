@@ -16,6 +16,11 @@ import {
 import { runBackupMaintenance } from '@/core/backup/backupCheckpoint';
 import { applyPendingThemeApplication } from '@/core/backup/backupSettings';
 import { getDbBootstrapErrorMessage } from '@/core/providers/bootstrapErrorMessage';
+import {
+  getDbBootstrapTimeoutMessage,
+  isLocalDbPhaseTimeout,
+  withLocalDbTimeout,
+} from '@/core/providers/localDbPhase';
 import { withRemoteTimeout } from '@/core/providers/remotePhase';
 import {
   createPreviewAdoptionGuard,
@@ -110,7 +115,15 @@ export function AppProviders({ children }: PropsWithChildren) {
 
     const bootstrap = async () => {
       try {
-        await initializeDatabase();
+        // Bounded (AUD-WS04-P1): `initializeDatabase()` can STALL rather than
+        // reject on web when another tab holds the origin-wide OPFS write lock
+        // (or a WASM worker wedges). Unbounded, that left the startup gate on
+        // "Preparing local workspace" forever with no retry affordance, because
+        // the gate only offers "Try again" when `dbError` is set. Every remote
+        // phase was already bounded by `withRemoteTimeout`; this closes the one
+        // unbounded phase left in bootstrap. The task keeps running — only the
+        // await is bounded — and a later success is still adopted.
+        await withLocalDbTimeout(initializeDatabase(), 'local database');
         // Web only: expose a boot-readiness marker so test harnesses (and
         // future boot-gated code) can observe that the schema is fully
         // migrated. The shell renders before initializeDatabase() completes,
@@ -137,11 +150,17 @@ export function AppProviders({ children }: PropsWithChildren) {
       } catch (e) {
         console.error('[db] initializeDatabase failed', e);
         if (!cancelled) {
+          // A stall is NOT evidence the browser is incapable, and it is not a
+          // network problem. Routing it through the generic failure copy would
+          // wrongly tell a capable browser it is unsupported; it must offer the
+          // same retry with a message that names the real cause.
           setDbError(
-            getDbBootstrapErrorMessage({
-              platformOs: Platform.OS,
-              hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
-            }),
+            isLocalDbPhaseTimeout(e)
+              ? getDbBootstrapTimeoutMessage({ platformOs: Platform.OS })
+              : getDbBootstrapErrorMessage({
+                  platformOs: Platform.OS,
+                  hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
+                }),
           );
         }
         return;
