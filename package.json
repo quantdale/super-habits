@@ -74,7 +74,8 @@
     "agent:resume": "node scripts/agent-execplan.mjs resume",
     "dev:doctor": "node scripts/dev-doctor.mjs",
     "qa:full": "npm run typecheck && npm run lint && npm test && npm run openspec:validate && npm run e2e:full && npm run qa:simulation -- --all --mode deterministic",
-    "postinstall": "patch-package && simple-git-hooks"
+    "postinstall": "patch-package && simple-git-hooks",
+    "release:readiness": "node scripts/release-readiness.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/nunito": "^0.4.2",
