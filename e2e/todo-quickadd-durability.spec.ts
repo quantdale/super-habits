@@ -46,17 +46,15 @@ test.describe('Todos Quick Add durability', () => {
     await submitTodoModal(page, { waitForClose: true });
     await expect(page.getByText('First real task')).toBeVisible();
 
-    // The DRAFT survives the empty→populated transition. The empty/populated
-    // swap also toggles Screen's ScrollView/View container, which recreates the
-    // input node (identity is NOT preserved across that container swap) — but
-    // the draft lives in the section, so its value is restored on the new node.
+    // The DRAFT survives the empty→populated transition. The container is now
+    // pinned non-scrolling (see the identity/focus regression below), so the
+    // input node itself survives too — the draft lives in the section, which
+    // makes the no-data-loss guarantee hold regardless of any future remount.
     await expect(quickAdd).toHaveCount(1);
     await expect(quickAdd).toHaveValue('Draft in pro');
 
-    // Focus stays re-establishable and the preserved draft is submittable. The
-    // container swap recreated the input node and reset its caret, so we re-focus
-    // then submit the INTACT partial draft — proving the unsaved text both
-    // survived AND creates exactly one Todo.
+    // Focus stays established and the preserved draft is submittable, so the
+    // unsaved text both survived AND creates exactly one Todo.
     await quickAdd.click();
     await expect(quickAdd).toBeFocused();
     await quickAdd.press('Enter');
@@ -107,6 +105,58 @@ test.describe('Todos Quick Add durability', () => {
     await expect(page.getByText('Survivor draft')).toHaveCount(1);
     const rows = await queryRows(page, `SELECT title FROM todos WHERE deleted_at IS NULL`);
     expect(rows.map((r) => r.title)).toEqual(['Survivor draft']);
+    await returnToApp(page);
+  });
+
+  test('keeps the input NODE across an empty→populated transition', async ({ page }) => {
+    // Discriminating regression for the hosted long-title visual failure.
+    //
+    // Lifting the draft into the section preserved the VALUE but not the DOM
+    // node: `Screen` renders a scrolling container when `scroll` is true and a
+    // plain view when it is false, and To Do derived that flag from
+    // `totallyEmpty`. Flipping it changed the container's element type, so React
+    // unmounted and recreated the whole subtree — including the Quick Capture
+    // input — and keystrokes still in flight were dropped. The hosted trace
+    // showed a 115-character title landing as "Call th".
+    //
+    // The value-only assertions above cannot catch that: they pass as long as
+    // SOME prefix survived. This test pins node IDENTITY, the property that was
+    // actually destroyed, so it fails if the container swap is reintroduced.
+    const quickAdd = page.getByLabel('Quick add task title');
+    await expect(quickAdd).toHaveCount(1);
+    await expect(page.getByText('No pending tasks', { exact: true }).last()).toBeVisible();
+
+    // Tag the live node so a remount is detectable after the fact.
+    await quickAdd.evaluate((el) => ((el as unknown as Record<string, unknown>).__nodeTag = 'A'));
+    await quickAdd.click();
+    await quickAdd.pressSequentially('Draft in pro');
+    await expect(quickAdd).toHaveValue('Draft in pro');
+    await expect(quickAdd).toBeFocused();
+
+    // Another surface adds the FIRST todo: empty becomes populated.
+    await openNewTodoModal(page);
+    await page.getByPlaceholder('Add a task...', { exact: true }).fill('First real task');
+    await submitTodoModal(page, { waitForClose: true });
+    await expect(page.getByText('First real task')).toBeVisible();
+
+    // Same node, draft intact: no remount, so no input loss. Identity is the
+    // discriminator — a value-only assertion passes on any surviving prefix.
+    // (Focus is deliberately NOT asserted here: opening the add-task modal
+    // moves focus by design, so asserting it across that step would test the
+    // modal, not the container swap.)
+    await expect(quickAdd).toHaveCount(1);
+    await expect(quickAdd).toHaveValue('Draft in pro');
+    const survivedWithIdentity = await quickAdd.evaluate(
+      (el) => (el as unknown as Record<string, unknown>).__nodeTag === 'A',
+    );
+    expect(survivedWithIdentity).toBe(true);
+
+    // And the intact draft still submits to exactly one durable Todo.
+    await quickAdd.click();
+    await quickAdd.press('Enter');
+    await expect(page.getByText('Draft in pro', { exact: true })).toBeVisible();
+    const rows = await queryRows(page, `SELECT title FROM todos WHERE deleted_at IS NULL`);
+    expect(rows.map((r) => r.title).sort()).toEqual(['Draft in pro', 'First real task']);
     await returnToApp(page);
   });
 

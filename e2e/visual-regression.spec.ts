@@ -332,24 +332,25 @@ test.describe('W15 primary destinations', () => {
   test('to do long title (phone, light)', async ({ page }) => {
     await openWithFixture(page, PHONE, 'TYPICAL');
     await goToTab(page, 'todos');
-    // Observable readiness (same contract the sibling To Do snapshots use):
-    // the quick-add input lives in a branch that REMOUNTS when the fixture
-    // list finishes loading (`totallyEmpty` swaps the tree). Filling before
-    // the populated branch is stable discards the typed value on that remount
-    // and the submit silently no-ops — an empty-title skip, not a data loss.
-    await expect(page.getByText(/^\d+ open$/).first()).toBeVisible({ timeout: 20_000 });
+    // Readiness must prove the POPULATED branch is mounted, not merely that a
+    // count is rendered: `/^\d+ open$/` also matches "0 open", which is what the
+    // EMPTY branch shows. Gating on it let typing begin while the empty branch
+    // was still mounted, so the list finishing its own load mid-keystrokes
+    // swapped the tree underneath the input (the historical flake). The search
+    // box only exists in the populated branch, so its presence is an honest
+    // "the fixture list has landed" signal.
+    await expect(page.getByPlaceholder('Search tasks')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('No pending tasks', { exact: true })).toHaveCount(0);
     const longTitle =
       'Call the insurance company about the renewed policy premium schedule before the end of the quarterly billing window';
     const quickAdd = page.getByPlaceholder('Quick add', { exact: true });
     await expect(quickAdd).toBeVisible({ timeout: 20_000 });
-    // Type the title instead of bulk-`fill()`: this input is a controlled
-    // component that can be REMOUNTED while the fixture list finishes loading
-    // (the `totallyEmpty` branch swaps the subtree), and a value landing on the
-    // soon-replaced node is silently discarded — the submit then reads an empty
-    // title and no-ops, and the row never appears (the historical flake).
-    // Per-key events keep the value flowing to whichever node is live.
     await quickAdd.click();
+    // The input must hold the COMPLETE title before submitting — this is the
+    // assertion that actually catches in-flight input loss (the defect this
+    // test previously only surfaced indirectly, ~46s later, as a missing row).
     await quickAdd.pressSequentially(longTitle);
+    await expect(quickAdd).toHaveValue(longTitle);
     // Observable readiness contract: the add button's `disabled` flag is
     // derived from React state (`canSubmit = trimmed.length > 0`), so its
     // enabled state is the honest signal that the typed title is submittable.

@@ -1009,7 +1009,21 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
 
   return (
     <View className="flex-1">
-      <Screen scroll={totallyEmpty} hero={hero}>
+      {/* `scroll` is pinned FALSE (never derived from `totallyEmpty`).
+          `Screen` swaps its scrolling container for a plain view when `scroll`
+          flips, so deriving that flag from the todo count made the
+          empty<->populated transition change the container's ELEMENT TYPE. React
+          then unmounts and recreates the whole child subtree — including the
+          Quick Capture `TextInput`. Lifting the draft here preserved the VALUE
+          but destroyed the DOM node and its focus, so keystrokes still in
+          flight were silently dropped (observed: a 115-character title landed
+          as "Call th" when the fixture list finished loading mid-typing).
+          Keeping one stable, non-scrolling container means the input node is
+          never recreated, so value, focus and in-flight keystrokes all survive.
+          The populated branch already required a non-scrolling parent (its
+          `DraggableFlatList`/`SectionList` own scrolling), and the empty branch
+          is short enough to fit without page scrolling. */}
+      <Screen scroll={false} hero={hero}>
         <View className="flex-1">
           {/* Single stable Quick Capture (Quick-Add durability): rendered ONCE,
               outside the empty/populated conditional, so its draft text and
