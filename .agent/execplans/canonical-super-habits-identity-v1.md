@@ -28,15 +28,40 @@ Establish the exact canonical brand `super-habits` across publicly visible produ
 
 ## Current Checkpoint
 
-- Current Milestone: Phase 1 staged on isolated review branch; automated tests pending.
-- Completed: canonicalized npm + lockfile metadata, app Expo name/slug, PWA manifest, boot/web title, current privacy and store-copy branding; added compatibility inventory and a brand identity test.
-- In Progress: hosted CI validation and independent review of this branch; evaluate Expo slug/EAS project-ID continuity.
-- Exact next action: run hosted branch/PR CI, inspect all failures, verify `expo.name` and `expo.slug` resolve with the existing `extra.eas.projectId`, and fix regressions without changing legacy data IDs.
-- modifiedFiles: package.json; package-lock.json; app.json; public/manifest.json; app/_layout.tsx; core/ui/BootSplash.tsx; README.md; public/privacy.html; docs/release/privacy-policy.md; docs/release/release-notes-1.0.0.md; tests/release-notes.test.ts; tests/privacy-hosting.test.ts; tests/canonicalBrandIdentity.test.ts; docs/branding/canonical-name-migration.md; .agent/execplans/canonical-super-habits-identity-v1.md.
-- failures: No branch validation result is available yet; do not claim green.
-- quarantines: None introduced.
-- blockers: Full name purge requires migration of native package/bundle IDs, local storage keys, backup format IDs and cloud resources; immutable historical evidence cannot be erased safely.
-- remainingDod: hosted typecheck/lint/ExecPlan/unit/integration/web/PWA/visual results; verified Expo/EAS linkage; full case-insensitive current-file inventory; explicit owner approvals before provider retirement and native ID changes.
+- Current Milestone: Phase 1 staged on isolated review branch; hosted `quality`
+  failed on this plan's own schema, now corrected.
+- Completed: canonicalized npm + lockfile metadata, app Expo name/slug, PWA
+  manifest, boot/web title, current privacy and store-copy branding; added
+  compatibility inventory and a brand identity test.
+- In Progress: hosted CI re-validation after this schema correction, then
+  independent review of the branch.
+- Important modified files: package.json; package-lock.json; app.json;
+  public/manifest.json; app/_layout.tsx; core/ui/BootSplash.tsx; README.md;
+  public/privacy.html; docs/release/privacy-policy.md;
+  docs/release/release-notes-1.0.0.md; tests/release-notes.test.ts;
+  tests/privacy-hosting.test.ts; tests/canonicalBrandIdentity.test.ts;
+  docs/branding/canonical-name-migration.md;
+  .agent/execplans/canonical-super-habits-identity-v1.md.
+- Last successful validation: local `canonicalBrandIdentity.test.ts` and the two
+  updated copy-assertion suites pass; hosted `quality` previously failed only on
+  `agent:plan:validate:all` (this file's checkpoint labels).
+- Current failures: hosted `quality` red at `880b692d` —
+  `Validate versioned ExecPlans` rejected this plan for
+  `Current Checkpoint missing field: modifiedFiles / lastValidation / remainingDod`,
+  because the labels were written in camelCase instead of the human-readable
+  forms the validator canonicalizes.
+- Relevant quarantines: None introduced.
+- Blockers: Full name purge requires migration of native package/bundle IDs,
+  local storage keys, backup format IDs and cloud resources; immutable historical
+  evidence cannot be erased safely. Provider retirement and native identity
+  changes remain owner-gated.
+- Exact next action: push this checkpoint-schema correction to the PR #85 branch,
+  confirm hosted `quality` advances past `Validate versioned ExecPlans`, and
+  resolve whatever the next real failure is.
+- Remaining definition of done: hosted typecheck/lint/ExecPlan/unit/integration/
+  web/PWA/visual results; verified Expo/EAS linkage; full case-insensitive
+  current-file inventory; explicit owner approvals before provider retirement and
+  native ID changes.
 
 ## Progress
 

@@ -8,6 +8,38 @@ The canonical repository, public display brand, Expo project slug and display na
 
 A case-insensitive GitHub search at the starting main SHA indexed **467 files** containing `superhabits`, including current source, tests, legacy documentation, historical release evidence, and API/data identifiers. Search index coverage is not an exhaustive proof of all binary or external occurrences.
 
+### Classified inventory (executable, replaces the file count above)
+
+A file count cannot drive this migration, because the same literal `superhabits`
+is simultaneously live brand copy we want to change AND durable identity we must
+not change. `npm run brand:inventory` scans tracked files and assigns every
+occurrence to exactly one class with an explicit disposition:
+
+| Class                   | Meaning                                                                | Disposition                                                                    |
+| ----------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `history`               | `.agent/`, `openspec/`, `docs/`, `simulation-output/`                  | **PRESERVED** — historical evidence is never rewritten                         |
+| `test`                  | `tests/`, `e2e/`, `simulation/`                                        | **ALLOWED** — updated with the source it pins                                  |
+| `guidance`              | `.cursor/`, `.github/`, `.eas/`, `AGENTS.md`, `README.md`, `CLAUDE.md` | **ALLOWED** — current contributor guidance                                     |
+| `native-id`             | Android package / iOS bundle ID                                        | **FROZEN** — changing it installs a distinct app and strands local SQLite data |
+| `scheme`                | Expo deep-link scheme                                                  | **FROZEN** — existing links must keep resolving                                |
+| `backup`                | `superhabits-portable-backup`, fingerprint/export names                | **FROZEN** — old backups must stay importable                                  |
+| `cache`                 | `superhabits-shell-*`, service-worker cache names                      | **FROZEN** — renaming orphans an installed shell                               |
+| `storage`               | `superhabits.*` AsyncStorage keys, SQLite filename                     | **FROZEN** — renaming silently hides existing local data                       |
+| `cloud`                 | Supabase/Vercel project ids and hosts                                  | **OWNER-GATED** — non-destructive verification first                           |
+| `package`               | npm `name`                                                             | **CANONICAL** — must be `super-habits`                                         |
+| `brand`                 | remaining live user-facing copy in source                              | **CANONICAL** — must read `super-habits`                                       |
+| `transient` / `tooling` | Expo keep-awake tag, temp-dir prefixes, local env vars                 | **ALLOWED** — recreated at runtime, never load-bearing                         |
+
+Classification is two-stage: **path first**, then **content**. That ordering is
+deliberate. A historical plan that happens to quote `openDatabaseAsync(...)` is
+still preserved history; running content rules first would misfile it as a frozen
+storage identifier and invite a destructive "cleanup".
+
+The gate (`npm run brand:inventory`, run in the `quality` job) fails ONLY when a
+`brand` or `package` occurrence remains, i.e. exactly the class this migration is
+authorized to change without owner approval. Frozen and owner-gated classes are
+reported so the ledger stays complete without ever becoming a rename checklist.
+
 ## Phase 1 implementation
 
 - Canonical metadata: `package.json`, `package-lock.json`, `app.json` Expo name/slug, and `public/manifest.json`.

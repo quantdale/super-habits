@@ -1,5 +1,5 @@
 /**
- * Finite web-server lifecycle helpers for SuperHabits autonomous agents.
+ * Finite web-server lifecycle helpers for super-habits autonomous agents.
  *
  * The repository distinguishes three web workflows:
  * - Persistent (human HMR): `npm run web` / `npm run web:dev` — long-lived
