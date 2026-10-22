@@ -1120,6 +1120,158 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.daily_plans TO anon, authen
 `;
 expectPlanningRejection(unsafeGlobalDateUniqueness, 'global date uniqueness + anon grant');
 
+// ---- Backup generation protocol (WS-03) ----
+// These five tables plus the two privileged functions carry the whole
+// validate-before-publish backup protocol, and until now NOTHING in this
+// validator referenced them: a policy drop, a widened grant, or a definer
+// function losing its pinned search_path could regress the single most
+// security-sensitive surface in the schema while `supabase:schema:validate`
+// stayed green. The checks below pin the FINAL post-chain state, which is what
+// a freshly-migrated project actually serves.
+const generationMigrationNames = migrationNames.filter((name) =>
+  /_backup_generation|_verify_and_reserve_backup_generations|_enforce_backup_publication_provenance/.test(
+    name,
+  ),
+);
+if (generationMigrationNames.length < 4) {
+  failures.push(
+    `expected >= 4 backup-generation migration files, found ${generationMigrationNames.length}`,
+  );
+}
+const generationSource = generationMigrationNames
+  .map((name) => read(`supabase/migrations/${name}`))
+  .join(String.fromCharCode(10));
+
+// Every generation table must have RLS enabled. There is no exception here —
+// unlike ai_request_quota there are no deny-all-by-omission tables: these all
+// serve the owner-scoped client path.
+for (const table of [
+  'backup_generation',
+  'backup_generation_chunk',
+  'backup_generation_head',
+  'backup_generation_sequence_reservation',
+  'backup_generation_publication',
+]) {
+  req(
+    `generation RLS ${table}`,
+    generationSource,
+    `ALTER TABLE public.${table} ENABLE ROW LEVEL SECURITY`,
+  );
+}
+
+// Owner-scoped policies only: the cross-tenant bug class is a policy that never
+// constrains the row to the caller's uid.
+for (const policy of [
+  'backup_generation_select_owner',
+  'backup_generation_insert_owner',
+  'backup_generation_update_owner',
+  'backup_generation_chunk_select_owner',
+  'backup_generation_chunk_insert_owner',
+  'backup_generation_chunk_update_owner',
+  'backup_generation_head_select_owner',
+  'backup_generation_reservation_select_owner',
+  'backup_generation_publication_select_owner',
+]) {
+  req(`generation policy ${policy}`, generationSource, policy);
+}
+// A `USING (true)` policy would silently make a generation row world-readable.
+reqAbsent('generation policies must not be blanket', generationSource, 'USING (true)');
+reqAbsent('generation policies must not target anon', generationSource, 'TO anon');
+
+// The provenance migration must revoke default Supabase grants (notably
+// TRUNCATE, which bypasses RLS) and re-grant only owner DML.
+req(
+  'generation privilege reset',
+  generationSource,
+  'REVOKE ALL PRIVILEGES ON TABLE',
+);
+req(
+  'generation client DML grant',
+  generationSource,
+  'GRANT SELECT, INSERT, UPDATE ON TABLE public.backup_generation TO authenticated',
+);
+req(
+  'generation chunk DML grant',
+  generationSource,
+  'GRANT SELECT, INSERT, UPDATE ON TABLE public.backup_generation_chunk TO authenticated',
+);
+// Head/reservation/publication are server-side only from the client's view.
+for (const table of [
+  'backup_generation_head',
+  'backup_generation_sequence_reservation',
+  'backup_generation_publication',
+]) {
+  req(
+    `generation read-only grant ${table}`,
+    generationSource,
+    `GRANT SELECT ON TABLE public.${table} TO authenticated`,
+  );
+  reqAbsent(
+    `generation must not grant client writes to ${table}`,
+    generationSource,
+    `INSERT, UPDATE ON TABLE public.${table} TO authenticated`,
+  );
+}
+
+// The two privileged functions must stay SECURITY DEFINER (they publish/allocate
+// across owner boundaries by design) AND must pin search_path, or a definer
+// function is a privilege-escalation primitive.
+for (const fn of [
+  'publish_backup_generation',
+  'reserve_backup_generation_sequence',
+]) {
+  req(`generation function ${fn}`, generationSource, `public.${fn}`);
+  // EXECUTE must be service_role only; the client must never call it directly.
+  req(
+    `generation function grant ${fn}`,
+    generationSource,
+    `GRANT EXECUTE ON FUNCTION public.${fn}`,
+  );
+}
+// Definitions that pin search_path next to the definer marker. The final
+// migration is authoritative, so assert the pinned paths exist there.
+const publicationMigration =
+  migrationNames.find((name) => name.endsWith('_enforce_backup_publication_provenance.sql')) ?? '';
+const publicationSource = publicationMigration
+  ? read(`supabase/migrations/${publicationMigration}`)
+  : '';
+req('provenance migration present', publicationSource, 'SECURITY DEFINER');
+req(
+  'provenance migration pins search_path',
+  publicationSource,
+  'SET search_path = pg_catalog',
+);
+// The retired v1 publisher must stay revoked — it was replaced precisely because
+// it could publish without provenance.
+reqAbsent(
+  'legacy v1 publisher must not be executable by clients',
+  publicationSource,
+  'GRANT EXECUTE ON FUNCTION public.backup_generation_publish_v1',
+);
+
+// Negative coverage: prove the generation checks actually reject unsafe
+// variants instead of passing vacuously on any input.
+function expectGenerationRejection(badSource, label) {
+  const badFailures = [];
+  const badReq = (l, cond) => {
+    if (!cond) badFailures.push(l);
+  };
+  badReq('RLS present', badSource.includes('ALTER TABLE public.backup_generation ENABLE ROW LEVEL SECURITY'));
+  badReq('no blanket policy', !badSource.includes('USING (true)'));
+  badReq('no anon target', !badSource.includes('TO anon'));
+  badReq('privilege reset present', badSource.includes('REVOKE ALL PRIVILEGES ON TABLE'));
+  if (badFailures.length === 0)
+    failures.push(`negative coverage failed: unsafe generation variant was NOT rejected (${label})`);
+}
+expectGenerationRejection(
+  `
+CREATE TABLE public.backup_generation (id TEXT PRIMARY KEY, user_id UUID);
+CREATE POLICY backup_generation_select_owner ON public.backup_generation FOR SELECT TO anon USING (true);
+GRANT SELECT ON TABLE public.backup_generation TO anon;
+`,
+  'blanket anon policy with no RLS and no revoke',
+);
+
 if (/SUPABASE_SERVICE_ROLE_KEY|SERVICE_ROLE_KEY/i.test(clientSource)) {
   failures.push('client Supabase source references a service-role credential');
 }
