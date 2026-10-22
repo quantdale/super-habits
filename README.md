@@ -1,6 +1,6 @@
-# SuperHabits
+# super-habits
 
-SuperHabits is an offline-first productivity app for web and mobile with a Today-first dashboard, six direct section surfaces, progressive settings, and an advanced command/capture overlay reached from the global Add flow. It runs as a Progressive Web App (PWA) and as native Android/iOS apps from one Expo + React Native codebase.
+super-habits is an offline-first productivity app for web and mobile with a Today-first dashboard, six direct section surfaces, progressive settings, and an advanced command/capture overlay reached from the global Add flow. It runs as a Progressive Web App (PWA) and as native Android/iOS apps from one Expo + React Native codebase.
 
 Data is stored locally in SQLite first, then optionally backed up to Supabase. The current remote story is backup-first: regular app usage pushes the complete recoverable scope to Supabase, and Restore V2 can import that full scope back onto an empty device. This is not full two-way sync. When remote backup is configured, the local SQLite dataset also keeps a durable owner binding so auth loss cannot silently attach existing data to a new anonymous user.
 
