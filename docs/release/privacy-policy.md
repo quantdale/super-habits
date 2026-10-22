@@ -1,8 +1,8 @@
-# SuperHabits — Privacy Policy (draft for owner review)
+# super-habits — Privacy Policy (draft for owner review)
 
 **Effective date:** `[OWNER ACTION: publication date]` (draft revised 2026-09-25)
 
-**Applies to:** SuperHabits 1.0.0 — web (PWA), Android, and iOS builds from
+**Applies to:** super-habits 1.0.0 — web (PWA), Android, and iOS builds from
 this repository.
 
 > Status: release draft. It describes the app's actual behavior as implemented
@@ -14,7 +14,7 @@ this repository.
 
 ## The short version
 
-- SuperHabits works fully offline. Your tasks, habits, workouts, meals, and
+- super-habits works fully offline. Your tasks, habits, workouts, meals, and
   settings live in a database **on your device**.
 - No registration step is needed, and there are **no ads or cross-app
   tracking**. A build configured with Supabase may automatically create an
@@ -136,7 +136,7 @@ leave your device, and the app uses no remote push-messaging service.
 
 ## 7. Children
 
-SuperHabits is a general-purpose productivity app with no age gate and no
+super-habits is a general-purpose productivity app with no age gate and no
 content aimed specifically at children. A parent or guardian should
 supervise use of its account-backed and AI-assisted features.
 
