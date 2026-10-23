@@ -4,7 +4,7 @@
  *
  * WHY THIS EXISTS
  * ---------------
- * SuperHabits is local-first: on web the SQLite database lives in OPFS and the
+ * super-habits is local-first: on web the SQLite database lives in OPFS and the
  * user's data may exist ONLY on their device. Three platform realities must be
  * handled honestly:
  *
