@@ -17,7 +17,35 @@ The audit gate and empty allowlist remain byte-unchanged. Existing historical
 production Vercel deployments are real: zero GitHub deployment records or a
 commit title saying “zero production deployments” cannot disprove that history.
 
-## 1. Current primary advisory and dependency evidence
+## Late-campaign advisory refresh — 2026-10-23 23:00 UTC
+
+The sections below preserve the worker's earlier observation (approximately
+08:40 UTC); they are not the final advisory snapshot. Parent reran the unchanged
+audit after resuming the campaign. GitHub now reports braces
+GHSA-vfj7-8cjw-p6xm **withdrawn at 2026-10-23T12:53:02Z** (updated12:53:05Z).
+The installed braces version is still3.0.3; this is upstream withdrawal, **not
+a dependency repair performed by this campaign**.
+
+The final production audit exits1 on **node-forge GHSA-86w9-cpqp-85rv** and
+**Zod GHSA-mrhx-c7xc-m3w5** (oversized constrained collection validation can
+exhaust memory; advisory updated18:26:52Z). Published affected Zod range is
+`<4.6.6`, first patched4.6.6; current registry latest is4.6.7. The lock has
+production `zod@3.25.76` required by `@expo/cli` (`^3.25.76`), and a separate
+dev-only OpenSpec copy4.4.3. Moving Expo's3.x dependency to4.6.6+ is a major
+API/range change, **not a proven safe transitive patch**. No cross-major override
+or allowlist entry was applied to manufacture green. Assess Expo's actual
+collection-validation input paths and obtain a compatible upstream3.x fix or a
+separately qualified parent upgrade; unreviewed parser patches are not remediation.
+
+Decision request CB-SEC-2026-10-23 must therefore be reevaluated against this new
+Zod finding before any owner decision. The older 35-package raw inventory below
+is historical, not a claim about the final audit's package count. Production
+remains blocked, the allowlist and audit implementation remain unchanged, and
+source integration would not accept this residual security risk. Final ledger:
+`/tmp/campaign-b-final-audit.log`; primary API GETs and exact installed versions
+were rechecked directly by the parent.
+
+## 1. Earlier primary advisory and dependency evidence
 
 Live GitHub advisory GETs and the npm registry-backed production audit agree:
 
