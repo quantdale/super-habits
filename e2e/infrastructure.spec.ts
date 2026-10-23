@@ -108,7 +108,7 @@ test.describe('Infrastructure', () => {
     expect(foundIn).toContain('superhabits-shell-');
   });
 
-  test('second tab gets OPFS lock error when first is open', async () => {
+  test('second tab cannot use the database while the first is open', async () => {
     test.setTimeout(90_000);
     const browser = await chromium.launch({ headless: true });
     // Same browser context = shared OPFS (separate contexts each have their own OPFS)
@@ -138,15 +138,24 @@ test.describe('Infrastructure', () => {
     });
 
     const combined = [...errors, ...pageErrors].join('\n');
+    // CORR-A-03 changed the MECHANISM, not the guarantee: a second tab is now
+    // refused UP FRONT by the Web Locks ownership probe (before the OPFS open
+    // can stall), so the old console-level lock error may never be produced.
+    // The test's contract is that the second tab is safely and visibly blocked
+    // from the database — either evidence class satisfies it.
     const hasLockError =
       combined.includes('createSyncAccessHandle') ||
       combined.includes('NoModificationAllowedError') ||
       combined.includes('initializeDatabase failed') ||
       combined.includes('Unable to open') ||
       combined.includes('database is locked');
+    const blockedByOwnership = await page2
+      .getByText(/already open in another tab|close the other tab/i)
+      .first()
+      .isVisible();
 
     await browser.close();
-    expect(hasLockError).toBe(true);
+    expect(hasLockError || blockedByOwnership).toBe(true);
   });
 
   test('no DB init error on clean load', async ({ page }) => {
