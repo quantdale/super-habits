@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import type * as SQLite from 'expo-sqlite';
-import { wrapDurableWriteError } from '@/core/storage/storageSafety';
+import { rethrowDurableWriteError } from '@/core/storage/storageSafety';
 
 const transactionTails = new WeakMap<object, Promise<void>>();
 
@@ -82,6 +82,6 @@ export async function withSQLiteTransaction<T>(
     // storage-caused rejection is classified once and surfaces as actionable
     // copy at any UI catch site that reads `error.message`. Non-storage errors
     // are rethrown UNWRAPPED — the exact original error.
-    throw wrapDurableWriteError(error, 'transactional write');
+    rethrowDurableWriteError(error, 'transactional write');
   }
 }

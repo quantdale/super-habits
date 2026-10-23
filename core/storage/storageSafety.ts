@@ -169,9 +169,9 @@ export function describeStoragePressure(status: 'warn' | 'critical'): string {
 }
 
 /**
- * Classified wrapper for a failed durable write. Non-storage failures are
+ * Classified rethrow for a failed durable write. Non-storage failures are
  * rethrown UNWRAPPED (the exact original error) so ordinary error handling and
- * any test asserting a specific message are unaffected.
+ * any test asserting a specific message are unaffected. Never returns.
  */
 export class StorageWriteError extends Error {
   readonly kind: StorageFailureKind;
@@ -186,13 +186,13 @@ export class StorageWriteError extends Error {
   }
 }
 
-export function wrapDurableWriteError(error: unknown, action: string): unknown {
+export function rethrowDurableWriteError(error: unknown, action: string): never {
   // Idempotent: nested transactional layers must not re-wrap an already
   // classified failure (its message already carries the storage copy).
-  if (error instanceof StorageWriteError) return error;
+  if (error instanceof StorageWriteError) throw error;
   const kind = classifyStorageError(error);
-  if (kind === 'unknown') return error;
-  return new StorageWriteError(kind, action, error);
+  if (kind === 'unknown') throw error;
+  throw new StorageWriteError(kind, action, error);
 }
 
 /** Storage-pressure levels, worst-first. */

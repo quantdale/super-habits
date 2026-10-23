@@ -13,7 +13,7 @@ import { withSQLiteTransaction } from '@/core/db/transactions';
 import { upsertSyncOutboxRecord } from '@/core/sync/syncPersistence';
 import { syncEngine, type PreparedSyncRecord, type SyncRecord } from '@/core/sync/sync.engine';
 import { getSupabaseSessionUserId } from '@/lib/supabase';
-import { wrapDurableWriteError } from '@/core/storage/storageSafety';
+import { rethrowDurableWriteError } from '@/core/storage/storageSafety';
 import { nowIso } from '@/lib/time';
 import { BACKUP_SETTINGS_RECORD_ID } from '@/core/backup/backup.types';
 import { readRecoverableSettings } from '@/core/backup/backupSettings';
@@ -124,7 +124,7 @@ export async function runBackupMutation<T>(input: {
     // ONCE here and surfaces as actionable copy at any UI catch site that
     // reads `error.message`. Non-storage errors are rethrown UNWRAPPED — the
     // exact original error — so ordinary error handling is unchanged.
-    throw wrapDurableWriteError(error, 'durable write');
+    rethrowDurableWriteError(error, 'durable write');
   });
 
   if (outcome.changed) {

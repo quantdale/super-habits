@@ -9,7 +9,7 @@ import {
   resetPersistentStorageRequestForTests,
   StorageWriteError,
   STORAGE_PRESSURE_THRESHOLDS,
-  wrapDurableWriteError,
+  rethrowDurableWriteError,
   type StorageManagerLike,
 } from '@/core/storage/storageSafety';
 
@@ -56,7 +56,7 @@ describe('classifyStorageError', () => {
     const appError = new Error('title is required');
     expect(classifyStorageError(appError)).toBe('unknown');
     expect(isStorageFailure(appError)).toBe(false);
-    expect(wrapDurableWriteError(appError, 'todo save')).toBe(appError);
+    expect(() => rethrowDurableWriteError(appError, 'todo save')).toThrow(appError);
   });
 
   it('never advises clearing site data in any failure message', () => {
@@ -86,22 +86,48 @@ describe('getSaveFailureMessage', () => {
   });
 });
 
-describe('wrapDurableWriteError', () => {
-  it('wraps storage failures with kind + cause, preserving the original', () => {
+describe('rethrowDurableWriteError', () => {
+  it('throws a classified StorageWriteError with kind + cause for storage failures', () => {
     const cause = quotaError();
-    const wrapped = wrapDurableWriteError(cause, 'workout save');
-    expect(wrapped).toBeInstanceOf(StorageWriteError);
-    const storageError = wrapped as StorageWriteError;
+    let thrown: unknown;
+    try {
+      rethrowDurableWriteError(cause, 'workout save');
+      expect.unreachable('must throw');
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(StorageWriteError);
+    const storageError = thrown as StorageWriteError;
     expect(storageError.kind).toBe('quota');
     expect(storageError.action).toBe('workout save');
     expect(storageError.cause).toBe(cause);
     expect(storageError.message).toMatch(/Storage is full/);
   });
 
+  it('rethrows non-storage errors UNWRAPPED (the exact original)', () => {
+    const appError = new Error('title is required');
+    expect(() => rethrowDurableWriteError(appError, 'x')).toThrow(appError);
+    try {
+      rethrowDurableWriteError(appError, 'x');
+    } catch (error) {
+      expect(error).toBe(appError);
+    }
+  });
+
   it('is idempotent: nested transactional layers never double-wrap', () => {
-    const once = wrapDurableWriteError(quotaError(), 'inner') as StorageWriteError;
-    const twice = wrapDurableWriteError(once, 'outer');
-    expect(twice).toBe(once);
+    let once: StorageWriteError | undefined;
+    try {
+      rethrowDurableWriteError(quotaError(), 'inner');
+    } catch (error) {
+      once = error as StorageWriteError;
+    }
+    expect(once).toBeInstanceOf(StorageWriteError);
+    try {
+      rethrowDurableWriteError(once, 'outer');
+      expect.unreachable('must throw');
+    } catch (error) {
+      expect(error).toBe(once);
+    }
   });
 });
 
