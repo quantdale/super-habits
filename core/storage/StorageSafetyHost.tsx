@@ -19,7 +19,6 @@ import { useEffect } from 'react';
 import type * as SQLite from 'expo-sqlite';
 import { createLinkedActionsNotice } from '@/core/linked-actions/linkedActionsNotice';
 import { useInAppNotices } from '@/core/providers/inAppNoticeContext';
-import { useAppNavigation } from '@/core/providers/navigationContext';
 import {
   describeStoragePressure,
   estimateStoragePressure,
@@ -34,11 +33,15 @@ export function StorageSafetyHost({
   /**
    * Dependency-injected database accessor (owned by the bootstrap orchestrator
    * in AppProviders). The host stays UI-layer: it never imports the DB client.
+   *
+   * NOTE: this host renders INSIDE AppProviders but ABOVE NavigationProvider
+   * (NavigationProvider wraps AppProviders' children in app/_layout.tsx), so it
+   * must not use `useAppNavigation` — the notices' copy names the Settings path
+   * instead of navigating there on press.
    */
   getDatabase: () => Promise<SQLite.SQLiteDatabase>;
 }) {
   const { showNotice } = useInAppNotices();
-  const { openSettings } = useAppNavigation();
 
   useEffect(() => {
     let cancelled = false;
@@ -55,7 +58,6 @@ export function StorageSafetyHost({
               reason: 'storage_reset_detected',
               source: { feature: 'todos', entityType: 'storage' },
               target: { feature: 'todos', entityType: 'storage' },
-              onPress: openSettings,
             }),
           );
         }
@@ -69,7 +71,6 @@ export function StorageSafetyHost({
               reason: `storage_pressure_${pressure.status}`,
               source: { feature: 'todos', entityType: 'storage' },
               target: { feature: 'todos', entityType: 'storage' },
-              onPress: openSettings,
             }),
           );
         }
@@ -87,7 +88,7 @@ export function StorageSafetyHost({
     return () => {
       cancelled = true;
     };
-  }, [getDatabase, openSettings, showNotice]);
+  }, [getDatabase, showNotice]);
 
   return null;
 }
