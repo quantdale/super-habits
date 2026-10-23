@@ -1120,6 +1120,293 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.daily_plans TO anon, authen
 `;
 expectPlanningRejection(unsafeGlobalDateUniqueness, 'global date uniqueness + anon grant');
 
+// ---- Backup generation protocol (WS-03) ----
+// These five tables plus the two privileged functions carry the whole
+// validate-before-publish backup protocol, and until now NOTHING in this
+// validator referenced them: a policy drop, a widened grant, or a definer
+// function losing its pinned search_path could regress the single most
+// security-sensitive surface in the schema while `supabase:schema:validate`
+// stayed green. The checks below pin the FINAL post-chain state, which is what
+// a freshly-migrated project actually serves.
+const generationMigrationNames = migrationNames.filter((name) =>
+  /_backup_generation|_verify_and_reserve_backup_generations|_enforce_backup_publication_provenance/.test(
+    name,
+  ),
+);
+if (generationMigrationNames.length < 4) {
+  failures.push(
+    `expected >= 4 backup-generation migration files, found ${generationMigrationNames.length}`,
+  );
+}
+const generationSource = generationMigrationNames
+  .map((name) => read(`supabase/migrations/${name}`))
+  .join(String.fromCharCode(10));
+// The final provenance migration is authoritative for the post-chain state.
+const publicationMigration =
+  migrationNames.find((name) => name.endsWith('_enforce_backup_publication_provenance.sql')) ?? '';
+const publicationSource = publicationMigration
+  ? read(`supabase/migrations/${publicationMigration}`)
+  : '';
+const allMigrationsSource = migrationNames
+  .map((name) => read(`supabase/migrations/${name}`))
+  .join(String.fromCharCode(10));
+// Per-function definition blocks of the authoritative migration, split at each
+// CREATE FUNCTION so a pin in one block can never vouch for a sibling.
+const publicationFunctionBlocks = publicationSource
+  .split(/(?=CREATE (OR REPLACE )?FUNCTION)/i)
+  .filter((block) => /CREATE (OR REPLACE )?FUNCTION/i.test(block));
+
+// Every generation table must have RLS enabled. There is no exception here —
+// unlike ai_request_quota there are no deny-all-by-omission tables: these all
+// serve the owner-scoped client path.
+for (const table of [
+  'backup_generation',
+  'backup_generation_chunk',
+  'backup_generation_head',
+  'backup_generation_sequence_reservation',
+  'backup_generation_publication',
+]) {
+  req(
+    `generation RLS ${table}`,
+    generationSource,
+    `ALTER TABLE public.${table} ENABLE ROW LEVEL SECURITY`,
+  );
+}
+
+// Owner-scoped policies only: the cross-tenant bug class is a policy that never
+// constrains the row to the caller's uid.
+for (const policy of [
+  'backup_generation_select_owner',
+  'backup_generation_insert_owner',
+  'backup_generation_update_owner',
+  'backup_generation_chunk_select_owner',
+  'backup_generation_chunk_insert_owner',
+  'backup_generation_chunk_update_owner',
+  'backup_generation_head_select_owner',
+  'backup_generation_reservation_select_owner',
+  'backup_generation_publication_select_owner',
+]) {
+  req(`generation policy ${policy}`, generationSource, policy);
+  // The policy NAME existing is not owner scoping: the PREDICATE must be the
+  // strict owner equality. Presence-checking `auth.uid()`/`user_id` is not
+  // enough (final review P1): `((user_id = (select auth.uid())) OR true)` and
+  // `USING (true /* auth.uid() user_id */)` both satisfy a presence check while
+  // opening the table. The predicate is therefore ALLOW-LISTED by shape, and
+  // disjunctions/comments in it are rejected outright.
+  {
+    const policyBlockMatch = generationSource.match(
+      new RegExp(`CREATE POLICY ${policy}\\b[\\s\\S]*?;`),
+    );
+    const policyBlock = policyBlockMatch ? policyBlockMatch[0] : '';
+    const predicate = policyBlock.slice(Math.max(0, policyBlock.search(/\bUSING\b/i)));
+    const strictOwnerEquality =
+      /(?:USING|WITH CHECK)\s*\(\s*\(?\s*(?:select\s+)?auth\.uid\(\)\s*\)?\s*=\s*user_id|USING\s*\(\s*user_id\s*=\s*\(?\s*(?:select\s+)?auth\.uid\(\)/i;
+    const bypassShape = /\bOR\b|\/\*|USING\s*\(\s*true/i;
+    if (!strictOwnerEquality.test(policyBlock) || bypassShape.test(predicate)) {
+      failures.push(
+        `generation policy ${policy} must constrain rows to the caller's uid with a strict ` +
+          `user_id = auth.uid() predicate (no disjunctions, comments, or blanket true); found: ${
+            policyBlock ? policyBlock.replace(/\s+/g, ' ').slice(0, 160) : '<missing>'
+          }`,
+      );
+    }
+  }
+}
+// A `USING (true)` policy would silently make a generation row world-readable.
+reqAbsent('generation policies must not be blanket', generationSource, 'USING (true)');
+reqAbsent('generation policies must not target anon', generationSource, 'TO anon');
+
+// The provenance migration must revoke default Supabase grants (notably
+// TRUNCATE, which bypasses RLS) and re-grant only owner DML. Scoped to the
+// provenance migration specifically: a generic REVOKE anywhere else in the
+// chain (e.g. the baseline's table-level revoke) must not satisfy this — the
+// check is about the final migration's five-table reset block.
+{
+  const resetBlock =
+    publicationSource.match(/REVOKE ALL PRIVILEGES ON TABLE[\s\S]{0,600}?FROM[^;]*;/i)?.[0] ?? '';
+  const resetCoversAllTables = [
+    'backup_generation',
+    'backup_generation_chunk',
+    'backup_generation_head',
+    'backup_generation_sequence_reservation',
+    'backup_generation_publication',
+  ].every((table) => resetBlock.includes(`public.${table}`));
+  if (!resetBlock || !resetCoversAllTables) {
+    failures.push(
+      'generation privilege reset is missing or incomplete: the provenance migration must contain one REVOKE ALL PRIVILEGES ON TABLE block covering all five generation tables (TRUNCATE bypasses RLS).',
+    );
+  }
+}
+req(
+  'generation client DML grant',
+  generationSource,
+  'GRANT SELECT, INSERT, UPDATE ON TABLE public.backup_generation TO authenticated',
+);
+req(
+  'generation chunk DML grant',
+  generationSource,
+  'GRANT SELECT, INSERT, UPDATE ON TABLE public.backup_generation_chunk TO authenticated',
+);
+// Head/reservation/publication are server-side only from the client's view.
+for (const table of [
+  'backup_generation_head',
+  'backup_generation_sequence_reservation',
+  'backup_generation_publication',
+]) {
+  req(
+    `generation read-only grant ${table}`,
+    generationSource,
+    `GRANT SELECT ON TABLE public.${table} TO authenticated`,
+  );
+  // Any WRITE-shaped grant to any client role is a violation — in ANY
+  // migration (final review P1: the chain is stateful, so a re-opening grant
+  // in a later/renamed file must not hide outside the filename filter), with
+  // or without the `public.` qualifier.
+  {
+    const writeGrant = new RegExp(
+      `GRANT\\s+(?:ALL[^;]*|[^;]*\\b(?:INSERT|UPDATE|DELETE|TRUNCATE)\\b[^;]*)ON (?:TABLE\\s+)?(?:public\\.)?${table}\\b[^;]*TO\\s+(?:authenticated|anon|PUBLIC)`,
+      'i',
+    );
+    if (writeGrant.test(allMigrationsSource)) {
+      failures.push(
+        `generation must not grant client writes to ${table} (write-shaped GRANT found in the chain)`,
+      );
+    }
+  }
+}
+// Schema-wide grant shapes re-open every table at once (TRUNCATE included) and
+// are never legitimate for client roles in this schema.
+{
+  const schemaWideWrite =
+    /GRANT[^;]*\b(?:INSERT|UPDATE|DELETE|TRUNCATE|ALL)\b[^;]*ON ALL TABLES IN SCHEMA[^;]*TO\s+(?:authenticated|anon|PUBLIC)/i;
+  const defaultPrivilegeGrant =
+    /ALTER DEFAULT PRIVILEGES[^;]*GRANT[^;]*ON TABLES[^;]*TO\s+(?:authenticated|anon|PUBLIC)/i;
+  if (schemaWideWrite.test(allMigrationsSource)) {
+    failures.push(
+      'generation must not grant client writes via ON ALL TABLES IN SCHEMA (write-shaped schema-wide grant found)',
+    );
+  }
+  if (defaultPrivilegeGrant.test(allMigrationsSource)) {
+    failures.push(
+      'generation must not grant client writes via ALTER DEFAULT PRIVILEGES (default-privilege grant found)',
+    );
+  }
+}
+
+// The two privileged functions must stay SECURITY DEFINER (they publish/allocate
+// across owner boundaries by design) AND must pin search_path, or a definer
+// function is a privilege-escalation primitive.
+for (const fn of ['publish_backup_generation', 'reserve_backup_generation_sequence']) {
+  req(`generation function ${fn}`, generationSource, `public.${fn}`);
+  // EXECUTE is granted to the authenticated owner path with PUBLIC/anon
+  // revoked first; the function itself MUST be SECURITY DEFINER (it publishes
+  // across owner boundaries) and must live in the provenance migration.
+  {
+    const fnBlock = publicationFunctionBlocks.find((block) =>
+      new RegExp(`CREATE (OR REPLACE )?FUNCTION\\s+(?:public\\.)?${fn}\\b`, 'i').test(block),
+    );
+    if (!fnBlock) {
+      failures.push(`generation function ${fn} must be defined in the provenance migration`);
+    } else if (!/SECURITY DEFINER/i.test(fnBlock)) {
+      failures.push(`generation function ${fn} must be SECURITY DEFINER`);
+    }
+  }
+  req(
+    `generation function grant ${fn}`,
+    generationSource,
+    `GRANT EXECUTE ON FUNCTION public.${fn}`,
+  );
+}
+// No generation function may ever be executable by anonymous clients.
+{
+  const anonFunctionGrant =
+    /GRANT[^;]*EXECUTE[^;]*ON (ALL )?FUNCTION[^;]*backup_generation[^;]*TO\s+anon/i;
+  if (anonFunctionGrant.test(allMigrationsSource)) {
+    failures.push(
+      'generation functions must never be granted to anon (unauthorized anonymous execution)',
+    );
+  }
+}
+// Definitions that pin search_path next to the definer marker. Per-FUNCTION
+// binding: every SECURITY DEFINER function in the provenance migration must
+// pin search_path (in its own definition block or via ALTER FUNCTION) — a
+// single surviving pin must not mask an unpinned definer sibling.
+for (const block of publicationFunctionBlocks) {
+  if (!/SECURITY DEFINER/i.test(block)) continue;
+  const nameMatch = block.match(/CREATE (OR REPLACE )?FUNCTION\s+(?:public\.)?([a-z0-9_]+)/i);
+  const fnName = nameMatch ? nameMatch[1] : '<unnamed>';
+  // Comment-stripped (final review P1: a commented-out pin must not count),
+  // and the ALTER fallback is LINE-bound to this function's name (a sibling's
+  // pin on a later line must not vouch for this one).
+  const blockWithoutComments = block.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const pinnedInBlock = /SET search_path\s*=/i.test(blockWithoutComments);
+  const pinnedByAlter = new RegExp(
+    `ALTER FUNCTION[^\\n;]*${fnName}[^\\n;]*SET search_path`,
+    'i',
+  ).test(publicationSource);
+  if (!pinnedInBlock && !pinnedByAlter) {
+    failures.push(
+      `generation definer function ${fnName} must pin search_path (SECURITY DEFINER without SET search_path is a privilege-escalation primitive)`,
+    );
+  }
+}
+req('provenance migration present', publicationSource, 'SECURITY DEFINER');
+req('provenance migration pins search_path', publicationSource, 'SET search_path = pg_catalog');
+// The retired v1 publisher must stay revoked — it was replaced precisely because
+// it could publish without provenance. It remains callable INTERNALLY by the
+// current publisher (definer-to-definer), so only CLIENT grants are banned, and
+// the ban applies to the ENTIRE migration chain, not just the final file (a
+// re-grant in any later/named-elsewhere migration is the regression).
+reqAbsent(
+  'legacy v1 publisher must not be executable by clients',
+  publicationSource,
+  'GRANT EXECUTE ON FUNCTION public.backup_generation_publish_v1',
+);
+{
+  const v1ClientGrant =
+    /GRANT[^;]*EXECUTE[^;]*ON (ALL )?FUNCTION[^;]*backup_generation_publish_v1[^;]*TO\s+(?:authenticated|anon|PUBLIC)/i;
+  if (v1ClientGrant.test(allMigrationsSource)) {
+    failures.push(
+      'legacy v1 publisher must not be executable by clients: a client-facing GRANT for backup_generation_publish_v1 exists somewhere in the chain',
+    );
+  }
+  const schemaWideExecute =
+    /GRANT[^;]*EXECUTE[^;]*ON ALL FUNCTIONS IN SCHEMA[^;]*TO\s+(?:authenticated|anon|PUBLIC)/i;
+  if (schemaWideExecute.test(allMigrationsSource)) {
+    failures.push(
+      'generation execution grants must stay function-scoped: a schema-wide EXECUTE grant would make the retired v1 publisher callable again',
+    );
+  }
+}
+
+// Negative coverage: prove the generation checks actually reject unsafe
+// variants instead of passing vacuously on any input.
+function expectGenerationRejection(badSource, label) {
+  const badFailures = [];
+  const badReq = (l, cond) => {
+    if (!cond) badFailures.push(l);
+  };
+  badReq(
+    'RLS present',
+    badSource.includes('ALTER TABLE public.backup_generation ENABLE ROW LEVEL SECURITY'),
+  );
+  badReq('no blanket policy', !badSource.includes('USING (true)'));
+  badReq('no anon target', !badSource.includes('TO anon'));
+  badReq('privilege reset present', badSource.includes('REVOKE ALL PRIVILEGES ON TABLE'));
+  if (badFailures.length === 0)
+    failures.push(
+      `negative coverage failed: unsafe generation variant was NOT rejected (${label})`,
+    );
+}
+expectGenerationRejection(
+  `
+CREATE TABLE public.backup_generation (id TEXT PRIMARY KEY, user_id UUID);
+CREATE POLICY backup_generation_select_owner ON public.backup_generation FOR SELECT TO anon USING (true);
+GRANT SELECT ON TABLE public.backup_generation TO anon;
+`,
+  'blanket anon policy with no RLS and no revoke',
+);
+
 if (/SUPABASE_SERVICE_ROLE_KEY|SERVICE_ROLE_KEY/i.test(clientSource)) {
   failures.push('client Supabase source references a service-role credential');
 }
@@ -1133,6 +1420,8 @@ if (failures.length > 0) {
     `Supabase schema contract PASS (${migrationNames.length} migration files; ` +
       `4 owner-scoped sync tables; ${backupTables.length} owner-scoped backup tables; ` +
       'planning + weekly_reviews + workout_session_sets scope-V5 + Gym V2 scope-V6/7 closure; ' +
-      'private AI quota RPC).',
+      'private AI quota RPC). Static source validation only — NOT hosted certification: ' +
+      'applied migrations, live pg_policies/ACLs and PostgREST exposure are verified ' +
+      'only by a hosted audit.',
   );
 }

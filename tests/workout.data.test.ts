@@ -49,6 +49,9 @@ describe('features/workout/workout.data', () => {
 
   it('writes a workout log for manual quick completion', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi
         .fn()
         .mockResolvedValueOnce({
@@ -102,6 +105,9 @@ describe('features/workout/workout.data', () => {
 
   it('writes workout session exercise rows for session flow completion', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi
         .fn()
         .mockResolvedValueOnce({
@@ -148,6 +154,9 @@ describe('features/workout/workout.data', () => {
 
   it('persists wall-clock timing and per-set rows for a timed session', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn(async (sql: string) =>
         sql.includes('FROM workout_routines')
           ? { id: 'routine_4', name: 'Push day', deleted_at: null }
@@ -228,6 +237,9 @@ describe('features/workout/workout.data', () => {
 
   it('applies linked-action workout log writes without source re-dispatch', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi
         .fn()
         .mockResolvedValueOnce({
@@ -259,6 +271,9 @@ describe('features/workout/workout.data', () => {
 
   it('addSet throws on invalid timing and writes nothing', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn(),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
@@ -272,6 +287,9 @@ describe('features/workout/workout.data', () => {
 
   it('addSet returns a real id for valid timing', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValue({ routine_id: 'routine_1' }),
       runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
     };
@@ -293,6 +311,9 @@ describe('features/workout/workout.data', () => {
 
   it('updateSet throws on invalid resulting timing and does not update', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValueOnce({ active_seconds: 40, rest_seconds: 20 }),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
@@ -306,6 +327,9 @@ describe('features/workout/workout.data', () => {
 
   it('updateSet stays a silent no-op for a missing set (different semantic: target vanished)', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValueOnce(null),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };

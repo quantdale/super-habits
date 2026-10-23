@@ -10,6 +10,9 @@ import {
 
 function buildDb() {
   return {
+    withTransactionAsync: async (task: () => Promise<void>) => {
+      await task();
+    },
     getFirstAsync: vi.fn(),
     runAsync: vi.fn().mockResolvedValue(undefined),
   };

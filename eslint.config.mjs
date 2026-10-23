@@ -248,6 +248,11 @@ export default [
   //    AppProviders (bootstrap), data layers, domain layers, lib/, and
   //    tests. Domain/lib files are excluded so that rules 2 and 3 above
   //    are not shadowed (in flat config the last config for a rule wins).
+  //    `core/storage/**` (CORR-A-02) originally joined this list while its
+  //    host imported the client directly; the host now receives the handle by
+  //    dependency injection (final review P2: the exemption was dead weight
+  //    that would silently permit future violations), so the exemption is
+  //    removed and the rule applies to core/storage like any UI layer.
   {
     files: ['**/*.ts', '**/*.tsx'],
     ignores: [

@@ -119,6 +119,70 @@ describe('core/db/client', () => {
     expect(openDatabaseAsync).toHaveBeenCalledTimes(2);
   });
 
+  it('mandatory 4: a storage-classified init failure surfaces actionable copy and a retry succeeds', async () => {
+    vi.resetModules();
+    const db = buildDb('13');
+    const quotaError = Object.assign(new Error('The quota has been exceeded.'), {
+      name: 'QuotaExceededError',
+    });
+    const openDatabaseAsync = vi.fn().mockRejectedValueOnce(quotaError).mockResolvedValueOnce(db);
+
+    vi.doMock('react-native', () => ({
+      Platform: {
+        OS: 'web',
+        select: (obj: Record<string, unknown>) => obj.web ?? obj.default,
+      },
+    }));
+    vi.doMock('expo-sqlite', () => ({ openDatabaseAsync }));
+
+    const client = await import('@/core/db/client');
+    const { describeStorageBootstrapFailure } = await import('@/core/storage/storageSafety');
+
+    const failure = await client.getDatabase().then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(Error);
+    // The bootstrap failure copy classifies it honestly (quota → storage full,
+    // no "clear site data" advice).
+    const message = describeStorageBootstrapFailure(failure);
+    expect(message).toMatch(/storage is full/i);
+    // The copy must PROHIBIT the destructive action, never advise it.
+    expect(message).toMatch(/do not clear site data/i);
+    expect(message).not.toMatch(/(try|please|consider) clear(ing)? (site|browser) data/i);
+
+    // Retry after space is freed: the memoized promise was reset, so the
+    // second call re-opens and succeeds — no wedged state.
+    await expect(client.getDatabase()).resolves.toBe(db);
+    expect(openDatabaseAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('a failed bootstrap releases the opened handle so retries cannot stack connections', async () => {
+    vi.resetModules();
+    const db = buildDb('13');
+    // The open SUCCEEDS but the very first bootstrap statement dies — the
+    // handle must be closed before the failure propagates (OPFS holds one
+    // access handle per origin; a stacked handle wedges every later attempt).
+    db.execAsync.mockRejectedValueOnce(new Error('disk I/O error'));
+    const openDatabaseAsync = vi.fn().mockResolvedValue(db);
+
+    vi.doMock('react-native', () => ({
+      Platform: {
+        OS: 'web',
+        select: (obj: Record<string, unknown>) => obj.web ?? obj.default,
+      },
+    }));
+    vi.doMock('expo-sqlite', () => ({ openDatabaseAsync }));
+
+    const client = await import('@/core/db/client');
+    await expect(client.getDatabase()).rejects.toThrow('disk I/O error');
+    expect(db.closeAsync).toHaveBeenCalledTimes(1);
+
+    // The retry opens again (fresh handle) instead of stacking on the dead one.
+    await expect(client.getDatabase()).resolves.toBe(db);
+    expect(openDatabaseAsync).toHaveBeenCalledTimes(2);
+  });
+
   it('enables WAL on native platforms', async () => {
     const { client, db } = await loadDbClient({ platform: 'ios' });
 

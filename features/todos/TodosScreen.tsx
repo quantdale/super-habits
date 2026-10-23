@@ -15,6 +15,7 @@ import { buildLinkedActionEditorRowsFromRules } from '@/core/linked-actions/link
 import { TODO_LINKED_ACTIONS_EDITOR_CONFIG } from '@/core/linked-actions/linkedActionsEditor.config';
 import { createSaveLinkedActionRuleInputFromEditorRow } from '@/core/linked-actions/linkedActionsEditor.model';
 import { createLinkedActionsNotice } from '@/core/linked-actions/linkedActionsNotice';
+import { getSaveFailureMessage } from '@/core/storage/storageSafety';
 import type {
   LinkedActionEditorRowDraft,
   LinkedActionEditorSourceOption,
@@ -621,25 +622,38 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
 
   const handleQuickAdd = useCallback(
     async (quickTitle: string) => {
-      // Quick capture has no editor form: pre-validate here so an over-length
-      // title surfaces as a notice instead of throwing into TodoQuickCapture
-      // (which has no error slot and would leave an unhandled rejection).
+      // Quick capture has no editor form: validate here and REJECT on failure —
+      // rejecting is what preserves the typed input (submitInlineQuickAdd clears
+      // it only on a resolved persist; a normal return here would report
+      // 'persisted' and discard the over-length draft — final review P2).
+      // The single failure notice is emitted by handleQuickAddPersistError.
       const validationError = validateTodo(quickTitle, '', null);
       if (validationError) {
-        showNotice(
-          createLinkedActionsNotice({
-            message: validationError,
-            reason: 'quick_add_validation_failed',
-            source: { feature: 'todos', entityType: 'todo' },
-            target: { feature: 'todos', entityType: 'todo' },
-          }),
-        );
-        return;
+        throw new Error(validationError);
       }
+      // A rejected write is reported through TodoQuickCapture's onPersistError
+      // slot (the typed input is preserved and the write never escapes as an
+      // unhandled rejection) — see submitInlineQuickAdd's failure contract.
       await addTodo({ title: quickTitle });
       void refresh();
     },
-    [refresh, showNotice],
+    [refresh],
+  );
+
+  const handleQuickAddPersistError = useCallback(
+    (error: unknown) => {
+      // Storage-classified failures get actionable copy (quota → export a
+      // backup); ordinary failures keep their own message.
+      showNotice(
+        createLinkedActionsNotice({
+          message: getSaveFailureMessage(error, 'Could not add the task. Try again.'),
+          reason: 'quick_add_save_failed',
+          source: { feature: 'todos', entityType: 'todo' },
+          target: { feature: 'todos', entityType: 'todo' },
+        }),
+      );
+    },
+    [showNotice],
   );
 
   const todoKeyExtractor = useCallback((item: Todo) => item.id, []);
@@ -1039,6 +1053,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
             title={quickDraft}
             onTitleChange={setQuickDraft}
             onSubmit={handleQuickAdd}
+            onPersistError={handleQuickAddPersistError}
           />
           {/* The empty branch supplies its own scroll region: the page-level
               scroller is pinned off (see the comment above) so the quick-add

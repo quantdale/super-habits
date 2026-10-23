@@ -60,6 +60,9 @@ function createFakeDb(options: { existingSessionIds?: string[] } = {}) {
   const calls: Statement[] = [];
   const state = { failSessionWrites: false };
   const db = {
+    withTransactionAsync: async (task: () => Promise<void>) => {
+      await task();
+    },
     meta,
     calls,
     insertedSessionIds,

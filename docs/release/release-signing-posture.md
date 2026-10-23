@@ -118,7 +118,33 @@ that sets it, and rejects a release-candidate profile that sets it through
 `app.json` instead. This record and the guard are the pair: the guard is the
 enforcement, this section is the reason.
 
-## 5. What is deliberately NOT recorded here
+## 5. Where the production upload key would come from (unpinned)
+
+`eas.json` `build.production` sets only `autoIncrement: true`. It does **not**
+set `credentialsSource`, so EAS resolves the Android upload keystore and the
+iOS distribution certificate from **EAS account state** rather than from
+anything in this repository. The consequence, stated plainly:
+
+- No reviewer, and no gate in this repository, can answer "which key signed
+  this artifact?" from source. The answer lives in the EAS account, outside
+  version control and outside CI review.
+- This is not itself a build failure — `credentialsSource: "remote"` (the
+  effective default) is a legitimate posture for EAS-managed credentials. It is
+  a **recorded decision gap**: the choice was never written down, so a later
+  profile edit can change it silently.
+- A pinned source does not prove the ARTIFACT was signed by it either. The only
+  sufficient check remains inspecting the built artifact:
+  `apksigner verify --print-certs <apk>` must report the owner's upload-key
+  certificate SHA-256, not the debug key's.
+
+**Exact resume action for the owner:** decide the intended upload-key source and
+make it explicit — either add `"credentialsSource": "remote"` (EAS-managed,
+requires the key to already exist in the owner's EAS account) or `"local"`
+(requires a `credentials.json` supplied at build time and never committed). Then
+record the choice here so the guard in `tests/releaseBuildPosture.test.ts` can
+pin it instead of tolerating an undocumented default.
+
+## 6. What is deliberately NOT recorded here
 
 - No APK/AAB hash, build ID, or store submission ID: none exists.
 - No production keystore path, alias, or credential reference.

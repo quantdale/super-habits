@@ -82,6 +82,9 @@ describe('features/habits/habits.data', () => {
 
   it('emits a linked-actions source event when an increment reaches the daily target', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi
         .fn()
         .mockResolvedValueOnce({ ...ACTIVE_HABIT_ROW })
@@ -137,6 +140,9 @@ describe('features/habits/habits.data', () => {
 
   it('does not emit linked-actions events before the target is reached', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi
         .fn()
         .mockResolvedValueOnce({
@@ -173,6 +179,9 @@ describe('features/habits/habits.data', () => {
 
   it('does not re-emit once the habit was already complete for the day', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi
         .fn()
         .mockResolvedValueOnce({ ...ACTIVE_HABIT_ROW })
@@ -193,6 +202,9 @@ describe('features/habits/habits.data', () => {
 
   it('does not write completion rows when the habit is missing or soft-deleted', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValueOnce(null),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
@@ -217,6 +229,9 @@ describe('features/habits/habits.data', () => {
     'refuses increments for a %s habit without writing a completion row',
     async (status) => {
       const db = {
+        withTransactionAsync: async (task: () => Promise<void>) => {
+          await task();
+        },
         getFirstAsync: vi.fn().mockResolvedValueOnce({ ...ACTIVE_HABIT_ROW, status }),
         runAsync: vi.fn().mockResolvedValue(undefined),
       };
@@ -239,6 +254,9 @@ describe('features/habits/habits.data', () => {
     // Resumed on 2026-04-20: the pause interval [2026-04-10, 2026-04-20]
     // keeps 2026-04-14 masked for writes and streak math alike.
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValueOnce({
         ...ACTIVE_HABIT_ROW,
         lifecycle_history: JSON.stringify([
@@ -258,6 +276,9 @@ describe('features/habits/habits.data', () => {
 
   it('refuses increments before the habit creation/effective date', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValueOnce({ ...ACTIVE_HABIT_ROW }),
       runAsync: vi.fn().mockResolvedValue(undefined),
     };
@@ -273,6 +294,9 @@ describe('features/habits/habits.data', () => {
   it('refuses increments on unscheduled weekdays', async () => {
     // Weekdays-only schedule; 2026-04-11 is a Saturday.
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValueOnce({
         ...ACTIVE_HABIT_ROW,
         rule_history: JSON.stringify([
@@ -296,6 +320,9 @@ describe('features/habits/habits.data', () => {
     // shape so the two upserts report counts 1 then 2.
     let upsertCount = 0;
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn(async (sql: string) => {
         if (typeof sql === 'string' && sql.includes('INSERT INTO habit_completions')) {
           upsertCount += 1;
@@ -331,6 +358,9 @@ describe('features/habits/habits.data', () => {
 
   it('skips linked-action increments when the habit target is missing or soft-deleted', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({
         id: 'habit_1',
         name: 'Hydrate',
@@ -368,6 +398,9 @@ describe('features/habits/habits.data', () => {
 
   it('updates an existing completion row for linked-action habit increments', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi
         .fn()
         .mockResolvedValueOnce({
@@ -411,6 +444,9 @@ describe('features/habits/habits.data', () => {
 
   it('inserts a completion row for linked-action habit increments when none exists', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi
         .fn()
         .mockResolvedValueOnce({
@@ -467,6 +503,9 @@ describe('features/habits/habits.data', () => {
   ] as const)('%s skips paused/archived habits as target_inactive', async (_name, run) => {
     for (const status of ['paused', 'archived'] as const) {
       const db = {
+        withTransactionAsync: async (task: () => Promise<void>) => {
+          await task();
+        },
         getFirstAsync: vi.fn().mockResolvedValueOnce({
           id: 'habit_1',
           name: 'Hydrate',
@@ -494,6 +533,9 @@ describe('features/habits/habits.data', () => {
 
   it('ensureHabitDailyTargetFromLinkedAction skips dates masked by a pause interval', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValueOnce({
         id: 'habit_1',
         name: 'Hydrate',
@@ -532,6 +574,9 @@ describe('features/habits/habits.data — durable lifecycle transitions', () => 
     current: { status: string | null; lifecycle_history: string | null } | null,
   ) {
     return {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn(async (sql: string) => {
         if (sql.includes('FROM habits')) return current;
         // sync_outbox owner reads and app_meta reads resolve to "absent".

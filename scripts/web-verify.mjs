@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Finite automated live-web verification for SuperHabits.
+ * Finite automated live-web verification for super-habits.
  *
  * This command is the repository-owned alternative to awaiting the persistent
  * Metro server (`npm run web` / `npm run web:dev`). It:

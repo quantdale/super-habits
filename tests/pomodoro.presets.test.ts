@@ -45,6 +45,9 @@ vi.mock('@/core/sync/syncedMutation', () => ({
 function createAppMetaDb() {
   const meta = new Map<string, string>();
   return {
+    withTransactionAsync: async (task: () => Promise<void>) => {
+      await task();
+    },
     meta,
     runAsync: vi.fn(async (sql: string, params?: unknown[]) => {
       const p = params ?? [];

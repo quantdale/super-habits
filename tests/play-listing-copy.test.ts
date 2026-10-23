@@ -76,7 +76,7 @@ describe('play listing copy length guard', () => {
     const { full } = extractListingCopy(extractListingSection(readDeclarations()));
     expect(full.length).toBeGreaterThan(0);
     expect(full.length).toBeLessThanOrEqual(4000);
-    expect(full).toContain('SuperHabits');
+    expect(full).toContain('super-habits');
     expect(full).toContain('1.0.0');
     expect(full).toContain('English');
     expect(full).toMatch(/Today/);

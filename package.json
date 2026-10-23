@@ -1,5 +1,5 @@
 {
-  "name": "superhabits",
+  "name": "super-habits",
   "version": "1.0.0",
   "main": "expo-router/entry",
   "engines": {
@@ -36,6 +36,7 @@
     "openspec:validate": "openspec validate --all",
     "release:profiles:guard": "node scripts/release-profile-guard.mjs",
     "native:isolation:guard": "node scripts/cloud-native-isolation.mjs",
+    "brand:inventory": "node scripts/legacy-name-inventory.mjs --check",
     "doctor": "npx expo-doctor",
     "e2e": "playwright test --project=chromium --project=journeys --project=pwa --project=visual",
     "e2e:simulation": "cross-env E2E_DIST_DIR=dist-sim playwright test --project=simulation",
@@ -74,7 +75,8 @@
     "agent:resume": "node scripts/agent-execplan.mjs resume",
     "dev:doctor": "node scripts/dev-doctor.mjs",
     "qa:full": "npm run typecheck && npm run lint && npm test && npm run openspec:validate && npm run e2e:full && npm run qa:simulation -- --all --mode deterministic",
-    "postinstall": "patch-package && simple-git-hooks"
+    "postinstall": "patch-package && simple-git-hooks",
+    "release:readiness": "node scripts/release-readiness.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/nunito": "^0.4.2",
@@ -141,14 +143,15 @@
     "metro-symbolicate": "0.83.8",
     "metro-transform-plugins": "0.83.8",
     "metro-transform-worker": "0.83.8",
-    "minimatch@3.1.5": {
-      "brace-expansion": "1.1.18"
-    },
     "patch-package": {
       "tmp": "0.2.7"
     },
     "brace-expansion@^5.0.0": "^5.0.12",
-    "source-map-js": "^1.2.2"
+    "source-map-js": "^1.2.2",
+    "brace-expansion@^2.0.0": "2.1.7",
+    "test-exclude": {
+      "brace-expansion": "1.1.21"
+    }
   },
   "simple-git-hooks": {
     "pre-commit": "npx lint-staged"

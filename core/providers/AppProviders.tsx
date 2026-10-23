@@ -2,7 +2,7 @@ import { type PropsWithChildren, useCallback, useEffect, useMemo, useRef, useSta
 import NetInfo from '@react-native-community/netinfo';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppState, Modal, Platform, Text, View } from 'react-native';
-import { initializeDatabase } from '@/core/db/client';
+import { getDatabase, initializeDatabase } from '@/core/db/client';
 import { installSimulationDataBridge } from '@/core/simulation/dataBridge';
 import { accountCoordinator } from '@/core/auth/accountCoordinator';
 import type { AccountActionResult, AccountState } from '@/core/auth/account.types';
@@ -16,6 +16,18 @@ import {
 import { runBackupMaintenance } from '@/core/backup/backupCheckpoint';
 import { applyPendingThemeApplication } from '@/core/backup/backupSettings';
 import { getDbBootstrapErrorMessage } from '@/core/providers/bootstrapErrorMessage';
+import {
+  getDbBootstrapTimeoutMessage,
+  isLocalDbPhaseTimeout,
+  withLocalDbTimeout,
+} from '@/core/providers/localDbPhase';
+import { describeStorageBootstrapFailure } from '@/core/storage/storageSafety';
+import {
+  getDbOwnedByOtherTabMessage,
+  tryAcquireDbOwnership,
+  type DbOwnership,
+} from '@/core/storage/dbOwnership';
+import { StorageSafetyHost } from '@/core/storage/StorageSafetyHost';
 import { withRemoteTimeout } from '@/core/providers/remotePhase';
 import {
   createPreviewAdoptionGuard,
@@ -39,6 +51,8 @@ import { Card } from '@/core/ui/Card';
 import { HabitReminderHost } from '@/core/notifications/HabitReminderHost';
 import { WorkoutReminderHost } from '@/core/notifications/WorkoutReminderHost';
 import { PomodoroCommandBridgeProvider } from '@/features/pomodoro/pomodoroCommandBridge';
+// Bootstrap step 5: one-time promotion of pre-v20 device-local Pomodoro
+// session metadata into the durable columns (see the pipeline call site).
 import { migrateLegacySessionMeta } from '@/features/pomodoro/pomodoro.sessionMeta';
 import { recoverPendingLinkedActions } from '@/core/linked-actions/linkedActions.recovery';
 
@@ -73,6 +87,23 @@ export function AppProviders({ children }: PropsWithChildren) {
    * overwrite fresher account state (stale-async overwrite class).
    */
   const accountTaskSeqRef = useRef(0);
+  /**
+   * Cross-tab database ownership (CORR-A-03): held for the app's session and
+   * REUSED across bootstrap retries — re-probing while holding our own lock
+   * would report ourselves as a competing tab.
+   */
+  const dbOwnershipRef = useRef<DbOwnership | null>(null);
+  // Release the writer-role claim only on true unmount (final review P2:
+  // a route-level ErrorBoundary remount would otherwise probe against this
+  // instance's still-held lock and report the user's own tab as a competitor).
+  // Bootstrap retries deliberately REUSE the claim — see dbOwnershipRef.
+  useEffect(
+    () => () => {
+      dbOwnershipRef.current?.release();
+      dbOwnershipRef.current = null;
+    },
+    [],
+  );
   const beginAccountTask = useCallback(() => ++accountTaskSeqRef.current, []);
   const applyAccountStateIfCurrent = useCallback((taskId: number, state: AccountState) => {
     if (taskId === accountTaskSeqRef.current) setAccountState(state);
@@ -110,7 +141,36 @@ export function AppProviders({ children }: PropsWithChildren) {
 
     const bootstrap = async () => {
       try {
-        await initializeDatabase();
+        // CORR-A-03: claim the per-origin database writer role BEFORE the
+        // OPFS open. A second tab's open does not fail — it stalls behind the
+        // first tab's write lock, so contention must be detected up front and
+        // answered with recovery UX instead of a 30-second silent hang. Where
+        // Web Locks is unavailable this degrades to the bounded-open path.
+        if (dbOwnershipRef.current?.status !== 'acquired') {
+          const ownership = await tryAcquireDbOwnership();
+          dbOwnershipRef.current = ownership;
+          if (ownership.status === 'contended') {
+            if (!cancelled) {
+              setDbError(getDbOwnedByOtherTabMessage());
+            }
+            return;
+          }
+        }
+        // Bounded (AUD-WS04-P1): `initializeDatabase()` can STALL rather than
+        // reject on web when another tab holds the origin-wide OPFS write lock
+        // (or a WASM worker wedges). Unbounded, that left the startup gate on
+        // "Preparing local workspace" forever with no retry affordance, because
+        // the gate only offers "Try again" when `dbError` is set. Every remote
+        // phase was already bounded by `withRemoteTimeout`; this closes the one
+        // unbounded phase left in bootstrap. The task keeps running — only the
+        // await is bounded — and a later success is still adopted.
+        await withLocalDbTimeout(initializeDatabase(), 'local database');
+        // F3 (adversarial review): retryBootstrap clears dbError at tap time,
+        // but the superseded run's late timeout rejection can re-set it before
+        // its cleanup flips `cancelled`. The success path must clear any stale
+        // error or the gate sticks on "Unable to start" while the database is
+        // actually open.
+        if (!cancelled) setDbError(null);
         // Web only: expose a boot-readiness marker so test harnesses (and
         // future boot-gated code) can observe that the schema is fully
         // migrated. The shell renders before initializeDatabase() completes,
@@ -137,11 +197,20 @@ export function AppProviders({ children }: PropsWithChildren) {
       } catch (e) {
         console.error('[db] initializeDatabase failed', e);
         if (!cancelled) {
+          // A stall is NOT evidence the browser is incapable, and it is not a
+          // network problem. Routing it through the generic failure copy would
+          // wrongly tell a capable browser it is unsupported; it must offer the
+          // same retry with a message that names the real cause. Storage-caused
+          // bootstrap failures (quota, blocked storage) get their own honest
+          // copy first (CORR-A-02).
           setDbError(
-            getDbBootstrapErrorMessage({
-              platformOs: Platform.OS,
-              hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
-            }),
+            isLocalDbPhaseTimeout(e)
+              ? getDbBootstrapTimeoutMessage({ platformOs: Platform.OS })
+              : (describeStorageBootstrapFailure(e) ??
+                  getDbBootstrapErrorMessage({
+                    platformOs: Platform.OS,
+                    hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
+                  })),
           );
         }
         return;
@@ -156,6 +225,10 @@ export function AppProviders({ children }: PropsWithChildren) {
         console.error('[sync] hydrate failed', e);
       });
       if (!cancelled) setSyncHydrated(true);
+      // F4 (adversarial review): an abandoned run (superseded by a retry) must
+      // not keep executing side-effectful pipeline stages — and must never
+      // claim a fresh account-task token the live run then sees as stale.
+      if (cancelled) return;
 
       // Promote pre-migration-20 device-local Pomodoro session notes and
       // associations into the durable `pomodoro_sessions` columns. Best-effort
@@ -168,6 +241,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       } catch (e) {
         console.error('[pomodoro] legacy session metadata promotion failed', e);
       }
+      if (cancelled) return;
 
       // Linked-action crash recovery: replay durable source events whose
       // dispatch never ran (crash between the source commit — which now
@@ -190,6 +264,7 @@ export function AppProviders({ children }: PropsWithChildren) {
         // remote wait so local use stays available. The settled result is
         // adopted only while its task is still the newest account task, so
         // a late settlement can never overwrite newer state.
+        if (cancelled) return;
         const taskId = beginAccountTask();
         const coordinatorTask = accountCoordinator.bootstrap();
         void awaitAccountTask(taskId, coordinatorTask, 'account bootstrap').then((state) => {
@@ -212,6 +287,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       }
 
       try {
+        if (cancelled) return;
         const taskId = beginAccountTask();
         const coordinatorTask = accountCoordinator.refresh();
         void awaitAccountTask(taskId, coordinatorTask, 'account refresh after sync hydrate').then(
@@ -251,6 +327,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       // second full preview would just repeat ~dozens of local scans and
       // remote meta requests for identical data).
       try {
+        if (cancelled) return;
         const maintenance = await runBackupMaintenance({ skipFlush: true });
         if (!cancelled && maintenance.capturedManifest) {
           const refreshedPreviewId = beginPreviewTask();
@@ -268,6 +345,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       // applied to AsyncStorage. Retry the staged application until it
       // succeeds; the marker is cleared only on success.
       try {
+        if (cancelled) return;
         await applyPendingThemeApplication();
       } catch (e) {
         console.error('[backup] pending theme application failed during bootstrap', e);
@@ -532,6 +610,7 @@ export function AppProviders({ children }: PropsWithChildren) {
                   {children}
                   <HabitReminderHost />
                   <WorkoutReminderHost />
+                  <StorageSafetyHost getDatabase={getDatabase} />
                   <RestorePrompt
                     preview={restorePreview}
                     visible={showRestorePrompt}
@@ -552,7 +631,10 @@ export function AppProviders({ children }: PropsWithChildren) {
 
 function BootstrapGate({
   dbError,
-  syncHydrated,
+  // Intentionally unused (name-prefixed per lint convention): kept in the
+  // gate's contract so the decision NOT to gate on local sync hydration stays
+  // explicit (see the comment below).
+  syncHydrated: _syncHydrated,
   authBootstrapReady,
   onRetryDbBootstrap,
   children,

@@ -106,6 +106,9 @@ describe('recurring series correction (features/todos/todos.data)', () => {
   describe('updateRecurringSeriesTemplate', () => {
     it('applies the template to every live instance and enqueues one intent per row', async () => {
       const db = {
+        withTransactionAsync: async (task: () => Promise<void>) => {
+          await task();
+        },
         getFirstAsync: vi.fn(),
         getAllAsync: vi.fn().mockImplementation(async (sql: string) =>
           /completed = 0/.test(sql)
@@ -149,6 +152,9 @@ describe('recurring series correction (features/todos/todos.data)', () => {
 
     it('never touches completed history and no-ops on an ended series', async () => {
       const db = {
+        withTransactionAsync: async (task: () => Promise<void>) => {
+          await task();
+        },
         getFirstAsync: vi.fn(),
         getAllAsync: vi.fn().mockResolvedValue([]),
         runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
@@ -171,6 +177,9 @@ describe('recurring series correction (features/todos/todos.data)', () => {
         member({ id: 'todo_deleted', deleted_at: '2026-04-14T10:00:00.000Z' }),
       ];
       const db = {
+        withTransactionAsync: async (task: () => Promise<void>) => {
+          await task();
+        },
         getFirstAsync: vi.fn(),
         getAllAsync: vi.fn(async (sql: string) =>
           /completed, deleted_at/.test(sql) ? members : [],
@@ -216,6 +225,9 @@ describe('recurring series correction (features/todos/todos.data)', () => {
 
     it('is a no-op for an unknown series', async () => {
       const db = {
+        withTransactionAsync: async (task: () => Promise<void>) => {
+          await task();
+        },
         getFirstAsync: vi.fn(),
         getAllAsync: vi.fn().mockResolvedValue([]),
         runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
@@ -233,6 +245,9 @@ describe('recurring series correction (features/todos/todos.data)', () => {
     it('starts a fresh series with a new recurrence id and a default due date', async () => {
       const current = member({ recurrence: null, recurrence_id: null, due_date: null });
       const db = {
+        withTransactionAsync: async (task: () => Promise<void>) => {
+          await task();
+        },
         getFirstAsync: vi.fn().mockResolvedValue({ ...current }),
         getAllAsync: vi.fn().mockResolvedValue([]),
         runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
@@ -257,6 +272,9 @@ describe('recurring series correction (features/todos/todos.data)', () => {
     it('never clears recurrence through updateTodo (stop is series-scoped)', async () => {
       const current = member({});
       const db = {
+        withTransactionAsync: async (task: () => Promise<void>) => {
+          await task();
+        },
         getFirstAsync: vi.fn().mockResolvedValue({ ...current }),
         getAllAsync: vi.fn().mockResolvedValue([]),
         runAsync: vi.fn().mockResolvedValue({ changes: 1 }),

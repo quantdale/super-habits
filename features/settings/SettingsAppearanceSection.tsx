@@ -41,7 +41,7 @@ function getAppearanceSummary(mode: ThemeMode, resolvedTheme: ResolvedTheme) {
 
   return {
     summary: `Using ${mode} mode across the app.`,
-    detail: `SuperHabits will stay in ${mode} mode until you change it here.`,
+    detail: `super-habits will stay in ${mode} mode until you change it here.`,
   };
 }
 
@@ -78,7 +78,7 @@ export function SettingsAppearanceSection({
               Theme mode
             </Text>
             <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-              Choose how SuperHabits should look on this device.
+              Choose how super-habits should look on this device.
             </Text>
           </View>
 

@@ -19,6 +19,13 @@ import type { SubmitGuard } from '@/lib/submitGuard';
  * Validation order is unchanged: `canSubmit` (non-empty trimmed title) is
  * checked before the guard, and the caller's persist path still validates
  * before it writes.
+ *
+ * Failure contract (CORR-A-02): a rejected write is NEVER swallowed into a
+ * silent no-op and NEVER escapes as an unhandled rejection. The typed input is
+ * preserved (`onPersisted` does not run), the guard is released so retry is
+ * possible, and the error is delivered to `onPersistFailed` so the caller can
+ * surface it. The function is total: it resolves with `'failed'` instead of
+ * throwing, so `void handleSubmit()` cannot produce an unhandled rejection.
  */
 export async function submitInlineQuickAdd(input: {
   /** Shared synchronous re-entry guard for this input instance. */
@@ -33,8 +40,11 @@ export async function submitInlineQuickAdd(input: {
   onSubmittingChange: (submitting: boolean) => void;
   /** Called after a successful write (clears the input). */
   onPersisted: () => void;
-}): Promise<'skipped' | 'persisted'> {
-  const { guard, canSubmit, title, persist, onSubmittingChange, onPersisted } = input;
+  /** Called with the rejection when the write fails (surfaces the failure). */
+  onPersistFailed?: (error: unknown) => void;
+}): Promise<'skipped' | 'persisted' | 'failed'> {
+  const { guard, canSubmit, title, persist, onSubmittingChange, onPersisted, onPersistFailed } =
+    input;
 
   // Empty input: no submit, no write, no loading presentation.
   if (!canSubmit) return 'skipped';
@@ -46,6 +56,11 @@ export async function submitInlineQuickAdd(input: {
     await persist(title);
     onPersisted();
     return 'persisted';
+  } catch (error) {
+    // The typed input is NOT cleared (onPersisted does not run) and the error
+    // is reported instead of discarded or left unhandled.
+    onPersistFailed?.(error);
+    return 'failed';
   } finally {
     // Release on every exit — success, validation error, or persistence
     // failure — so one failed attempt cannot lock the input.

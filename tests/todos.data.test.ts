@@ -131,6 +131,9 @@ describe('features/todos/todos.data', () => {
 
   it('dispatches linked actions only on non-recurring 0->1 completion', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValue({
         id: 'todo_1',
         title: 'Source todo',
@@ -168,6 +171,9 @@ describe('features/todos/todos.data', () => {
 
   it('does not dispatch on reopen (1->0)', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValue({
         id: 'todo_1',
         title: 'Source todo',
@@ -200,6 +206,9 @@ describe('features/todos/todos.data', () => {
 
   it('does not dispatch for recurring todos and still creates follow-up instance', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi
         .fn()
         .mockResolvedValueOnce({
@@ -232,6 +241,9 @@ describe('features/todos/todos.data', () => {
 
   it('skips a recurring instance when the same active series/day already exists', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn(),
       runAsync: vi.fn().mockResolvedValue({ changes: 0 }),
     };
@@ -254,6 +266,9 @@ describe('features/todos/todos.data', () => {
 
   it('inserts and enqueues one recurring instance when the series/day is missing', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn(),
       runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
     };
@@ -286,6 +301,9 @@ describe('features/todos/todos.data', () => {
 
   it('rejects saving non-empty source rules for recurring todos based on persisted row', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValue({
         id: 'todo_1',
         recurrence: 'daily',
@@ -316,6 +334,9 @@ describe('features/todos/todos.data', () => {
 
   it('allows saving todo.completed -> habit.increment rules for non-recurring todos', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValue({
         id: 'todo_1',
         recurrence: null,
@@ -367,6 +388,9 @@ describe('features/todos/todos.data', () => {
 
   it('cleans source and target linked rules when removing a todo', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValue({
         id: 'todo_1',
         recurrence: null,
@@ -404,6 +428,9 @@ describe('features/todos/todos.data', () => {
 
   it('returns safe no-op notice metadata when engine reports self-target skip', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValue({
         id: 'todo_1',
         title: 'Self target todo',
@@ -478,6 +505,9 @@ describe('features/todos/todos.data', () => {
 
   it('skips completeTodoFromLinkedAction when the target todo is missing or soft-deleted', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({
         id: 'todo_deleted',
         title: 'Deleted target',
@@ -504,6 +534,9 @@ describe('features/todos/todos.data', () => {
 
   it('marks the target todo complete without emitting a new todo.completed source event', async () => {
     const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockResolvedValue({
         id: 'todo_2',
         title: 'Target todo',
@@ -616,6 +649,9 @@ describe('bulk todo operations', () => {
 
   function makeDb() {
     return {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
       getFirstAsync: vi.fn().mockImplementation(async (sql: string) => {
         if (/COALESCE\(MAX\(sort_order\)/.test(sql)) return { maxOrder: 0 };
         if (/FROM todos/.test(sql)) return { ...TODO_DEFAULTS, id: 'todo_1' };

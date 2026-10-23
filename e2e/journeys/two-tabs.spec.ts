@@ -60,9 +60,17 @@ defineJourney({
         await expect(second.getByText('Unable to start', { exact: true })).toBeVisible({
           timeout: 60_000,
         });
-        // The actionable copy (exact web message from getDbBootstrapErrorMessage).
-        await expect(second.getByText(/could not start its local database/i)).toBeVisible();
-        await expect(second.getByText(/close other SuperHabits tabs/i)).toBeVisible();
+        // The actionable copy. With multi-tab ownership detection (CORR-A-03)
+        // a contended second tab is told UP FRONT that another tab owns the
+        // database (Web Locks ifAvailable probe), before any OPFS stall can
+        // occur. The pre-ownership failure copy remains the accepted fallback
+        // where navigator.locks is unavailable.
+        await expect(
+          second.getByText(/already open in another tab|could not start its local database/i),
+        ).toBeVisible();
+        await expect(
+          second.getByText(/close the other tab|close other super-habits tabs/i),
+        ).toBeVisible();
         await expect(second.getByText(/Your data is still safe on this device/i)).toBeVisible();
         // The app shell is gated away — nothing silently half-renders.
         await expect(second.getByRole('button', { name: 'Today', exact: true })).toHaveCount(0);

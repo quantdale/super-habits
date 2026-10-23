@@ -457,9 +457,15 @@ test.describe('W11.5 planning write-failure regressions', () => {
     await page.getByRole('button', { name: '+10' }).click();
     await page.getByRole('button', { name: 'Save Goal' }).click();
 
+    // Explicit bound sized to the meaning of this wait (WM2.4/CG-9): the
+    // renamed row appears only after transaction commit → onBack remount →
+    // Promise.all list reload → render — a load-sensitive real-I/O chain. The
+    // 5s default budget produced a recovered first-attempt failure on hosted
+    // runners (run 39814238152); classifying that as product flake would hide
+    // a test-budget defect. The assertions themselves are unchanged.
     await expect(
       page.getByRole('button', { name: /^Renamed goal, Active, 10 percent/ }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 20_000 });
     const after = await queryRows(
       page,
       `SELECT title, progress_percent FROM goals WHERE id = '${SEED.goal}'`,
