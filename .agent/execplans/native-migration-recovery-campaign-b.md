@@ -32,19 +32,44 @@ force pushes or claims beyond actual evidence.
 
 ## Current Checkpoint
 
-- Current milestone: reconnaissance complete; isolated component lanes launching.
+- Current milestone: all workers terminated; parent recovered and committed candidate
+  components after the user's resume instruction. Independent review remains blocked.
 - Completed: fetched origin, main ancestry verified, clean worktree preserved,
   PR #91 merge and open PRs #57/#80/#81/#92 verified; ruleset inspected.
-- In progress: five exclusive component lanes below; parent owns integration/report.
-- Important modified files: this plan only.
-- Last successful validation: Git remote/ancestry/worktree reconnaissance.
-- Current failures: None newly tested; historical advisory gate remains unverified.
+- In progress: parent alone owns stopped worktrees and integration checkout. No active
+  child writers. Candidate commits: B1 d878b92f; B1.2 0a459498; B2 bfaba93a;
+  B3 50e41af5; B4 01e7b39f. These are not independently accepted or merged.
+- Worker dispositions: migration/cloud/security hit provider usage limit; original
+  native worker crashed and its same-protocol revival231a51cc hit quota; transaction
+  worker timed out1800000ms. Workflow731bf16c completed with five failed children,
+  mission10e5a613; receipt retained under its async run directory.
+- Important modified files: this plan, Campaign A correction annotations,
+  tests/releaseReadiness.test.ts; five component commits contain tests, participating
+  writer FIFO, native resource admission and cloud read-only preflight.
+- Last successful validation: parent recovered SQLite migration38/38 and
+  concurrency/generation46/46, cloud preflight source guards6/6, readiness11/11.
+  Readiness NC2 now tests owner-marker helper directly; zero-audit policy test
+  stubs one audit response, retaining real CLI/audit tests and production gate.
+  Starting-main hosted CI39893146510 e2e success/quality audit-only failure.
+- Current failures: baseline qa:fast had 2543 passed / 1 skipped / 2 timing failures
+  (qaNativeProcess elapsed1255ms vs1000; releaseReadiness CLI >30sec), plus worker RPC
+  timeout. Focused reproduction had qaNativeProcess pass but two readiness tests exceed
+  5sec; logs /tmp/campaign-b-base-qa-fast.log and /tmp/campaign-b-base-timing-repro.log.
+  No assertions/timeouts weakened. Advisory recheck confirms exactly2 unresolved highs.
 - Relevant quarantines: None.
-- Blockers: hosted credentials and fresh native environment require investigation.
-- Condition required to unblock: lane evidence will identify exact external needs.
-- Exact resume action after unblock: run the affected lane's documented replay.
-- Exact next action: launch bounded isolated B1/B1.2/B2/B3/B4 workers with fresh
-  independent reviews after B1/B2 handoffs; inspect final diffs before integration.
+- Blockers: independent reviewers unavailable after provider quota; no fresh APK
+  due native resource limits; Vercel connected auth absent. Supabase management
+  metadata GET succeeded through cached CLI auth: all3 projects INACTIVE, including
+  kruubbynsmxzxfdunaal and disposable target. SQL/Auth certification remains blocked.
+  PostgreSQL17 tools absent; local SQL rehearsals could not start.
+- Condition required to unblock: authorized hosted read-only access; sufficient native
+  build disk/RAM beyond current3.48GB free (C/D share physical volume).
+- Exact resume action after unblock: B2's bounded replay on a fresh disposable target;
+  B3's authorized catalog preflight and disposable qualification commands.
+- Exact next action: cherry-pick preserved components to local candidate, run bounded
+  aggregate validation and active changed-path diagnostics, publish only a draft PR
+  with exact failures and explicit review/native/cloud blockers. Do not merge.
+  Independent review cannot be replaced by worker self-reports.
 - Remaining definition of done: conservative migration decision, transaction tests,
   native evidence or precise blocker, cloud/security reevaluation, independent review,
   validation ledger, safe publication/integration decision, final report and hygiene.
@@ -73,8 +98,10 @@ All paths are siblings beneath C:/Users/Michael Roy/Documents/.
 | B4     | sh-b4-security / campaign/b4-security                  | docs/reports/campaign-b-security.md, proposed governance config; safe dependency correction only after parent coordination    | audit/advisory recheck + review; committed handoff                | no deployment/protection mutation               |
 | Parent | super-habits / integration/native-migration-campaign-b | campaign plan, final report, historical correction annotations, integration                                                   | aggregate QA/PR/hosted verification                               | never edits active worker worktrees             |
 
-Workers may commit, not push/merge/deploy or spawn children. Read-only reviewers
-inspect actual lane diffs and logs; parent accepts or rejects findings.
+Workers may commit, not push/merge/deploy or spawn children. All workers are now
+terminal. Parent recovered their partial files in place and committed the candidates;
+no replacement model/CLI was silently launched. Read-only independent reviewers
+remain unavailable; parent adversarial tests are not represented as independence.
 
 ## Surprises & Discoveries
 
@@ -83,6 +110,12 @@ inspect actual lane diffs and logs; parent accepts or rejects findings.
 - Open security PRs are #57/#81/#92; #80 is a separate recovery successor.
 - Campaign A's broad all-zero repair recommendation is not authority to overwrite
   legitimate ordering: no repair without a discriminating cohort predicate.
+- Native provisioning created only disposable SH_Campaign_B_API36 (emulator5588,
+  launcher PID28496); disk exhaustion crashed its worker before any APK install.
+  Parent verified command identity, killed exact owned tree, removed only this new
+  unused AVD and recovered3.48GB. Existing emulator5554/user data untouched.
+- Blanket transactions in appMeta setters would deadlock web callbacks; approved
+  bounded scoped-capability FIFO design with audit of all existing callback usages.
 
 ## Decision Log
 
@@ -95,12 +128,25 @@ inspect actual lane diffs and logs; parent accepts or rejects findings.
 
 - Reconnaissance — `git fetch origin`, `git status --short`, ancestry check — PASS;
   clean original checkout; main 02d43088; PR #91 merged; ruleset disabled.
-- Remaining gates — NOT RUN at this checkpoint.
+- Baseline qa:fast — FAIL with timing/RPC errors recorded above, not a clean pass;
+  typecheck and lint passed before unit stage. Focused timing reproduction12 pass/2 fail.
+- `npm run agent:plan:validate:all` — PASS for all versioned plans.
+- `npm run web:hygiene` — PASS8081/8082 free.
+- Native worker failure — ENVIRONMENT, partial worktree clean; same-protocol resume
+  231a51cc limited to static/synthetic validation and disk-preflight/replay improvements.
+- Parent full baseline maxWorkers2 — FAIL3172passed/3skipped/2readiness timeouts,
+  plus RPC timeout; /tmp/campaign-b-base-tests-bounded.log.
+- Parent recovery — SQLite migration38pass; concurrency/generation46pass; cloud
+  source guards6pass; readiness11pass. Native first replay23pass/1CRLF assertion
+  failure corrected without weakening launch order; final replay remains next gate.
 
 ## Changed Files / Areas
 
 - `.agent/execplans/native-migration-recovery-campaign-b.md` — durable campaign state.
-- Component files will be recorded from committed handoffs and actual Git diffs.
+- `docs/reports/critical-integrity-cross-pr-acceptance-report.md` and Campaign A plan — historical corrections.
+- `tests/releaseReadiness.test.ts` — isolate two policy checks from network latency without changing production checks.
+- B1/B1.2/B2/B3/B4 candidate commits above — exact file inventory from Git.
+- `docs/reports/native-migration-recovery-campaign-b-report.md` — final report to create.
 
 ## Recovery / Resume Instructions
 
