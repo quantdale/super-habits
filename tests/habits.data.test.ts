@@ -737,9 +737,20 @@ describe('features/habits/habits.data — notification completion lifecycle guar
         linkedActions: { matchedRuleCount: 0, notices: [] },
       });
 
+      const calls = notificationActions.setNotificationActionLinkedRequiredInTransaction.mock.calls;
+      expect(calls).toHaveLength(1);
+      const [transactionHandle, actionKey, required] = calls[0];
+      // The helper must receive the SAME scoped transaction as the claim, not
+      // the base connection. Compare identity without traversing an expired
+      // capability after commit (database operations are deliberately revoked).
+      // Vitest probes `.then` even for identity matchers; keep that probe away
+      // from the revoked handle by passing the identity result, not the proxy.
+      expect(transactionHandle === db).toBe(false);
       expect(
-        notificationActions.setNotificationActionLinkedRequiredInTransaction,
-      ).toHaveBeenCalledWith(db, 'action_key_1', false);
+        transactionHandle ===
+          notificationActions.claimNotificationActionInTransaction.mock.calls[0][0],
+      ).toBe(true);
+      expect([actionKey, required]).toEqual(['action_key_1', false]);
       expect(
         db.getFirstAsync.mock.calls.some(([sql]) => sql.includes('INSERT INTO habit_completions')),
       ).toBe(false);

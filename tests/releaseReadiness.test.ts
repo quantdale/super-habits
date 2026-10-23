@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import {
   mkdtempSync,
@@ -15,11 +15,19 @@ import { fileURLToPath } from 'node:url';
 import {
   UNOBSERVABLE_INPUTS,
   checkNativeSigning,
+  checkOwnerActions,
   checkProductionHold,
   checkSubmitCredentials,
   computeVerdict,
   evaluateReleaseReadiness,
 } from '../scripts/release-readiness.mjs';
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  // Real CLI tests retain the real subprocess. Policy-only tests can isolate a
+  // single network audit response without changing the production audit gate.
+  return { ...actual, execFileSync: vi.fn(actual.execFileSync) };
+});
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const scriptPath = resolve(repoRoot, 'scripts', 'release-readiness.mjs');
@@ -241,8 +249,8 @@ describe('release-readiness verdict', () => {
     copyFileSync(target, backup);
     try {
       writeFileSync(target, `${original}\n- \`[OWNER ACTION]\` file the Play data-safety form\n`);
-      const result = evaluateReleaseReadiness();
-      const markerBlocker = result.blockers.find((b) => b.id === 'OWNER-ACTION-MARKERS');
+      // The marker contract has no dependency on registry/network latency.
+      const markerBlocker = checkOwnerActions().find((b) => b.id === 'OWNER-ACTION-MARKERS');
       expect(markerBlocker).toBeDefined();
       expect(markerBlocker!.detail).toMatch(/known-gaps/);
     } finally {
@@ -260,7 +268,16 @@ describe('release-readiness verdict', () => {
     expect(computeVerdict(0)).toBe('REPO_CHECKS_CLEAR');
     expect(computeVerdict(0)).not.toMatch(/READY|RELEASE/i);
     expect(computeVerdict(3)).toBe('BLOCKED');
+    // Even a successful external audit cannot authorize production. Isolate
+    // this policy assertion from npm registry latency; real CLI/audit tests
+    // above still execute the unchanged gate and assert its blocked result.
+    vi.mocked(execFileSync).mockImplementationOnce(() => '');
     const result = evaluateReleaseReadiness();
+    expect(execFileSync).toHaveBeenLastCalledWith(
+      process.execPath,
+      [resolve(repoRoot, 'scripts', 'audit-runtime-deps.mjs')],
+      expect.any(Object),
+    );
     expect(result.releaseAuthorized).toBe(false);
     expect(result.verdict).not.toMatch(/RELEASE_READY/i);
   });

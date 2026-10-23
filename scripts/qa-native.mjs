@@ -42,6 +42,7 @@ import {
 } from './native-flow-coverage.mjs';
 import { baseReplayCommand, replayForAvd } from './qa-native-replay.mjs';
 import { checkIosSimulatorReadiness, runNativeCommand } from './qa-native-process.mjs';
+import { checkNativeResources, requireNativeResources } from './native-resource-preflight.mjs';
 import {
   assertMockProof,
   interpretDeviceProbe,
@@ -1102,6 +1103,7 @@ function resolveAvdTarget(adb, emulator, avdName, bootTimeoutMs) {
     console.log(`Reusing connected '${avdName}' on ${reuse} (not owned; it will not be stopped).`);
     return { serial: reuse, owned: false, pid: null };
   }
+  requireNativeResources(ROOT, { avdName });
   bootOwnedEmulator(emulator, avdName);
   const deadline = Date.now() + bootTimeoutMs;
   const serial = waitForNewSerial(adb, devices.stdout, deadline);
@@ -1312,6 +1314,15 @@ function runMultiAvdTarget(adb, emulator, avdName, options, sessionCtl, records,
 }
 
 function runMultiAvd(options) {
+  const resources = checkNativeResources(ROOT);
+  if (!resources.ok) {
+    return blocked('android', options.tag, options.replayCommand, resources.issues.join(' '), {
+      resourcePreflight: resources,
+      flow: options.flow ?? '.maestro',
+      remediation:
+        'Provide at least 16 GiB free disk per workspace/cache/AVD filesystem and 4 GiB free RAM before starting an emulator. Do not delete existing device data to make room.',
+    }).exitCode;
+  }
   const emulator = findEmulator();
   if (!emulator) {
     console.error('Android emulator CLI is not installed or not on PATH.');

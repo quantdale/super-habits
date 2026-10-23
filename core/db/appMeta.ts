@@ -1,4 +1,6 @@
 import type * as SQLite from 'expo-sqlite';
+import { withSQLiteWriter } from '@/core/db/sqliteWriter';
+import { rethrowDurableWriteError } from '@/core/storage/storageSafety';
 
 export type AppMetaOwner =
   'system' | 'auth' | 'calories' | 'pomodoro' | 'sync' | 'workout' | 'notifications';
@@ -160,10 +162,16 @@ export async function setAppMetaText(
   metaKey: AppMetaTextKey | AppMetaJsonKey,
   value: string,
 ): Promise<void> {
-  await db.runAsync('INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)', [
-    metaKey.key,
-    value,
-  ]);
+  try {
+    await withSQLiteWriter(db, () =>
+      db.runAsync('INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)', [
+        metaKey.key,
+        value,
+      ]),
+    );
+  } catch (error) {
+    rethrowDurableWriteError(error, 'metadata write');
+  }
 }
 
 export async function getAppMetaJson<T>(
@@ -203,5 +211,11 @@ export async function deleteAppMetaKey(
   db: SQLite.SQLiteDatabase,
   metaKey: AppMetaTextKey | AppMetaJsonKey,
 ): Promise<void> {
-  await db.runAsync('DELETE FROM app_meta WHERE key = ?', [metaKey.key]);
+  try {
+    await withSQLiteWriter(db, () =>
+      db.runAsync('DELETE FROM app_meta WHERE key = ?', [metaKey.key]),
+    );
+  } catch (error) {
+    rethrowDurableWriteError(error, 'metadata write');
+  }
 }

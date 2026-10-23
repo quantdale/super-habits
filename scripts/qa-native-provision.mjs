@@ -23,6 +23,7 @@ import {
   remoteEnvRefusal,
 } from './hermetic-build.mjs';
 import { assertApkHasNoHost } from './native-apk-scan.mjs';
+import { requireNativeResources } from './native-resource-preflight.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const APP_ID = 'com.dale16.superhabits';
@@ -294,6 +295,7 @@ function installOnlyMain(args) {
 }
 
 function main(args) {
+  requireNativeResources(ROOT, { build: true });
   const adb = findCommand('adb');
   if (!adb) throw new Error('Android adb is not installed or not discoverable on PATH.');
 
@@ -301,7 +303,7 @@ function main(args) {
   const sourceProvenance = requireCleanGitTree(ROOT);
   console.log(`Preparing clean source ${sourceProvenance.sourceSha} for ${serial}...`);
 
-  const prebuildCommand = 'npx expo prebuild --platform android --clean';
+  const prebuildCommand = 'npx expo prebuild --platform android --clean --no-install';
   // Hermetic by construction (harden-native-evidence-and-release-posture
   // task 1.2): `EXPO_NO_DOTENV=1` blocks `.env`/`.env.local`, every ambient
   // `EXPO_PUBLIC_*` is stripped, and a Supabase variable in the ambient
@@ -330,10 +332,14 @@ function main(args) {
   const buildEnv = hermeticEnv;
   const npx = findCommand('npx');
   if (!npx) throw new Error('npx is not installed or not discoverable on PATH.');
-  const prebuild = run(npx, ['expo', 'prebuild', '--platform', 'android', '--clean'], {
-    env: buildEnv,
-    stdio: 'inherit',
-  });
+  const prebuild = run(
+    npx,
+    ['expo', 'prebuild', '--platform', 'android', '--clean', '--no-install'],
+    {
+      env: buildEnv,
+      stdio: 'inherit',
+    },
+  );
   requireSuccess(prebuild, 'Expo Android prebuild', prebuildCommand);
   if (mockMode) {
     // TEST-ONLY: allow cleartext HTTP to the device-loopback mock in the
@@ -476,6 +482,6 @@ try {
   main(args);
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
-  writeFailure(args, message);
+  writeFailure(args, message, { resourcePreflight: error?.resourcePreflight ?? null });
   process.exit(2);
 }

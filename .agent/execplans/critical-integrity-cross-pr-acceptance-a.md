@@ -3,6 +3,13 @@
 Plan-Version: 2
 Status: COMPLETED
 
+> Historical evidence correction (Campaign B, 2026-10-23): main subsequently
+> advanced to `02d43088e10170d03f9db44c887227a9705f8dff`. The zero historical
+> production-deployment assertions below are incorrect: Vercel has historical
+> production deployments. GitHub's Deployments API is not a complete Vercel
+> deployment ledger. Preserve the original statements as historical evidence,
+> not current truth; see `.agent/execplans/native-migration-recovery-campaign-b.md`.
+
 ## Purpose / User Outcome
 
 Turn six separately validated workstreams (PRs #85–#90) into one coherent,

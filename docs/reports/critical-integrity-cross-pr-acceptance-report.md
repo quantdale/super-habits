@@ -1,5 +1,16 @@
 # Critical Integrity, Cross-PR Acceptance & Controlled Main Integration — Correction Campaign A
 
+> Campaign B correction (2026-10-23): this report is historical evidence.
+> The later report-only commit advanced remote main to
+> `02d43088e10170d03f9db44c887227a9705f8dff`, not the `d682abaf` listed in
+> section P. The zero historical production-deployment statement in section P
+> was incorrect: historical Vercel production deployments exist. An empty
+> GitHub Deployments response cannot establish Vercel deployment history.
+> No new production deployment was reported for Campaign A's integration;
+> live provider verification remains a separate requirement. Section Q's
+> all-zero ordering repair suggestion is not a safe cohort predicate by itself
+> and must not overwrite legitimate ordering. See Campaign B's report and plan.
+
 Campaign ExecPlan: `.agent/execplans/critical-integrity-cross-pr-acceptance-a.md`
 Base: `origin/main` = `0259c2a72bb71ba3f9459cd071b791feb2a4ff35`
 Candidate: `integration/full-spectrum-correction-a` → PR #91
