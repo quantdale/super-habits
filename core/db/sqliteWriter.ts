@@ -51,6 +51,7 @@ export async function withSQLiteTransactionScope<T>(
       if (
         property === 'withTransactionAsync' ||
         property === 'withExclusiveTransactionAsync' ||
+        property === 'withTransactionSync' ||
         property === 'closeAsync' ||
         property === 'closeSync'
       ) {

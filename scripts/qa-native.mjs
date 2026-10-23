@@ -1103,7 +1103,7 @@ function resolveAvdTarget(adb, emulator, avdName, bootTimeoutMs) {
     console.log(`Reusing connected '${avdName}' on ${reuse} (not owned; it will not be stopped).`);
     return { serial: reuse, owned: false, pid: null };
   }
-  requireNativeResources(ROOT);
+  requireNativeResources(ROOT, { avdName });
   bootOwnedEmulator(emulator, avdName);
   const deadline = Date.now() + bootTimeoutMs;
   const serial = waitForNewSerial(adb, devices.stdout, deadline);

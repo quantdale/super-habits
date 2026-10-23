@@ -204,15 +204,23 @@ describe.each(['web', 'ios'] as const)(
     it('fails nested/lifecycle calls immediately and expires retained capabilities and methods', async () => {
       let retained!: SQLite.SQLiteDatabase;
       let retainedWrite!: SQLite.SQLiteDatabase['runAsync'];
+      let syncLifecycleCalls = 0;
+      root.withTransactionSync = () => {
+        syncLifecycleCalls += 1;
+        throw new Error('Adapter synchronous lifecycle must never execute');
+      };
       await withSQLiteTransaction(root, async (tx) => {
         retained = tx;
         retainedWrite = tx.runAsync;
         await expect(withSQLiteTransaction(tx, async () => undefined)).rejects.toThrow(
           'Nested SQLite',
         );
-        expect(() => tx.withTransactionAsync(async () => undefined)).toThrow('lifecycle');
-        expect(() => tx.closeAsync()).toThrow('lifecycle');
         await setAppMetaText(tx, appMetaKeys.backupDirty, '1');
+        expect(() => tx.withTransactionAsync(async () => undefined)).toThrow('lifecycle');
+        expect(() => tx.withTransactionSync(() => undefined)).toThrow('lifecycle');
+        expect(syncLifecycleCalls).toBe(0);
+        expect(() => tx.closeAsync()).toThrow('lifecycle');
+        expect(await getAppMetaText(tx, appMetaKeys.backupDirty)).toBe('1');
       });
       await expect(setAppMetaText(retained, appMetaKeys.backupDirty, 'late')).rejects.toThrow(
         'expired',
