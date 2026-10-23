@@ -2,7 +2,11 @@ import { Platform } from 'react-native';
 import type * as SQLite from 'expo-sqlite';
 import { rethrowDurableWriteError } from '@/core/storage/storageSafety';
 
-const transactionTails = new WeakMap<object, Promise<void>>();
+import {
+  assertSQLiteTransactionRoot,
+  withSQLiteTransactionScope,
+  withSQLiteWriter,
+} from '@/core/db/sqliteWriter';
 
 /**
  * Raised when an adapter cannot run real transactions. Fail-closed on purpose:
@@ -30,7 +34,11 @@ export class SQLiteTransactionUnavailableError extends Error {
  * read/modify/write boundaries because ordinary async queries can interleave
  * with another writer. Web SQLite does not expose that API, so the regular
  * transaction is the portable fallback used by the web build and the real
- * SQLite integration harness.
+ * SQLite integration harness. The callback receives a scoped, method-bound
+ * capability: pass it to dependent helpers and await their work. Do not use a
+ * captured base handle inside the callback (queued metadata would wait on its
+ * own transaction), retain the capability after return, or start nested
+ * transactions. Standalone app_meta writes share this FIFO; raw SQL does not.
  *
  * CORR-A-04: the old `return task(db)` fallback for adapters without
  * `withTransactionAsync` was reachable only by unit-test doubles, but it was a
@@ -43,38 +51,25 @@ export async function withSQLiteTransaction<T>(
   db: SQLite.SQLiteDatabase,
   task: (transactionDb: SQLite.SQLiteDatabase) => Promise<T>,
 ): Promise<T> {
+  assertSQLiteTransactionRoot(db);
   if (typeof db.withTransactionAsync !== 'function') {
     throw new SQLiteTransactionUnavailableError();
   }
 
-  // SAFETY: `db` is typed as the class but keyed here purely by object
-  // identity for the per-connection serialization tail; the WeakMap<object>
-  // imposes no structural requirement, so erasing to `object` is sound.
-  const key = db as unknown as object;
-  const previous = transactionTails.get(key) ?? Promise.resolve();
-  let result!: T;
-  const current = previous.then(async () => {
-    if (Platform.OS !== 'web' && typeof db.withExclusiveTransactionAsync === 'function') {
-      await db.withExclusiveTransactionAsync(async (transactionDb) => {
-        result = await task(transactionDb);
-      });
-      return;
-    }
-
-    await db.withTransactionAsync(async () => {
-      result = await task(db);
-    });
-  });
-  transactionTails.set(
-    key,
-    current.then(
-      () => undefined,
-      () => undefined,
-    ),
-  );
   try {
-    await current;
-    return result;
+    return await withSQLiteWriter(db, async () => {
+      let result!: T;
+      if (Platform.OS !== 'web' && typeof db.withExclusiveTransactionAsync === 'function') {
+        await db.withExclusiveTransactionAsync(async (transactionDb) => {
+          result = await withSQLiteTransactionScope(transactionDb, task);
+        });
+      } else {
+        await db.withTransactionAsync(async () => {
+          result = await withSQLiteTransactionScope(db, task);
+        });
+      }
+      return result;
+    });
   } catch (error) {
     // Central durable-write failure classification (CORR-A-02): EVERY
     // transactional write (data-layer mutations, backup capture, portable
