@@ -1,7 +1,9 @@
 # Campaign B — participating SQLite writer serialization candidate
 
 Base `02d43088`; parent recovered this work after worker timeout. This is an
-**unreviewed candidate**, not accepted main source or native qualification.
+**reviewed source candidate**, not integrated main source or native qualification.
+Reviewer A accepted the data seam and the0d8475af synchronous-lifecycle correction;
+see the final campaign report for review receipts and final validation.
 
 ## Changed contract
 
@@ -20,7 +22,8 @@ FIFO automatically. The migration runner uses direct adapter transactions before
 DB bootstrap is published, not this callback capability. Existing call sites must
 pass the callback handle to dependent helpers and await work before returning;
 a captured root handle inside a queued transaction can deadlock. Independent
-call-site review remains a merge prerequisite.
+call-site review has completed without a current captured-root defect; the
+participating-writer scope and external native qualification limits remain.
 
 ## Evidence
 
