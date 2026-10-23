@@ -40,10 +40,20 @@ describe('classifyStorageError', () => {
     expect(isStorageFailure(quotaError())).toBe(true);
   });
 
-  it('classifies legacy quota code 22 and full-disk messages', () => {
-    expect(classifyStorageError(domError('Error', 22))).toBe('quota');
+  it('classifies legacy quota code 22 only on DOMException shapes, plus full-disk messages', () => {
+    // Legacy DOMException shape: numeric code 22 with the DOM name.
+    expect(classifyStorageError(domError('DOMException', 22))).toBe('quota');
+    // SQLite's primary code 22 is SQLITE_NOLFS — unrelated to quota. A
+    // non-DOMException carrying code 22 must NOT become a storage emergency
+    // (final review P2: the old check misclassified it).
+    expect(classifyStorageError(domError('SQLiteError', 22))).toBe('unknown');
+    // Legacy Firefox quota rejection shape.
+    expect(classifyStorageError(domError('NS_ERROR_DOM_QUOTA_REACHED'))).toBe('quota');
+    // Full-disk phrasing is quota; bare 'quota' wording (e.g. a REMOTE AI
+    // request-quota error) is deliberately NOT.
     expect(classifyStorageError(new Error('database or disk is full'))).toBe('quota');
     expect(classifyStorageError(new Error('SQLITE_FULL: disk I/O error'))).toBe('quota');
+    expect(classifyStorageError(new Error('AI request quota exhausted'))).toBe('unknown');
   });
 
   it('classifies blocked storage access (mandatory scenario 7 shape)', () => {

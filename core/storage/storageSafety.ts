@@ -32,11 +32,15 @@
 export type StorageFailureKind = 'quota' | 'storage-access' | 'unavailable' | 'unknown';
 
 const QUOTA_NAME = 'QuotaExceededError';
+const LEGACY_QUOTA_NAME = 'NS_ERROR_DOM_QUOTA_REACHED';
 const QUOTA_CODE = 22; // legacy DOMException.QUOTA_EXCEEDED_ERR
 const STORAGE_ACCESS_NAMES = new Set(['SecurityError', 'NotAllowedError']);
 const UNAVAILABLE_NAMES = new Set(['NotSupportedError', 'InvalidStateError']);
+// Full-disk phrasing only — a bare /quota/ would misclassify REMOTE quota
+// events (this app has an AI request quota) as storage emergencies (final
+// review P2).
 const QUOTA_MESSAGE =
-  /quota|disk is full|database or disk is full|sqlite_full|no space|storage is full/i;
+  /quota has been exceeded|quota exceeded|quota_exceeded|disk is full|database or disk is full|sqlite_full|no space left|storage is full|persistent storage maximum size reached/i;
 
 function errorName(error: unknown): string {
   if (typeof error === 'object' && error !== null && 'name' in error) {
@@ -73,9 +77,11 @@ function errorCode(error: unknown): number | null {
  */
 export function classifyStorageError(error: unknown): StorageFailureKind {
   const name = errorName(error);
-  if (name === QUOTA_NAME) return 'quota';
+  if (name === QUOTA_NAME || name === LEGACY_QUOTA_NAME) return 'quota';
+  // Legacy numeric code counts only on a DOMException-shaped error: SQLite's
+  // primary code 22 is SQLITE_NOLFS, unrelated to quota (final review P2).
   const code = errorCode(error);
-  if (code === QUOTA_CODE) return 'quota';
+  if (code === QUOTA_CODE && (name === 'DOMException' || name === '')) return 'quota';
   if (STORAGE_ACCESS_NAMES.has(name)) return 'storage-access';
   if (UNAVAILABLE_NAMES.has(name)) return 'unavailable';
   const message = errorMessage(error);

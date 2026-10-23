@@ -36,7 +36,8 @@
  * USAGE
  *   node scripts/release-readiness.mjs           # human verdict
  *   node scripts/release-readiness.mjs --json    # machine-readable
- * Exit codes: 0 = READY (all blockers cleared), 1 = BLOCKED, 2 = script error.
+ * Exit codes: 0 = REPO_CHECKS_CLEAR (repository-observable checks pass; this
+ * is NOT release authorization), 1 = BLOCKED, 2 = script error.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -426,7 +427,7 @@ function main(argv) {
         'the external certifications above plus explicit owner authorization.',
     );
   }
-  return result.verdict === 'READY' ? 0 : 1;
+  return result.verdict === 'REPO_CHECKS_CLEAR' ? 0 : 1;
 }
 
 const invokedDirectly =

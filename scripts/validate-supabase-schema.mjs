@@ -1187,20 +1187,27 @@ for (const policy of [
   'backup_generation_publication_select_owner',
 ]) {
   req(`generation policy ${policy}`, generationSource, policy);
-  // The policy NAME existing is not owner scoping: the predicate must actually
-  // constrain the row to the caller's uid (a renamed predicate like
-  // `USING (user_id IS NOT NULL)` passes a name-only check while opening the
-  // table to every authenticated user).
+  // The policy NAME existing is not owner scoping: the PREDICATE must be the
+  // strict owner equality. Presence-checking `auth.uid()`/`user_id` is not
+  // enough (final review P1): `((user_id = (select auth.uid())) OR true)` and
+  // `USING (true /* auth.uid() user_id */)` both satisfy a presence check while
+  // opening the table. The predicate is therefore ALLOW-LISTED by shape, and
+  // disjunctions/comments in it are rejected outright.
   {
     const policyBlockMatch = generationSource.match(
       new RegExp(`CREATE POLICY ${policy}\\b[\\s\\S]*?;`),
     );
     const policyBlock = policyBlockMatch ? policyBlockMatch[0] : '';
-    if (!/auth\.uid\(\)/.test(policyBlock) || !/user_id/.test(policyBlock)) {
+    const predicate = policyBlock.slice(Math.max(0, policyBlock.search(/\bUSING\b/i)));
+    const strictOwnerEquality =
+      /(?:USING|WITH CHECK)\s*\(\s*\(?\s*(?:select\s+)?auth\.uid\(\)\s*\)?\s*=\s*user_id|USING\s*\(\s*user_id\s*=\s*\(?\s*(?:select\s+)?auth\.uid\(\)/i;
+    const bypassShape = /\bOR\b|\/\*|USING\s*\(\s*true/i;
+    if (!strictOwnerEquality.test(policyBlock) || bypassShape.test(predicate)) {
       failures.push(
-        `generation policy ${policy} must constrain rows to the caller's uid (auth.uid() vs user_id); found predicate: ${
-          policyBlock ? policyBlock.replace(/\s+/g, ' ').slice(0, 160) : '<missing>'
-        }`,
+        `generation policy ${policy} must constrain rows to the caller's uid with a strict ` +
+          `user_id = auth.uid() predicate (no disjunctions, comments, or blanket true); found: ${
+            policyBlock ? policyBlock.replace(/\s+/g, ' ').slice(0, 160) : '<missing>'
+          }`,
       );
     }
   }
@@ -1251,19 +1258,38 @@ for (const table of [
     generationSource,
     `GRANT SELECT ON TABLE public.${table} TO authenticated`,
   );
-  // Any WRITE-shaped grant to any client role is a violation — not only the
-  // exact `INSERT, UPDATE` phrasing (single-statement, reordered, or
-  // `ALL`-shaped grants must all be caught).
+  // Any WRITE-shaped grant to any client role is a violation — in ANY
+  // migration (final review P1: the chain is stateful, so a re-opening grant
+  // in a later/renamed file must not hide outside the filename filter), with
+  // or without the `public.` qualifier.
   {
     const writeGrant = new RegExp(
-      `GRANT\\s+(?:ALL[^;]*|[^;]*\\b(?:INSERT|UPDATE|DELETE|TRUNCATE)\\b[^;]*)ON TABLE public\\.${table}[^;]*TO\\s+(?:authenticated|anon|PUBLIC)`,
+      `GRANT\\s+(?:ALL[^;]*|[^;]*\\b(?:INSERT|UPDATE|DELETE|TRUNCATE)\\b[^;]*)ON (?:TABLE\\s+)?(?:public\\.)?${table}\\b[^;]*TO\\s+(?:authenticated|anon|PUBLIC)`,
       'i',
     );
-    if (writeGrant.test(generationSource)) {
+    if (writeGrant.test(allMigrationsSource)) {
       failures.push(
-        `generation must not grant client writes to ${table} (write-shaped GRANT found)`,
+        `generation must not grant client writes to ${table} (write-shaped GRANT found in the chain)`,
       );
     }
+  }
+}
+// Schema-wide grant shapes re-open every table at once (TRUNCATE included) and
+// are never legitimate for client roles in this schema.
+{
+  const schemaWideWrite =
+    /GRANT[^;]*\b(?:INSERT|UPDATE|DELETE|TRUNCATE|ALL)\b[^;]*ON ALL TABLES IN SCHEMA[^;]*TO\s+(?:authenticated|anon|PUBLIC)/i;
+  const defaultPrivilegeGrant =
+    /ALTER DEFAULT PRIVILEGES[^;]*GRANT[^;]*ON TABLES[^;]*TO\s+(?:authenticated|anon|PUBLIC)/i;
+  if (schemaWideWrite.test(allMigrationsSource)) {
+    failures.push(
+      'generation must not grant client writes via ON ALL TABLES IN SCHEMA (write-shaped schema-wide grant found)',
+    );
+  }
+  if (defaultPrivilegeGrant.test(allMigrationsSource)) {
+    failures.push(
+      'generation must not grant client writes via ALTER DEFAULT PRIVILEGES (default-privilege grant found)',
+    );
   }
 }
 
@@ -1309,9 +1335,13 @@ for (const block of publicationFunctionBlocks) {
   if (!/SECURITY DEFINER/i.test(block)) continue;
   const nameMatch = block.match(/CREATE (OR REPLACE )?FUNCTION\s+(?:public\.)?([a-z0-9_]+)/i);
   const fnName = nameMatch ? nameMatch[1] : '<unnamed>';
-  const pinnedInBlock = /SET search_path\s*=/i.test(block);
+  // Comment-stripped (final review P1: a commented-out pin must not count),
+  // and the ALTER fallback is LINE-bound to this function's name (a sibling's
+  // pin on a later line must not vouch for this one).
+  const blockWithoutComments = block.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const pinnedInBlock = /SET search_path\s*=/i.test(blockWithoutComments);
   const pinnedByAlter = new RegExp(
-    `ALTER FUNCTION[\\s\\S]{0,160}${fnName}[\\s\\S]{0,160}SET search_path`,
+    `ALTER FUNCTION[^\\n;]*${fnName}[^\\n;]*SET search_path`,
     'i',
   ).test(publicationSource);
   if (!pinnedInBlock && !pinnedByAlter) {

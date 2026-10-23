@@ -93,6 +93,17 @@ export function AppProviders({ children }: PropsWithChildren) {
    * would report ourselves as a competing tab.
    */
   const dbOwnershipRef = useRef<DbOwnership | null>(null);
+  // Release the writer-role claim only on true unmount (final review P2:
+  // a route-level ErrorBoundary remount would otherwise probe against this
+  // instance's still-held lock and report the user's own tab as a competitor).
+  // Bootstrap retries deliberately REUSE the claim — see dbOwnershipRef.
+  useEffect(
+    () => () => {
+      dbOwnershipRef.current?.release();
+      dbOwnershipRef.current = null;
+    },
+    [],
+  );
   const beginAccountTask = useCallback(() => ++accountTaskSeqRef.current, []);
   const applyAccountStateIfCurrent = useCallback((taskId: number, state: AccountState) => {
     if (taskId === accountTaskSeqRef.current) setAccountState(state);

@@ -302,6 +302,76 @@ describe('backup generation protocol schema guard (hermetic mutation suite)', ()
     }
   });
 
+  // ---- Final-review P1 regressions: predicate/guard evasion shapes -------
+  it('FAILS on a disjunctive owner predicate (… OR true)', () => {
+    const { root, script } = makeFixture();
+    try {
+      mutateFile(root, '_add_backup_generation_protocol', (source) =>
+        source.replace('(select auth.uid()) = user_id', '(user_id = (select auth.uid())) OR true'),
+      );
+      const result = runValidator(script);
+      expect(result.ok).toBe(false);
+      expect(result.output).toMatch(/strict/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('FAILS on a comment-smuggled blanket predicate', () => {
+    const { root, script } = makeFixture();
+    try {
+      mutateFile(root, '_add_backup_generation_protocol', (source) =>
+        source.replace('(select auth.uid()) = user_id', 'true /* auth.uid() user_id */'),
+      );
+      const result = runValidator(script);
+      expect(result.ok).toBe(false);
+      expect(result.output).toMatch(/strict|blanket/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('FAILS on an UNQUALIFIED write grant to a read-only table', () => {
+    const { root, script } = makeFixture();
+    try {
+      appendToProvenance(root, 'GRANT INSERT ON backup_generation_head TO authenticated;');
+      const result = runValidator(script);
+      expect(result.ok).toBe(false);
+      expect(result.output).toMatch(/must not grant client writes to backup_generation_head/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('FAILS on a schema-wide write grant (ON ALL TABLES IN SCHEMA)', () => {
+    const { root, script } = makeFixture();
+    try {
+      appendToProvenance(root, 'GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;');
+      const result = runValidator(script);
+      expect(result.ok).toBe(false);
+      expect(result.output).toMatch(/ON ALL TABLES IN SCHEMA/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('FAILS when the only remaining search_path pin is a comment', () => {
+    const { root, script } = makeFixture();
+    try {
+      mutateFile(root, '_enforce_backup_publication_provenance', (source) =>
+        source
+          .replace(/(SECURITY DEFINER)\s*\r?\n\s*SET search_path = pg_catalog/, '$1')
+          .replace(/(SECURITY DEFINER)\s*\r?\n\s*SET search_path = pg_catalog/, '$1')
+          .replace(/SECURITY DEFINER/g, 'SECURITY DEFINER\n-- SET search_path = pg_catalog'),
+      );
+      const result = runValidator(script);
+      expect(result.ok).toBe(false);
+      expect(result.output).toMatch(/must pin search_path/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   // ---- Honesty ------------------------------------------------------------
   it('states it is static validation only and never claims hosted certification', () => {
     const { root, script } = makeFixture();
