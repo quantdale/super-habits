@@ -1,7 +1,7 @@
 # ExecPlan: Correction Campaign A — Critical Integrity, Cross-PR Convergence, Adversarial Certification & Controlled Main Integration
 
 Plan-Version: 2
-Status: ACTIVE
+Status: COMPLETED
 
 ## Purpose / User Outcome
 
@@ -65,60 +65,48 @@ preflight condition is satisfied. Production release is NOT authorized.
 
 ## Current Checkpoint
 
-- Current milestone: Phase C partial (six PRs merged into integration branch,
-  lockfile semantics verified) → Phase A implementation in progress.
-- Completed: recon; PR #85 visual failure ROOT-CAUSED (both failures are the
-  single intended branding string `SuperHabits`→`super-habits` in the Settings
-  Theme-mode helper line; diff masks prove pixel changes confined to that line;
-  evidence under .agent/evidence/campaign-a/run-39814238152/); all six PRs
-  merged `--no-ff` into `integration/full-spectrum-correction-a` with zero
-  textual conflicts; lockfile inventory proven identical to PR #86's validated
-  lock (0 version diffs vs f632b00b; exactly the 2 intended brace-expansion
-  bumps vs main; 131 platform packages intact); advisory gate still honest
-  (braces + node-forge only).
-- In progress: Phase A implementation — core/storage/storageSafety.ts
-  (classification/estimate/persist), core/storage/dbOwnership.ts (Web Locks
-  single-writer), core/storage/storageSentinel.ts (reset detection),
-  transactions fail-closed, runBackupMutation error classification,
-  quick-add failure notice, AppProviders wiring.
-- Important modified files: this plan; merged PR content (86: core/db/client.ts
-  migration-6 transaction + scripts/audit-runtime-deps.mjs; 87:
-  core/providers/localDbPhase.ts; 88: scripts/validate-supabase-schema.mjs;
-  89: docs/release/release-signing-posture.md; 90: scripts/release-readiness.mjs;
-  85: brand copy + ci.yml + package metadata).
-- Last successful validation: `git fetch origin --prune` (origin/main =
-  0259c2a7, matches brief) 2026-10-23.
-- Current failures: dependency-advisory gate red (braces + node-forge) — by
-  design, unchanged.
-- Relevant quarantines: none added/removed.
-- Blockers: hosted Supabase/Vercel certification EXTERNAL (no credentials);
-  native device certification EXTERNAL; branch-protection enablement EXTERNAL.
-- Condition required to unblock: n/a (unrelated work proceeds).
-- Exact resume action after unblock: n/a.
-- Exact next action: commit Phase A increment 1; then implement
-  core/storage/dbOwnership.ts + storageSentinel.ts + runBackupMutation
-  classification + quick-add failure notice + integration negative tests
-  (quota write, interrupted backup, retry/no-duplicate, real-adapter rollback).
-  Then correct the P1 guard findings from the #88–#90 review (verify by
-  mutation first), then PR #85 visual baseline closure, then Phase D/E.
-- Remaining definition of done: all of §18 of the campaign brief — Phase A/A2/A3
-  fixes + mandatory negative tests, PR #85 visual closure, independent review of
-  #86–#90, combined candidate validated on final SHA, security posture honest,
-  Vercel hold verified on both projects, conditional main integration +
-  post-verification, final report sections A–R.
+- Current milestone: **COMPLETE** — integrated to `main`.
+- Completed: Phase A (storage safety + mandatory negative tests), Phase A2
+  (multi-tab OPFS ownership), Phase A3 (fail-closed transactions + real-engine
+  rollback proofs), Phase B (PR #85 visual closure + planning flake), Phase B2-B4
+  (independent adversarial review of PRs #86-#90 with all P1s corrected and
+  mutation-proven), Phase C (six-branch integration with lockfile semantics
+  verified), Phase D (combined acceptance on the exact candidate + final
+  adversarial review), Phase E (**main integration complete**: PR #91 merged
+  non-force at `3022e9dd64e3a692d144fd02ec87fe711999022b`).
+- In progress: nothing.
+- Important modified files: see the campaign report
+  `docs/reports/critical-integrity-cross-pr-acceptance-report.md` (sections B, D,
+  K); Git is authoritative.
+- Last successful validation: on the final candidate `0c05c74f` — typecheck 0,
+  lint 0, 3174 unit+integration tests pass, visual 34/34, schema validator PASS,
+  brand inventory OK, plus hosted `e2e` PASS (run 39887821954) and `quality` red
+  only on the dependency-advisory step.
+- Current failures: dependency-advisory gate red by design (`braces`,
+  `node-forge`; `first_patched_version: null`; no waiver added).
+- Relevant quarantines: none.
+- Blockers: none for source integration. Remaining release gates are external
+  (hosted Supabase/Vercel certification, native device certification, store and
+  legal owner actions, branch-protection enablement, advisory policy decision).
+- Condition required to unblock: owner credentials/devices for those external
+  gates — tracked in report section Q.
+- Exact resume action after unblock: see report section R (Correction
+  Campaign B: native certification + migration block 26 cohort repair).
+- Exact next action: None — task complete.
+- Remaining definition of done: none for this campaign.
 
 ## Progress
 
 - [x] Recon: remote/PR/worktree/security/CI state established
-- [ ] Phase A: storage safety (CORR-A-02) + negative tests
-- [ ] Phase A2: multi-tab OPFS (CORR-A-03) + tests
-- [ ] Phase A3: transaction atomicity (CORR-A-04) + rollback tests
-- [ ] Phase B: PR #85 visual closure + planning flake triage
-- [ ] Phase B2–B4: independent review PR #86–#90 (+ negative controls)
-- [ ] Phase C: integration branch + conflict/lockfile resolution
-- [ ] Phase D: combined acceptance + adversarial review
-- [ ] Phase E: conditional main integration + post-verification
-- [ ] Final report + ExecPlan COMPLETED
+- [x] Phase A: storage safety (CORR-A-02) + negative tests
+- [x] Phase A2: multi-tab OPFS (CORR-A-03) + tests
+- [x] Phase A3: transaction atomicity (CORR-A-04) + rollback tests
+- [x] Phase B: PR #85 visual closure + planning flake triage
+- [x] Phase B2–B4: independent review PR #86–#90 (+ negative controls)
+- [x] Phase C: integration branch + conflict/lockfile resolution
+- [x] Phase D: combined acceptance + adversarial review
+- [x] Phase E: conditional main integration + post-verification
+- [x] Final report + ExecPlan COMPLETED
 
 ## Surprises & Discoveries
 
@@ -168,6 +156,21 @@ preflight condition is satisfied. Production release is NOT authorized.
   ENVIRONMENT failures (OAuth expired / sandbox rejection); hy3-free-worker —
   BLOCKED fail-closed.
 
+### Final integration evidence (2026-10-23)
+
+- **PR #91 MERGED non-force** at `2026-10-23T03:02:08Z`; merge commit
+  `3022e9dd64e3a692d144fd02ec87fe711999022b`; `origin/main` = `3022e9dd`.
+- All six PR heads verified in `main` ancestry; PRs #85–#91 all state=MERGED.
+- Hosted `e2e` on the final candidate `0c05c74f` (run `39887821954`) — **PASS**
+  (48m39s, 0 failing steps; includes the Linux visual corpus validating the two
+  updated goldens). `quality` red on the advisory step ONLY.
+- **Production safety:** `gh api repos/.../deployments` after the merge → ZERO
+  deployments created; ZERO Production-environment deployments in all history.
+  The hold prevented promotion. CI triggered on the integrated head `3022e9dd`.
+- Preflight at merge: main unchanged at `0259c2a7`; ruleset `Protect Main`
+  enforcement=disabled (nothing bypassed); classic protection absent;
+  `vercel.json` = `{"git":{"deploymentEnabled":{"main":false}}}` unchanged.
+
 ## Changed Files / Areas
 
 - `.agent/execplans/critical-integrity-cross-pr-acceptance-a.md` — this plan.
@@ -185,6 +188,32 @@ preflight condition is satisfied. Production release is NOT authorized.
 
 ## Outcomes & Retrospective
 
-- Status: Active.
-- Summary: campaign in progress.
-- Follow-up: fill at completion.
+- Status: Complete — integrated to `main`.
+- Summary: six independently developed workstreams became one validated
+  source package. Two genuine product defects were found and fixed that no
+  unit test would have caught: (a) this campaign's own `StorageSafetyHost`
+  called `useAppNavigation` above `NavigationProvider`, crashing the app behind
+  the error boundary — caught only by the visual gate; (b) the backup-capture
+  path bypassed the mutation-level storage-error classification — caught only by
+  a real-SQLite negative test. The visual gate also proved PR #85's failures
+  were exactly the intended branding string (443/575 px confined to one line),
+  and a _second_ stale E2E contract (`infrastructure.spec.ts`) failed all three
+  hosted attempts after CORR-A-03 legitimately changed the multi-tab mechanism —
+  fixed by asserting the guarantee rather than the superseded mechanism.
+- Corrected: 7 P1 + 5 P2 adversarial-review findings (guard evasions, one-sided
+  signing claim, READY-from-local-verdict, owner-action under-count, stale
+  `dbError` race, account-token theft, quick-add input loss, dead lint
+  exemption, lock-after-remount, classification collisions), each pinned by a
+  mutation/negative test rather than by prose.
+- Proof of production safety: `gh api .../deployments` shows zero deployments
+  after the merge and zero Production-environment deployments in history.
+- Follow-up: report section Q/R — advisory policy decision, hosted Supabase/Vercel
+  certification, native device certification, migration block 26 cohort repair,
+  web non-transactional interleave, branch protection.
+- Lessons: a `#!/usr/bin/env node` shebang breaks Vite's transform of an
+  imported `.mjs` (the whole suite silently failed to collect); text-matching
+  security guards need per-item mutation tests or their template literals go
+  vacuous; hosted E2E is the only place cross-platform contracts (visual
+  rasterization, multi-tab locking) are actually proven; and an automated
+  delta-lint queue can lag far enough behind edits to report resolved findings —
+  the repo gates (`npm run lint`, `tsc`, `eslint --no-cache`) stay authoritative.
