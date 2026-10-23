@@ -369,12 +369,28 @@ Integration was performed as ONE non-force merge of PR #91
 exact candidate: `quality` red **only** on the pre-existing dependency-advisory
 gate (all other quality steps green) and `e2e` green including the Linux visual
 corpus validating the two updated goldens. Final state recorded after the
-push: remote `main` SHA, PR #85–#90 auto-reconciled as Merged by GitHub (their
-head commits entered `main`'s ancestry through the merge commit — no PR was
-manually closed), CI re-triggered on the integrated head, and no production
-deployment created by either Vercel project (see section O). Exact SHAs and
-run URLs: `.agent/execplans/critical-integrity-cross-pr-acceptance-a.md`
-Validation Ledger.
+push (all re-verified against remote GitHub):
+
+| Evidence                                        | Value                                                                           |
+| ----------------------------------------------- | ------------------------------------------------------------------------------- |
+| Merge commit (PR #91, non-force)                | `3022e9dd64e3a692d144fd02ec87fe711999022b`                                      |
+| Final `origin/main`                             | `d682abaf0bd8c44bd302071d39b9a4d56e59fa6c` (ExecPlan closure on top)            |
+| Six PR heads in `main` ancestry                 | `c88b4d40`, `f632b00b`, `4132a23c`, `cda1e378`, `a0a4e2ce`, `0bf967be` — all OK |
+| PR states                                       | #85–#91 all `MERGED` (GitHub auto-reconciled; none manually closed)             |
+| Production-environment deployments, all history | **0**                                                                           |
+| Deployments created after the merge             | **none**                                                                        |
+| CI on the integrated head                       | triggered (`d682abaf`, `3022e9dd`)                                              |
+
+Hosted CI on the candidate (`0c05c74f`, run `39887821954`): `e2e` **PASS**
+(48m39s, 0 failing steps — feature suite plus the Linux visual corpus
+validating the two updated goldens); `quality` red on the dependency-advisory
+step only (step-by-step verified). No force push, no protection bypass (the
+`Protect Main` ruleset was `enforcement: disabled` throughout), and no manual
+PR closure. Two hosted E2E failures found on the first candidate push were
+triaged rather than ignored: one was a real stale contract of this campaign's
+own making (`infrastructure.spec.ts` asserted the superseded OPFS lock-error
+mechanism; fixed to assert the guarantee) and one was a pre-existing flake
+(gamification overlay: failed-then-passed, retry gate green, 12/12 locally).
 
 ## Q. Remaining release requirements
 
