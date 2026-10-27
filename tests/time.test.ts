@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  addLocalDays,
   buildDateRange,
   buildDateRangeOldestFirst,
   buildDateRangeTodayFirst,
+  diffLocalDays,
   getUtcIsoRangeForLocalDateKeys,
   inclusiveWindowStartDateKey,
+  parseLocalDateKey,
   timestampToLocalDateKey,
   toDateKey,
 } from '@/lib/time';
@@ -158,3 +161,148 @@ function localDaysBetween(startKey: string, endKey: string): number {
   const end = new Date(ey, em - 1, ed);
   return Math.round((end.getTime() - start.getTime()) / 86_400_000);
 }
+
+/**
+ * The shared local-day utility (audit C #9): ONE local parser, ONE day adder,
+ * ONE calendar-day differ. Every assertion here is a property the duplicated
+ * builders and the `Math.round(diff / 86_400_000)` helpers could not hold.
+ */
+describe('parseLocalDateKey', () => {
+  it('names the local calendar day of an instant (not the UTC one)', () => {
+    // 23:30 local on Jan 31 — a UTC key would already be the next month for
+    // any negative offset, so this is the case `toISOString().slice(0, 10)`
+    // gets wrong.
+    const lateEvening = new Date(2026, 0, 31, 23, 30, 0, 0);
+    expect(toDateKey(lateEvening)).toBe('2026-01-31');
+    expect(parseLocalDateKey(toDateKey(lateEvening))).toEqual(new Date(2026, 0, 31, 0, 0, 0, 0));
+  });
+
+  it('parseLocalDateKey returns LOCAL midnight, not UTC midnight', () => {
+    const parsed = parseLocalDateKey('2026-03-04');
+    expect(parsed.getFullYear()).toBe(2026);
+    expect(parsed.getMonth()).toBe(2);
+    expect(parsed.getDate()).toBe(4);
+    expect(parsed.getHours()).toBe(0);
+    expect(parsed.getMinutes()).toBe(0);
+    expect(parsed.getTime()).toBe(new Date(2026, 2, 4, 0, 0, 0, 0).getTime());
+    // The bug this replaces: ECMA-262 parses date-only strings as UTC.
+    expect(parsed.getTime()).not.toBe(Date.parse('2026-03-04'));
+  });
+
+  it('parseLocalDateKey round-trips every day of a leap year without drift', () => {
+    const days = buildDateRangeOldestFirst(366, new Date(2028, 11, 31, 12));
+    for (const dateKey of days) expect(toDateKey(parseLocalDateKey(dateKey))).toBe(dateKey);
+    expect(days).toContain('2028-02-29');
+  });
+
+  it('parseLocalDateKey rejects malformed and non-existent days', () => {
+    for (const bad of [
+      '',
+      '2026-3-4',
+      '2026-13-01',
+      '2026-02-30',
+      'today',
+      '2026-03-04T00:00:00',
+    ]) {
+      expect(() => parseLocalDateKey(bad)).toThrow(RangeError);
+    }
+  });
+});
+
+describe('addLocalDays', () => {
+  it('walks calendar days across month and year boundaries', () => {
+    expect(addLocalDays('2026-01-31', 1)).toBe('2026-02-01');
+    expect(addLocalDays('2026-12-31', 1)).toBe('2027-01-01');
+    expect(addLocalDays('2026-03-01', -1)).toBe('2026-02-28');
+    expect(addLocalDays('2028-03-01', -1)).toBe('2028-02-29');
+    expect(addLocalDays('2026-06-15', 0)).toBe('2026-06-15');
+  });
+});
+
+describe('diffLocalDays', () => {
+  it('counts whole local calendar days, signed', () => {
+    expect(diffLocalDays('2026-03-04', '2026-03-04')).toBe(0);
+    expect(diffLocalDays('2026-03-04', '2026-03-05')).toBe(1);
+    expect(diffLocalDays('2026-03-05', '2026-03-04')).toBe(-1);
+    expect(diffLocalDays('2026-02-28', '2026-03-01')).toBe(1);
+    expect(diffLocalDays('2026-01-01', '2026-12-31')).toBe(364);
+  });
+
+  it('agrees with addLocalDays over a full year', () => {
+    for (let offset = -400; offset <= 400; offset += 7) {
+      expect(diffLocalDays('2026-06-15', addLocalDays('2026-06-15', offset))).toBe(offset);
+    }
+  });
+});
+
+/**
+ * DST correctness for the shared utility. Forced America/New_York, whose
+ * spring-forward day is 23 h and fall-back day 25 h — the two lengths where
+ * `Math.round(ms / 86_400_000)` stops counting calendar days.
+ */
+describe('DST boundaries (forced America/New_York)', () => {
+  const previousTz = process.env.TZ;
+
+  beforeEach(() => {
+    process.env.TZ = 'America/New_York';
+  });
+
+  afterEach(() => {
+    if (previousTz === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTz;
+  });
+
+  it('parseLocalDateKey lands on local midnight on both DST days', () => {
+    // Spring forward: 2026-03-08 is 23 h long, local midnight still exists.
+    const spring = parseLocalDateKey('2026-03-08');
+    expect(spring.getDate()).toBe(8);
+    expect(spring.getHours()).toBe(0);
+    // Fall back: 2026-11-01 is 25 h long.
+    const fall = parseLocalDateKey('2026-11-01');
+    expect(fall.getDate()).toBe(1);
+    expect(fall.getHours()).toBe(0);
+  });
+
+  it('diffLocalDays reports 1 between the two sides of a DST day', () => {
+    // The exact case `Math.round(diff / 86_400_000)` gets wrong on the
+    // 23-hour spring-forward day: 0.958 rounds UP to 1 for the SAME day.
+    expect(diffLocalDays('2026-03-08', '2026-03-09')).toBe(1);
+    expect(diffLocalDays('2026-03-07', '2026-03-08')).toBe(1);
+    // A 23-hour span never survives as 0 days.
+    expect(diffLocalDays('2026-03-08', '2026-03-08')).toBe(0);
+    // Fall back: the 25-hour day is still exactly one calendar day.
+    expect(diffLocalDays('2026-11-01', '2026-11-02')).toBe(1);
+    expect(diffLocalDays('2026-10-31', '2026-11-01')).toBe(1);
+  });
+
+  it('addLocalDays never repeats or skips a key across a DST boundary', () => {
+    const keys: string[] = [];
+    let cursor = '2026-03-06';
+    for (let i = 0; i < 6; i += 1) {
+      keys.push(cursor);
+      cursor = addLocalDays(cursor, 1);
+    }
+    expect(keys).toEqual([
+      '2026-03-06',
+      '2026-03-07',
+      '2026-03-08',
+      '2026-03-09',
+      '2026-03-10',
+      '2026-03-11',
+    ]);
+
+    const fallKeys: string[] = [];
+    let fallCursor = '2026-10-30';
+    for (let i = 0; i < 5; i += 1) {
+      fallKeys.push(fallCursor);
+      fallCursor = addLocalDays(fallCursor, 1);
+    }
+    expect(fallKeys).toEqual([
+      '2026-10-30',
+      '2026-10-31',
+      '2026-11-01',
+      '2026-11-02',
+      '2026-11-03',
+    ]);
+  });
+});

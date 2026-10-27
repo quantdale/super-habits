@@ -1,27 +1,25 @@
 import type { TodoPriority } from '@/core/db/types';
+import { addLocalDays, toDateKey } from '@/lib/time';
 
 /**
  * Get tomorrow's date key as YYYY-MM-DD (local date).
+ *
+ * `reference` defaults to now; pass an explicit clock to keep a caller
+ * deterministic (recurrence spawning and notification actions both do).
  */
-export function getTomorrowDateKey(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${dd}`;
+export function getTomorrowDateKey(reference: Date = new Date()): string {
+  return addLocalDays(toDateKey(reference), 1);
 }
 
 /**
  * Get today's date key as YYYY-MM-DD (local date).
- * Inline implementation — no toDateKey() import (domain purity).
+ *
+ * Thin alias of `lib/time`'s local-day contract: `lib/time` is dependency-free
+ * and already imported by other `*.domain.ts` files, so domain purity is not
+ * a reason to duplicate the builder here.
  */
-export function getTodayDateKey(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${dd}`;
+export function getTodayDateKey(reference: Date = new Date()): string {
+  return toDateKey(reference);
 }
 
 /**
@@ -111,12 +109,7 @@ function getDueWindowEndDate(window: Exclude<TodoDueWindow, 'all' | 'no_due'>, t
   if (window === 'today') return todayKey;
   if (window === 'overdue') return todayKey;
   // 'week': the next 7 days including today.
-  const end = new Date(todayKey + 'T12:00:00');
-  end.setDate(end.getDate() + 6);
-  const y = end.getFullYear();
-  const m = String(end.getMonth() + 1).padStart(2, '0');
-  const d = String(end.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  return addLocalDays(todayKey, 6);
 }
 
 export function filterTodos<T extends TodoLikeForQuery>(todos: T[], filters: TodoListFilters): T[] {

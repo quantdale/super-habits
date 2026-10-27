@@ -6,7 +6,7 @@
  * the whole reward loop is unit-testable and reproducible for a given date.
  */
 
-import { dateKeyToLocalDate, isValidDateKey, toDateKey } from '@/lib/time';
+import { addLocalDays, isValidDateKey, toDateKey } from '@/lib/time';
 import {
   BADGE_TIER_LABELS,
   CELEBRATION_PRIORITY,
@@ -48,11 +48,15 @@ import {
 // date helpers (pure, local-calendar)
 // ---------------------------------------------------------------------------
 
-/** Shift a local date key by whole days; keeps the key format valid. */
+/**
+ * Shift a local date key by whole days; keeps the key format valid.
+ *
+ * Delegates to `lib/time`'s `addLocalDays` — the one `setDate`-walking shift in
+ * the codebase, so a DST boundary inside the shift keeps naming the intended
+ * calendar day (audit C #9).
+ */
 export function shiftDateKey(dateKey: string, deltaDays: number): string {
-  const date = dateKeyToLocalDate(dateKey);
-  date.setDate(date.getDate() + deltaDays);
-  return toDateKey(date);
+  return addLocalDays(dateKey, deltaDays);
 }
 
 function safeDateKey(dateKey: string): string {

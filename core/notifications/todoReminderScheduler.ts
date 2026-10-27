@@ -9,9 +9,11 @@ import {
   type NotificationRequest,
 } from '@/lib/notifications';
 import { TODO_REMINDER_DATA_KIND, TODO_REMINDER_DATA_VERSION } from '@/lib/notificationConstants';
+import { DATE_KEY_PATTERN } from '@/lib/time';
 import {
   computeTodoReminderFireAt,
   getTodoReminderSnoozeIdentifier,
+  resolveTodoDueAt,
   todoReminderIdentifier,
   TODO_REMINDER_DEFAULT_LEAD_MINUTES,
 } from './reminderPlanning';
@@ -172,7 +174,16 @@ function buildReminderData(
 }
 
 function toDate(value: string | Date): Date | null {
-  const date = value instanceof Date ? value : new Date(value);
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  // A bare `YYYY-MM-DD` is a LOCAL CALENDAR DAY, not an instant: ECMA-262
+  // parses date-only strings as UTC midnight, which is 08:00 in UTC+8 and the
+  // PREVIOUS evening in UTC-5. `resolveTodoDueAt` anchors the day at a
+  // documented local wall-clock time so the reminder fires during the day it
+  // belongs to, in every timezone.
+  if (DATE_KEY_PATTERN.test(trimmed)) return resolveTodoDueAt(trimmed);
+  const date = new Date(trimmed);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 

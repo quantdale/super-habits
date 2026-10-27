@@ -24,9 +24,65 @@ export function toDateKey(date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Locally-constructed midnight for a `YYYY-MM-DD` key — the ONE construction
+ * site for "the instant this local day starts".
+ *
+ * Lenient by design (a malformed key yields an Invalid Date so legacy callers
+ * keep their existing degradation); use {@link parseLocalDateKey} when a bad
+ * key is a bug worth throwing on.
+ */
 export function dateKeyToLocalDate(dateKey: string): Date {
   const [year, month, day] = dateKey.split('-').map(Number);
   return new Date(year, month - 1, day, 0, 0, 0, 0);
+}
+
+/**
+ * Parse a `YYYY-MM-DD` local-calendar key into that day's LOCAL midnight.
+ *
+ * ECMA-262 parses a bare date-only string as **UTC** midnight: `new
+ * Date('2026-03-04')` is 08:00 on Mar 4 in UTC+8 and 19:00 on Mar **3** in
+ * UTC-5. Every caller that means "the day named by this key" must use this
+ * function instead, because it builds the instant from local calendar fields —
+ * always 00:00 local on that key, in every timezone, across DST boundaries.
+ *
+ * Throws on a malformed key: silently substituting `now` would turn a data bug
+ * into a wrong-day write.
+ */
+export function parseLocalDateKey(dateKey: string): Date {
+  if (!isValidDateKey(dateKey)) {
+    throw new RangeError(`parseLocalDateKey: invalid local date key "${dateKey}"`);
+  }
+  return dateKeyToLocalDate(dateKey);
+}
+
+/**
+ * Shift a local-calendar date key by whole days, `setDate`-walked so a DST
+ * boundary inside the shift cannot move the result onto the wrong calendar day
+ * (a spring-forward local day is 23 hours long, a fall-back day 25).
+ */
+export function addLocalDays(dateKey: string, days: number): string {
+  const date = parseLocalDateKey(dateKey);
+  date.setDate(date.getDate() + days);
+  return toDateKey(date);
+}
+
+/**
+ * Whole LOCAL calendar days from `fromKey` to `toKey` (positive when `toKey`
+ * is later, negative when earlier).
+ *
+ * Implemented as local-midnight to local-midnight arithmetic on the UTC day
+ * index, so a 23- or 25-hour local day counts as exactly one day. The naive
+ * `Math.round(diff / 86_400_000)` this replaces rounds 0.958 to 1 and reports
+ * "1 day" between two keys naming the *same* local day across a spring-forward
+ * boundary.
+ */
+export function diffLocalDays(fromKey: string, toKey: string): number {
+  const from = parseLocalDateKey(fromKey);
+  const to = parseLocalDateKey(toKey);
+  const fromIndex = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate()) / 86_400_000;
+  const toIndex = Date.UTC(to.getFullYear(), to.getMonth(), to.getDate()) / 86_400_000;
+  return Math.round(toIndex - fromIndex);
 }
 
 export function timestampToLocalDateKey(timestamp: string): string {
