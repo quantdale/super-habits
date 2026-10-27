@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { MAX_BANKED_FREEZES } from '@/features/gamification/gamification.types';
 import { freshDatabase } from './helpers/db';
 import type { TestDatabase } from './helpers/db';
 
@@ -401,5 +402,154 @@ describe('gamification ledger', () => {
       { date_key: otherDay, count: 1 },
       { date_key: cappedDay, count: 25 },
     ]);
+  });
+});
+
+describe('streak freeze accounting (audit C #2)', () => {
+  /** Seven consecutive active ledger days ending the day before yesterday. */
+  async function seedRunEndingYesterday(
+    todayKey: string,
+    domain: Awaited<ReturnType<typeof loadModules>>['domain'],
+  ) {
+    const run = [2, 3, 4, 5, 6, 7, 8].map((offset) => domain.shiftDateKey(todayKey, -offset));
+    await seedLedgerDays(run);
+    return run;
+  }
+
+  /** Real milestone grants, so `recordedFreezeMilestones` suppresses re-grants. */
+  async function grantFreeze(milestones: readonly number[], dateKey: string) {
+    for (const milestone of milestones) {
+      await db.runAsync(
+        `INSERT OR IGNORE INTO gamification_events (id, event_kind, source_key, date_key, xp, created_at)
+         VALUES (?, 'freeze_grant', ?, ?, 0, ?)`,
+        [`gxp_grant_${milestone}`, `freeze:${milestone}`, dateKey, `${dateKey}T12:00:00.000Z`],
+      );
+    }
+  }
+
+  async function freezeRows(): Promise<string[]> {
+    const rows = await db.getAllAsync<{ date_key: string }>(
+      `SELECT date_key FROM gamification_streak_freezes ORDER BY date_key ASC`,
+    );
+    return rows.map((row) => row.date_key);
+  }
+
+  it('earns a freeze at the milestone, spends it on the miss, and stops at MAX_BANKED_FREEZES', async () => {
+    const { gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    await seedRunEndingYesterday(today, domain);
+    const yesterday = domain.shiftDateKey(today, -1);
+    await grantFreeze([7], domain.shiftDateKey(today, -2));
+
+    const earned = await gamification.readGamificationSnapshot({ todayKey: today });
+    expect(earned.freezes).toMatchObject({ earned: 1, used: 0, banked: 1 });
+
+    expect(await gamification.ensureStreakFreeze({ todayKey: today })).toEqual({
+      savedDateKey: yesterday,
+    });
+    const spent = await gamification.readGamificationSnapshot({ todayKey: today });
+    expect(spent.freezes).toMatchObject({ earned: 1, used: 1, banked: 0 });
+    expect(spent.streak.current).toBe(7);
+
+    // The cap is on the BANK, not on lifetime grants: four earned grants bank
+    // at most MAX_BANKED_FREEZES even though `earned` keeps counting.
+    await db.runAsync(`DELETE FROM gamification_streak_freezes`);
+    await grantFreeze([30, 100, 365], domain.shiftDateKey(today, -2));
+    const capped = await gamification.readGamificationSnapshot({ todayKey: today });
+    expect(capped.freezes.earned).toBe(4);
+    expect(capped.freezes.used).toBe(0);
+    expect(capped.freezes.banked).toBe(3);
+    expect(capped.freezes.banked).toBe(MAX_BANKED_FREEZES);
+  });
+
+  it('releases a freeze when its day is later backfilled as active, restoring the bank', async () => {
+    const { gamification, habits, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    const run = await seedRunEndingYesterday(today, domain);
+    const yesterday = domain.shiftDateKey(today, -1);
+    const lastRunDay = run[run.length - 1];
+    await grantFreeze([7], lastRunDay);
+
+    expect(await gamification.ensureStreakFreeze({ todayKey: today })).toEqual({
+      savedDateKey: yesterday,
+    });
+    expect(await freezeRows()).toEqual([yesterday]);
+    expect((await gamification.readGamificationSnapshot({ todayKey: today })).freezes.banked).toBe(
+      0,
+    );
+
+    // Real activity lands on the frozen day afterwards: a backdated day-strip
+    // check-in (the same shape a restore / linked-action / overnight reminder
+    // write produces). The freeze is no longer needed.
+    const habitId = await habits.addHabit('Backfilled read', 1);
+    await db.runAsync(
+      `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+       VALUES ('hcmp_backfill', ?, ?, 1, ?, ?)`,
+      [habitId, yesterday, `${yesterday}T23:30:00.000Z`, `${yesterday}T23:30:00.000Z`],
+    );
+    await gamification.awardGamificationAction({
+      kind: 'habit',
+      entityId: habitId,
+      todayKey: yesterday,
+    });
+
+    expect(await freezeRows()).toEqual([]);
+    const after = await gamification.readGamificationSnapshot({ todayKey: today });
+    expect(after.freezes).toMatchObject({ earned: 1, used: 0, banked: 1 });
+    // The day is genuinely active now, so the run is longer without the freeze.
+    expect(after.streak.current).toBe(8);
+    expect(after.week.find((day) => day.dateKey === yesterday)).toMatchObject({
+      active: true,
+      frozen: false,
+    });
+  });
+
+  it('housekeeping releases a stale freeze before planning a new one', async () => {
+    const { gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    const run = await seedRunEndingYesterday(today, domain);
+    const yesterday = domain.shiftDateKey(today, -1);
+    await grantFreeze([7], run[run.length - 1]);
+
+    // A freeze was already written for yesterday, then yesterday's activity was
+    // awarded directly against its own date key (the reconcile path).
+    await db.runAsync(
+      `INSERT INTO gamification_streak_freezes (date_key, saved_at) VALUES (?, ?)`,
+      [yesterday, `${yesterday}T22:00:00.000Z`],
+    );
+    await db.runAsync(
+      `INSERT INTO gamification_events (id, event_kind, source_key, date_key, xp, created_at)
+       VALUES ('gxp_yesterday_late', 'habit', ?, ?, 10, ?)`,
+      [`${yesterday}:habit_late`, yesterday, `${yesterday}T23:00:00.000Z`],
+    );
+
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+
+    expect(await freezeRows()).toEqual([]);
+    const after = await gamification.readGamificationSnapshot({ todayKey: today });
+    expect(after.freezes).toMatchObject({ earned: 1, used: 0, banked: 1 });
+    expect(after.streak.current).toBe(8);
+  });
+
+  it('keeps the released freeze banked across repeated housekeeping passes', async () => {
+    const { gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    const run = await seedRunEndingYesterday(today, domain);
+    await grantFreeze([7], run[run.length - 1]);
+    const yesterday = domain.shiftDateKey(today, -1);
+    await gamification.ensureStreakFreeze({ todayKey: today });
+    await db.runAsync(
+      `INSERT INTO gamification_events (id, event_kind, source_key, date_key, xp, created_at)
+       VALUES ('gxp_idem_yesterday', 'habit', 'yesterday:habit_idem', ?, 10, ?)`,
+      [yesterday, `${yesterday}T23:00:00.000Z`],
+    );
+
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+    const first = await gamification.readGamificationSnapshot({ todayKey: today });
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+    const second = await gamification.readGamificationSnapshot({ todayKey: today });
+
+    expect(second.freezes).toEqual(first.freezes);
+    expect(await freezeRows()).toEqual([]);
   });
 });

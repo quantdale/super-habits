@@ -26,6 +26,13 @@ const { notificationActions } = vi.hoisted(() => ({
   },
 }));
 
+/** Serialized habit rule history for an every-day schedule from `fromDate`. */
+function everyDayFrom(fromDate: string): string {
+  return JSON.stringify([
+    { effective_from_date: fromDate, weekdays: [1, 2, 3, 4, 5, 6, 7], target_per_day: 1 },
+  ]);
+}
+
 // The owner-resolution path now inspects local data on the unprimed-cache path
 // (harden-silent-failure-certification 4.5). These tests own a bare db fixture
 // with order-sensitive  queues, so the inspection is stubbed
@@ -407,7 +414,11 @@ describe('features/habits/habits.data', () => {
           id: 'habit_1',
           name: 'Hydrate',
           target_per_day: 2,
+          created_at: '2026-04-01T00:00:00.000Z',
+          rule_history: everyDayFrom('2026-04-01'),
           deleted_at: null,
+          status: 'active',
+          lifecycle_history: null,
         })
         .mockResolvedValueOnce({
           id: 'hcmp_1',
@@ -453,7 +464,11 @@ describe('features/habits/habits.data', () => {
           id: 'habit_1',
           name: 'Hydrate',
           target_per_day: 2,
+          created_at: '2026-04-01T00:00:00.000Z',
+          rule_history: everyDayFrom('2026-04-01'),
           deleted_at: null,
+          status: 'active',
+          lifecycle_history: null,
         })
         .mockResolvedValueOnce(null),
       runAsync: vi.fn().mockResolvedValue(undefined),

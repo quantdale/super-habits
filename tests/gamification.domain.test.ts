@@ -4,9 +4,11 @@ import {
   badgeStates as buildBadgeStates,
   buildDailyQuests,
   buildWeek,
+  canBankFreeze,
   computeActionReward,
   computeStreakSummary,
   evaluateBadges,
+  isFreezeAccountingInconsistent,
   levelFromXp,
   nextStreakMilestone,
   pickCelebration,
@@ -21,6 +23,7 @@ import {
 } from '@/features/gamification/gamification.domain';
 import {
   BADGE_TIER_LABELS,
+  MAX_BANKED_FREEZES,
   STREAK_MILESTONE_XP_CAP,
   XP_AWARDS,
   type ActionRewardInput,
@@ -209,6 +212,22 @@ describe('streak freezes', () => {
   it('banks the difference between earned and spent freezes', () => {
     expect(streakFreezeState({ earned: 3, used: 1 })).toEqual({ earned: 3, used: 1, banked: 2 });
     expect(streakFreezeState({ earned: 2, used: 5 }).banked).toBe(0);
+  });
+
+  it('never banks more than MAX_BANKED_FREEZES', () => {
+    expect(streakFreezeState({ earned: 9, used: 0 }).banked).toBe(MAX_BANKED_FREEZES);
+    expect(streakFreezeState({ earned: 9, used: 4 }).banked).toBe(MAX_BANKED_FREEZES);
+    expect(canBankFreeze(streakFreezeState({ earned: 9, used: 0 }))).toBe(false);
+    expect(canBankFreeze(streakFreezeState({ earned: 3, used: 1 }))).toBe(true);
+  });
+
+  it('surfaces used > earned instead of silently clamping it', () => {
+    // Audit C #2: the audited defect clamped `used` to `earned`, which hid the
+    // invariant violation and permanently consumed the grant budget.
+    const inconsistent = streakFreezeState({ earned: 3, used: 5 });
+    expect(inconsistent.used).toBe(5);
+    expect(isFreezeAccountingInconsistent(inconsistent)).toBe(true);
+    expect(isFreezeAccountingInconsistent(streakFreezeState({ earned: 3, used: 3 }))).toBe(false);
   });
 
   it('spends a freeze on the most recent gap only when a run is behind it', () => {
