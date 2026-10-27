@@ -16,6 +16,7 @@ import {
   listSavedMealCategories,
   sortSavedMealsForSearch,
   macroKcalShares,
+  resolveCalorieLogDateKey,
 } from '@/features/calories/calories.domain';
 import type { DailySummary } from '@/features/calories/types';
 import type { SavedMeal } from '@/core/db/types';
@@ -525,5 +526,41 @@ describe('DST boundary (forced America/New_York)', () => {
     expect(trend[6].value).toBe(2100);
     expect(trend[6].label).toBe('Mar 8');
     expect(trend[5].label).toBe('Mar 7');
+  });
+});
+
+/**
+ * `resolveCalorieLogDateKey` is the single day resolver every Calories write
+ * path uses (audit C #14): form submit, quick-add chips, the kcal quick add,
+ * and the manual-add modal. The audited bug was a create path that fell back
+ * to an implicit "today" while the surface was showing another day.
+ */
+describe('resolveCalorieLogDateKey', () => {
+  const TODAY = '2026-03-04';
+
+  it('logs to the selected day, not to today', () => {
+    expect(resolveCalorieLogDateKey('2026-02-27', TODAY)).toBe('2026-02-27');
+    expect(resolveCalorieLogDateKey('2025-12-31', TODAY)).toBe('2025-12-31');
+  });
+
+  it('defaults to today when nothing is selected', () => {
+    expect(resolveCalorieLogDateKey(null, TODAY)).toBe(TODAY);
+    expect(resolveCalorieLogDateKey(undefined, TODAY)).toBe(TODAY);
+    expect(resolveCalorieLogDateKey('', TODAY)).toBe(TODAY);
+  });
+
+  it('falls back to today for an unparseable selection', () => {
+    for (const bad of ['2026-3-4', '2026-02-30', 'not-a-date', '2026-03-04T00:00:00Z']) {
+      expect(resolveCalorieLogDateKey(bad, TODAY)).toBe(TODAY);
+    }
+  });
+
+  it('clamps a future selection onto today instead of writing a rejected row', () => {
+    expect(resolveCalorieLogDateKey('2026-03-05', TODAY)).toBe(TODAY);
+    expect(resolveCalorieLogDateKey('2027-01-01', TODAY)).toBe(TODAY);
+  });
+
+  it('treats today itself as selectable (no clamp drift)', () => {
+    expect(resolveCalorieLogDateKey(TODAY, TODAY)).toBe(TODAY);
   });
 });

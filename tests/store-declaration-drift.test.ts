@@ -133,13 +133,48 @@ const EXPECTED_CHANNELS = [
 
 type AppJson = {
   expo?: {
+    version?: unknown;
     android?: {
       permissions?: unknown;
       allowBackup?: unknown;
       blockedPermissions?: unknown;
+      versionCode?: unknown;
     };
+    ios?: { buildNumber?: unknown };
   };
 };
+
+type EasJson = {
+  cli?: { appVersionSource?: unknown };
+  build?: { production?: { autoIncrement?: unknown } };
+  submit?: { production?: unknown };
+};
+
+/**
+ * Release-version posture, folded in from the deleted
+ * `tests/version-build-consistency.test.ts` (audit C §4.1: keep the app/store
+ * version assertion, drop the release-document substring assertions).
+ *
+ * These are the values the first store submission was declared against, and
+ * they are load-bearing in a way no E2E can observe: `expo.version` feeds the
+ * portable-backup manifest, `versionCode`/`buildNumber` decide whether a store
+ * upload is even accepted, and `appVersionSource: 'remote'` is what makes
+ * `autoIncrement` authoritative on EAS rather than a local guess.
+ */
+function readJson<T>(absolutePath: string): T {
+  return JSON.parse(readFileSync(absolutePath, 'utf8')) as T;
+}
+
+/**
+ * The two version sources must agree exactly. `expo.version` is what the store
+ * listing and the portable-backup manifest report, `package.json` is what the
+ * build reads, so a one-sided bump is a real inconsistency rather than a style
+ * preference.
+ */
+function assertVersionAgreement(packageVersion: unknown, appVersion: unknown): void {
+  expect(appVersion).toBe(packageVersion);
+  expect(appVersion).toMatch(/^\d+\.\d+\.\d+$/);
+}
 
 function readAppJsonPermissions(): unknown {
   const appJson = JSON.parse(readFileSync(appJsonPath, 'utf8')) as AppJson;
@@ -467,6 +502,44 @@ describe('store declaration drift guard', () => {
   it('rejects a permission set with a removed permission (guard is not vacuous)', () => {
     const trimmed = (readAppJsonPermissions() as string[]).slice(1);
     expect(() => assertPermissionSet(trimmed)).toThrow();
+  });
+
+  it('keeps package.json and app.json versions in agreement for the release', () => {
+    const packageJson = readJson<{ version?: unknown }>(resolve(repositoryRoot, 'package.json'));
+    const appJson = readJson<AppJson>(appJsonPath);
+    assertVersionAgreement(packageJson.version, appJson.expo?.version);
+  });
+
+  it('keeps the store build numbers typed for EAS auto-increment', () => {
+    const appJson = readJson<AppJson>(appJsonPath);
+    // iOS build numbers are strings and Android version codes are numbers in
+    // the Expo config schema; swapping either type silently breaks the upload.
+    expect(typeof appJson.expo?.ios?.buildNumber).toBe('string');
+    expect(typeof appJson.expo?.android?.versionCode).toBe('number');
+    expect(Number(appJson.expo?.ios?.buildNumber)).toBeGreaterThan(0);
+    expect(Number(appJson.expo?.android?.versionCode)).toBeGreaterThan(0);
+  });
+
+  it('delegates build-number authority to EAS remote state with auto-increment on', () => {
+    const easJson = readJson<EasJson>(resolve(repositoryRoot, 'eas.json'));
+    // `local` would make a store upload reuse a build number already spent at
+    // EAS, and `autoIncrement: false` would make every upload a manual bump.
+    expect(easJson.cli?.appVersionSource).toBe('remote');
+    expect(easJson.build?.production?.autoIncrement).toBe(true);
+  });
+
+  it('keeps production submission credentials out of the repository', () => {
+    const easJson = readJson<EasJson>(resolve(repositoryRoot, 'eas.json'));
+    // Empty object, not absent: credentials live in owner-controlled EAS state.
+    expect(easJson.submit?.production).toEqual({});
+  });
+
+  it('rejects a drifted version pair (guard is not vacuous)', () => {
+    // A bumped package.json without a bumped app.json ships an app whose
+    // portable-backup manifest disagrees with its store listing.
+    expect(() => assertVersionAgreement('1.0.0', '1.0.1')).toThrow();
+    expect(() => assertVersionAgreement('1.0.0', undefined)).toThrow();
+    expect(() => assertVersionAgreement('1.0.0', '1.0.0')).not.toThrow();
   });
 
   it('rejects a channel inventory with an added channel (guard is not vacuous)', () => {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NotificationRequest } from 'expo-notifications';
 import {
   reconcileTodoReminders,
@@ -126,6 +126,14 @@ const pendingTodo = (id: string): TodoReminderSnapshot => ({
   id,
   title: `Todo ${id}`,
   dueDate: new Date(DUE_MS).toISOString(),
+  completedAt: null,
+});
+
+/** Same todo, but carrying the production shape: a local `YYYY-MM-DD` key. */
+const pendingTodoWithDateKey = (id: string, dueKey: string): TodoReminderSnapshot => ({
+  id,
+  title: `Todo ${id}`,
+  dueDate: dueKey,
   completedAt: null,
 });
 
@@ -273,5 +281,76 @@ describe('reconcileTodoReminders', () => {
     });
     expect(result).toMatchObject({ status: 'reconciled', scheduled: 0, cancelled: 0 });
     expect(env.scheduled).toHaveLength(0);
+  });
+});
+
+/**
+ * Reconciliation must resolve a DATE-ONLY `due_date` through the same local
+ * parser the write path uses (audit C #1). The reconcile runs on every
+ * foreground/toggle, so a UTC interpretation here would rewrite a correct
+ * reminder into a wrong-time one (or cancel it) even after the scheduler fixed
+ * the create path.
+ */
+describe('reconcileTodoReminders with date-only due_date keys', () => {
+  const previousTz = process.env.TZ;
+  const DUE_KEY = '2026-08-12';
+  const LOCAL_DUE_MS = new Date(2026, 7, 12, 9, 0, 0, 0).getTime();
+
+  afterEach(() => {
+    if (previousTz === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTz;
+  });
+
+  it('schedules at 09:00 local and treats the matching live request as current', async () => {
+    process.env.TZ = 'Asia/Manila';
+    await setTodoRemindersEnabled(true);
+    const env = harness([todoRequest('todo_key', LOCAL_DUE_MS)]);
+
+    const result = await reconcileTodoReminders({
+      now: new Date(2026, 7, 12, 7, 0, 0, 0),
+      adapter: env.adapter,
+      loadTodos: async () => [pendingTodoWithDateKey('todo_key', DUE_KEY)],
+    });
+
+    // The already-correct request is kept, no churn.
+    expect(result).toMatchObject({ status: 'reconciled', scheduled: 0, cancelled: 0 });
+    expect(env.scheduled).toHaveLength(0);
+  });
+
+  it('replaces a live request built from the UTC interpretation of the key', async () => {
+    process.env.TZ = 'Asia/Manila';
+    expect(new Date(2026, 7, 12, 12).getTimezoneOffset()).toBe(-480);
+    await setTodoRemindersEnabled(true);
+    // The pre-fix fire instant: `new Date('2026-08-12')` == 08:00 local.
+    const utcMs = Date.parse(DUE_KEY);
+    const env = harness([todoRequest('todo_key', utcMs)]);
+
+    const result = await reconcileTodoReminders({
+      now: new Date(2026, 7, 12, 7, 0, 0, 0),
+      adapter: env.adapter,
+      loadTodos: async () => [pendingTodoWithDateKey('todo_key', DUE_KEY)],
+    });
+
+    expect(result).toMatchObject({ scheduled: 1, cancelled: 1 });
+    expect(env.cancelled).toContain(todoReminderIdentifier('todo_key'));
+    expect(env.scheduled[0].fireAt.getTime()).toBe(LOCAL_DUE_MS);
+  });
+
+  it('schedules a tomorrow-due key at tomorrow 09:00 local, not tonight (UTC-5)', async () => {
+    process.env.TZ = 'America/New_York';
+    expect(new Date(2026, 7, 12, 12).getTimezoneOffset()).toBe(240); // EDT, UTC-4
+    await setTodoRemindersEnabled(true);
+    const env = harness([]);
+
+    await reconcileTodoReminders({
+      now: new Date(2026, 7, 12, 20, 0, 0, 0),
+      adapter: env.adapter,
+      loadTodos: async () => [pendingTodoWithDateKey('todo_key', '2026-08-13')],
+    });
+
+    expect(env.scheduled).toHaveLength(1);
+    const fireAt = env.scheduled[0].fireAt;
+    expect(fireAt.getDate()).toBe(13);
+    expect(fireAt.getHours()).toBe(9);
   });
 });

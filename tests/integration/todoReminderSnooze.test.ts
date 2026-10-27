@@ -11,9 +11,11 @@ import { snoozeTodoReminderAction } from '@/core/notifications/todoReminderActio
 const NOW = new Date(2026, 7, 12, 12, 0, 0, 0);
 // Production due_dates are local-calendar YYYY-MM-DD keys (the UI validator
 // and the data-layer write contract both reject full timestamps) — fixtures
-// use the same shape so occurrence matching runs on realistic rows.
+// use the same shape so occurrence matching runs on realistic rows. The due
+// instant is `resolveTodoDueAt`'s (local 09:00 on the due day), the same
+// resolver the scheduler uses to build `occurrenceId`.
 const DUE_KEY = '2026-08-12';
-const DUE_MS = new Date(DUE_KEY).getTime();
+const DUE_MS = new Date(2026, 7, 12, 9, 0, 0, 0).getTime();
 
 type SnoozeAdapter = Parameters<typeof snoozeTodoReminderAction>[1];
 
@@ -172,7 +174,7 @@ describe('todo reminder Snooze against real SQLite', () => {
     // not the due moment itself, so a production-shaped date key suffices.
     const lateDue = '2026-08-12';
     const todoId = await todos.addTodo({ title: 'Late chore', dueDate: lateDue });
-    const lateMs = new Date(lateDue).getTime();
+    const lateMs = new Date(2026, 7, 12, 9, 0, 0, 0).getTime();
     const native = adapter(db);
     const occurrenceId = `${todoReminderIdentifier(todoId)}:${lateMs}`;
 

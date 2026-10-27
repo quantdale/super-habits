@@ -6,7 +6,7 @@ import {
   habitCreationDateKey,
   type DayCompletion,
 } from './habits.domain';
-import { dateKeyToLocalDate, toDateKey } from '@/lib/time';
+import { addLocalDays, toDateKey } from '@/lib/time';
 
 export type HabitInsightWindowDays = 7 | 30 | 90;
 
@@ -48,9 +48,7 @@ const TREND_MINIMUM_OCCURRENCES = 2;
 const TREND_DELTA_THRESHOLD = 10;
 
 function startDateKeyForWindow(endDateKey: string, windowDays: number): string {
-  const start = dateKeyToLocalDate(endDateKey);
-  start.setDate(start.getDate() - (windowDays - 1));
-  return toDateKey(start);
+  return addLocalDays(endDateKey, -(windowDays - 1));
 }
 
 function daysBetween(
@@ -91,9 +89,7 @@ function calculateRate(
 
 function calculateTrend(days: DayCompletion[], todayKey: string): HabitInsightTrend {
   const recentStart = startDateKeyForWindow(todayKey, TREND_WINDOW_DAYS);
-  const previousEndDate = dateKeyToLocalDate(recentStart);
-  previousEndDate.setDate(previousEndDate.getDate() - 1);
-  const previousEnd = toDateKey(previousEndDate);
+  const previousEnd = addLocalDays(recentStart, -1);
   const previousStart = startDateKeyForWindow(previousEnd, TREND_WINDOW_DAYS);
   const recentDays = daysBetween(days, recentStart, todayKey);
   const previousDays = daysBetween(days, previousStart, previousEnd);

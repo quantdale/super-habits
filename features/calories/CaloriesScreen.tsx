@@ -39,6 +39,7 @@ import {
   caloriesTotal,
   kcalFromMacros,
   buildTargetProgress,
+  resolveCalorieLogDateKey,
 } from '@/features/calories/calories.domain';
 import type {
   CalorieGoal,
@@ -224,6 +225,19 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     setFrequentFoods(buildFrequentFoods(windowEntries));
   }, [beginRefresh, selectedDateKey]);
 
+  /**
+   * The ONE day every Calories write and read follows. Both modes share it:
+   * the diary navigator moves it, and the inline form, the quick-add chips,
+   * the kcal quick add, and the manual-add modal all log to it (audit C #14 —
+   * Form mode used to fall back to an implicit "today"). A future-dated
+   * selection from a clock change or a restored preference degrades to today
+   * instead of producing a row the data layer rejects at submit time.
+   */
+  const logDateKey = useMemo(
+    () => resolveCalorieLogDateKey(selectedDateKey, toDateKey()),
+    [selectedDateKey],
+  );
+
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 
   useEffect(() => {
@@ -360,18 +374,24 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const entryDateMax = new Date();
   entryDateMax.setHours(23, 59, 59, 999);
 
-  const resetCalorieForm = () => {
+  // Stable identity: `handleDeleteEntry` is a `useCallback` that resets the
+  // form on the deleted row's own edit session, so this must not be a fresh
+  // closure per render (`react-hooks/exhaustive-deps`).
+  const resetCalorieForm = useCallback(() => {
     setFood('');
     setProtein('');
     setCarbs('');
     setFats('');
     setFiber('');
     setMealType('breakfast');
-    setEntryDateKey(toDateKey());
+    // The edit-only date field starts on the day the surface is showing, so a
+    // stale value from a previous edit session can never survive a reset
+    // (audit C §3.6).
+    setEntryDateKey(logDateKey);
     setShowEntryDatePicker(false);
     setEditingEntryId(null);
     setCalorieError(null);
-  };
+  }, [logDateKey]);
 
   const setAndPersistViewMode = useCallback(
     (nextMode: CaloriesViewMode) => {
@@ -379,13 +399,12 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       // hydration (see viewPreferenceGuard).
       viewPreferenceGuard.markChoiceMade();
       setViewMode(nextMode);
-      if (nextMode === 'form') {
-        // The form always logs to today: drop any diary day selection so the
-        // Today-labeled totals can never silently show a past day.
-        setFollowsToday(true);
-        setSelectedDateKey(toDateKey());
-        setCopyStatus(null);
-      }
+      // The selected day is SHARED by both modes, so switching views must not
+      // silently retarget the day the user is looking at. Entering Form mode
+      // from a past diary day keeps that day — the header, the totals and the
+      // day log all name it via `formatDayContext`/the day log, so nothing can
+      // be labelled "Today" while showing another day (decided contract D9b).
+      setCopyStatus(null);
       void AsyncStorage.setItem(CALORIES_VIEW_MODE_STORAGE_KEY, nextMode).catch(() => undefined);
     },
     [viewPreferenceGuard],
@@ -475,7 +494,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       }
       await refresh();
     },
-    [confirm, editingEntryId, refresh],
+    [confirm, editingEntryId, refresh, resetCalorieForm],
   );
 
   const toggleMealGroup = useCallback((meal: MealType) => {
@@ -542,14 +561,14 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           fats: 0,
           fiber: 0,
           mealType: 'snack',
-          consumedOn: selectedDateKey,
+          consumedOn: logDateKey,
         },
         { maintainSavedMeal: false },
       );
       recordAction('nutrition');
       await refresh();
     },
-    [recordAction, refresh, selectedDateKey],
+    [logDateKey, recordAction, refresh],
   );
 
   const handleSubmit = () => {
@@ -598,6 +617,10 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
             consumedOn: entryDateKey,
           });
         } else {
+          // Both modes log to the day the surface is showing (selectedDateKey),
+          // never an implicit "today": a meal added while the diary sits on
+          // last Tuesday belongs to last Tuesday. `addCalorieEntry` already
+          // rejects a future day, so this cannot create a forward-dated row.
           await addCalorieEntry({
             foodName: food.trim(),
             calories: computedKcal,
@@ -606,6 +629,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
             fats: fatsN,
             fiber: fiberN,
             mealType,
+            consumedOn: logDateKey,
           });
         }
 
@@ -715,6 +739,8 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           savedMealCount={allSavedMeals.length}
           groups={groupedEntries}
           collapsedMeals={collapsedMeals}
+          logDateKey={logDateKey}
+          onLogToToday={() => handleSelectDiaryDate(toDateKey())}
           food={food}
           protein={protein}
           carbs={carbs}
