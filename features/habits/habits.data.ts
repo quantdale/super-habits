@@ -43,7 +43,6 @@ import {
   getHabitRuleForDate,
   getHabitTargetForDate,
   isHabitActionableOn,
-  isHabitLifecycleMaskedOn,
   isHabitScheduledOn,
   parseHabitRuleHistory,
   serializeHabitLifecycleHistory,
@@ -1165,9 +1164,19 @@ export async function incrementHabitFromLinkedAction(input: {
     db,
     mutate: async (transactionDb, enqueue) => {
       const habit = await transactionDb.getFirstAsync<
-        Pick<Habit, 'id' | 'name' | 'deleted_at' | 'status' | 'lifecycle_history'>
+        Pick<
+          Habit,
+          | 'id'
+          | 'name'
+          | 'target_per_day'
+          | 'created_at'
+          | 'rule_history'
+          | 'deleted_at'
+          | 'status'
+          | 'lifecycle_history'
+        >
       >(
-        `SELECT id, name, deleted_at, status, lifecycle_history
+        `SELECT id, name, target_per_day, created_at, rule_history, deleted_at, status, lifecycle_history
          FROM habits
          WHERE id = ?`,
         [input.habitId],
@@ -1190,11 +1199,19 @@ export async function incrementHabitFromLinkedAction(input: {
         };
       }
 
-      // A paused/archived habit (or a date inside a paused/archived interval)
-      // accepts no completion writes, even from linked actions.
+      // ONE write gate (audit C #6): the same `isHabitActionableOn` predicate the
+      // UI checkbox uses. A linked-action writer used to skip the schedule half,
+      // so it could write a completion onto an unscheduled off-day that the UI
+      // path refuses — contradicting the gate's own docstring.
       if (
         (habit.status ?? 'active') !== 'active' ||
-        isHabitLifecycleMaskedOn(habit.lifecycle_history, input.dateKey)
+        !isHabitActionableOn(
+          habit.rule_history,
+          input.dateKey,
+          habit.target_per_day,
+          safeTimestampToLocalDateKey(habit.created_at),
+          habit.lifecycle_history,
+        )
       ) {
         if (input.executionId) {
           await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {
@@ -1319,11 +1336,18 @@ export async function ensureHabitDailyTargetFromLinkedAction(input: {
         };
       }
 
-      // A paused/archived habit (or a date inside a paused/archived interval)
-      // accepts no completion writes, even from linked actions.
+      // ONE write gate (audit C #6): the same `isHabitActionableOn` predicate
+      // the UI checkbox uses, so a linked action can never land a completion on
+      // an off-schedule, pre-creation, or paused/archived day.
       if (
         (habit.status ?? 'active') !== 'active' ||
-        isHabitLifecycleMaskedOn(habit.lifecycle_history, input.dateKey)
+        !isHabitActionableOn(
+          habit.rule_history,
+          input.dateKey,
+          habit.target_per_day,
+          safeTimestampToLocalDateKey(habit.created_at),
+          habit.lifecycle_history,
+        )
       ) {
         if (input.executionId) {
           await updateLinkedActionExecutionInTransaction(transactionDb, input.executionId, {

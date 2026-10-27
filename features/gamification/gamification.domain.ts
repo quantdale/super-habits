@@ -7,6 +7,7 @@
  */
 
 import { addLocalDays, isValidDateKey, toDateKey } from '@/lib/time';
+import { computeStreakRun, type StreakRunDay } from '@/features/habits/habitStreak.domain';
 import {
   BADGE_TIER_LABELS,
   CELEBRATION_PRIORITY,
@@ -61,6 +62,23 @@ export function shiftDateKey(dateKey: string, deltaDays: number): string {
 
 function safeDateKey(dateKey: string): string {
   return isValidDateKey(dateKey) ? dateKey : toDateKey();
+}
+
+/**
+ * The shared streak engine's view of the reward ledger.
+ *
+ * The ledger only stores days with a record: an `xp > 0` row is an active day
+ * and a `gamification_streak_freezes` row is a frozen one. Everything else is
+ * a missed day, which is what makes the reward streak a "did anything at all"
+ * run rather than a per-habit schedule (the surfaces label it "reward streak").
+ */
+export function toRewardStreakDays(days: readonly StreakDay[]): StreakRunDay[] {
+  return days.map((day) => ({
+    dateKey: day.dateKey,
+    required: true,
+    completed: day.active,
+    frozen: day.frozen,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -236,83 +254,21 @@ export function withDayActive(days: readonly StreakDay[], dateKey: string): Stre
 }
 
 /**
- * Longest completed run anywhere in the day history. Frozen days bridge a run
- * without adding to it; a missing or unfrozen-inactive day breaks it.
- */
-function longestRun(days: readonly StreakDay[]): number {
-  const sorted = [...days].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
-  let longest = 0;
-  let run = 0;
-  let previousKey: string | null = null;
-  for (const day of sorted) {
-    if (previousKey === null || shiftDateKey(previousKey, 1) !== day.dateKey) run = 0;
-    if (day.active) {
-      run += 1;
-      if (run > longest) longest = run;
-    } else if (!day.frozen) {
-      run = 0;
-    }
-    previousKey = day.dateKey;
-  }
-  return longest;
-}
-
-/**
- * Current + longest streak over the day history.
+ * Current + longest reward streak over the ledger day history.
  *
- * Grace: an open day never breaks a live streak — today with no activity yet
- * still counts the run that ended yesterday (`atRisk` flags it for the UI).
- * Frozen days bridge a run without adding to it.
+ * Delegates to the app-wide streak engine (`habitStreak.domain`) in sparse
+ * mode, so a reward day and a habit day are judged by the same rules: a
+ * completed day counts, a frozen day bridges, a missing day breaks, and today
+ * is grace while yesterday is still active or frozen (audit C #10).
  */
 export function computeStreakSummary(days: readonly StreakDay[], todayKey: string): StreakSummary {
-  const byDate = new Map(days.map((day) => [day.dateKey, day]));
-  const safeToday = safeDateKey(todayKey);
-  const today = byDate.get(safeToday);
-  const activeToday = Boolean(today?.active);
-
-  let lastActiveDateKey: string | null = null;
-  for (const day of days) {
-    if (!day.active) continue;
-    if (lastActiveDateKey === null || day.dateKey > lastActiveDateKey) {
-      lastActiveDateKey = day.dateKey;
-    }
-  }
-
-  let cursor = safeToday;
-  if (!activeToday) {
-    const yesterday = byDate.get(shiftDateKey(safeToday, -1));
-    if (!yesterday || (!yesterday.active && !yesterday.frozen)) {
-      return {
-        current: 0,
-        longest: longestRun(days),
-        activeToday: false,
-        atRisk: false,
-        lastActiveDateKey,
-      };
-    }
-    cursor = shiftDateKey(safeToday, -1);
-  }
-
-  let current = 0;
-  // A decade of history is far past any realistic streak; the bound protects
-  // against a corrupted or adversarial day set.
-  for (let guard = 0; guard < 3660; guard += 1) {
-    const day = byDate.get(cursor);
-    if (!day) break;
-    if (day.active) {
-      current += 1;
-    } else if (!day.frozen) {
-      break;
-    }
-    cursor = shiftDateKey(cursor, -1);
-  }
-
+  const run = computeStreakRun(toRewardStreakDays(days), safeDateKey(todayKey), { sparse: true });
   return {
-    current,
-    longest: Math.max(longestRun(days), current),
-    activeToday,
-    atRisk: !activeToday && current > 0,
-    lastActiveDateKey,
+    current: run.current,
+    longest: run.longest,
+    activeToday: run.activeToday,
+    atRisk: run.atRisk,
+    lastActiveDateKey: run.lastActiveDateKey,
   };
 }
 
@@ -362,11 +318,28 @@ export function planAutoFreeze(input: {
   return yesterdayKey;
 }
 
-/** Banked freezes = earned at milestones − consumed by saved days. */
+/**
+ * Banked freezes = earned at milestones − freezes still bridging a missed day.
+ *
+ * `used` is deliberately NOT clamped to `earned`: `used > earned` is an
+ * accounting invariant violation, and the audit (C #2) records that silently
+ * rewriting it to `earned` hid the defect instead of surfacing it. `banked` is
+ * capped at `MAX_BANKED_FREEZES` so the bank can never exceed its ceiling, even
+ * after a freeze is released by a backfilled day.
+ */
 export function streakFreezeState(input: { earned: number; used: number }): StreakFreezeState {
   const earned = Math.max(0, Math.floor(input.earned));
-  const used = Math.max(0, Math.min(earned, Math.floor(input.used)));
-  return { earned, used, banked: Math.max(0, earned - used) };
+  const used = Math.max(0, Math.floor(input.used));
+  return { earned, used, banked: Math.max(0, Math.min(MAX_BANKED_FREEZES, earned - used)) };
+}
+
+/**
+ * Whether an accounting state violates the bank invariant (`used > earned`),
+ * e.g. because a freeze row was imported, hand-edited, or written by an older
+ * build. Callers surface it rather than clamping silently.
+ */
+export function isFreezeAccountingInconsistent(state: StreakFreezeState): boolean {
+  return state.used > state.earned;
 }
 
 /** Freeze grants stay below the bank cap so the mechanic keeps a ceiling. */

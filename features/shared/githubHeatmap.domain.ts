@@ -1,4 +1,5 @@
 import type { HeatmapDay } from './activityTypes';
+import { computeStreakRun } from '@/features/habits/habitStreak.domain';
 
 const DEFAULT_WEEKS = 52;
 
@@ -35,6 +36,23 @@ export function buildHeatmapWeekColumns(
   const trimmedDays = days.length > maxDays ? days.slice(-maxDays) : days;
   const calendarGrid = buildCalendarGrid(trimmedDays);
   return calendarGrid.length > weeks ? calendarGrid.slice(-weeks) : calendarGrid;
+}
+
+/**
+ * Longest run of consecutive active days in the supplied history.
+ *
+ * Delegates the day walk to `computeStreakRun` (the ONE streak definition, audit
+ * C #10) instead of re-implementing it here: this caption is derived state like
+ * any other streak number, so it must not be able to disagree with the Habits
+ * tab or the reward surface about what a streak is.
+ */
+export function longestActiveStreak(days: HeatmapDay[]): number {
+  const active = days.filter((day) => day.value > 0);
+  if (active.length === 0) return 0;
+  return computeStreakRun(
+    active.map((day) => ({ dateKey: day.dateKey, required: true, completed: true })),
+    active[active.length - 1].dateKey,
+  ).longest;
 }
 
 function firstDayInWeek(week: (HeatmapDay | null)[]): HeatmapDay | null {

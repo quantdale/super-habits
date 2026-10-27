@@ -307,14 +307,16 @@ export function AchievementsScreen() {
             {snapshot.freezes.banked} of {snapshot.freezes.earned} earned streak freezes available
           </Text>
           <Text style={{ ...typography.caption, color: tokens.textMuted }}>
-            Current streak: {snapshot.streak.current} day
+            Reward streak: {snapshot.streak.current} day
             {snapshot.streak.current === 1 ? '' : 's'} · best: {snapshot.streak.longest} day
             {snapshot.streak.longest === 1 ? '' : 's'}.
           </Text>
           <Text style={{ ...typography.caption, color: tokens.textMuted }}>
-            A freeze is earned at 7, 30, 100, and 365 day streaks and spends itself automatically on
-            the first missed day, so one off day never wipes a long run. Today is always grace: the
-            streak only breaks once a full day has passed with no activity.
+            A freeze is earned at 7, 30, 100, and 365 day reward streaks and spends itself
+            automatically on the first missed day, so one off day never wipes a long run. Today is
+            always grace: the streak only breaks once a full day has passed with no activity. The
+            Habits tab shows a separate per-habit streak, which counts that habit&apos;s scheduled
+            occurrences only.
           </Text>
         </View>
       </ScreenSection>

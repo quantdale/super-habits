@@ -24,6 +24,17 @@ async function createTodoHabitIncrementCycle(db: TestDatabase) {
 
   const sourceTodoId = await todos.addTodo({ title: 'Ship the report' });
   const targetHabitId = await habits.addHabit('Drink water', 3);
+  // `incrementHabitFromLinkedAction` now honours the ONE habit write gate
+  // (`isHabitActionableOn`, audit C #6), so the fixture habit must already
+  // exist on the fixed source dates these engine tests use — otherwise every
+  // write would correctly be refused as pre-creation.
+  await db.runAsync(`UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?`, [
+    '2026-01-01T00:00:00.000Z',
+    JSON.stringify([
+      { effective_from_date: '2026-01-01', weekdays: [1, 2, 3, 4, 5, 6, 7], target_per_day: 3 },
+    ]),
+    targetHabitId,
+  ]);
 
   await linked.createLinkedActionRule({
     source: {
@@ -95,6 +106,188 @@ describe('full source → rule → effect → execution cycle', () => {
       expect.objectContaining({ source_entity_id: sourceTodoId, trigger_type: 'todo.completed' }),
     ]);
     expect(events).toHaveLength(1);
+
+    await db.closeAsync();
+  });
+});
+
+describe('a linked action respects the target habit schedule (audit C #6)', () => {
+  /**
+   * The ONE write gate (`isHabitActionableOn`, audit C #6) has to hold at the
+   * ENGAGED path too, not only at the adapter the gate lives in: a source event
+   * on an unscheduled day must produce a `skipped` execution and no completion
+   * row on disk. 2026-07-01 is a Wednesday, so a Mon/Wed/Fri habit's off-days are
+   * 07-02 (Thu), 07-04 (Sat) and 07-05 (Sun) — real rest days, not a fixture bug.
+   */
+  it('skips a habit.increment whose source date is an off-schedule day', async () => {
+    const db = await freshDatabase();
+    const todos = await import('@/features/todos/todos.data');
+    const habits = await import('@/features/habits/habits.data');
+    const linked = await import('@/core/linked-actions/linkedActions.data');
+    const engineModule = await import('@/core/linked-actions/linkedActions.engine');
+
+    const sourceTodoId = await todos.addTodo({ title: 'Trigger on a rest day' });
+    const targetHabitId = await habits.addHabit(
+      'Gym',
+      1,
+      'anytime',
+      'fitness-center',
+      '#10b981',
+      [1, 3, 5],
+    );
+    await db.runAsync(`UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?`, [
+      '2026-01-01T00:00:00.000Z',
+      JSON.stringify([
+        { effective_from_date: '2026-01-01', weekdays: [1, 3, 5], target_per_day: 1 },
+      ]),
+      targetHabitId,
+    ]);
+
+    await linked.createLinkedActionRule({
+      source: {
+        feature: 'todos',
+        entityType: 'todo',
+        entityId: sourceTodoId,
+        triggerType: 'todo.completed',
+      },
+      target: {
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: targetHabitId,
+        effect: {
+          kind: 'progress',
+          type: 'habit.increment',
+          amount: 1,
+          dateStrategy: 'source_date',
+        },
+      },
+    });
+
+    const source = {
+      feature: 'todos' as const,
+      entityType: 'todo' as const,
+      entityId: sourceTodoId,
+      triggerType: 'todo.completed' as const,
+      label: 'Trigger on a rest day',
+      sourceDateKey: '2026-07-02',
+    };
+    const skipped = await engineModule.linkedActionsEngine.processSourceAction(source);
+
+    expect(skipped.effects[0]).toMatchObject({ status: 'skipped', reason: 'target_inactive' });
+    expect(
+      await db.getAllAsync<{ date_key: string }>(
+        'SELECT date_key FROM habit_completions WHERE habit_id = ?',
+        [targetHabitId],
+      ),
+    ).toEqual([]);
+    expect(
+      await db.getFirstAsync<{ status: string }>(
+        `SELECT x.status
+           FROM linked_action_executions x
+           INNER JOIN linked_action_events e ON e.id = x.source_event_id
+          WHERE e.source_entity_id = ?`,
+        [sourceTodoId],
+      ),
+    ).toEqual({ status: 'skipped' });
+
+    // The very same rule DOES apply on a scheduled day of the same week, so the
+    // refusal above is the schedule and not a broken fixture.
+    const applied = await engineModule.linkedActionsEngine.processSourceAction({
+      ...source,
+      sourceDateKey: '2026-07-03',
+    });
+    expect(applied.effects[0]).toMatchObject({ status: 'applied' });
+    expect(
+      await db.getAllAsync<{ date_key: string; count: number }>(
+        'SELECT date_key, count FROM habit_completions WHERE habit_id = ?',
+        [targetHabitId],
+      ),
+    ).toEqual([{ date_key: '2026-07-03', count: 1 }]);
+
+    await db.closeAsync();
+  });
+
+  it('skips a habit.ensure_daily_target whose source date is an off-schedule day', async () => {
+    const db = await freshDatabase();
+    const habits = await import('@/features/habits/habits.data');
+    const linked = await import('@/core/linked-actions/linkedActions.data');
+    const engineModule = await import('@/core/linked-actions/linkedActions.engine');
+
+    // `habit.ensure_daily_target` is a supported path from a HABIT source, so
+    // the trigger is a habit completion and the target is a second habit.
+    const sourceHabitId = await habits.addHabit('Meditate', 1);
+    const targetHabitId = await habits.addHabit(
+      'Gym',
+      3,
+      'anytime',
+      'fitness-center',
+      '#10b981',
+      [1, 3, 5],
+    );
+    await db.runAsync(`UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?`, [
+      '2026-01-01T00:00:00.000Z',
+      JSON.stringify([
+        { effective_from_date: '2026-01-01', weekdays: [1, 2, 3, 4, 5, 6, 7], target_per_day: 1 },
+      ]),
+      sourceHabitId,
+    ]);
+    await db.runAsync(`UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?`, [
+      '2026-01-01T00:00:00.000Z',
+      JSON.stringify([
+        { effective_from_date: '2026-01-01', weekdays: [1, 3, 5], target_per_day: 3 },
+      ]),
+      targetHabitId,
+    ]);
+    await linked.createLinkedActionRule({
+      source: {
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: sourceHabitId,
+        triggerType: 'habit.completed_for_day',
+      },
+      target: {
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: targetHabitId,
+        effect: {
+          kind: 'progress',
+          type: 'habit.ensure_daily_target',
+          minimumCount: 'target_per_day',
+          dateStrategy: 'source_date',
+        },
+      },
+    });
+
+    const source = {
+      feature: 'habits' as const,
+      entityType: 'habit' as const,
+      entityId: sourceHabitId,
+      triggerType: 'habit.completed_for_day' as const,
+      label: 'Meditate',
+    };
+
+    const skipped = await engineModule.linkedActionsEngine.processSourceAction({
+      ...source,
+      sourceDateKey: '2026-07-05',
+    });
+    expect(skipped.effects[0]).toMatchObject({ status: 'skipped', reason: 'target_inactive' });
+    expect(
+      await db.getAllAsync<{ id: string }>('SELECT id FROM habit_completions WHERE habit_id = ?', [
+        targetHabitId,
+      ]),
+    ).toEqual([]);
+
+    const applied = await engineModule.linkedActionsEngine.processSourceAction({
+      ...source,
+      sourceDateKey: '2026-07-06',
+    });
+    expect(applied.effects[0]).toMatchObject({ status: 'applied' });
+    expect(
+      await db.getFirstAsync<{ count: number }>(
+        'SELECT count FROM habit_completions WHERE habit_id = ? AND date_key = ?',
+        [targetHabitId, '2026-07-06'],
+      ),
+    ).toEqual({ count: 3 });
 
     await db.closeAsync();
   });

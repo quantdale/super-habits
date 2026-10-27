@@ -1,6 +1,7 @@
 import type { HabitCompletion } from './types';
 import type { HabitLifecycleInterval, HabitLifecycleStatus } from '@/core/db/types';
 import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
+import { computeStreakRun, type StreakRunDay } from './habitStreak.domain';
 import {
   buildDateRange,
   buildDateRangeOldestFirst,
@@ -510,46 +511,44 @@ export function buildDayCompletions(
 }
 
 /**
- * Count completed scheduled occurrences ending at today. An incomplete
- * scheduled today is granted grace while today is active; a prior scheduled
- * miss breaks the streak. Unscheduled and ineligible dates are ignored.
+ * The shared streak engine's view of a habit day history.
+ *
+ * A habit day is REQUIRED when it is a scheduled, eligible (not future, not
+ * pre-creation, not inside a paused/archived interval) occurrence. Everything
+ * else — a weekly off-day, a masked pause day — carried no obligation and
+ * therefore bridges a run instead of breaking it, which is the documented Habit
+ * Engine V2 semantics (`openspec/specs/habit-scheduling-and-history-semantics`).
+ */
+export function toHabitStreakDays(dayCompletions: readonly DayCompletion[]): StreakRunDay[] {
+  return dayCompletions.map((day) => {
+    const required = day.scheduled && day.eligible;
+    return {
+      dateKey: day.dateKey,
+      required,
+      completed: required && day.completed,
+    };
+  });
+}
+
+/**
+ * Current completed scheduled occurrences, using the app-wide streak engine
+ * (`habitStreak.domain`). An incomplete scheduled today is granted grace while
+ * today is active; a prior scheduled miss breaks the streak; off-days and
+ * paused/archived days bridge instead of breaking (audit C #10).
  */
 export function calculateCurrentStreak(
   dayCompletions: DayCompletion[],
   todayKey = toDateKey(),
 ): number {
-  const eligibleDays = dayCompletions
-    .filter((day) => day.scheduled && day.eligible && day.dateKey <= todayKey)
-    .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
-  if (eligibleDays.length === 0) return 0;
-
-  let index = eligibleDays.length - 1;
-  const latest = eligibleDays[index];
-  if (latest.dateKey === todayKey && !latest.completed) index -= 1;
-
-  let streak = 0;
-  for (; index >= 0; index -= 1) {
-    const day = eligibleDays[index];
-    if (!day.completed) break;
-    streak += 1;
-  }
-  return streak;
+  return computeStreakRun(toHabitStreakDays(dayCompletions), todayKey).current;
 }
 
 /** Calculate the longest completed run across all eligible scheduled dates. */
-export function calculateLongestStreak(dayCompletions: DayCompletion[]): number {
-  let longest = 0;
-  let current = 0;
-  for (const day of [...dayCompletions].sort((a, b) => a.dateKey.localeCompare(b.dateKey))) {
-    if (!day.scheduled || !day.eligible) continue;
-    if (day.completed) {
-      current += 1;
-      longest = Math.max(longest, current);
-    } else {
-      current = 0;
-    }
-  }
-  return longest;
+export function calculateLongestStreak(
+  dayCompletions: DayCompletion[],
+  todayKey = toDateKey(),
+): number {
+  return computeStreakRun(toHabitStreakDays(dayCompletions), todayKey).longest;
 }
 
 export type HabitGridHabit = {

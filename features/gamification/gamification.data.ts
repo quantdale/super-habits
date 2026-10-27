@@ -350,17 +350,64 @@ async function loadStreakDays(db: Db, snapshot?: LedgerSnapshot): Promise<Streak
   return streakDaysFromSnapshot(snapshot ?? (await readLedgerSnapshot(db)));
 }
 
+/**
+ * Freeze accounting for a pass, from the snapshot when one is in hand.
+ *
+ * Freeze rows are counted exactly as stored. The ledger does not clamp `used`
+ * to `earned` (audit C #2: a silent clamp both hid the invariant violation and
+ * permanently consumed a grant budget); `banked` is capped at
+ * MAX_BANKED_FREEZES instead, and `releaseStaleFreezes` frees a row that a
+ * backfilled/restored/synced activity day has since made unnecessary.
+ */
 async function loadFreezeState(db: Db, snapshot?: LedgerSnapshot): Promise<StreakFreezeState> {
-  if (!snapshot) {
-    const [earned, used] = await Promise.all([
-      readCount(db, `SELECT COUNT(*) AS value FROM gamification_events WHERE event_kind = ?`, [
-        FREEZE_GRANT_EVENT_KIND,
-      ]),
-      readCount(db, `SELECT COUNT(*) AS value FROM gamification_streak_freezes`),
-    ]);
-    return streakFreezeState({ earned, used });
+  if (snapshot)
+    return streakFreezeState({ earned: snapshot.freezesEarned, used: snapshot.freezesUsed });
+  const [earned, used] = await Promise.all([
+    readCount(db, `SELECT COUNT(*) AS value FROM gamification_events WHERE event_kind = ?`, [
+      FREEZE_GRANT_EVENT_KIND,
+    ]),
+    readCount(db, `SELECT COUNT(*) AS value FROM gamification_streak_freezes`),
+  ]);
+  return streakFreezeState({ earned, used });
+}
+
+/**
+ * Release frozen days that are no longer misses (audit C #2).
+ *
+ * A freeze row is written when a day looks missed. That verdict is provisional:
+ * a habit completion can still land on that day afterwards (backdated day-strip
+ * edit, a restore, a linked-action write, or the 7-day housekeeping reconcile
+ * awarding an overnight reminder completion). Left in place the row kept
+ * consuming grant budget forever, so `banked` only ever shrank and the
+ * `MAX_BANKED_FREEZES` ceiling could never matter again.
+ *
+ * A row is released when the same day has real activity in the reward ledger
+ * (`xp > 0`) — the day is active, so no freeze is needed. This is exactly the
+ * "active" predicate `streakDaysFromSnapshot` reads, so the release decision
+ * and the streak reading can never disagree.
+ *
+ * Releasing is idempotent and local-only: freeze rows are never synced or
+ * backed up. Callers that then read freeze state through a pass snapshot must
+ * treat that snapshot as stale (re-read the ledger), because the snapshot was
+ * built BEFORE these rows were deleted.
+ *
+ * Returns the released date keys (oldest first) so callers can report/log it.
+ */
+export async function releaseStaleFreezes(db: Db): Promise<string[]> {
+  const stale = await db.getAllAsync<{ date_key: string }>(
+    `SELECT f.date_key
+       FROM gamification_streak_freezes f
+      WHERE EXISTS (
+              SELECT 1 FROM gamification_events e
+               WHERE e.date_key = f.date_key AND e.xp > 0
+            )
+      ORDER BY f.date_key ASC`,
+  );
+  if (stale.length === 0) return [];
+  for (const row of stale) {
+    await db.runAsync(`DELETE FROM gamification_streak_freezes WHERE date_key = ?`, [row.date_key]);
   }
-  return streakFreezeState({ earned: snapshot.freezesEarned, used: snapshot.freezesUsed });
+  return stale.map((row) => row.date_key);
 }
 
 async function loadRecordedMilestones(
@@ -747,6 +794,10 @@ async function computeAward(input: {
     });
 
     await insertEvents(transactionDb, award);
+    // A freeze spent on this day before its real activity existed is now
+    // unnecessary: release it in the same transaction that records the winning
+    // activity, so the bank cap and the grant budget stay honest (audit C #2).
+    await releaseStaleFreezes(transactionDb);
     const completedAt = nowIso();
     for (const questId of award.completedQuestIds) {
       await transactionDb.runAsync(
@@ -930,13 +981,21 @@ export async function reconcileGamificationActivity(
  * Spend a banked freeze on the most recent missed day, if one is available and
  * the run before it is still alive. Called on foreground/day rollover; the
  * resulting row is what makes the streak survive a miss.
+ *
+ * Freeze rows whose day has since become active are released FIRST, and the
+ * ledger snapshot is re-read when that happened, so planning spends from the
+ * current bank rather than a snapshot that still counts a stale freeze as
+ * spent (audit C #2). The release is a no-op for a correct ledger, so the
+ * common path still takes exactly one snapshot read.
  */
 export async function ensureStreakFreeze(
   options: GamificationReadOptions = {},
 ): Promise<{ savedDateKey: string } | null> {
   const todayKey = options.todayKey ?? toDateKey();
   const db = await getDatabase();
-  const ledger = await readLedgerSnapshot(db);
+  let ledger = await readLedgerSnapshot(db);
+  const released = await releaseStaleFreezes(db);
+  if (released.length > 0) ledger = await readLedgerSnapshot(db);
   const [streakDays, freezes] = await Promise.all([
     loadStreakDays(db, ledger),
     loadFreezeState(db, ledger),
@@ -963,6 +1022,12 @@ export async function ensureStreakFreeze(
  * scoped to each day and the ledger's unique source key keeps replays cheap;
  * an unbounded scan would rewrite historical streaks, so the window stays
  * fixed and small.
+ *
+ * Order matters three times over: award first (so real activity is never
+ * mistaken for a miss), then release freezes whose day turned out active (so a
+ * spent freeze goes back to the bank instead of consuming the grant budget
+ * forever, audit C #2), then plan a new freeze last (so the release cannot hand
+ * back capacity that is immediately double-spent).
  */
 export async function runGamificationHousekeeping(
   options: GamificationReadOptions = {},
@@ -976,7 +1041,9 @@ export async function runGamificationHousekeeping(
   for (let offset = GAMIFICATION_RECONCILE_LOOKBACK_DAYS - 1; offset >= 0; offset -= 1) {
     await reconcileDayAwards(db, shiftDateKey(todayKey, -offset), ledger);
   }
-  // Freeze planning must observe the awards this pass just wrote, so it reads
-  // the ledger again rather than the pre-award snapshot.
+  // Freeze rows whose day the pass just made active are released BEFORE freeze
+  // planning reads them, and `ensureStreakFreeze` re-reads the ledger itself,
+  // so the refreshed bank is what gets planned against (audit C #2).
+  await releaseStaleFreezes(db);
   await ensureStreakFreeze({ todayKey });
 }

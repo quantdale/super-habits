@@ -4,7 +4,11 @@ import { InteractionManager, View, type ViewStyle } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { HorizontalScrollArea } from '@/core/ui/HorizontalScrollArea';
 import type { HeatmapDay } from './activityTypes';
-import { buildHeatmapWeekColumns, monthLabelsForHeatmapWeeks } from './githubHeatmap.domain';
+import {
+  buildHeatmapWeekColumns,
+  longestActiveStreak,
+  monthLabelsForHeatmapWeeks,
+} from './githubHeatmap.domain';
 
 type Props = {
   days: HeatmapDay[];
@@ -84,15 +88,7 @@ function GitHubHeatmapInner({ days, color, label, weeks = DEFAULT_WEEKS }: Props
     for (const d of activeDays) {
       if (d.value > bestDay.value) bestDay = d;
     }
-    const sorted = [...activeDays].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
-    let bestStreak = 1;
-    let currentStreak = 1;
-    for (let i = 1; i < sorted.length; i++) {
-      const prevMs = Date.parse(`${sorted[i - 1].dateKey}T00:00:00Z`);
-      const currMs = Date.parse(`${sorted[i].dateKey}T00:00:00Z`);
-      currentStreak = currMs - prevMs === 86_400_000 ? currentStreak + 1 : 1;
-      if (currentStreak > bestStreak) bestStreak = currentStreak;
-    }
+    const bestStreak = longestActiveStreak(days);
     return [
       `Activity heatmap: ${total} total across ${weekColumns.length} weeks.`,
       `Best day ${bestDay.dateKey} with ${bestDay.value}.`,
