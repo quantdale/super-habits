@@ -169,18 +169,16 @@ export function findGateFiles(files) {
 }
 
 /**
- * Files excluded from the scan because they implement or test the quarantine
- * mechanism itself rather than carrying a product gate.
+ * Files this guard scans: Playwright spec files under `e2e/` and Vitest test files under `tests/`.
  *
- * `tests/quarantineRegisterParity.test.ts` holds this guard's own fixtures —
- * gate-call syntax inside string literals, which `stripComments` deliberately
- * preserves. Scanning it would report the guard as its own unregistered gate.
+ * There is deliberately no self-exclusion list. The guard used to skip its own
+ * fixture file (`tests/quarantineRegisterParity.test.ts`, which held gate-call
+ * syntax inside string literals) because `stripComments` preserves literals and
+ * would have reported the guard as its own unregistered gate. That file was
+ * deleted in the test-suite triage, so an exclusion naming it would be dead
+ * state that silently widens the scan hole if the name is ever reused.
  */
-const MECHANISM_FILES = [/(^|[\\/])tests[\\/]quarantineRegisterParity\.test\.ts$/];
-
-/** Files this guard scans: Playwright spec files under `e2e/` and Vitest test files under `tests/`. */
 function isScannableFile(file) {
-  if (MECHANISM_FILES.some((pattern) => pattern.test(file))) return false;
   return (
     /(^|[\\/])e2e[\\/].*\.spec\.ts$/.test(file) || /(^|[\\/])tests[\\/].*\.test\.ts$/.test(file)
   );

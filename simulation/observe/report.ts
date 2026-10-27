@@ -8,8 +8,7 @@
  *
  * This module is PURE TypeScript — no fs, no Playwright, no browser. Artifact
  * *writing* lives in `observe/artifacts.ts`; this module only defines the
- * shape and the parse/validate functions, so it is unit-testable in isolation
- * (`tests/simulation.report.test.ts`).
+ * shape and the parse/validate functions, so it is checkable in isolation.
  *
  * The report also carries an `actionLog`: a deterministic, duration-free list
  * of the semantic actions actually taken. Identical seeds + `deterministic`

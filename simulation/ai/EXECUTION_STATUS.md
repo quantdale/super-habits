@@ -21,8 +21,7 @@ screenshots, or state — is forbidden and was not done.
   objectives (error-prone user in Todos+Calories, new-device restore attempt,
   power-user linked actions, daily driver across simulated midnight), each with
   persona, fixture, budget, and rubric and **no prescribed steps**.
-- The report schema + validator (task 7.1): `simulation/ai/anomaly-report.ts`,
-  unit-tested in `tests/simulation.anomaly.test.ts`.
+- The report schema + validator (task 7.1): `simulation/ai/anomaly-report.ts`.
 - The runbook (task 7.3): `simulation/ai/RUNBOOK.md` — how to execute, against
   which build, where reports land, the triage rule, and the CI-wiring open
   question (task 7.5).

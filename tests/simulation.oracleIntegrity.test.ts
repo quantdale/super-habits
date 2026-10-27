@@ -10,7 +10,7 @@
  * These tests discriminate the fixed contract at the model boundary, at the
  * runner's oracle evaluator/dispatch boundary, and at the placeholder binding
  * that lets a scenario assert on an id it actually produced. The browser-driven
- * end-to-end proof lives in `tests/simulation.oracleIntegrity.browser.test.ts`
+ * end-to-end proof lives in `simulation/runner/specs/oracleIntegrity.spec.ts`
  * (Playwright, real page) and in the deterministic scenario lane.
  */
 
