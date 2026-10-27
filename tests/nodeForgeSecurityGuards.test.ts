@@ -9,9 +9,9 @@ import { createRequire } from 'node:module';
  * (change `resolve-windows-dependency-security`, tasks 4.1/4.2 in their
  * blocked-branch form; the goal's "dependency/cryptographic regression tests").
  *
- * WHAT THIS IS NOT: remediation. The known-vulnerable `node-forge@1.4.0`
- * (GHSA-86w9-cpqp-85rv) is still installed and the live audit must stay red
- * until a safe repair exists (see `openspec/changes/.../options-ledger.md`).
+ * Remediated 2026-10-27: node-forge is bumped to 1.4.2, which fixes
+ * GHSA-86w9-cpqp-85rv (previously the vulnerable 1.4.0 was pinned here; see
+ * `openspec/changes/.../options-ledger.md` for the history).
  * These guards execute the ACTUAL security behavior instead of script text:
  *
  *  1. A semantic dependency-resolution guard that pins the DOCUMENTED exposure
@@ -51,9 +51,10 @@ type ForgeGraph = {
 };
 
 /**
- * The documented resolution as of 2026-10-02 (exposure-assessment.md §1):
- * ONE physical copy at node_modules/node-forge, version 1.4.0 — still
- * VULNERABLE on purpose; the audit gate stays red. This constant documents
+ * The documented resolution as of 2026-10-27: ONE physical copy at
+ * node_modules/node-forge, version 1.4.2 (fixed for GHSA-86w9-cpqp-85rv),
+ * forced via the root devDependency `^1.4.2` plus `overrides["node-forge"]`.
+ * Previously (2026-10-02) the documented copy was the vulnerable 1.4.0. This constant documents
  * KNOWN state, not safety. Updating the dependency must update this constant
  * in the same change (the drift tests below enforce that).
  *
@@ -63,13 +64,13 @@ type ForgeGraph = {
  * to the same physical copy; no effect on the production audit tree).
  */
 const DOCUMENTED_RESOLUTION: ForgeGraph = {
-  copies: [{ path: 'node_modules/node-forge', version: '1.4.0', dev: false }],
+  copies: [{ path: 'node_modules/node-forge', version: '1.4.2', dev: false }],
   parents: [
-    { path: '(root)', range: '^1.3.3', dev: true },
+    { path: '(root)', range: '^1.4.2', dev: true },
     { path: 'node_modules/@expo/cli', range: '^1.3.3', dev: false },
     { path: 'node_modules/@expo/code-signing-certificates', range: '^1.3.3', dev: false },
   ],
-  installedVersion: '1.4.0',
+  installedVersion: '1.4.2',
 };
 
 function extractForgeGraph(
@@ -244,19 +245,21 @@ describe('node-forge nested-DigestAlgorithm verification defect (GHSA-86w9-cpqp-
     expect(reparsed.value[0].value).toHaveLength(3); // OID + NULL + EXTRA
   });
 
-  it('TRIPWIRE: installed node-forge 1.4.0 ACCEPTS the nested-DigestAlgorithm forgery shape', () => {
+  it('REGRESSION: installed node-forge REJECTS the nested-DigestAlgorithm forgery shape', () => {
     // This assertion DOCUMENTS the advisory's presence at the documented
     // resolution (GHSA-86w9-cpqp-85rv: "RSA PKCS#1 v1.5 signature verification
     // accepts extra nested DigestAlgorithm elements"). A conformant verifier
     // must REJECT this input. When a fixed node-forge release replaces the
     // documented resolution, this test flips red on purpose — update it in the
     // same change to require `rejected`, alongside the resolution guard.
+    // Flipped 2026-10-27 with the bump to node-forge 1.4.2: the fixed verifier
+    // must reject this input; acceptance would mean the advisory regressed.
     const signature = keyPair.privateKey.sign(nestedGarbageDigestInfoDer(digestBytes()), 'NONE');
-    expect(tryVerify(digestBytes(), signature)).toBe(true);
+    expect(tryVerify(digestBytes(), signature)).toBe('rejected');
   });
 
-  it('the digest content is still compared (acceptance is specific, not blanket)', () => {
+  it('also rejects the forgery shape for a different digest (no accept path)', () => {
     const signature = keyPair.privateKey.sign(nestedGarbageDigestInfoDer(digestBytes()), 'NONE');
-    expect(tryVerify('other digest bytes................', signature)).toBe(false);
+    expect(tryVerify('other digest bytes................', signature)).toBe('rejected');
   });
 });
