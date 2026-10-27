@@ -193,6 +193,47 @@ describe('buildActivityTimeline data layer', () => {
     expect(calorieCall?.[1]).toEqual(['2026-05-23']);
   });
 
+  // Pages are slices of ONE merged feed, so paging neither loses a row from a
+  // light source nor serves the same row twice.
+  it('pages one merged newest-first feed without losing rows across pages', async () => {
+    const now = new Date('2026-08-20T12:00:00');
+    const todos = Array.from({ length: 60 }, (_, i) => ({
+      id: `todo_${i}`,
+      title: `Task ${i}`,
+      completed_at: new Date(Date.UTC(2026, 6, 20, 10, 0, i)).toISOString(),
+    }));
+    const workouts = Array.from({ length: 2 }, (_, i) => ({
+      id: `wrk_${i}`,
+      routine_id: 'r1',
+      name: `Routine ${i}`,
+      completed_at: new Date(Date.UTC(2026, 6, 19, 10, 0, i)).toISOString(),
+    }));
+    getDatabase.mockResolvedValue(makeDb({ todos, workout_logs: workouts }));
+
+    const collected: string[] = [];
+    let after: { occurredAt: string; id: string } | undefined;
+    let guard = 0;
+    for (;;) {
+      const page = await buildActivityTimeline({ days: 'all', now, limit: 25, after });
+      expect(page.items.length).toBeLessThanOrEqual(25);
+      for (let i = 1; i < page.items.length; i += 1) {
+        expect(page.items[i - 1].occurredAt >= page.items[i].occurredAt).toBe(true);
+      }
+      collected.push(...page.items.map((item) => item.id));
+      if (!page.hasMore) break;
+      after = page.nextCursor ?? undefined;
+      expect(after, 'a page with hasMore carries a cursor').toBeDefined();
+      guard += 1;
+      expect(guard, 'paging terminates').toBeLessThan(20);
+    }
+
+    expect(collected).toHaveLength(62);
+    expect(new Set(collected).size).toBe(62);
+    // Both workouts (the oldest rows) survived paging.
+    expect(collected).toContain('workout:wrk_0');
+    expect(collected).toContain('workout:wrk_1');
+  });
+
   // F3 canonical history rule: completions of soft-deleted habits stay in the
   // timeline with a fallback label instead of vanishing via an INNER JOIN.
   it('keeps completions of deleted habits via LEFT JOIN with a fallback label', async () => {
@@ -204,7 +245,10 @@ describe('buildActivityTimeline data layer', () => {
     });
     getDatabase.mockResolvedValue(db);
 
-    const items = await buildActivityTimeline({ days: 30, now: new Date('2026-08-20T12:00:00') });
+    const { items } = await buildActivityTimeline({
+      days: 30,
+      now: new Date('2026-08-20T12:00:00'),
+    });
 
     const sql = db.getAllAsync.mock.calls.find((call) =>
       call[0].includes('FROM habit_completions'),
@@ -244,7 +288,10 @@ describe('buildActivityTimeline data layer', () => {
     });
     getDatabase.mockResolvedValue(db);
 
-    const items = await buildActivityTimeline({ days: 30, now: new Date('2026-08-20T12:00:00') });
+    const { items } = await buildActivityTimeline({
+      days: 30,
+      now: new Date('2026-08-20T12:00:00'),
+    });
     const backdated = items.find((item) => item.id === 'habit:hc_backdated');
     const single = items.find((item) => item.id === 'habit:hc_single');
 
@@ -263,7 +310,10 @@ describe('buildActivityTimeline data layer', () => {
     });
     getDatabase.mockResolvedValue(db);
 
-    const items = await buildActivityTimeline({ days: 30, now: new Date('2026-08-20T12:00:00') });
+    const { items } = await buildActivityTimeline({
+      days: 30,
+      now: new Date('2026-08-20T12:00:00'),
+    });
     const corrupt = items.find((item) => item.id === 'habit:hc_corrupt');
     expect(corrupt?.dateKey).toBe('2026-08-05');
   });
@@ -283,7 +333,10 @@ describe('buildActivityTimeline data layer', () => {
     });
     getDatabase.mockResolvedValue(db);
 
-    const items = await buildActivityTimeline({ days: 30, now: new Date('2026-08-20T12:00:00') });
+    const { items } = await buildActivityTimeline({
+      days: 30,
+      now: new Date('2026-08-20T12:00:00'),
+    });
     const decremented = items.find((item) => item.id === 'habit:hc_decremented');
     expect(decremented?.title).toBe('Logged "Water"');
     expect(decremented?.title.startsWith('Completed')).toBe(false);

@@ -1,13 +1,13 @@
 import { test, expect, type Page } from './fixtures';
 import { clearDatabase } from './helpers/db';
-import { goToTab } from './helpers/navigation';
+import { goToTab, planningHubTab } from './helpers/navigation';
 import { queryRows } from './helpers/dbHarness';
 
 /** W11 disclosure & planning journeys. SQLite oracles come last because the
  * database harness replaces the active app page/worker. */
 async function openPlanning(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Plan today' }).click();
-  await expect(page.getByRole('tab', { name: 'Projects' })).toBeVisible({ timeout: 20_000 });
+  await expect(planningHubTab(page, 'Projects')).toBeVisible({ timeout: 20_000 });
 }
 
 test.describe('W11 Planning disclosure hierarchy', () => {
@@ -20,7 +20,7 @@ test.describe('W11 Planning disclosure hierarchy', () => {
 
   test('projects show objective first; filters preserve state when collapsed', async ({ page }) => {
     await openPlanning(page);
-    await page.getByRole('tab', { name: 'Projects' }).click();
+    await planningHubTab(page, 'Projects').click();
     await page.getByRole('button', { name: 'Create project' }).click();
     await expect(page.getByRole('button', { name: 'Project more options' })).toHaveAttribute(
       'aria-expanded',
@@ -82,7 +82,7 @@ test.describe('W11 Planning disclosure hierarchy', () => {
 
   test('goals share the row grammar and preserve manual progress', async ({ page }) => {
     await openPlanning(page);
-    await page.getByRole('tab', { name: 'Goals' }).click();
+    await planningHubTab(page, 'Goals').click();
     await page.getByRole('button', { name: 'Create goal' }).click();
     await expect(page.getByRole('button', { name: 'Goal more options' })).toHaveAttribute(
       'aria-expanded',

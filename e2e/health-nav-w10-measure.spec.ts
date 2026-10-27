@@ -118,7 +118,7 @@ async function barLabels(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const rail = document.querySelector('[aria-label="Section tabs"]');
     if (!rail) return [];
-    return Array.from(rail.querySelectorAll('[role="button"]')).map(
+    return Array.from(rail.querySelectorAll('[role="tab"]')).map(
       (el) => el.getAttribute('aria-label') ?? '',
     );
   });
@@ -154,7 +154,7 @@ async function startFromOverview(page: Page) {
 /** Tap the bar destination(s) that open `section`; returns taps spent. */
 async function openSectionFromBar(page: Page, section: 'Workout' | 'Calories'): Promise<number> {
   const rail = page.getByRole('tablist', { name: 'Section tabs' });
-  const direct = rail.getByRole('button', { name: section, exact: true });
+  const direct = rail.getByRole('tab', { name: section, exact: true });
   if (await direct.count()) {
     await direct.click();
     return 1;
@@ -243,7 +243,7 @@ test('D3 measurement: five-destination vs six-tab', async ({ page }) => {
       completed = await healthRemaining.isVisible().catch(() => false);
       detail = 'remaining kcal read on the Health parent surface';
     } else {
-      await rail.getByRole('button', { name: 'Calories', exact: true }).click();
+      await rail.getByRole('tab', { name: 'Calories', exact: true }).click();
       await page.waitForTimeout(900);
       // The remaining-kcal hero (the exact number varies with what the log-meal
       // flow already wrote, so the probe matches the indicator, not a value).
@@ -271,7 +271,7 @@ test('D3 measurement: five-destination vs six-tab', async ({ page }) => {
       let success = false;
       try {
         const rail = page.getByRole('tablist', { name: 'Section tabs' });
-        const direct = rail.getByRole('button', { name: label, exact: true });
+        const direct = rail.getByRole('tab', { name: label, exact: true });
         if (await direct.count()) {
           await direct.click();
           taps = 1;
@@ -304,9 +304,9 @@ test('D3 measurement: five-destination vs six-tab', async ({ page }) => {
         .getByRole('button', { name: 'Pause', exact: true })
         .waitFor({ state: 'visible', timeout: 15_000 });
       const rail = page.getByRole('tablist', { name: 'Section tabs' });
-      await rail.getByRole('button', { name: 'To Do', exact: true }).click();
+      await rail.getByRole('tab', { name: 'To Do', exact: true }).click();
       await page.waitForTimeout(600);
-      await rail.getByRole('button', { name: 'Focus', exact: true }).click();
+      await rail.getByRole('tab', { name: 'Focus', exact: true }).click();
       await page.waitForTimeout(900);
       const pause = page.getByRole('button', { name: 'Pause', exact: true }).first();
       record.sectionSwitch.activeSessionSurvivesSwitch = await pause.isVisible().catch(() => false);
@@ -327,7 +327,7 @@ test('D3 measurement: five-destination vs six-tab', async ({ page }) => {
     const geometry = await page.evaluate(() => {
       const rail = document.querySelector('[aria-label="Section tabs"]');
       if (!rail) return null;
-      const buttons = Array.from(rail.querySelectorAll('[role="button"]'));
+      const buttons = Array.from(rail.querySelectorAll('[role="tab"]'));
       let minTargetWidth = Number.POSITIVE_INFINITY;
       let minTargetHeight = Number.POSITIVE_INFINITY;
       let minLabelFontPx = Number.POSITIVE_INFINITY;

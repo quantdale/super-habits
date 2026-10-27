@@ -126,14 +126,17 @@ test.describe('W12 Progress and Activity reconstruction', () => {
     );
     await expect(dialog.getByRole('button', { name: 'Filter timeline by Habits' })).toBeVisible();
     await expect(
-      dialog.getByRole('button', { name: 'Show activity from the last 7d' }),
+      dialog.getByRole('button', { name: 'Show activity from the last 7 days' }),
     ).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Show activity from all time' })).toHaveCount(
+      1,
+    );
     await expect(dialog.getByRole('button', { name: 'All days' })).toBeVisible();
 
     // Selecting a non-default filter updates the closed control's summary and
     // signals an active filter count.
     await dialog.getByRole('button', { name: 'Filter timeline by Habits' }).click();
-    await dialog.getByRole('button', { name: 'Show activity from the last 7d' }).click();
+    await dialog.getByRole('button', { name: 'Show activity from the last 7 days' }).click();
     await dialog.getByRole('button', { name: 'Timeline filters, 2 active' }).click();
     await expect(dialog).toContainText('Habits · Last 7 days');
 
@@ -184,5 +187,56 @@ test.describe('W12 Progress and Activity reconstruction', () => {
     const dialog = await openHubView(page, 'Timeline');
     await expect(dialog.getByText('Nothing logged yet')).toBeVisible({ timeout: 20_000 });
     await expect(dialog.getByText('No matching activity')).toHaveCount(0);
+  });
+
+  // Audit C §7: "All time" used to run the same 90-day, per-source-truncated
+  // query as "90d". It must now reach history older than 90 days, in pages.
+  test('Activity "All time" reaches history older than 90 days, one page at a time', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    const oldestDayKey = await page.evaluate(() => {
+      const d = new Date();
+      d.setDate(d.getDate() - 400);
+      const p = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    });
+    const oldestStamp = `${oldestDayKey}T08:00:00.000Z`;
+
+    // One 400-day-old completion (invisible to every bounded chip) plus enough
+    // recent rows to push the merged feed past the first page.
+    const recentRows = Array.from({ length: 130 }, (_, i) => {
+      const id = `w12all_${String(i).padStart(3, '0')}`;
+      const stamp = new Date(Date.now() - i * 60_000).toISOString();
+      return `INSERT INTO todos (id,title,notes,completed,created_at,updated_at,deleted_at,due_date,priority,sort_order,recurrence,recurrence_id,completed_at)
+        VALUES ('${id}','Paged ${i}',null,1,'${stamp}','${stamp}',null,null,'normal',0,null,null,'${stamp}');`;
+    }).join('\n');
+    await runSql(
+      page,
+      `INSERT INTO todos (id,title,notes,completed,created_at,updated_at,deleted_at,due_date,priority,sort_order,recurrence,recurrence_id,completed_at)
+         VALUES ('w12all_old','Ancient task',null,1,'${oldestStamp}','${oldestStamp}',null,null,'normal',0,null,null,'${oldestStamp}');
+       ${recentRows}`,
+    );
+    await returnToApp(page);
+
+    const dialog = await openHubView(page, 'Timeline');
+    const loadMore = dialog.getByRole('button', { name: 'Load more' });
+    await expect(loadMore).toBeVisible({ timeout: 30_000 });
+    // The default 30-day window genuinely cannot see the ancient row.
+    await expect(dialog.getByText('Ancient task')).toHaveCount(0);
+
+    await dialog.getByRole('button', { name: 'Timeline filters' }).click();
+    await dialog.getByRole('button', { name: 'Show activity from all time' }).click();
+    await expect(dialog).toContainText('All time');
+
+    // Paging is the only way to that row: take pages until it shows up.
+    const ancient = dialog.getByText('Ancient task');
+    for (let paged = 0; paged < 5 && !(await ancient.isVisible()); paged += 1) {
+      await loadMore.click();
+      await page.waitForTimeout(300);
+    }
+    await expect(ancient).toBeVisible({ timeout: 20_000 });
+    // The feed is exhausted, so the paging control is gone.
+    await expect(loadMore).toHaveCount(0);
   });
 });

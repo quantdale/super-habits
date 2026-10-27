@@ -342,7 +342,7 @@ defineJourney({
         await page.getByRole('button', { name: 'Close settings' }).click();
 
         // First synced write on the fresh anonymous install.
-        await page.getByRole('button', { name: TAB_LABELS.todos, exact: true }).click();
+        await page.getByRole('tab', { name: TAB_LABELS.todos, exact: true }).click();
         await page.getByRole('button', { name: 'Add task with details', exact: true }).click();
         await page.getByPlaceholder(/Add a task/i).fill('First synced todo');
         await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
@@ -390,7 +390,7 @@ defineJourney({
         await page.getByRole('button', { name: 'Close settings' }).click();
 
         // The user keeps using the app while the OTP is pending.
-        await page.getByRole('button', { name: TAB_LABELS.todos, exact: true }).click();
+        await page.getByRole('tab', { name: TAB_LABELS.todos, exact: true }).click();
         await page.getByRole('button', { name: 'Add task with details', exact: true }).click();
         await page.getByPlaceholder(/Add a task/i).fill('Todo while code pending');
         await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
@@ -444,7 +444,7 @@ defineJourney({
         // buttons (same protocol as helpers/navigation.goToTab).
         await page
           .getByRole('tablist', { name: 'Section tabs' })
-          .getByRole('button', { name: TAB_LABELS.pomodoro, exact: true })
+          .getByRole('tab', { name: TAB_LABELS.pomodoro, exact: true })
           .click();
         await page.getByText('Start focus', { exact: true }).click();
         await page.clock.fastForward(25 * 60 * 1000);
@@ -461,7 +461,7 @@ defineJourney({
         // Scope to the tab rail landmark (see the Focus note above).
         await page
           .getByRole('tablist', { name: 'Section tabs' })
-          .getByRole('button', { name: TAB_LABELS.overview, exact: true })
+          .getByRole('tab', { name: TAB_LABELS.overview, exact: true })
           .click();
         await page.getByRole('button', { name: 'Open settings' }).click();
         await expect(page.getByText('Anonymous / unprotected', { exact: true })).toBeVisible();

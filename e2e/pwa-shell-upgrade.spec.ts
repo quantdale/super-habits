@@ -186,7 +186,7 @@ test.describe('real two-build shell upgrade', () => {
     await context.setOffline(true);
     try {
       await page.reload({ waitUntil: 'domcontentloaded' });
-      await page.getByRole('button', { name: 'Today', exact: true }).first().waitFor({
+      await page.getByRole('tab', { name: 'Today', exact: true }).first().waitFor({
         timeout: 60_000,
       });
       // The offline boot is build B's real JavaScript, verified by the inlined

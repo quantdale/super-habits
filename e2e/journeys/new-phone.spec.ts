@@ -382,7 +382,7 @@ defineJourney({
         // This contract holds on BOTH builds: eligibility is gated on local
         // rows before remote availability, so adding a todo blocks restore
         // regardless of whether a remote boundary exists.
-        await page.getByRole('button', { name: 'To Do', exact: true }).click();
+        await page.getByRole('tab', { name: 'To Do', exact: true }).click();
         await page.getByRole('button', { name: 'Add task with details', exact: true }).click();
         await page.getByPlaceholder(/Add a task/i).fill('New phone todo');
         await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
@@ -491,7 +491,7 @@ defineJourney({
         // Positive UI: the imported habit survived, but with no completion
         // history its streak is 0 — the current-streak stat reads zero.
         await returnToApp(page);
-        await page.getByRole('button', { name: 'Habits', exact: true }).click();
+        await page.getByRole('tab', { name: 'Habits', exact: true }).click();
         await expect(page.getByText('Hydrate').first()).toBeVisible();
         // The compact current UI keeps aggregate stats behind Trends.
         await page.getByRole('button', { name: 'Trends' }).click();

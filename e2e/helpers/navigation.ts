@@ -18,6 +18,37 @@ export const TAB_LABELS = {
 } as const;
 
 /**
+ * The app's primary section rail (bottom bar on narrow viewports, side rail on
+ * wide ones). Every rail destination is an ARIA `tab` of this `tablist`.
+ *
+ * Always resolve rail destinations through this helper rather than an
+ * unscoped `getByRole('tab', { name })`: the Planning Hub, the Habit detail
+ * modal, the Pomodoro presets and the Calories day navigator all render their
+ * own tablists, and several reuse a section label (`Today`, `Timeline`,
+ * `Settings`). An unscoped lookup then strict-matches two tabs and fails.
+ */
+export function sectionRail(page: Page) {
+  return page.getByRole('tablist', { name: 'Section tabs' });
+}
+
+/** One rail destination inside the primary section rail. */
+export function sectionTab(page: Page, label: string) {
+  return sectionRail(page).getByRole('tab', { name: label, exact: true });
+}
+
+/**
+ * The Planning Hub's own view switcher (Today / Projects / Goals / Progress /
+ * Timeline). Hub views are `tab`s of the "Planning hub views" `tablist`, and
+ * `Today` also names a rail destination — an unscoped lookup is ambiguous
+ * whenever the hub drawer is open.
+ */
+export function planningHubTab(page: Page, label: string) {
+  return page
+    .getByRole('tablist', { name: 'Planning hub views' })
+    .getByRole('tab', { name: label, exact: true });
+}
+
+/**
  * Click a rail tab — the six-destination bar resolves every section label
  * directly (the W4–W9 Health-parent indirection was removed by the W10 D3
  * gate; `health` has no destination of its own).
@@ -26,14 +57,15 @@ export async function goToTab(page: Page, tab: keyof typeof TAB_LABELS): Promise
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   // Scope to the tab rail landmark: the first-run onboarding card on Overview
   // exposes interest chips whose labels can equal a tab label (Habits, Focus,
-  // Workout), so an unscoped lookup strict-matches two buttons.
-  const rail = page.getByRole('tablist', { name: 'Section tabs' });
+  // Workout), so an unscoped lookup strict-matches two controls. Rail
+  // destinations are ARIA `tab` (audit C §11), not `button`.
+  const rail = sectionRail(page);
   if (tab === 'health') {
     // Health is not a bar destination in the six-tab model; it is reached via
     // the command center or a deep link. Specs that need it drive those paths.
     throw new Error("goToTab('health'): Health has no rail destination in the six-tab model");
   }
-  await rail.getByRole('button', { name: TAB_LABELS[tab], exact: true }).click();
+  await rail.getByRole('tab', { name: TAB_LABELS[tab], exact: true }).click();
   // Wait until React has hydrated all inputs — React attaches __reactFiber$xxx
   // properties to DOM nodes during hydration. Filling SSR-rendered inputs before
   // hydration sets DOM values that React immediately overrides with controlled state.

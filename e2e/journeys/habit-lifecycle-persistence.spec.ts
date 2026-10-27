@@ -51,7 +51,7 @@ async function dropLifecycleFailTrigger(page: Page) {
 
 /** The app always re-lands on Today after a harness round-trip. */
 async function openHabitDetailSettings(page: Page) {
-  await page.getByRole('button', { name: 'Habits', exact: true }).first().click();
+  await page.getByRole('tab', { name: 'Habits', exact: true }).first().click();
   // A paused/archived habit is hidden by the default Active filter; switch
   // the status filter to All before looking for the row (established pattern
   // from habits-w7-audit.spec.ts).

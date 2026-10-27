@@ -62,7 +62,7 @@ async function dismissStartupRestorePromptIfPresent(page: Page) {
  * targeted explicitly to avoid a strict-mode collision in `switchSection`.
  */
 async function goToFocus(page: Page) {
-  await page.getByRole('button', { name: 'Focus', exact: true }).first().click();
+  await page.getByRole('tab', { name: 'Focus', exact: true }).first().click();
 }
 
 function getThemeIdAttr(page: Page) {
@@ -108,7 +108,7 @@ defineJourney({
         await returnToApp(page);
         await dismissStartupRestorePromptIfPresent(page);
         // The overview shell is the entry point to the settings launcher.
-        await expect(page.getByRole('button', { name: 'Today', exact: true })).toBeVisible();
+        await expect(page.getByRole('tab', { name: 'Today', exact: true })).toBeVisible();
       },
     },
     {
