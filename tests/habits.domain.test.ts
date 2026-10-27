@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   ALL_HABIT_WEEKDAYS,
   applyHabitLifecycleTransition,
@@ -760,5 +760,161 @@ describe('shouldAwardHabitFastPath (today-only confirmed-write gate)', () => {
     // incrementHabit returns count 0 (not a throw) for missing, paused,
     // archived, or unscheduled writes.
     expect(shouldAwardHabitFastPath(today, 0, today)).toBe(false);
+  });
+});
+
+/**
+ * Audit C §15 / Top-10 #10 — the 364-cell grid used to `JSON.parse` a habit's
+ * serialized rule/lifecycle history once per cell (~364 parses per habit per
+ * refresh). These tests pin the fix from both sides: identical output, and a
+ * parse count that is a function of history VARIETY, not of window length.
+ */
+describe('habit history parse cost (grid hot path)', () => {
+  const ruleHistory = JSON.stringify([
+    { effective_from_date: '2025-01-01', weekdays: [1, 2, 3, 4, 5, 6, 7], target_per_day: 1 },
+    { effective_from_date: '2026-01-05', weekdays: [1, 3, 5], target_per_day: 2 },
+  ]);
+  const lifecycleHistory = JSON.stringify([
+    { status: 'paused', from_date_key: '2026-03-02', to_date_key: '2026-03-09' },
+    { status: 'archived', from_date_key: '2026-06-01', to_date_key: null },
+  ]);
+  const todayKey = '2026-08-20';
+
+  /** Deliberately unoptimised: one parse per cell through the public entries. */
+  function referenceCell(dateKey: string, count: number) {
+    const rule = getHabitRuleForDate(ruleHistory, dateKey, 1, '2025-01-01');
+    const scheduled =
+      rule !== null &&
+      rule.weekdays.includes(
+        (dateKeyToLocalDate(dateKey).getDay() || 7) as 1 | 2 | 3 | 4 | 5 | 6 | 7,
+      ) &&
+      !isHabitLifecycleMaskedOn(lifecycleHistory, dateKey);
+    const eligible = scheduled && dateKey <= todayKey;
+    const target = rule?.target_per_day ?? 1;
+    return {
+      dateKey,
+      count,
+      targetPerDay: target,
+      scheduled,
+      eligible,
+      completed: eligible && target > 0 && count >= target,
+      partial: eligible && count > 0 && count < target,
+    };
+  }
+
+  function readGrid() {
+    return buildHabitGrid(
+      [
+        {
+          id: 'habit_a',
+          name: 'Read',
+          color: '#fff',
+          target_per_day: 1,
+          rule_history: ruleHistory,
+          lifecycle_history: lifecycleHistory,
+          created_at: '2025-01-01T00:00:00.000Z',
+        },
+      ],
+      [
+        { habit_id: 'habit_a', date_key: '2026-08-17', count: 2 },
+        { habit_id: 'habit_a', date_key: '2026-03-04', count: 1 },
+      ],
+      364,
+      todayKey,
+    );
+  }
+
+  it('buildHabitGrid output is identical to one-parse-per-cell resolution', () => {
+    const grid = readGrid();
+    expect(grid[0].cells).toEqual(
+      grid[0].cells.map((cell) => referenceCell(cell.dateKey, cell.count)),
+    );
+    // The fixture really exercises both masks and a mid-window target change.
+    expect(grid[0].cells.some((cell) => !cell.scheduled && cell.dateKey <= todayKey)).toBe(true);
+    expect(grid[0].cells.some((cell) => cell.targetPerDay === 2)).toBe(true);
+  });
+
+  it('parse cost is independent of the window length, not one parse per cell', () => {
+    // A unique serialized history per assertion keeps the measurement honest
+    // whether or not an earlier test already warmed the memo.
+    const unique = (suffix: string) =>
+      JSON.stringify([
+        {
+          effective_from_date: '2025-01-01',
+          weekdays: [1, 2, 3, 4, 5, 6, 7],
+          target_per_day: 1,
+          note: suffix,
+        },
+        { effective_from_date: '2026-01-05', weekdays: [1, 3, 5], target_per_day: 2 },
+      ]);
+    const measure = (days: number) => {
+      const jsonParse = vi.spyOn(JSON, 'parse');
+      try {
+        const grid = buildHabitGrid(
+          [
+            {
+              id: 'habit_a',
+              name: 'Read',
+              color: '#fff',
+              target_per_day: 1,
+              rule_history: unique(`grid-${days}`),
+              lifecycle_history: unique(`life-${days}`),
+              created_at: '2025-01-01T00:00:00.000Z',
+            },
+          ],
+          [],
+          days,
+          todayKey,
+        );
+        expect(grid[0].cells).toHaveLength(days);
+        return jsonParse.mock.calls.length;
+      } finally {
+        jsonParse.mockRestore();
+      }
+    };
+
+    const short = measure(364);
+    const long = measure(3640);
+    // One parse per distinct serialized history (rule + lifecycle); a
+    // per-cell implementation would scale with the window (364 vs 3,640).
+    expect(short).toBeLessThanOrEqual(8);
+    expect(long).toBeLessThanOrEqual(8);
+    expect(long - short).toBeLessThanOrEqual(2);
+  });
+
+  it('a newly serialized history is never served from the previous cache entry', () => {
+    // Rule-history writes serialize a NEW string, so the serialized value is a
+    // safe cache key and needs no invalidation hook.
+    const v1 = JSON.stringify([
+      { effective_from_date: '2026-01-01', weekdays: [1], target_per_day: 1 },
+    ]);
+    const v2 = JSON.stringify([
+      { effective_from_date: '2026-01-01', weekdays: [5], target_per_day: 3 },
+    ]);
+    expect(getHabitRuleForDate(v1, '2026-01-05')).toMatchObject({
+      weekdays: [1],
+      target_per_day: 1,
+    });
+    expect(getHabitRuleForDate(v2, '2026-01-05')).toMatchObject({
+      weekdays: [5],
+      target_per_day: 3,
+    });
+    expect(getHabitRuleForDate(v1, '2026-01-05')).toMatchObject({
+      weekdays: [1],
+      target_per_day: 1,
+    });
+  });
+
+  it('callers that mutate a returned history array cannot poison the cache', () => {
+    const rules = JSON.stringify([
+      { effective_from_date: '2026-01-01', weekdays: [1, 2], target_per_day: 1 },
+    ]);
+    const intervals = JSON.stringify([
+      { status: 'paused', from_date_key: '2026-01-01', to_date_key: null },
+    ]);
+    parseHabitRuleHistory(rules).push(createHabitRule('2026-02-01', [3], 9));
+    parseHabitLifecycleHistory(intervals).pop();
+    expect(parseHabitRuleHistory(rules)).toEqual([createHabitRule('2026-01-01', [1, 2], 1)]);
+    expect(parseHabitLifecycleHistory(intervals)).toHaveLength(1);
   });
 });
