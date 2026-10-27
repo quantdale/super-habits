@@ -617,7 +617,6 @@ async function seedSourceDevice(db: TestDatabase) {
   const calories = await import('@/features/calories/calories.data');
   const pomodoro = await import('@/features/pomodoro/pomodoro.data');
   const workout = await import('@/features/workout/workout.data');
-  const linkedActions = await import('@/core/linked-actions/linkedActions.data');
   const projects = await import('@/features/projects/projects.data');
   const goals = await import('@/features/goals/goals.data');
   const dailyPlan = await import('@/features/daily-plan/dailyPlan.data');
@@ -658,22 +657,22 @@ async function seedSourceDevice(db: TestDatabase) {
     [habitId, habitId, habitId],
   );
   // Link the todo → habit rule (future events must fire exactly once).
-  await linkedActions.createLinkedActionRule({
-    status: 'active',
-    directionPolicy: 'one_way',
-    source: {
-      feature: 'todos',
-      entityType: 'todo',
-      entityId: todoId,
+  await todos.saveTodoLinkedActionRules(todoId, [
+    {
       triggerType: 'todo.completed',
+      target: {
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: habitId,
+        effect: {
+          kind: 'progress',
+          type: 'habit.increment',
+          amount: 1,
+          dateStrategy: 'source_date',
+        },
+      },
     },
-    target: {
-      feature: 'habits',
-      entityType: 'habit',
-      entityId: habitId,
-      effect: { kind: 'progress', type: 'habit.increment', amount: 1, dateStrategy: 'source_date' },
-    },
-  });
+  ]);
   await calories.addCalorieEntry({
     foodName: 'Oatmeal',
     calories: 300,
@@ -850,7 +849,9 @@ describe('backup completeness v2 restore', () => {
     expect(detailed?.exercises[0].supports_external_load).toBe(1);
     expect(detailed?.exercises[0].sets).toHaveLength(1);
     expect(detailed?.exercises[0].sets[0].active_seconds).toBe(40);
-    const logs = await workout.listWorkoutLogs();
+    // `completed_at` is wall-clock at log time, so read a deliberately wide range
+    // (the range read is the live equivalent of the deleted convenience listing).
+    const logs = await workout.listWorkoutLogsForRange('2000-01-01', '2100-01-01');
     expect(logs).toHaveLength(1);
     expect(logs[0].notes).toBe('Felt strong');
     const restoredSessionExercise = await targetDb.getFirstAsync<{
@@ -893,8 +894,7 @@ describe('backup completeness v2 restore', () => {
     expect(pomodoroSettings.focusMinutes).toBe(50);
 
     // Linked-action rule restored; ledgers empty; NO historical replay.
-    const linkedActions = await import('@/core/linked-actions/linkedActions.data');
-    const rules = await linkedActions.listLinkedActionRules();
+    const rules = await todos.listTodoLinkedActionRules(todoRows[0].id);
     expect(rules).toHaveLength(1);
     expect(rules[0].rawEffectType).toBe('habit.increment');
     const events = await targetDb.getFirstAsync<{ count: number }>(

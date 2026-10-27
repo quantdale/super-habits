@@ -1,29 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { freshDatabase } from './helpers/db';
+import { saveHabitRules } from './helpers/linkedActionRules';
 import { toDateKey } from '@/lib/time';
 
 async function seedThresholdCase(targetPerDay: number) {
   const db = await freshDatabase();
   const habits = await import('@/features/habits/habits.data');
   const todos = await import('@/features/todos/todos.data');
-  const linked = await import('@/core/linked-actions/linkedActions.data');
   const habitId = await habits.addHabit(`Concurrent ${targetPerDay}`, targetPerDay);
   const todoId = await todos.addTodo({ title: `threshold ${targetPerDay}` });
 
-  await linked.createLinkedActionRule({
-    source: {
-      feature: 'habits',
-      entityType: 'habit',
-      entityId: habitId,
+  await saveHabitRules(habitId, [
+    {
       triggerType: 'habit.completed_for_day',
+      target: {
+        feature: 'todos',
+        entityType: 'todo',
+        entityId: todoId,
+        effect: { kind: 'binary', type: 'todo.complete' },
+      },
     },
-    target: {
-      feature: 'todos',
-      entityType: 'todo',
-      entityId: todoId,
-      effect: { kind: 'binary', type: 'todo.complete' },
-    },
-  });
+  ]);
 
   return { db, habits, habitId };
 }

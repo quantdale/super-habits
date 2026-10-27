@@ -88,10 +88,6 @@ export function serializeCardLayout(visibleIds: readonly OverviewCardId[]): stri
   return JSON.stringify(unique);
 }
 
-export function isCardVisible(layout: readonly OverviewCardId[], id: OverviewCardId): boolean {
-  return layout.includes(id);
-}
-
 /** Toggle a card's visibility while preserving the relative order of the rest. */
 export function toggleCardVisibility(
   layout: readonly OverviewCardId[],
@@ -148,13 +144,6 @@ export function formatTodayHeading(date: Date): string {
     month: 'long',
     day: 'numeric',
   }).format(date);
-}
-
-/** Human label for a due date relative to today's local date key. */
-export function formatDueDateLabel(dueDate: string, todayKey: string): string {
-  if (dueDate < todayKey) return 'Overdue';
-  if (dueDate === todayKey) return 'Due today';
-  return `Due ${dueDate}`;
 }
 
 // ---------------------------------------------------------------------------

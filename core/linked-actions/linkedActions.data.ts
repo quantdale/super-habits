@@ -15,7 +15,6 @@ import { upsertSyncOutboxRecord } from '@/core/sync/syncPersistence';
 import { syncEngine, type PreparedSyncRecord, type SyncRecord } from '@/core/sync/sync.engine';
 import { resolveSyncOwnerUserId } from '@/core/sync/syncedMutation';
 import {
-  type CreateLinkedActionRuleInput,
   type LinkedActionEventRecord,
   type LinkedActionEventRow,
   type LinkedActionExecutionRecord,
@@ -170,17 +169,6 @@ async function updateLinkedActionRuleRow(
   );
 }
 
-export async function listLinkedActionRules(): Promise<LinkedActionRuleDefinition[]> {
-  const db = await getDatabase();
-  const rows = await db.getAllAsync<LinkedActionRuleRow>(
-    `SELECT *
-     FROM linked_action_rules
-     WHERE deleted_at IS NULL
-     ORDER BY created_at DESC`,
-  );
-  return rows.map(normalizeLinkedActionRuleRow);
-}
-
 export async function listMatchingLinkedActionRules(
   source: Pick<LinkedActionSourceAction, 'feature' | 'entityType' | 'entityId' | 'triggerType'>,
   options?: { createdNotAfter?: string },
@@ -209,40 +197,6 @@ export async function listMatchingLinkedActionRules(
   return rows.map(normalizeLinkedActionRuleRow);
 }
 
-export async function getLinkedActionRule(id: string): Promise<LinkedActionRuleDefinition | null> {
-  const db = await getDatabase();
-  const row = await db.getFirstAsync<LinkedActionRuleRow>(
-    `SELECT *
-     FROM linked_action_rules
-     WHERE id = ?
-       AND deleted_at IS NULL`,
-    [id],
-  );
-  return row ? normalizeLinkedActionRuleRow(row) : null;
-}
-
-export async function listActiveLinkedActionRulesForSource(input: {
-  feature: LinkedActionFeature;
-  entityType: LinkedActionSourceEntityType;
-  entityId: string;
-  triggerType: LinkedActionTriggerType;
-}): Promise<LinkedActionRuleDefinition[]> {
-  const db = await getDatabase();
-  const rows = await db.getAllAsync<LinkedActionRuleRow>(
-    `SELECT *
-     FROM linked_action_rules
-     WHERE deleted_at IS NULL
-       AND status = 'active'
-       AND source_feature = ?
-       AND source_entity_type = ?
-       AND source_entity_id = ?
-       AND trigger_type = ?
-     ORDER BY created_at DESC`,
-    [input.feature, input.entityType, input.entityId, input.triggerType],
-  );
-  return rows.map(normalizeLinkedActionRuleRow);
-}
-
 export async function listLinkedActionRulesForSourceEntity(input: {
   feature: LinkedActionFeature;
   entityType: LinkedActionSourceEntityType;
@@ -260,37 +214,6 @@ export async function listLinkedActionRulesForSourceEntity(input: {
     [input.feature, input.entityType, input.entityId],
   );
   return rows.map(normalizeLinkedActionRuleRow);
-}
-
-export async function createLinkedActionRule(
-  input: CreateLinkedActionRuleInput,
-): Promise<LinkedActionRuleDefinition> {
-  const now = nowIso();
-  const rule: LinkedActionRuleDefinition = {
-    id: createId('link'),
-    status: input.status ?? 'active',
-    directionPolicy: input.directionPolicy ?? 'one_way',
-    bidirectionalGroupId: input.bidirectionalGroupId ?? null,
-    source: input.source,
-    target: input.target,
-    isUnsupported: false,
-    unsupportedReason: null,
-    rawTargetFeature: input.target.feature,
-    rawTargetEntityType: input.target.entityType,
-    rawEffectType: input.target.effect.type,
-    createdAt: now,
-    updatedAt: now,
-    deletedAt: null,
-  };
-
-  const row = buildLinkedActionRuleRow(rule);
-  const db = await getDatabase();
-  await runWithBackupIntents(db, async (transactionDb, intents) => {
-    await insertLinkedActionRuleRow(transactionDb, row);
-    intents.push(ruleIntent(rule.id, 'create', now));
-  });
-
-  return rule;
 }
 
 export async function replaceLinkedActionRulesForSourceEntity(input: {
@@ -407,39 +330,6 @@ export async function replaceLinkedActionRulesForSourceEntity(input: {
   }
   await runWithBackupIntents(db, async (transactionDb, intents) => {
     await apply(transactionDb, intents);
-  });
-}
-
-export async function updateLinkedActionRuleStatus(
-  id: string,
-  status: LinkedActionRuleDefinition['status'],
-): Promise<void> {
-  const db = await getDatabase();
-  const now = nowIso();
-  await runWithBackupIntents(db, async (transactionDb, intents) => {
-    await transactionDb.runAsync(
-      `UPDATE linked_action_rules
-       SET status = ?, updated_at = ?
-       WHERE id = ?
-         AND deleted_at IS NULL`,
-      [status, now, id],
-    );
-    intents.push(ruleIntent(id, 'update', now));
-  });
-}
-
-export async function deleteLinkedActionRule(id: string): Promise<void> {
-  const db = await getDatabase();
-  const now = nowIso();
-  await runWithBackupIntents(db, async (transactionDb, intents) => {
-    await transactionDb.runAsync(
-      `UPDATE linked_action_rules
-       SET deleted_at = ?, updated_at = ?
-       WHERE id = ?
-         AND deleted_at IS NULL`,
-      [now, now, id],
-    );
-    intents.push(ruleIntent(id, 'delete', now));
   });
 }
 

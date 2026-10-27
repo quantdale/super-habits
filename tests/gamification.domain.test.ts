@@ -10,7 +10,6 @@ import {
   evaluateBadges,
   isFreezeAccountingInconsistent,
   levelFromXp,
-  nextStreakMilestone,
   pickCelebration,
   planAutoFreeze,
   questProgressFor,
@@ -156,13 +155,6 @@ describe('streak multiplier and milestones', () => {
     expect(streakMilestoneXp(30)).toBe(150);
     expect(streakMilestoneXp(100)).toBe(STREAK_MILESTONE_XP_CAP);
     expect(streakMilestoneXp(365)).toBe(STREAK_MILESTONE_XP_CAP);
-  });
-
-  it('points at the next unreached milestone', () => {
-    expect(nextStreakMilestone(0)).toBe(3);
-    expect(nextStreakMilestone(3)).toBe(7);
-    expect(nextStreakMilestone(100)).toBe(180);
-    expect(nextStreakMilestone(400)).toBeNull();
   });
 });
 

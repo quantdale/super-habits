@@ -45,36 +45,6 @@ export function isValidWallClock(hour: unknown, minute: unknown): hour is number
   );
 }
 
-/**
- * The next occurrence of `weekday` at `minutesOfDay` (local wall-clock),
- * strictly after `now`. DST-safe by construction: candidates are built from
- * calendar parts (never millisecond arithmetic), so a spring-forward/fall-back
- * transition keeps the intended wall clock.
- */
-export function nextWeeklyOccurrence(
-  now: Date,
-  weekday: WeeklyReviewWeekday,
-  minutesOfDay: number,
-): Date {
-  if (!isValidWeekday(weekday)) {
-    throw new Error(`Invalid weekday: ${String(weekday)}`);
-  }
-  if (!Number.isInteger(minutesOfDay) || minutesOfDay < 0 || minutesOfDay > 24 * 60 - 1) {
-    throw new Error(`Invalid minutesOfDay: ${String(minutesOfDay)}`);
-  }
-  const hour = Math.floor(minutesOfDay / 60);
-  const minute = minutesOfDay % 60;
-
-  // Candidate this week at the target wall clock.
-  const candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0);
-  let deltaDays = (weekday - candidate.getDay() + 7) % 7;
-  if (deltaDays === 0 && candidate.getTime() <= now.getTime()) {
-    deltaDays = 7;
-  }
-  candidate.setDate(candidate.getDate() + deltaDays);
-  return candidate;
-}
-
 export function encodeWeeklyReviewReminderPreference(
   preference: WeeklyReviewReminderPreference,
 ): string {

@@ -123,7 +123,7 @@ export type VerifiedGenerationBaseHead = {
   sequence: number;
 };
 
-/** The captured payload, returned by `captureGeneration`. */
+/** The captured payload, returned by the capture entrypoints above. */
 export interface CapturedGeneration {
   capture: GenerationCapture;
   chunks: GenerationChunk[];
@@ -272,6 +272,15 @@ export async function captureGenerationWithinTransaction(
   return captured.capture;
 }
 
+/**
+ * Capture a generation in its own transaction.
+ *
+ * Production uses the caller-owned variants below; this entrypoint exists for
+ * the conflict-resolution and client-recovery suites, which seed a durable
+ * in-flight capture without going through a backup maintenance cycle.
+ *
+ * @param options the capture-bound settings payload
+ */
 export async function captureGeneration(options: {
   settingsPayload: unknown;
 }): Promise<CapturedGeneration> {
@@ -470,25 +479,6 @@ export async function readCapturedChunks(
 }
 
 /**
- * Record that an entity's chunks are staged and durable.
- *
- * @param snapshotId the capture this belongs to
- * @param entity the staged entity
- */
-export async function markEntityStaged(snapshotId: string, entity: string): Promise<void> {
-  const db = await getDatabase();
-  const captured = await readCapturedChunks(db);
-  if (!captured || captured.capture.snapshotId !== snapshotId) return;
-  const { capture, chunks } = captured;
-  if (capture.stagedEntities.includes(entity)) return;
-  await setAppMetaJson(db, appMetaKeys.backupGenerationCapture, {
-    ...capture,
-    chunks,
-    stagedEntities: [...capture.stagedEntities, entity],
-  });
-}
-
-/**
  * Record an acknowledged publication.
  *
  * The sequence floor advances only for a generation that actually published, so
@@ -603,7 +593,12 @@ export function withReservedGenerationSequence(
 ): CapturedGeneration {
   if (!Number.isSafeInteger(sequence) || sequence < 1)
     throw new Error('Invalid reserved generation sequence.');
-  const parsed = JSON.parse(captured.capture.manifest) as Record<string, unknown>[];
+  let parsed: Record<string, unknown>[];
+  try {
+    parsed = JSON.parse(captured.capture.manifest) as Record<string, unknown>[];
+  } catch {
+    throw new Error('The captured generation manifest is unreadable; publication is paused.');
+  }
   const manifest = canonicalGenerationRows([{ ...parsed[0], sequence }]);
   return {
     chunks: captured.chunks,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
+import { saveHabitRules } from './helpers/linkedActionRules';
 import { toDateKey } from '@/lib/time';
 
 /**
@@ -179,31 +180,27 @@ describe('linked action execution unique indexes', () => {
     effectFingerprint: string;
   }> {
     const habits = await import('@/features/habits/habits.data');
-    const linked = await import('@/core/linked-actions/linkedActions.data');
     const engine = await import('@/core/linked-actions/linkedActions.engine');
 
     const habitId = await habits.addHabit('Source habit', 1);
     const targetHabitId = await habits.addHabit('Target habit', 3);
 
-    await linked.createLinkedActionRule({
-      source: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: habitId,
+    await saveHabitRules(habitId, [
+      {
         triggerType: 'habit.completed_for_day',
-      },
-      target: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: targetHabitId,
-        effect: {
-          kind: 'progress',
-          type: 'habit.increment',
-          amount: 1,
-          dateStrategy: 'source_date',
+        target: {
+          feature: 'habits',
+          entityType: 'habit',
+          entityId: targetHabitId,
+          effect: {
+            kind: 'progress',
+            type: 'habit.increment',
+            amount: 1,
+            dateStrategy: 'source_date',
+          },
         },
       },
-    });
+    ]);
 
     const result = await engine.linkedActionsEngine.processSourceAction({
       eventId: 'levt_0001',

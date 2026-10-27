@@ -285,14 +285,6 @@ export async function completeRoutine(
   return outcome.value;
 }
 
-export async function listWorkoutLogs(limit: number = 30): Promise<WorkoutLog[]> {
-  const db = await getDatabase();
-  return db.getAllAsync<WorkoutLog>(
-    'SELECT * FROM workout_logs ORDER BY completed_at DESC LIMIT ?',
-    [limit],
-  );
-}
-
 export async function listWorkoutLogsForRange(
   startDateKey: string,
   endDateKey: string,

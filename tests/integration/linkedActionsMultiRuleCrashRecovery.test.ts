@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { freshDatabase, type TestDatabase } from './helpers/db';
+import { pauseTodoRule, removeTodoRule, saveTodoRules } from './helpers/linkedActionRules';
 
 /**
  * Multi-rule crash-recovery matrix (campaign A1 follow-up).
@@ -86,50 +87,42 @@ async function setupTwoRuleWorld(
 ): Promise<TwoRuleWorld> {
   const todos = await import('@/features/todos/todos.data');
   const habits = await import('@/features/habits/habits.data');
-  const linked = await import('@/core/linked-actions/linkedActions.data');
-
   const sourceTodoId = await todos.addTodo({ title: 'Ship the report' });
   const habitAId = await habits.addHabit('Hydrate', 1);
   const habitBId = await habits.addHabit('Stretch', 1);
 
-  const ruleA = await linked.createLinkedActionRule({
-    source: {
-      feature: 'todos',
-      entityType: 'todo',
-      entityId: sourceTodoId,
+  const ruleIds = await saveTodoRules(sourceTodoId, [
+    {
       triggerType: 'todo.completed',
-    },
-    target: {
-      feature: 'habits',
-      entityType: 'habit',
-      entityId: habitAId,
-      effect: {
-        kind: 'progress',
-        type: 'habit.increment',
-        amount: 1,
-        dateStrategy: 'source_date',
+      target: {
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: habitAId,
+        effect: {
+          kind: 'progress',
+          type: 'habit.increment',
+          amount: 1,
+          dateStrategy: 'source_date',
+        },
       },
     },
-  });
-  const ruleB = await linked.createLinkedActionRule({
-    source: {
-      feature: 'todos',
-      entityType: 'todo',
-      entityId: sourceTodoId,
+    {
       triggerType: 'todo.completed',
-    },
-    target: {
-      feature: 'habits',
-      entityType: 'habit',
-      entityId: habitBId,
-      effect: {
-        kind: 'progress',
-        type: 'habit.increment',
-        amount: 1,
-        dateStrategy: 'source_date',
+      target: {
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: habitBId,
+        effect: {
+          kind: 'progress',
+          type: 'habit.increment',
+          amount: 1,
+          dateStrategy: 'source_date',
+        },
       },
     },
-  });
+  ]);
+  const ruleA = { id: ruleIds[0] };
+  const ruleB = { id: ruleIds[1] };
 
   await db.runAsync(`UPDATE linked_action_rules SET created_at = ? WHERE id = ?`, [
     '2026-01-01T00:00:00.000Z',
@@ -416,48 +409,40 @@ describe('multi-rule complete state', () => {
     const db = await freshDatabase();
     const todos = await import('@/features/todos/todos.data');
     const habits = await import('@/features/habits/habits.data');
-    const linked = await import('@/core/linked-actions/linkedActions.data');
-
     const sourceTodoId = await todos.addTodo({ title: 'Ship the report' });
     const habitAId = await habits.addHabit('Hydrate', 1);
     const targetTodoId = await todos.addTodo({ title: 'Already done' });
     await todos.completeTodo(targetTodoId);
 
-    const ruleA = await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: sourceTodoId,
-        triggerType: 'todo.completed',
-      },
-      target: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: habitAId,
-        effect: {
-          kind: 'progress',
-          type: 'habit.increment',
-          amount: 1,
-          dateStrategy: 'source_date',
-        },
-      },
-    });
     // Rule B's target is already completed at dispatch time: the adapter
     // records a terminal `skipped` (already_completed) — done, not pending.
-    const ruleB = await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: sourceTodoId,
+    const ruleIds = await saveTodoRules(sourceTodoId, [
+      {
         triggerType: 'todo.completed',
+        target: {
+          feature: 'habits',
+          entityType: 'habit',
+          entityId: habitAId,
+          effect: {
+            kind: 'progress',
+            type: 'habit.increment',
+            amount: 1,
+            dateStrategy: 'source_date',
+          },
+        },
       },
-      target: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: targetTodoId,
-        effect: { kind: 'binary', type: 'todo.complete' },
+      {
+        triggerType: 'todo.completed',
+        target: {
+          feature: 'todos',
+          entityType: 'todo',
+          entityId: targetTodoId,
+          effect: { kind: 'binary', type: 'todo.complete' },
+        },
       },
-    });
+    ]);
+    const ruleA = { id: ruleIds[0] };
+    const ruleB = { id: ruleIds[1] };
     await db.runAsync(`UPDATE linked_action_rules SET created_at = ? WHERE id = ?`, [
       '2026-01-01T00:00:00.000Z',
       ruleA.id,
@@ -494,7 +479,6 @@ describe('historical rule changes', () => {
     const world = await setupTwoRuleWorld(db, { crashDispatch: true });
     const engineModule = await import('@/core/linked-actions/linkedActions.engine');
     const effects = await import('@/core/linked-actions/linkedActions.effects');
-    const linked = await import('@/core/linked-actions/linkedActions.data');
     const realIncrement = effects.linkedActionEffectRegistry['habit.increment'];
 
     const interrupted = await new engineModule.LinkedActionsEngine({
@@ -509,7 +493,7 @@ describe('historical rule changes', () => {
     }).processSourceAction(await persistedEvent(world));
     expect(interrupted.effects.map((effect) => effect.status)).toEqual(['applied', 'failed']);
 
-    await linked.updateLinkedActionRuleStatus(world.ruleBId, 'paused');
+    await pauseTodoRule(world.sourceTodoId, world.ruleBId);
 
     const recovery = await import('@/core/linked-actions/linkedActions.recovery');
     const first = await recovery.recoverPendingLinkedActions();
@@ -529,7 +513,6 @@ describe('historical rule changes', () => {
     const db = await freshDatabase();
     const world = await setupTwoRuleWorld(db, { crashDispatch: true });
     const engineModule = await import('@/core/linked-actions/linkedActions.engine');
-    const linked = await import('@/core/linked-actions/linkedActions.data');
 
     const interrupted = new engineModule.LinkedActionsEngine({
       onNotice: () => {
@@ -540,7 +523,7 @@ describe('historical rule changes', () => {
       'crash between rule iterations',
     );
 
-    await linked.deleteLinkedActionRule(world.ruleBId);
+    await removeTodoRule(world.sourceTodoId, world.ruleBId);
 
     const recovery = await import('@/core/linked-actions/linkedActions.recovery');
     const first = await recovery.recoverPendingLinkedActions();
@@ -568,26 +551,43 @@ describe('historical rule changes', () => {
     );
 
     // The user authors a new matching rule AFTER the source event happened.
+    // The editor replaces a source's whole rule set, so the two existing rules
+    // are resubmitted by id and the new one is appended.
     const habitCId = await habits.addHabit('Meditate', 1);
-    const ruleC = await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: world.sourceTodoId,
+    const existing = await linked.listLinkedActionRulesForSourceEntity({
+      feature: 'todos',
+      entityType: 'todo',
+      entityId: world.sourceTodoId,
+    });
+    const resubmitted = existing.flatMap((rule) =>
+      rule.isUnsupported
+        ? []
+        : [
+            {
+              existingRuleId: rule.id,
+              triggerType: rule.source.triggerType,
+              target: rule.target,
+            },
+          ],
+    );
+    const ruleIds = await saveTodoRules(world.sourceTodoId, [
+      ...resubmitted,
+      {
         triggerType: 'todo.completed',
-      },
-      target: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: habitCId,
-        effect: {
-          kind: 'progress',
-          type: 'habit.increment',
-          amount: 1,
-          dateStrategy: 'source_date',
+        target: {
+          feature: 'habits',
+          entityType: 'habit',
+          entityId: habitCId,
+          effect: {
+            kind: 'progress',
+            type: 'habit.increment',
+            amount: 1,
+            dateStrategy: 'source_date',
+          },
         },
       },
-    });
+    ]);
+    const ruleC = { id: ruleIds[ruleIds.length - 1] };
     await db.runAsync(`UPDATE linked_action_rules SET created_at = ? WHERE id = ?`, [
       '2026-12-31T00:00:00.000Z',
       ruleC.id,
@@ -698,85 +698,71 @@ describe('exactly-once integrity across effect types', () => {
     const habitId = await habits.addHabit('Hydrate', 1);
     const targetTodoId = await todos.addTodo({ title: 'Write the changelog' });
 
-    const ruleHabit = await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: sourceTodoId,
+    const ruleIds = await saveTodoRules(sourceTodoId, [
+      {
         triggerType: 'todo.completed',
-      },
-      target: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: habitId,
-        effect: {
-          kind: 'progress',
-          type: 'habit.increment',
-          amount: 1,
-          dateStrategy: 'source_date',
+        target: {
+          feature: 'habits',
+          entityType: 'habit',
+          entityId: habitId,
+          effect: {
+            kind: 'progress',
+            type: 'habit.increment',
+            amount: 1,
+            dateStrategy: 'source_date',
+          },
         },
       },
-    });
-    const ruleTodo = await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: sourceTodoId,
+      {
         triggerType: 'todo.completed',
-      },
-      target: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: targetTodoId,
-        effect: { kind: 'binary', type: 'todo.complete' },
-      },
-    });
-    const ruleCalorie = await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: sourceTodoId,
-        triggerType: 'todo.completed',
-      },
-      target: {
-        feature: 'calories',
-        entityType: 'calorie_log',
-        entityId: null,
-        effect: {
-          kind: 'log',
-          type: 'calorie.log',
-          dateStrategy: 'today',
-          templateSource: 'inline',
-          savedMealId: null,
-          foodName: 'Release snack',
-          calories: 200,
-          protein: 5,
-          carbs: 30,
-          fats: 6,
-          fiber: 2,
-          mealType: 'snack',
+        target: {
+          feature: 'todos',
+          entityType: 'todo',
+          entityId: targetTodoId,
+          effect: { kind: 'binary', type: 'todo.complete' },
         },
       },
-    });
-    const rulePomodoro = await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: sourceTodoId,
+      {
         triggerType: 'todo.completed',
-      },
-      target: {
-        feature: 'pomodoro',
-        entityType: 'pomodoro_session',
-        entityId: null,
-        effect: {
-          kind: 'log',
-          type: 'pomodoro.log',
-          sessionType: 'focus',
-          durationSeconds: 1500,
+        target: {
+          feature: 'calories',
+          entityType: 'calorie_log',
+          entityId: null,
+          effect: {
+            kind: 'log',
+            type: 'calorie.log',
+            dateStrategy: 'today',
+            templateSource: 'inline',
+            savedMealId: null,
+            foodName: 'Release snack',
+            calories: 200,
+            protein: 5,
+            carbs: 30,
+            fats: 6,
+            fiber: 2,
+            mealType: 'snack',
+          },
         },
       },
-    });
+      {
+        triggerType: 'todo.completed',
+        target: {
+          feature: 'pomodoro',
+          entityType: 'pomodoro_session',
+          entityId: null,
+          effect: {
+            kind: 'log',
+            type: 'pomodoro.log',
+            sessionType: 'focus',
+            durationSeconds: 1500,
+          },
+        },
+      },
+    ]);
+    const ruleHabit = { id: ruleIds[0] };
+    const ruleTodo = { id: ruleIds[1] };
+    const ruleCalorie = { id: ruleIds[2] };
+    const rulePomodoro = { id: ruleIds[3] };
 
     // Deterministic rule order: habit → todo → calorie → pomodoro.
     await db.runAsync(`UPDATE linked_action_rules SET created_at = ? WHERE id = ?`, [
