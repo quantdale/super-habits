@@ -8,9 +8,9 @@ import { join } from 'node:path';
  * The V3 accessibility contract requires ~44–48 logical points of interactive
  * area for frequent controls even when the visible face is smaller (visual
  * compactness must not cost touch reliability). There is no React component
- * render harness in this repo, so — like journeyLabelParity and
- * ciLaneIntegrity — this is a source-contract test: it pins the geometry
- * constants and their application at the call sites that carry the contract.
+ * render harness in this repo, so — like `scripts/release-facts-guard.mjs` —
+ * this is a source-contract test: it pins the geometry constants and their
+ * application at the call sites that carry the contract.
  *
  * If a primitive's face size changes, update BOTH the component and the
  * expected arithmetic here; a mismatch means the 44pt contract silently broke.

@@ -8,8 +8,8 @@
  * before applying its result; it returns `true` only for the newest result
  * that has not been superseded by an already-applied newer one.
  *
- * Pure logic, no React, no DB — the interleaving rules are unit-tested in
- * `tests/snapshotSequencer.test.ts`.
+ * Pure logic, no React, no DB — the interleaving rules are exercised through
+ * the routine-detail save path in `features/workout/RoutineDetailScreen.tsx`.
  */
 
 export type SnapshotSequencer = {

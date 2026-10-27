@@ -15,7 +15,7 @@ import type {
 } from '@/core/linked-actions/linkedActions.types';
 import { createId } from '@/lib/id';
 import { assertHabitWrite } from '@/lib/validation';
-import { nowIso, timestampToLocalDateKey, toDateKey } from '@/lib/time';
+import { addLocalDays, nowIso, timestampToLocalDateKey, toDateKey } from '@/lib/time';
 import { runBackupMutation, runSyncedMutation } from '@/core/sync/syncedMutation';
 import {
   buildTransactionalSourceEvent,
@@ -691,10 +691,11 @@ export async function getCompletionHistory(
     );
   }
 
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - (days - 1));
-  const startKey = toDateKey(startDate);
-  const endKey = toDateKey(new Date());
+  // Local-calendar window walk (never a fixed millisecond offset), so a DST
+  // boundary inside the window cannot shift the inclusive lower bound onto the
+  // wrong day (audit C #9).
+  const endKey = toDateKey();
+  const startKey = addLocalDays(endKey, -(days - 1));
 
   return db.getAllAsync<HabitCompletion>(
     `SELECT * FROM habit_completions

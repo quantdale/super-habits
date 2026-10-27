@@ -1,7 +1,5 @@
 import { isValidDateKey, toDateKey } from './time';
 
-const YYYY_MM_DD = /^\d{4}-\d{2}-\d{2}$/;
-
 export function validateTodoTitle(title: string): string | null {
   if (!title.trim()) return 'Task title is required.';
   if (title.trim().length > 200) return 'Title must be 200 characters or less.';
@@ -15,13 +13,9 @@ export function validateTodoNotes(notes: string): string | null {
 
 export function validateTodoDueDate(dueDate: string | null | undefined): string | null {
   if (dueDate != null && dueDate !== '') {
-    if (!YYYY_MM_DD.test(dueDate)) return 'Due date must be a valid YYYY-MM-DD date.';
-    const d = new Date(`${dueDate}T12:00:00`);
-    if (Number.isNaN(d.getTime())) return 'Due date must be a valid YYYY-MM-DD date.';
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    if (`${y}-${m}-${day}` !== dueDate) return 'Due date must be a valid YYYY-MM-DD date.';
+    // `isValidDateKey` is the single round-trip integer check for a local date
+    // key (format + real calendar day + no normalization drift).
+    if (!isValidDateKey(dueDate)) return 'Due date must be a valid YYYY-MM-DD date.';
   }
   return null;
 }

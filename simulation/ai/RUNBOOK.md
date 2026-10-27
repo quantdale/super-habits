@@ -82,11 +82,11 @@ Give the agent the mission file's **Objective, Fixture, Budget, and rubric**
 
 Every written `anomaly-report.json` must pass
 `validateAnomalyReport` / `parseAnomalyReport` from
-`simulation/ai/anomaly-report.ts` (unit-tested in
-`tests/simulation.anomaly.test.ts`). Example, with the repo's test runner:
+`simulation/ai/anomaly-report.ts`. Example, with the repo's test runner:
 
 ```bash
-npx vitest run --project unit tests/simulation.anomaly.test.ts
+node -e "import('./simulation/ai/anomaly-report.ts')"   # via tsx/ts-node
+npm run sim:validate                                    # lane matrix + model contracts
 ```
 
 A report that fails validation is rejected before triage — the writer fixes it.

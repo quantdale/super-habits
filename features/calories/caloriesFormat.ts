@@ -1,3 +1,5 @@
+import { addLocalDays, toDateKey } from '@/lib/time';
+
 /** Locale-formatted kcal/secondary metric for the Calories surfaces. */
 export function formatKcal(kcal: number): string {
   if (!Number.isFinite(kcal)) return '0';
@@ -5,14 +7,13 @@ export function formatKcal(kcal: number): string {
 }
 
 /** "Today" / "Yesterday" / "Mon, Oct 5" for the hero's context line. */
-export function formatDayContext(dateKey: string): string {
-  const today = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const localKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  if (dateKey === localKey(today)) return 'Today';
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (dateKey === localKey(yesterday)) return 'Yesterday';
+export function formatDayContext(dateKey: string, today: Date = new Date()): string {
+  const todayKey = toDateKey(today);
+  if (dateKey === todayKey) return 'Today';
+  // Calendar-day math, not a fixed millisecond subtraction: a fall-back day is
+  // 25 hours long, so `setDate(-1)` walking is the only way to name the local
+  // day before `today` in every zone.
+  if (dateKey === addLocalDays(todayKey, -1)) return 'Yesterday';
   return new Date(`${dateKey}T12:00:00`).toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',

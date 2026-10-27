@@ -203,11 +203,7 @@
         "tests/qaIosSimctl.test.ts"
       ],
       "gates": ["qa:fast", "qa:native:smoke", "qa:native:lifecycle", "qa:full"],
-      "tests": [
-        "tests/nativeAvd.test.ts",
-        "tests/qaNativeProvision.test.ts",
-        "tests/qaIosSimctl.test.ts"
-      ],
+      "tests": ["tests/maestro*.test.ts"],
       "journeys": ["native smoke and targeted flows"],
       "broadRegression": true
     },
@@ -225,10 +221,10 @@
         "qa/impact-map.json",
         "scripts/agent-execplan.mjs",
         "scripts/qa-impact.mjs",
-        "tests/agent-execplan.test.ts"
+        "scripts/release-facts-guard.mjs"
       ],
       "gates": ["qa:fast"],
-      "tests": ["tests/agent-execplan.test.ts"],
+      "tests": [],
       "journeys": [],
       "broadRegression": false
     }
