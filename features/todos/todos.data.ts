@@ -16,7 +16,7 @@ import {
 } from '@/core/linked-actions/linkedActions.data';
 import { createId } from '@/lib/id';
 import { assertTodoPartialUpdate, assertTodoWrite } from '@/lib/validation';
-import { nowIso, toDateKey, dateKeyToLocalDate } from '@/lib/time';
+import { addLocalDays, nowIso, toDateKey } from '@/lib/time';
 import { runBackupMutation, runSyncedMutation } from '@/core/sync/syncedMutation';
 import type { SyncRecord } from '@/core/sync/sync.engine';
 import {
@@ -42,9 +42,7 @@ import { getTomorrowDateKey } from './todos.domain';
 function nextRecurringSpawnDueDate(completedDueDate: string | null): string {
   const tomorrow = getTomorrowDateKey();
   if (!completedDueDate || completedDueDate < tomorrow) return tomorrow;
-  const next = dateKeyToLocalDate(completedDueDate);
-  next.setDate(next.getDate() + 1);
-  return toDateKey(next);
+  return addLocalDays(completedDueDate, 1);
 }
 
 export type TodoLinkedActionsDispatchResult = Pick<
@@ -1546,6 +1544,14 @@ export async function applyRemoteTodos(
   rows: Todo[],
 ): Promise<void> {
   for (const row of rows) {
+    // SAFETY: backup payloads are version-tagged and may predate later-scope
+    // columns; reading the optional fields is the documented restore contract
+    // (a missing key restores as null), and `row` is the declared Todo shape.
+    const legacy = row as unknown as {
+      completed_at?: string | null;
+      project_id?: string | null;
+      goal_id?: string | null;
+    };
     await db.runAsync(
       `INSERT OR REPLACE INTO todos (
          id,
@@ -1569,7 +1575,7 @@ export async function applyRemoteTodos(
         row.title,
         row.notes,
         row.completed,
-        (row as unknown as { completed_at?: string | null }).completed_at ?? null,
+        legacy.completed_at ?? null,
         row.due_date,
         row.priority,
         row.sort_order,
@@ -1580,8 +1586,8 @@ export async function applyRemoteTodos(
         row.deleted_at,
         // Planning links joined the recoverable scope in V4; legacy rows omit
         // them and restore as unassigned.
-        (row as unknown as { project_id?: string | null }).project_id ?? null,
-        (row as unknown as { goal_id?: string | null }).goal_id ?? null,
+        legacy.project_id ?? null,
+        legacy.goal_id ?? null,
       ],
     );
   }

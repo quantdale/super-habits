@@ -7,14 +7,8 @@ import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { Modal } from '@/core/ui/Modal';
-import { dateKeyToLocalDate, toDateKey } from '@/lib/time';
+import { addLocalDays, dateKeyToLocalDate, toDateKey } from '@/lib/time';
 import type { DailySummary } from './types';
-
-function addDays(dateKey: string, days: number): string {
-  const d = dateKeyToLocalDate(dateKey);
-  d.setDate(d.getDate() + days);
-  return toDateKey(d);
-}
 
 function shortWeekday(dateKey: string): string {
   return dateKeyToLocalDate(dateKey).toLocaleDateString('en-US', { weekday: 'narrow' });
@@ -28,7 +22,7 @@ function formatNavLabel(dateKey: string): string {
   const d = dateKeyToLocalDate(dateKey);
   const today = toDateKey();
   if (dateKey === today) return 'Today';
-  if (dateKey === addDays(today, -1)) return 'Yesterday';
+  if (dateKey === addLocalDays(today, -1)) return 'Yesterday';
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
@@ -160,7 +154,7 @@ export function DiaryDayNavigator({
     >
       <View className="mb-3 flex-row items-center justify-between">
         <Pressable
-          onPress={() => onSelectDate(addDays(selectedDateKey, -1))}
+          onPress={() => onSelectDate(addLocalDays(selectedDateKey, -1))}
           accessibilityRole="button"
           accessibilityLabel="Previous day"
           className="h-12 w-12 items-center justify-center rounded-2xl border"
@@ -181,7 +175,7 @@ export function DiaryDayNavigator({
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => onSelectDate(addDays(selectedDateKey, 1))}
+          onPress={() => onSelectDate(addLocalDays(selectedDateKey, 1))}
           accessibilityRole="button"
           accessibilityLabel="Next day"
           disabled={selectedDateKey >= today}

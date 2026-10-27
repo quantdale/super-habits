@@ -10,6 +10,7 @@ import type { LinkedActionProcessResult } from '@/core/linked-actions/linkedActi
 import { TODO_REMINDER_DATA_KIND, TODO_REMINDER_DATA_VERSION } from '@/lib/notificationConstants';
 import {
   getTodoReminderSnoozeIdentifier,
+  resolveTodoDueAt,
   todoReminderIdentifier,
   TODO_REMINDER_SNOOZE_MINUTES,
 } from './reminderPlanning';
@@ -219,7 +220,11 @@ async function runSnooze(
     // due moment. An edited todo was rescheduled under a fresh occurrence, so
     // a mismatching delivered notification is stale and must not snooze.
     if (valid && todo) {
-      const dueAtMs = new Date(todo.due_date ?? '').getTime();
+      // `resolveTodoDueAt` is the same resolver the scheduler used to build
+      // `occurrenceId`; parsing the stored date key with `new Date(...)` would
+      // agree only by accident (both would be UTC) and would reject every
+      // reminder this build schedules.
+      const dueAtMs = todo.due_date ? (resolveTodoDueAt(todo.due_date)?.getTime() ?? NaN) : NaN;
       const legacyOccurrenceId = todoReminderIdentifier(input.todoId);
       if (!Number.isNaN(dueAtMs)) {
         const expectedOccurrenceId = `${legacyOccurrenceId}:${dueAtMs}`;

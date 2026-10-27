@@ -5,6 +5,8 @@
  * bridge that ties them together is `core/notifications/todoReminderScheduler.ts`.
  */
 
+import { isValidDateKey, parseLocalDateKey } from '@/lib/time';
+
 export type TimeOfDay = { hour: number; minute: number };
 
 export const TODO_REMINDER_DEFAULT_LEAD_MINUTES = 0;
@@ -84,4 +86,50 @@ export function computeTodoReminderFireAt(
   const fireAt = new Date(dueAt.getTime() - leadMinutes * 60_000);
   if (fireAt.getTime() <= now.getTime()) return null;
   return fireAt;
+}
+
+/**
+ * Default wall-clock reminder time for a DATE-ONLY due date.
+ *
+ * A todo stored with `due_date = 'YYYY-MM-DD'` carries no due moment — only a
+ * local calendar day. Anchoring that day at an explicit, documented local time
+ * is what makes the reminder meaningful: at local midnight it would fire while
+ * the user sleeps, and at UTC midnight (the pre-fix behaviour of `new
+ * Date('YYYY-MM-DD')`) it fires at 08:00 in UTC+8 — inside the morning, i.e.
+ * already "past" for anyone planning their day at 07:00, who then gets *no*
+ * reminder at all — or at 19:00 the *evening before* in UTC-5.
+ *
+ * 09:00 local is the default so a due-date task pings once the day has
+ * visibly started, while staying a fixed, documented wall-clock rule (no
+ * per-user due-time column exists, and inventing one is out of scope here).
+ */
+export const TODO_REMINDER_DEFAULT_DUE_TIME: TimeOfDay = { hour: 9, minute: 0 };
+
+/**
+ * The instant a DATE-ONLY due date names, on the local calendar.
+ *
+ * - `timeOfDay` omitted → {@link TODO_REMINDER_DEFAULT_DUE_TIME} local.
+ * - `timeOfDay` given → that local wall clock on the due day. A time the wall
+ *   clock skipped (spring-forward gap) resolves forward to the first existing
+ *   instant of that local day instead of silently wrapping an hour earlier.
+ *
+ * The due day itself is parsed locally via `parseLocalDateKey`; never via
+ * `new Date('YYYY-MM-DD')`, which is UTC by spec and shifts the day in every
+ * timezone with a non-zero offset.
+ */
+export function resolveTodoDueAt(
+  dateKey: string,
+  timeOfDay: TimeOfDay = TODO_REMINDER_DEFAULT_DUE_TIME,
+): Date | null {
+  if (!isValidDateKey(dateKey)) return null;
+  const midnight = parseLocalDateKey(dateKey);
+  const dueAt = new Date(midnight);
+  dueAt.setHours(timeOfDay.hour, timeOfDay.minute, 0, 0);
+  // A spring-forward gap (02:30 does not exist on that date) makes
+  // `setHours` normalize forward by an hour. Landing on a different wall clock
+  // means the requested time is not real that day, so use the day's own first
+  // instant instead of guessing an hour.
+  return dueAt.getHours() === timeOfDay.hour && dueAt.getMinutes() === timeOfDay.minute
+    ? dueAt
+    : midnight;
 }
