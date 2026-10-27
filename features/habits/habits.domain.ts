@@ -78,7 +78,41 @@ function normalizeRule(value: unknown): HabitRule | null {
   }
 }
 
+/**
+ * Bounded memo for serialized histories.
+ *
+ * A 364-day grid resolves a rule and the lifecycle mask for every cell, and
+ * every resolution used to `JSON.parse` the same serialized history again
+ * (~364 parses per habit per refresh). Histories are immutable values: a
+ * write serializes a NEW string, so the raw string is a safe cache key — a
+ * change produces a new key instead of a stale hit, and no invalidation is
+ * needed. The cache is bounded because a long session could otherwise retain
+ * every historical variant it ever read.
+ */
+const PARSED_HISTORY_CACHE_LIMIT = 64;
+const ruleHistoryCache = new Map<string, HabitRule[]>();
+const lifecycleHistoryCache = new Map<string, HabitLifecycleInterval[]>();
+
+function memoized<T>(cache: Map<string, T>, key: string, parse: () => T): T {
+  const cached = cache.get(key);
+  if (cached !== undefined) return cached;
+  const parsed = parse();
+  if (cache.size >= PARSED_HISTORY_CACHE_LIMIT) {
+    const oldest = cache.keys().next();
+    if (!oldest.done) cache.delete(oldest.value);
+  }
+  cache.set(key, parsed);
+  return parsed;
+}
+
 export function parseHabitRuleHistory(value: HabitRuleHistoryInput): HabitRule[] {
+  if (typeof value !== 'string') return parseRuleHistoryValue(value);
+  // Copies keep the cached entry safe from a caller that mutates its result;
+  // the rule objects themselves are treated as immutable values.
+  return [...memoized(ruleHistoryCache, value, () => parseRuleHistoryValue(value))];
+}
+
+function parseRuleHistoryValue(value: HabitRuleHistoryInput): HabitRule[] {
   let parsed: unknown = value;
   if (typeof value === 'string') {
     try {
@@ -160,6 +194,11 @@ function normalizeLifecycleInterval(value: unknown): HabitLifecycleInterval | nu
 export function parseHabitLifecycleHistory(
   value: HabitLifecycleHistoryInput,
 ): HabitLifecycleInterval[] {
+  if (typeof value !== 'string') return parseLifecycleHistoryValue(value);
+  return [...memoized(lifecycleHistoryCache, value, () => parseLifecycleHistoryValue(value))];
+}
+
+function parseLifecycleHistoryValue(value: HabitLifecycleHistoryInput): HabitLifecycleInterval[] {
   let parsed: unknown = value;
   if (typeof value === 'string') {
     try {
@@ -241,17 +280,18 @@ export function habitCreationDateKey(timestamp: string | undefined): string | un
 }
 
 /**
- * Resolve the rule active on a local date. A null result is an ineligible
- * pre-creation date when valid history exists. Legacy-shaped callers without
- * history get a conservative every-day fallback for compatibility.
+ * Resolve the rule active on a local date from an ALREADY-PARSED history.
+ *
+ * Grid builders resolve one date per cell over a year of cells, so the parse
+ * and the sort must not repeat per call — this is the single-pass resolver
+ * both the public entry point and the grid builders use.
  */
-export function getHabitRuleForDate(
-  history: HabitRuleHistoryInput,
+function resolveParsedRuleForDate(
+  rules: readonly HabitRule[],
   dateKey: string,
-  fallbackTargetPerDay = 1,
+  fallbackTargetPerDay: number,
   fallbackEffectiveFromDate?: string,
 ): HabitRule | null {
-  const rules = parseHabitRuleHistory(history);
   if (rules.length === 0) {
     if (fallbackEffectiveFromDate && dateKey < fallbackEffectiveFromDate) return null;
     return createHabitRule(
@@ -267,6 +307,25 @@ export function getHabitRuleForDate(
     active = rule;
   }
   return active;
+}
+
+/**
+ * Resolve the rule active on a local date. A null result is an ineligible
+ * pre-creation date when valid history exists. Legacy-shaped callers without
+ * history get a conservative every-day fallback for compatibility.
+ */
+export function getHabitRuleForDate(
+  history: HabitRuleHistoryInput,
+  dateKey: string,
+  fallbackTargetPerDay = 1,
+  fallbackEffectiveFromDate?: string,
+): HabitRule | null {
+  return resolveParsedRuleForDate(
+    parseHabitRuleHistory(history),
+    dateKey,
+    fallbackTargetPerDay,
+    fallbackEffectiveFromDate,
+  );
 }
 
 export function getHabitTargetForDate(
@@ -414,6 +473,9 @@ export function buildDayCompletions(
   rangeStartDateKey?: string,
 ): DayCompletion[] {
   const rules = parseHabitRuleHistory(history);
+  // Resolve the lifecycle intervals once per call: the per-cell check used to
+  // re-parse the serialized history for every date in the window.
+  const lifecycleIntervals = parseHabitLifecycleHistory(lifecycleHistory);
   // Derived read models can provide a bounded local window without changing
   // the full-history behavior used by streaks and the existing habit UI.
   const startDateKey =
@@ -428,11 +490,11 @@ export function buildDayCompletions(
   for (const completion of completions) map.set(completion.date_key, completion.count);
 
   return dateKeys.map((dateKey) => {
-    const rule = getHabitRuleForDate(rules, dateKey, targetPerDay, fallbackEffectiveFromDate);
+    const rule = resolveParsedRuleForDate(rules, dateKey, targetPerDay, fallbackEffectiveFromDate);
     const scheduled =
       rule !== null &&
       rule.weekdays.includes(weekdayForDateKey(dateKey)) &&
-      !isHabitLifecycleMaskedOn(lifecycleHistory, dateKey);
+      !isHabitLifecycleMaskedOn(lifecycleIntervals, dateKey);
     const eligible = scheduled && dateKey <= todayKey;
     const count = map.get(dateKey) ?? 0;
     const target = rule?.target_per_day ?? targetPerDay;
@@ -547,13 +609,19 @@ export function buildHabitGrid(
   return habits.map((habit) => {
     const habitMap = lookup.get(habit.id) ?? new Map<string, number>();
     const rules = parseHabitRuleHistory(habit.rule_history);
+    const lifecycleIntervals = parseHabitLifecycleHistory(habit.lifecycle_history);
     const fallbackCreationDate = habitCreationDateKey(habit.created_at);
     const cells = dateKeys.map((dateKey) => {
-      const rule = getHabitRuleForDate(rules, dateKey, habit.target_per_day, fallbackCreationDate);
+      const rule = resolveParsedRuleForDate(
+        rules,
+        dateKey,
+        habit.target_per_day,
+        fallbackCreationDate,
+      );
       const scheduled =
         rule !== null &&
         rule.weekdays.includes(weekdayForDateKey(dateKey)) &&
-        !isHabitLifecycleMaskedOn(habit.lifecycle_history, dateKey);
+        !isHabitLifecycleMaskedOn(lifecycleIntervals, dateKey);
       const eligible = scheduled && dateKey <= todayKey;
       const count = habitMap.get(dateKey) ?? 0;
       const target = rule?.target_per_day ?? habit.target_per_day;
