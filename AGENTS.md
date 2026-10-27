@@ -484,8 +484,8 @@ eas build -p android --profile preview
      `dist-sync/` artifact is built and uploaded here for inspection, but the
      `journeys-sync` lane itself does NOT run in this gating job — the lane table
      (`simulation/matrix.ts`) declares it `gates: false`, and
-     `tests/ciLaneIntegrity.test.ts` pins that (`does not run the dist-sync lane
-as a hard step in the gating e2e job`). It runs in the `nightly` job below,
+     `scripts/release-facts-guard.mjs` (run by `qa:fast`) pins that the gating
+     `e2e` job never runs it. It runs in the `nightly` job below,
      report-only.
    - Uploads `e2e-report`, `simulation-output/` (run reports, digests, traces,
      repro bundles), and `dist-sync/` — all 7-day retention.

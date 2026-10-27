@@ -293,12 +293,13 @@ not raised to make it pass.
 
 ## Building and testing
 
-The model layer is pure TypeScript with no runtime dependencies. It is covered
-by `tests/simulation.model.test.ts` (Vitest, unit project):
+The model layer is pure TypeScript with no runtime dependencies. It is
+validated by `npm run sim:validate`, which runs `validateMatrix()` and the
+model validator over the whole scenario library:
 
 ```bash
 npm run typecheck               # 0 errors
-npm run test:unit               # includes tests/simulation.model.test.ts
+npm run sim:validate            # lane matrix + model/scenario contracts
 ```
 
 ## Runner + observability (tasks 3.1–3.5, 4.1–4.4)
@@ -351,9 +352,8 @@ engine seed for `buildRunPlan`.
 
 `{ schemaVersion, runId, lane, mode, seed, environment, persona, scenario,
 startedAt, finishedAt, outcome, durationMs, actionLog, steps[], artifacts,
-failure? }` — validated by `validateRunReport(report)` (pure, unit-tested in
-`tests/simulation.report.test.ts`). One schema across all lanes (scenario /
-seeded / repro) per task 4.4.
+failure? }` — validated by `validateRunReport(report)`. One schema across all
+lanes (scenario / seeded / repro) per task 4.4.
 
 ### Artifacts (task 4.2) + digest (task 4.3)
 
@@ -367,9 +367,8 @@ issue.
 
 `apiLeg` steps perform real data-layer writes through the DB harness (the
 parent's seeding mechanism — the web export exposes no data-layer bridge).
-`assertApiLegSafe` rejects raw SQL strings in `functionName`/`args` (unit-tested
-in `tests/simulation.apileg.test.ts`); the Supabase-client resolution is a
-disposable-lane (task 8) seam.
+`assertApiLegSafe` rejects raw SQL strings in `functionName`/`args`; the
+Supabase-client resolution is a disposable-lane (task 8) seam.
 
 ### Self-test (tasks 3.5 / 4.4)
 

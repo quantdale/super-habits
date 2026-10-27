@@ -32,7 +32,7 @@ export const COVERAGE_MISMATCH = 'MISMATCH';
  * Maestro's flow header is `appId:` then an optional `tags:` list; the
  * document body starts at the `---` separator. Only the list is needed, and a
  * hand parser keeps the lane free of a YAML dependency (the same reasoning as
- * the workflow reader in tests/ciLaneIntegrity.test.ts).
+ * the workflow reader in scripts/release-facts-guard.mjs).
  *
  * @param {string} source
  * @returns {string[]}

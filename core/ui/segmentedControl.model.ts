@@ -1,7 +1,7 @@
 /**
  * Pure segmented-control navigation model (no React): computes the next
  * selected value for web arrow-key navigation with wrap-around, skipping
- * disabled options. Unit-tested in `tests/segmented-control.model.test.ts`.
+ * disabled options.
  */
 export type SegmentOptionLike<T extends string> = {
   value: T;
