@@ -108,16 +108,30 @@ type TabButtonProps = {
   /** Contrast-safe accent for the icon/label (falls back to `accent`). */
   accentInk?: string;
   layout: 'bar' | 'rail';
+  /** DOM id of the section panel this tab controls (`aria-controls`). */
+  controlsId: string;
   onPress: () => void;
 };
 
-/** One navigation destination: icon over label, with a tinted active capsule. */
+/** DOM ids linking every nav tab to the section panel it controls. */
+const sectionTabId = (section: AppSection) => `sh-section-tab-${section}`;
+const sectionPanelId = (section: AppSection) => `sh-section-panel-${section}`;
+
+/**
+ * One navigation destination: icon over label, with a tinted active capsule.
+ *
+ * Audit C §11: this is a `tab` inside a `tablist` (matching
+ * `core/ui/SegmentedControl.tsx`), not a `button` inside a `tablist` — a
+ * `tablist` whose children are buttons is invalid ARIA, so assistive tech
+ * neither announces position/count nor honours `aria-selected`.
+ */
 function TabButton({
   item,
   isFocused,
   accent,
   accentInk,
   layout: layoutRole,
+  controlsId,
   onPress,
 }: TabButtonProps) {
   const { tokens } = useAppTheme();
@@ -127,9 +141,12 @@ function TabButton({
 
   return (
     <Pressable
-      accessibilityRole="button"
+      id={sectionTabId(item.name)}
+      accessibilityRole="tab"
       accessibilityLabel={item.label}
       accessibilityState={{ selected: isFocused }}
+      aria-selected={isFocused}
+      aria-controls={controlsId}
       focusable
       onPress={onPress}
       onFocus={() => setKeyboardFocused(true)}
@@ -231,8 +248,9 @@ function CaptureButton({ onPress, variant }: { onPress: () => void; variant: 'ba
 function SectionContainer({
   children,
   isActive,
+  section,
   ...rest
-}: { isActive: boolean; children: React.ReactNode } & ViewProps) {
+}: { isActive: boolean; children: React.ReactNode; section: AppSection } & ViewProps) {
   const [opacity] = useState(() => new Animated.Value(isActive ? 1 : 0));
   const [translate] = useState(() => new Animated.Value(isActive ? 0 : 12));
   const containerRef = useRef<View>(null);
@@ -271,6 +289,12 @@ function SectionContainer({
     <Animated.View
       ref={containerRef}
       {...rest}
+      id={sectionPanelId(section)}
+      // `role` (not `accessibilityRole`): RN's `AccessibilityRole` union omits
+      // `tabpanel`, while the ARIA `Role` union includes it and RN maps `role`
+      // to native accessibility on iOS/Android.
+      role="tabpanel"
+      aria-labelledby={sectionTabId(section)}
       aria-hidden={!isActive}
       style={[
         StyleSheet.absoluteFill,
@@ -385,7 +409,7 @@ export default function Index() {
           const isActive = activeSection === section;
           const isMounted = mountedSections[section] || isActive;
           return (
-            <SectionContainer key={section} isActive={isActive}>
+            <SectionContainer key={section} section={section} isActive={isActive}>
               {isMounted ? <ScreenComponent isActive={isActive} /> : null}
             </SectionContainer>
           );
@@ -422,6 +446,7 @@ export default function Index() {
         accent={accent}
         accentInk={accentInk}
         layout={layoutRole}
+        controlsId={sectionPanelId(item.name)}
         onPress={() => setActiveSection(item.name)}
       />
     );

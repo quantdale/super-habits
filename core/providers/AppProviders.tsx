@@ -704,8 +704,16 @@ function RestorePrompt({
   if (!visible || !preview) return null;
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onDismiss}>
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onDismiss}
+      // Names RN-Web's own `role="dialog"` container (see core/ui/dialogA11y).
+      aria-label="Restore backup"
+    >
       <View
+        accessibilityViewIsModal
         style={{
           flex: 1,
           justifyContent: 'center',

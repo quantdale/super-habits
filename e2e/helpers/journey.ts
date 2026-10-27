@@ -150,7 +150,7 @@ export function defineJourney(declaration: JourneyDeclaration): JourneyDeclarati
         const ctx: JourneyContext = {
           page,
           switchSection: async (tab) => {
-            await page.getByRole('button', { name: TAB_LABELS[tab], exact: true }).click();
+            await page.getByRole('tab', { name: TAB_LABELS[tab], exact: true }).click();
           },
         };
         try {

@@ -1,6 +1,6 @@
 import { test, expect, type Page } from './fixtures';
 import { clearDatabase } from './helpers/db';
-import { goToTab } from './helpers/navigation';
+import { goToTab, planningHubTab } from './helpers/navigation';
 import { queryRows, returnToApp, runSql } from './helpers/dbHarness';
 import { browserLocalTodayKey } from './helpers/browserDate';
 
@@ -21,7 +21,7 @@ import { browserLocalTodayKey } from './helpers/browserDate';
 
 async function openPlanHub(page: Page) {
   await page.getByRole('button', { name: 'Plan today' }).click();
-  await expect(page.getByRole('tab', { name: 'Projects' })).toBeVisible({ timeout: 20_000 });
+  await expect(planningHubTab(page, 'Projects')).toBeVisible({ timeout: 20_000 });
 }
 
 test.describe('Planning Hub', () => {
@@ -93,11 +93,11 @@ test.describe('Planning Hub', () => {
 
     // Today tab is the default; every tab control is present and switchable.
     await openPlanHub(page);
-    await expect(page.getByRole('tab', { name: 'Today' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Timeline' })).toBeVisible();
+    await expect(planningHubTab(page, 'Today')).toBeVisible();
+    await expect(planningHubTab(page, 'Timeline')).toBeVisible();
 
     // --- Projects view: create through the detail editor. ---
-    await page.getByRole('tab', { name: 'Projects' }).click();
+    await planningHubTab(page, 'Projects').click();
     await expect(page.getByText('No projects yet')).toBeVisible({ timeout: 20_000 });
     await page.getByRole('button', { name: 'Create project' }).click();
     await page.getByPlaceholder('Project name').fill('Home renovation');
@@ -107,7 +107,7 @@ test.describe('Planning Hub', () => {
     ).toBeVisible({ timeout: 20_000 });
 
     // --- Goals view: create through the detail editor. ---
-    await page.getByRole('tab', { name: 'Goals' }).click();
+    await planningHubTab(page, 'Goals').click();
     await expect(page.getByText('No goals yet')).toBeVisible({ timeout: 20_000 });
     await page.getByRole('button', { name: 'Create goal' }).click();
     await page.getByPlaceholder('Goal title').fill('Run a 5k');
@@ -120,7 +120,7 @@ test.describe('Planning Hub', () => {
     // insight surface (fed live by progress.data through real SQLite). W12
     // leads with the period + narrative and keeps the full metric set behind
     // one disclosure, so the metric rows are asserted after opening it. ---
-    await page.getByRole('tab', { name: 'Progress' }).click();
+    await planningHubTab(page, 'Progress').click();
     await expect(
       page.getByRole('dialog').getByRole('button', { name: 'Open weekly review' }),
     ).toBeVisible({
@@ -132,7 +132,7 @@ test.describe('Planning Hub', () => {
     await expect(page.getByText('Habit check-ins')).toBeVisible();
 
     // --- Timeline view: the real activity rows surface as feed items. ---
-    await page.getByRole('tab', { name: 'Timeline' }).click();
+    await planningHubTab(page, 'Timeline').click();
     await expect(page.getByText('Created project "Home renovation"')).toBeVisible({
       timeout: 20_000,
     });
@@ -164,7 +164,7 @@ test.describe('Planning Hub', () => {
     await returnToApp(page);
     await goToTab(page, 'overview');
     await openPlanHub(page);
-    await page.getByRole('tab', { name: 'Projects' }).click();
+    await planningHubTab(page, 'Projects').click();
     await expect(
       page.getByRole('button', { name: /^Home renovation, Active, 0 percent progress/ }),
     ).toBeVisible({ timeout: 20_000 });
@@ -176,7 +176,7 @@ test.describe('Planning Hub', () => {
     test.setTimeout(240_000);
 
     await openPlanHub(page);
-    await page.getByRole('tab', { name: 'Projects' }).click();
+    await planningHubTab(page, 'Projects').click();
     await expect(page.getByText('No projects yet')).toBeVisible({ timeout: 20_000 });
 
     await page.getByRole('button', { name: 'Create project' }).click();
@@ -221,7 +221,7 @@ test.describe('Planning Hub', () => {
     await returnToApp(page);
     await goToTab(page, 'overview');
     await openPlanHub(page);
-    await page.getByRole('tab', { name: 'Projects' }).click();
+    await planningHubTab(page, 'Projects').click();
     const afterRestart = page.getByRole('button', { name: /percent progress/ });
     await expect(afterRestart.first()).toHaveText(/Beta/, { timeout: 20_000 });
   });

@@ -551,7 +551,7 @@ async function todayKey(page: Page): Promise<string> {
  * first match in DOM order (lazy-mounted sections come after the rail).
  */
 async function switchTab(page: Page, tab: keyof typeof TAB_LABELS): Promise<void> {
-  await page.getByRole('button', { name: TAB_LABELS[tab], exact: true }).first().click();
+  await page.getByRole('tab', { name: TAB_LABELS[tab], exact: true }).first().click();
 }
 
 /** Add one to a quantitative habit and await its committed, refreshed count. */

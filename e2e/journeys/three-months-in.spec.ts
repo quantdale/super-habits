@@ -789,7 +789,7 @@ async function measureSwitch(page: Page, tab: SectionName, marker: string): Prom
  * order, so the first role-matched button IS the tab.
  */
 async function goToSection(page: Page, tab: SectionName): Promise<void> {
-  await page.getByRole('button', { name: TAB_LABELS_NAMES[tab], exact: true }).first().click();
+  await page.getByRole('tab', { name: TAB_LABELS_NAMES[tab], exact: true }).first().click();
 }
 
 async function expectSectionActive(page: Page, marker: string): Promise<void> {

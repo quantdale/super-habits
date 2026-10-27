@@ -123,7 +123,7 @@ describe('activityTimeline.data (real SQLite)', () => {
     const run5k = await goals.addGoal({ title: 'Run 5k', progressPercent: 50 });
     await goals.setGoalStatus(run5k, 'completed');
 
-    const items = await buildActivityTimeline({ days: 30, now: new Date() });
+    const { items } = await buildActivityTimeline({ days: 30, now: new Date() });
     const titles = new Set(items.map((i) => i.title));
     const byTitle = new Map(items.map((i) => [i.title, i]));
 
@@ -191,7 +191,7 @@ describe('activityTimeline.data (real SQLite)', () => {
     ]);
 
     const titles = new Set(
-      (await buildActivityTimeline({ days: 7, now: new Date() })).map((i) => i.title),
+      (await buildActivityTimeline({ days: 7, now: new Date() })).items.map((i) => i.title),
     );
     expect(titles.has('Completed "Three days ago"')).toBe(true);
     expect(titles.has('Completed "Edge day start"')).toBe(true);
@@ -218,7 +218,7 @@ describe('activityTimeline.data (real SQLite)', () => {
     ]);
     await habits.incrementHabit(habitId, backdatedKey);
 
-    const items = await buildActivityTimeline({ days: 30, now: new Date() });
+    const { items } = await buildActivityTimeline({ days: 30, now: new Date() });
     const item = items.find((i) => i.title === 'Logged "Journal"');
     expect(item).toBeDefined();
     expect(item!.dateKey).toBe(backdatedKey);
@@ -239,7 +239,7 @@ describe('activityTimeline.data (real SQLite)', () => {
     await habits.incrementHabit(habitId, todayKey);
     await habits.decrementHabit(habitId, todayKey);
 
-    const items = await buildActivityTimeline({ days: 30, now: new Date() });
+    const { items } = await buildActivityTimeline({ days: 30, now: new Date() });
     const habitItems = items.filter((i) => i.source === 'habit');
     expect(habitItems).toHaveLength(1);
     expect(habitItems[0].title).toBe('Logged "Decrement probe"');
@@ -247,5 +247,84 @@ describe('activityTimeline.data (real SQLite)', () => {
     expect(habitItems[0].dateKey).toBe(todayKey);
     // Count is back to 1 after 2 increments + 1 decrement, so no × suffix.
     expect(habitItems[0].subtitle).toBe(`Habit · ${todayKey}`);
+  });
+  // Audit C §7 regression, proved against real SQLite rows: the "All time"
+  // filter used to be `min(90, days)` PLUS a per-source `LIMIT`, so anything
+  // older than 90 days (and anything past the per-source cap) was silently
+  // dropped. This seeds >90-day-old history and >200 items, then requires the
+  // unbounded request to return every one of them across pages.
+  it('returns complete history for days: "all" (>90 days old, >200 items)', async () => {
+    db = await freshDatabase();
+    const { toDateKey } = await import('@/lib/time');
+    const { buildActivityTimeline, ACTIVITY_TIMELINE_PAGE_SIZE } =
+      await import('@/features/activity/activityTimeline.data');
+    const todayKey = toDateKey();
+    const nowMs = Date.now();
+
+    // 120 days older than any 90-day window, one todo per day: every one of
+    // these rows is invisible to `days: 90` and must be visible to 'all'.
+    const ANCIENT = 120;
+    for (let i = 0; i < ANCIENT; i += 1) {
+      const dayKey = shiftKey(todayKey, -(100 + i));
+      const id = `todo_ancient_${String(i).padStart(3, '0')}`;
+      await db.runAsync(
+        `INSERT INTO todos (id, title, notes, completed, created_at, updated_at, deleted_at, completed_at)
+         VALUES (?, ?, null, 1, ?, ?, null, ?)`,
+        [
+          id,
+          `Ancient ${i}`,
+          new Date(`${dayKey}T08:00:00`).toISOString(),
+          new Date(`${dayKey}T08:00:00`).toISOString(),
+          new Date(`${dayKey}T09:00:00`).toISOString(),
+        ],
+      );
+    }
+
+    // Plus enough recent todos to push the merged feed well past 200 items and
+    // past a single page, proving paging does not truncate either.
+    const RECENT = 220;
+    for (let i = 0; i < RECENT; i += 1) {
+      const minutesAgo = i;
+      const stamp = new Date(nowMs - minutesAgo * 60_000).toISOString();
+      await db.runAsync(
+        `INSERT INTO todos (id, title, notes, completed, created_at, updated_at, deleted_at, completed_at)
+         VALUES (?, ?, null, 1, ?, ?, null, ?)`,
+        [`todo_recent_${String(i).padStart(3, '0')}`, `Recent ${i}`, stamp, stamp, stamp],
+      );
+    }
+
+    const expected = ANCIENT + RECENT;
+    // A bounded read keeps its window: 90 days cannot see the ancient rows.
+    const bounded = await buildActivityTimeline({ days: 90, now: new Date(nowMs) });
+    expect(bounded.items.filter((i) => i.title.startsWith('Completed "Ancient')).length).toBe(0);
+
+    // The unbounded read pages through the full history.
+    const collected: string[] = [];
+    let after: { occurredAt: string; id: string } | undefined;
+    let guard = 0;
+    for (;;) {
+      const page: Awaited<ReturnType<typeof buildActivityTimeline>> = await buildActivityTimeline({
+        days: 'all',
+        now: new Date(nowMs),
+        limit: ACTIVITY_TIMELINE_PAGE_SIZE,
+        after,
+      });
+      collected.push(...page.items.map((item) => item.title));
+      if (!page.hasMore) break;
+      after = page.nextCursor ?? undefined;
+      expect(after, 'a page with hasMore carries a cursor').toBeDefined();
+      guard += 1;
+      expect(guard, 'paging terminates').toBeLessThan(20);
+    }
+
+    expect(collected).toHaveLength(expected);
+    expect(new Set(collected).size).toBe(expected);
+    expect(collected.filter((title) => title.startsWith('Completed "Ancient')).length).toBe(
+      ANCIENT,
+    );
+    // The oldest seeded row is present — 90-day truncation would have lost it.
+    expect(collected).toContain(`Completed "Ancient ${ANCIENT - 1}"`);
+    // Newest-first ordering survives paging.
+    expect(collected[0]).toBe('Completed "Recent 0"');
   });
 });

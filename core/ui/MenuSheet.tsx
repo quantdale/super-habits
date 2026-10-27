@@ -4,6 +4,7 @@ import { Modal as RNModal, Pressable, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
+import { dialogA11yProps } from '@/core/ui/dialogA11y';
 
 export type MenuItem = {
   icon: keyof typeof MaterialIcons.glyphMap;
@@ -32,9 +33,18 @@ type MenuSheetProps = {
 export function MenuSheet({ visible, onClose, title, items, children }: MenuSheetProps) {
   const { tokens } = useAppTheme();
   const cancelFocusRing = useKeyboardFocusRing(tokens.accent);
+  // Names RN-Web's own `role="dialog"` container, so the sheet is announced by
+  // its purpose instead of as an unlabelled dialog (see core/ui/dialogA11y).
+  const dialogName = dialogA11yProps({ title });
 
   return (
-    <RNModal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <RNModal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      {...dialogName}
+    >
       <View
         className="flex-1 justify-end"
         accessibilityViewIsModal

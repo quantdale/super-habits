@@ -286,7 +286,7 @@ test.describe('Global — no NaN, undefined, or Error text anywhere', () => {
   for (const tab of tabs) {
     test(`${tab} tab has no NaN or undefined in rendered text`, async ({ page }) => {
       await goToTab(page, tab);
-      await expect(page.getByRole('button', { name: 'Today', exact: true })).toBeVisible();
+      await expect(page.getByRole('tab', { name: 'Today', exact: true })).toBeVisible();
       await expect(page.locator('body')).not.toContainText('NaN');
       await expect(page.locator('body')).not.toContainText('undefined');
       await expect(page.locator('body')).not.toContainText('Infinity');

@@ -23,7 +23,7 @@ test.describe('W10 six-destination navigation', () => {
     const bar = BAR(page);
     for (const label of Object.values(TAB_LABELS)) {
       if (label === 'Health') continue; // no longer a bar destination
-      await expect(bar.getByRole('button', { name: label, exact: true })).toBeVisible();
+      await expect(bar.getByRole('tab', { name: label, exact: true })).toBeVisible();
     }
     await expect(bar.getByRole('button', { name: 'Quick capture' })).toBeVisible();
   });
@@ -39,7 +39,7 @@ test.describe('W10 six-destination navigation', () => {
       const geometry = await page.evaluate(() => {
         const rail = document.querySelector('[aria-label="Section tabs"]');
         if (!rail) return null;
-        const buttons = Array.from(rail.querySelectorAll('[role="button"]'));
+        const buttons = Array.from(rail.querySelectorAll('[role="tab"]'));
         let minWidth = Number.POSITIVE_INFINITY;
         let minHeight = Number.POSITIVE_INFINITY;
         let minFont = Number.POSITIVE_INFINITY;
@@ -73,10 +73,10 @@ test.describe('W10 six-destination navigation', () => {
   }) => {
     await goToTab(page, 'overview');
     // Workout.
-    await BAR(page).getByRole('button', { name: 'Workout', exact: true }).click();
+    await BAR(page).getByRole('tab', { name: 'Workout', exact: true }).click();
     await expect(page.getByText('Workout', { exact: true }).first()).toBeVisible();
     // Calories: the hero's remaining-kcal indicator identifies the section.
-    await BAR(page).getByRole('button', { name: 'Calories', exact: true }).click();
+    await BAR(page).getByRole('tab', { name: 'Calories', exact: true }).click();
     await expect(page.getByText(/[\d,]+ kcal left/).first()).toBeVisible();
     // No intermediate "Open <section>" affordance remains anywhere.
     await expect(page.getByRole('button', { name: 'Open Workout' })).toHaveCount(0);
@@ -90,9 +90,9 @@ test.describe('W10 six-destination navigation', () => {
       .getByRole('button', { name: 'Pause', exact: true })
       .waitFor({ state: 'visible', timeout: 15_000 });
 
-    await BAR(page).getByRole('button', { name: 'Calories', exact: true }).click();
+    await BAR(page).getByRole('tab', { name: 'Calories', exact: true }).click();
     await expect(page.getByText(/[\d,]+ kcal left/).first()).toBeVisible();
-    await BAR(page).getByRole('button', { name: 'Focus', exact: true }).click();
+    await BAR(page).getByRole('tab', { name: 'Focus', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible({
       timeout: 15_000,
     });
@@ -103,7 +103,7 @@ test.describe('W10 six-destination navigation', () => {
     // section container to carry that section's identity string.
     for (const section of ['todos', 'habits', 'pomodoro', 'workout', 'calories'] as const) {
       await switchSection(page, section);
-      await expect(BAR(page).getByRole('button', { name: TAB_LABELS[section] })).toBeVisible();
+      await expect(BAR(page).getByRole('tab', { name: TAB_LABELS[section] })).toBeVisible();
     }
     await switchSection(page, 'overview');
   });

@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { test, expect, type Page } from './fixtures';
-import { goToTab } from './helpers/navigation';
+import { goToTab, planningHubTab } from './helpers/navigation';
 import { resetAll } from './helpers/reset';
 import { returnToApp } from './helpers/dbHarness';
 
@@ -21,11 +21,11 @@ async function shot(page: Page, name: string): Promise<void> {
 async function openHub(page: Page): Promise<void> {
   await goToTab(page, 'overview');
   await page.getByRole('button', { name: 'Plan today' }).click();
-  await expect(page.getByRole('tab', { name: 'Projects' })).toBeVisible({ timeout: 20_000 });
+  await expect(planningHubTab(page, 'Projects')).toBeVisible({ timeout: 20_000 });
 }
 
 async function switchTo(page: Page, name: 'Today' | 'Projects' | 'Goals'): Promise<void> {
-  await page.getByRole('tab', { name }).click();
+  await planningHubTab(page, name).click();
   await page.waitForTimeout(350);
 }
 

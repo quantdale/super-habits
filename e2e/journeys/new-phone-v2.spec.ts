@@ -872,7 +872,7 @@ defineJourney({
         await returnToApp(page);
         // Complete the restored todo: the restored linked-action rule must
         // fire EXACTLY once (habit.increment on today).
-        await page.getByRole('button', { name: 'To Do', exact: true }).click();
+        await page.getByRole('tab', { name: 'To Do', exact: true }).click();
         const activeSection = page.locator(ACTIVE_SECTION_SELECTOR);
         await expect(activeSection.getByText('Restored V2 task').first()).toBeVisible({
           timeout: 10_000,

@@ -1146,7 +1146,15 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
             </>
           ) : null}
         </View>
-        <Modal visible={modalVisible} onClose={closeModal} scroll>
+        <Modal
+          visible={modalVisible}
+          onClose={closeModal}
+          scroll
+          // The visible heading lives in the `Card variant="header"` below, so
+          // the dialog container would otherwise be announced as an unnamed
+          // dialog (see core/ui/dialogA11y).
+          accessibilityLabel={editingId ? 'Edit task' : 'Add new task'}
+        >
           <Card
             variant="header"
             accentColor={SECTION_COLORS.todos}
