@@ -1,7 +1,6 @@
 import type { CalorieEntry, CalorieGoal, DailySummary, SavedMeal } from './types';
-import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
-import { SECTION_COLORS } from '@/constants/sectionColors';
-import { buildDateRange, buildDateRangeOldestFirst, isValidDateKey } from '@/lib/time';
+import type { HeatmapDay } from '@/features/shared/activityTypes';
+import { buildDateRangeOldestFirst, isValidDateKey } from '@/lib/time';
 
 export const DEFAULT_CALORIE_GOAL: CalorieGoal = {
   calories: 2000,
@@ -75,59 +74,6 @@ export function buildDailyTrend(summaries: DailySummary[], days: number = 365): 
       label,
     };
   });
-}
-
-export type MacroSlice = {
-  /** Percent of total macro kcal (0–100), adjusted so slices sum to 100. */
-  value: number;
-  /** Energy from this macro for split visualization (carbs use total carbs × 4; fiber separate). */
-  kcal: number;
-  color: string;
-  label: string;
-  /** Grams shown in the legend — carbs use total carbs grams. */
-  grams: number;
-};
-
-/**
- * Builds macro split slices for charts that need proportional segments.
- * Carbs use total carbs × 4 kcal so a carb slice appears whenever carbs > 0
- * (digestible carbs can be 0 when fiber ≥ carbs). Fiber keeps its own slice.
- */
-export function buildMacroDonutData(
-  protein: number,
-  carbs: number,
-  fats: number,
-  fiber: number,
-): MacroSlice[] {
-  const proteinKcal = protein * 4;
-  const carbsKcal = carbs * 4;
-  const fiberKcal = fiber * 2;
-  const fatsKcal = fats * 9;
-  const totalKcal = proteinKcal + carbsKcal + fiberKcal + fatsKcal;
-
-  if (totalKcal === 0) return [];
-
-  const raw = [
-    { kcal: proteinKcal, color: SECTION_COLORS.todos, label: 'Protein' as const, grams: protein },
-    { kcal: carbsKcal, color: SECTION_COLORS.calories, label: 'Carbs' as const, grams: carbs },
-    { kcal: fatsKcal, color: SECTION_COLORS.workout, label: 'Fats' as const, grams: fats },
-    { kcal: fiberKcal, color: SECTION_COLORS.habits, label: 'Fiber' as const, grams: fiber },
-  ];
-
-  const nonZero = raw.filter((s) => s.kcal > 0);
-  if (nonZero.length === 0) return [];
-
-  const slices: MacroSlice[] = nonZero.map((s) => ({
-    ...s,
-    value: Math.round((s.kcal / totalKcal) * 100),
-  }));
-
-  const pctSum = slices.reduce((acc, s) => acc + s.value, 0);
-  if (slices.length > 0 && pctSum !== 100) {
-    slices[slices.length - 1].value += 100 - pctSum;
-  }
-
-  return slices;
 }
 
 export function calculateGoalProgress(
@@ -257,63 +203,6 @@ export function sortSavedMealsForSearch(meals: SavedMeal[], query: string = ''):
     const byRecent = (b.last_used_at ?? '').localeCompare(a.last_used_at ?? '');
     if (byRecent !== 0) return byRecent;
     return a.food_name.localeCompare(b.food_name);
-  });
-}
-
-export type MacroShare = {
-  protein: number;
-  carbs: number;
-  fats: number;
-  fiber: number;
-};
-
-/**
- * Percentage of total macro kcal per macro (carbs use total carbs × 4 so
- * fiber is not double-counted into the carb share). All zeros → all zeros.
- * Informational only.
- */
-export function macroKcalShares(
-  proteinG: number,
-  carbsG: number,
-  fatsG: number,
-  fiberG: number,
-): MacroShare {
-  const proteinKcal = proteinG * 4;
-  const carbsKcal = Math.max(0, carbsG - fiberG) * 4;
-  const fiberKcal = fiberG * 2;
-  const fatsKcal = fatsG * 9;
-  const total = proteinKcal + carbsKcal + fiberKcal + fatsKcal;
-  if (total <= 0) return { protein: 0, carbs: 0, fats: 0, fiber: 0 };
-  const pct = (kcal: number) => Math.round((kcal / total) * 100);
-  return {
-    protein: pct(proteinKcal),
-    carbs: pct(carbsKcal),
-    fats: pct(fatsKcal),
-    fiber: pct(fiberKcal),
-  };
-}
-
-/**
- * Build ActivityDay array from daily summaries.
- * A day is "active" if any calories were logged.
- * value = min(1, totalCalories / goalCalories) for intensity.
- */
-export function buildCalorieActivityDays(
-  summaries: DailySummary[],
-  goalCalories: number = 2000,
-  days: number = 364,
-): ActivityDay[] {
-  const map = new Map<string, number>();
-  for (const s of summaries) {
-    map.set(s.dateKey, s.totalCalories);
-  }
-  return buildDateRange(days).map((dateKey) => {
-    const cal = map.get(dateKey) ?? 0;
-    return {
-      dateKey,
-      active: cal > 0,
-      value: goalCalories > 0 ? Math.min(1, cal / goalCalories) : cal > 0 ? 1 : 0,
-    };
   });
 }
 

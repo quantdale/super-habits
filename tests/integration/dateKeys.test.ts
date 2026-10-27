@@ -180,7 +180,9 @@ describe('getUtcIsoRangeForLocalDateKeys boundaries (pomodoro_sessions / workout
       '2026-07-01T04:00:00.000Z',
       '2026-07-02T15:59:59.999Z',
     ]);
-    expect(await workout.listWorkoutLogs()).toHaveLength(4);
+    // The whole corpus sits inside this range; the range read is the unbounded
+    // equivalent of the deleted convenience listing.
+    expect(await workout.listWorkoutLogsForRange('2026-06-01', '2026-07-31')).toHaveLength(4);
     await db.closeAsync();
   });
 });

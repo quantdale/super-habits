@@ -4,7 +4,6 @@ import {
   applyHabitLifecycleTransition,
   buildAggregatedHabitHeatmap,
   buildDayCompletions,
-  buildHabitActivityDays,
   buildHabitGrid,
   calculateCurrentStreak,
   calculateHabitProgress,
@@ -24,7 +23,6 @@ import {
   serializeHabitLifecycleHistory,
   shouldAwardHabitFastPath,
   sortHabits,
-  summarizeHabitLifecycle,
   type DayCompletion,
 } from '@/features/habits/habits.domain';
 import { dateKeyToLocalDate, timestampToLocalDateKey, toDateKey } from '@/lib/time';
@@ -403,7 +401,7 @@ describe('schedule-aware heatmaps and activity', () => {
         ],
       },
     ];
-    expect(buildHabitActivityDays(grid, 1)[0]).toMatchObject({ active: false, value: 0 });
+    expect(buildAggregatedHabitHeatmap(grid, 1)[0]).toMatchObject({ value: 0 });
   });
 });
 
@@ -661,10 +659,6 @@ describe('paused-interval masking (F1)', () => {
     );
     expect(calculateOverallConsistency(pausedToday)).toBe(0);
     expect(buildAggregatedHabitHeatmap(pausedToday, 30).at(-1)?.value).toBe(0);
-    expect(buildHabitActivityDays(pausedToday, 30).at(-1)).toMatchObject({
-      active: false,
-      value: 0,
-    });
   });
 
   it('anchors the grid window on the injected todayKey (F7)', () => {
@@ -686,20 +680,6 @@ describe('paused-interval masking (F1)', () => {
     const heatmap = buildAggregatedHabitHeatmap(grid, 30);
     expect(heatmap).toHaveLength(30);
     expect(heatmap.at(-1)?.dateKey).toBe('2026-08-10');
-  });
-
-  it('summarizeHabitLifecycle counts durable status buckets', () => {
-    const habits = [
-      { id: 'h1' },
-      { id: 'h2', status: 'paused' as const },
-      { id: 'h3', status: 'archived' as const },
-      { id: 'h4' },
-    ];
-    expect(summarizeHabitLifecycle(habits)).toEqual({
-      activeCount: 2,
-      pausedCount: 1,
-      archivedCount: 1,
-    });
   });
 });
 

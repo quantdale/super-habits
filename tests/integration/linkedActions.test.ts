@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
+import { saveHabitRules, saveTodoRules } from './helpers/linkedActionRules';
 
 /**
  * Task 2.9 — a full linked-action cycle against REAL rows: source trigger →
@@ -19,7 +20,6 @@ import { freshDatabase } from './helpers/db';
 async function createTodoHabitIncrementCycle(db: TestDatabase) {
   const todos = await import('@/features/todos/todos.data');
   const habits = await import('@/features/habits/habits.data');
-  const linked = await import('@/core/linked-actions/linkedActions.data');
   const engineModule = await import('@/core/linked-actions/linkedActions.engine');
 
   const sourceTodoId = await todos.addTodo({ title: 'Ship the report' });
@@ -36,27 +36,24 @@ async function createTodoHabitIncrementCycle(db: TestDatabase) {
     targetHabitId,
   ]);
 
-  await linked.createLinkedActionRule({
-    source: {
-      feature: 'todos',
-      entityType: 'todo',
-      entityId: sourceTodoId,
+  await saveTodoRules(sourceTodoId, [
+    {
       triggerType: 'todo.completed',
-    },
-    target: {
-      feature: 'habits',
-      entityType: 'habit',
-      entityId: targetHabitId,
-      effect: {
-        kind: 'progress',
-        type: 'habit.increment',
-        amount: 1,
-        dateStrategy: 'source_date',
+      target: {
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: targetHabitId,
+        effect: {
+          kind: 'progress',
+          type: 'habit.increment',
+          amount: 1,
+          dateStrategy: 'source_date',
+        },
       },
     },
-  });
+  ]);
 
-  return { todos, habits, linked, engineModule, sourceTodoId, targetHabitId };
+  return { todos, habits, engineModule, sourceTodoId, targetHabitId };
 }
 
 describe('full source → rule → effect → execution cycle', () => {
@@ -123,7 +120,6 @@ describe('a linked action respects the target habit schedule (audit C #6)', () =
     const db = await freshDatabase();
     const todos = await import('@/features/todos/todos.data');
     const habits = await import('@/features/habits/habits.data');
-    const linked = await import('@/core/linked-actions/linkedActions.data');
     const engineModule = await import('@/core/linked-actions/linkedActions.engine');
 
     const sourceTodoId = await todos.addTodo({ title: 'Trigger on a rest day' });
@@ -143,25 +139,22 @@ describe('a linked action respects the target habit schedule (audit C #6)', () =
       targetHabitId,
     ]);
 
-    await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: sourceTodoId,
+    await saveTodoRules(sourceTodoId, [
+      {
         triggerType: 'todo.completed',
-      },
-      target: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: targetHabitId,
-        effect: {
-          kind: 'progress',
-          type: 'habit.increment',
-          amount: 1,
-          dateStrategy: 'source_date',
+        target: {
+          feature: 'habits',
+          entityType: 'habit',
+          entityId: targetHabitId,
+          effect: {
+            kind: 'progress',
+            type: 'habit.increment',
+            amount: 1,
+            dateStrategy: 'source_date',
+          },
         },
       },
-    });
+    ]);
 
     const source = {
       feature: 'todos' as const,
@@ -210,7 +203,6 @@ describe('a linked action respects the target habit schedule (audit C #6)', () =
   it('skips a habit.ensure_daily_target whose source date is an off-schedule day', async () => {
     const db = await freshDatabase();
     const habits = await import('@/features/habits/habits.data');
-    const linked = await import('@/core/linked-actions/linkedActions.data');
     const engineModule = await import('@/core/linked-actions/linkedActions.engine');
 
     // `habit.ensure_daily_target` is a supported path from a HABIT source, so
@@ -238,25 +230,22 @@ describe('a linked action respects the target habit schedule (audit C #6)', () =
       ]),
       targetHabitId,
     ]);
-    await linked.createLinkedActionRule({
-      source: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: sourceHabitId,
+    await saveHabitRules(sourceHabitId, [
+      {
         triggerType: 'habit.completed_for_day',
-      },
-      target: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: targetHabitId,
-        effect: {
-          kind: 'progress',
-          type: 'habit.ensure_daily_target',
-          minimumCount: 'target_per_day',
-          dateStrategy: 'source_date',
+        target: {
+          feature: 'habits',
+          entityType: 'habit',
+          entityId: targetHabitId,
+          effect: {
+            kind: 'progress',
+            type: 'habit.ensure_daily_target',
+            minimumCount: 'target_per_day',
+            dateStrategy: 'source_date',
+          },
         },
       },
-    });
+    ]);
 
     const source = {
       feature: 'habits' as const,
@@ -653,34 +642,29 @@ describe('target_missing skips', () => {
     const db = await freshDatabase();
     const todos = await import('@/features/todos/todos.data');
     const habits = await import('@/features/habits/habits.data');
-    const linked = await import('@/core/linked-actions/linkedActions.data');
-
     // Target is deleted BEFORE the rule is created (the rule editor would not
-    // offer it, but `createLinkedActionRule` accepts any id — this is the
-    // defensive `target_missing` path the engine exists for).
+    // offer it, but the rule save accepts any id — this is the defensive
+    // `target_missing` path the engine exists for).
     const strayHabitId = await habits.addHabit('Stray habit', 3);
     await habits.deleteHabit(strayHabitId);
 
     const sourceTodoId = await todos.addTodo({ title: 'Trigger with missing target' });
-    await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: sourceTodoId,
+    await saveTodoRules(sourceTodoId, [
+      {
         triggerType: 'todo.completed',
-      },
-      target: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: strayHabitId,
-        effect: {
-          kind: 'progress',
-          type: 'habit.increment',
-          amount: 1,
-          dateStrategy: 'source_date',
+        target: {
+          feature: 'habits',
+          entityType: 'habit',
+          entityId: strayHabitId,
+          effect: {
+            kind: 'progress',
+            type: 'habit.increment',
+            amount: 1,
+            dateStrategy: 'source_date',
+          },
         },
       },
-    });
+    ]);
 
     const source = (await todos.listTodos()).find((t) => t.id === sourceTodoId)!;
     const result = await todos.toggleTodo(source);
@@ -707,26 +691,22 @@ describe('target_missing skips', () => {
   it('skips a todo.complete whose target todo is soft-deleted, leaving it untouched', async () => {
     const db = await freshDatabase();
     const todos = await import('@/features/todos/todos.data');
-    const linked = await import('@/core/linked-actions/linkedActions.data');
     const engineModule = await import('@/core/linked-actions/linkedActions.engine');
 
     const targetTodoId = await todos.addTodo({ title: 'already deleted target' });
     await todos.removeTodo(targetTodoId);
     const sourceTodoId = await todos.addTodo({ title: 'source' });
-    await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: sourceTodoId,
+    await saveTodoRules(sourceTodoId, [
+      {
         triggerType: 'todo.completed',
+        target: {
+          feature: 'todos',
+          entityType: 'todo',
+          entityId: targetTodoId,
+          effect: { kind: 'binary', type: 'todo.complete' },
+        },
       },
-      target: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: targetTodoId,
-        effect: { kind: 'binary', type: 'todo.complete' },
-      },
-    });
+    ]);
 
     const result = await engineModule.linkedActionsEngine.processSourceAction({
       eventId: 'levt_missing_target',

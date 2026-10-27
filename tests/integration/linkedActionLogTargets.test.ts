@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { freshDatabase, type TestDatabase } from './helpers/db';
+import { saveTodoRules } from './helpers/linkedActionRules';
 
 /**
  * Wave 6 (design D6, option A): the newly exposed calorie.log and
@@ -15,53 +16,44 @@ describe('log-target linked actions (real SQLite)', () => {
   });
 
   async function authorLogRules(todoId: string) {
-    const linked = await import('@/core/linked-actions/linkedActions.data');
-    await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: todoId,
+    await saveTodoRules(todoId, [
+      {
         triggerType: 'todo.completed',
-      },
-      target: {
-        feature: 'calories',
-        entityType: 'calorie_log',
-        entityId: null,
-        effect: {
-          kind: 'log',
-          type: 'calorie.log',
-          dateStrategy: 'today',
-          templateSource: 'inline',
-          savedMealId: null,
-          foodName: 'Post-run smoothie',
-          calories: 250,
-          protein: 0,
-          carbs: 0,
-          fats: 0,
-          fiber: 0,
-          mealType: 'snack',
+        target: {
+          feature: 'calories',
+          entityType: 'calorie_log',
+          entityId: null,
+          effect: {
+            kind: 'log',
+            type: 'calorie.log',
+            dateStrategy: 'today',
+            templateSource: 'inline',
+            savedMealId: null,
+            foodName: 'Post-run smoothie',
+            calories: 250,
+            protein: 0,
+            carbs: 0,
+            fats: 0,
+            fiber: 0,
+            mealType: 'snack',
+          },
         },
       },
-    });
-    await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: todoId,
+      {
         triggerType: 'todo.completed',
-      },
-      target: {
-        feature: 'pomodoro',
-        entityType: 'pomodoro_session',
-        entityId: null,
-        effect: {
-          kind: 'log',
-          type: 'pomodoro.log',
-          sessionType: 'focus',
-          durationSeconds: 1500,
+        target: {
+          feature: 'pomodoro',
+          entityType: 'pomodoro_session',
+          entityId: null,
+          effect: {
+            kind: 'log',
+            type: 'pomodoro.log',
+            sessionType: 'focus',
+            durationSeconds: 1500,
+          },
         },
       },
-    });
+    ]);
   }
 
   it('a completed authored task logs the calorie entry and focus session once', async () => {

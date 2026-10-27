@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { freshDatabase, type TestDatabase } from './helpers/db';
+import { saveTodoRules } from './helpers/linkedActionRules';
 import type {
   DraftAddTodoToDailyPlan,
   DraftCreateProject,
@@ -135,29 +136,24 @@ describe('Command Center V2 canonical SQLite execution', () => {
       const todos = await import('@/features/todos/todos.data');
       const habits = await import('@/features/habits/habits.data');
       const workout = await import('@/features/workout/workout.data');
-      const linked = await import('@/core/linked-actions/linkedActions.data');
-
       const sourceTodoId = await todos.addTodo({ title: 'Buy groceries' });
       const targetHabitId = await habits.addHabit('Drink water', 1);
-      await linked.createLinkedActionRule({
-        source: {
-          feature: 'todos',
-          entityType: 'todo',
-          entityId: sourceTodoId,
+      await saveTodoRules(sourceTodoId, [
+        {
           triggerType: 'todo.completed',
-        },
-        target: {
-          feature: 'habits',
-          entityType: 'habit',
-          entityId: targetHabitId,
-          effect: {
-            kind: 'progress',
-            type: 'habit.increment',
-            amount: 1,
-            dateStrategy: 'source_date',
+          target: {
+            feature: 'habits',
+            entityType: 'habit',
+            entityId: targetHabitId,
+            effect: {
+              kind: 'progress',
+              type: 'habit.increment',
+              amount: 1,
+              dateStrategy: 'source_date',
+            },
           },
         },
-      });
+      ]);
 
       const input = {
         rawText: 'complete Buy groceries',

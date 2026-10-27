@@ -1,9 +1,8 @@
 import type { HabitCompletion } from './types';
 import type { HabitLifecycleInterval, HabitLifecycleStatus } from '@/core/db/types';
-import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
+import type { HeatmapDay } from '@/features/shared/activityTypes';
 import { computeStreakRun, type StreakRunDay } from './habitStreak.domain';
 import {
-  buildDateRange,
   buildDateRangeOldestFirst,
   dateKeyToLocalDate,
   timestampToLocalDateKey,
@@ -681,32 +680,6 @@ export function buildAggregatedHabitHeatmap(
   });
 }
 
-function buildEmptyActivityDays(days: number): ActivityDay[] {
-  return buildDateRange(days).map((dateKey) => ({ dateKey, active: false }));
-}
-
-export function buildHabitActivityDays(grid: HabitGridRow[], days: number = 30): ActivityDay[] {
-  if (grid.length === 0) return buildEmptyActivityDays(days);
-  const dateKeys = (grid[0].cells.slice(-days) ?? []).map((cell) => cell.dateKey).reverse();
-  const indexedRows = grid.map((row) => new Map(row.cells.map((cell) => [cell.dateKey, cell])));
-
-  return dateKeys.map((dateKey) => {
-    let completed = 0;
-    let scheduled = 0;
-    for (const row of indexedRows) {
-      const cell = row.get(dateKey);
-      if (!cell?.eligible) continue;
-      scheduled += 1;
-      if (cell.completed) completed += 1;
-    }
-    return {
-      dateKey,
-      active: completed > 0,
-      value: scheduled > 0 ? completed / scheduled : 0,
-    };
-  });
-}
-
 // ---------------------------------------------------------------------------
 // List filtering / sorting
 // ---------------------------------------------------------------------------
@@ -750,32 +723,4 @@ export function sortHabits<T extends { id: string; name: string }>(
     copy.sort((a, b) => (streaks?.[b.id] ?? 0) - (streaks?.[a.id] ?? 0));
   }
   return copy;
-}
-
-// ---------------------------------------------------------------------------
-// Lifecycle summaries
-// ---------------------------------------------------------------------------
-
-export type HabitLifecycleSummary = {
-  activeCount: number;
-  pausedCount: number;
-  archivedCount: number;
-};
-
-/** Count habits per durable lifecycle bucket (missing status counts as active). */
-export function summarizeHabitLifecycle(
-  habits: {
-    status?: HabitLifecycleStatus;
-  }[],
-): HabitLifecycleSummary {
-  let activeCount = 0;
-  let pausedCount = 0;
-  let archivedCount = 0;
-  for (const habit of habits) {
-    const status = habit.status ?? 'active';
-    if (status === 'archived') archivedCount += 1;
-    else if (status === 'paused') pausedCount += 1;
-    else activeCount += 1;
-  }
-  return { activeCount, pausedCount, archivedCount };
 }

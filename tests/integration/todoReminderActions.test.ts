@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { freshDatabase } from './helpers/db';
+import { saveTodoRules } from './helpers/linkedActionRules';
 import { toDateKey } from '@/lib/time';
 import {
   getTodoReminderActionKey,
@@ -139,23 +140,19 @@ describe('todo reminder Mark done against real SQLite', () => {
     const db = await freshDatabase();
     const todos = await import('@/features/todos/todos.data');
     const actions = await import('@/features/todos/todoNotificationActions.data');
-    const linked = await import('@/core/linked-actions/linkedActions.data');
     const sourceId = await createTodo(todos, 'Pack bags');
     const targetId = await createTodo(todos, 'Review packing list');
-    await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: sourceId,
+    await saveTodoRules(sourceId, [
+      {
         triggerType: 'todo.completed',
+        target: {
+          feature: 'todos',
+          entityType: 'todo',
+          entityId: targetId,
+          effect: { kind: 'binary', type: 'todo.complete' },
+        },
       },
-      target: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: targetId,
-        effect: { kind: 'binary', type: 'todo.complete' },
-      },
-    });
+    ]);
 
     const input = actionInput(sourceId);
     const first = await actions.completeTodoFromNotification({ ...input, now: NOW });

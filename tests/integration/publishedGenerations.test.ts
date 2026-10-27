@@ -20,21 +20,6 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import {
-  checkChunkReplacement,
-  checkGenerationScope,
-  currentGenerationScope,
-  decideHeadAdvance,
-  GENERATION_PROTOCOL_VERSION,
-  generatableForCleanup,
-  resolveRestoreGeneration,
-  retainedGenerations,
-  verifyGenerationCompleteness,
-  type GenerationChunk,
-  type GenerationScope,
-  type OwnerHead,
-  type PublishedGeneration,
-} from '@/core/backup/generations/generationProtocol';
 import { freshDatabase } from './helpers/db';
 import { sha256Hex } from '@/lib/checksum';
 
@@ -42,218 +27,7 @@ vi.mock('expo-constants', () => ({
   default: { expoConfig: { version: '1.0.0' } },
 }));
 
-function chunk(overrides: Partial<GenerationChunk> = {}): GenerationChunk {
-  const payload = overrides.payload ?? '[{"id":"todo_1"}]';
-  return {
-    snapshotId: overrides.snapshotId ?? 'gsnap_1',
-    entity: overrides.entity ?? 'todos',
-    ordinal: overrides.ordinal ?? 0,
-    payload,
-    checksum: overrides.checksum ?? sha256Hex(payload),
-  };
-}
-
-function generation(sequence: number, snapshotId = `gsnap_${sequence}`): PublishedGeneration {
-  return {
-    snapshotId,
-    sequence,
-    scope: currentGenerationScope({
-      backupSchemaVersion: 2,
-      scopeVersion: 7,
-      settingsVersion: 5,
-    }),
-    manifest: `manifest-${sequence}`,
-    manifestChecksum: sha256Hex(`manifest-${sequence}`),
-    publishedAt: '2026-10-18T00:00:00.000Z',
-  };
-}
-
-describe('AUD-SH02-A: chunk content is immutable', () => {
-  it('inserts a new identity and accepts an identical retry', () => {
-    const incoming = chunk();
-    expect(checkChunkReplacement(null, incoming)).toEqual({ ok: true, value: 'inserted' });
-    expect(checkChunkReplacement(incoming, incoming)).toEqual({ ok: true, value: 'unchanged' });
-    // A retry with the same bytes but a re-serialized payload object is identical.
-    const retry = chunk({ payload: incoming.payload });
-    expect(checkChunkReplacement(incoming, retry)).toEqual({ ok: true, value: 'unchanged' });
-  });
-
-  it('refuses different bytes under an existing chunk identity', () => {
-    // This is the exact mutation the audited transport performed implicitly: the
-    // same identity would have carried generation-2 content, destroying G1.
-    const original = chunk();
-    const mutated = chunk({ payload: '[{"id":"todo_1","title":"Changed"}]' });
-    expect(checkChunkReplacement(original, mutated)).toEqual({
-      ok: false,
-      reason: 'chunk_content_changed',
-    });
-  });
-});
-
-describe('AUD-SH02-A: publication requires a complete generation', () => {
-  it('accepts a fully staged generation', () => {
-    const chunks = [
-      chunk({ entity: 'todos', ordinal: 0 }),
-      chunk({ entity: 'habits', ordinal: 0 }),
-    ];
-    expect(verifyGenerationCompleteness({ todos: 1, habits: 1 }, chunks)).toEqual({
-      ok: true,
-      value: { totalChunks: 2 },
-    });
-  });
-
-  it('refuses a missing chunk for an expected entity', () => {
-    const chunks = [chunk({ entity: 'todos', ordinal: 0 })];
-    expect(verifyGenerationCompleteness({ todos: 1, habits: 1 }, chunks)).toEqual({
-      ok: false,
-      reason: 'incomplete_generation',
-    });
-  });
-
-  it('refuses a gap in an entity’s ordinals', () => {
-    const chunks = [chunk({ entity: 'todos', ordinal: 0 }), chunk({ entity: 'todos', ordinal: 2 })];
-    expect(verifyGenerationCompleteness({ todos: 3 }, chunks)).toEqual({
-      ok: false,
-      reason: 'incomplete_generation',
-    });
-  });
-
-  it('refuses a duplicate ordinal instead of counting it twice', () => {
-    const chunks = [chunk({ entity: 'todos', ordinal: 0 }), chunk({ entity: 'todos', ordinal: 0 })];
-    expect(verifyGenerationCompleteness({ todos: 2 }, chunks)).toEqual({
-      ok: false,
-      reason: 'incomplete_generation',
-    });
-  });
-
-  it('refuses content for an entity the snapshot never asked for', () => {
-    const chunks = [chunk({ entity: 'todos', ordinal: 0 }), chunk({ entity: 'ghost', ordinal: 0 })];
-    expect(verifyGenerationCompleteness({ todos: 1 }, chunks)).toEqual({
-      ok: false,
-      reason: 'incomplete_generation',
-    });
-  });
-});
-
-describe('AUD-SH02-B: the head advance is atomic and idempotent', () => {
-  it('advances from the expected previous sequence', () => {
-    const current: OwnerHead = { snapshotId: 'gsnap_1', sequence: 1 };
-    expect(decideHeadAdvance(current, generation(2))).toEqual({
-      ok: true,
-      value: { snapshotId: 'gsnap_2', sequence: 2 },
-    });
-  });
-
-  it('creates the first head when none exists', () => {
-    expect(decideHeadAdvance(null, generation(1))).toEqual({
-      ok: true,
-      value: { snapshotId: 'gsnap_1', sequence: 1 },
-    });
-  });
-
-  it('a lost response is idempotent, not a regression', () => {
-    const current: OwnerHead = { snapshotId: 'gsnap_2', sequence: 2 };
-    const retry = generation(2, 'gsnap_2');
-    expect(decideHeadAdvance(current, retry)).toEqual({ ok: true, value: current });
-  });
-
-  it('a stale retry never regresses a newer head', () => {
-    const current: OwnerHead = { snapshotId: 'gsnap_3', sequence: 3 };
-    expect(decideHeadAdvance(current, generation(2))).toEqual({
-      ok: false,
-      reason: 'stale_sequence',
-    });
-  });
-
-  it('an older snapshot cannot claim the head’s sequence', () => {
-    // Same sequence, different snapshot: not a retry, so it is refused.
-    const current: OwnerHead = { snapshotId: 'gsnap_2', sequence: 2 };
-    expect(decideHeadAdvance(current, generation(2, 'gsnap_other'))).toEqual({
-      ok: false,
-      reason: 'stale_sequence',
-    });
-  });
-});
-
-describe('AUD-SH02-D: restore reads exactly one retained generation', () => {
-  it('pins the head generation', () => {
-    const published = [generation(1), generation(2)];
-    const head: OwnerHead = { snapshotId: 'gsnap_1', sequence: 1 };
-    const resolved = resolveRestoreGeneration(head, published);
-    expect(resolved.ok).toBe(true);
-    if (resolved.ok) expect(resolved.value.snapshotId).toBe('gsnap_1');
-  });
-
-  it('refuses a head whose generation is no longer retained', () => {
-    const published = [generation(1)];
-    const head: OwnerHead = { snapshotId: 'gsnap_9', sequence: 9 };
-    expect(resolveRestoreGeneration(head, published)).toEqual({
-      ok: false,
-      reason: 'generation_not_retained',
-    });
-  });
-
-  it('keeps at least the current and previous complete generation', () => {
-    const published = [generation(1), generation(2), generation(3)];
-    expect(retainedGenerations(published).map((entry) => entry.sequence)).toEqual([2, 3]);
-    // Even a nonsensical request for one cannot drop the previous generation.
-    expect(retainedGenerations(published, 1).map((entry) => entry.sequence)).toEqual([2, 3]);
-  });
-
-  it('never cleans up a generation an active restore is reading', () => {
-    const published = [generation(1), generation(2), generation(3)];
-    // Without an active reader, G1 is collectable (current + previous kept).
-    expect(generatableForCleanup(published, null).map((entry) => entry.sequence)).toEqual([1]);
-    // An active G1 reader protects it.
-    expect(generatableForCleanup(published, 'gsnap_1')).toEqual([]);
-  });
-});
-
 describe('AUD-SH02-C: RLS and protocol boundaries', () => {
-  it('refuses a NEWER protocol version explicitly', () => {
-    const future: GenerationScope = {
-      protocolVersion: GENERATION_PROTOCOL_VERSION + 1,
-      backupSchemaVersion: 2,
-      scopeVersion: 7,
-      settingsVersion: 5,
-    };
-    const supported = currentGenerationScope({
-      backupSchemaVersion: 2,
-      scopeVersion: 7,
-      settingsVersion: 5,
-    });
-    expect(checkGenerationScope(future, supported)).toEqual({
-      ok: false,
-      reason: 'unsupported_protocol',
-    });
-  });
-
-  it('refuses a newer backup schema or settings version', () => {
-    const supported = currentGenerationScope({
-      backupSchemaVersion: 2,
-      scopeVersion: 7,
-      settingsVersion: 5,
-    });
-    expect(checkGenerationScope({ ...supported, backupSchemaVersion: 3 }, supported)).toEqual({
-      ok: false,
-      reason: 'unsupported_protocol',
-    });
-    expect(checkGenerationScope({ ...supported, settingsVersion: 6 }, supported)).toEqual({
-      ok: false,
-      reason: 'unsupported_protocol',
-    });
-  });
-
-  it('accepts an older supported scope (legacy readers stay working)', () => {
-    const supported = currentGenerationScope({
-      backupSchemaVersion: 2,
-      scopeVersion: 7,
-      settingsVersion: 5,
-    });
-    expect(checkGenerationScope({ ...supported, scopeVersion: 6 }, supported).ok).toBe(true);
-    expect(checkGenerationScope(supported, supported).ok).toBe(true);
-  });
-
   it('the migration pins owner isolation to auth.uid(), never a client field', async () => {
     const { readFileSync } = await import('node:fs');
     const path = await import('node:path');
@@ -316,10 +90,13 @@ describe('AUD-SH02-E: the real capture is coherent and resumable', () => {
     const settingsChunk = captured.chunks.find((entry) => entry.entity === 'user_backup_settings');
     expect(settingsChunk).toBeTruthy();
     expect(settingsChunk!.payload).toContain('2000');
-    // The generation verifies complete against its own expectation.
-    expect(verifyGenerationCompleteness(captured.capture.expectedChunks, captured.chunks).ok).toBe(
-      true,
-    );
+    // The generation carries exactly the chunks its own expectation declares,
+    // one per ordinal, so publication is complete on arrival.
+    for (const [entity, count] of Object.entries(captured.capture.expectedChunks)) {
+      const staged = captured.chunks.filter((entry) => entry.entity === entity);
+      expect(staged).toHaveLength(count);
+      expect(new Set(staged.map((entry) => entry.ordinal)).size).toBe(count);
+    }
     await db.closeAsync();
   }, 60000);
 
@@ -363,17 +140,15 @@ describe('AUD-SH02-E: the real capture is coherent and resumable', () => {
     const db = await freshDatabase();
     const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
     await setLocalDatasetOwner(db as never, 'user_a');
-    const { captureGeneration, markEntityStaged, readGenerationCapture, readCapturedChunks } =
+    const { captureGeneration, readGenerationCapture, readCapturedChunks } =
       await import('@/core/backup/generations/capture');
     const captured = await captureGeneration({ settingsPayload: {} });
-    await markEntityStaged(captured.capture.snapshotId, 'todos');
     expect((await readCapturedChunks(db as never))?.chunks).toEqual(captured.chunks);
 
     // A "restart" is a fresh read of durable state.
     const resumed = await readGenerationCapture(db as never);
     expect(resumed?.snapshotId).toBe(captured.capture.snapshotId);
     expect(resumed?.sequence).toBe(captured.capture.sequence);
-    expect(resumed?.stagedEntities).toContain('todos');
     expect(resumed?.manifestChecksum).toBe(captured.capture.manifestChecksum);
     await db.closeAsync();
   }, 60000);

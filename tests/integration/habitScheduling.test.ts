@@ -7,6 +7,7 @@ import {
 } from '@/features/habits/habits.domain';
 import { toDateKey } from '@/lib/time';
 import { freshDatabase } from './helpers/db';
+import { saveTodoRules } from './helpers/linkedActionRules';
 
 describe('real SQLite habit scheduling persistence', () => {
   function nextWeekdayOutside(weekdays: readonly number[]): string {
@@ -138,7 +139,6 @@ describe('real SQLite habit scheduling persistence', () => {
     const db = await freshDatabase();
     const habits = await import('@/features/habits/habits.data');
     const todos = await import('@/features/todos/todos.data');
-    const linked = await import('@/core/linked-actions/linkedActions.data');
     const { linkedActionsEngine } = await import('@/core/linked-actions/linkedActions.engine');
     const habitDomain = await import('@/features/habits/habits.domain');
     const habitId = await habits.addHabit(
@@ -152,25 +152,22 @@ describe('real SQLite habit scheduling persistence', () => {
     const sourceTodoId = await todos.addTodo({ title: 'Trigger gym' });
     const offDay = nextWeekdayOutside([1, 3, 5]);
 
-    await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: sourceTodoId,
+    await saveTodoRules(sourceTodoId, [
+      {
         triggerType: 'todo.completed',
-      },
-      target: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: habitId,
-        effect: {
-          kind: 'progress',
-          type: 'habit.increment',
-          amount: 1,
-          dateStrategy: 'source_date',
+        target: {
+          feature: 'habits',
+          entityType: 'habit',
+          entityId: habitId,
+          effect: {
+            kind: 'progress',
+            type: 'habit.increment',
+            amount: 1,
+            dateStrategy: 'source_date',
+          },
         },
       },
-    });
+    ]);
 
     const source = {
       feature: 'todos' as const,

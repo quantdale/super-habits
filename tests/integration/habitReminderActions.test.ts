@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { freshDatabase } from './helpers/db';
+import { saveHabitRules } from './helpers/linkedActionRules';
 import { toDateKey } from '@/lib/time';
 import {
   HABIT_REMINDER_MARK_COMPLETE_ACTION,
@@ -161,23 +162,19 @@ describe('habit reminder Mark complete against real SQLite', () => {
     const db = await freshDatabase();
     const habits = await import('@/features/habits/habits.data');
     const todos = await import('@/features/todos/todos.data');
-    const linked = await import('@/core/linked-actions/linkedActions.data');
     const habitId = await createHabit(habits);
     const todoId = await todos.addTodo({ title: 'Review gym progress' });
-    await linked.createLinkedActionRule({
-      source: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: habitId,
+    await saveHabitRules(habitId, [
+      {
         triggerType: 'habit.completed_for_day',
+        target: {
+          feature: 'todos',
+          entityType: 'todo',
+          entityId: todoId,
+          effect: { kind: 'binary', type: 'todo.complete' },
+        },
       },
-      target: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: todoId,
-        effect: { kind: 'binary', type: 'todo.complete' },
-      },
-    });
+    ]);
 
     const today = toDateKey(NOW);
     const input = actionInput(habitId, today, HABIT_REMINDER_MARK_COMPLETE_ACTION);

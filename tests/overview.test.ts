@@ -3,9 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_CARD_LAYOUT,
   OVERVIEW_CARD_IDS,
-  formatDueDateLabel,
   getGreeting,
-  isCardVisible,
   isActiveHabit,
   moveCard,
   parseCardLayout,
@@ -75,11 +73,6 @@ describe('card layout persistence helpers', () => {
     ).toEqual(['focus']);
   });
 
-  it('isCardVisible reflects the layout', () => {
-    expect(isCardVisible(['todos'], 'todos')).toBe(true);
-    expect(isCardVisible(['todos'], 'habits')).toBe(false);
-  });
-
   it('toggleCardVisibility removes and re-inserts at default position', () => {
     const full = [...OVERVIEW_CARD_IDS];
     const withoutHabits = toggleCardVisibility(full, 'habits');
@@ -112,12 +105,6 @@ describe('greeting / date logic', () => {
     expect(getGreeting(17)).toBe('Good afternoon');
     expect(getGreeting(18)).toBe('Good evening');
     expect(getGreeting(23)).toBe('Good evening');
-  });
-
-  it('labels due dates relative to today', () => {
-    expect(formatDueDateLabel('2026-01-01', '2026-01-02')).toBe('Overdue');
-    expect(formatDueDateLabel('2026-01-02', '2026-01-02')).toBe('Due today');
-    expect(formatDueDateLabel('2026-01-03', '2026-01-02')).toBe('Due 2026-01-03');
   });
 });
 

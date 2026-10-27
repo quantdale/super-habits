@@ -150,17 +150,6 @@ export async function hasCalorieEntriesInRange(
   return Boolean(row);
 }
 
-export async function hasAnyCalorieEntries(): Promise<boolean> {
-  const db = await getDatabase();
-  const row = await db.getFirstAsync<{ id: string }>(
-    `SELECT id
-     FROM calorie_entries
-     WHERE deleted_at IS NULL
-     LIMIT 1`,
-  );
-  return Boolean(row);
-}
-
 export async function addCalorieEntry(
   input: {
     foodName: string;

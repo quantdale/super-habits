@@ -18,7 +18,6 @@ import {
   isQuickLoggedSession,
   normalizeEffort,
   recommendProgression,
-  resolveWorkoutSchedule,
 } from '@/features/workout/workout.domain';
 import type { HeatmapDay } from '@/features/shared/activityTypes';
 import type { BodyWeightEntry, WorkoutLog } from '@/core/db/types';
@@ -476,45 +475,6 @@ describe('buildExerciseHistory', () => {
 });
 
 describe('Gym V2 training domain', () => {
-  it('resolves local weekly weekdays and lets a date override win without changing the plan', () => {
-    const weeklyPlan = [
-      {
-        id: 'plan-mon',
-        weekday: 1,
-        routine_id: 'push',
-        plan_kind: 'workout' as const,
-        note: null,
-        created_at: '2026-08-01T00:00:00.000Z',
-        updated_at: '2026-08-01T00:00:00.000Z',
-        deleted_at: null,
-      },
-    ];
-    const override = [
-      {
-        id: 'override-aug-24',
-        date_key: '2026-08-24',
-        override_kind: 'rest' as const,
-        routine_id: null,
-        moved_from_date_key: null,
-        note: 'Recovery day',
-        created_at: '2026-08-01T00:00:00.000Z',
-        updated_at: '2026-08-01T00:00:00.000Z',
-        deleted_at: null,
-      },
-    ];
-
-    expect(resolveWorkoutSchedule('2026-08-17', weeklyPlan, [])).toMatchObject({
-      source: 'weekly',
-      planKind: 'workout',
-      routineId: 'push',
-    });
-    expect(resolveWorkoutSchedule('2026-08-24', weeklyPlan, override)).toMatchObject({
-      source: 'override',
-      planKind: 'rest',
-      routineId: null,
-    });
-  });
-
   it('gives linear progression an explicit successful-work explanation', () => {
     expect(
       recommendProgression({

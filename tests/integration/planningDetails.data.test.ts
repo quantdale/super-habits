@@ -147,17 +147,17 @@ describe('planning detail queries (real SQLite)', () => {
       reflection: 'Solid week',
     });
 
-    const review = await weekly.getWeeklyReviewById(id);
+    const review = await weekly.getWeeklyReviewByWeekKey('2026-W36');
     expect(review).toMatchObject({
       id,
       week_key: '2026-W36',
       reflection: 'Solid week',
       status: 'completed',
     });
-    expect(await weekly.getWeeklyReviewById('wrev_missing')).toBeNull();
+    expect(await weekly.getWeeklyReviewByWeekKey('2026-W99')).toBeNull();
 
     await weekly.deleteWeeklyReview(id);
-    expect(await weekly.getWeeklyReviewById(id)).toBeNull();
+    expect(await weekly.getWeeklyReviewByWeekKey('2026-W36')).toBeNull();
     expect(await weekly.listWeeklyReviews()).toHaveLength(0);
   });
 });

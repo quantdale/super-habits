@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { freshDatabase } from './helpers/db';
+import { saveTodoRules } from './helpers/linkedActionRules';
 
 async function createOutboxInsertFailure(
   db: {
@@ -24,23 +25,19 @@ describe('local tombstone and sync intent atomicity', () => {
   it('rolls a todo tombstone back when source linked-action cleanup fails', async () => {
     const db = await freshDatabase();
     const todos = await import('@/features/todos/todos.data');
-    const linked = await import('@/core/linked-actions/linkedActions.data');
     const sourceId = await todos.addTodo({ title: 'source' });
     const targetId = await todos.addTodo({ title: 'target' });
-    await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: sourceId,
+    await saveTodoRules(sourceId, [
+      {
         triggerType: 'todo.completed',
+        target: {
+          feature: 'todos',
+          entityType: 'todo',
+          entityId: targetId,
+          effect: { kind: 'binary', type: 'todo.complete' },
+        },
       },
-      target: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: targetId,
-        effect: { kind: 'binary', type: 'todo.complete' },
-      },
-    });
+    ]);
     await db.execAsync(`
       CREATE TRIGGER fail_source_cleanup
       BEFORE UPDATE OF deleted_at ON linked_action_rules
@@ -71,23 +68,19 @@ describe('local tombstone and sync intent atomicity', () => {
   it('rolls a todo tombstone back when target linked-action cleanup fails', async () => {
     const db = await freshDatabase();
     const todos = await import('@/features/todos/todos.data');
-    const linked = await import('@/core/linked-actions/linkedActions.data');
     const sourceId = await todos.addTodo({ title: 'other source' });
     const targetId = await todos.addTodo({ title: 'target' });
-    await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: sourceId,
+    await saveTodoRules(sourceId, [
+      {
         triggerType: 'todo.completed',
+        target: {
+          feature: 'todos',
+          entityType: 'todo',
+          entityId: targetId,
+          effect: { kind: 'binary', type: 'todo.complete' },
+        },
       },
-      target: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: targetId,
-        effect: { kind: 'binary', type: 'todo.complete' },
-      },
-    });
+    ]);
     await db.execAsync(`
       CREATE TRIGGER fail_target_cleanup
       BEFORE UPDATE OF deleted_at ON linked_action_rules

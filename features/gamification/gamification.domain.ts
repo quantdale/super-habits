@@ -347,11 +347,6 @@ export function canBankFreeze(current: StreakFreezeState): boolean {
   return current.banked < MAX_BANKED_FREEZES;
 }
 
-/** The next streak milestone worth showing in the UI, or null past the last. */
-export function nextStreakMilestone(streakDays: number): number | null {
-  return STREAK_MILESTONES.find((milestone) => milestone > streakDays) ?? null;
-}
-
 // ---------------------------------------------------------------------------
 // badges
 // ---------------------------------------------------------------------------
@@ -429,30 +424,6 @@ export function badgeStates(stats: BadgeStats, unlockedIds: readonly string[]): 
     });
   }
   return states;
-}
-
-/** The next locked tier per family — what the UI shows as "in progress". */
-export function nextBadges(stats: BadgeStats, unlockedIds: readonly string[]): BadgeState[] {
-  const unlocked = new Set(unlockedIds);
-  const next: BadgeState[] = [];
-  for (const definition of BADGE_FAMILY_DEFINITIONS) {
-    const value = badgeMetricValue(definition.family, stats);
-    const index = definition.thresholds.findIndex(
-      (threshold, tierIndex) =>
-        !unlocked.has(badgeId(definition.family, (tierIndex + 1) as BadgeTier)) &&
-        value < threshold,
-    );
-    if (index === -1) continue;
-    const threshold = definition.thresholds[index];
-    const tier = (index + 1) as BadgeTier;
-    next.push({
-      ...badgeUnlockAt(definition, tier, threshold),
-      unlocked: false,
-      progress: value,
-      ratio: threshold > 0 ? Math.max(0, Math.min(1, value / threshold)) : 0,
-    });
-  }
-  return next;
 }
 
 // ---------------------------------------------------------------------------
