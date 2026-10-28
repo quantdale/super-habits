@@ -119,12 +119,22 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
 
   const handleSave = useCallback(async () => {
     setError(null);
+    // A typed draft wins over the last committed value; an empty draft keeps it.
+    const resolvedProgress = progressText.trim() ? parseGoalProgressText(progressText) : null;
+    if (resolvedProgress && !resolvedProgress.ok) {
+      setProgressParseError(resolvedProgress.error);
+      setError(resolvedProgress.error);
+      return;
+    }
+    const nextProgress = resolvedProgress ? resolvedProgress.value : progress;
+    setProgressParseError(null);
+    setProgress(nextProgress);
     const input: GoalInput = {
       title,
       description,
       horizon,
       status,
-      progressPercent: progress,
+      progressPercent: nextProgress,
       targetDate: targetDate || null,
       projectId,
     };
@@ -154,6 +164,7 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
     horizon,
     status,
     progress,
+    progressText,
     targetDate,
     projectId,
     isCreate,

@@ -107,6 +107,12 @@ describe('parseGoalProgressText', () => {
     expect(parseGoalProgressText('-3').ok).toBe(false);
     expect(parseGoalProgressText('101').ok).toBe(false);
   });
+  it('rejects a blank draft so the save path can keep the committed value', () => {
+    // GoalDetailView treats a blank draft as "no edit" and keeps `progress`;
+    // parseGoalProgressText must therefore report blank as not-ok rather than
+    // silently returning 0.
+    expect(parseGoalProgressText('   ').ok).toBe(false);
+  });
 });
 
 describe('filterGoalRows / sortGoalRows', () => {
