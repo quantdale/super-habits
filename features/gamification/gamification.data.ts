@@ -49,6 +49,7 @@ import {
   type DayFacts,
   type GamificationAwardResult,
   type GamificationSnapshot,
+  type LevelProgress,
   type StreakDay,
   type StreakFreezeState,
   type StreakSummary,
@@ -444,19 +445,27 @@ async function loadBadgeIds(db: Db, snapshot?: LedgerSnapshot): Promise<string[]
   return [...badgeIds];
 }
 
-/** Lifetime counters every badge family reads from. */
+/**
+ * Lifetime counters every badge family reads from, plus the level progress they
+ * imply. The level is returned in full so a snapshot can render it without
+ * walking the level ladder a second time (audit C §3.1).
+ */
 async function loadBadgeStats(
   db: Db,
   streak: StreakSummary,
   snapshot?: LedgerSnapshot,
-): Promise<BadgeStats> {
+): Promise<{ stats: BadgeStats; level: LevelProgress }> {
   if (snapshot) {
+    const level = levelFromXp(snapshot.totalXp);
     return {
-      currentStreak: streak.current,
-      longestStreak: streak.longest,
-      totalXp: snapshot.totalXp,
-      level: levelFromXp(snapshot.totalXp).level,
-      ...snapshot.counts,
+      level,
+      stats: {
+        currentStreak: streak.current,
+        longestStreak: streak.longest,
+        totalXp: snapshot.totalXp,
+        level: level.level,
+        ...snapshot.counts,
+      },
     };
   }
 
@@ -487,17 +496,21 @@ async function loadBadgeStats(
     readCount(db, `SELECT COALESCE(SUM(xp), 0) AS value FROM gamification_events`),
   ]);
 
+  const level = levelFromXp(totalXp);
   return {
-    currentStreak: streak.current,
-    longestStreak: streak.longest,
-    totalXp,
-    level: levelFromXp(totalXp).level,
-    questsCompleted,
-    perfectDays,
-    habitCheckins,
-    focusSessions,
-    workouts,
-    nutritionDays,
+    level,
+    stats: {
+      currentStreak: streak.current,
+      longestStreak: streak.longest,
+      totalXp,
+      level: level.level,
+      questsCompleted,
+      perfectDays,
+      habitCheckins,
+      focusSessions,
+      workouts,
+      nutritionDays,
+    },
   };
 }
 
@@ -589,13 +602,13 @@ export async function readGamificationSnapshot(
     loadDayCompletion(db, todayKey, ledger),
   ]);
   const streak = computeStreakSummary(streakDays, todayKey);
-  const stats = await loadBadgeStats(db, streak, ledger);
+  const { stats, level } = await loadBadgeStats(db, streak, ledger);
 
   return {
     todayKey,
     totalXp: stats.totalXp,
     xpToday: facts.xpEarned,
-    level: levelFromXp(stats.totalXp),
+    level,
     streak,
     freezes,
     quests: buildDailyQuests({ dateKey: todayKey, facts, completedQuestIds }),
@@ -809,7 +822,7 @@ async function computeAward(input: {
     // award never writes, so the evaluation is identical to the post-commit
     // one. `INSERT OR IGNORE` still keeps concurrent awards harmless.
     const streak = computeStreakSummary(streakDaysFromSnapshot(snapshot), todayKey);
-    const stats = await loadBadgeStats(transactionDb, streak, snapshot);
+    const { stats } = await loadBadgeStats(transactionDb, streak, snapshot);
     const unlockedIds = await loadBadgeIds(transactionDb, snapshot);
     const newBadges = evaluateBadges(stats, unlockedIds);
     if (newBadges.length > 0) {
