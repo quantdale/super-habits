@@ -52,6 +52,28 @@ async function writeTempJson(name: string, text: string): Promise<string> {
   return filePath;
 }
 
+/**
+ * A file just past the shared V1 size contract (100 MB, `PORTABLE_V1_MAX_BYTES`
+ * in `core/portable/portable.types.ts` — restated here so the E2E tree keeps
+ * its existing no-path-alias-imports rule), written in chunks so the whole
+ * body never sits in this process at once. The picker rejects on `File.size`.
+ */
+async function writeOversizedJson(name: string): Promise<string> {
+  const filePath = path.join(os.tmpdir(), name);
+  const handle = await fs.open(filePath, 'w');
+  try {
+    const chunk = Buffer.alloc(1024 * 1024, 0x20);
+    let written = 0;
+    while (written <= 100 * 1024 * 1024) {
+      await handle.write(chunk);
+      written += chunk.length;
+    }
+  } finally {
+    await handle.close();
+  }
+  return filePath;
+}
+
 async function exportPortableFile(page: import('@playwright/test').Page): Promise<string> {
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export data', exact: true }).click();
@@ -206,5 +228,41 @@ test.describe('Portable data export & import', () => {
 
     await expect(page.getByText(/Import is available only on an empty device/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Import data', exact: true })).toBeDisabled();
+  });
+
+  test('a rejected second pick disarms the first file instead of importing it', async ({
+    page,
+  }) => {
+    await addTodoViaUi(page, 'Armed task');
+    await openSettingsScreen(page);
+    await dismissStartupRestorePromptIfPresent(page);
+    const text = await exportPortableFile(page);
+
+    await clearDatabase(page);
+    await openSettingsScreen(page);
+    await dismissStartupRestorePromptIfPresent(page);
+
+    // First pick: a valid file, so the preview is armed and Import is enabled.
+    const armedPath = await writeTempJson('armed.json', text);
+    await page.locator(IMPORT_INPUT).setInputFiles(armedPath);
+    await expect(page.getByText('Portable Super Habits backup')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Import', exact: true })).toBeEnabled();
+
+    // Second pick: a file the picker rejects BEFORE validation (over the shared
+    // 100 MB V1 bound). The new selection replaces the armed one, so nothing
+    // is left importable: otherwise Import would silently restore the FIRST
+    // file while the error describes the file the user just chose.
+    const oversizedPath = await writeOversizedJson('oversized.json');
+    try {
+      await page.locator(IMPORT_INPUT).setInputFiles(oversizedPath);
+      await expect(page.getByText(/larger than this version/)).toBeVisible();
+      await expect(page.getByText('Portable Super Habits backup')).toBeHidden();
+      await expect(page.getByRole('button', { name: 'Import', exact: true })).toBeHidden();
+
+      const rows = await queryRows(page, 'SELECT COUNT(*) AS count FROM todos');
+      expect(rows[0]?.count).toBe(0);
+    } finally {
+      await fs.unlink(oversizedPath).catch(() => undefined);
+    }
   });
 });
