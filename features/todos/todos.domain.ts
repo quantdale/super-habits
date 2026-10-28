@@ -27,6 +27,17 @@ export function getTodayDateKey(reference: Date = new Date()): string {
  * Returns the set of recurrence_ids that have no active
  * (non-deleted, non-completed) instance with due_date = today.
  *
+ * A live PENDING instance with NO due date also covers its series. Such a row
+ * cannot be matched by the date comparison, so without this it looked
+ * permanently missing and the rollover scan appended another pending copy on
+ * the first load of each day — an ever-growing pile of identical tasks.
+ * Starting a daily series without typing a date (`Repeat daily` alone) and
+ * clearing the date of an existing series both produce exactly that row.
+ *
+ * Completion state matters here, unlike the due-date branch: a COMPLETED
+ * undated row must not cover its series, or finishing today's copy would
+ * suppress every future copy of the chain forever.
+ *
  * activeTodos: all non-deleted todos (completed and pending)
  * todayKey: today's date key
  */
@@ -35,6 +46,7 @@ export function findMissingRecurrenceIds(
     recurrence_id: string | null;
     recurrence: string | null;
     due_date: string | null;
+    completed: 0 | 1;
     deleted_at: string | null;
   }[],
   todayKey: string,
@@ -48,7 +60,9 @@ export function findMissingRecurrenceIds(
 
   const coveredToday = new Set<string>();
   for (const t of activeTodos) {
-    if (t.recurrence_id && t.due_date === todayKey && t.deleted_at === null) {
+    if (!t.recurrence_id || t.deleted_at !== null) continue;
+    // Dated coverage is unchanged (a completed row due today still covers).
+    if (t.due_date === todayKey || (t.due_date === null && t.completed === 0)) {
       coveredToday.add(t.recurrence_id);
     }
   }

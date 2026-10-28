@@ -432,11 +432,11 @@ export async function getRecurringTodosByIds(recurrenceIds: string[]): Promise<T
 }
 
 export async function listAllActiveTodosForRecurrence(): Promise<
-  Pick<Todo, 'recurrence_id' | 'recurrence' | 'due_date' | 'deleted_at'>[]
+  Pick<Todo, 'recurrence_id' | 'recurrence' | 'due_date' | 'completed' | 'deleted_at'>[]
 > {
   const db = await getDatabase();
   return db.getAllAsync(
-    `SELECT recurrence_id, recurrence, due_date, deleted_at
+    `SELECT recurrence_id, recurrence, due_date, completed, deleted_at
      FROM todos
      WHERE deleted_at IS NULL`,
   );
