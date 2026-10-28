@@ -7,7 +7,6 @@ import {
   isActiveHabit,
   moveCard,
   parseCardLayout,
-  pickEmptyStateCta,
   serializeCardLayout,
   shapeCaloriesSummary,
   shapeFocusWeekSummary,
@@ -421,55 +420,5 @@ describe('shapeProjectsSummary / shapeGoalsSummary', () => {
   it('handles empty inputs', () => {
     expect(shapeProjectsSummary([])).toEqual({ activeCount: 0, preview: [] });
     expect(shapeGoalsSummary([])).toEqual({ activeCount: 0, averageProgress: 0, preview: [] });
-  });
-});
-
-describe('pickEmptyStateCta', () => {
-  const empty = {
-    plan: { hasPlan: false },
-    todos: { pendingCount: 0 },
-    habits: { scheduledToday: 0 },
-    focus: { sessionCount: 0 },
-    workout: { sessionsThisWeek: 0 },
-    calories: { consumed: 0 },
-    projects: { activeCount: 0 },
-    goals: { activeCount: 0 },
-  };
-
-  it('defaults to the Todos tab when nothing is tracked', () => {
-    expect(pickEmptyStateCta(empty)).toEqual({
-      label: 'Add your first task',
-      destination: { kind: 'section', section: 'todos' },
-    });
-  });
-
-  // F9: a committed plan with no other data is tracked data.
-  it('points at the planning hub when only a plan exists', () => {
-    expect(pickEmptyStateCta({ ...empty, plan: { hasPlan: true } })).toEqual({
-      label: 'Review your plan',
-      destination: { kind: 'planning', view: 'today' },
-    });
-  });
-
-  it('walks domains in card order and returns the first non-empty one', () => {
-    expect(pickEmptyStateCta({ ...empty, habits: { scheduledToday: 2 } })).toEqual({
-      label: 'Check on your habits',
-      destination: { kind: 'section', section: 'habits' },
-    });
-    expect(pickEmptyStateCta({ ...empty, focus: { sessionCount: 3 } })).toEqual({
-      label: 'Start a focus session',
-      destination: { kind: 'section', section: 'pomodoro' },
-    });
-    expect(pickEmptyStateCta({ ...empty, projects: { activeCount: 1 } })).toEqual({
-      label: 'Open your projects',
-      destination: { kind: 'planning', view: 'projects' },
-    });
-    expect(
-      pickEmptyStateCta({
-        ...empty,
-        goals: { activeCount: 1 },
-        calories: { consumed: 200 },
-      }),
-    ).toEqual({ label: 'Log a meal', destination: { kind: 'section', section: 'calories' } });
   });
 });

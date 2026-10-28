@@ -30,6 +30,7 @@ import {
   computeActionReward,
   computeStreakSummary,
   evaluateBadges,
+  isDayComplete,
   levelFromXp,
   pickCelebration,
   planAutoFreeze,
@@ -569,14 +570,6 @@ async function computeDayCompletion(db: Db, todayKey: string): Promise<DayComple
 // ---------------------------------------------------------------------------
 // snapshot
 // ---------------------------------------------------------------------------
-
-function isDayComplete(dayCompletion: DayCompletionInput): boolean {
-  return (
-    dayCompletion.wasComplete ||
-    (dayCompletion.activeHabits > 0 &&
-      dayCompletion.completedHabitsAfter >= dayCompletion.activeHabits)
-  );
-}
 
 /** Everything the gamification surfaces render from, in one bounded read. */
 export async function readGamificationSnapshot(
