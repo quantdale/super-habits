@@ -138,6 +138,50 @@ describe('gamification ledger', () => {
     ).toBeNull();
   });
 
+  it('rolls the award and its badge unlock back together when the unlock write fails', async () => {
+    const { habits, gamification, time } = await loadModules();
+    const today = time.toDateKey();
+    const firstHabit = await habits.addHabit('Read', 1);
+    const secondHabit = await habits.addHabit('Walk', 1);
+    await habits.incrementHabit(firstHabit, today);
+    await gamification.awardGamificationAction({ kind: 'habit', entityId: firstHabit });
+
+    // Fail ONLY the badge write, i.e. after the award's ledger + quest inserts.
+    // Pre-fix the unlock ran post-commit, so the events survived a lost badge
+    // row (audit C §3.2); now both land in one transaction or neither does.
+    await db.execAsync(`
+      CREATE TRIGGER fail_badge_unlock
+      BEFORE INSERT ON gamification_badges
+      BEGIN
+        SELECT RAISE(ABORT, 'simulated badge write failure');
+      END;
+    `);
+
+    await habits.incrementHabit(secondHabit, today);
+    await expect(
+      gamification.awardGamificationAction({ kind: 'habit', entityId: secondHabit }),
+    ).rejects.toThrow('simulated badge write failure');
+
+    // Neither half of the award survives, so re-running it can still celebrate.
+    expect(
+      await db.getFirstAsync<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM gamification_events WHERE event_kind = 'habit'`,
+      ),
+    ).toEqual({ n: 1 });
+    expect(
+      await db.getFirstAsync<{ n: number }>(`SELECT COUNT(*) AS n FROM gamification_badges`),
+    ).toEqual({ n: 0 });
+
+    // With the failure gone the same award pays once and unlocks the badge once.
+    await db.execAsync('DROP TRIGGER fail_badge_unlock');
+    const retried = await gamification.awardGamificationAction({
+      kind: 'habit',
+      entityId: secondHabit,
+    });
+    expect(retried?.newBadges.map((badge) => badge.id)).toContain('perfect_days:1');
+    expect(retried?.celebration).toMatchObject({ tier: 'badge' });
+  });
+
   it('backfills actions that never reported themselves, then stays quiet', async () => {
     const { todos, gamification } = await loadModules();
 

@@ -771,7 +771,7 @@ async function computeAward(input: {
   ]);
   const streakDays = streakDaysFromSnapshot(snapshot);
 
-  const result = await withSQLiteTransaction(db, async (transactionDb) => {
+  const outcome = await withSQLiteTransaction(db, async (transactionDb) => {
     const existing = await transactionDb.getFirstAsync<{ id: string }>(
       `SELECT id FROM gamification_events WHERE event_kind = ? AND source_key = ?`,
       [input.kind, sourceKey],
@@ -807,33 +807,38 @@ async function computeAward(input: {
       );
     }
     absorbAward(snapshot, award, todayKey);
-    return award;
+
+    // Badge unlocks are written in THIS transaction (audit C §3.2). They used
+    // to land after commit, so a crash in between kept the award while losing
+    // the unlock row: the tier was re-earned silently on a later award and its
+    // celebration — the entire point of the layer — was skipped. They read the
+    // counters `absorbAward` just advanced plus the feature-table totals an
+    // award never writes, so the evaluation is identical to the post-commit
+    // one. `INSERT OR IGNORE` still keeps concurrent awards harmless.
+    const streak = computeStreakSummary(streakDaysFromSnapshot(snapshot), todayKey);
+    const stats = await loadBadgeStats(transactionDb, streak, snapshot);
+    const unlockedIds = await loadBadgeIds(transactionDb, snapshot);
+    const newBadges = evaluateBadges(stats, unlockedIds);
+    if (newBadges.length > 0) {
+      const unlockedAt = nowIso();
+      for (const badge of newBadges) {
+        await transactionDb.runAsync(
+          `INSERT OR IGNORE INTO gamification_badges (badge_id, family, tier, unlocked_at, date_key)
+           VALUES (?, ?, ?, ?, ?)`,
+          [badge.id, badge.family, badge.tier, unlockedAt, todayKey],
+        );
+      }
+      // Keep the pass memo truthful: the next award must not re-earn these.
+      snapshot.unlockedBadgeIds = [
+        ...(snapshot.unlockedBadgeIds ?? unlockedIds),
+        ...newBadges.map((badge) => badge.id),
+      ].sort();
+    }
+    return { award, newBadges };
   });
 
-  if (!result) return null;
-
-  // Badges read post-write counters, so they are evaluated against the snapshot
-  // AFTER the award was absorbed into it; INSERT OR IGNORE keeps concurrent
-  // awards harmless.
-  const streak = computeStreakSummary(streakDaysFromSnapshot(snapshot), todayKey);
-  const stats = await loadBadgeStats(db, streak, snapshot);
-  const unlockedIds = await loadBadgeIds(db, snapshot);
-  const newBadges = evaluateBadges(stats, unlockedIds);
-  if (newBadges.length > 0) {
-    const unlockedAt = nowIso();
-    for (const badge of newBadges) {
-      await db.runAsync(
-        `INSERT OR IGNORE INTO gamification_badges (badge_id, family, tier, unlocked_at, date_key)
-         VALUES (?, ?, ?, ?, ?)`,
-        [badge.id, badge.family, badge.tier, unlockedAt, todayKey],
-      );
-    }
-    // Keep the pass memo truthful: the next award must not re-earn these.
-    snapshot.unlockedBadgeIds = [
-      ...(snapshot.unlockedBadgeIds ?? unlockedIds),
-      ...newBadges.map((badge) => badge.id),
-    ].sort();
-  }
+  if (!outcome) return null;
+  const { award: result, newBadges } = outcome;
 
   const celebration = pickCelebration([
     ...(result.celebration ? [result.celebration] : []),
