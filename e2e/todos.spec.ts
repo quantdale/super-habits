@@ -285,4 +285,45 @@ test.describe('Todos', () => {
     );
     expect(stopped).toEqual([{ title: 'Morning stretch' }]);
   });
+
+  test('reopening a completed daily copy removes the copy its completion spawned', async ({
+    page,
+  }) => {
+    await openNewTodoModal(page);
+    await page.getByPlaceholder(/Add a task/i).fill('Daily review');
+    await page.getByText('Repeat daily', { exact: true }).click({ force: true });
+    await submitTodoModal(page);
+    await expect(page.getByText('Daily review').filter({ visible: true }).last()).toBeVisible();
+
+    // Completing today's copy spawns exactly one copy for the next due date.
+    await page
+      .getByRole('checkbox', { name: 'Mark complete: Daily review' })
+      .first()
+      .click({ force: true });
+    await expect(page.getByText('1 open', { exact: true })).toBeVisible();
+    await expect(page.getByText('1 completed', { exact: true })).toBeVisible();
+
+    // Reopening it must retract that spawn: the user is left with ONE pending
+    // copy, never the reopened row plus an untouched copy beside it.
+    await page.getByRole('button', { name: 'Show completed tasks' }).click();
+    await page
+      .getByRole('checkbox', { name: 'Mark incomplete: Daily review' })
+      .first()
+      .click({ force: true });
+    await expect(page.getByText('1 open', { exact: true })).toBeVisible();
+
+    // Row oracle (kept last: the harness navigates away from the app). One live
+    // pending row, and the spoiling copy is a soft-deleted tombstone carrying a
+    // synced remote-delete intent — never a hard delete.
+    const live = await queryRows(page, `SELECT completed FROM todos WHERE deleted_at IS NULL`);
+    expect(live).toEqual([{ completed: 0 }]);
+    const retired = await queryRows(page, `SELECT id FROM todos WHERE deleted_at IS NOT NULL`);
+    expect(retired).toHaveLength(1);
+    const retiredId = String(retired[0].id);
+    const intents = await queryRows(
+      page,
+      `SELECT operation FROM sync_outbox WHERE entity = 'todos' AND id = '${retiredId}'`,
+    );
+    expect(intents.map((row) => row.operation)).toContain('delete');
+  });
 });

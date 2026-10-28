@@ -45,6 +45,73 @@ function nextRecurringSpawnDueDate(completedDueDate: string | null): string {
   return addLocalDays(completedDueDate, 1);
 }
 
+/**
+ * A spawned daily copy is "pristine" while nothing has written it since the
+ * spawn. `createRecurringInstances` inserts with `created_at = updated_at`, and
+ * every later write (instance edit, series-template rename, reorder,
+ * completion) bumps `updated_at` — so this predicate is the exact
+ * "untouched since it was spawned" oracle without adding a provenance column.
+ */
+const PRISTINE_SPAWN_SQL = 'completed = 0 AND deleted_at IS NULL AND updated_at = created_at';
+
+/**
+ * Undo the copy that completing `parent` spawned.
+ *
+ * Completing a daily copy spawns the next day's copy. Reopening (unchecking)
+ * that same copy must retract the spawn, otherwise the user is left holding two
+ * pending copies of one daily task: the reopened row plus the copy the reopen
+ * was supposed to make unnecessary. Only a copy nothing has touched since the
+ * spawn is retracted — an edited, renamed, reordered, or completed future copy
+ * belongs to the user and stays. Re-completing the parent spawns a fresh copy
+ * again, because the retraction is a soft delete and the spawn guard ignores
+ * tombstones.
+ */
+async function removePristineSpawnedCopyWithinTransaction(
+  transactionDb: SQLite.SQLiteDatabase,
+  parent: Pick<
+    Todo,
+    'id' | 'title' | 'notes' | 'priority' | 'due_date' | 'recurrence' | 'recurrence_id'
+  >,
+  now: string,
+  enqueue: (record: SyncRecord) => void,
+): Promise<string | null> {
+  if (parent.recurrence !== 'daily' || !parent.recurrence_id) return null;
+  const spawnDueDate = nextRecurringSpawnDueDate(parent.due_date);
+  const spawned = await transactionDb.getFirstAsync<{
+    id: string;
+    title: string;
+    notes: string | null;
+    priority: TodoPriority;
+    due_date: string | null;
+  }>(
+    `SELECT id, title, notes, priority, due_date FROM todos
+     WHERE recurrence_id = ?
+       AND due_date = ?
+       AND id != ?
+       AND ${PRISTINE_SPAWN_SQL}`,
+    [parent.recurrence_id, spawnDueDate, parent.id],
+  );
+  if (!spawned) return null;
+  // The pristine timestamp is millisecond-granular, so an edit landing in the
+  // same millisecond as the insert cannot be distinguished by time alone.
+  // Every field the spawn copies must therefore still match the parent.
+  if (
+    spawned.title !== parent.title ||
+    spawned.notes !== parent.notes ||
+    spawned.priority !== parent.priority ||
+    spawned.due_date !== spawnDueDate
+  ) {
+    return null;
+  }
+
+  const removed = await removeTodoWithinTransaction(transactionDb, spawned.id, now, enqueue);
+  if (!removed) return null;
+  // The tombstone must ride the durable outbox exactly like removeTodo's own
+  // record; without it the remote copy (and any restore) keeps the duplicate.
+  enqueue({ entity: 'todos', id: spawned.id, updatedAt: now, operation: 'delete' });
+  return spawned.id;
+}
+
 export type TodoLinkedActionsDispatchResult = Pick<
   LinkedActionProcessResult,
   'matchedRuleCount' | 'notices'
@@ -989,11 +1056,13 @@ async function setTodoCompletion(
     current: Todo | null;
     previous: 0 | 1;
     next: 0 | 1;
+    /** Copy retracted by this reopen (reminder cancelled after commit). */
+    removedSpawnId: string | null;
   };
   const outcome = await runSyncedMutation<ToggleMutation>({
     db,
     record: { entity: 'todos', id: todoId, updatedAt: now, operation: 'update' },
-    mutate: async (transactionDb) => {
+    mutate: async (transactionDb, enqueue) => {
       const current = await transactionDb.getFirstAsync<Todo>(
         `SELECT *
          FROM todos
@@ -1004,14 +1073,14 @@ async function setTodoCompletion(
       if (!current) {
         return {
           changed: false,
-          value: { current: null, previous: 0, next: 0 },
+          value: { current: null, previous: 0, next: 0, removedSpawnId: null },
         };
       }
       const previous = current.completed;
       const next: 0 | 1 =
         desiredCompletion === 'toggle' ? (previous === 1 ? 0 : 1) : desiredCompletion;
       if (next === previous) {
-        return { changed: false, value: { current, previous, next } };
+        return { changed: false, value: { current, previous, next, removedSpawnId: null } };
       }
       const completedAtValue = next === 1 ? now : null;
       const result = await transactionDb.runAsync(
@@ -1022,9 +1091,15 @@ async function setTodoCompletion(
       if (result.changes !== 1) {
         return {
           changed: false,
-          value: { current: null, previous: 0, next: 0 },
+          value: { current: null, previous: 0, next: 0, removedSpawnId: null },
         };
       }
+      // Reopening retracts the copy the completion spawned, in the SAME
+      // transaction as the reopen (see removePristineSpawnedCopyWithinTransaction).
+      const removedSpawnId =
+        previous === 1 && next === 0
+          ? await removePristineSpawnedCopyWithinTransaction(transactionDb, current, now, enqueue)
+          : null;
       // Linked actions fire only on a genuine non-recurring 0->1 completion;
       // persist the dispatch intent atomically with the completion itself
       // (same condition as the post-commit dispatch below).
@@ -1055,7 +1130,7 @@ async function setTodoCompletion(
           now,
         );
       }
-      return { changed: true, value: { current, previous, next } };
+      return { changed: true, value: { current, previous, next, removedSpawnId } };
     },
   });
 
@@ -1067,7 +1142,13 @@ async function setTodoCompletion(
     };
   }
 
-  const { current, previous, next } = outcome.value;
+  const { current, previous, next, removedSpawnId } = outcome.value;
+
+  // The retracted copy is gone from the database already; drop its pending
+  // device reminder so a notification cannot resurrect a completed-looking row.
+  if (removedSpawnId) {
+    await cancelTodoReminderSafely(removedSpawnId);
+  }
 
   // Idempotent completion is intentionally a safe no-op. This branch is used
   // by Command Center; it must never toggle a completed Todo back to pending.
@@ -1190,7 +1271,13 @@ export async function bulkSetTodoCompletion(
   const now = nowIso();
   const linkedSourceDateKey = toDateKey();
 
-  type AppliedCompletion = { row: BulkCompletionRow; previous: 0 | 1; linkedEventId: string };
+  type AppliedCompletion = {
+    row: BulkCompletionRow;
+    previous: 0 | 1;
+    linkedEventId: string;
+    /** Copy retracted by this reopen (reminder cancelled after commit). */
+    removedSpawnId: string | null;
+  };
   const outcome = await runBackupMutation<AppliedCompletion[]>({
     db,
     mutate: async (transactionDb, enqueue) => {
@@ -1215,6 +1302,12 @@ export async function bulkSetTodoCompletion(
         );
         if (result.changes !== 1) continue;
         enqueue({ entity: 'todos', id: current.id, updatedAt: now, operation: 'update' });
+        // Bulk reopen retracts the copy the completion spawned, exactly like the
+        // single-item path (a pristine future copy is not the user's yet).
+        const removedSpawnId =
+          previous === 1 && completed === 0
+            ? await removePristineSpawnedCopyWithinTransaction(transactionDb, current, now, enqueue)
+            : null;
         // Durable dispatch handoff (same contract as setTodoCompletion): a
         // genuine non-recurring 0->1 completion persists its source event in
         // this transaction, so a post-commit crash is recoverable.
@@ -1247,15 +1340,23 @@ export async function bulkSetTodoCompletion(
             now,
           );
         }
-        applied.push({ row: current, previous, linkedEventId: linkedEventId ?? '' });
+        applied.push({
+          row: current,
+          previous,
+          linkedEventId: linkedEventId ?? '',
+          removedSpawnId,
+        });
       }
       return { changed: applied.length > 0, value: applied };
     },
   });
 
   // Post-commit side effects, identical to setTodoCompletion's per-item path.
-  for (const { row, previous, linkedEventId } of outcome.value) {
+  for (const { row, previous, linkedEventId, removedSpawnId } of outcome.value) {
     const next = completed;
+    if (removedSpawnId) {
+      await cancelTodoReminderSafely(removedSpawnId);
+    }
     if (next === 1) {
       await cancelTodoReminderSafely(row.id);
     } else if (previous === 1 && row.due_date) {
