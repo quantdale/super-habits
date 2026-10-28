@@ -187,8 +187,10 @@ function TabButton({
       // Roving tabindex (WAI-ARIA tabs): only the selected destination is a
       // tab stop, so a keyboard user tabs INTO the rail once and then moves
       // with the arrow keys instead of tabbing through all six destinations on
-      // every pass. `tabIndex` is forwarded verbatim by RN-Web.
-      tabIndex={isFocused ? 0 : -1}
+      // every pass. `tabIndex` is forwarded verbatim by RN-Web. Web only:
+      // native RN maps `tabIndex={-1}` to `focusable={false}`, and the arrow-key
+      // handler above is web-only, so native keeps every destination focusable.
+      tabIndex={Platform.OS === 'web' ? (isFocused ? 0 : -1) : undefined}
       focusable
       onPress={onPress}
       onFocus={() => setKeyboardFocused(true)}
