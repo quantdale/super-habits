@@ -978,9 +978,17 @@ export async function reconcileGamificationActivity(
 }
 
 /**
- * Spend a banked freeze on the most recent missed day, if one is available and
- * the run before it is still alive. Called on foreground/day rollover; the
- * resulting row is what makes the streak survive a miss.
+ * Spend banked freezes on the trailing missed days, if the run behind the gap
+ * is still alive. Called on foreground/day rollover; the resulting rows are what
+ * make the streak survive a miss.
+ *
+ * Every missed day the bank can cover is spent, not just yesterday: a user who
+ * returns after a two- or three-day absence still holds the freeze they earned,
+ * and burning only one of them (then leaving the rest banked with the streak
+ * already broken) made the grant unspendable. `planAutoFreeze` bounds the spend
+ * by both `MAX_BANKED_FREEZES` and the bank, and stops at the first day the
+ * ledger already counts as active or frozen, so an unbounded absence cannot
+ * retroactively resurrect a dead run.
  *
  * Freeze rows whose day has since become active are released FIRST, and the
  * ledger snapshot is re-read when that happened, so planning spends from the
@@ -990,7 +998,7 @@ export async function reconcileGamificationActivity(
  */
 export async function ensureStreakFreeze(
   options: GamificationReadOptions = {},
-): Promise<{ savedDateKey: string } | null> {
+): Promise<{ savedDateKeys: string[] } | null> {
   const todayKey = options.todayKey ?? toDateKey();
   const db = await getDatabase();
   let ledger = await readLedgerSnapshot(db);
@@ -1000,13 +1008,16 @@ export async function ensureStreakFreeze(
     loadStreakDays(db, ledger),
     loadFreezeState(db, ledger),
   ]);
-  const savedDateKey = planAutoFreeze({ days: streakDays, todayKey, banked: freezes.banked });
-  if (!savedDateKey) return null;
-  await db.runAsync(
-    `INSERT OR IGNORE INTO gamification_streak_freezes (date_key, saved_at) VALUES (?, ?)`,
-    [savedDateKey, nowIso()],
-  );
-  return { savedDateKey };
+  const savedDateKeys = planAutoFreeze({ days: streakDays, todayKey, banked: freezes.banked });
+  if (savedDateKeys.length === 0) return null;
+  const savedAt = nowIso();
+  for (const savedDateKey of savedDateKeys) {
+    await db.runAsync(
+      `INSERT OR IGNORE INTO gamification_streak_freezes (date_key, saved_at) VALUES (?, ?)`,
+      [savedDateKey, savedAt],
+    );
+  }
+  return { savedDateKeys };
 }
 
 /**

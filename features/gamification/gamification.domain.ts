@@ -289,33 +289,48 @@ export function buildWeek(days: readonly StreakDay[], todayKey: string, length =
 }
 
 /**
- * Which missed day a banked freeze should save, if any.
+ * Which missed days banked freezes should save, if any (newest first).
  *
- * Only the most recent gap is bridged: yesterday is frozen when the run
- * before it is still alive. Freezing older history would retroactively
- * resurrect streaks the user already gave up on.
+ * The trailing gap is bridged one missed day at a time, walking back from
+ * yesterday, and the walk stops at the first day the ledger already counts as
+ * active or frozen. Only a gap that reaches a live run is worth spending on,
+ * and the spend can never exceed what is banked — so an absence of up to
+ * `MAX_BANKED_FREEZES` days is survivable, while an unbounded absence still
+ * ends the streak instead of retroactively resurrecting history the user gave
+ * up on.
+ *
+ * Bridging exactly one day (the pre-audit rule) made a banked freeze
+ * unspendable after a two-day absence: the user had earned and kept the freeze,
+ * kept the bank, and still lost the run it existed to protect (audit C §3.3).
  *
  * A missed day has no ledger row at all, so an absent row is the gap itself —
- * only a row that is already active or already frozen disqualifies the plan.
+ * only a row that is already active or already frozen ends the walk.
  */
 export function planAutoFreeze(input: {
   days: readonly StreakDay[];
   todayKey: string;
   banked: number;
-}): string | null {
-  if (input.banked <= 0) return null;
+}): string[] {
+  const budget = Math.max(0, Math.min(MAX_BANKED_FREEZES, Math.floor(input.banked)));
+  if (budget <= 0) return [];
   const byDate = new Map(input.days.map((day) => [day.dateKey, day]));
   const safeToday = safeDateKey(input.todayKey);
-  if (byDate.get(safeToday)?.active) return null;
+  if (byDate.get(safeToday)?.active) return [];
 
-  const yesterdayKey = shiftDateKey(safeToday, -1);
-  const yesterday = byDate.get(yesterdayKey);
-  if (yesterday && (yesterday.active || yesterday.frozen)) return null;
-
-  const dayBefore = byDate.get(shiftDateKey(safeToday, -2));
-  if (!dayBefore || (!dayBefore.active && !dayBefore.frozen)) return null;
-
-  return yesterdayKey;
+  const gap: string[] = [];
+  for (let offset = 1; offset <= budget + 1; offset += 1) {
+    const dateKey = shiftDateKey(safeToday, -offset);
+    const day = byDate.get(dateKey);
+    // A live day closes the gap: freeze exactly the missed days in front of
+    // it. (Yesterday being live/frozen means there is no gap at all.)
+    if (day && (day.active || day.frozen)) return gap;
+    // The gap is longer than the bank can bridge, so spending here would only
+    // burn freezes and leave the streak broken anyway.
+    if (gap.length === budget) return [];
+    gap.push(dateKey);
+  }
+  // Unreachable: the loop always returns on its last iteration.
+  return [];
 }
 
 /**
