@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   addLocalDays,
-  buildDateRange,
   buildDateRangeOldestFirst,
   buildDateRangeTodayFirst,
   diffLocalDays,
@@ -12,19 +11,15 @@ import {
   toDateKey,
 } from '@/lib/time';
 
-describe('buildDateRange / buildDateRangeTodayFirst', () => {
+describe('buildDateRangeTodayFirst', () => {
   it('returns today first then older days', () => {
     const today = toDateKey();
-    const range = buildDateRange(3);
+    const range = buildDateRangeTodayFirst(3);
     expect(range).toHaveLength(3);
     expect(range[0]).toBe(today);
     const y = new Date();
     y.setDate(y.getDate() - 1);
     expect(range[1]).toBe(toDateKey(y));
-  });
-
-  it('buildDateRange matches buildDateRangeTodayFirst', () => {
-    expect(buildDateRangeTodayFirst(5)).toEqual(buildDateRange(5));
   });
 });
 

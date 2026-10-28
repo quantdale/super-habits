@@ -9,8 +9,8 @@ import type {
   WorkoutWeightUnit,
 } from '@/core/db/types';
 import {
-  buildDateRange,
   buildDateRangeOldestFirst,
+  buildDateRangeTodayFirst,
   dateKeyToLocalDate,
   diffLocalDays,
   timestampToLocalDateKey,
@@ -26,7 +26,7 @@ export function buildWorkoutActivityDays(logs: WorkoutLog[], days: number = 364)
   for (const log of logs) {
     set.add(timestampToLocalDateKey(log.completed_at));
   }
-  return buildDateRange(days).map((dateKey) => ({
+  return buildDateRangeTodayFirst(days).map((dateKey) => ({
     dateKey,
     active: set.has(dateKey),
   }));

@@ -159,8 +159,3 @@ export function buildDateRangeOldestFirst(days: number, reference: Date = new Da
 export function buildDateRangeTodayFirst(days: number): string[] {
   return buildDateRangeOldestFirst(days).reverse();
 }
-
-/** Local calendar keys for the last `days` days, **today first** (most recent → older). */
-export function buildDateRange(days: number): string[] {
-  return buildDateRangeTodayFirst(days);
-}
