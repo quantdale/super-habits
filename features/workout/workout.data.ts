@@ -379,6 +379,49 @@ export async function deleteRoutine(routineId: string): Promise<void> {
           operation: 'delete',
         });
       }
+      // The weekly plan and the one-day overrides both name a routine. Leaving
+      // an entry that points at this tombstoned routine makes the landing say
+      // "Rest day" while Today still promises a scheduled workout (the weekly
+      // cell is derived through the routine-name lookup, Today's hero is not),
+      // and native reminders keep firing for a routine that no longer exists.
+      // Tombstone the plan rows with their parent so the day returns to
+      // unplanned — deleting a routine must not invent a rest day either.
+      const planRows = await transactionDb.getAllAsync<{ id: string }>(
+        `SELECT id FROM workout_weekly_plan
+         WHERE routine_id = ? AND deleted_at IS NULL`,
+        [routineId],
+      );
+      const overrideRows = await transactionDb.getAllAsync<{ id: string }>(
+        `SELECT id FROM workout_schedule_overrides
+         WHERE routine_id = ? AND deleted_at IS NULL`,
+        [routineId],
+      );
+      await transactionDb.runAsync(
+        `UPDATE workout_weekly_plan SET deleted_at = ?, updated_at = ?
+         WHERE routine_id = ? AND deleted_at IS NULL`,
+        [now, now, routineId],
+      );
+      await transactionDb.runAsync(
+        `UPDATE workout_schedule_overrides SET deleted_at = ?, updated_at = ?
+         WHERE routine_id = ? AND deleted_at IS NULL`,
+        [now, now, routineId],
+      );
+      for (const planRow of planRows) {
+        enqueue({
+          entity: 'workout_weekly_plan',
+          id: planRow.id,
+          updatedAt: now,
+          operation: 'delete',
+        });
+      }
+      for (const overrideRow of overrideRows) {
+        enqueue({
+          entity: 'workout_schedule_overrides',
+          id: overrideRow.id,
+          updatedAt: now,
+          operation: 'delete',
+        });
+      }
       await replaceLinkedActionRulesForSourceEntity({
         feature: 'workout',
         entityType: 'workout_routine',
@@ -398,6 +441,7 @@ export async function deleteRoutine(routineId: string): Promise<void> {
       return { changed: true, value: undefined };
     },
   });
+  requestWorkoutReminderReconciliation();
 }
 
 // --- Exercises ---
