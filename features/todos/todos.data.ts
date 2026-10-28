@@ -38,9 +38,16 @@ import { getTomorrowDateKey } from './todos.domain';
  * classic "spawn tomorrow" behaviour. Without this, completing a future copy
  * would look for an instance on the *same* future date, find itself, and stop
  * the series (boundary chain contract).
+ *
+ * `reference` defaults to now; a retraction passes the instant the occurrence
+ * was originally completed, so it resolves the copy that completion spawned
+ * instead of the one today's clock would ask for.
  */
-function nextRecurringSpawnDueDate(completedDueDate: string | null): string {
-  const tomorrow = getTomorrowDateKey();
+function nextRecurringSpawnDueDate(
+  completedDueDate: string | null,
+  reference: Date = new Date(),
+): string {
+  const tomorrow = getTomorrowDateKey(reference);
   if (!completedDueDate || completedDueDate < tomorrow) return tomorrow;
   return addLocalDays(completedDueDate, 1);
 }
@@ -70,13 +77,25 @@ async function removePristineSpawnedCopyWithinTransaction(
   transactionDb: SQLite.SQLiteDatabase,
   parent: Pick<
     Todo,
-    'id' | 'title' | 'notes' | 'priority' | 'due_date' | 'recurrence' | 'recurrence_id'
+    | 'id'
+    | 'title'
+    | 'notes'
+    | 'priority'
+    | 'due_date'
+    | 'completed_at'
+    | 'recurrence'
+    | 'recurrence_id'
   >,
   now: string,
   enqueue: (record: SyncRecord) => void,
 ): Promise<string | null> {
-  if (parent.recurrence !== 'daily' || !parent.recurrence_id) return null;
-  const spawnDueDate = nextRecurringSpawnDueDate(parent.due_date);
+  // `parent` is the pre-update row, so `completed_at` is the ORIGINAL completion
+  // instant: replaying the spawn from it finds the copy that completion created
+  // even when the reopen happens days later. No provenance, nothing to retract.
+  const spawnDueDate = parent.completed_at
+    ? nextRecurringSpawnDueDate(parent.due_date, new Date(parent.completed_at))
+    : null;
+  if (parent.recurrence !== 'daily' || !parent.recurrence_id || !spawnDueDate) return null;
   const spawned = await transactionDb.getFirstAsync<{
     id: string;
     title: string;
@@ -1250,7 +1269,15 @@ export type BulkTodoOutcome = {
 
 type BulkCompletionRow = Pick<
   Todo,
-  'id' | 'title' | 'notes' | 'priority' | 'completed' | 'due_date' | 'recurrence' | 'recurrence_id'
+  | 'id'
+  | 'title'
+  | 'notes'
+  | 'priority'
+  | 'completed'
+  | 'due_date'
+  | 'completed_at'
+  | 'recurrence'
+  | 'recurrence_id'
 >;
 
 /**
@@ -1284,7 +1311,7 @@ export async function bulkSetTodoCompletion(
       const applied: AppliedCompletion[] = [];
       for (const id of ids) {
         const current = await transactionDb.getFirstAsync<BulkCompletionRow>(
-          `SELECT id, title, notes, priority, completed, due_date, recurrence, recurrence_id
+          `SELECT id, title, notes, priority, completed, due_date, completed_at, recurrence, recurrence_id
            FROM todos
            WHERE id = ?
              AND deleted_at IS NULL`,
