@@ -286,6 +286,64 @@ test.describe('Todos', () => {
     expect(stopped).toEqual([{ title: 'Morning stretch' }]);
   });
 
+  test('an undated daily series does not spawn a duplicate copy on reload', async ({ page }) => {
+    // Starting a daily series without typing a due date stores due_date = NULL.
+    // The rollover scan can only match coverage by due date, so an undated live
+    // copy looked permanently missing and the first load of each day appended
+    // another pending duplicate (2 open, then 3, then 4 …) of the same task.
+    await openNewTodoModal(page);
+    await page.getByPlaceholder(/Add a task/i).fill('Daily undated');
+    await page.getByText('Repeat daily', { exact: true }).click({ force: true });
+    await submitTodoModal(page);
+    await expect(page.getByText('Daily undated').filter({ visible: true }).last()).toBeVisible();
+    await expect(page.getByText('1 open', { exact: true })).toBeVisible();
+
+    await page.reload();
+    await page.waitForLoadState('load');
+    await goToTab(page, 'todos');
+
+    // Still exactly one pending copy — not a second row for the same series.
+    await expect(page.getByText('Daily undated').filter({ visible: true }).last()).toBeVisible();
+    await expect(page.getByText('1 open', { exact: true })).toBeVisible();
+
+    const rows = await queryRows(
+      page,
+      `SELECT due_date, completed FROM todos WHERE deleted_at IS NULL ORDER BY created_at ASC`,
+    );
+    expect(rows).toEqual([{ due_date: null, completed: 0 }]);
+  });
+
+  test('completing an undated daily copy still spawns the next copy', async ({ page }) => {
+    // Regression guard for the duplicate fix: coverage by an undated row must be
+    // PENDING-only. A completed undated copy that counted as coverage would
+    // silence the chain forever and no new daily copy would ever appear.
+    await openNewTodoModal(page);
+    await page.getByPlaceholder(/Add a task/i).fill('Daily undated done');
+    await page.getByText('Repeat daily', { exact: true }).click({ force: true });
+    await submitTodoModal(page);
+    await expect(
+      page.getByText('Daily undated done').filter({ visible: true }).last(),
+    ).toBeVisible();
+
+    await page
+      .getByRole('checkbox', { name: 'Mark complete: Daily undated done' })
+      .first()
+      .click({ force: true });
+
+    // Completing today's copy mints tomorrow's: the series keeps moving.
+    await expect(page.getByText('1 completed', { exact: true })).toBeVisible();
+    await expect(page.getByText('1 open', { exact: true })).toBeVisible();
+
+    const rows = await queryRows(
+      page,
+      `SELECT due_date, completed FROM todos WHERE deleted_at IS NULL ORDER BY completed DESC`,
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toEqual({ due_date: null, completed: 1 });
+    expect(rows[1]?.completed).toBe(0);
+    expect(rows[1]?.due_date).not.toBeNull();
+  });
+
   test('reopening a completed daily copy removes the copy its completion spawned', async ({
     page,
   }) => {

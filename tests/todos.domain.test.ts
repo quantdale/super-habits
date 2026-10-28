@@ -35,36 +35,103 @@ describe('getTomorrowDateKey', () => {
   });
 });
 
+type MissingRecurrenceRow = {
+  recurrence_id: string | null;
+  recurrence: string | null;
+  due_date: string | null;
+  completed: 0 | 1;
+  deleted_at: string | null;
+};
+
 describe('findMissingRecurrenceIds', () => {
   it('returns empty when no recurring todos', () => {
-    const todos = [{ recurrence_id: null, recurrence: null, due_date: null, deleted_at: null }];
+    const todos: MissingRecurrenceRow[] = [
+      { recurrence_id: null, recurrence: null, due_date: null, completed: 0, deleted_at: null },
+    ];
     expect(findMissingRecurrenceIds(todos, '2025-01-01')).toHaveLength(0);
   });
 
   it('returns recurrence_id when no instance exists for today', () => {
-    const todos = [
-      { recurrence_id: 'rec_001', recurrence: 'daily', due_date: '2025-01-01', deleted_at: null }, // yesterday
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: '2025-01-01',
+        completed: 0,
+        deleted_at: null,
+      }, // yesterday
     ];
     const missing = findMissingRecurrenceIds(todos, '2025-01-02');
     expect(missing).toContain('rec_001');
   });
 
   it('does not return recurrence_id when today already covered', () => {
-    const todos = [
-      { recurrence_id: 'rec_001', recurrence: 'daily', due_date: '2025-01-02', deleted_at: null }, // today
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: '2025-01-02',
+        completed: 0,
+        deleted_at: null,
+      }, // today
     ];
     const missing = findMissingRecurrenceIds(todos, '2025-01-02');
     expect(missing).toHaveLength(0);
   });
 
   it('handles multiple series independently', () => {
-    const todos = [
-      { recurrence_id: 'rec_001', recurrence: 'daily', due_date: '2025-01-02', deleted_at: null }, // covered
-      { recurrence_id: 'rec_002', recurrence: 'daily', due_date: '2025-01-01', deleted_at: null }, // not covered
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: '2025-01-02',
+        completed: 0,
+        deleted_at: null,
+      }, // covered
+      {
+        recurrence_id: 'rec_002',
+        recurrence: 'daily',
+        due_date: '2025-01-01',
+        completed: 0,
+        deleted_at: null,
+      }, // not covered
     ];
     const missing = findMissingRecurrenceIds(todos, '2025-01-02');
     expect(missing).toHaveLength(1);
     expect(missing).toContain('rec_002');
+  });
+
+  it('treats an undated PENDING instance as covering its series', () => {
+    // A daily series started without a due date (`Repeat daily` with no date
+    // typed) stores due_date = NULL. Its live pending copy cannot match the
+    // today-key comparison, so before this guard the rollover scan appended a
+    // fresh duplicate on the first load of each day.
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: null,
+        completed: 0,
+        deleted_at: null,
+      },
+    ];
+    expect(findMissingRecurrenceIds(todos, '2025-01-02')).toEqual([]);
+  });
+
+  it('a COMPLETED undated instance does NOT cover its series', () => {
+    // Regression guard: completion must not silence a daily chain forever. If
+    // a finished undated copy counted as coverage, no new copy would ever be
+    // spawned again for that series.
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: null,
+        completed: 1,
+        deleted_at: null,
+      },
+    ];
+    expect(findMissingRecurrenceIds(todos, '2025-01-02')).toEqual(['rec_001']);
   });
 });
 
