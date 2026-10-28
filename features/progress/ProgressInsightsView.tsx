@@ -11,6 +11,7 @@ import { SectionLabel } from '@/core/ui/SectionLabel';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import { spacing } from '@/core/theme/designTokens';
 import { useForegroundRefresh } from '@/lib/useForegroundRefresh';
+import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { buildProgressSummary } from '@/features/progress/progress.summary';
 import { PROGRESS_WINDOW_OPTIONS } from '@/features/progress/progress.domain';
 import { buildProgressNarrative } from '@/features/progress/progress.narrative';
@@ -61,20 +62,32 @@ export function ProgressInsightsView() {
   // F8: the hub stays mounted across midnight — reload when the local day rolls over.
   const dayGeneration = useDayRolloverGeneration();
 
-  const load = useCallback(async (days: number) => {
-    setIsLoading(true);
-    try {
-      setSummary(await buildProgressSummary(days));
-      setLoadError(null);
-    } catch (err) {
-      // F8: no unhandled rejections; a failed load must not read as
-      // "No progress data yet". The error panel below offers a retry.
-      console.error('[ProgressInsightsView] load failed', err);
-      setLoadError(err instanceof Error ? err.message : 'Could not load progress insights.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const { begin } = useGuardedAsyncRefresh();
+
+  const load = useCallback(
+    async (days: number) => {
+      // One guard instance per refresh unit (audit C §12): switching the window
+      // or crossing local midnight mid-flight must not let the stale run write
+      // its summary (or clear the newer load's spinner) over fresher state.
+      const isCurrent = begin();
+      setIsLoading(true);
+      try {
+        const nextSummary = await buildProgressSummary(days);
+        if (!isCurrent()) return;
+        setSummary(nextSummary);
+        setLoadError(null);
+      } catch (err) {
+        if (!isCurrent()) return;
+        // F8: no unhandled rejections; a failed load must not read as
+        // "No progress data yet". The error panel below offers a retry.
+        console.error('[ProgressInsightsView] load failed', err);
+        setLoadError(err instanceof Error ? err.message : 'Could not load progress insights.');
+      } finally {
+        if (isCurrent()) setIsLoading(false);
+      }
+    },
+    [begin],
+  );
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional async data-load

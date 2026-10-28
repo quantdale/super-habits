@@ -7,6 +7,7 @@ import { Modal } from '@/core/ui/Modal';
 import { Card } from '@/core/ui/Card';
 import { Button } from '@/core/ui/Button';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
+import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import {
   computePersonalRecords,
@@ -95,19 +96,25 @@ type Props = {
 export function WorkoutHistoryDetailModal({ visible, logId, onClose, onDeleted }: Props) {
   const { tokens } = useAppTheme();
   const { confirm, confirmationDialog } = useConfirmationDialog();
+  const { begin } = useGuardedAsyncRefresh();
   const [detail, setDetail] = useState<WorkoutLogDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!logId) return;
+    // Refresh unit (audit C §12): reopening on another log, or closing the
+    // modal, must not let this run's `finally` clear the newer run's spinner.
+    const isCurrent = begin();
     setLoading(true);
     try {
-      setDetail(await getWorkoutLogDetail(logId));
+      const nextDetail = await getWorkoutLogDetail(logId);
+      if (!isCurrent()) return;
+      setDetail(nextDetail);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [logId]);
+  }, [begin, logId]);
 
   useEffect(() => {
     if (!visible || !logId) return;
