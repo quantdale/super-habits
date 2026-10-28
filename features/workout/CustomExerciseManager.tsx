@@ -10,6 +10,7 @@ import { PillChip } from '@/core/ui/PillChip';
 import { TextField } from '@/core/ui/TextField';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
+import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import type { CustomExercise, WorkoutModality } from '@/core/db/types';
 import {
@@ -82,13 +83,19 @@ type Props = {
 export function CustomExerciseManagerModal({ visible, onClose, onDismiss, onChanged }: Props) {
   const { tokens } = useAppTheme();
   const { confirm, confirmationDialog } = useConfirmationDialog();
+  const { begin } = useGuardedAsyncRefresh();
   const [exercises, setExercises] = useState<CustomExercise[]>([]);
   const [showArchived, setShowArchived] = useState(true);
   const [editing, setEditing] = useState<EditState | null>(null);
 
   const refresh = useCallback(async () => {
-    setExercises(await listCustomExercises(true));
-  }, []);
+    // Refresh unit (audit C §12): a close/reopen or a post-archive reload
+    // invalidates earlier runs, so a stale list cannot land over fresher rows.
+    const isCurrent = begin();
+    const next = await listCustomExercises(true);
+    if (!isCurrent()) return;
+    setExercises(next);
+  }, [begin]);
 
   useEffect(() => {
     if (!visible) return;

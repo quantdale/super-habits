@@ -122,6 +122,11 @@ export function ActivityTimelineView() {
       // whole unit instead of letting a stale run clear the newer spinner
       // (audit C §12).
       const isCurrent = begin();
+      // A reload unit takes ownership of BOTH spinners: it supersedes any
+      // in-flight page append, whose own finally will (correctly) decline to
+      // write. Clearing the paging flag here is what keeps a superseded append
+      // from stranding "Loading…" on the Load more button forever.
+      setIsLoadingMore(false);
       setIsLoading(true);
       try {
         const page = await buildActivityTimeline({
@@ -158,6 +163,10 @@ export function ActivityTimelineView() {
   const loadMore = useCallback(async () => {
     if (isLoadingMore || !nextCursor) return;
     const isCurrent = begin();
+    // Symmetrically, a page unit supersedes the reload it interrupts and owns
+    // both spinners, so the stale reload's finally cannot strand the initial
+    // spinner.
+    setIsLoading(false);
     setIsLoadingMore(true);
     try {
       const page = await buildActivityTimeline({

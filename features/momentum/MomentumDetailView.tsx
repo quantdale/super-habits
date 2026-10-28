@@ -1,9 +1,10 @@
 import { Text } from '@/core/ui/Text';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { useForegroundRefresh } from '@/lib/useForegroundRefresh';
+import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { dateKeyToLocalDate } from '@/lib/time';
 import { Card } from '@/core/ui/Card';
 import { Button } from '@/core/ui/Button';
@@ -104,33 +105,30 @@ export function MomentumDetailView({ initialDays = 7 }: MomentumDetailViewProps)
   const [model, setModel] = useState<MomentumGardenModel | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const loadRequestRef = useRef(0);
-  const mountedRef = useRef(true);
+  const { begin } = useGuardedAsyncRefresh();
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  const load = useCallback(async (days: 7 | 28) => {
-    const requestId = ++loadRequestRef.current;
-    const isCurrent = () => mountedRef.current && loadRequestRef.current === requestId;
-    setIsLoading(true);
-    try {
-      const nextModel = await getMomentumGarden({ days });
-      if (!isCurrent()) return;
-      setModel(nextModel);
-      setLoadError(null);
-    } catch (error) {
-      if (!isCurrent()) return;
-      console.error('[MomentumDetailView] load failed', error);
-      setLoadError(error instanceof Error ? error.message : 'Could not load your garden.');
-    } finally {
-      if (isCurrent()) setIsLoading(false);
-    }
-  }, []);
+  const load = useCallback(
+    async (days: 7 | 28) => {
+      // One guard instance per refresh unit (audit C §12): a newer window or
+      // day-rollover load invalidates this one, so a stale run can neither
+      // overwrite fresher state nor clear the newer load's spinner.
+      const isCurrent = begin();
+      setIsLoading(true);
+      try {
+        const nextModel = await getMomentumGarden({ days });
+        if (!isCurrent()) return;
+        setModel(nextModel);
+        setLoadError(null);
+      } catch (error) {
+        if (!isCurrent()) return;
+        console.error('[MomentumDetailView] load failed', error);
+        setLoadError(error instanceof Error ? error.message : 'Could not load your garden.');
+      } finally {
+        if (isCurrent()) setIsLoading(false);
+      }
+    },
+    [begin],
+  );
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional async data-load

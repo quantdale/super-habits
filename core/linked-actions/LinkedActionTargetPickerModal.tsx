@@ -23,6 +23,7 @@ import {
   type SectionKey,
 } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 
 type CandidateState = {
   status: 'idle' | 'loading' | 'ready' | 'error';
@@ -81,6 +82,7 @@ export function LinkedActionTargetPickerModal({
   const defaultFeature = availableModules[0]?.feature ?? initialFeature;
   const [selectedFeature, setSelectedFeature] = useState<LinkedActionFeature>(defaultFeature);
   const [selectedExistingId, setSelectedExistingId] = useState<string | null>(null);
+  const { begin } = useGuardedAsyncRefresh();
   const [candidateState, setCandidateState] = useState<CandidateState>({
     status: 'idle',
     items: [],
@@ -110,7 +112,10 @@ export function LinkedActionTargetPickerModal({
     // never reads candidateState, so there is nothing to seed here.
     if (!provider.existing.supported) return;
 
-    let cancelled = false;
+    // Guard instance for this refresh unit (audit C §12): closing the modal or
+    // picking another feature invalidates the in-flight read, so a stale
+    // resolve cannot mark the newer selection ready/error.
+    const isCurrent = begin();
     // Data fetch on selection change: the terminal states below (ready/error)
     // are set after loadCandidates() resolves, not synchronously here.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -123,7 +128,7 @@ export function LinkedActionTargetPickerModal({
     void provider.existing
       .loadCandidates()
       .then((items) => {
-        if (cancelled) return;
+        if (!isCurrent()) return;
         setCandidateState({
           status: 'ready',
           items,
@@ -131,7 +136,7 @@ export function LinkedActionTargetPickerModal({
         });
       })
       .catch((error: unknown) => {
-        if (cancelled) return;
+        if (!isCurrent()) return;
         const message =
           error instanceof Error ? error.message : 'Could not load target candidates.';
         setCandidateState({
@@ -140,11 +145,7 @@ export function LinkedActionTargetPickerModal({
           error: message,
         });
       });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedFeature, visible]);
+  }, [begin, selectedFeature, visible]);
 
   const provider = useMemo(
     () => getLinkedActionTargetPickerProvider(selectedFeature),

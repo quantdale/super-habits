@@ -18,6 +18,7 @@ import { parseQuickCapture } from '@/features/quick-capture/quickCapture.domain'
 import { rebuildRecentCapture } from '@/features/quick-capture/rebuildRecentCapture';
 import { sanitizeNumericInput, parseNumericInput } from '@/lib/numericInput';
 import { createSubmitGuard } from '@/lib/submitGuard';
+import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import {
   loadLastCaptureMode,
   loadPersistedRecentCaptures,
@@ -81,12 +82,18 @@ export function QuickCaptureOverlay() {
   const [recent, setRecent] = useState<RecentCapture[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const submitGuard = useRef(createSubmitGuard());
+  const { begin } = useGuardedAsyncRefresh();
 
   const refreshOptions = useCallback(async () => {
+    // Refresh unit (audit C §12): the post-capture re-read can be overtaken by
+    // the overlay closing; a stale run must not write options onto the closed
+    // sheet or a newer overlay instance.
+    const isCurrent = begin();
     const [ps, gs] = await Promise.all([listProjects(), listGoals()]);
+    if (!isCurrent()) return;
     setProjects(ps.map((p) => ({ id: p.id, name: p.name })));
     setGoals(gs.map((g) => ({ id: g.id, title: g.title })));
-  }, []);
+  }, [begin]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional async data-load
