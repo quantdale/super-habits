@@ -18,7 +18,7 @@ import {
   formatProjectStatusAnswer,
   formatTodayFocusAnswer,
 } from './planningAsk.domain';
-import { dateKeyToLocalDate, toDateKey } from '@/lib/time';
+import { dateKeyToLocalDate, diffLocalDays, toDateKey } from '@/lib/time';
 import { isValidCommandDateKey, normalizeReference } from './command.validation';
 import type {
   AiAskParser,
@@ -195,9 +195,10 @@ function normalizeDateRange(
   if (!isValidCommandDateKey(normalizedStart) || !isValidCommandDateKey(normalizedEnd)) {
     throw new Error('Classify response must include valid date keys.');
   }
-  const start = dateKeyToLocalDate(normalizedStart);
-  const end = dateKeyToLocalDate(normalizedEnd);
-  const dayCount = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+  // Inclusive span in LOCAL calendar days, not fixed-millisecond subtraction:
+  // a 23/25-hour day or a skipped date-line day would otherwise miscount the
+  // bound this guard enforces.
+  const dayCount = diffLocalDays(normalizedStart, normalizedEnd) + 1;
   if (normalizedStart > normalizedEnd || dayCount < 1 || dayCount > 366) {
     throw new Error('Classify response date range is outside the supported bounds.');
   }

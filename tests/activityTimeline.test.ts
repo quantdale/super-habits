@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   filterTimelineByDay,
   filterTimelineByRange,
   filterTimelineBySources,
   formatHabitTimelineTitle,
+  formatTimelineDayLabel,
   getTimelineDayKeys,
   groupTimelineByDay,
   hasClockTime,
@@ -382,5 +383,54 @@ describe('hasClockTime (W17 date-only guard)', () => {
     // date-only key only for the calorie day aggregate.
     expect(hasClockTime('2026-10-13T18:30:00.000Z')).toBe(true);
     expect(hasClockTime('2026-10-13')).toBe(false);
+  });
+});
+
+/**
+ * Audit C §9: `formatDayLabel` lived in the view with
+ * `Math.round(diff / (24 * 60 * 60 * 1000))`. It is now a pure domain helper
+ * over `lib/time`'s calendar-day differ and injectable `todayKey`.
+ */
+describe('formatTimelineDayLabel', () => {
+  const previousTz = process.env.TZ;
+
+  afterEach(() => {
+    if (previousTz === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTz;
+  });
+
+  it('labels Today, Yesterday, the synthetic bucket, and older days', () => {
+    expect(formatTimelineDayLabel('2026-08-20', '2026-08-20')).toBe('Today');
+    expect(formatTimelineDayLabel('2026-08-19', '2026-08-20')).toBe('Yesterday');
+    expect(formatTimelineDayLabel('unknown', '2026-08-20')).toBe('Earlier');
+    expect(formatTimelineDayLabel('2026-08-03', '2026-08-20')).toBe('2026-08-03');
+  });
+
+  it('degrades a malformed key to the raw key instead of throwing', () => {
+    // A corrupt timestamp yields this key; the label is on the render path.
+    expect(formatTimelineDayLabel('NaN-NaN-NaN', '2026-08-20')).toBe('NaN-NaN-NaN');
+  });
+
+  it('resolves Yesterday across the 23-hour DST day', () => {
+    process.env.TZ = 'America/New_York';
+    expect(formatTimelineDayLabel('2026-03-07', '2026-03-08')).toBe('Yesterday');
+  });
+
+  it('does not call the skipped date-line day Yesterday', () => {
+    process.env.TZ = 'Pacific/Apia';
+    expect(formatTimelineDayLabel('2011-12-29', '2011-12-31')).toBe('2011-12-29');
+  });
+
+  it('filterTimelineByRange spans exactly N local days across DST', () => {
+    process.env.TZ = 'America/New_York';
+    const items = ['2026-03-01', '2026-03-02', '2026-03-03', '2026-03-08'].map((key) =>
+      item(`i-${key}`, 'todo', key),
+    );
+    // 7-day window ending on the 23-hour spring-forward day starts Mar 2.
+    expect(filterTimelineByRange(items, '7', '2026-03-08').map((i) => i.dateKey)).toEqual([
+      '2026-03-02',
+      '2026-03-03',
+      '2026-03-08',
+    ]);
   });
 });

@@ -1,5 +1,11 @@
 import { buildDayCompletions, habitCreationDateKey } from '@/features/habits/habits.domain';
-import { dateKeyToLocalDate, isValidDateKey, timestampToLocalDateKey, toDateKey } from '@/lib/time';
+import {
+  dateKeyToLocalDate,
+  diffLocalDays,
+  isValidDateKey,
+  timestampToLocalDateKey,
+  toDateKey,
+} from '@/lib/time';
 import {
   MOMENTUM_DEFAULT_DAYS,
   MOMENTUM_LIMITS,
@@ -408,4 +414,19 @@ export function formatMomentumTodaySummary(model: MomentumGardenModel): string {
   const sources = model.today.activeSources;
   if (sources.length === 0) return 'Your garden is ready for today.';
   return `Today: activity from ${sources.map((source) => MOMENTUM_SOURCE_LABELS[source]).join(', ')}.`;
+}
+
+/**
+ * Row label for one garden day: "Today" / "Yesterday" / short date.
+ *
+ * The gap is a calendar-day count from `lib/time` rather than fixed
+ * millisecond subtraction, because two local midnights can be 23/25 hours
+ * apart across a DST boundary.
+ */
+export function formatMomentumDateLabel(dateKey: string, todayKey: string): string {
+  if (dateKey === todayKey) return 'Today';
+  const date = dateKeyToLocalDate(dateKey);
+  const dayGap = diffLocalDays(dateKey, todayKey);
+  if (dayGap === 1) return 'Yesterday';
+  return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }

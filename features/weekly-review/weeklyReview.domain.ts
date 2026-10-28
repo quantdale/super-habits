@@ -8,7 +8,7 @@ import type {
   HabitSummary,
   HabitAttentionItem,
 } from './weeklyReview.types';
-import { dateKeyToLocalDate, toDateKey, isValidDateKey } from '@/lib/time';
+import { addLocalDays, dateKeyToLocalDate, toDateKey, isValidDateKey } from '@/lib/time';
 import {
   getHabitTargetForDate,
   habitCreationDateKey,
@@ -298,11 +298,9 @@ export function parsePlanPayload(
 
 // ---------- local-calendar day-key arithmetic ----------
 
-/** Shift a date key by whole local-calendar days (DST-safe via local midnight). */
+/** Shift a date key by whole local-calendar days (DST-safe via `lib/time`). */
 export function shiftDateKeyByDays(dateKey: string, days: number): string {
-  const date = dateKeyToLocalDate(dateKey);
-  date.setDate(date.getDate() + days);
-  return toDateKey(date);
+  return addLocalDays(dateKey, days);
 }
 
 /**

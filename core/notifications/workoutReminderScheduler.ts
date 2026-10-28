@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { toDateKey } from '@/lib/time';
 import {
   cancelScheduledNotification,
   listScheduledNotifications,
@@ -47,11 +48,7 @@ export async function reconcileWorkoutDayReminder(): Promise<WorkoutReminderSync
   let attempted = false;
   for (let offset = 0; offset < LOOKAHEAD_DAYS; offset += 1) {
     const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset, 12, 0, 0, 0);
-    const dateKey = [
-      date.getFullYear(),
-      String(date.getMonth() + 1).padStart(2, '0'),
-      String(date.getDate()).padStart(2, '0'),
-    ].join('-');
+    const dateKey = toDateKey(date);
     const schedule = await resolveWorkoutScheduleForDate(dateKey);
     if (schedule.planKind === 'rest' || !schedule.routineId) continue;
     const fireAt = fireAtForDate(

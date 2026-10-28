@@ -5,28 +5,22 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { useForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
-import { dateKeyToLocalDate } from '@/lib/time';
 import { Card } from '@/core/ui/Card';
 import { Button } from '@/core/ui/Button';
 import { PillChip } from '@/core/ui/PillChip';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { getMomentumGarden } from './momentum.data';
-import { buildMomentumSourceExplanations, formatMomentumTodaySummary } from './momentum.domain';
+import {
+  buildMomentumSourceExplanations,
+  formatMomentumDateLabel,
+  formatMomentumTodaySummary,
+} from './momentum.domain';
 import { MomentumGardenArt } from './MomentumGardenArt';
 import type { MomentumGardenModel, MomentumSource } from './momentum.types';
 
 type MomentumDetailViewProps = {
   initialDays?: 7 | 28;
 };
-
-function formatDateLabel(dateKey: string, todayKey: string): string {
-  if (dateKey === todayKey) return 'Today';
-  const today = dateKeyToLocalDate(todayKey);
-  const date = dateKeyToLocalDate(dateKey);
-  const difference = Math.round((today.getTime() - date.getTime()) / 86_400_000);
-  if (difference === 1) return 'Yesterday';
-  return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-}
 
 function sourceColor(
   source: MomentumSource,
@@ -65,7 +59,7 @@ function MomentumDayRow({ model, dateKey }: { model: MomentumGardenModel; dateKe
     >
       <View className="w-[72px]">
         <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-          {formatDateLabel(day.dateKey, model.todayKey)}
+          {formatMomentumDateLabel(day.dateKey, model.todayKey)}
         </Text>
         <Text className="text-[11px]" style={{ color: tokens.textMuted }}>
           {day.dateKey}
