@@ -117,3 +117,81 @@ describe('buildWeeklyReviewSummary schedule-aware habit counts (F6)', () => {
     await db.closeAsync();
   });
 });
+
+/**
+ * Weekly-review F8: "Completed this week" must count what was actually
+ * finished this week (`completed_at`), not what happened to be DUE this week.
+ * The old due-date window dropped every undated task finished in the week and
+ * credited tasks finished months earlier whose due date landed inside it, so a
+ * week with real completions could report "0 completed" (and the wins list
+ * could stay silent). Rows predating the `completed_at` backfill keep the old
+ * due-date behaviour.
+ */
+describe('buildWeeklyReviewSummary completed-count semantics (F8)', () => {
+  const WEEK_REF_DONE = '2026-08-19'; // Mon 2026-08-17 – Sun 2026-08-23
+
+  async function insertTodo(
+    db: Awaited<ReturnType<typeof freshDatabase>>,
+    row: {
+      id: string;
+      title: string;
+      completed: 0 | 1;
+      dueDate: string | null;
+      completedAt: string | null;
+    },
+  ): Promise<void> {
+    const stamp = '2026-08-01T08:00:00.000Z';
+    await db.runAsync(
+      `INSERT INTO todos
+         (id, title, notes, completed, completed_at, due_date, priority, sort_order,
+          recurrence, recurrence_id, created_at, updated_at, deleted_at)
+       VALUES (?, ?, NULL, ?, ?, ?, 'normal', 0, NULL, NULL, ?, ?, NULL)`,
+      [row.id, row.title, row.completed, row.completedAt, row.dueDate, stamp, stamp],
+    );
+  }
+
+  it('counts undated work finished inside the week and ignores stale completions', async () => {
+    const db = await freshDatabase();
+    await insertTodo(db, {
+      id: 'f8_undated',
+      title: 'Undated but finished this week',
+      completed: 1,
+      dueDate: null,
+      completedAt: '2026-08-18T12:00:00.000Z',
+    });
+    await insertTodo(db, {
+      id: 'f8_undated2',
+      title: 'Second undated task finished this week',
+      completed: 1,
+      dueDate: null,
+      completedAt: '2026-08-21T12:00:00.000Z',
+    });
+    await insertTodo(db, {
+      id: 'f8_stale',
+      title: 'Finished in June, due this week',
+      completed: 1,
+      dueDate: '2026-08-19',
+      completedAt: '2026-06-02T12:00:00.000Z',
+    });
+    await insertTodo(db, {
+      id: 'f8_legacy',
+      title: 'Legacy row without completed_at',
+      completed: 1,
+      dueDate: '2026-08-20',
+      completedAt: null,
+    });
+
+    const { buildWeeklyReviewSummary } =
+      await import('@/features/weekly-review/weeklyReview.summary');
+    const summary = await buildWeeklyReviewSummary(WEEK_REF_DONE);
+
+    // Both undated completions plus the legacy due-date fallback count; the
+    // June completion is not work done in this week. The old due-date window
+    // reported 2 here (stale + legacy) and missed both real completions.
+    expect(summary.todos.completedCount).toBe(3);
+    expect(summary.wins).toEqual([
+      expect.objectContaining({ kind: 'todos_completed', message: 'Completed 3 todos this week' }),
+    ]);
+    await db.closeAsync();
+  });
+});
