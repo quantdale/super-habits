@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   computeProjectProgress,
   computeTargetDateCountdown,
@@ -171,5 +171,35 @@ describe('filterProjectRows / sortProjectRows', () => {
     const original = ['a', 'b'];
     swapProjectInOrder(original, 0, 1);
     expect(original).toEqual(['a', 'b']);
+  });
+});
+
+/**
+ * Audit C §9: `daysUntilDate` compares two date KEYS, so its gap must be a
+ * calendar-day count, not a fixed-millisecond subtraction.
+ */
+describe('daysUntilDate calendar-day semantics', () => {
+  const previousTz = process.env.TZ;
+
+  afterEach(() => {
+    if (previousTz === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTz;
+  });
+
+  it('is zero on the day itself across a DST transition', () => {
+    process.env.TZ = 'America/New_York';
+    // 2026-03-08 is the 23-hour spring-forward day: both keys name the SAME
+    // local day, which fixed-millisecond math with a midnight anchor survives
+    // but a noon-anchored variant does not.
+    expect(daysUntilDate('2026-03-08', '2026-03-08')).toBe(0);
+    expect(computeTargetDateCountdown('2026-03-08', '2026-03-08')?.isToday).toBe(true);
+    expect(computeTargetDateCountdown('2026-03-08', '2026-03-08')?.label).toBe('Due today');
+  });
+
+  it('counts the skipped calendar day in a date-line zone', () => {
+    process.env.TZ = 'Pacific/Apia';
+    // Samoa skipped 2011-12-30 entirely: 24 h of elapsed time, two day-keys.
+    expect(daysUntilDate('2011-12-31', '2011-12-29')).toBe(2);
+    expect(computeTargetDateCountdown('2011-12-31', '2011-12-29')?.label).toBe('2 days remaining');
   });
 });

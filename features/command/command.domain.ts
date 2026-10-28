@@ -1,4 +1,4 @@
-import { toDateKey } from '@/lib/time';
+import { isValidDateKey, toDateKey } from '@/lib/time';
 import type {
   DraftAiAction,
   DraftCreateHabit,
@@ -74,13 +74,6 @@ function cleanEntityLabel(text: string): string | null {
   ]);
 
   return cleaned.length > 0 ? cleaned : null;
-}
-
-function isValidDateKey(dateKey: string): boolean {
-  const date = new Date(`${dateKey}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return false;
-
-  return toDateKey(date) === dateKey;
 }
 
 function getTomorrowDateKey(now: Date): string {

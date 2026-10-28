@@ -20,6 +20,7 @@ import {
   filterTimelineByDay,
   filterTimelineByRange,
   filterTimelineBySources,
+  formatTimelineDayLabel,
   getTimelineDayKeys,
   groupTimelineByDay,
   hasClockTime,
@@ -65,19 +66,6 @@ const daysForRange = (range: ActivityTimelineRangeFilter) =>
 function cursorAfter(page: ActivityTimelineItem[]) {
   const last = page[page.length - 1];
   return last ? { occurredAt: last.occurredAt, id: last.id } : null;
-}
-
-function formatDayLabel(dateKey: string): string {
-  if (dateKey === 'unknown') return 'Earlier';
-  // Browser-local day boundary, matching `toDateKey()`: never `new Date(key)`
-  // (UTC-parsed) for the "today/yesterday" comparison.
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const d = new Date(`${dateKey}T00:00:00`);
-  const diffDays = Math.round((today.getTime() - d.getTime()) / (24 * 60 * 60 * 1000));
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  return dateKey;
 }
 
 /**
@@ -304,7 +292,7 @@ export function ActivityTimelineView() {
               (one text node, so it reads as one sentence to a screen reader). */}
           <Text className="text-xs" style={{ color: tokens.textMuted }}>
             {`${sourceSummary} · ${rangeSummary}${
-              selectedDay ? ` · ${formatDayLabel(selectedDay)}` : ''
+              selectedDay ? ` · ${formatTimelineDayLabel(selectedDay, todayKey)}` : ''
             }`}
           </Text>
 
@@ -346,7 +334,7 @@ export function ActivityTimelineView() {
                     {dayKeys.slice(0, 14).map((key) => (
                       <PillChip
                         key={key}
-                        label={formatDayLabel(key)}
+                        label={formatTimelineDayLabel(key, todayKey)}
                         accessibilityLabel={`Show activity from ${key}`}
                         active={selectedDay === key}
                         color={SECTION_COLORS.habits}
@@ -392,7 +380,7 @@ export function ActivityTimelineView() {
                     marginTop: spacing.sm,
                   }}
                 >
-                  {formatDayLabel(group.dateKey)}
+                  {formatTimelineDayLabel(group.dateKey, todayKey)}
                 </Text>
                 <View
                   className="rounded-2xl border"

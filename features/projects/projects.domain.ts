@@ -1,5 +1,5 @@
 import type { Project, ProjectStatus, TodoPriority } from '@/core/db/types';
-import { dateKeyToLocalDate, isValidDateKey } from '@/lib/time';
+import { diffLocalDays, isValidDateKey } from '@/lib/time';
 import {
   PROJECT_COLORS,
   PROJECT_STATUS_VALUES,
@@ -145,12 +145,15 @@ export function computeProjectProgress(input: {
   return { todoRatio, goalRatio, habitRatio, percent, isEmpty: parts.length === 0 };
 }
 
-/** Days from `todayKey` until `targetKey` (negative when overdue). */
+/**
+ * Days from `todayKey` until `targetKey` (negative when overdue).
+ *
+ * Delegates to `lib/time`'s calendar-day differ: this compares two date KEYS,
+ * and fixed-millisecond subtraction miscounts when a local calendar day is
+ * 23/25 hours long or skipped outright by a zone change.
+ */
 export function daysUntilDate(targetKey: string, todayKey: string): number {
-  const msPerDay = 86_400_000;
-  const target = dateKeyToLocalDate(targetKey).getTime();
-  const today = dateKeyToLocalDate(todayKey).getTime();
-  return Math.round((target - today) / msPerDay);
+  return diffLocalDays(todayKey, targetKey);
 }
 
 export type TargetDateCountdown = {

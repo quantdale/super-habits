@@ -6,7 +6,7 @@ import { Button } from '@/core/ui/Button';
 import { TextField } from '@/core/ui/TextField';
 import { NumberStepperField } from '@/core/ui/NumberStepperField';
 import { SECTION_COLORS } from '@/constants/sectionColors';
-import { toDateKey } from '@/lib/time';
+import { addLocalDays, toDateKey } from '@/lib/time';
 import {
   carryForwardFromPreviousDay,
   getDailyPlan,
@@ -36,12 +36,6 @@ type GuidedPlanningFlowProps = {
 
 const STEPS = ['Carry-over', 'Commitments', 'Priorities', 'Focus', 'Confirm'] as const;
 
-function shiftDateKey(dateKey: string, days: number): string {
-  const d = new Date(`${dateKey}T00:00:00`);
-  d.setDate(d.getDate() + days);
-  return toDateKey(d);
-}
-
 /**
  * Skippable five-step guided planning sequence for the Planning Hub Today
  * tab (carry-over → commitments → priorities → focus → confirm). Purely a
@@ -51,7 +45,7 @@ function shiftDateKey(dateKey: string, days: number): string {
 export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
   const { tokens, sectionAccents } = useAppTheme();
   const todayKey = toDateKey();
-  const yesterdayKey = shiftDateKey(todayKey, -1);
+  const yesterdayKey = addLocalDays(todayKey, -1);
 
   const [dismissed, setDismissed] = useState<boolean | null>(null);
   const [step, setStep] = useState(0);

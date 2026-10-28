@@ -3,6 +3,7 @@ import {
   buildTimerSequence,
   buildPreviousSetLookup,
   collectSessionSetRecords,
+  formatLastPerformedLabel,
   formatWorkoutTime,
   groupSessionExercises,
   lookupPreviousSet,
@@ -689,5 +690,39 @@ describe('isQuickLoggedSession', () => {
   it('treats non-positive counts as quick logs (absence of evidence)', () => {
     expect(isQuickLoggedSession(-1)).toBe(true);
     expect(isQuickLoggedSession(Number.NaN)).toBe(true);
+  });
+});
+
+/**
+ * Audit C §9: the last-performed gap is a calendar-day count. Anchoring both
+ * endpoints on local midnight makes an ordinary DST transition harmless, but a
+ * skipped date-line day still loses a day under fixed-millisecond math.
+ */
+describe('formatLastPerformedLabel calendar-day gap', () => {
+  const previousTz = process.env.TZ;
+
+  afterEach(() => {
+    if (previousTz === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTz;
+  });
+
+  it('labels the day before as Yesterday across a DST boundary', () => {
+    process.env.TZ = 'America/New_York';
+    // Spring forward: the 23-hour day between Mar 7 and Mar 8.
+    expect(formatLastPerformedLabel('2026-03-07T18:00:00', new Date('2026-03-08T09:00:00'))).toBe(
+      'Yesterday',
+    );
+    // Fall back: the 25-hour day between Oct 31 and Nov 1.
+    expect(formatLastPerformedLabel('2026-10-31T18:00:00', new Date('2026-11-01T09:00:00'))).toBe(
+      'Yesterday',
+    );
+  });
+
+  it('counts a skipped date-line day instead of collapsing it', () => {
+    process.env.TZ = 'Pacific/Apia';
+    // 2011-12-30 never existed locally, so Dec 29 → Dec 31 is two days.
+    expect(formatLastPerformedLabel('2011-12-29T18:00:00', new Date('2011-12-31T09:00:00'))).toBe(
+      '2 days ago',
+    );
   });
 });

@@ -185,8 +185,21 @@ describe('parseLocalDateKey', () => {
     expect(parsed.getHours()).toBe(0);
     expect(parsed.getMinutes()).toBe(0);
     expect(parsed.getTime()).toBe(new Date(2026, 2, 4, 0, 0, 0, 0).getTime());
-    // The bug this replaces: ECMA-262 parses date-only strings as UTC.
-    expect(parsed.getTime()).not.toBe(Date.parse('2026-03-04'));
+  });
+
+  it('parseLocalDateKey differs from the UTC parse west of UTC', () => {
+    // The bug this replaces: ECMA-262 parses date-only strings as UTC. The
+    // assertion is only meaningful off the UTC meridian (local midnight == UTC
+    // midnight there), so force a west-of-UTC zone instead of relying on the
+    // ambient one — this test is also run by `npm run qa:timezones` under UTC.
+    const previousTz = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+    try {
+      expect(parseLocalDateKey('2026-03-04').getTime()).not.toBe(Date.parse('2026-03-04'));
+    } finally {
+      if (previousTz === undefined) delete process.env.TZ;
+      else process.env.TZ = previousTz;
+    }
   });
 
   it('parseLocalDateKey round-trips every day of a leap year without drift', () => {
@@ -304,5 +317,61 @@ describe('DST boundaries (forced America/New_York)', () => {
       '2026-11-02',
       '2026-11-03',
     ]);
+  });
+});
+
+/**
+ * The skipped-calendar-day class (audit C §9).
+ *
+ * The four duplicated `Math.round(diff / 86_400_000)` helpers are *not* wrong
+ * across an ordinary DST transition — the ±1 h is absorbed by the rounding —
+ * but they are wrong when a local calendar day is skipped outright, which is
+ * exactly the case `diffLocalDays` exists to survive. `Pacific/Apia` jumped
+ * across the date line on 2011-12-30 (Thu 29th → Sat 31st), so 24 h of elapsed
+ * time spans TWO calendar days.
+ */
+describe('skipped local calendar day (forced Pacific/Apia)', () => {
+  const previousTz = process.env.TZ;
+
+  beforeEach(() => {
+    process.env.TZ = 'Pacific/Apia';
+  });
+
+  afterEach(() => {
+    if (previousTz === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTz;
+  });
+
+  it('the forced zone really skips 2011-12-30 on this Node', () => {
+    // Two local midnights 24 h apart that name keys two apart.
+    expect(new Date(2011, 11, 30).getDate()).toBe(31);
+    expect(Date.UTC(2011, 11, 31) - Date.UTC(2011, 11, 29)).toBe(2 * 86_400_000);
+  });
+
+  it('diffLocalDays counts the skipped day; fixed-millisecond math loses it', () => {
+    expect(diffLocalDays('2011-12-29', '2011-12-31')).toBe(2);
+    expect(diffLocalDays('2011-12-28', '2011-12-31')).toBe(3);
+    expect(diffLocalDays('2011-12-31', '2011-12-29')).toBe(-2);
+
+    // The shape the duplicated helpers had: same local midnights, 24 h apart.
+    const naive = (fromKey: string, toKey: string) => {
+      const from = parseLocalDateKey(fromKey).getTime();
+      const to = parseLocalDateKey(toKey).getTime();
+      return Math.round((to - from) / 86_400_000);
+    };
+    expect(naive('2011-12-29', '2011-12-31')).toBe(1);
+    expect(naive('2011-12-29', '2011-12-31')).not.toBe(diffLocalDays('2011-12-29', '2011-12-31'));
+  });
+
+  it('addLocalDays still lands on the named local day', () => {
+    // `setDate` walks calendar fields, so the skipped key simply does not exist
+    // and the forward walk never produces it.
+    expect(addLocalDays('2011-12-29', 1)).toBe('2011-12-31');
+    // Known, documented limitation: the inverse of that walk is NOT symmetric,
+    // because "one day before Dec 31" names the non-existent Dec 30 and the
+    // runtime normalizes it forward again. This only affects zones that
+    // skipped a calendar day historically (Samoa 2011, Kiritimati 1994); no
+    // DST transition can produce it.
+    expect(addLocalDays('2011-12-31', -1)).toBe('2011-12-31');
   });
 });

@@ -12,6 +12,7 @@ import {
   buildDateRange,
   buildDateRangeOldestFirst,
   dateKeyToLocalDate,
+  diffLocalDays,
   timestampToLocalDateKey,
   toDateKey,
 } from '@/lib/time';
@@ -72,8 +73,9 @@ export function formatWorkoutTime(totalSeconds: number): string {
 export function formatLastPerformedLabel(iso: string, now: Date = new Date()): string | null {
   const then = new Date(iso);
   if (Number.isNaN(then.getTime())) return null;
-  const startOfDayMs = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const dayGap = Math.round((startOfDayMs(now) - startOfDayMs(then)) / (24 * 60 * 60 * 1000));
+  // Calendar-day gap via `lib/time`, not fixed-millisecond subtraction: the two
+  // endpoints are local midnights that can be 23/25 hours apart.
+  const dayGap = diffLocalDays(toDateKey(then), toDateKey(now));
   if (dayGap <= 0) return 'Today';
   if (dayGap === 1) return 'Yesterday';
   if (dayGap < 30) return `${dayGap} days ago`;

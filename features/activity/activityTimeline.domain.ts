@@ -1,3 +1,4 @@
+import { addLocalDays, diffLocalDays, isValidDateKey } from '@/lib/time';
 import type {
   ActivityTimelineCategory,
   ActivityTimelineItem,
@@ -102,14 +103,9 @@ export function filterTimelineByRange(
 ): ActivityTimelineItem[] {
   if (range === 'all') return items;
   const days = RANGE_DAYS[range];
-  const cutoff = new Date(`${todayKey}T00:00:00`);
-  cutoff.setDate(cutoff.getDate() - (days - 1));
-  // Compose the cutoff key locally to stay offset/DST-safe via Date arithmetic.
-  const cutoffKey = [
-    `${cutoff.getFullYear()}`,
-    `${cutoff.getMonth() + 1}`.padStart(2, '0'),
-    `${cutoff.getDate()}`.padStart(2, '0'),
-  ].join('-');
+  // `addLocalDays` walks calendar days, so the inclusive window is exactly
+  // `days` local days even when it crosses a 23- or 25-hour day.
+  const cutoffKey = addLocalDays(todayKey, -(days - 1));
   return items.filter((item) => item.dateKey >= cutoffKey);
 }
 
@@ -136,6 +132,26 @@ export function sortTimelineByOccurredAt(items: ActivityTimelineItem[]): Activit
     if (a.occurredAt === b.occurredAt) return a.id.localeCompare(b.id);
     return a.occurredAt < b.occurredAt ? 1 : -1;
   });
+}
+
+/**
+ * Bucket label for a timeline day: "Today" / "Yesterday" / the raw key.
+ *
+ * `todayKey` is injectable for determinism. The gap is a calendar-day count
+ * from `lib/time`, so a 23/25-hour local day cannot report the wrong day.
+ *
+ * An unresolvable key (a corrupt timestamp yields `NaN-NaN-NaN`) falls back to
+ * the raw key and never throws: `diffLocalDays` validates its input, and this
+ * runs in the render path.
+ */
+export function formatTimelineDayLabel(dateKey: string, todayKey: string): string {
+  if (dateKey === 'unknown' || !isValidDateKey(dateKey) || !isValidDateKey(todayKey)) {
+    return dateKey === 'unknown' ? 'Earlier' : dateKey;
+  }
+  const dayGap = diffLocalDays(dateKey, todayKey);
+  if (dayGap === 0) return 'Today';
+  if (dayGap === 1) return 'Yesterday';
+  return dateKey;
 }
 
 /**
