@@ -58,6 +58,19 @@ const APP_FONT_FAMILIES = [
 ] as const;
 
 /**
+ * The icon-glyph family `@expo/vector-icons` registers (`MaterialIcons`).
+ *
+ * It was previously unawaited: icon faces load per-GLYPH on first use, so a
+ * capture could rasterise a surface while one of its icons still resolved
+ * through a fallback box. Measured on the Workout landing screen 1.5s after
+ * `domcontentloaded`: `document.fonts.status` already read `loaded` while
+ * `Nunito_400Regular` was still `unloaded`, and the icon family was not part
+ * of the required set at all — i.e. `fonts.ready` is not a completeness
+ * signal. Awaiting it explicitly removes one real capture race.
+ */
+const ICON_FONT_FAMILIES = ['material'] as const;
+
+/**
  * How long the cross-fade settle may wait before readiness fails closed.
  * Bounded on purpose: long enough for the measured 200ms fade (completion
  * ~260ms) plus layout slack, short enough to fail fast on a stuck section.
@@ -94,7 +107,15 @@ const SETTLE_TIMEOUT_MS = 4000;
  */
 async function settle(page: Page): Promise<void> {
   const diagnostics = await page.evaluate(
-    async ({ families, timeoutMs }: { families: readonly string[]; timeoutMs: number }) => {
+    async ({
+      families,
+      iconFamilies,
+      timeoutMs,
+    }: {
+      families: readonly string[];
+      iconFamilies: readonly string[];
+      timeoutMs: number;
+    }) => {
       const fontFailures: string[] = [];
       await Promise.all(
         families.map(async (family) => {
@@ -115,6 +136,35 @@ async function settle(page: Page): Promise<void> {
         return { fontFailures, unmetSections: [] as string[] };
       }
       await document.fonts.ready;
+      // `fonts.ready` resolving does NOT mean every face finished: it can
+      // settle while a family is still `unloaded` (see APP_FONT_FAMILIES).
+      // `FontFaceSet` is iterable at runtime but is not typed as `Iterable` or
+      // `ArrayLike` in this TS lib, so read it through an explicit cast.
+      const allFaces = (): FontFace[] =>
+        Array.from(document.fonts as unknown as Iterable<FontFace>);
+      const required = [...families, ...iconFamilies];
+      const faceIsPending = (family: string): boolean => {
+        const faces = allFaces().filter((face) => face.family.replace(/["']/g, '') === family);
+        // No registered face for the family is not a pending state (an icon
+        // family the current surface never used has no entry at all).
+        return faces.some((face) => face.status !== 'loaded');
+      };
+      const deadlineForFaces = Date.now() + timeoutMs;
+      for (;;) {
+        // Force the icon faces to actually resolve rather than only checking
+        // state: a glyph-specific face stays `unloaded` until requested.
+        for (const family of iconFamilies) {
+          try {
+            await document.fonts.load(`16px ${family}`);
+          } catch {
+            // Icon coverage is best-effort: a missing icon glyph must not fail
+            // a text capture (the icon surfaces have their own assertions).
+          }
+        }
+        if (!required.some(faceIsPending)) break;
+        if (Date.now() >= deadlineForFaces) break;
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      }
 
       const describeSection = (el: HTMLElement): string => {
         const opacity = Number.parseFloat(getComputedStyle(el).opacity);
@@ -146,7 +196,7 @@ async function settle(page: Page): Promise<void> {
         unmetSections: unmetSections().map(describeSection),
       };
     },
-    { families: APP_FONT_FAMILIES, timeoutMs: SETTLE_TIMEOUT_MS },
+    { families: APP_FONT_FAMILIES, iconFamilies: ICON_FONT_FAMILIES, timeoutMs: SETTLE_TIMEOUT_MS },
   );
 
   if (diagnostics.fontFailures.length > 0) {

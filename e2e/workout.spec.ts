@@ -415,18 +415,29 @@ test.describe('Workout', () => {
     await page.getByText('Add routine', { exact: true }).click();
     await page.getByText('Custom manager', { exact: true }).first().click();
 
-    const builder = page.getByRole('dialog');
+    const builder = page.getByRole('dialog', { name: 'Custom manager' });
     await builder.getByRole('button', { name: 'Manage custom exercises' }).click();
-    const manager = page.getByRole('dialog').last();
-    await expect(manager.getByText('Custom exercises')).toBeVisible();
+    // Scope by the dialog's ACCESSIBLE NAME, never by stack position.
+    // `page.getByRole('dialog').last()` was the real flake here: a locator is
+    // lazy, so it re-resolved on every use, and across the confirm→archive
+    // transition the modal stack passes through
+    // `Archive custom exercise` → `<unnamed>` → `Custom exercises`. Whenever a
+    // later assertion ran on a frame whose topmost dialog was the confirmation
+    // sheet (or RN-Web's still-activating container), `.last()` bound to the
+    // wrong container and the lookup failed. Every Modal is named via
+    // `dialogA11yProps`, so the name is the stable identity.
+    const manager = page.getByRole('dialog', { name: 'Custom exercises' });
     await expect(manager.getByText('Cable Fly')).toBeVisible();
 
     await manager.getByRole('button', { name: 'Archive custom exercise Cable Fly' }).click();
     await page.getByText('Archive exercise', { exact: true }).last().click({ force: true });
-    // `exact` is required: the non-exact text query also matches the
-    // "Showing archived" filter pill, which is a strict-mode violation under
-    // full-suite timing because both texts are present at once.
-    await expect(manager.getByText('Archived', { exact: true })).toBeVisible();
+    // Assert the badge on THIS exercise's row, not anywhere in the dialog, so
+    // the claim under test is "the archived row is marked archived". Row
+    // scoping also removes the old dependence on `exact: true` merely to dodge
+    // the "Showing archived" filter pill: a substring match on the pill could
+    // not satisfy a lookup anchored to the Cable Fly row.
+    const archivedRow = manager.getByText('Cable Fly', { exact: true }).locator('..');
+    await expect(archivedRow.getByText('Archived', { exact: true })).toBeVisible();
     await manager.getByRole('button', { name: 'Restore custom exercise Cable Fly' }).click();
     await expect(
       manager.getByRole('button', { name: 'Archive custom exercise Cable Fly' }),
@@ -440,7 +451,9 @@ test.describe('Workout', () => {
     await manager.getByLabel('Close').click();
     // Library picker now lists the renamed exercise for routine building.
     await builder.getByText('Choose from exercise library', { exact: true }).click();
-    const picker = page.getByRole('dialog').last();
+    // Name-scoped for the same reason as `manager` above: `.last()` re-resolves
+    // to whatever is topmost while the builder and picker overlap.
+    const picker = page.getByRole('dialog', { name: 'Exercise library' });
     await picker.getByRole('textbox', { name: 'Exercise library search' }).fill('Pec Deck');
     await expect(picker.getByRole('button', { name: 'Add Pec Deck' })).toBeVisible();
   });
