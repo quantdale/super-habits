@@ -424,6 +424,15 @@ function normalizeActiveTimerIntent(value: unknown): ActiveTimerIntent | null {
       candidate.pausedRemainingSeconds > 0
         ? candidate.pausedRemainingSeconds
         : null,
+    // `AUD-SH10-A`: the running countdown deadline is part of the intent, so it
+    // must survive this normalization. Dropping it made every persisted intent
+    // fall back to `startedAt + totalSeconds`, which re-created the audited
+    // phantom-completion bug on the very next reload. Kept absent (not null) for
+    // legacy/paused intents so their stored shape is unchanged.
+    ...(typeof candidate.runningDeadlineIso === 'string' &&
+    !Number.isNaN(new Date(candidate.runningDeadlineIso).getTime())
+      ? { runningDeadlineIso: candidate.runningDeadlineIso }
+      : {}),
   };
 }
 
