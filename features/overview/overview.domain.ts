@@ -437,9 +437,8 @@ type EmptyStateSummaries = {
 };
 
 /**
- * Ordered candidate list mirroring the domain chain in card order (plan →
- * todos → habits → focus → workout → calories → projects → goals). Kept in
- * one place so `pickEmptyStateCta` and `listEmptyStateCtas` never drift.
+ * Ordered candidate list for the zero-data panel, in card order (plan → todos
+ * → habits → focus → workout → calories → projects → goals).
  */
 const EMPTY_STATE_CHAIN: { when: (s: EmptyStateSummaries) => boolean; cta: EmptyStateCta }[] = [
   {
@@ -483,28 +482,10 @@ const EMPTY_STATE_STARTERS: EmptyStateCta[] = [
   { label: 'Start a focus session', destination: { kind: 'section', section: 'pomodoro' } },
 ];
 
-function pickChainMatch(summaries: EmptyStateSummaries): EmptyStateCta | null {
-  for (const candidate of EMPTY_STATE_CHAIN) {
-    if (candidate.when(summaries)) return candidate.cta;
-  }
-  return null;
-}
-
 /**
- * Pick the dashboard empty-state CTA from the first non-empty domain in card
- * order (plan → todos → habits → focus → workout → calories → projects →
- * goals). Falls back to the Todos tab when nothing is tracked at all. Keeps
- * the CTA honest even if the "nothing tracked" gate and the summaries ever
- * drift apart.
- */
-export function pickEmptyStateCta(summaries: EmptyStateSummaries): EmptyStateCta {
-  return pickChainMatch(summaries) ?? EMPTY_STATE_STARTERS[0];
-}
-
-/**
- * Guided-starter CTA list for the zero-data panel: the primary CTA from the
- * existing chain plus up to two follow-up options (next chain matches, then
- * fixed first-run starters). Still one panel — no wizard.
+ * Guided-starter CTA list for the zero-data panel: the first chain matches
+ * plus the fixed first-run starters, capped at three. Still one panel — no
+ * wizard.
  */
 export function listEmptyStateCtas(summaries: EmptyStateSummaries): EmptyStateCta[] {
   const result: EmptyStateCta[] = [];

@@ -34,6 +34,7 @@ import {
   type BadgeUnlock,
   type Celebration,
   type DailyQuestState,
+  type DayCompletionInput,
   type DayFacts,
   type GamificationAwardResult,
   type GamificationEventDraft,
@@ -493,6 +494,22 @@ export function actionSourceKey(kind: ActionKind, entityId: string, dateKey: str
 }
 
 /**
+ * Whether today counts as a complete habit day.
+ *
+ * Two paths: a `perfect_day` event already recorded today (so the day stays
+ * complete even if a habit is added later), or every active scheduled habit is
+ * at or above its target. Shared by the snapshot read and the award pipeline so
+ * the badge the UI shows and the perfect-day award can never disagree.
+ */
+export function isDayComplete(dayCompletion: DayCompletionInput): boolean {
+  return (
+    dayCompletion.wasComplete ||
+    (dayCompletion.activeHabits > 0 &&
+      dayCompletion.completedHabitsAfter >= dayCompletion.activeHabits)
+  );
+}
+
+/**
  * Reward one action.
  *
  * Idempotency is the caller's contract: `sourceKey` must be stable per real
@@ -570,10 +587,7 @@ export function computeActionReward(input: ActionRewardInput): GamificationAward
     });
   }
 
-  const dayComplete =
-    input.dayCompletion.wasComplete ||
-    (input.dayCompletion.activeHabits > 0 &&
-      input.dayCompletion.completedHabitsAfter >= input.dayCompletion.activeHabits);
+  const dayComplete = isDayComplete(input.dayCompletion);
   const perfectDay = dayComplete && !input.dayCompletion.wasComplete;
   if (perfectDay) {
     events.push({
