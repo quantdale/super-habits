@@ -129,6 +129,27 @@ test.describe('W11 Planning disclosure hierarchy', () => {
     expect(rows).toEqual([{ title: 'W11 Run', status: 'active', progress_percent: 10 }]);
   });
 
+  test('typed goal progress is saved without pressing Set first', async ({ page }) => {
+    // Regression: the save path used the last committed percentage, so a value
+    // typed into the progress field and saved directly (no "Set" press) was
+    // silently discarded — the row was created at 0%.
+    await openPlanning(page);
+    await planningHubTab(page, 'Goals').click();
+    await page.getByRole('button', { name: 'Create goal' }).click();
+    await page.getByPlaceholder('Goal title').fill('W11 Typed Progress');
+    await page.getByRole('textbox', { name: 'Goal progress percent' }).fill('50');
+    await page.getByRole('button', { name: 'Create Goal' }).click();
+    await expect(
+      page.getByRole('button', { name: /^W11 Typed Progress, Active, 50 percent/ }),
+    ).toBeVisible();
+
+    const rows = await queryRows(
+      page,
+      'SELECT title, progress_percent FROM goals WHERE deleted_at IS NULL',
+    );
+    expect(rows).toEqual([{ title: 'W11 Typed Progress', progress_percent: 50 }]);
+  });
+
   test('Daily Plan hides optional fields, retains drafts, commits and completes', async ({
     page,
   }) => {
