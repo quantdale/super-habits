@@ -172,6 +172,14 @@ It SHALL NOT introduce an opaque global productivity score.
 
 ### Requirement: New planning entities remain local-only during the implementation wave
 
+> **Superseded** by `productivity-expansion-hardening` ("Projects, Goals, and
+> Daily Plans are complete recoverable backup entities"). Projects, Goals, and
+> Daily Plans ARE recoverable backup entities in the shipped product: they are
+> members of `BACKUP_ENTITIES` in `core/backup/backup.types.ts` and ride the
+> owner-scoped durable backup contract. The requirement below records only the
+> historical scope of the implementation wave and SHALL NOT be read as the
+> current contract.
+
 During this change, Projects, Goals, and Daily Plans SHALL NOT be added to remote Backup/Sync/Restore/Portable contracts.
 
 #### Scenario: Client is connected to Supabase
@@ -179,7 +187,7 @@ During this change, Projects, Goals, and Daily Plans SHALL NOT be added to remot
 - **WHEN** the user creates a Project during this implementation wave,
 - **THEN** no new remote sync entity is enqueued for a nonexistent production table.
 
-The UI SHALL NOT falsely claim these entities are protected by the existing complete cloud backup.
+During the implementation wave, the UI SHALL NOT falsely claim these entities are protected by the existing complete cloud backup.
 
 ### Requirement: Existing six-section navigation remains stable
 

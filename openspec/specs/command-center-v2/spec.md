@@ -11,7 +11,12 @@ read orchestration across the existing SuperHabits feature surfaces.
 
 The Command Center SHALL support only `create_todo`, `complete_todo`,
 `create_habit`, `log_habit`, `log_calorie_entry`, `log_workout_routine`, and
-`start_focus_session` mutation kinds in V2. Each draft SHALL expose its own
+`start_focus_session` mutation kinds in V2. This seven-kind list is the V2 set
+and is not the final allowlist: later waves add `create_project`,
+`update_goal_progress`, and `add_todo_to_daily_plan` through the same canonical
+action pipeline (see the `product-completion-wave` planning-coverage
+requirement), so the ten-kind set is the current shipped contract while the V2
+set remains the V2 scope. Each draft SHALL expose its own
 intent-specific fields, status, confidence, warnings, and missing fields; a
 single object with unrelated nullable fields SHALL NOT be used as the public
 contract. The model SHALL reference entities by human-facing title or name,
