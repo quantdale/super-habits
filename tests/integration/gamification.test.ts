@@ -194,7 +194,7 @@ describe('gamification ledger', () => {
     expect(before.week.find((day) => day.dateKey === yesterday)?.active).toBe(false);
 
     const saved = await gamification.ensureStreakFreeze({ todayKey: today });
-    expect(saved).toEqual({ savedDateKey: yesterday });
+    expect(saved).toEqual({ savedDateKeys: [yesterday] });
 
     const after = await gamification.readGamificationSnapshot({ todayKey: today });
     expect(after.streak.current).toBe(7);
@@ -445,7 +445,7 @@ describe('streak freeze accounting (audit C #2)', () => {
     expect(earned.freezes).toMatchObject({ earned: 1, used: 0, banked: 1 });
 
     expect(await gamification.ensureStreakFreeze({ todayKey: today })).toEqual({
-      savedDateKey: yesterday,
+      savedDateKeys: [yesterday],
     });
     const spent = await gamification.readGamificationSnapshot({ todayKey: today });
     expect(spent.freezes).toMatchObject({ earned: 1, used: 1, banked: 0 });
@@ -471,7 +471,7 @@ describe('streak freeze accounting (audit C #2)', () => {
     await grantFreeze([7], lastRunDay);
 
     expect(await gamification.ensureStreakFreeze({ todayKey: today })).toEqual({
-      savedDateKey: yesterday,
+      savedDateKeys: [yesterday],
     });
     expect(await freezeRows()).toEqual([yesterday]);
     expect((await gamification.readGamificationSnapshot({ todayKey: today })).freezes.banked).toBe(
@@ -529,6 +529,70 @@ describe('streak freeze accounting (audit C #2)', () => {
     const after = await gamification.readGamificationSnapshot({ todayKey: today });
     expect(after.freezes).toMatchObject({ earned: 1, used: 0, banked: 1 });
     expect(after.streak.current).toBe(8);
+  });
+
+  /**
+   * Audit C §4.7 #5 / §3.3 — the 3-day-absence outcome through the SHIPPED path.
+   *
+   * The user banks three freezes at 7/30/100, then disappears for three days.
+   * `runGamificationHousekeeping` is the only real caller of freeze planning, so
+   * the assertion is made against it rather than against `planAutoFreeze`.
+   *
+   * Before the fix, planning bridged exactly one day (yesterday) and required
+   * the day before it to be alive. After a 3-day absence that precondition never
+   * held again: the run was already broken, the bank was never spent, and the
+   * three freezes the user had earned were permanently unspendable.
+   */
+  it('bridges a three-day absence with three banked freezes through housekeeping', async () => {
+    const { gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    // Six active days ending four days ago: the run is alive behind a
+    // three-day gap (three missed days, three banked freezes).
+    const run = [4, 5, 6, 7, 8, 9].map((offset) => domain.shiftDateKey(today, -offset));
+    await seedLedgerDays(run);
+    await grantFreeze([7, 30, 100], run[run.length - 1]);
+
+    const gap = [1, 2, 3].map((offset) => domain.shiftDateKey(today, -offset));
+
+    const before = await gamification.readGamificationSnapshot({ todayKey: today });
+    expect(before.freezes).toMatchObject({ earned: 3, used: 0, banked: 3 });
+    // The absence really did break the run — that is what the freezes are for.
+    expect(before.streak.current).toBe(0);
+    expect(before.streak.longest).toBe(6);
+
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+
+    // Every missed day in the gap is bridged, and nothing older is touched.
+    expect(await freezeRows()).toEqual([...gap].sort());
+    const after = await gamification.readGamificationSnapshot({ todayKey: today });
+    expect(after.freezes).toMatchObject({ earned: 3, used: 3, banked: 0 });
+    expect(after.streak.current).toBe(6);
+    for (const dateKey of gap) {
+      expect(after.week.find((day) => day.dateKey === dateKey)?.frozen).toBe(true);
+    }
+
+    // The bank is empty, so a repeat pass spends nothing and changes nothing.
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+    const replayed = await gamification.readGamificationSnapshot({ todayKey: today });
+    expect(replayed.freezes).toEqual(after.freezes);
+    expect(await freezeRows()).toEqual([...gap].sort());
+  });
+
+  it('does not resurrect a run the bank cannot reach', async () => {
+    const { gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    // Five missed days but only three banked freezes: spending them would burn
+    // the grant and leave the streak broken anyway, so nothing is spent.
+    const run = [5, 6, 7, 8, 9, 10].map((offset) => domain.shiftDateKey(today, -offset));
+    await seedLedgerDays(run);
+    await grantFreeze([7, 30, 100], run[run.length - 1]);
+
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+
+    expect(await freezeRows()).toEqual([]);
+    const after = await gamification.readGamificationSnapshot({ todayKey: today });
+    expect(after.freezes).toMatchObject({ earned: 3, used: 0, banked: 3 });
+    expect(after.streak.current).toBe(0);
   });
 
   it('keeps the released freeze banked across repeated housekeeping passes', async () => {

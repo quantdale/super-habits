@@ -222,18 +222,20 @@ describe('streak freezes', () => {
     expect(isFreezeAccountingInconsistent(streakFreezeState({ earned: 3, used: 3 }))).toBe(false);
   });
 
-  it('spends a freeze on the most recent gap only when a run is behind it', () => {
+  it('spends a freeze on the trailing gap only when a run is behind it', () => {
     const missedYesterday: StreakDay[] = [...activeRun('2026-06-08', 2)];
-    expect(planAutoFreeze({ days: missedYesterday, todayKey: TODAY, banked: 1 })).toBe(YESTERDAY);
-    expect(planAutoFreeze({ days: missedYesterday, todayKey: TODAY, banked: 0 })).toBeNull();
+    expect(planAutoFreeze({ days: missedYesterday, todayKey: TODAY, banked: 1 })).toEqual([
+      YESTERDAY,
+    ]);
+    expect(planAutoFreeze({ days: missedYesterday, todayKey: TODAY, banked: 0 })).toEqual([]);
   });
 
   it('does nothing when today is already active or the gap is older', () => {
-    expect(planAutoFreeze({ days: activeRun(TODAY, 3), todayKey: TODAY, banked: 2 })).toBeNull();
+    expect(planAutoFreeze({ days: activeRun(TODAY, 3), todayKey: TODAY, banked: 2 })).toEqual([]);
     expect(
       planAutoFreeze({ days: activeRun('2026-06-05', 3), todayKey: TODAY, banked: 2 }),
-    ).toBeNull();
-    expect(planAutoFreeze({ days: [], todayKey: TODAY, banked: 2 })).toBeNull();
+    ).toEqual([]);
+    expect(planAutoFreeze({ days: [], todayKey: TODAY, banked: 2 })).toEqual([]);
   });
 
   it('does not freeze a day twice', () => {
@@ -241,7 +243,34 @@ describe('streak freezes', () => {
       ...activeRun('2026-06-08', 2),
       { dateKey: YESTERDAY, active: false, frozen: true },
     ];
-    expect(planAutoFreeze({ days, todayKey: TODAY, banked: 2 })).toBeNull();
+    expect(planAutoFreeze({ days, todayKey: TODAY, banked: 2 })).toEqual([]);
+  });
+
+  // Audit C §3.3: bridging only yesterday made a banked freeze unspendable
+  // after a two-day absence — the user kept the grant, kept the bank, and still
+  // lost the run it exists to protect.
+  it('bridges a multi-day absence with as many freezes as the bank holds', () => {
+    const runEndingThreeDaysAgo: StreakDay[] = activeRun('2026-06-07', 3);
+    const twoDaysAgo = '2026-06-08';
+    expect(planAutoFreeze({ days: runEndingThreeDaysAgo, todayKey: TODAY, banked: 2 })).toEqual([
+      YESTERDAY,
+      twoDaysAgo,
+    ]);
+    // Three missed days need three freezes: the third day of the gap is the
+    // day the run ended on, so a two-freeze bank stops one day short.
+    const runEndingFourDaysAgo: StreakDay[] = activeRun('2026-06-06', 3);
+    expect(planAutoFreeze({ days: runEndingFourDaysAgo, todayKey: TODAY, banked: 2 })).toEqual([]);
+  });
+
+  it('never spends more than the bank and never resurrects an unbounded absence', () => {
+    const oneMissedDayOnly: StreakDay[] = activeRun('2026-06-08', 2);
+    // The bank is capped at MAX_BANKED_FREEZES, so a long absence simply ends
+    // the run instead of retroactively rewriting history.
+    expect(planAutoFreeze({ days: oneMissedDayOnly, todayKey: TODAY, banked: 99 })).toEqual([
+      YESTERDAY,
+    ]);
+    const longGap: StreakDay[] = activeRun('2026-05-01', 3);
+    expect(planAutoFreeze({ days: longGap, todayKey: TODAY, banked: 3 })).toEqual([]);
   });
 });
 

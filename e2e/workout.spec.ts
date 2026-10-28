@@ -423,7 +423,10 @@ test.describe('Workout', () => {
 
     await manager.getByRole('button', { name: 'Archive custom exercise Cable Fly' }).click();
     await page.getByText('Archive exercise', { exact: true }).last().click({ force: true });
-    await expect(manager.getByText('Archived')).toBeVisible();
+    // `exact` is required: the non-exact text query also matches the
+    // "Showing archived" filter pill, which is a strict-mode violation under
+    // full-suite timing because both texts are present at once.
+    await expect(manager.getByText('Archived', { exact: true })).toBeVisible();
     await manager.getByRole('button', { name: 'Restore custom exercise Cable Fly' }).click();
     await expect(
       manager.getByRole('button', { name: 'Archive custom exercise Cable Fly' }),
