@@ -138,6 +138,37 @@ test.describe('Weekly Review', () => {
     expect(deleteIntents).toEqual([{ operation: 'delete' }]);
   });
 
+  test('counts a completion in the week it was finished, not the week it was due', async ({
+    page,
+  }) => {
+    // Weekly-review F8: "Completed this week" used to window by `due_date`, so
+    // an undated task finished today was invisible (the review said "Nothing
+    // scheduled this week") while a task finished months ago whose due date
+    // fell inside the week was credited as this week's work.
+    const todayKey = await page.evaluate(() => {
+      const d = new Date();
+      const p = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+    });
+    await runSql(
+      page,
+      `INSERT INTO todos (id,title,notes,completed,created_at,updated_at,deleted_at,due_date,priority,sort_order,recurrence,recurrence_id,completed_at)
+         VALUES ('wrev_undated','Undated but finished today',null,1,'${todayKey}T01:00:00.000Z','${todayKey}T10:00:00.000Z',null,null,'normal',0,null,null,'${todayKey}T10:00:00.000Z');`,
+    );
+    await returnToApp(page);
+    await goToTab(page, 'overview');
+
+    const modal = await openReviewFromHub(page);
+    await expect(modal.getByText('Completed 1 todo this week')).toBeVisible({ timeout: 20_000 });
+    await expect(modal.getByText('Nothing scheduled this week.')).toHaveCount(0);
+
+    // The row is really undated — the count cannot be a due-date coincidence.
+    await returnToApp(page);
+    expect(
+      await queryRows(page, `SELECT due_date, completed_at FROM todos WHERE id = 'wrev_undated'`),
+    ).toEqual([{ due_date: null, completed_at: `${todayKey}T10:00:00.000Z` }]);
+  });
+
   test('a rejected review write reports failure and never renders the saved state', async ({
     page,
   }) => {

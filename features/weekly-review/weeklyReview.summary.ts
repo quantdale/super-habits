@@ -23,6 +23,7 @@ import {
   summarizeHabitWeekOccurrences,
 } from './weeklyReview.domain';
 import { listTodos } from '@/features/todos/todos.data';
+import { isValidDateKey, timestampToLocalDateKey } from '@/lib/time';
 import { listHabits, getAllHabitCompletionsForRange } from '@/features/habits/habits.data';
 import { listPomodoroSessionsForDateRange } from '@/features/pomodoro/pomodoro.data';
 import {
@@ -43,9 +44,23 @@ async function summarizeTodos(week: ReviewWeek): Promise<TodoSummary> {
     return t.due_date >= start && t.due_date <= end;
   };
 
-  const completedInWeek = allTodos.filter(
-    (t) => t.completed === 1 && isInRange(t, week.startDateKey, week.endDateKey),
-  );
+  // Completed work belongs to the week it was FINISHED in (`completed_at`),
+  // not the week it happened to be due in. Counting by `due_date` dropped
+  // every task finished this week that had no due date (an undated task is
+  // never "in range") and credited tasks finished months ago whose due date
+  // fell inside the reviewed week — the review could report "0 completed"
+  // for a week with real completions.
+  const completedInWeek = allTodos.filter((t) => {
+    if (t.completed !== 1) return false;
+    const completedKey =
+      typeof t.completed_at === 'string' ? timestampToLocalDateKey(t.completed_at) : null;
+    // Rows predating the `completed_at` backfill keep the old due-date window
+    // instead of silently disappearing from the count.
+    if (completedKey === null || !isValidDateKey(completedKey)) {
+      return isInRange(t, week.startDateKey, week.endDateKey);
+    }
+    return completedKey >= week.startDateKey && completedKey <= week.endDateKey;
+  });
   const incompleteInWeek = allTodos.filter(
     (t) => t.completed === 0 && isInRange(t, week.startDateKey, week.endDateKey),
   );
