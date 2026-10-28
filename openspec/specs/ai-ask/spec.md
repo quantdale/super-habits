@@ -6,7 +6,7 @@ Define the command center's read-only "Ask" capability: users ask natural-langua
 
 ### Requirement: Ask mode in the command center
 
-The command center SHALL offer a three-way mode selector — Ask, Create, Auto — as a single segmented control. Create mode SHALL behave exactly as the existing command-parsing pipeline behaves today, unmodified. Auto mode SHALL classify the input as either an Ask question or a Create command before routing to the corresponding pipeline.
+The command center SHALL offer a three-way mode selector — Ask, Create, Auto — as a single segmented control, subject to the "Ask and Auto are default-off" requirement below: in an ordinary build the selector offers Create only, and Ask and Auto appear only in a build that sets the `EXPO_PUBLIC_AI_ASK_INTERNAL_ROLLOUT` flag. Create mode SHALL behave exactly as the existing command-parsing pipeline behaves today, unmodified. Auto mode SHALL classify the input as either an Ask question or a Create command before routing to the corresponding pipeline.
 
 #### Scenario: User selects Ask mode and asks a question
 
@@ -22,6 +22,48 @@ The command center SHALL offer a three-way mode selector — Ask, Create, Auto �
 
 - **WHEN** the user leaves mode on Auto and submits "what's still pending today?"
 - **THEN** the system classifies the input as an Ask question and routes it to the Ask pipeline without the user manually switching modes.
+
+### Requirement: Ask and Auto are default-off
+
+The Ask and Auto command modes SHALL be hidden in an ordinary build. They SHALL
+become reachable only when the build-time rollout flag
+`EXPO_PUBLIC_AI_ASK_INTERNAL_ROLLOUT` is `true`, and no build SHALL enable that
+flag by default. Reachability SHALL be enforced at the render boundary so that a
+build without the flag cannot expose the mode selector, the Ask result view, or
+the Auto result view; a persisted `ask`/`auto` last-used mode SHALL resolve to
+Create rather than restoring a mode the selector cannot leave.
+
+#### Scenario: An ordinary build is run
+
+- **WHEN** the application is built without `EXPO_PUBLIC_AI_ASK_INTERNAL_ROLLOUT=true`
+- **THEN** the mode selector offers Create only, and no Ask or Auto view can be
+  rendered
+
+#### Scenario: A rollout build is run
+
+- **WHEN** the application is built with `EXPO_PUBLIC_AI_ASK_INTERNAL_ROLLOUT=true`
+- **THEN** Ask and Auto become reachable through the same selector with no
+  additional configuration
+
+#### Scenario: The flag constant is preserved but the render boundary regresses
+
+- **WHEN** a refactor keeps the flag constant false but renders the mode
+  selector unconditionally
+- **THEN** the executing coverage fails, because the assertion is on the
+  rendered surface rather than only on the constant's value
+
+### Requirement: No paid provider call is reachable without the rollout flag
+
+A build without `EXPO_PUBLIC_AI_ASK_INTERNAL_ROLLOUT=true` SHALL NOT issue a
+request to a paid model provider, and no paid provider credential SHALL be
+present in a client bundle.
+
+#### Scenario: A default build attempts an Ask
+
+- **WHEN** a user of a build without the rollout flag submits input through the
+  command center
+- **THEN** no paid provider request is issued and the Create path behaves exactly
+  as it does today
 
 ### Requirement: Auto-mode misroute offers a same-input retry in the other mode
 
@@ -39,7 +81,7 @@ When Auto mode routes an input to the wrong pipeline, the result view SHALL show
 
 ### Requirement: Last-used mode persists across sessions
 
-The system SHALL persist the last-used command mode to AsyncStorage under the key `superhabits.command.last-used-mode`, read on command-center launch and written whenever the user changes mode. Absent a stored value, the mode SHALL default to `"auto"`.
+The system SHALL persist the last-used command mode to AsyncStorage under the key `superhabits.command.last-used-mode`, read on command-center launch and written whenever the user changes mode. Absent a stored value, the mode SHALL default to `"auto"`. A stored or defaulted Ask/Auto value SHALL render as Create in a build where the rollout flag is not set, per the "Ask and Auto are default-off" requirement.
 
 #### Scenario: Returning user sees their last mode
 
