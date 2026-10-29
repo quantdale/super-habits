@@ -10,6 +10,7 @@ import {
   earnedMilestones,
   evaluateBadges,
   isFreezeAccountingInconsistent,
+  legacyActionSourceKeys,
   levelFromXp,
   pickCelebration,
   planAutoFreeze,
@@ -586,6 +587,20 @@ describe('action source keys', () => {
     expect(actionSourceKey('todo', 'todo_1', TODAY)).not.toBe(
       actionSourceKey('todo', 'todo_1', '2026-06-11'),
     );
+  });
+
+  // Upgrade compatibility: the pre-per-day build stored a todo award under the
+  // bare id. That row still exists after an update, so the legacy key is what
+  // the award path checks (against the row's own date_key) before paying the
+  // day-qualified key for the same completion.
+  it('names the legacy bare-id key for a todo and nothing for other kinds', () => {
+    expect(legacyActionSourceKeys('todo', 'todo_1')).toEqual(['todo_1']);
+    expect(legacyActionSourceKeys('todo', 'todo_1')).not.toContain(
+      actionSourceKey('todo', 'todo_1', TODAY),
+    );
+    for (const kind of ['habit', 'nutrition', 'focus', 'workout', 'plan', 'review'] as const) {
+      expect(legacyActionSourceKeys(kind, 'id_1')).toEqual([]);
+    }
   });
 });
 

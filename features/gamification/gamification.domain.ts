@@ -522,6 +522,24 @@ export function actionSourceKey(kind: ActionKind, entityId: string, dateKey: str
 }
 
 /**
+ * Source keys an EARLIER build used for the same real action.
+ *
+ * Before todos were keyed per day, a todo award was stored under the bare todo
+ * id. Those rows survive an upgrade, so the id-only key no longer matches the
+ * key this build computes and the same completion would be paid a second time
+ * on the first reconcile after the update. Callers check these keys against the
+ * row's own `date_key`, which is what makes the legacy row suppress only the
+ * day it already paid for: a genuine re-completion on a later day still earns.
+ *
+ * `habit` has always been day-scoped, `nutrition` is day-keyed, and
+ * `focus`/`workout`/`plan`/`review` are unchanged single-use ids, so `todo` is
+ * the only kind with a legacy form.
+ */
+export function legacyActionSourceKeys(kind: ActionKind, entityId: string): string[] {
+  return kind === 'todo' ? [entityId] : [];
+}
+
+/**
  * Whether today counts as a complete habit day.
  *
  * Two paths: a `perfect_day` event already recorded today (so the day stays
