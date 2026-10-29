@@ -7,6 +7,7 @@ import {
   canBankFreeze,
   computeActionReward,
   computeStreakSummary,
+  earnedMilestones,
   evaluateBadges,
   isFreezeAccountingInconsistent,
   levelFromXp,
@@ -521,6 +522,21 @@ describe('badges', () => {
       first.map((badge) => badge.id),
     );
     expect(second).toEqual([]);
+  });
+
+  it('orders the Latest milestone card by tier, not by raw threshold across families', () => {
+    // Repro: Silver Check-ins (threshold 250) vs Gold Workouts (threshold 100).
+    // Raw thresholds are incommensurable across families, so sorting by them
+    // buried the more advanced Gold tier behind a Silver one in the card the
+    // screen titles "Latest milestone" (the documented intent is "most
+    // advanced").
+    const states = buildBadgeStates({ ...EMPTY_STATS, habitCheckins: 250, workouts: 100 }, [
+      'habits:2',
+      'workouts:3',
+    ]);
+    const milestones = earnedMilestones(states);
+    expect(milestones.map((badge) => badge.id)).toEqual(['workouts:3', 'habits:2']);
+    expect(milestones[0].tier).toBeGreaterThan(milestones[1].tier);
   });
 
   it('keeps locked tiers visible with clamped progress', () => {

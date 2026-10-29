@@ -10,6 +10,7 @@ import { ScreenSection } from '@/core/ui/ScreenSection';
 import { SkeletonBlock } from '@/core/ui/SkeletonBlock';
 import { StatBlock } from '@/core/ui/StatBlock';
 import { BadgeGrid } from './BadgeGrid';
+import { earnedMilestones } from './gamification.domain';
 import { LevelHero } from './LevelHero';
 import { QuestRow } from './QuestRow';
 import { WeekStrip } from './WeekStrip';
@@ -28,21 +29,6 @@ function SectionHeading({ title, hint }: { title: string; hint?: string }) {
       ) : null}
     </View>
   );
-}
-
-/**
- * Highest earned tier per family, most recently relevant first. `BadgeState`
- * carries no earn timestamp, so "most advanced" is the honest ordering: the
- * highest threshold the user has actually reached.
- */
-function earnedMilestones(badges: readonly BadgeState[]): BadgeState[] {
-  const byFamily = new Map<string, BadgeState>();
-  for (const badge of badges) {
-    if (!badge.unlocked) continue;
-    const current = byFamily.get(badge.family);
-    if (!current || badge.threshold > current.threshold) byFamily.set(badge.family, badge);
-  }
-  return [...byFamily.values()].sort((a, b) => b.threshold - a.threshold);
 }
 
 /**
