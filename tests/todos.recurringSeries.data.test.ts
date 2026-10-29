@@ -196,8 +196,10 @@ describe('recurring series correction (features/todos/todos.data)', () => {
       // Every member of the series (active, completed, already deleted) loses
       // the marker — a surviving 'daily' row would resurrect via rollover.
       expect(cleared).toHaveLength(4);
-      const deletedFuture = cleared.filter((call: unknown[]) =>
-        String(call[0]).includes('deleted_at = ?'),
+      // The future copy is tombstoned through the shared dependent cleanup
+      // (removeTodoWithinTransaction), whose tombstone carries deleted_at.
+      const deletedFuture = db.runAsync.mock.calls.filter((call: unknown[]) =>
+        String(call[0]).includes('SET deleted_at = ?'),
       );
       expect(deletedFuture).toHaveLength(1);
       expect(deletedFuture[0][1]).toContain('todo_future');
