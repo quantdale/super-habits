@@ -100,10 +100,18 @@ Current developer-facing documentation SHALL state schema version, sync scope, p
 
 #### Scenario: Docs cite an old schema version
 
-Given `core/db/client.ts` contains migrations through v21,
-When documentation states the stored schema version,
-Then it states v21 with next free version >=22,
-And stale v15/v20 claims are corrected.
+Given `core/db/client.ts` defines `EXPECTED_SCHEMA_VERSION = 25` and its highest
+append-only migration block is `if (version < 25)`,
+When developer-facing documentation states the stored schema version as the
+current runtime contract,
+Then it states schema 25 with next append-only migration slot 26 and Backup
+Scope 7,
+And stale earlier claims are corrected rather than left standing as current
+(the historical v21 / "next free version >=22" and v15/v20 statements are
+examples of claims this scenario corrects),
+And a document that explicitly describes an earlier era remains free to name
+that era's schema version, provided it is not presented as the current runtime
+contract.
 
 ### Requirement: Recovery invariants are re-proven after changes
 
