@@ -22,6 +22,8 @@ export function useXpFloat() {
   const trigger = () => {
     if (reduced) {
       rise.value = 0;
+      // Restore visibility first so repeat awards on a mounted float still show.
+      opacity.value = 1;
       opacity.value = withTiming(0, { duration: MOTION_V2_DURATION.reducedFade });
       return;
     }

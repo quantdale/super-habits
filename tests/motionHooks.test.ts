@@ -323,6 +323,21 @@ describe('useXpFloat', () => {
       float.trigger();
       expect(float.rise.value).toBe(0);
       expect(timingCalls()).toEqual([{ api: 'withTiming', toValue: 0, config: { duration: 120 } }]);
+
+      // A second award on the same mounted float must start visible again.
+      const writes: unknown[] = [];
+      let current: unknown = float.opacity.value;
+      Object.defineProperty(float.opacity, 'value', {
+        configurable: true,
+        get: () => current,
+        set: (next: unknown) => {
+          writes.push(next);
+          current = next;
+        },
+      });
+      float.trigger();
+      expect(writes[0]).toBe(1);
+      expect(writes).toHaveLength(2);
     });
   });
 });
