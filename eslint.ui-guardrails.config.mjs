@@ -28,8 +28,7 @@ export default [
       'no-restricted-syntax': [
         'warn',
         {
-          selector:
-            "JSXAttribute[name.name='className'] Literal[value=/text-\\[[0-9]+px\\]/]",
+          selector: "JSXAttribute[name.name='className'] Literal[value=/text-\\[[0-9]+px\\]/]",
           message:
             'UI P0 guardrail: raw text-[Npx] className size literal — use core/ui/Text typography roles instead.',
         },
