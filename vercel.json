@@ -5,7 +5,6 @@
   "outputDirectory": "dist",
   "git": {
     "deploymentEnabled": {
-      "main": false,
       "snyk-fix-*": false,
       "campaign/*": false,
       "frontend-v3-*": false
