@@ -215,12 +215,25 @@ export type ApplyNextWeekSuggestionsResult = {
 
 export async function applyNextWeekPlanSuggestions(
   suggestions: NextWeekPlanSuggestion[],
+  options: {
+    /**
+     * Number of carry-forward candidates the caller offered to
+     * buildNextWeekPlanSuggestions BEFORE its cap truncated the list.
+     *
+     * Optional because the truncation is done by the pure builder: the ids that
+     * never made it into `suggestions` are unrecoverable from `suggestions`
+     * alone, so counting only its ids always reported 0 and the screen's
+     * "didn't fit" disclosure could never render.
+     */
+    candidateCount?: number;
+  } = {},
 ): Promise<ApplyNextWeekSuggestionsResult> {
   // Candidates beyond the suggestion cap never appear in `suggestions`; report
   // them so the UI can tell the user how many were left out.
   const uniqueCandidateCount = new Set(suggestions.flatMap((s) => s.todoIds)).size;
   const scheduledCandidateCount = suggestions.reduce((sum, s) => sum + s.todoIds.length, 0);
-  const truncatedCandidateCount = Math.max(0, uniqueCandidateCount - scheduledCandidateCount);
+  const truncationBasis = Math.max(uniqueCandidateCount, options.candidateCount ?? 0);
+  const truncatedCandidateCount = Math.max(0, truncationBasis - scheduledCandidateCount);
 
   const appliedDateKeys: string[] = [];
   const skipped: ApplyNextWeekSkipped[] = [];
