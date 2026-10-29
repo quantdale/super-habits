@@ -199,17 +199,17 @@ describe('appendAddedSets', () => {
       [2, 60],
       [3, 60],
       [4, 60],
-      [5, 0], // the new final set runs back-to-back
+      [5, 60], // the new final set inherits the prescribed rest
     ]);
     const sequence = buildTimerSequence(extended);
-    // Bench gains one active phase per added set plus the rest that the old
-    // final set now needs before them: 5 actives + 4 rests.
+    // Bench gains one active phase and one inter-set rest per added set:
+    // 5 actives + 5 rests (bench is not the session's last exercise).
     expect(
       sequence.filter((phase) => phase.exerciseIndex === 0 && phase.phase === 'active'),
     ).toHaveLength(5);
     expect(
       sequence.filter((phase) => phase.exerciseIndex === 0 && phase.phase === 'rest'),
-    ).toHaveLength(4);
+    ).toHaveLength(5);
     expect(sequence[sequence.length - 1].phase).toBe('active');
   });
 
@@ -247,6 +247,36 @@ describe('appendAddedSets', () => {
     expect(canAddSetToExercise(strengthExercises(), 0)).toBe(true);
     expect(canAddSetToExercise(strengthExercises(), 5)).toBe(false);
   });
+
+  it('an added final set keeps the inter-exercise rest before the next exercise', () => {
+    const extended = appendAddedSets(strengthExercises(), { 0: 1 });
+    // The added set becomes bench's new final set, but bench is not the
+    // session's last exercise: its final set still rests before Cable Row,
+    // exactly like bench's prescribed final set does.
+    expect(extended[0].sets[3].rest_seconds).toBe(60);
+    const sequence = buildTimerSequence(extended);
+    expect(
+      sequence.filter((phase) => phase.exerciseIndex === 0 && phase.phase === 'rest'),
+    ).toHaveLength(4);
+    expect(
+      sequence.find(
+        (phase) => phase.exerciseIndex === 0 && phase.phase === 'rest' && phase.setNumber === 4,
+      ),
+    ).toMatchObject({ durationSeconds: 60 });
+  });
+
+  it('an added set on the session-final exercise ends the workout with no trailing rest', () => {
+    const extended = appendAddedSets(strengthExercises(), { 1: 1 });
+    // Added sets inherit the prescribed rest; the engine's positional
+    // last-set rule suppresses rest after the true session-final set.
+    expect(extended[1].sets[2].rest_seconds).toBe(90);
+    const sequence = buildTimerSequence(extended);
+    expect(sequence[sequence.length - 1]).toMatchObject({
+      phase: 'active',
+      exerciseIndex: 1,
+      setNumber: 3,
+    });
+  });
 });
 
 describe('phase-index remap after an in-session add', () => {
@@ -255,12 +285,12 @@ describe('phase-index remap after an in-session add', () => {
     const after = buildTimerSequence(appendAddedSets(strengthExercises(), { 0: 1 }));
     const remap = remapPhaseIndices(before, after);
 
-    // bench phases keep their positions; the row exercise shifts by one.
+    // bench phases keep their positions; the row exercise shifts by two.
     expect(remap.get(0)).toBe(0);
     expect(remap.get(2)).toBe(2);
     expect(remap.get(4)).toBe(4);
-    expect(remap.get(6)).toBe(7);
-    expect(remap.get(8)).toBe(9);
+    expect(remap.get(6)).toBe(8);
+    expect(remap.get(8)).toBe(10);
     expect(remap.size).toBe(before.length);
 
     const dispositions: Record<number, PhaseDisposition> = { 0: 'completed', 2: 'skipped' };
