@@ -140,4 +140,25 @@ describe('todo bulk operations (real SQLite)', () => {
     );
     expect(planIntents.map((row) => row.operation)).toEqual(['update']);
   });
+
+  it('keeps top_todo_titles index-aligned when pruning a deleted top priority', async () => {
+    db = await freshDatabase();
+    const todos = await import('@/features/todos/todos.data');
+    const plans = await import('@/features/daily-plan/dailyPlan.data');
+
+    const a = await todos.addTodo({ title: 'Alpha' });
+    const b = await todos.addTodo({ title: 'Beta' });
+    const c = await todos.addTodo({ title: 'Gamma' });
+    await plans.upsertDailyPlan(toDateKey(), { topTodoIds: [a, b, c] });
+
+    await todos.removeTodo(a);
+
+    const planRow = await db.getFirstAsync<{ top_todo_ids: string; top_todo_titles: string }>(
+      `SELECT top_todo_ids, top_todo_titles FROM daily_plans WHERE deleted_at IS NULL`,
+    );
+    expect(JSON.parse(planRow!.top_todo_ids)).toEqual([b, c]);
+    // Index-aligned snapshot contract (dailyPlan.domain.parseTopTodoTitles): the
+    // pruned slot's title must go with it so the remaining ids keep THEIR titles.
+    expect(JSON.parse(planRow!.top_todo_titles)).toEqual(['Beta', 'Gamma']);
+  });
 });
