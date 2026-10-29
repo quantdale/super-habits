@@ -441,8 +441,14 @@ function AssociationSection({
           <IconButton
             icon="link-off"
             onPress={async () => {
-              await onUnlink(item.id);
-              await onChanged();
+              try {
+                await onUnlink(item.id);
+              } catch {
+                // Stale row (e.g. a goal soft-deleted elsewhere): the refresh
+                // below drops it; never leave an unhandled rejection.
+              } finally {
+                await onChanged();
+              }
             }}
             accessibilityLabel={`Unlink ${labelOf(item)}`}
           />
@@ -455,8 +461,14 @@ function AssociationSection({
           className="mb-2 flex-row items-center gap-2 rounded-xl border p-2"
           style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
           onPress={async () => {
-            await onLink(item.id);
-            await onChanged();
+            try {
+              await onLink(item.id);
+            } catch {
+              // Stale row (e.g. a goal soft-deleted elsewhere): the refresh
+              // below drops it; never leave an unhandled rejection.
+            } finally {
+              await onChanged();
+            }
           }}
         >
           <Text style={{ fontSize: 18 }}>•</Text>

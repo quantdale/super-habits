@@ -568,7 +568,7 @@ export function buildExerciseHistory(
   });
   points.sort((a, b) => a.completedAt.localeCompare(b.completedAt));
   return {
-    exerciseKey: record?.exerciseKey ?? ordered[0]?.catalogExerciseId ?? null,
+    exerciseKey: record?.exerciseKey ?? (ordered[0] ? exerciseHistoryKey(ordered[0]) : null),
     exerciseName: ordered[ordered.length - 1]?.exerciseName ?? '',
     sessions: sessions.size,
     performedSets: ordered.filter((entry) => entry.completed).length,
