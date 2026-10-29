@@ -27,7 +27,10 @@ export type KeyboardFocusRing = {
  * Two supporting pieces:
  * - a document-level pointerdown listener re-evaluates the *already focused*
  *   control, because pressing an already-focused element does not emit a new
- *   focus event but does change `:focus-visible`;
+ *   focus event but does change `:focus-visible`; likewise the first keydown
+ *   after pointer input re-evaluates it, because a user who clicks a control and
+ *   then switches to the keyboard without moving focus flips `:focus-visible`
+ *   to true without any new focus event;
  * - the ring is drawn *outside* the control (`outlineOffset: 3`, §5.7) so focus
  *   indication never changes the box the control occupies — geometry, touch
  *   targets and goldens stay put.
@@ -66,10 +69,27 @@ function notify(): void {
   for (const subscriber of subscribers) subscriber();
 }
 
+/**
+ * True after pointer input until a keydown has re-read `:focus-visible`, so
+ * ordinary typing (already keyboard modality) does not fan out to every hook.
+ */
+let pointerModality = false;
+
 function handlePointerDown(): void {
+  pointerModality = true;
   // Deferred so the platform has finished updating :focus-visible for the
   // pointer press before the ring re-reads it.
   queueMicrotask(notify);
+}
+
+function handleKeyDown(): void {
+  if (!pointerModality) return;
+  // Deferred like pointerdown: the platform flips :focus-visible on the
+  // keyboard interaction itself, then the focused control re-reads it.
+  queueMicrotask(() => {
+    if (isFocusVisible()) pointerModality = false;
+    notify();
+  });
 }
 
 function installListeners(): void {
@@ -77,12 +97,14 @@ function installListeners(): void {
   listenersInstalled = true;
   document.addEventListener('mousedown', handlePointerDown, true);
   document.addEventListener('touchstart', handlePointerDown, true);
+  document.addEventListener('keydown', handleKeyDown, true);
 }
 
 export function useKeyboardFocusRing(ringColor: string): KeyboardFocusRing {
   const isWeb = Platform.OS === 'web';
   // `ringVisible` is only meaningful while focused: it is the `:focus-visible`
-  // answer captured at focus time (and refreshed on pointer input).
+  // answer captured at focus time (and refreshed on pointer input and on the
+  // first keydown after pointer input).
   const [focused, setFocused] = useState(false);
   const [ringVisible, setRingVisible] = useState(true);
 
