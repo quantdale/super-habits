@@ -140,4 +140,57 @@ test.describe('Gamification', () => {
     await openSettingsScreen(page);
     await expect(page.getByText('All reward sounds are off.')).toBeVisible();
   });
+
+  /**
+   * The preference has to be *loaded on launch*, not only when Settings →
+   * Accessibility mounts. The first reward of a session is usually a habit
+   * check-off, which never opens Settings: while hydration only happened in
+   * the settings hook, that check-off still vibrated with the in-memory
+   * defaults and the stored "off" applied only after a settings visit.
+   */
+  test('a stored haptics-off choice applies to the first reward after a reload', async ({
+    page,
+  }) => {
+    // Count vibrations from the launch onward: `addInitScript` re-runs on every
+    // navigation, so the counter is fresh when the post-reload check-off lands.
+    await page.addInitScript(() => {
+      const state = { vibrations: 0 };
+      Object.defineProperty(window, '__rewardVibrations', { configurable: true, value: state });
+      Object.defineProperty(navigator, 'vibrate', {
+        configurable: true,
+        value: () => {
+          state.vibrations += 1;
+          return true;
+        },
+      });
+    });
+
+    await createHabit(page, HABIT);
+
+    await openSettingsScreen(page);
+    const hapticsOff = page.getByText('Haptics off', { exact: true });
+    await hapticsOff.scrollIntoViewIfNeeded();
+    await hapticsOff.click();
+    await expect(
+      page.getByText('Vibration feedback is off. Rewards are visual only.'),
+    ).toBeVisible();
+
+    // A fresh launch, then a reward WITHOUT visiting Settings.
+    await goToTab(page, 'habits');
+    await page.getByLabel(new RegExp(`${HABIT}: 0 of 1 today`)).click({ force: true });
+    await expect(page.getByLabel(new RegExp(`${HABIT}: 1 of 1 today`))).toBeVisible({
+      timeout: 10_000,
+    });
+    // The award (and therefore the feedback call) is async: synchronize on the
+    // celebration the same check-off unlocks, so a zero reading below means
+    // "the reward fired silently", not "the reward has not fired yet".
+    await expect(page.getByText(/Badge unlocked/)).toBeVisible({ timeout: 10_000 });
+    expect(
+      await page.evaluate(
+        () =>
+          (window as unknown as { __rewardVibrations: { vibrations: number } }).__rewardVibrations
+            .vibrations,
+      ),
+    ).toBe(0);
+  });
 });
