@@ -128,6 +128,15 @@ defineJourney({
         await expect(
           page.getByText('2000 kcal, 150g protein, 200g carbs, 65g fats.', { exact: true }),
         ).toBeVisible({ timeout: 15_000 });
+        // Stepper input contract: a decimal suffix is dropped instead of
+        // concatenated (10.5 -> 10) and typed values clamp to the field max
+        // (6000 kcal) as you type. Both fed as single input events (fill).
+        const caloriesInput = stepperInput(page, 'Calories (kcal)');
+        await caloriesInput.fill('10.5');
+        await expect(caloriesInput).toHaveValue('10');
+        await caloriesInput.fill('999999');
+        await expect(caloriesInput).toHaveValue('6000');
+
         await setNumberStepper(page, 'Calories (kcal)', '2400');
         await page.getByRole('button', { name: 'Save nutrition defaults' }).click();
         await expect(
