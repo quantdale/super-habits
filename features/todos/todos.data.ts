@@ -355,6 +355,10 @@ export async function createRecurringInstances(inputs: RecurringInstanceInput[])
 
   const db = await getDatabase();
 
+  // Copies inserted here are ordinary pending todos with a due date, so they
+  // schedule their own device reminder below (F2), exactly like `addTodo`.
+  const spawned: TodoReminderSnapshot[] = [];
+
   // One transaction for the whole batch: the MAX(sort_order) baseline is read
   // inside it and each insert takes the next slot, so a concurrent manual add
   // or a parallel batch can never interleave between reads and inserts (F9).
@@ -399,12 +403,21 @@ export async function createRecurringInstances(inputs: RecurringInstanceInput[])
         );
         if (result.changes === 1) {
           inserted += 1;
+          spawned.push({ id, title: input.title, dueDate: input.dueDate, completedAt: null });
           enqueue({ entity: 'todos', id, updatedAt: now, operation: 'create' });
         }
       }
       return { changed: inserted > 0, value: inserted };
     },
   });
+
+  // F2: the spawn used to skip the reminder sync, so the next day's copy had no
+  // device reminder until the next bootstrap/foreground reconcile. Best-effort:
+  // a scheduler failure must never fail the spawn (the row and outbox intent are
+  // already committed).
+  for (const copy of spawned) {
+    await syncReminderSafely(copy);
+  }
 }
 
 export async function getRecurringTodosByIds(recurrenceIds: string[]): Promise<Todo[]> {

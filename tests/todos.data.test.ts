@@ -84,6 +84,20 @@ vi.mock('@/core/sync/sync.engine', () => ({
   syncEngine,
 }));
 
+// F2: a spawned recurring copy is created behind `addTodo`, so it must schedule
+// its own device reminder exactly like `addTodo` does.
+const reminderSchedulerMocks = vi.hoisted(() => ({
+  syncTodoDueReminder: vi.fn(),
+  cancelTodoReminderSafely: vi.fn(),
+  cancelTodoDueReminder: vi.fn(),
+}));
+
+vi.mock('@/core/notifications/todoReminderScheduler', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/core/notifications/todoReminderScheduler')>()),
+  syncTodoDueReminder: reminderSchedulerMocks.syncTodoDueReminder,
+  cancelTodoReminderSafely: reminderSchedulerMocks.cancelTodoReminderSafely,
+}));
+
 vi.mock('@/lib/time', async () => {
   const actual = await vi.importActual<typeof import('@/lib/time')>('@/lib/time');
   return {
@@ -297,6 +311,56 @@ describe('features/todos/todos.data', () => {
       },
       { durablyPersisted: true },
     );
+  });
+
+  it('schedules the device reminder for a spawned recurring instance (F2)', async () => {
+    const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
+      getFirstAsync: vi.fn(),
+      runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
+    };
+    getDatabase.mockResolvedValue(db);
+    reminderSchedulerMocks.syncTodoDueReminder.mockResolvedValue({ status: 'scheduled' });
+
+    await createRecurringInstance({
+      title: 'Daily review',
+      notes: null,
+      priority: 'normal',
+      recurrenceId: 'rec_1',
+      dueDate: '2026-04-17',
+    });
+
+    expect(reminderSchedulerMocks.syncTodoDueReminder).toHaveBeenCalledTimes(1);
+    expect(reminderSchedulerMocks.syncTodoDueReminder).toHaveBeenCalledWith({
+      id: expect.stringMatching(/^todo_/),
+      title: 'Daily review',
+      dueDate: '2026-04-17',
+      completedAt: null,
+    });
+  });
+
+  it('never fails the spawn when reminder scheduling throws (F2)', async () => {
+    const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
+      getFirstAsync: vi.fn(),
+      runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
+    };
+    getDatabase.mockResolvedValue(db);
+    reminderSchedulerMocks.syncTodoDueReminder.mockRejectedValue(new Error('scheduler down'));
+
+    await expect(
+      createRecurringInstance({
+        title: 'Daily review',
+        notes: null,
+        priority: 'normal',
+        recurrenceId: 'rec_1',
+        dueDate: '2026-04-17',
+      }),
+    ).resolves.toBeUndefined();
   });
 
   it('rejects saving non-empty source rules for recurring todos based on persisted row', async () => {
