@@ -225,7 +225,6 @@ describe('carry-forward selection seeding', () => {
       selection: ['todo_1'],
       planIdsBeforeCarry: ['todo_1'],
       planIdsAfterCarry: ['todo_1', 'todo_2'],
-      deselectedIds: [],
     });
     expect(press1).toEqual(['todo_1', 'todo_2']);
 
