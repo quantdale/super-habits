@@ -1268,7 +1268,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   const allowsExternalLoad = descriptorPhase.supportsExternalLoad !== false;
   const targetText = isLoadBased
     ? [
-        descriptorPhase.targetLoad != null ? `target ${descriptorPhase.targetLoad} kg` : null,
+        descriptorPhase.targetLoad != null
+          ? `target ${descriptorPhase.targetLoad} ${weightUnit}`
+          : null,
         descriptorPhase.targetRepsMin != null || descriptorPhase.targetRepsMax != null
           ? `${descriptorPhase.targetRepsMin ?? descriptorPhase.targetRepsMax}–${descriptorPhase.targetRepsMax ?? descriptorPhase.targetRepsMin} reps`
           : null,
@@ -1431,7 +1433,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   /** Read-only display of a recorded set row. */
   const renderRecordedSet = (row: SetRow) => {
     const parts: string[] = [];
-    if (row.entered.weight) parts.push(`${row.entered.weight} kg`);
+    if (row.entered.weight) parts.push(`${row.entered.weight} ${weightUnit}`);
     if (row.entered.reps)
       parts.push(`${row.entered.reps}${row.phase.unilateral ? '/side' : ''} reps`);
     if (row.entered.duration) parts.push(`${row.entered.duration}s`);
@@ -1509,7 +1511,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
               style={{ color: tokens.successText }}
               numberOfLines={2}
             >
-              {`PR! ${prNotice.exerciseName} · est. ${formatMetricNumber(prNotice.estimated1RM)} kg`}
+              {`PR! ${prNotice.exerciseName} · est. ${formatMetricNumber(prNotice.estimated1RM)} ${weightUnit}`}
             </Text>
             <Pressable
               onPress={dismissPrNotice}
