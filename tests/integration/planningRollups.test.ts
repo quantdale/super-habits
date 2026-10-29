@@ -130,6 +130,39 @@ describe('goal rollups (F8 / task 11.1)', () => {
     expect(yearRollup.habits.habitCount).toBe(1);
   });
 
+  it('scheduled-habit consistency denominator counts only scheduled days in the window', async () => {
+    const db = await freshDatabase();
+    const goals = await import('@/features/goals/goals.data');
+    const habits = await import('@/features/habits/habits.data');
+
+    const goalId = await goals.addGoal({ title: 'Scheduled denominator', horizon: 'month' });
+    const habitId = await habits.addHabit('Weekday habit', 1);
+    // Backdate the habit (>30 days) with a weekdays-only schedule so the
+    // 30-day window contains rest days that must stay out of the denominator.
+    const { createHabitRule } = await import('@/features/habits/habits.domain');
+    await db.runAsync('UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?', [
+      new Date(`${shiftKey(TODAY, -40)}T12:00:00`).toISOString(),
+      JSON.stringify([createHabitRule(shiftKey(TODAY, -40), [1, 2, 3, 4, 5], 1)]),
+      habitId,
+    ]);
+    await habits.setHabitProjectGoal(habitId, { goalId });
+
+    // Expected = Mon-Fri local days inside the inclusive 30-day window,
+    // computed from the date keys (weekday-dependent, never hardcoded).
+    let expectedScheduledDays = 0;
+    for (let offset = 29; offset >= 0; offset -= 1) {
+      const [y, m, d] = shiftKey(TODAY, -offset).split('-').map(Number);
+      const jsWeekday = new Date(y, m - 1, d).getDay(); // 0=Sun..6=Sat
+      const habitWeekday = ((jsWeekday + 6) % 7) + 1; // 1=Mon..7=Sun
+      if (habitWeekday <= 5) expectedScheduledDays += 1;
+    }
+
+    const rollup = await goals.getGoalRollup(goalId);
+    expect(rollup.habits.habitCount).toBe(1);
+    expect(rollup.habits.expectedOccurrences).toBe(expectedScheduledDays);
+    expect(rollup.habits.expectedOccurrences).toBeLessThan(30);
+  });
+
   it('listHabitsForGoal returns only non-deleted linked habits', async () => {
     await freshDatabase();
     const goals = await import('@/features/goals/goals.data');
