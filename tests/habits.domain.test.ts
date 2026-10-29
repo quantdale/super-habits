@@ -132,6 +132,37 @@ describe('buildDayCompletions', () => {
     expect(buildDayCompletions([], 1, 30)).toHaveLength(30);
   });
 
+  it('anchors the requested N-day window at the injected todayKey, not the wall clock', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-30T12:00:00'));
+    try {
+      // The reward layer resolves a PAST action day (midnight-crossing
+      // backfill / per-day XP keys) through the same one-day scheduler read it
+      // uses for today. A wall-clock-anchored window silently resolves the
+      // WRONG local day: the past day's completions miss the map, so the day
+      // reads incomplete (or unscheduled) and "every habit done" disagrees
+      // with the Habits rings.
+      const result = buildDayCompletions(
+        [completion('habit_test', '2026-10-29', 1)],
+        1,
+        1,
+        [createHabitRule('2026-01-01', ALL_HABIT_WEEKDAYS, 1)],
+        undefined,
+        '2026-10-29',
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        dateKey: '2026-10-29',
+        count: 1,
+        scheduled: true,
+        eligible: true,
+        completed: true,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('marks scheduled completion against the target active on that date', () => {
     const today = toDateKey();
     const result = buildDayCompletions([completion('habit_test', today, 2)], 1, 1, [
