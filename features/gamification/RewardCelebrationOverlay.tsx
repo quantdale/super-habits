@@ -31,7 +31,7 @@ import type { CelebrationTier } from './gamification.types';
  */
 
 const CONFETTI_COUNT = 24;
-/** Long enough to read one line, short enough to stay out of the way. */
+/** Long enough to read one line, short enough to stay out of the way. The duration contract is pinned behaviorally in `tests/rewardCelebrationOverlay.test.ts` (spy on the scheduled auto-dismiss). */
 const AUTO_DISMISS_MS = 2800;
 
 type TierVisual = {
