@@ -380,6 +380,10 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
   // wide layouts use space intentionally instead of stretching a phone stack
   // (W5: defect SUR-02).
   const isWideLayout = width >= 1024;
+  // Phone/tablet widths (360–599): the streak/XP chips move to their own row
+  // under the title so the date and greeting never wrap (P11 r2). At ≥600 the
+  // P10 inline header still applies.
+  const isNarrowHeader = width < 600;
 
   return (
     <View className="flex-1" style={{ backgroundColor: tokens.background }}>
@@ -420,15 +424,24 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
                 <Text
                   variant="label"
                   tone="muted"
-                  style={{ letterSpacing: 1.2, textTransform: 'uppercase' }}
+                  numberOfLines={1}
+                  style={{ letterSpacing: 0.8, textTransform: 'uppercase' }}
                 >
                   {todayHeading}
                 </Text>
-                <Text variant="titleLg">{greeting}</Text>
+                <Text
+                  variant="titleLg"
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.9}
+                >
+                  {greeting}
+                </Text>
               </View>
               <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
-                {/* P10 (§7 Shell): Streak + XP chips live in the Today header. */}
-                <ShellRewardChips />
+                {/* P10 (§7 Shell): Streak + XP chips live in the Today header —
+                    inline at ≥600, their own row under the title below it. */}
+                {isNarrowHeader ? null : <ShellRewardChips />}
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={isCustomizing ? 'Done customizing' : 'Customize dashboard'}
@@ -474,6 +487,12 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
                 </Pressable>
               </View>
             </View>
+
+            {isNarrowHeader ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <ShellRewardChips />
+              </View>
+            ) : null}
 
             <Pressable
               accessibilityRole="button"
