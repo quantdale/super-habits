@@ -342,13 +342,20 @@ describe('buildTodoRowMeta (W6 row metadata hierarchy)', () => {
 });
 
 describe('shouldAwardTodoFastPath (confirmed-completion gate)', () => {
-  it('awards confirmed completions', () => {
-    expect(shouldAwardTodoFastPath(1)).toBe(true);
+  it('awards confirmed completions on the award day', () => {
+    expect(shouldAwardTodoFastPath(1, '2026-03-10', '2026-03-10')).toBe(true);
   });
 
   it('refuses failed or non-completed toggles (no phantom XP)', () => {
     // toggleTodo returns completed 0 (not a throw) for missing/deleted rows
     // and lost races, and for the un-complete direction.
-    expect(shouldAwardTodoFastPath(0)).toBe(false);
+    expect(shouldAwardTodoFastPath(0, '2026-03-10', '2026-03-10')).toBe(false);
+  });
+
+  it('refuses a completion that does not belong to the award day (midnight straddle)', () => {
+    // The write stamped completed_at on day D but the award re-read the day
+    // after local midnight: awarding under D+1 would double-pay against
+    // reconcile's `${D}:${todoId}` key and light a zero-activity streak day.
+    expect(shouldAwardTodoFastPath(1, '2026-03-10', '2026-03-11')).toBe(false);
   });
 });
