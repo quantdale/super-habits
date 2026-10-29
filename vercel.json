@@ -1,10 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build:web",
+  "ignoreCommand": "sh scripts/vercel-ignore-build.sh",
   "outputDirectory": "dist",
   "git": {
     "deploymentEnabled": {
-      "main": false
+      "main": false,
+      "snyk-fix-*": false,
+      "campaign/*": false,
+      "frontend-v3-*": false
     }
   },
   "rewrites": [
