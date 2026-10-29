@@ -6,7 +6,6 @@ import {
   BACKUP_SETTINGS_VERSION,
   backupEntityColumnsForScope,
   BACKUP_SCOPE_V4_ENTITY_COLUMNS,
-  BACKUP_SCOPE_V5_ENTITY_COLUMNS,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V2_ENTITY_SET,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V3_ENTITY_SET,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET,
@@ -331,7 +330,7 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
       : isHistoricalScope6
         ? backupEntityColumnsForScope(6)
         : isHistoricalScope5
-          ? (BACKUP_SCOPE_V5_ENTITY_COLUMNS as Record<BackupEntity, readonly string[]>)
+          ? backupEntityColumnsForScope(5)
           : (BACKUP_SCOPE_V4_ENTITY_COLUMNS as Record<BackupEntity, readonly string[]>);
   }
 
