@@ -486,8 +486,9 @@ describe('durable lifecycle interval history', () => {
 
   it('applyHabitLifecycleTransition closes the open interval on resume/unarchive', () => {
     const paused = [{ status: 'paused' as const, from_date_key: '2026-08-10', to_date_key: null }];
+    // The resume day is active again, so the interval closes the day before it.
     expect(applyHabitLifecycleTransition(paused, 'active', '2026-08-15')).toEqual([
-      { status: 'paused', from_date_key: '2026-08-10', to_date_key: '2026-08-15' },
+      { status: 'paused', from_date_key: '2026-08-10', to_date_key: '2026-08-14' },
     ]);
     // Resuming with no open interval is a harmless no-op.
     expect(
@@ -497,6 +498,39 @@ describe('durable lifecycle interval history', () => {
         '2026-08-15',
       ),
     ).toEqual([{ status: 'paused', from_date_key: '2026-08-10', to_date_key: '2026-08-12' }]);
+  });
+
+  it('keeps the resume/unarchive day scheduled and actionable', () => {
+    const mwf = [1, 2, 3, 4, 5, 6, 7] as const;
+    const rules = [createHabitRule('2026-08-01', mwf, 1)];
+    const paused = applyHabitLifecycleTransition([], 'paused', '2026-08-10');
+    const resumed = applyHabitLifecycleTransition(paused, 'active', '2026-08-14');
+
+    // Paused days stay masked; the day the user resumes is not.
+    expect(isHabitActionableOn(rules, '2026-08-13', 1, '2026-08-01', resumed)).toBe(false);
+    expect(isHabitActionableOn(rules, '2026-08-14', 1, '2026-08-01', resumed)).toBe(true);
+
+    const days = buildDayCompletions([], 1, undefined, rules, '2026-08-01', '2026-08-14', resumed);
+    // The resume day is back in the today denominator (no false rest day).
+    expect(days.find((day) => day.dateKey === '2026-08-14')?.scheduled).toBe(true);
+    // Paused days stay neutral so they bridge instead of breaking a streak.
+    expect(days.find((day) => day.dateKey === '2026-08-11')?.scheduled).toBe(false);
+  });
+
+  it('leaves no masked interval when a pause and resume happen on the same day', () => {
+    const paused = applyHabitLifecycleTransition([], 'paused', '2026-08-14');
+    const resumed = applyHabitLifecycleTransition(paused, 'active', '2026-08-14');
+    expect(resumed).toEqual([]);
+    expect(isHabitLifecycleMaskedOn(resumed, '2026-08-14')).toBe(false);
+    expect(
+      isHabitActionableOn(
+        [createHabitRule('2026-08-01', ALL_HABIT_WEEKDAYS, 1)],
+        '2026-08-14',
+        1,
+        '2026-08-01',
+        resumed,
+      ),
+    ).toBe(true);
   });
 
   it('applyHabitLifecycleTransition archiving closes an open pause first', () => {

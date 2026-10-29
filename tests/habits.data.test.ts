@@ -645,9 +645,49 @@ describe('features/habits/habits.data — durable lifecycle transitions', () => 
     expect(update).toBeDefined();
     const [status, historyJson] = update![1];
     expect(status).toBe('active');
+    // The resume day is active again, so the pause interval ends the day before.
     expect(JSON.parse(historyJson as string)).toEqual([
-      { status: 'paused', from_date_key: '2026-08-01', to_date_key: '2026-08-10' },
+      { status: 'paused', from_date_key: '2026-08-01', to_date_key: '2026-08-09' },
     ]);
+  });
+
+  it('accepts a check-in on the day a habit is resumed', async () => {
+    const db = {
+      withTransactionAsync: async (task: () => Promise<void>) => {
+        await task();
+      },
+      getFirstAsync: vi
+        .fn()
+        // Habit read: active again, pause interval closed the day before.
+        .mockResolvedValueOnce({
+          name: 'Hydrate',
+          target_per_day: 1,
+          created_at: '2026-04-01T00:00:00.000Z',
+          rule_history: JSON.stringify([
+            {
+              effective_from_date: '2026-04-01',
+              weekdays: [1, 2, 3, 4, 5, 6, 7],
+              target_per_day: 1,
+            },
+          ]),
+          status: 'active',
+          lifecycle_history: JSON.stringify([
+            { status: 'paused', from_date_key: '2026-08-01', to_date_key: '2026-08-09' },
+          ]),
+        })
+        .mockResolvedValueOnce({ id: 'hcmp_1', count: 1 })
+        .mockResolvedValue(null),
+      runAsync: vi.fn().mockResolvedValue(undefined),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    await expect(incrementHabit('habit_1', '2026-08-10')).resolves.toEqual({
+      count: 1,
+      linkedActions: { matchedRuleCount: 0, notices: [] },
+    });
+    expect(
+      db.getFirstAsync.mock.calls.some(([sql]) => (sql as string).includes('INSERT INTO')),
+    ).toBe(true);
   });
 
   it('archiveHabit closes an open pause and opens the archive interval', async () => {

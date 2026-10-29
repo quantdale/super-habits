@@ -3,6 +3,7 @@ import type { HabitLifecycleInterval, HabitLifecycleStatus } from '@/core/db/typ
 import type { HeatmapDay } from '@/features/shared/activityTypes';
 import { computeStreakRun, type StreakRunDay } from './habitStreak.domain';
 import {
+  addLocalDays,
   buildDateRangeOldestFirst,
   dateKeyToLocalDate,
   timestampToLocalDateKey,
@@ -225,9 +226,12 @@ export function serializeHabitLifecycleHistory(value: HabitLifecycleHistoryInput
  * Apply a lifecycle transition to an interval history. Intervals are inclusive
  * on both bounds; `to_date_key === null` marks the ongoing interval.
  * - Entering paused/archived closes any open interval at `dateKey` (archiving
- *   therefore also closes an open pause) and opens the matching one.
- * - Returning to active just closes open intervals — active is the default
- *   state and records no interval of its own.
+ *   therefore also closes an open pause) and opens the matching one; the habit
+ *   is already inactive on `dateKey` itself.
+ * - Returning to active closes the open interval the day BEFORE `dateKey`: the
+ *   habit resumes on `dateKey` inclusive, so that day is scheduled and
+ *   actionable again. A same-day pause + resume closes an empty interval and
+ *   therefore leaves none behind.
  * Idempotent: re-entering the current state leaves the history unchanged.
  */
 export function applyHabitLifecycleTransition(
@@ -238,9 +242,15 @@ export function applyHabitLifecycleTransition(
   const intervals = parseHabitLifecycleHistory(history);
 
   if (nextStatus === 'active') {
-    return intervals.map((interval) =>
-      interval.to_date_key === null ? { ...interval, to_date_key: dateKey } : interval,
-    );
+    const lastCoveredDateKey = addLocalDays(dateKey, -1);
+    return intervals.flatMap((interval) => {
+      if (interval.to_date_key !== null) return [interval];
+      // Masking uses inclusive bounds, so closing earlier leaves the resume day
+      // actionable; an interval that closes before it opens covered no day.
+      return lastCoveredDateKey < interval.from_date_key
+        ? []
+        : [{ ...interval, to_date_key: lastCoveredDateKey }];
+    });
   }
 
   const alreadyInState = intervals.some(
