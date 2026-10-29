@@ -14,7 +14,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { Text } from '@/core/ui/Text';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 import { dialogA11yProps } from '@/core/ui/dialogA11y';
-import { elevation, layers, layout, radius, size, spacing } from '@/core/theme/designTokens';
+import { layers, layout, radius, sheetDepth, size, spacing } from '@/core/theme/designTokens';
 import { useReducedMotion } from '@/core/theme/motion';
 
 export type ModalLayout = 'dialog' | 'drawer' | 'bottom-sheet';
@@ -55,9 +55,10 @@ const MODAL_FOOTER_HEIGHT_RESERVE = 88;
  *
  * Anatomy contract, verified against the V3 spec: scrim (`overlayScrim`),
  * title row, one consistent close control (48pt target), 24pt body padding,
- * footer actions pinned above the keyboard/safe area, level-3 elevation,
- * radius 24 panels, and reduced-motion support (the entrance spring is
- * skipped entirely when reduced motion is requested).
+ * footer actions pinned above the keyboard/safe area, P3 floating-surface
+ * depth (`sheetDepth`: level-3 lift in light, `surfaceElevated` + 2px border
+ * in dark — no blur halo), radius 28 panels, and reduced-motion support (the
+ * entrance spring is skipped entirely when reduced motion is requested).
  */
 export function Modal({
   visible,
@@ -70,7 +71,7 @@ export function Modal({
   modalLayout = 'dialog',
   footer,
 }: ModalProps) {
-  const { tokens } = useAppTheme();
+  const { tokens, resolvedTheme } = useAppTheme();
   const reducedMotion = useReducedMotion();
   const closeFocusRing = useKeyboardFocusRing(tokens.accent);
   const insets = useSafeAreaInsets();
@@ -162,8 +163,14 @@ export function Modal({
                 paddingBottom: isBottomSheet ? Math.max(modalBottomInset, spacing.lg) : 0,
                 maxHeight: isBottomSheet ? '92%' : '86%',
                 ...(isBottomSheet ? sheetRadius : null),
-                ...elevation.level3,
-                shadowColor: tokens.shadowColor,
+                ...sheetDepth(
+                  {
+                    border: tokens.border,
+                    borderStrong: tokens.borderStrong,
+                    surfaceElevated: tokens.surfaceElevated,
+                  },
+                  resolvedTheme,
+                ),
                 opacity: progress,
                 transform: isBottomSheet
                   ? [{ translateY }]
@@ -198,7 +205,7 @@ export function Modal({
             >
               <View style={{ minWidth: 0, flex: 1 }}>
                 {title ? (
-                  <Text variant="titleMd" numberOfLines={2}>
+                  <Text variant="titleMd" numberOfLines={2} style={{ textAlign: 'center' }}>
                     {title}
                   </Text>
                 ) : null}
@@ -286,9 +293,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: layout.modalMaxWidth + 60,
     alignSelf: 'center',
-    borderWidth: 1,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
+    borderRadius: radius.xl,
     overflow: 'hidden',
     zIndex: layers.modal,
   },

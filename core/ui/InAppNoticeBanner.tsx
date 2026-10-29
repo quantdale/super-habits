@@ -45,16 +45,16 @@ export function InAppNoticeBanner() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={payload.message}
-          className="overflow-hidden rounded-2xl border"
+          className="overflow-hidden"
           onPress={handlePress}
           style={{
-            borderColor: noticeAccent,
+            // §5.7 depth: 2px ring + solid lip edge — no blur shadow.
+            borderRadius: 20,
+            borderWidth: 2,
+            borderColor: tokens.border,
+            borderBottomWidth: 4,
+            borderBottomColor: tokens.borderStrong,
             backgroundColor: tokens.surface,
-            shadowColor: tokens.shadowColor,
-            shadowOffset: { width: 0, height: 8 },
-            shadowOpacity: 0.12,
-            shadowRadius: 16,
-            elevation: 6,
           }}
         >
           <View className="flex-row items-start gap-3 px-4 py-3">

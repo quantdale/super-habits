@@ -77,15 +77,15 @@ export function UpdateAvailableBanner() {
   return (
     <View pointerEvents="box-none" className="absolute inset-x-0 bottom-0 z-[90] px-3 pb-3">
       <View
-        className="flex-row items-center gap-3 rounded-2xl border px-4 py-3"
+        className="flex-row items-center gap-3 px-4 py-3"
         style={{
-          borderColor: tokens.accent,
+          // §5.7 depth: 2px ring + solid lip edge — no blur shadow.
+          borderRadius: 20,
+          borderWidth: 2,
+          borderColor: tokens.border,
+          borderBottomWidth: 4,
+          borderBottomColor: tokens.borderStrong,
           backgroundColor: tokens.surface,
-          shadowColor: tokens.shadowColor,
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.12,
-          shadowRadius: 16,
-          elevation: 6,
         }}
       >
         <View
