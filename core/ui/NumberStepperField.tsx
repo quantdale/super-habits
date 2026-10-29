@@ -1,6 +1,7 @@
 import { Text } from '@/core/ui/Text';
 import { Pressable, TextInput, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { sanitizeStepperInput } from '@/core/ui/stepperInput';
 
 type NumberStepperFieldProps = {
   label: string;
@@ -25,7 +26,7 @@ export function NumberStepperField({
   const num = Number(value);
   const validNum = Number.isFinite(num) ? num : min;
   const handleChangeText = (nextValue: string) => {
-    onChange(nextValue.replace(/\D/g, ''));
+    onChange(sanitizeStepperInput(nextValue, max));
   };
 
   const handleMinus = () => {
