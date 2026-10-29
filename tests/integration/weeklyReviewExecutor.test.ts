@@ -183,6 +183,35 @@ describe('applyNextWeekPlanSuggestions structured outcomes (F4)', () => {
     expect(day2?.top_todo_ids ? JSON.parse(day2.top_todo_ids) : []).toEqual([day2a]);
   });
 
+  it('reports the candidates the 21-slot suggestion cap actually dropped', async () => {
+    await freshDatabase();
+    const apply = await import('@/features/weekly-review/weeklyReview.applyNextWeek');
+    const { buildNextWeekPlanSuggestions } =
+      await import('@/features/weekly-review/weeklyReview.domain');
+    const todos = await import('@/features/todos/todos.data');
+
+    // 25 carry-forward candidates: the suggestion builder caps the week at
+    // 3/day x 7 days = 21 slots, so 4 can never be scheduled. The caller must
+    // be told about those 4 — otherwise the screen's "didn't fit" disclosure can
+    // never render and the user is told the whole set was applied.
+    const candidateTodoIds: string[] = [];
+    for (let i = 0; i < 25; i++) {
+      candidateTodoIds.push(await todos.addTodo({ title: `carry-${i}` }));
+    }
+    const suggestions = buildNextWeekPlanSuggestions({
+      candidateTodoIds,
+      nextWeekStartDateKey: WEEK.nextWeekStartDateKey,
+    });
+    expect(suggestions.reduce((sum, s) => sum + s.todoIds.length, 0)).toBe(21);
+
+    const result = await apply.applyNextWeekPlanSuggestions(suggestions, {
+      candidateCount: candidateTodoIds.length,
+    });
+
+    expect(result.addedCount).toBe(21);
+    expect(result.truncatedCandidateCount).toBe(4);
+  });
+
   it('counts candidates truncated by the suggestion cap and records invalid days as failed', async () => {
     await freshDatabase();
     const apply = await import('@/features/weekly-review/weeklyReview.applyNextWeek');

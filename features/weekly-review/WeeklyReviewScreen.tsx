@@ -185,7 +185,9 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
   const handleApplyNextWeek = useCallback(async () => {
     setApplyStatus('applying');
     try {
-      const result = await applyNextWeekPlanSuggestions(nextWeekSuggestions);
+      const result = await applyNextWeekPlanSuggestions(nextWeekSuggestions, {
+        candidateCount: carryForwardTodoIds.length,
+      });
       setApplyStatus('applied');
       const parts: string[] = [];
       if (result.addedCount === 0) {
@@ -208,7 +210,7 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
       setApplyStatus('error');
       setApplyMessage(e instanceof Error ? e.message : 'Failed to apply suggestions');
     }
-  }, [nextWeekSuggestions]);
+  }, [nextWeekSuggestions, carryForwardTodoIds.length]);
 
   const historyToggle = (
     <Pressable
