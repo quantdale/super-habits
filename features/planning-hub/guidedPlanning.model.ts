@@ -84,9 +84,10 @@ export function buildGuidedPlanDraft(
 
 /**
  * Merge ids newly written by carry-forward into the current selection. Only
- * the delta against the plan captured at flow open is added, so re-pressing
- * "Carry forward" (idempotent write) can never resurrect an item the user
- * deliberately deselected. Bounded by MAX_TOP_PRIORITIES via addTopTodoId.
+ * the delta against the plan captured at flow open is added, and ids the user
+ * has deliberately deselected (`deselectedIds`) are never re-added, so
+ * re-pressing "Carry forward" (idempotent write) can never resurrect an item
+ * the user deliberately removed. Bounded by MAX_TOP_PRIORITIES via addTopTodoId.
  */
 export function applyCarriedForwardSelection(input: {
   selection: string[];
@@ -94,9 +95,16 @@ export function applyCarriedForwardSelection(input: {
   planIdsBeforeCarry: string[];
   /** Today's plan ids re-read after carryForwardFromPreviousDay succeeded. */
   planIdsAfterCarry: string[];
+  /**
+   * Ids the user explicitly removed from the selection this session. A repeat
+   * carry press re-detects them as "newly carried" against the stale open
+   * baseline; this list is what keeps them out.
+   */
+  deselectedIds?: readonly string[];
 }): string[] {
+  const deselected = new Set(input.deselectedIds ?? []);
   const before = new Set(input.planIdsBeforeCarry);
-  const carriedNew = input.planIdsAfterCarry.filter((id) => !before.has(id));
+  const carriedNew = input.planIdsAfterCarry.filter((id) => !before.has(id) && !deselected.has(id));
   return carriedNew.reduce((acc, id) => addTopTodoId(acc, id), [...input.selection]);
 }
 
