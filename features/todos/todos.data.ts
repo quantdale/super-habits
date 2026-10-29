@@ -810,11 +810,18 @@ export async function stopRecurringSeries(recurrenceId: string): Promise<void> {
         const endsFuture =
           member.completed === 0 && member.due_date !== null && member.due_date > todayKey;
         if (endsFuture) {
-          await transactionDb.runAsync(
-            `UPDATE todos SET recurrence = NULL, deleted_at = ?, updated_at = ? WHERE id = ?`,
-            [now, now, member.id],
-          );
-          enqueue({ entity: 'todos', id: member.id, updatedAt: now, operation: 'delete' });
+          // F2: the tombstone must run through the shared dependent cleanup
+          // (daily-plan top-priority prune + linked-action rules in both
+          // directions) exactly like removeTodo — a direct UPDATE leaves ghost
+          // plan priorities and live rules bound to the dead copy. The
+          // recurrence marker is cleared in the same pass.
+          await transactionDb.runAsync(`UPDATE todos SET recurrence = NULL WHERE id = ?`, [
+            member.id,
+          ]);
+          const removed = await removeTodoWithinTransaction(transactionDb, member.id, now, enqueue);
+          if (removed) {
+            enqueue({ entity: 'todos', id: member.id, updatedAt: now, operation: 'delete' });
+          }
         } else {
           await transactionDb.runAsync(
             `UPDATE todos SET recurrence = NULL, updated_at = ? WHERE id = ?`,

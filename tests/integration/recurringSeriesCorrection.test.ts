@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { toDateKey } from '@/lib/time';
 import { freshDatabase, type TestDatabase } from './helpers/db';
 
 /**
@@ -122,6 +123,89 @@ describe('recurring series correction (real SQLite)', () => {
     const futureCopy = remaining.find((row) => row.completed === 0 && row.deleted_at !== null);
     expect(intents.find((row) => row.id === futureCopy?.id)?.operation).toBe('delete');
     expect(intents.find((row) => row.id === history?.id)?.operation).toBe('update');
+  });
+
+  it('stopping prunes dependent daily-plan priorities and linked-action rules of future copies', async () => {
+    db = await freshDatabase();
+    const todos = await import('@/features/todos/todos.data');
+    const plans = await import('@/features/daily-plan/dailyPlan.data');
+    const linked = await import('@/core/linked-actions/linkedActions.data');
+
+    const id = await todos.addTodo({ title: 'Meds', recurrence: 'daily' });
+    const first = await db.getFirstAsync<{ recurrence_id: string }>(
+      'SELECT recurrence_id FROM todos WHERE id = ?',
+      [id],
+    );
+    const recId = first!.recurrence_id;
+    await todos.toggleTodo({ id } as never);
+    const spawned = await db.getFirstAsync<{ id: string }>(
+      `SELECT id FROM todos
+       WHERE recurrence_id = ? AND completed = 0 AND deleted_at IS NULL`,
+      [recId],
+    );
+    const spawnedId = spawned!.id;
+
+    // Dependent state bound to the future copy: a daily-plan top priority
+    // (titles snapshotted at save) and linked-action rules in BOTH directions.
+    const other = await todos.addTodo({ title: 'Water plants' });
+    await plans.upsertDailyPlan(toDateKey(), { topTodoIds: [spawnedId, other] });
+    await linked.replaceLinkedActionRulesForSourceEntity({
+      feature: 'todos',
+      entityType: 'todo',
+      entityId: spawnedId,
+      rules: [
+        {
+          triggerType: 'todo.completed',
+          target: {
+            feature: 'todos',
+            entityType: 'todo',
+            entityId: other,
+            effect: { kind: 'binary', type: 'todo.complete' },
+          },
+        },
+      ],
+    });
+    await linked.replaceLinkedActionRulesForSourceEntity({
+      feature: 'todos',
+      entityType: 'todo',
+      entityId: other,
+      rules: [
+        {
+          triggerType: 'todo.completed',
+          target: {
+            feature: 'todos',
+            entityType: 'todo',
+            entityId: spawnedId,
+            effect: { kind: 'binary', type: 'todo.complete' },
+          },
+        },
+      ],
+    });
+
+    await todos.stopRecurringSeries(recId);
+
+    // The stopped future copy must take its plan slot and snapshot title with
+    // it (same prune removeTodo performs) — otherwise the plan renders a ghost
+    // priority and the surviving priority keeps the wrong title.
+    const planRow = await db.getFirstAsync<{ top_todo_ids: string; top_todo_titles: string }>(
+      'SELECT top_todo_ids, top_todo_titles FROM daily_plans WHERE deleted_at IS NULL',
+    );
+    expect(JSON.parse(planRow!.top_todo_ids)).toEqual([other]);
+    expect(JSON.parse(planRow!.top_todo_titles)).toEqual(['Water plants']);
+
+    // Rules bound to the dead copy die with it in both directions.
+    const rules = await db.getAllAsync<{
+      source_entity_id: string;
+      target_entity_id: string;
+      deleted_at: string | null;
+    }>('SELECT source_entity_id, target_entity_id, deleted_at FROM linked_action_rules');
+    expect(rules).toHaveLength(2);
+    expect(rules.every((row) => row.deleted_at !== null)).toBe(true);
+
+    const planIntents = await db.getAllAsync<{ operation: string }>(
+      `SELECT operation FROM sync_outbox WHERE entity = 'daily_plans'`,
+    );
+    expect(planIntents.map((row) => row.operation)).toEqual(['update']);
   });
 
   it('restart creates a fresh independent series', async () => {
