@@ -286,6 +286,42 @@ export default [
     },
   },
 
+  // ---- V4 calm-momentum P0 guardrails (warn until close-out P20) --------
+  // docs/ui-ux/16-v4-calm-momentum-finish.md retires three "vibe-coded"
+  // literal classes from core/ui + features TSX: raw `text-[Npx]` sizes, raw
+  // Tailwind palette color utilities, and emoji literals in UI text/strings.
+  // Built-in no-restricted-syntax with selector regexes only — no new deps or
+  // plugins. Severity WARN at P0 (counts recorded in the PR body and the
+  // ledger); P20 tightens these to error once the migration phases clear the
+  // violations. User content strings are exempt by design (emoji allowed in
+  // what the user typed, never in app chrome).
+  {
+    files: ['core/ui/**/*.tsx', 'features/**/*.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'warn',
+        {
+          selector:
+            "JSXAttribute[name.name='className'] Literal[value=/text-\\[[0-9]+px\\]/]",
+          message:
+            'V4 P0 guardrail: raw text-[Npx] className size literal — use core/ui/Text typography roles instead.',
+        },
+        {
+          selector:
+            "JSXAttribute[name.name='className'] Literal[value=/(?:^|[^\\w-])(?:bg|text|border|ring|fill|stroke)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}(?![\\w-])/]",
+          message:
+            'V4 P0 guardrail: raw Tailwind palette color utility — use section/theme color tokens instead.',
+        },
+        {
+          selector:
+            'JSXText[value=/\\p{Extended_Pictographic}/u], JSXAttribute Literal[value=/\\p{Extended_Pictographic}/u], JSXExpressionContainer Literal[value=/\\p{Extended_Pictographic}/u]',
+          message:
+            'V4 P0 guardrail: emoji literal in UI text/strings — use the icon system (P5); emoji remain allowed only in user content.',
+        },
+      ],
+    },
+  },
+
   // Prettier must be last to override conflicting stylistic rules
   eslintConfigPrettier,
   eslintPluginPrettierRecommended,
