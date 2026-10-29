@@ -12,7 +12,7 @@ type Props = {
   active: boolean;
   color: string;
   onPress: () => void;
-  icon?: string; // optional emoji or text prefix
+  icon?: React.ReactNode; // optional decorative prefix
 };
 
 export type ChipProps = Props;
