@@ -20,7 +20,8 @@ type ScreenProps = PropsWithChildren<{
   padded?: boolean;
   /**
    * Wide-viewport-only cap for the centered content column
-   * (defaults to `layout.contentMaxWidth`). Narrow viewports are unaffected.
+   * (defaults to `layout.contentMaxWidth`, the 640 phone-like column of §5.6).
+   * Narrow viewports are unaffected.
    */
   contentMaxWidth?: number;
   /**

@@ -1,16 +1,20 @@
 /**
- * Non-color design tokens for the "Calm Momentum" design language (V3).
+ * Non-color design tokens for the v2 "Playful Momentum" design language.
  *
- * Theme-independent by definition: geometry, rhythm, type scale, and motion
- * envelopes. Color semantics live in `ThemeTokens`; features ask for
+ * Theme-independent by definition: geometry, depth, rhythm, type scale, and
+ * motion envelopes. Color semantics live in `ThemeTokens`; features ask for
  * `spacing.lg` or `typography.titleLg`, never for raw numbers.
  *
- * V3's rules of thumb (docs/ui-ux/13-calm-momentum-design-system.md):
- * - modest radii: controls 8–12, cards 16, sheets/hero 24; pills only for chips;
+ * v2's rules of thumb (docs/ui-ux/16-playful-momentum.md):
+ * - playful but systematic radii: 8/12/16/20/28, nothing above 28 except
+ *   pills and circles (§5.6);
+ * - depth comes from a solid lip or a 2px border, **never** from a blur
+ *   shadow on a card (§5.7); `elevation` exists only for genuinely floating
+ *   surfaces (sheets, dialogs, the capture affordance);
  * - one type family (Nunito) mapped per role, with weight carried by the
  *   family itself rather than `fontWeight` (RN does not reliably synthesise
  *   weight for a custom family). Heavy weights (800/900) are rare enough to
- *   create hierarchy — titles are 700, body 600, 900 only for celebration;
+ *   create hierarchy — titles are 800, body 600, 900 only for celebration;
  * - honest touch targets (44–52pt) and a 16pt phone page gutter, because the
  *   layout must put content first and keep dense screens dense.
  */
@@ -35,21 +39,101 @@ export const spacing = {
   xxxl: 48,
 } as const;
 
-/** Corner-radius roles. V3 keeps geometry calm: nothing above 24 except pills. */
+/**
+ * Corner-radius roles — v2 §5.6. Playful but systematic: every step is used by
+ * exactly one weight class, and nothing above 28 except pills and circles
+ * (the §9 C2 resolution caps the scale at 28; 26–34pt mid-radii were
+ * rejected).
+ */
 export const radius = {
-  /** Chips, small tags, inline pills, compact buttons. */
+  /** Checkbox, tag, compact badge. */
   xs: 8,
-  /** Inputs and compact controls. */
-  sm: 10,
-  /** Buttons, list rows, standard controls. */
-  md: 12,
-  /** Default cards. */
-  lg: 16,
-  /** Hero panels, sheets, celebration surfaces. */
-  xl: 24,
-  /** Pills, avatars, circular status. */
+  /** Inputs, rect chips, small buttons. */
+  sm: 12,
+  /** Buttons, option rows, list cards. */
+  md: 16,
+  /** Cards, hero surfaces. */
+  lg: 20,
+  /** Sheets top, dialogs, celebration card. */
+  xl: 28,
+  /** Nodes, avatars, pills, capture button. */
   full: 9999,
 } as const;
+
+/**
+ * Solid-lip depth (v2 §5.7). A pressable reads as a physical slab: a colored
+ * lip of `lip` px under the face at rest, collapsing to 0 while the face
+ * translates by the same amount. Cards do it with a thicker bottom border
+ * instead, and static surfaces get a flat 2px ring with no lip at all.
+ *
+ * These are *geometry*, not color: the actual lip color is a theme decision
+ * (`tokens.buttonLip`, `tokens.borderStrong`). Compose the two through
+ * `cardDepth()` / `pressDepth()` below so appearance handling stays in one
+ * place.
+ */
+export const depth = {
+  /**
+   * Lip thickness per pressable weight: lg 4 (52px buttons, path nodes),
+   * md 3 (44px buttons, option rows), sm 2 (compact buttons, toggle chips).
+   */
+  lip: {
+    lg: 4,
+    md: 3,
+    sm: 2,
+  },
+  /** Pressable cards: 2px ring all round + a 4px bottom edge in `borderStrong`. */
+  card: {
+    ring: 2,
+    bottom: 4,
+  },
+  /** Static info cards: 2px ring all round, no lip. */
+  flat: 2,
+} as const;
+
+/**
+ * The minimum theme surface `cardDepth` needs. Structural, not an import of
+ * `ThemeTokens`, so the token module stays theme-agnostic and dependency-free.
+ */
+export type DepthPalette = {
+  border: string;
+  borderStrong: string;
+  surfaceElevated: string;
+};
+
+/**
+ * Pressable card geometry (`depth.card`): a 2px ring all round plus a 4px
+ * bottom edge in `borderStrong`, so a card reads as a lifted slab without a
+ * blur shadow. Half-pressed states are the pressable's job (P5 Pressable3D).
+ */
+export function cardDepth(palette: DepthPalette) {
+  return {
+    borderWidth: depth.card.ring,
+    borderColor: palette.border,
+    borderBottomWidth: depth.card.bottom,
+    borderBottomColor: palette.borderStrong,
+  } as const;
+}
+
+/**
+ * Static info card geometry (`depth.flat`): the same 2px ring, no lip. This is
+ * the *only* card depth a non-interactive surface may claim (§5.7: no blur
+ * shadow on cards, ever).
+ */
+export function flatDepth(palette: DepthPalette) {
+  return {
+    borderWidth: depth.flat,
+    borderColor: palette.border,
+  } as const;
+}
+
+/**
+ * Lip geometry for a pressable face: the visible lip height plus the face
+ * travel that consumes it. P5's `Pressable3D` reads these numbers; P3 only
+ * declares them so no call site re-derives `4`/`3`/`2` by hand.
+ */
+export function pressDepth(lip: number) {
+  return { lip, travel: lip } as const;
+}
 
 /** Weight-specific families: RN needs the weight baked into the family name. */
 export const fonts = {
@@ -182,45 +266,72 @@ export const typography = {
 export type TypographyRole = keyof typeof typography;
 
 /**
- * Elevation levels. Calm Momentum keeps elevation neutral and sparing:
- * hierarchy comes from tone and spacing first, borders where necessary — not
- * from shadows on ordinary cards. Shadow tokens exist for genuinely floating
- * surfaces only (capture affordance, active overlays, modals).
+ * Elevation levels — v2 §5.7. There are **no blur shadows on cards**: cards
+ * are defined by their 2px ring (or lip) and nothing else. `level3` is
+ * reserved for genuinely floating surfaces (sheets, dialogs, the celebration
+ * card); `level0` is the page. `level1`/`level2` stay declared for the few
+ * floating controls that predate this phase (capture affordance, sticky
+ * banners) and are not a licence to shadow a card.
+ *
+ * §5.7 gives the light-mode `level3` spec as `0 12 32 rgba(16,19,26,0.18)`;
+ * the RN shadow fields below are that shadow in RN's vocabulary (offset 12,
+ * radius 32, opacity 0.18). Dark mode may instead use `surfaceElevated` + a 2px
+ * border — `deepSheet()` below composes that.
  */
 export const elevation = {
   /** Page background. */
   level0: {
-    shadowColor: '#000',
+    shadowColor: '#10131A',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0,
     shadowRadius: 0,
     elevation: 0,
   },
-  /** Ordinary card/row surface. */
+  /** Floating control (capture affordance, sticky banner) — not for cards. */
   level1: {
-    shadowColor: '#000',
+    shadowColor: '#10131A',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 12,
     elevation: 2,
   },
-  /** Floating action, sticky control, popover, active timer. */
+  /** Active overlay / popover above a surface. */
   level2: {
-    shadowColor: '#000',
+    shadowColor: '#10131A',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.12,
     shadowRadius: 22,
     elevation: 5,
   },
-  /** Modal/sheet/dialog. */
+  /** Sheets, dialogs, celebration card **only** (§5.7). */
   level3: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 18 },
+    shadowColor: '#10131A',
+    shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.18,
-    shadowRadius: 36,
-    elevation: 9,
+    shadowRadius: 32,
+    elevation: 12,
   },
 } as const;
+
+/**
+ * Floating-surface composition for sheets/dialogs/celebration cards (§5.7):
+ * light mode lifts with `elevation.level3`; dark mode lifts with
+ * `surfaceElevated` + a 2px border instead of a blur shadow, which reads as
+ * depth on a blue-charcoal canvas without a muddy halo.
+ *
+ * Kept out of the `elevation` const because it depends on appearance, and this
+ * module never reads the active theme.
+ */
+export function sheetDepth(palette: DepthPalette, appearance: 'light' | 'dark') {
+  if (appearance === 'dark') {
+    return {
+      backgroundColor: palette.surfaceElevated,
+      borderWidth: depth.card.ring,
+      borderColor: palette.border,
+    } as const;
+  }
+  return elevation.level3;
+}
 
 /**
  * Press/transition springs in the `Animated.spring` shape (speed/bounciness),
@@ -270,8 +381,16 @@ export const layout = {
   gutterTabletBreakpoint: 768,
   /** Width at which the gutter steps up from tablet to desktop. */
   gutterDesktopBreakpoint: 1280,
-  /** Max reading/content width on tablet/desktop before centering. */
-  contentMaxWidth: 760,
+  /**
+   * Max content width on tablet/desktop before centering — a phone-like 640
+   * column (§5.6), so a desktop window keeps the same reading rhythm as a
+   * phone instead of stretching rows to 760. */
+  contentMaxWidth: 640,
+  /**
+   * Dashboard grid cap (≥1280 two-column, §5.6). Separate from
+   * `contentMaxWidth` because the dashboard is a composed layout, not a
+   * single reading column. */
+  dashboardMaxWidth: 1040,
   /** Max width for centered modal-style content. */
   modalMaxWidth: 460,
   /** Width at which the shell switches from bottom tabs to a side rail. */

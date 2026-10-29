@@ -808,7 +808,6 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     <Screen
       scroll={false}
       padded
-      contentMaxWidth={720}
       hero={
         <View className="gap-2">
           <PageHeader

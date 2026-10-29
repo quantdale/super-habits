@@ -2,20 +2,23 @@ import type { ReactNode } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { elevation, radius, spacing } from '@/core/theme/designTokens';
+import { depth, elevation, radius, spacing } from '@/core/theme/designTokens';
 
 /**
- * Card variants (docs/ui-ux/13 §3/§8):
+ * Card variants (docs/ui-ux/16-playful-momentum.md §5.7/§7):
  * - `standard` — default grouping surface: flat fill one step from canvas,
- *   hairline border, no shadow.
+ *   `depth.flat` (2px border, no lip, **no blur shadow**).
  * - `header`   — standard surface plus a quiet title row on the same surface
- *   (the Pop saturated band is retired; 43 existing call sites keep working).
+ *   (43 existing call sites keep working).
  * - `stat`     — compact numeric tile.
  * - `hero`     — the one emphasis surface a screen may own: section tint at
- *   low alpha, radius 24 (xl), level-2 elevation.
+ *   low alpha plus level-2 elevation (the only non-modal card allowed a shadow,
+ *   because it is the screen's single lifted moment).
  * - `inset`    — sub-group inside a surface: sunken fill, no border, no shadow.
  *
  * An `accentColor` tints fill/border subtly; it no longer colors the shadow.
+ * Pressable cards (`depth.card`, 4px `borderStrong` bottom) arrive with P5's
+ * Pressable3D — this phase only pins the flat/hero geometry.
  */
 export type CardVariant = 'standard' | 'header' | 'stat' | 'hero' | 'inset';
 
@@ -81,7 +84,7 @@ export function Card({
   const rootStyle: StyleProp<ViewStyle> = [
     {
       borderRadius: isHero ? radius.xl : radius.lg,
-      borderWidth: isInset ? 0 : 1,
+      borderWidth: isInset ? 0 : depth.flat,
       borderColor,
       backgroundColor,
     },

@@ -1,9 +1,7 @@
 import { Text } from '@/core/ui/Text';
 import { Pressable, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
-
-/** Align with `Card` (rounded-2xl, border, shadow). */
-const CARD_RADIUS = 16;
+import { radius } from '@/core/theme/designTokens';
 
 type Props = {
   onEdit: () => void;
@@ -20,7 +18,9 @@ export function SwipeRightActions({ onEdit, onDelete, editColor, compact }: Prop
     alignItems: 'center' as const,
     width: btnWidth,
     alignSelf: 'stretch' as const,
-    borderRadius: CARD_RADIUS,
+    // Matches `Card`'s `radius.lg` (v2 §5.6) so the revealed action continues
+    // the row's corner instead of cutting a tighter arc behind it.
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: tokens.border,
     shadowColor: tokens.shadowColor,

@@ -1,5 +1,6 @@
 import { performance } from 'node:perf_hooks';
 import { test, expect, type Page } from './fixtures';
+import type { Locator } from '@playwright/test';
 import { expectRows } from './helpers/oracles';
 import { queryRows, runSql, returnToApp } from './helpers/dbHarness';
 import { auditPage } from './helpers/a11yAudit';
@@ -13,6 +14,25 @@ import {
 
 async function closeDetail(page: Page) {
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+}
+
+/**
+ * Focus a control the way a keyboard user reaches it, for focus-ring
+ * assertions.
+ *
+ * The P3 ring follows `:focus-visible` semantics (doc 16 §5.7: "pointer click
+ * shows no ring"), and Chromium reports focus-visible = false for scripted
+ * focus while pointer modality is active — so `locator.focus()` after any click
+ * reads the UA default outline (3px computed) instead of the 2px token ring.
+ * A single key that neither moves focus nor activates anything flips the
+ * modality back to keyboard, and the next (scripted) focus then matches
+ * `:focus-visible` exactly like a real Tab focus does. The ring assertions stay
+ * at 2px: they prove the keyboard ring, and are never relaxed for pointer
+ * focus. (Ctrl/Alt keydowns do not flip modality; Shift does.)
+ */
+async function focusAsKeyboardUser(page: Page, target: Locator) {
+  await page.keyboard.press('Shift');
+  await target.focus();
 }
 
 /** Same-turn pointer sequences exercise the real RN Web press listeners. */
@@ -323,16 +343,19 @@ test.describe('W7 Habits reconstruction regressions', () => {
       expect(height).toBeLessThanOrEqual(64);
       expect(Number((await action.boundingBox())!.width.toFixed(3))).toBeGreaterThanOrEqual(48);
       expect(Number((await action.boundingBox())!.height.toFixed(3))).toBeGreaterThanOrEqual(48);
-      await action.focus();
+      await focusAsKeyboardUser(page, action);
       await expect(action).toHaveCSS('outline-width', '2px');
       await page.keyboard.press('Tab');
       await expect(details).toBeFocused();
       await expect(details).toHaveCSS('outline-width', '2px');
     }
-    await page.getByRole('button', { name: /^Sunday:/ }).focus();
+    await focusAsKeyboardUser(page, page.getByRole('button', { name: /^Sunday:/ }));
     await expect(page.getByRole('button', { name: /^Sunday:/ })).toHaveCSS('outline-width', '2px');
     await page.keyboard.press('Enter');
-    await page.getByRole('button', { name: 'Back to today', exact: true }).focus();
+    await focusAsKeyboardUser(
+      page,
+      page.getByRole('button', { name: 'Back to today', exact: true }),
+    );
     await expect(page.getByRole('button', { name: 'Back to today', exact: true })).toHaveCSS(
       'outline-width',
       '2px',
@@ -373,7 +396,7 @@ test.describe('W7 Habits reconstruction regressions', () => {
     await dialog.getByRole('button', { name: 'Custom', exact: true }).click();
     const monday = dialog.getByRole('checkbox', { name: 'Monday scheduled', exact: true });
     await expect(monday).toBeChecked();
-    await monday.focus();
+    await focusAsKeyboardUser(page, monday);
     await expect(monday).toHaveCSS('outline-width', '2px');
     await page.keyboard.press('Space');
     await expect(monday).not.toBeChecked();
@@ -382,7 +405,7 @@ test.describe('W7 Habits reconstruction regressions', () => {
     for (const label of ['Select menu book icon', 'Select habit color #ef4444']) {
       const choice = dialog.getByRole('button', { name: label, exact: true });
       await choice.scrollIntoViewIfNeeded();
-      await choice.focus();
+      await focusAsKeyboardUser(page, choice);
       await expect(choice).toHaveCSS('outline-width', '2px');
       await page.keyboard.press('Enter');
       await expect(choice).toHaveAttribute('aria-pressed', 'true');
