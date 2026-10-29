@@ -55,6 +55,19 @@ describe('THEME_REGISTRY invariants', () => {
   it('ships at least the 14 catalog themes from the design doc', () => {
     expect(THEME_IDS.length).toBeGreaterThanOrEqual(14);
   });
+
+  it('defaults carry the P1 §5.2/§5.3 token values', () => {
+    const l = getTheme(DEFAULT_LIGHT_THEME_ID).tokens;
+    expect(l.primary).toBe('#1A7F2B');
+    expect(l.primaryBright).toBe('#4DC93A');
+    expect(l.buttonLip).toBe('#135B1F');
+    expect(l.textSubtle).toBe('#656D80');
+    const d = getTheme(DEFAULT_DARK_THEME_ID).tokens;
+    expect(d.primary).toBe('#4DC93A');
+    expect(d.primaryBright).toBe('#4DC93A');
+    expect(d.buttonLip).toBe('#1A7F2B');
+    expect(d.textSubtle).toBe('#8A93A6');
+  });
 });
 
 // Re-validates the *actual shipped* registry with the same WCAG checks as
@@ -70,9 +83,13 @@ describe('THEME_REGISTRY contrast', () => {
         ['text on surfaceElevated', t.text, t.surfaceElevated, WCAG_AA_TEXT],
         ['textMuted on surface', t.textMuted, t.surface, WCAG_AA_TEXT],
         ['textMuted on surfaceElevated', t.textMuted, t.surfaceElevated, WCAG_AA_TEXT],
+        ['textSubtle on surface', t.textSubtle, t.surface, WCAG_AA_TEXT],
         ['buttonText on button', t.buttonText, t.button, WCAG_AA_TEXT],
         ['buttonText on buttonHover', t.buttonText, t.buttonHover, WCAG_AA_TEXT],
         ['buttonText on buttonActive', t.buttonText, t.buttonActive, WCAG_AA_TEXT],
+        // Press depth under the face — adjacent color (WCAG 1.4.11), matching
+        // scripts/validate-theme-contrast.mjs and createTheme.assertContrast.
+        ['buttonText on buttonLip (press depth)', t.buttonText, t.buttonLip, WCAG_AA_NON_TEXT],
         ['accent on surface', t.accent, t.surface, WCAG_AA_TEXT],
         ['primary on surface (non-text)', t.primary, t.surface, WCAG_AA_NON_TEXT],
       ];

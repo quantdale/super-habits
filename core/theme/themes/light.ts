@@ -1,31 +1,45 @@
 import { createTheme } from '@/core/theme/createTheme';
 
 /**
- * Pop Light — the default. A soft lavender canvas, crisp white cards, and a
- * vivid violet brand. Chosen so the app reads as a friendly consumer product
- * rather than a grey productivity tool.
+ * Light — the default. Playful Momentum §5.2: a Duolingo-style white canvas,
+ * cards defined by their 2px border, and the Sprout green brand
+ * (`#1A7F2B` face / `#4DC93A` marks).
  */
 export const light = createTheme({
   id: 'light',
   name: 'Light',
   appearance: 'light',
-  description: 'Lavender canvas, white cards, vivid violet brand. Default.',
-  primary: '#6C4CF5',
-  secondary: '#EDE7FF',
-  accent: '#C026D3',
-  button: '#6C4CF5',
+  description: 'White canvas, 2px card borders, Sprout green brand. Default.',
+  primary: '#1A7F2B',
+  primaryBright: '#4DC93A',
+  secondary: '#FFFFFF',
+  accent: '#1769D8',
+  button: '#1A7F2B',
   buttonText: '#FFFFFF',
-  buttonHover: '#5B3AE0',
-  buttonActive: '#4A2BC4',
-  background: '#F5F3FF',
+  buttonHover: '#17742A',
+  buttonActive: '#135B1F',
+  buttonLip: '#135B1F',
+  background: '#FFFFFF',
   surface: '#FFFFFF',
-  surfaceElevated: '#FBFAFF',
-  border: '#E7E3F7',
+  surfaceElevated: '#FFFFFF',
+  surfaceSunken: '#F3F5F9',
+  surfaceHover: '#F7F8FB',
+  surfaceActive: '#EDF0F5',
+  border: '#E3E6EE',
+  borderStrong: '#D5DAE3',
   tabRail: '#FFFFFF',
-  tabRailBorder: '#ECE8F8',
-  text: '#16123A',
-  textMuted: '#655F8A',
-  iconMuted: '#8C86B0',
-  overlayScrim: 'rgba(20, 14, 60, 0.45)',
-  shadowColor: '#2A1E6B',
+  tabRailBorder: '#E3E6EE',
+  text: '#1F2430',
+  textMuted: '#5B6475',
+  textSubtle: '#656D80',
+  iconMuted: '#9AA2B1',
+  chipBackground: '#FFFFFF',
+  chipBorder: '#E3E6EE',
+  overlayScrim: 'rgba(16, 19, 26, 0.55)',
+  shadowColor: '#10131A',
+  // Gradients retired outside celebration; the type is kept (flat pair).
+  brandGradient: ['#4DC93A', '#4DC93A'],
+  glow: 'transparent',
+  webThemeColor: '#FFFFFF',
+  statusBarStyle: 'dark',
 });
