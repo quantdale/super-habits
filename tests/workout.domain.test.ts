@@ -111,6 +111,41 @@ describe('buildTimerSequence', () => {
     expect(sequence.map((phase) => phase.phase)).toEqual(['active', 'active', 'rest', 'active']);
     expect(sequence[2].durationSeconds).toBe(30);
   });
+
+  it('emits no trailing rest when set numbers are non-contiguous (deleted middle set)', () => {
+    // `deleteSet` soft-deletes without renumbering, so a routine whose middle
+    // set was removed keeps gaps like [1, 3]. Last-set detection must not
+    // depend on set_number matching the set count.
+    const sequence = buildTimerSequence([
+      {
+        name: 'Squat',
+        sets: [
+          { set_number: 1, active_seconds: 40, rest_seconds: 60 },
+          { set_number: 3, active_seconds: 40, rest_seconds: 60 },
+        ],
+      },
+    ]);
+    expect(sequence.map((phase) => phase.phase)).toEqual(['active', 'rest', 'active']);
+  });
+
+  it('keeps supersets back-to-back when the first partner has non-contiguous set numbers', () => {
+    const sequence = buildTimerSequence([
+      {
+        name: 'Press',
+        superset_group: 'push-pull',
+        sets: [
+          { set_number: 1, active_seconds: 30, rest_seconds: 60 },
+          { set_number: 3, active_seconds: 30, rest_seconds: 60 },
+        ],
+      },
+      {
+        name: 'Row',
+        superset_group: 'push-pull',
+        sets: [{ set_number: 1, active_seconds: 30, rest_seconds: 60 }],
+      },
+    ]);
+    expect(sequence.map((phase) => phase.phase)).toEqual(['active', 'rest', 'active', 'active']);
+  });
 });
 
 describe('buildWorkoutActivityDays', () => {
