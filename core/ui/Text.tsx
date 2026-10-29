@@ -1,5 +1,6 @@
 import { StyleSheet, Text as RNText, type TextProps, type TextStyle } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { useCardInk } from '@/core/ui/cardInk';
 import { fonts, typography, type TypographyRole } from '@/core/theme/designTokens';
 import type { ThemeTokens } from '@/core/theme/tokens';
 
@@ -102,6 +103,7 @@ export function Text({
   ...rest
 }: AppTextProps) {
   const { tokens } = useAppTheme();
+  const forcedInk = useCardInk();
   const role = typography[variant];
   const flat = StyleSheet.flatten(style) as TextStyle | undefined;
   const family =
@@ -123,7 +125,15 @@ export function Text({
     <RNText
       {...rest}
       className={className}
-      style={[baseStyle, { fontFamily: family, color: toneColor(tone, tokens) }, style]}
+      style={[
+        baseStyle,
+        { fontFamily: family, color: toneColor(tone, tokens) },
+        style,
+        // Colored Card faces (§6 hero) force their ink over tonal text so the
+        // face keeps AA contrast; a caller-explicit `style.color` (e.g. a
+        // control with its own surface) is respected instead.
+        forcedInk && flat?.color === undefined ? { color: forcedInk } : null,
+      ]}
     />
   );
 }

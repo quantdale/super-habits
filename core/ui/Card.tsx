@@ -2,37 +2,47 @@ import type { ReactNode } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { depth, elevation, radius, spacing } from '@/core/theme/designTokens';
+import { cardDepth, flatDepth, radius, spacing } from '@/core/theme/designTokens';
+import { CardInkContext } from '@/core/ui/cardInk';
 
 /**
- * Card variants (docs/ui-ux/16-playful-momentum.md §5.7/§7):
- * - `standard` — default grouping surface: flat fill one step from canvas,
- *   `depth.flat` (2px border, no lip, **no blur shadow**).
- * - `header`   — standard surface plus a quiet title row on the same surface
- *   (43 existing call sites keep working).
- * - `stat`     — compact numeric tile.
- * - `hero`     — the one emphasis surface a screen may own: section tint at
- *   low alpha plus level-2 elevation (the only non-modal card allowed a shadow,
- *   because it is the screen's single lifted moment).
- * - `inset`    — sub-group inside a surface: sunken fill, no border, no shadow.
+ * Card variants (docs/ui-ux/16-playful-momentum.md §5.7/§6):
+ * - `flat`     — static info surface: white face, `depth.flat` (2px border,
+ *   no lip, **no blur shadow**). This is the only depth a non-interactive
+ *   surface may claim.
+ * - `standard` — alias of `flat` (43 existing call sites keep working).
+ * - `header`   — flat surface plus a quiet title row on the same surface.
+ * - `stat`     — compact numeric tile (flat surface).
+ * - `card`     — pressable-list surface: `depth.card` (2px ring + 4px
+ *   `borderStrong` bottom lip). The Pressable3D half-pressed state is P5.
+ * - `hero`     — the one emphasis surface a screen may own (≤1/screen):
+ *   section **bright** face with ink text (default `faceTone="bright"`) or
+ *   **solid** face with white text (`faceTone="solid"`), radius 20.
+ * - `inset`    — plain sub-group container: no fill, no border (never a
+ *   nested-card look).
  *
- * An `accentColor` tints fill/border subtly; it no longer colors the shadow.
- * Pressable cards (`depth.card`, 4px `borderStrong` bottom) arrive with P5's
- * Pressable3D — this phase only pins the flat/hero geometry.
+ * Bodies are never tinted and no card carries a blur shadow; depth comes from
+ * P3's `depth` tokens only (§5.7).
  */
-export type CardVariant = 'standard' | 'header' | 'stat' | 'hero' | 'inset';
+export type CardVariant = 'flat' | 'card' | 'standard' | 'header' | 'stat' | 'hero' | 'inset';
+export type CardFaceTone = 'bright' | 'solid';
+
+/** Ink on a bright face (§5.1 "ink `#10131A` on bright"). */
+const HERO_INK = '#10131A';
 
 type CardProps = {
   children: ReactNode;
-  /** Tints the surface/border with this hue at low alpha (no colored shadow). */
+  /** Tints the border with this hue at low alpha (never the body). */
   accentColor?: string;
   className?: string;
   variant?: CardVariant;
+  /** Hero only: bright face + ink text (default) or solid face + white text. */
+  faceTone?: CardFaceTone;
   headerTitle?: string;
   /** Shown below `headerTitle` (header variant only). */
   headerSubtitle?: string;
   headerRight?: ReactNode;
-  /** Merged onto the outer card `View` (border/elevation applied first). */
+  /** Merged onto the outer card `View` (border applied first). */
   style?: StyleProp<ViewStyle>;
   /** Standard/header variants: replaces default inner padding when set (e.g. `p-0`). */
   innerClassName?: string;
@@ -54,6 +64,7 @@ export function Card({
   accentColor,
   className,
   variant = 'standard',
+  faceTone = 'bright',
   headerTitle,
   headerSubtitle,
   headerRight,
@@ -67,36 +78,45 @@ export function Card({
 
   const isHero = variant === 'hero';
   const isInset = variant === 'inset';
+  const isPressableCard = variant === 'card';
 
   const backgroundColor = isHero
-    ? withAlpha(accentColor ?? tokens.primary, 0.12)
+    ? (accentColor ?? tokens.primaryBright)
     : isInset
-      ? tokens.surfaceSunken
-      : accentColor
-        ? withAlpha(accentColor, 0.06)
-        : tokens.surface;
-  const borderColor = isInset
-    ? 'transparent'
-    : accentColor
-      ? withAlpha(accentColor, 0.22)
-      : tokens.border;
+      ? 'transparent'
+      : tokens.surface;
+  const borderColor = accentColor && !isInset ? withAlpha(accentColor, 0.22) : tokens.border;
+
+  const surfaceDepth = isInset
+    ? null
+    : isHero
+      ? null
+      : isPressableCard
+        ? cardDepth({
+            border: borderColor,
+            borderStrong: tokens.borderStrong,
+            surfaceElevated: tokens.surfaceElevated,
+          })
+        : flatDepth({
+            border: borderColor,
+            borderStrong: tokens.borderStrong,
+            surfaceElevated: tokens.surfaceElevated,
+          });
 
   const rootStyle: StyleProp<ViewStyle> = [
     {
-      borderRadius: isHero ? radius.xl : radius.lg,
-      borderWidth: isInset ? 0 : depth.flat,
-      borderColor,
+      borderRadius: radius.lg,
       backgroundColor,
     },
-    isHero ? elevation.level2 : null,
+    surfaceDepth,
     style,
   ];
 
   const rootClass = ['overflow-hidden', marginClass, extra].filter(Boolean).join(' ');
 
-  if (variant === 'header' || (headerTitle && variant === 'standard')) {
-    // Quiet title row on the same surface — V3 replaces Pop's saturated band.
-    // The title carries the hierarchy; no band, no white-on-hue contrast risk.
+  if (variant === 'header' || (headerTitle && (variant === 'standard' || variant === 'flat'))) {
+    // Quiet title row on the same surface — the title carries the hierarchy;
+    // no band, no white-on-hue contrast risk.
     return (
       <View className={rootClass} style={rootStyle}>
         <View
@@ -137,6 +157,19 @@ export function Card({
       >
         {children}
       </View>
+    );
+  }
+
+  if (isHero) {
+    // §6 hero: colored face, ink text (bright) or white text (solid), the one
+    // illustration/mascot slot a screen may own. No shadow, no tint wash.
+    const ink = faceTone === 'solid' ? tokens.onSolid : HERO_INK;
+    return (
+      <CardInkContext.Provider value={ink}>
+        <View className={rootClass} style={rootStyle}>
+          <View className={innerClassName ?? 'p-5'}>{children}</View>
+        </View>
+      </CardInkContext.Provider>
     );
   }
 

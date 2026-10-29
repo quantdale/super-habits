@@ -62,6 +62,57 @@ vi.mock('expo-constants', () => ({
   default: { expoConfig: { version: '1.0.0' } },
 }));
 
+// Post-import reminder reconciliation spies: a portable import must reconcile
+// the todo-reminder family (todo due-date reminders + the daily-plan and
+// weekly-review nudges) exactly like Restore V2. Only the reconcile entry
+// points are stubbed; the rest of each module stays real.
+const reminderReconcileSpies = vi.hoisted(() => ({
+  reconcileTodoReminders: vi.fn(),
+  syncDailyPlanReminder: vi.fn(),
+  syncWeeklyReviewReminder: vi.fn(),
+}));
+
+vi.mock('@/core/notifications/todoReminderScheduler', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/core/notifications/todoReminderScheduler')>();
+  return {
+    ...actual,
+    reconcileTodoReminders: reminderReconcileSpies.reconcileTodoReminders,
+  };
+});
+vi.mock('@/core/notifications/dailyPlanReminderScheduler', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/core/notifications/dailyPlanReminderScheduler')>();
+  return {
+    ...actual,
+    syncDailyPlanReminder: reminderReconcileSpies.syncDailyPlanReminder,
+  };
+});
+vi.mock('@/core/notifications/weeklyReviewReminderScheduler', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/core/notifications/weeklyReviewReminderScheduler')>();
+  return {
+    ...actual,
+    syncWeeklyReviewReminder: reminderReconcileSpies.syncWeeklyReviewReminder,
+  };
+});
+
+// The call sites treat these as promise-returning (fire-and-forget with
+// `.catch(...)`), so the spies must resolve like the real schedulers.
+reminderReconcileSpies.reconcileTodoReminders.mockResolvedValue({
+  status: 'reconciled',
+  scheduled: 0,
+  cancelled: 0,
+});
+reminderReconcileSpies.syncDailyPlanReminder.mockResolvedValue({
+  status: 'skipped',
+  reason: 'web',
+});
+reminderReconcileSpies.syncWeeklyReviewReminder.mockResolvedValue({
+  status: 'skipped',
+  reason: 'web',
+});
+
 const THEME_MODE_KEY = 'superhabits.theme.mode';
 const THEME_SLOTS_KEY = 'superhabits.theme.slots.v2';
 
@@ -362,7 +413,7 @@ async function seedSourceDevice(db: TestDatabase): Promise<{ todoId: string; hab
   return { todoId, habitId };
 }
 
-async function exportSourceDevice(db: TestDatabase) {
+async function exportSourceDevice(_db: TestDatabase) {
   const { exportPortableBackup } = await import('@/core/portable/portableExport');
   const result = await exportPortableBackup();
   expect(result.ok).toBe(true);
@@ -722,6 +773,33 @@ describe('portable import — source→import semantic equivalence', () => {
     expect(after?.value).toBe('null');
     expect(asyncStorageMock.state.get(THEME_MODE_KEY)).toBe('dark');
     await targetDb.closeAsync();
+  }, 60000);
+
+  it('reconciles the todo-reminder family after a portable import', async () => {
+    reminderReconcileSpies.reconcileTodoReminders.mockClear();
+    reminderReconcileSpies.syncDailyPlanReminder.mockClear();
+    reminderReconcileSpies.syncWeeklyReviewReminder.mockClear();
+
+    const sourceDb = await freshDatabase();
+    await seedSourceDevice(sourceDb);
+    const result = await exportSourceDevice(sourceDb);
+    await sourceDb.closeAsync();
+
+    await freshDatabase();
+    const { preparePortableImport, confirmPortableImport } =
+      await import('@/core/portable/portableImport');
+    const outcome = await preparePortableImport({ fileName: result.fileName, text: result.json });
+    expect(outcome.status).toBe('ready');
+    if (outcome.status !== 'ready') return;
+    expect((await confirmPortableImport({ file: outcome.file })).status).toBe('restored');
+
+    // Post-commit, the import must reconcile the todo-reminder family just
+    // like Restore V2: restored due-dated todos get their reminders, and the
+    // restored daily-plan / weekly-review nudges reschedule — without any of
+    // these the restored reminders stay silent for the whole session.
+    expect(reminderReconcileSpies.reconcileTodoReminders).toHaveBeenCalled();
+    expect(reminderReconcileSpies.syncDailyPlanReminder).toHaveBeenCalled();
+    expect(reminderReconcileSpies.syncWeeklyReviewReminder).toHaveBeenCalled();
   }, 60000);
 });
 
