@@ -1,6 +1,6 @@
 import { expect, test, type Page } from './fixtures';
 import { clearDatabase } from './helpers/db';
-import { goToTab, hardReload } from './helpers/navigation';
+import { goToTab, hardReload, waitForDb } from './helpers/navigation';
 import { openSettingsScreen } from './helpers/commandObservation';
 
 /**
@@ -175,7 +175,18 @@ test.describe('Gamification', () => {
       page.getByText('Vibration feedback is off. Rewards are visual only.'),
     ).toBeVisible();
 
-    // A fresh launch, then a reward WITHOUT visiting Settings.
+    // A genuinely fresh launch: an explicit reload throws away every module's
+    // in-memory state, so the reward below can only be silent if the stored
+    // choice was loaded at launch. Without this the check-off would merely
+    // reuse the state that mounting Settings already hydrated, and the test
+    // would pass even with launch-time hydration broken.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForDb(page, 15_000);
+    await expect(page.getByRole('tablist', { name: 'Section tabs' })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    // The reward WITHOUT visiting Settings in this launch.
     await goToTab(page, 'habits');
     await page.getByLabel(new RegExp(`${HABIT}: 0 of 1 today`)).click({ force: true });
     await expect(page.getByLabel(new RegExp(`${HABIT}: 1 of 1 today`))).toBeVisible({
