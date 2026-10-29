@@ -14,8 +14,8 @@ import {
 import {
   computeProjectProgress,
   filterProjectRows,
+  manualProjectMoveOrder,
   sortProjectRows,
-  swapProjectInOrder,
   type ProjectListRow,
   type ProjectSortKey,
   type ProjectStatusFilter,
@@ -82,8 +82,11 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
   const manualOrderActive = sortKey === 'manual' && statusFilter === 'all';
   const moveProject = useCallback(
     async (index: number, direction: -1 | 1) => {
-      const ids = rows.map((row) => row.project.id);
-      const next = swapProjectInOrder(ids, index, direction);
+      // `rows` is the FULL manual order (unfiltered, status-grouped) so the
+      // persisted order stays absolute and complete; the group-aware swap
+      // refuses moves across the completed/archived boundary, which renders
+      // last no matter what sort_order says.
+      const next = manualProjectMoveOrder(rows, index, direction);
       if (!next) return;
       await reorderProjects(next);
       void loadProjects();

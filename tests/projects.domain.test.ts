@@ -4,6 +4,7 @@ import {
   computeTargetDateCountdown,
   daysUntilDate,
   filterProjectRows,
+  manualProjectMoveOrder,
   sortProjectRows,
   swapProjectInOrder,
   type ProjectListRow,
@@ -257,5 +258,37 @@ describe('daysUntilDate calendar-day semantics', () => {
     // Samoa skipped 2011-12-30 entirely: 24 h of elapsed time, two day-keys.
     expect(daysUntilDate('2011-12-31', '2011-12-29')).toBe(2);
     expect(computeTargetDateCountdown('2011-12-31', '2011-12-29')?.label).toBe('2 days remaining');
+  });
+});
+
+/**
+ * Manual project order is only meaningful inside a status group: the data
+ * layer sorts completed/archived projects into a trailing group
+ * (`PROJECT_ORDER` in projects.data.ts), so a move that crosses that boundary
+ * rewrites sort_order without changing a single rendered row.
+ */
+describe('manualProjectMoveOrder', () => {
+  const rows = [
+    makeRow({ project: { id: 'a', status: 'active', sort_order: 1 } }),
+    makeRow({ project: { id: 'b', status: 'active', sort_order: 2 } }),
+    makeRow({ project: { id: 'c', status: 'completed', sort_order: 3 } }),
+    makeRow({ project: { id: 'd', status: 'archived', sort_order: 4 } }),
+  ];
+
+  it('swaps inside the status group and returns the full manual order', () => {
+    // The returned array is the FULL manual order so the caller persists
+    // absolute sort_order 1..N and the two groups can never collide later.
+    expect(manualProjectMoveOrder(rows, 1, -1)).toEqual(['b', 'a', 'c', 'd']);
+    expect(manualProjectMoveOrder(rows, 2, 1)).toEqual(['a', 'b', 'd', 'c']);
+  });
+
+  it('refuses a move that would cross the trailing completed/archived boundary', () => {
+    // 'b' is the last active row: moving it down lands in the completed group,
+    // which always renders last — the rows would not move.
+    expect(manualProjectMoveOrder(rows, 1, 1)).toBeNull();
+    // Likewise 'c' moving up out of the trailing group.
+    expect(manualProjectMoveOrder(rows, 2, -1)).toBeNull();
+    expect(manualProjectMoveOrder(rows, 0, -1)).toBeNull();
+    expect(manualProjectMoveOrder(rows, 3, 1)).toBeNull();
   });
 });
