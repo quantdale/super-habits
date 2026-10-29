@@ -24,7 +24,11 @@ describe('W6.5 Todo list contracts', () => {
     expect(screen).toContain('selectionMode || queryActive || showCompleted');
     expect(screen).toContain('<SectionList');
     expect(screen).toContain('sections={listSections}');
-    expect(screen).toContain('extraData={selectedIds}');
+    expect(screen).toContain('extraData={groupedExtraData}');
+    // The grouped rows' refresh marker must keep the W6.5 selection signal and
+    // add the local day key so "today"-derived row meta re-renders across a
+    // local-midnight rollover.
+    expect(screen).toContain('groupedExtraData = useMemo(() => ({ selectedIds, todayKey })');
     expect(screen).toContain('windowSize={5}');
     expect(screen).not.toContain('ScrollView');
     expect(screen).not.toContain('groupItems.map');
