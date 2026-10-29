@@ -64,6 +64,7 @@ import {
   computeWorkoutStreakFromHeatmapDays,
   computePersonalRecords,
   computeTrainingTotals,
+  resolveWeightUnit,
   computeBodyAreaDistribution,
   isQuickLoggedSession,
   type EnteredSetValues,
@@ -782,6 +783,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   // Heavy history derivations (records, totals, body-area split) run only
   // while the History & insights disclosure is open — the training path never
   // pays for them, and a collapsed landing does not re-render them on ticks.
+  const displayWeightUnit = resolveWeightUnit(workoutPreferences?.goalWeight?.unit);
   const landingAnalytics = useMemo(() => {
     if (!historyOpen) return null;
     const records = computePersonalRecords(
@@ -797,6 +799,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
           durationSeconds: row.durationSeconds,
           distance: row.distance,
         })),
+      displayWeightUnit,
     );
     const performanceByLog = new Map<string, WorkoutPerformanceRow[]>();
     for (const row of performanceRows) {
@@ -816,6 +819,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
           modality: row.modality ?? undefined,
         })),
       })),
+      displayWeightUnit,
     );
     const catalogAreaById = new Map<string, string>([
       ...BUILT_IN_EXERCISES.map((exercise) => [exercise.id, exercise.primaryArea] as const),
@@ -830,7 +834,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         })),
     );
     return { records, totals, bodyAreas };
-  }, [historyOpen, performanceRows, allLogs, customExercises]);
+  }, [historyOpen, performanceRows, allLogs, customExercises, displayWeightUnit]);
   const personalRecords = landingAnalytics?.records ?? [];
   const trainingTotals = landingAnalytics?.totals ?? null;
   const bodyAreaDistribution = landingAnalytics?.bodyAreas ?? [];
@@ -1015,6 +1019,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         bodyAreas={bodyAreaDistribution}
         selectedExercise={selectedProgressExercise}
         onSelectExercise={setSelectedProgressExercise}
+        weightUnit={displayWeightUnit}
       />
       <BodyWeightCard
         entries={bodyWeightEntries}
@@ -1416,6 +1421,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       <WorkoutHistoryDetailModal
         visible={detailLogId !== null}
         logId={detailLogId}
+        weightUnit={displayWeightUnit}
         onClose={() => setDetailLogId(null)}
         onDeleted={() => {
           setDetailLogId(null);

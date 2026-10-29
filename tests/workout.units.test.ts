@@ -149,3 +149,58 @@ describe('unit-aware progression seeding', () => {
     expect(lookupPreviousSet(lookup, 'Bench Press', 1)!.weight).toBe(100);
   });
 });
+
+describe('display-unit reporting (History detail / Progress / Totals)', () => {
+  it("buildExerciseHistory reports 1RM and volume in the user's lb display unit", () => {
+    const entries: ExerciseHistoryEntry[] = [
+      {
+        logId: 'a',
+        completedAt: '2026-10-01T10:00:00.000Z',
+        completed: true,
+        setNumber: 1,
+        exerciseName: 'Bench Press',
+        weight: 100,
+        reps: 1,
+        weightUnit: 'lb',
+      },
+      {
+        logId: 'b',
+        completedAt: '2026-10-02T10:00:00.000Z',
+        completed: true,
+        setNumber: 1,
+        exerciseName: 'Bench Press',
+        weight: 80,
+        reps: 1,
+        weightUnit: 'kg',
+      },
+    ];
+    const history = buildExerciseHistory(entries, 'lb');
+    expect(history!.bestEstimated1RM).toBeCloseTo(80 * KG_TO_LB, 6);
+    expect(history!.measurableVolume).toBeCloseTo(100 + 80 * KG_TO_LB, 6);
+  });
+
+  it("computeTrainingTotals measurableVolume reports in the user's lb display unit", () => {
+    const sessions = [
+      {
+        completedAt: '2026-10-01T10:00:00.000Z',
+        sets: [
+          { completed: true, weight: 100, reps: 1, weightUnit: 'kg' as const },
+          { completed: true, weight: 50, reps: 1, weightUnit: 'lb' as const },
+        ],
+      },
+    ];
+    expect(computeTrainingTotals(sessions, 'lb').measurableVolume).toBeCloseTo(
+      100 * KG_TO_LB + 50,
+      6,
+    );
+  });
+
+  it("computePersonalRecords reports best lifts in the user's lb display unit", () => {
+    const records = computePersonalRecords(
+      [{ exerciseName: 'Bench Press', weight: 80, reps: 5, weightUnit: 'kg' }],
+      'lb',
+    );
+    expect(records[0].bestTopSetWeight).toBeCloseTo(80 * KG_TO_LB, 6);
+    expect(records[0].bestEstimated1RM).toBeCloseTo(80 * (1 + 5 / 30) * KG_TO_LB, 6);
+  });
+});
