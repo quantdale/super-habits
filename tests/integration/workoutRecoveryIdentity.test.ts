@@ -303,6 +303,7 @@ describe('R3-02: performed identity survives mutable routine edits', () => {
           recovered.routine,
           domain.summarizeCompletedSets(replay, restored.phaseIndex, restored.dispositions),
           records,
+          'kg',
         );
         const result = await workout.logWorkoutSession({
           routineId: restored.routineId,

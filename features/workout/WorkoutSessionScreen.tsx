@@ -71,7 +71,7 @@ import {
   REST_SECONDS_STEP,
   clampRestSeconds,
 } from './restTimerPreferences';
-import type { WorkoutEffortScale } from '@/core/db/types';
+import type { WorkoutEffortScale, WorkoutWeightUnit } from '@/core/db/types';
 import type { RoutineWithExercises } from './types';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 
@@ -134,6 +134,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   const [restDefault, setRestDefault] = useState<number | null>(null);
   const [persistedRestDefault, setPersistedRestDefault] = useState<number | null>(null);
   const [effortScale, setEffortScale] = useState<WorkoutEffortScale>(resume?.effortScale ?? 'off');
+  // The user's weight unit (same resolution as the body-weight modal): stamped
+  // on logged sets so history never fabricates 'kg' for an lb user.
+  const [weightUnit, setWeightUnit] = useState<WorkoutWeightUnit>('kg');
   // The engine exercises, mapped once. The live sequence composes these
   // with any session-local added sets — the routine template is never written.
   const baseExercises = useMemo(() => buildSessionExerciseInputs(routine), [routine]);
@@ -157,6 +160,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
           setRestDefault(seconds);
           setPersistedRestDefault(seconds);
           if (!resume?.effortScale) setEffortScale(preferences.effortScale);
+          setWeightUnit(preferences.goalWeight?.unit ?? 'kg');
         }
       },
     );
@@ -914,7 +918,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       const logResult = await logWorkoutSession({
         routineId: routine.id,
         notes: notes.trim() ? notes.trim() : undefined,
-        exercises: buildSessionLogExercises(routine, summary, records),
+        exercises: buildSessionLogExercises(routine, summary, records, weightUnit),
         startedAt: startedAtMs !== null ? new Date(startedAtMs).toISOString() : null,
         endedAt: new Date(endedAtMs).toISOString(),
         // Resumed sessions log active time, not wall-clock: the gap between the
@@ -1265,7 +1269,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   const allowsExternalLoad = descriptorPhase.supportsExternalLoad !== false;
   const targetText = isLoadBased
     ? [
-        descriptorPhase.targetLoad != null ? `target ${descriptorPhase.targetLoad} kg` : null,
+        descriptorPhase.targetLoad != null
+          ? `target ${descriptorPhase.targetLoad} ${weightUnit}`
+          : null,
         descriptorPhase.targetRepsMin != null || descriptorPhase.targetRepsMax != null
           ? `${descriptorPhase.targetRepsMin ?? descriptorPhase.targetRepsMax}–${descriptorPhase.targetRepsMax ?? descriptorPhase.targetRepsMin} reps`
           : null,
@@ -1428,7 +1434,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   /** Read-only display of a recorded set row. */
   const renderRecordedSet = (row: SetRow) => {
     const parts: string[] = [];
-    if (row.entered.weight) parts.push(`${row.entered.weight} kg`);
+    if (row.entered.weight) parts.push(`${row.entered.weight} ${weightUnit}`);
     if (row.entered.reps)
       parts.push(`${row.entered.reps}${row.phase.unilateral ? '/side' : ''} reps`);
     if (row.entered.duration) parts.push(`${row.entered.duration}s`);
@@ -1506,7 +1512,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
               style={{ color: tokens.successText }}
               numberOfLines={2}
             >
-              {`PR! ${prNotice.exerciseName} · est. ${formatMetricNumber(prNotice.estimated1RM)} kg`}
+              {`PR! ${prNotice.exerciseName} · est. ${formatMetricNumber(prNotice.estimated1RM)} ${weightUnit}`}
             </Text>
             <Pressable
               onPress={dismissPrNotice}
