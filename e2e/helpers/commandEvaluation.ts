@@ -183,8 +183,22 @@ async function readActiveChipValue<T extends string>(
       if (!visible) continue;
 
       const isActive = await candidate.evaluate((element) => {
-        const color = window.getComputedStyle(element as HTMLElement).color;
-        return color === 'rgb(255, 255, 255)';
+        // P6 chip restyle: the selected label is section ink on a tint, not
+        // white, so color can no longer decide "active". Read the control's
+        // selection semantics instead: walk up to the nearest ancestor
+        // carrying aria-pressed / aria-selected / aria-checked
+        // (PillChip/Chip sets aria-pressed={active}).
+        let node: HTMLElement | null = element as HTMLElement;
+        while (node) {
+          const pressed = node.getAttribute('aria-pressed');
+          if (pressed !== null) return pressed === 'true';
+          const selected = node.getAttribute('aria-selected');
+          if (selected !== null) return selected === 'true';
+          const checked = node.getAttribute('aria-checked');
+          if (checked !== null) return checked === 'true';
+          node = node.parentElement;
+        }
+        return false;
       });
       if (isActive) {
         return option.value;

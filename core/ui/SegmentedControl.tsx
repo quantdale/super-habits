@@ -4,9 +4,13 @@ import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useReducedMotion } from '@/core/theme/motion';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
-import { radius, spacing } from '@/core/theme/designTokens';
-import { readableSurface } from '@/core/theme/contrast';
+import { radius } from '@/core/theme/designTokens';
 import { nextSegmentValue } from '@/core/ui/segmentedControl.model';
+
+/** 40px track (§6): 36pt segment faces + 2pt padding. */
+const TRACK_PADDING = 2;
+/** Thumb lip under the white face (§6 "white Pressable3D (2px lip)"). */
+const THUMB_LIP = 2;
 
 type SegmentOption<T extends string> = {
   value: T;
@@ -68,7 +72,7 @@ function SegmentOptionButton<T extends string>({
     >
       <Text
         variant="label"
-        style={{ color: active ? tokens.onSolid : tokens.textMuted }}
+        style={{ color: active ? ringColor : tokens.textMuted }}
         numberOfLines={1}
       >
         {option.label}
@@ -108,9 +112,6 @@ export function SegmentedControl<T extends string>({
   const { tokens } = useAppTheme();
   const reducedMotion = useReducedMotion();
   const resolvedAccent = accentColor ?? tokens.primary;
-  // The sliding pill carries white labels; deepen a mid-tone accent so the
-  // selected label clears WCAG AA (white on a section hue is ~2.5:1).
-  const pillColor = readableSurface(resolvedAccent, tokens.onSolid);
   const containerRef = useRef<View>(null);
   const [trackWidth, setTrackWidth] = useState(0);
   const [indicator] = useState(() => new Animated.Value(0));
@@ -165,12 +166,12 @@ export function SegmentedControl<T extends string>({
       ref={containerRef}
       accessibilityRole="tablist"
       accessibilityLabel={accessibilityLabel}
-      onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width - spacing.xs * 2)}
+      onLayout={(event) => setTrackWidth(event.nativeEvent.layout.width - TRACK_PADDING * 2)}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        padding: spacing.xs,
-        borderRadius: radius.full,
+        padding: TRACK_PADDING,
+        borderRadius: 14,
         borderWidth: 1,
         borderColor: tokens.border,
         backgroundColor: tokens.surfaceSunken,
@@ -182,16 +183,25 @@ export function SegmentedControl<T extends string>({
           style={[
             StyleSheet.absoluteFill,
             {
-              left: spacing.xs,
-              top: spacing.xs,
-              bottom: spacing.xs,
+              left: TRACK_PADDING,
+              top: TRACK_PADDING,
+              bottom: TRACK_PADDING,
               width: segmentWidth,
               borderRadius: radius.full,
-              backgroundColor: pillColor,
+              backgroundColor: tokens.borderStrong,
               transform: [{ translateX: indicator }],
             },
           ]}
-        />
+        >
+          <View
+            style={{
+              flex: 1,
+              marginBottom: THUMB_LIP,
+              borderRadius: radius.full,
+              backgroundColor: tokens.surface,
+            }}
+          />
+        </Animated.View>
       ) : null}
       {options.map((option) => (
         <SegmentOptionButton

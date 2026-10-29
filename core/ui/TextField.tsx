@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Text } from '@/core/ui/Text';
 import { Platform, TextInput, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { resolveTextFieldA11y } from '@/core/ui/textFieldA11y';
-import { spacing, typography } from '@/core/theme/designTokens';
+import { radius, spacing, typography } from '@/core/theme/designTokens';
 
 type TextFieldProps = {
   label: string;
@@ -32,6 +34,13 @@ type TextFieldProps = {
   disabled?: boolean;
 };
 
+/**
+ * TextField — v2 input well (Playful Momentum §6): 52px, radius 12, a
+ * `surfaceSunken` face with a 2px transparent border (so focus can swap in the
+ * 2px `accent` ring without a layout shift); focused = `accent` border + white
+ * face. `label` 13/700 above; error = Cherry text + icon, still
+ * programmatically associated via `resolveTextFieldA11y`.
+ */
 export function TextField({
   label,
   value,
@@ -52,6 +61,7 @@ export function TextField({
   disabled = false,
 }: TextFieldProps) {
   const { tokens } = useAppTheme();
+  const [focused, setFocused] = useState(false);
   const resolvedKeyboardType = unsignedInteger ? 'number-pad' : keyboardType;
   const { helperId, errorId, describedBy } = resolveTextFieldA11y(nativeID, error, helperText);
 
@@ -67,19 +77,24 @@ export function TextField({
         accessibilityLabel={accessibilityLabelProp ?? label}
         aria-describedby={describedBy}
         aria-invalid={error ? true : undefined}
-        className="rounded-2xl border px-4 py-3"
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         style={{
-          minHeight: 48,
+          minHeight: 52,
           fontSize: typography.bodyLg.fontSize,
-          borderColor: error ? tokens.dangerText : tokens.border,
-          backgroundColor: tokens.surfaceElevated,
+          borderRadius: radius.sm,
+          borderWidth: 2,
+          borderColor: error ? tokens.dangerText : focused ? tokens.accent : 'transparent',
+          backgroundColor: focused ? tokens.surface : tokens.surfaceSunken,
+          paddingHorizontal: spacing.lg,
+          paddingVertical: spacing.md,
           color: tokens.text,
           opacity: disabled ? 0.6 : 1,
         }}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={tokens.textMuted}
+        placeholderTextColor={tokens.textSubtle}
         keyboardType={resolvedKeyboardType}
         editable={!disabled}
         multiline={multiline}
@@ -93,13 +108,23 @@ export function TextField({
         {...(Platform.OS === 'web' && nativeID ? { id: nativeID } : {})}
       />
       {error ? (
-        <Text
-          nativeID={errorId}
-          variant="label"
-          style={{ marginTop: spacing.xs + 2, color: tokens.dangerText }}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.xs,
+            marginTop: spacing.xs + 2,
+          }}
         >
-          {error}
-        </Text>
+          <MaterialIcons name="error-outline" size={16} color={tokens.dangerText} />
+          <Text
+            nativeID={errorId}
+            variant="label"
+            style={{ color: tokens.dangerText, flexShrink: 1 }}
+          >
+            {error}
+          </Text>
+        </View>
       ) : helperText ? (
         <Text
           nativeID={helperId}
