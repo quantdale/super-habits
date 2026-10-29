@@ -1,4 +1,4 @@
-import { useCallback, useState, type PropsWithChildren } from 'react';
+import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from 'react';
 import {
   NavigationContext,
   type AppSection,
@@ -6,6 +6,41 @@ import {
 } from '@/core/providers/navigationContext';
 
 export type { AppSection, PlanningHubView } from '@/core/providers/navigationContext';
+
+const KNOWN_SECTIONS: readonly string[] = [
+  'overview',
+  'todos',
+  'habits',
+  'pomodoro',
+  'workout',
+  'calories',
+  'health',
+];
+
+/**
+ * URL-hash stamp for the section a history entry represents (web only).
+ *
+ * The hash — not `history.state` — is deliberate: expo-router's
+ * `createMemoryHistory.replace` rewrites `history.state` to `{ id }` on startup
+ * and on every popstate (its `onStateChange` else-branch), silently dropping
+ * any extra state keys, while it preserves `location.hash` verbatim
+ * (`pathWithHash = path + location.hash`). The URL survives that rewriting,
+ * reloads, and SW-update reloads, and it makes sections deep-linkable
+ * (`/#habits`). Back/forward between sections depends on this stamp.
+ */
+function readHistorySection(): AppSection | null {
+  if (typeof window === 'undefined') return null;
+  const hash = window.location.hash.replace(/^#/, '');
+  return KNOWN_SECTIONS.includes(hash) ? (hash as AppSection) : null;
+}
+
+function stampHistorySection(section: AppSection): void {
+  if (typeof window === 'undefined') return;
+  // `overview` maps to the clean URL; the hash carries every other section.
+  const url =
+    section === 'overview' ? window.location.pathname + window.location.search : `#${section}`;
+  window.history.pushState(window.history.state, '', url);
+}
 
 export function NavigationProvider({ children }: PropsWithChildren) {
   const [activeSection, setActiveSectionState] = useState<AppSection>('overview');
@@ -55,10 +90,37 @@ export function NavigationProvider({ children }: PropsWithChildren) {
     setIsAchievementsOpen(true);
   }, []);
   const closeAchievements = useCallback(() => setIsAchievementsOpen(false), []);
-  const setActiveSection = useCallback((section: AppSection) => {
+  const activeSectionRef = useRef<AppSection>(activeSection);
+  const applySection = useCallback((section: AppSection) => {
+    activeSectionRef.current = section;
     setMountedSections((current) => (current[section] ? current : { ...current, [section]: true }));
     setActiveSectionState(section);
   }, []);
+  const setActiveSection = useCallback(
+    (section: AppSection) => {
+      const changed = activeSectionRef.current !== section;
+      applySection(section);
+      // Browser back/forward must walk between sections instead of leaving the
+      // app: each real section change is a history entry. Re-selecting the
+      // current section and popstate restores never push.
+      if (changed) stampHistorySection(section);
+    },
+    [applySection],
+  );
+  // Web history mirror (native has no window/history): adopt the stamped
+  // section after hydration (the prerendered shell always renders `overview`,
+  // so this must not run during render — also makes `/#habits` a deep link)
+  // and restore the stamped section on back/forward.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stamped = readHistorySection();
+    if (stamped && stamped !== activeSectionRef.current) applySection(stamped);
+    const handlePopState = () => {
+      applySection(readHistorySection() ?? 'overview');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [applySection]);
   const openHabit = useCallback(
     (habitId: string) => {
       setPendingHabitFocusId(habitId);
