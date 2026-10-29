@@ -180,13 +180,18 @@ export function parseQuickCapture(
         const fullName = WEEKDAYS[i];
         const abbreviation = fullName.slice(0, 3);
         const patterns = [
-          // Full names always count ("friday", "on friday").
-          new RegExp(`(^|\\s)(on\\s+)?${fullName}(?=\\s|$)`, 'i'),
+          // Full names always count ("friday", "on friday"); a leading
+          // "next/this/coming" qualifier is part of the date phrase and is
+          // consumed with it, so the title never keeps a stranded "next".
+          new RegExp(`(^|\\s)(?:on\\s+)?(?:(?:next|this|coming)\\s+)?${fullName}(?=\\s|$)`, 'i'),
           // Unambiguous abbreviations count bare ("fri"); ambiguous ones only
-          // with the "on" qualifier ("on sat").
+          // with a qualifier ("on sat", "next sat").
           AMBIGUOUS_WEEKDAY_ABBREVIATIONS.has(abbreviation)
-            ? new RegExp(`(^|\\s)on\\s+${abbreviation}(?=\\s|$)`, 'i')
-            : new RegExp(`(^|\\s)(on\\s+)?${abbreviation}(?=\\s|$)`, 'i'),
+            ? new RegExp(`(^|\\s)(?:(?:on|next|this|coming)\\s+)+${abbreviation}(?=\\s|$)`, 'i')
+            : new RegExp(
+                `(^|\\s)(?:on\\s+)?(?:(?:next|this|coming)\\s+)?${abbreviation}(?=\\s|$)`,
+                'i',
+              ),
         ];
         const pattern = patterns.find((candidate) => candidate.test(text));
         if (pattern) {
