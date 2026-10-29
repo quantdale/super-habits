@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
-import { queryRows } from './helpers/dbHarness';
+import { queryRows, returnToApp } from './helpers/dbHarness';
 import { fillRoutineName } from './helpers/forms';
 
 async function tomorrowDateKey(page: Parameters<typeof goToTab>[0]): Promise<string> {
@@ -473,5 +473,18 @@ test.describe('Workout Gym V2', () => {
     expect(JSON.parse(String(prefs[0]?.value))).toMatchObject({
       goalWeight: { value: 75, unit: 'kg' },
     });
+
+    // The goal keeps its own unit: logging a measurement in lb must not
+    // silently reinterpret the stored 75 kg goal as 75 lb.
+    await returnToApp(page);
+    await goToTab(page, 'workout');
+    await page.getByRole('button', { name: 'History and insights' }).click();
+    await page.getByText('Log weight', { exact: true }).click();
+    const lbDialog = page.getByRole('dialog');
+    await lbDialog.getByText('lb', { exact: true }).click();
+    await lbDialog.getByRole('textbox', { name: 'Weight', exact: true }).fill('176');
+    await lbDialog.getByText('Save weight and goal', { exact: true }).click();
+    await expect(page.getByText('176 lb', { exact: true })).toBeVisible();
+    await expect(page.getByText('Goal · 75 kg', { exact: true })).toBeVisible();
   });
 });

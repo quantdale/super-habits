@@ -1331,10 +1331,19 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                   note: bodyWeightNote,
                 });
               }
+              const storedGoal = workoutPreferences?.goalWeight ?? null;
               const nextPreferences: WorkoutPreferences = {
                 ...(workoutPreferences ?? { effortScale: 'off', workoutReminder: null }),
                 goalWeight:
-                  bodyWeightGoalValue.trim() === '' ? null : { value: goal, unit: bodyWeightUnit },
+                  bodyWeightGoalValue.trim() === ''
+                    ? null
+                    : // An untouched goal keeps its stored value AND unit (the
+                      // kg/lb toggle belongs to the measurement; reusing it
+                      // reinterpreted a 75 kg goal as 75 lb). A changed or
+                      // new goal is entered in the currently selected unit.
+                      storedGoal && goal === storedGoal.value
+                      ? storedGoal
+                      : { value: goal, unit: bodyWeightUnit },
               };
               await saveWorkoutPreferences(nextPreferences);
               setWorkoutPreferences(nextPreferences);
