@@ -3,6 +3,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useAppNavigation, type AppSection } from '@/core/providers/navigationContext';
+import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { Card } from '@/core/ui/Card';
 import { Screen } from '@/core/ui/Screen';
 import { SectionLabel } from '@/core/ui/SectionLabel';
@@ -25,6 +26,9 @@ import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 export function HealthScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
   const navigation = useAppNavigation();
+  // Day rollover: today's totals must follow the local day across midnight,
+  // matching every other section screen's refresh wiring.
+  const dayGeneration = useDayRolloverGeneration();
   const [workoutToday, setWorkoutToday] = useState<boolean | null>(null);
   const [kcalState, setKcalState] = useState<{ eaten: number; goal: number } | null>(null);
 
@@ -43,7 +47,7 @@ export function HealthScreen({ isActive }: { isActive: boolean }) {
     }
   }, []);
 
-  useActiveForegroundRefresh(isActive, refresh);
+  useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 
   const openSection = (section: AppSection) => navigation.setActiveSection(section);
 
