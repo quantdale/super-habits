@@ -2,6 +2,7 @@ import { Text } from '@/core/ui/Text';
 import { Platform, TextInput, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { resolveTextFieldA11y } from '@/core/ui/textFieldA11y';
+import { spacing, typography } from '@/core/theme/designTokens';
 
 type TextFieldProps = {
   label: string;
@@ -57,7 +58,7 @@ export function TextField({
   return (
     <View className="mb-3">
       {label ? (
-        <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
+        <Text variant="label" tone="muted" style={{ marginBottom: spacing.xs + 2 }}>
           {label}
         </Text>
       ) : null}
@@ -66,9 +67,10 @@ export function TextField({
         accessibilityLabel={accessibilityLabelProp ?? label}
         aria-describedby={describedBy}
         aria-invalid={error ? true : undefined}
-        className="rounded-2xl border px-4 py-3 text-base"
+        className="rounded-2xl border px-4 py-3"
         style={{
           minHeight: 48,
+          fontSize: typography.bodyLg.fontSize,
           borderColor: error ? tokens.dangerText : tokens.border,
           backgroundColor: tokens.surfaceElevated,
           color: tokens.text,
@@ -91,11 +93,20 @@ export function TextField({
         {...(Platform.OS === 'web' && nativeID ? { id: nativeID } : {})}
       />
       {error ? (
-        <Text nativeID={errorId} className="mt-1.5 text-sm" style={{ color: tokens.dangerText }}>
+        <Text
+          nativeID={errorId}
+          variant="label"
+          style={{ marginTop: spacing.xs + 2, color: tokens.dangerText }}
+        >
           {error}
         </Text>
       ) : helperText ? (
-        <Text nativeID={helperId} className="mt-1.5 text-sm" style={{ color: tokens.textMuted }}>
+        <Text
+          nativeID={helperId}
+          variant="label"
+          tone="muted"
+          style={{ marginTop: spacing.xs + 2 }}
+        >
           {helperText}
         </Text>
       ) : null}

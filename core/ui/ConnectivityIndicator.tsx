@@ -34,7 +34,7 @@ export function ConnectivityIndicator() {
         }}
       >
         <MaterialIcons name="cloud-off" size={14} color={tokens.warningText} />
-        <Text className="text-xs font-semibold" style={{ color: tokens.warningText }}>
+        <Text variant="caption" style={{ color: tokens.warningText }}>
           Offline — changes stay on this device
         </Text>
       </View>

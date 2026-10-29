@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Card } from '@/core/ui/Card';
 import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { radius, spacing } from '@/core/theme/designTokens';
+import { radius, spacing, typography } from '@/core/theme/designTokens';
 import { readableAccent } from '@/core/theme/contrast';
 
 type StatBlockProps = {
@@ -58,10 +58,13 @@ export function StatBlock({
             {icon}
           </View>
         ) : null}
-        <Text variant="metric" style={{ color: valueColor, fontSize: 24 }}>
+        {/* Numeric stats keep the metric face (800 + tabular figures, §5.5)
+            at title scale, so dense 3-up grids never clip while digits stay
+            fixed-width. Both values are role tokens, never raw sizes. */}
+        <Text variant="metric" style={{ color: valueColor, fontSize: typography.titleLg.fontSize }}>
           {value}
         </Text>
-        <Text variant="caption" tone="muted" style={{ fontSize: 11 }} numberOfLines={1}>
+        <Text variant="caption" tone="muted" style={{ color: tokens.textMuted }} numberOfLines={1}>
           {label}
         </Text>
         {detail ? (

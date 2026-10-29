@@ -94,7 +94,7 @@ export function UpdateAvailableBanner() {
         >
           <MaterialIcons name="system-update" size={18} color={tokens.accent} />
         </View>
-        <Text className="min-w-0 flex-1 text-sm font-medium" style={{ color: tokens.text }}>
+        <Text variant="bodyMd" style={{ color: tokens.text }}>
           Update available
         </Text>
         <Pressable
@@ -105,7 +105,7 @@ export function UpdateAvailableBanner() {
           style={{ backgroundColor: tokens.accent }}
           onPress={handleApply}
         >
-          <Text className="text-sm font-semibold" style={{ color: tokens.textOnAccent }}>
+          <Text variant="label" style={{ color: tokens.textOnAccent }}>
             {applying ? 'Updating…' : 'Refresh'}
           </Text>
         </Pressable>

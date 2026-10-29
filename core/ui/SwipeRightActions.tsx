@@ -47,7 +47,9 @@ export function SwipeRightActions({ onEdit, onDelete, editColor, compact }: Prop
         accessibilityLabel="Edit item"
         style={[actionStyle, { backgroundColor: editColor }]}
       >
-        <Text style={{ color: tokens.textOnAccent, fontSize: 13, fontWeight: '600' }}>Edit</Text>
+        <Text variant="label" style={{ color: tokens.textOnAccent }}>
+          Edit
+        </Text>
       </Pressable>
       <Pressable
         onPress={onDelete}
@@ -55,7 +57,9 @@ export function SwipeRightActions({ onEdit, onDelete, editColor, compact }: Prop
         accessibilityLabel="Delete item"
         style={[actionStyle, { backgroundColor: tokens.dangerSolid }]}
       >
-        <Text style={{ color: tokens.textOnAccent, fontSize: 13, fontWeight: '600' }}>Delete</Text>
+        <Text variant="label" style={{ color: tokens.textOnAccent }}>
+          Delete
+        </Text>
       </Pressable>
     </View>
   );

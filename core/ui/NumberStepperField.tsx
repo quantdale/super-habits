@@ -2,6 +2,7 @@ import { Text } from '@/core/ui/Text';
 import { Pressable, TextInput, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { sanitizeStepperInput } from '@/core/ui/stepperInput';
+import { spacing, typography } from '@/core/theme/designTokens';
 
 type NumberStepperFieldProps = {
   label: string;
@@ -39,7 +40,7 @@ export function NumberStepperField({
 
   return (
     <View className="mb-3">
-      <Text className="mb-1.5 text-sm font-medium" style={{ color: tokens.textMuted }}>
+      <Text variant="label" tone="muted" style={{ marginBottom: spacing.xs + 2 }}>
         {label}
       </Text>
       <View className="flex-row items-center">
@@ -55,15 +56,16 @@ export function NumberStepperField({
             backgroundColor: tokens.surface,
           }}
         >
-          <Text className="text-lg font-semibold" style={{ color: tokens.textMuted }}>
+          <Text variant="titleMd" tone="muted">
             −
           </Text>
         </Pressable>
         <TextInput
-          className="flex-1 border px-3 py-2 text-center text-base"
+          className="flex-1 border px-3 py-2 text-center"
           accessibilityLabel={inputAccessibilityLabel ?? label}
           style={{
             height: 48,
+            fontSize: typography.bodyLg.fontSize,
             borderColor: tokens.border,
             backgroundColor: tokens.surfaceElevated,
             color: tokens.text,
@@ -86,7 +88,7 @@ export function NumberStepperField({
             backgroundColor: tokens.surface,
           }}
         >
-          <Text className="text-lg font-semibold" style={{ color: tokens.textMuted }}>
+          <Text variant="titleMd" tone="muted">
             +
           </Text>
         </Pressable>
