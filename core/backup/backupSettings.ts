@@ -26,6 +26,7 @@ import {
   DEFAULT_DAILY_PLAN_REMINDER_TIME,
   DAILY_PLAN_REMINDER_TIME_KEY,
   TODO_REMINDERS_ENABLED_KEY,
+  resetNotificationPreferenceCaches,
 } from '@/core/notifications/notificationPreferences';
 import {
   formatTimeOfDay,
@@ -791,6 +792,11 @@ export async function applyPendingThemeApplication(): Promise<boolean> {
     }
     // Marker cleared only after every AsyncStorage write succeeded.
     await setAppMetaText(db, appMetaKeys.backupPendingThemeApply, 'null');
+    // These AsyncStorage writes bypass the notification-preference setters,
+    // so their in-memory caches still hold the pre-restore values; invalidate
+    // them here or every reader this session (schedulers, Settings UI) keeps
+    // gating on the stale preference until the app restarts.
+    resetNotificationPreferenceCaches();
     return true;
   } catch {
     // AsyncStorage failed; the marker stays durable for the next retry.
