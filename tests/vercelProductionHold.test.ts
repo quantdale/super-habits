@@ -79,23 +79,40 @@ describe('Vercel production-release hold', () => {
     expect((enabled as Record<string, boolean>)['main']).toBe(false);
   });
 
+  it('disables Git-triggered deployments for bot and campaign branches', () => {
+    // Bot-fix and campaign/frontend-v3 namespaces are never reviewed through
+    // PR previews and must not consume build minutes or create deployments.
+    // These rules are per-branch minimatch patterns; every one must stay
+    // `false` — see the precedence note below.
+    const enabled = readVercelConfig().git?.deploymentEnabled as Record<string, boolean>;
+    expect(enabled['snyk-fix-*']).toBe(false);
+    expect(enabled['campaign/*']).toBe(false);
+    expect(enabled['frontend-v3-*']).toBe(false);
+  });
+
   it('contains no rule that can re-enable main deployments', () => {
     const enabled = readVercelConfig().git?.deploymentEnabled;
     expect(typeof enabled).toBe('object');
     const rules = enabled as Record<string, boolean>;
     // Two layers, because a hand-rolled minimatch is easy to get wrong:
     //
-    // 1. The PRIMARY guard is the exact-key assertion in the next test
-    //    (`Object.keys(...)` equals `['main']`). Any added rule, `true` or
-    //    `false`, fails it — so no pattern can be smuggled in at all.
-    // 2. This scan is a readable, targeted statement of intent for the common
-    //    bypass shapes. It is deliberately NOT a general minimatch
-    //    implementation (it would miss `mai*`, `**`, `[m]ain`, `{main}`), which
-    //    is exactly why the exact-key assertion is the load-bearing one.
+    // 1. The PRIMARY guard is the exact-key assertion in the last test
+    //    (`Object.keys(...)` equals the declared four-key set). Any rule
+    //    outside that set, `true` or `false`, fails it — so no pattern can be
+    //    smuggled in at all.
+    // 2. The scans below are readable, targeted statements of intent for the
+    //    common bypass shapes. They are deliberately NOT a general minimatch
+    //    implementation (they would miss `mai*`, `**`, `[m]ain`, `{main}`),
+    //    which is exactly why the exact-key assertion is the load-bearing one.
     //
     // Vercel: "If a branch matches multiple rules and at least one rule is
     // `true`, a deployment will occur." A `true` rule matching `main` therefore
-    // re-opens auto-release and defeats the hold.
+    // re-opens auto-release and defeats the hold — and a `true` rule is a hold
+    // bypass for ANY branch it matches, so no rule may be `true` at all.
+    const trueRules = Object.entries(rules)
+      .filter(([, value]) => value === true)
+      .map(([pattern]) => pattern);
+    expect(trueRules).toEqual([]);
     const matchesMain = (pattern: string): boolean =>
       ['main', '*', 'm*', '*ain', 'ma*'].includes(pattern);
     const bypasses = Object.entries(rules)
@@ -121,16 +138,25 @@ describe('Vercel production-release hold', () => {
     expect(config.headers?.[0]?.source).toBe('/(.*)');
   });
 
-  it('does not disable preview deployments for non-main branches', () => {
-    // The hold must be scoped to main only: PR previews are how a change gets
-    // reviewed and verified before integration.
+  it('scopes deployment disabling to main plus the declared bot/campaign branches', () => {
+    // The hold must not blanket-disable previews: PR previews are how a change
+    // gets reviewed and verified before integration. Only `main` (the
+    // production hold) and the bot/campaign namespaces (`snyk-fix-*`,
+    // `campaign/*`, `frontend-v3-*`) are disabled; every other branch keeps
+    // its default `true`.
     //
     // This exact-key assertion is ALSO the primary bypass guard for the rule
-    // scan above: any added rule (true or false, any pattern) fails here, so a
-    // pattern that the scan's limited matcher would miss cannot be introduced
-    // without a deliberate edit to this test.
+    // scan above: any rule beyond these four (true or false, any pattern)
+    // fails here, so a pattern that the scan's limited matcher would miss
+    // cannot be introduced without a deliberate edit to this test.
     const enabled = readVercelConfig().git?.deploymentEnabled as Record<string, boolean>;
-    expect(Object.keys(enabled)).toEqual(['main']);
+    expect(Object.keys(enabled).sort()).toEqual([
+      'campaign/*',
+      'frontend-v3-*',
+      'main',
+      'snyk-fix-*',
+    ]);
+    expect(Object.values(enabled).every((value) => value === false)).toBe(true);
     expect(enabled['main']).toBe(false);
   });
 });
