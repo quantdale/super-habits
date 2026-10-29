@@ -419,10 +419,11 @@ export async function getGoalRollup(goalId: string): Promise<GoalRollupData> {
       windowStart,
     );
     expectedOccurrences += days.filter((day) => day.eligible).length;
-    // Numerator keeps the count > 0 semantics (a partial counted day counts),
-    // but only on eligible days: a completion left on a now-masked day (e.g. a
-    // pause taken after today's check-in) must not inflate consistency.
-    completionsInWindow += days.filter((day) => day.eligible && day.count > 0).length;
+    // Numerator is completed eligible occurrences, matching the habit engine's
+    // own consistency (count >= that date's rule target): a partial day (1 of 3)
+    // is not a completed occurrence, and a completion left on a now-masked day
+    // (e.g. a pause taken after today's check-in) must not inflate it either.
+    completionsInWindow += days.filter((day) => day.completed).length;
   }
 
   return {
