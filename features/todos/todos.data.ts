@@ -23,7 +23,11 @@ import {
   buildTransactionalSourceEvent,
   linkedActionsEngine,
 } from '@/core/linked-actions/linkedActions.engine';
-import { parseTopTodoIds, serializeTopTodoIds } from '@/features/daily-plan/dailyPlan.domain';
+import {
+  parseTopTodoIds,
+  parseTopTodoTitles,
+  serializeTopTodoIds,
+} from '@/features/daily-plan/dailyPlan.domain';
 import {
   cancelTodoReminderSafely,
   syncTodoDueReminder,
@@ -1566,17 +1570,34 @@ async function removeTodoWithinTransaction(
   // F11: prune the removed id from any daily plan's top_todo_ids inside the
   // same transaction. daily_plans is a synced entity, so each touched plan
   // gets its own update intent; plans without the id are left untouched.
-  const plans = await transactionDb.getAllAsync<{ id: string; top_todo_ids: string }>(
-    `SELECT id, top_todo_ids FROM daily_plans
+  const plans = await transactionDb.getAllAsync<{
+    id: string;
+    top_todo_ids: string;
+    top_todo_titles: string | null;
+  }>(
+    `SELECT id, top_todo_ids, top_todo_titles FROM daily_plans
      WHERE deleted_at IS NULL AND top_todo_ids LIKE ?`,
     [`%"${id}"%`],
   );
   for (const plan of plans) {
     const topTodoIds = parseTopTodoIds(plan.top_todo_ids);
     if (!topTodoIds.includes(id)) continue;
+    // The ids and titles arrays are index-aligned (parseTopTodoTitles
+    // contract): removing the id must remove its title slot too, or every
+    // later priority renders the previous item's title. A missing slot
+    // snapshots as '' (the documented "no snapshot" marker).
+    const topTodoTitles = parseTopTodoTitles(plan.top_todo_titles);
+    const kept = topTodoIds
+      .map((todoId, index) => ({ todoId, title: topTodoTitles[index] ?? '' }))
+      .filter((entry) => entry.todoId !== id);
     await transactionDb.runAsync(
-      `UPDATE daily_plans SET top_todo_ids = ?, updated_at = ? WHERE id = ?`,
-      [serializeTopTodoIds(topTodoIds.filter((todoId) => todoId !== id)), now, plan.id],
+      `UPDATE daily_plans SET top_todo_ids = ?, top_todo_titles = ?, updated_at = ? WHERE id = ?`,
+      [
+        serializeTopTodoIds(kept.map((entry) => entry.todoId)),
+        JSON.stringify(kept.map((entry) => entry.title)),
+        now,
+        plan.id,
+      ],
     );
     enqueue({ entity: 'daily_plans', id: plan.id, updatedAt: now, operation: 'update' });
   }

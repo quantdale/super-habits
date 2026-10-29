@@ -728,7 +728,7 @@ describe('bulk todo operations', () => {
   }
 
   type SeedRow = Partial<typeof TODO_DEFAULTS>;
-  type PlanRow = { id: string; top_todo_ids: string };
+  type PlanRow = { id: string; top_todo_ids: string; top_todo_titles?: string | null };
 
   /**
    * A stateful in-memory double: UPDATE handlers mutate the seeded rows so
@@ -1045,7 +1045,11 @@ describe('bulk todo operations', () => {
   describe('daily plan pruning on remove (F11)', () => {
     it('prunes the removed id from plan top_todo_ids inside the same transaction', async () => {
       const { db, getTransactionCount } = makeStatefulDb({ todo_1: {} }, [
-        { id: 'dplan_1', top_todo_ids: JSON.stringify(['todo_1', 'todo_9']) },
+        {
+          id: 'dplan_1',
+          top_todo_ids: JSON.stringify(['todo_1', 'todo_9']),
+          top_todo_titles: JSON.stringify(['One', 'Nine']),
+        },
         { id: 'dplan_2', top_todo_ids: JSON.stringify(['todo_9']) },
       ]);
       getDatabase.mockResolvedValue(db);
@@ -1057,8 +1061,10 @@ describe('bulk todo operations', () => {
         String(call[0]).includes('UPDATE daily_plans'),
       );
       expect(planUpdates).toHaveLength(1);
+      // Index-aligned contract: the pruned id takes its title slot with it.
       expect(planUpdates[0][1]).toEqual([
         JSON.stringify(['todo_9']),
+        JSON.stringify(['Nine']),
         expect.any(String),
         'dplan_1',
       ]);
