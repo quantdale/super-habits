@@ -96,6 +96,10 @@ export type ProjectHabitRollupInput = {
   habitCount: number;
   recentCompletions: number;
   windowDays: number;
+  /** Completed eligible scheduled occurrences in the window. */
+  completedOccurrences: number;
+  /** Eligible scheduled occurrences in the window (rest days are neutral). */
+  expectedOccurrences: number;
 };
 
 export type ProjectProgressComponents = {
@@ -130,10 +134,14 @@ export function computeProjectProgress(input: {
     input.goals.count > 0
       ? ratio(clampProgressPercent(input.goals.averageProgressPercent), 100)
       : null;
-  const expectedSlots = input.habits.habitCount * Math.max(0, input.habits.windowDays);
+  // Denominator = eligible scheduled occurrences, not calendar slots: rest
+  // days, pre-creation days, and paused/archived intervals are neutral and
+  // never count as misses (habit-scheduling-and-history-semantics spec), which
+  // keeps project consistency aligned with goal consistency.
+  const expectedSlots = Math.max(0, input.habits.expectedOccurrences);
   const habitRatio =
     input.habits.habitCount > 0 && expectedSlots > 0
-      ? ratio(input.habits.recentCompletions, expectedSlots)
+      ? ratio(input.habits.completedOccurrences, expectedSlots)
       : null;
 
   const parts = [todoRatio, goalRatio, habitRatio].filter((r): r is number => r !== null);
