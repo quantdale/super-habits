@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from 'react';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
-import { emitRewardFeedback, type RewardFeedbackTier } from '@/lib/rewardFeedback';
+import {
+  emitRewardFeedback,
+  hydrateRewardFeedbackPreferences,
+  type RewardFeedbackTier,
+} from '@/lib/rewardFeedback';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import {
   awardGamificationAction,
@@ -77,6 +81,11 @@ export function GamificationProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     mountedRef.current = true;
+    // The persisted haptics/sound choice must load on launch, not only when
+    // Settings → Accessibility happens to mount: a check-off in Habits is the
+    // first reward of a session and would otherwise fire with the in-memory
+    // defaults (vibrate/chime despite the user turning feedback off).
+    hydrateRewardFeedbackPreferences();
     return () => {
       mountedRef.current = false;
     };
