@@ -99,6 +99,17 @@ describe('day-window reads at a DST boundary (forced America/New_York)', () => {
 
     const goalId = await goals.addGoal({ title: 'Month goal', horizon: 'month' });
     const habitId = await habits.addHabit('Window probe', 1);
+    // Backdate the habit before the seeded rows so the window-start row is an
+    // eligible scheduled day and the boundary signal (the in-window row counts,
+    // the pre-window row is excluded) survives eligibility filtering.
+    const { createHabitRule } = await import('@/features/habits/habits.domain');
+    await db.runAsync('UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?', [
+      new Date(`${shiftKey(EXPECTED_START['30@spring'], -1)}T12:00:00`).toISOString(),
+      JSON.stringify([
+        createHabitRule(shiftKey(EXPECTED_START['30@spring'], -1), [1, 2, 3, 4, 5, 6, 7], 1),
+      ]),
+      habitId,
+    ]);
     await habits.setHabitProjectGoal(habitId, { goalId });
     await writeCompletions(db, habitId, [
       EXPECTED_START['30@spring'], // inside the window
@@ -106,7 +117,7 @@ describe('day-window reads at a DST boundary (forced America/New_York)', () => {
     ]);
 
     const rollup = await goals.getGoalRollup(goalId);
-    expect(rollup.habits.expectedOccurrences).toBe(1); // habit created today: one eligible day, not 30 calendar days
+    expect(rollup.habits.expectedOccurrences).toBe(30); // rule effective before the window: all 30 days scheduled
     expect(rollup.habits.completionsInWindow).toBe(1);
   });
 
@@ -118,6 +129,17 @@ describe('day-window reads at a DST boundary (forced America/New_York)', () => {
 
     const goalId = await goals.addGoal({ title: 'Month goal', horizon: 'month' });
     const habitId = await habits.addHabit('Window probe', 1);
+    // Backdate the habit before the seeded rows so the window-start row is an
+    // eligible scheduled day and the boundary signal (the in-window row counts,
+    // the pre-window row is excluded) survives eligibility filtering.
+    const { createHabitRule } = await import('@/features/habits/habits.domain');
+    await db.runAsync('UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?', [
+      new Date(`${shiftKey(EXPECTED_START['30@fallback'], -1)}T12:00:00`).toISOString(),
+      JSON.stringify([
+        createHabitRule(shiftKey(EXPECTED_START['30@fallback'], -1), [1, 2, 3, 4, 5, 6, 7], 1),
+      ]),
+      habitId,
+    ]);
     await habits.setHabitProjectGoal(habitId, { goalId });
     await writeCompletions(db, habitId, [
       EXPECTED_START['30@fallback'],
@@ -125,7 +147,7 @@ describe('day-window reads at a DST boundary (forced America/New_York)', () => {
     ]);
 
     const rollup = await goals.getGoalRollup(goalId);
-    expect(rollup.habits.expectedOccurrences).toBe(1); // habit created today: one eligible day, not 30 calendar days
+    expect(rollup.habits.expectedOccurrences).toBe(30); // rule effective before the window: all 30 days scheduled
     expect(rollup.habits.completionsInWindow).toBe(1);
   });
 

@@ -377,14 +377,27 @@ export async function getGoalRollup(goalId: string): Promise<GoalRollupData> {
      FROM habits WHERE goal_id = ? AND deleted_at IS NULL`,
     [goalId],
   );
-  const completionRow = await db.getFirstAsync<{ completions: number }>(
-    `SELECT COUNT(*) AS completions
+  const completionRows = await db.getAllAsync<{
+    habit_id: string;
+    date_key: string;
+    count: number;
+  }>(
+    `SELECT hc.habit_id, hc.date_key, hc.count
      FROM habit_completions hc
      JOIN habits h ON h.id = hc.habit_id
      WHERE h.goal_id = ? AND h.deleted_at IS NULL AND hc.date_key >= ?
        AND hc.count > 0`,
     [goalId, windowStart],
   );
+  const completionsByHabit = new Map<
+    string,
+    { habit_id: string; date_key: string; count: number }[]
+  >();
+  for (const row of completionRows) {
+    const rows = completionsByHabit.get(row.habit_id) ?? [];
+    rows.push(row);
+    completionsByHabit.set(row.habit_id, rows);
+  }
 
   // Denominator = eligible scheduled occurrences in the window, resolved
   // through the one habit engine: rest days, pre-creation days, and
@@ -393,9 +406,10 @@ export async function getGoalRollup(goalId: string): Promise<GoalRollupData> {
   // scheduled-rate denominator).
   const todayKey = toDateKey(new Date(nowIso()));
   let expectedOccurrences = 0;
+  let completionsInWindow = 0;
   for (const habit of habitRows) {
     const days = buildDayCompletions(
-      [],
+      completionsByHabit.get(habit.id) ?? [],
       habit.target_per_day,
       undefined,
       habit.rule_history,
@@ -405,13 +419,17 @@ export async function getGoalRollup(goalId: string): Promise<GoalRollupData> {
       windowStart,
     );
     expectedOccurrences += days.filter((day) => day.eligible).length;
+    // Numerator keeps the count > 0 semantics (a partial counted day counts),
+    // but only on eligible days: a completion left on a now-masked day (e.g. a
+    // pause taken after today's check-in) must not inflate consistency.
+    completionsInWindow += days.filter((day) => day.eligible && day.count > 0).length;
   }
 
   return {
     todos: { total: todoRow?.total ?? 0, done: todoRow?.done ?? 0 },
     habits: {
       habitCount: habitRows.length,
-      completionsInWindow: completionRow?.completions ?? 0,
+      completionsInWindow,
       expectedOccurrences,
     },
   };

@@ -163,6 +163,31 @@ describe('goal rollups (F8 / task 11.1)', () => {
     expect(rollup.habits.expectedOccurrences).toBeLessThan(30);
   });
 
+  it('completions on lifecycle-masked days leave the consistency numerator', async () => {
+    const db = await freshDatabase();
+    const goals = await import('@/features/goals/goals.data');
+    const habits = await import('@/features/habits/habits.data');
+
+    const goalId = await goals.addGoal({ title: 'Pause scenario', horizon: 'month' });
+    const habitId = await habits.addHabit('Daily habit', 1);
+    // Backdate so the prior days are eligible misses and today is actionable.
+    const { createHabitRule } = await import('@/features/habits/habits.domain');
+    await db.runAsync('UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?', [
+      new Date(`${shiftKey(TODAY, -3)}T12:00:00`).toISOString(),
+      JSON.stringify([createHabitRule(shiftKey(TODAY, -3), [1, 2, 3, 4, 5, 6, 7], 1)]),
+      habitId,
+    ]);
+    await habits.setHabitProjectGoal(habitId, { goalId });
+    // Two missed days stay missed; check in today, then pause today — the
+    // pause masks today inclusively without deleting today's check-in, so a
+    // raw count would read 1 while the day no longer carries an obligation.
+    await habits.incrementHabit(habitId, TODAY);
+    await habits.pauseHabit(habitId, TODAY);
+
+    const rollup = await goals.getGoalRollup(goalId);
+    expect(rollup.habits.completionsInWindow).toBe(0);
+  });
+
   it('listHabitsForGoal returns only non-deleted linked habits', async () => {
     await freshDatabase();
     const goals = await import('@/features/goals/goals.data');
