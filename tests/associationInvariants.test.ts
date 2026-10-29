@@ -265,7 +265,10 @@ describe('H9: Project/Goal association invariants', () => {
   describe('updateGoal project move', () => {
     it('reconciles linked todos/habits project_id to the new project', async () => {
       const db = makeDb(
-        vi.fn().mockResolvedValueOnce(undefined).mockResolvedValue({ id: 'proj_2' }),
+        vi
+          .fn()
+          .mockResolvedValueOnce({ status: 'active', completed_at: null })
+          .mockResolvedValue({ id: 'proj_2' }),
         vi.fn().mockResolvedValue({ changes: 1 }),
       );
       getDatabase.mockResolvedValue(db);
@@ -290,7 +293,10 @@ describe('H9: Project/Goal association invariants', () => {
 
     it('rejects a dangling project_id on move', async () => {
       const db = makeDb(
-        vi.fn().mockResolvedValueOnce(undefined).mockResolvedValueOnce(null),
+        vi
+          .fn()
+          .mockResolvedValueOnce({ status: 'active', completed_at: null })
+          .mockResolvedValueOnce(null),
         vi.fn().mockResolvedValue({ changes: 1 }),
       );
       getDatabase.mockResolvedValue(db);

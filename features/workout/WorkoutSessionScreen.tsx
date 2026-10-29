@@ -46,6 +46,7 @@ import {
   resolveSessionSave,
   type SetRow,
 } from './workoutSessionView';
+import { tickCountdown } from './workoutTimerTick';
 import {
   clearWorkoutPendingSave,
   clearWorkoutSessionDraft,
@@ -706,49 +707,44 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     if (!isRunning || isComplete) return;
     const id = setInterval(() => {
       setElapsedSeconds((e) => e + 1);
-      setRemaining((prev) => {
-        if (prev > 1) return prev - 1;
-
-        // Phase just hit zero: advance immediately instead of waiting for
-        // a second effect to notice `remaining === 0` on the next render.
-        const finishedIndex = currentIndexRef.current;
-        const finishedPhase = sequence[finishedIndex];
-        // Weighted and bodyweight strength sets are manual logging events. A
-        // configured active duration is still shown as a pacing aid, but it
-        // must not silently turn an unconfirmed set into performed history.
-        // Legacy free-text routines remain timer-driven for V1 compatibility;
-        // typed timed/cardio modalities are also safe to complete at target.
-        if (
-          finishedPhase?.phase === 'active' &&
-          finishedPhase.modality !== undefined &&
-          finishedPhase.modality !== 'timed' &&
-          finishedPhase.modality !== 'cardio'
-        ) {
-          setIsRunning(false);
-          return 0;
-        }
-        if (
-          finishedPhase?.phase === 'active' &&
-          (finishedPhase.modality === 'timed' || finishedPhase.modality === 'cardio')
-        ) {
-          setEnteredSets((values) => ({
-            ...values,
-            [finishedIndex]: {
-              ...(values[finishedIndex] ?? { weight: '', reps: '' }),
-              duration: String(Math.max(0, Math.round(finishedPhase.durationSeconds))),
-            },
-          }));
-        }
-        setDispositions((d) => ({ ...d, [finishedIndex]: 'completed' }));
-        const nextIdx = finishedIndex + 1;
-        if (nextIdx >= sequence.length) {
-          setIsRunning(false);
-          setIsComplete(true);
-          return 0;
-        }
-        setCurrentIndex(nextIdx);
-        currentIndexRef.current = nextIdx;
-        return sequence[nextIdx].durationSeconds;
+      // The countdown updater is pure (decrement/clamp only): React may
+      // invoke an updater twice (StrictMode / concurrent retry), so phase
+      // advancement must never run inside one — the second call would see
+      // the advanced index ref and skip a whole phase (bughunt31 F1).
+      // tickCountdown applies the on-zero advancement exactly once per tick.
+      tickCountdown({
+        remaining: remainingRef,
+        setRemaining,
+        getCurrentIndex: () => currentIndexRef.current,
+        getSequence: () => sequence,
+        onPhaseExpired: (outcome) => {
+          const finishedIndex = outcome.finishedIndex;
+          // Weighted and bodyweight strength sets are manual logging events
+          // (pause-at-zero): a configured active duration is a pacing aid,
+          // never an auto-confirmed result. Timed/cardio auto-enter target.
+          if (outcome.kind === 'pause-at-zero') {
+            setIsRunning(false);
+            return;
+          }
+          const autoDurationSeconds = outcome.autoEnterDurationSeconds;
+          if (autoDurationSeconds !== undefined) {
+            setEnteredSets((values) => ({
+              ...values,
+              [finishedIndex]: {
+                ...(values[finishedIndex] ?? { weight: '', reps: '' }),
+                duration: String(autoDurationSeconds),
+              },
+            }));
+          }
+          setDispositions((d) => ({ ...d, [finishedIndex]: 'completed' }));
+          if (outcome.kind === 'finish-session') {
+            setIsRunning(false);
+            setIsComplete(true);
+            return;
+          }
+          setCurrentIndex(outcome.nextIndex);
+          currentIndexRef.current = outcome.nextIndex;
+        },
       });
     }, 1000);
     return () => clearInterval(id);
@@ -794,6 +790,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     setCurrentIndex(nextIndex);
     currentIndexRef.current = nextIndex;
     setRemaining(sequence[nextIndex].durationSeconds);
+    remainingRef.current = sequence[nextIndex].durationSeconds;
     setIsRunning(phaseRunsOnTimer(sequence[nextIndex]));
   };
 
@@ -979,6 +976,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   };
 
   const handleAdjustRemaining = (delta: number) => {
+    remainingRef.current = Math.max(1, remainingRef.current + delta);
     setRemaining((prev) => Math.max(1, prev + delta));
   };
 

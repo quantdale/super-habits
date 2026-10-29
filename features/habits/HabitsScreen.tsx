@@ -167,11 +167,20 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     Record<string, Record<string, number>>
   >({});
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey());
+  // D9b (the Calories day-selection contract): a selection that pointed at
+  // "today" follows the new day so check-ins never keep targeting yesterday
+  // after midnight; an explicitly selected past day (backfilling) stays put.
+  const [followsToday, setFollowsToday] = useState(true);
+  const handleSelectDate = useCallback((dateKey: string) => {
+    setFollowsToday(dateKey === toDateKey());
+    setSelectedDateKey(dateKey);
+  }, []);
   // Day rollover: the strip selection is captured at mount, so without this
   // snap the ring/check-ins would keep targeting yesterday after midnight.
   useEffect(() => {
+    if (!followsToday) return;
     queueMicrotask(() => setSelectedDateKey(toDateKey()));
-  }, [dayGeneration]);
+  }, [dayGeneration, followsToday]);
   const [streakMap, setStreakMap] = useState<Record<string, number>>({});
   const [modalVisible, setModalVisible] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
@@ -763,11 +772,15 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const habitsById = useMemo(() => new Map(habits.map((habit) => [habit.id, habit])), [habits]);
 
   // Last 7 days ending at today (today anchored last), with per-day
-  // scheduled/completed aggregates over durable-active habits only.
+  // scheduled/completed aggregates over durable-active habits only. Keyed on
+  // the day signal so the window and the trailing "today" pill re-anchor after
+  // local midnight even when a refresh is superseded, bails, or errors and the
+  // data identities stay unchanged.
   const stripDays = useMemo<HabitDayStripDay[]>(
     () =>
       buildHabitDayStrip({ activeHabits, ruleHistoryById, countsByHabitDate, today: new Date() }),
-    [activeHabits, ruleHistoryById, countsByHabitDate],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- todayKey/dayGeneration are intentional extra deps: they re-anchor the window and trailing "today" pill at local midnight even when data identities are unchanged (stale refresh/load error).
+    [activeHabits, ruleHistoryById, countsByHabitDate, todayKey, dayGeneration],
   );
 
   const listItems = useMemo<CheckInListItem[]>(
@@ -840,7 +853,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                 days={stripDays}
                 selectedDateKey={selectedDateKey}
                 todayKey={todayKey}
-                onSelect={setSelectedDateKey}
+                onSelect={handleSelectDate}
               />
             </View>
           ) : null}
