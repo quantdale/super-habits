@@ -43,7 +43,13 @@ describe('computeProjectProgress', () => {
     const result = computeProjectProgress({
       todos: { total: 0, done: 0 },
       goals: { count: 0, averageProgressPercent: 0 },
-      habits: { habitCount: 0, recentCompletions: 0, windowDays: 30 },
+      habits: {
+        habitCount: 0,
+        recentCompletions: 0,
+        windowDays: 30,
+        completedOccurrences: 0,
+        expectedOccurrences: 0,
+      },
     });
     expect(result.isEmpty).toBe(true);
     expect(result.percent).toBe(0);
@@ -56,7 +62,13 @@ describe('computeProjectProgress', () => {
     const result = computeProjectProgress({
       todos: { total: 4, done: 1 },
       goals: { count: 0, averageProgressPercent: 0 },
-      habits: { habitCount: 0, recentCompletions: 0, windowDays: 30 },
+      habits: {
+        habitCount: 0,
+        recentCompletions: 0,
+        windowDays: 30,
+        completedOccurrences: 0,
+        expectedOccurrences: 0,
+      },
     });
     expect(result.todoRatio).toBeCloseTo(0.25);
     expect(result.percent).toBe(25);
@@ -67,7 +79,13 @@ describe('computeProjectProgress', () => {
     const result = computeProjectProgress({
       todos: { total: 2, done: 1 },
       goals: { count: 2, averageProgressPercent: 100 },
-      habits: { habitCount: 0, recentCompletions: 0, windowDays: 30 },
+      habits: {
+        habitCount: 0,
+        recentCompletions: 0,
+        windowDays: 30,
+        completedOccurrences: 0,
+        expectedOccurrences: 0,
+      },
     });
     expect(result.percent).toBe(75);
   });
@@ -76,27 +94,65 @@ describe('computeProjectProgress', () => {
     const result = computeProjectProgress({
       todos: { total: 0, done: 0 },
       goals: { count: 0, averageProgressPercent: 0 },
-      habits: { habitCount: 1, recentCompletions: 90, windowDays: 30 },
+      habits: {
+        habitCount: 1,
+        recentCompletions: 25,
+        windowDays: 30,
+        completedOccurrences: 25,
+        expectedOccurrences: 20,
+      },
     });
     expect(result.habitRatio).toBe(1);
     expect(result.percent).toBe(100);
   });
 
-  it('computes habit consistency as completions over expected slots', () => {
+  it('computes habit consistency as completed eligible occurrences over expected occurrences', () => {
     const result = computeProjectProgress({
       todos: { total: 0, done: 0 },
       goals: { count: 0, averageProgressPercent: 0 },
-      habits: { habitCount: 2, recentCompletions: 30, windowDays: 30 },
+      // Two weekday-only habits: 12 eligible occurrences, 9 completed. The old
+      // calendar-slot math (2 habits x 30 days, 12 check-ins) would read 20%.
+      habits: {
+        habitCount: 2,
+        recentCompletions: 12,
+        windowDays: 30,
+        completedOccurrences: 9,
+        expectedOccurrences: 12,
+      },
     });
-    expect(result.habitRatio).toBeCloseTo(0.5);
-    expect(result.percent).toBe(50);
+    expect(result.habitRatio).toBeCloseTo(0.75);
+    expect(result.percent).toBe(75);
+  });
+
+  it('treats a zero expected-occurrence habit window as neutral, like goals', () => {
+    // A habit created today with no eligible day yet has nothing to measure.
+    const result = computeProjectProgress({
+      todos: { total: 0, done: 0 },
+      goals: { count: 0, averageProgressPercent: 0 },
+      habits: {
+        habitCount: 1,
+        recentCompletions: 0,
+        windowDays: 30,
+        completedOccurrences: 0,
+        expectedOccurrences: 0,
+      },
+    });
+    expect(result.habitRatio).toBeNull();
+    expect(result.isEmpty).toBe(true);
+    expect(result.percent).toBe(0);
   });
 
   it('clamps goal average progress into 0–100', () => {
     const result = computeProjectProgress({
       todos: { total: 0, done: 0 },
       goals: { count: 1, averageProgressPercent: 150 },
-      habits: { habitCount: 0, recentCompletions: 0, windowDays: 30 },
+      habits: {
+        habitCount: 0,
+        recentCompletions: 0,
+        windowDays: 30,
+        completedOccurrences: 0,
+        expectedOccurrences: 0,
+      },
     });
     expect(result.goalRatio).toBe(1);
     expect(result.percent).toBe(100);

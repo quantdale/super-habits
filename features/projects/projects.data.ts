@@ -1,7 +1,8 @@
 import { getDatabase } from '@/core/db/client';
 import { runBackupMutation } from '@/core/sync/syncedMutation';
 import { createId } from '@/lib/id';
-import { inclusiveWindowStartDateKey, nowIso } from '@/lib/time';
+import { inclusiveWindowStartDateKey, nowIso, toDateKey } from '@/lib/time';
+import { buildDayCompletions, habitCreationDateKey } from '@/features/habits/habits.domain';
 import {
   normalizeProjectColor,
   normalizeProjectStatus,
@@ -328,13 +329,93 @@ export const PROJECT_HABIT_WINDOW_DAYS = 30;
 export type ProjectRollup = {
   todos: { total: number; done: number };
   goals: { count: number; averageProgressPercent: number };
-  habits: { habitCount: number; recentCompletions: number; windowDays: number };
+  habits: {
+    habitCount: number;
+    recentCompletions: number;
+    windowDays: number;
+    /** Completed eligible scheduled occurrences in the window. */
+    completedOccurrences: number;
+    /** Eligible scheduled occurrences in the window (rest days are neutral). */
+    expectedOccurrences: number;
+  };
 };
+
+type RollupHabitRow = {
+  id: string;
+  project_id: string;
+  target_per_day: number;
+  rule_history: string | null;
+  created_at: string;
+  lifecycle_history: string | null;
+};
+
+type RollupCompletionRow = { habit_id: string; date_key: string; count: number };
+
+/**
+ * Schedule-aware habit inputs for one group of linked habits: the numerator is
+ * completed eligible scheduled occurrences and the denominator is eligible
+ * scheduled occurrences, both resolved through the one habit engine
+ * (`buildDayCompletions`) exactly like the goal rollup. Rest days, pre-creation
+ * days, and paused/archived intervals are neutral, and a partial day (1 of 3)
+ * is not a completed occurrence.
+ */
+function summarizeHabitOccurrences(
+  habitRows: readonly RollupHabitRow[],
+  completionRows: readonly RollupCompletionRow[],
+  windowStart: string,
+): { habitCount: number; completedOccurrences: number; expectedOccurrences: number } {
+  const completionsByHabit = new Map<string, RollupCompletionRow[]>();
+  for (const row of completionRows) {
+    const rows = completionsByHabit.get(row.habit_id) ?? [];
+    rows.push(row);
+    completionsByHabit.set(row.habit_id, rows);
+  }
+
+  const todayKey = toDateKey(new Date(nowIso()));
+  let completedOccurrences = 0;
+  let expectedOccurrences = 0;
+  for (const habit of habitRows) {
+    const days = buildDayCompletions(
+      completionsByHabit.get(habit.id) ?? [],
+      habit.target_per_day,
+      undefined,
+      habit.rule_history,
+      habitCreationDateKey(habit.created_at),
+      todayKey,
+      habit.lifecycle_history,
+      windowStart,
+    );
+    expectedOccurrences += days.filter((day) => day.eligible).length;
+    completedOccurrences += days.filter((day) => day.completed).length;
+  }
+
+  return { habitCount: habitRows.length, completedOccurrences, expectedOccurrences };
+}
+
+const ROLLUP_HABIT_COLUMNS = `id, project_id, target_per_day, rule_history, created_at, lifecycle_history`;
+
+/** In-window completions for the given project's linked habits (one query). */
+async function listRollupCompletions(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  projectClause: string,
+  params: readonly string[],
+  windowStart: string,
+): Promise<RollupCompletionRow[]> {
+  return db.getAllAsync<RollupCompletionRow>(
+    `SELECT hc.habit_id, hc.date_key, hc.count
+     FROM habit_completions hc
+     JOIN habits h ON h.id = hc.habit_id
+     WHERE ${projectClause} AND h.deleted_at IS NULL AND hc.date_key >= ?
+       AND hc.count > 0`,
+    [...params, windowStart],
+  );
+}
 
 /**
  * Bounded per-project rollup inputs using aggregate queries (no row loads).
- * Habit recency is measured over the last
- * {@link PROJECT_HABIT_WINDOW_DAYS} local calendar days via habit_completions.
+ * Habit recency is reported over the last {@link PROJECT_HABIT_WINDOW_DAYS}
+ * local calendar days, while the consistency inputs behind project progress are
+ * scheduled occurrences resolved through the habit engine.
  */
 export async function getProjectRollup(projectId: string): Promise<ProjectRollup> {
   const db = await getDatabase();
@@ -352,18 +433,17 @@ export async function getProjectRollup(projectId: string): Promise<ProjectRollup
      FROM goals WHERE project_id = ? AND deleted_at IS NULL AND status != 'archived'`,
     [projectId],
   );
-  const habitCountRow = await db.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) AS count FROM habits WHERE project_id = ? AND deleted_at IS NULL`,
+  const habitRows = await db.getAllAsync<RollupHabitRow>(
+    `SELECT ${ROLLUP_HABIT_COLUMNS} FROM habits WHERE project_id = ? AND deleted_at IS NULL`,
     [projectId],
   );
-  const completionRow = await db.getFirstAsync<{ completions: number }>(
-    `SELECT COUNT(*) AS completions
-     FROM habit_completions hc
-     JOIN habits h ON h.id = hc.habit_id
-     WHERE h.project_id = ? AND h.deleted_at IS NULL AND hc.date_key >= ?
-       AND hc.count > 0`,
-    [projectId, windowStart],
+  const completionRows = await listRollupCompletions(
+    db,
+    'h.project_id = ?',
+    [projectId],
+    windowStart,
   );
+  const habitSummary = summarizeHabitOccurrences(habitRows, completionRows, windowStart);
 
   return {
     todos: { total: todoRow?.total ?? 0, done: todoRow?.done ?? 0 },
@@ -372,16 +452,19 @@ export async function getProjectRollup(projectId: string): Promise<ProjectRollup
       averageProgressPercent: goalRow?.avgProgress ?? 0,
     },
     habits: {
-      habitCount: habitCountRow?.count ?? 0,
-      recentCompletions: completionRow?.completions ?? 0,
+      habitCount: habitSummary.habitCount,
+      recentCompletions: completionRows.length,
       windowDays: PROJECT_HABIT_WINDOW_DAYS,
+      completedOccurrences: habitSummary.completedOccurrences,
+      expectedOccurrences: habitSummary.expectedOccurrences,
     },
   };
 }
 
 /**
- * Rollup inputs for every non-deleted project in three grouped queries —
- * bounded regardless of project count (no N+1).
+ * Rollup inputs for every non-deleted project in four bounded queries (todos,
+ * goals, linked habits, in-window completions) — flat regardless of project or
+ * habit count (no N+1).
  */
 export async function listProjectRollups(): Promise<Record<string, ProjectRollup>> {
   const db = await getDatabase();
@@ -403,19 +486,34 @@ export async function listProjectRollups(): Promise<Record<string, ProjectRollup
      FROM goals WHERE deleted_at IS NULL AND project_id IS NOT NULL AND status != 'archived'
      GROUP BY project_id`,
   );
-  const habitRows = await db.getAllAsync<{
-    project_id: string;
-    count: number;
-    completions: number;
-  }>(
-    `SELECT h.project_id AS project_id, COUNT(DISTINCT h.id) AS count,
-            COALESCE(SUM(CASE WHEN hc.date_key >= ? AND hc.count > 0 THEN 1 ELSE 0 END), 0) AS completions
-     FROM habits h
-     LEFT JOIN habit_completions hc ON hc.habit_id = h.id
-     WHERE h.deleted_at IS NULL AND h.project_id IS NOT NULL
-     GROUP BY h.project_id`,
-    [windowStart],
+  // Schedule-aware habit inputs: one query for every project-linked habit and
+  // one for their in-window completions, resolved per habit in JS (no N+1).
+  const habitRows = await db.getAllAsync<RollupHabitRow>(
+    `SELECT ${ROLLUP_HABIT_COLUMNS} FROM habits
+     WHERE deleted_at IS NULL AND project_id IS NOT NULL`,
   );
+  const completionRows = await listRollupCompletions(
+    db,
+    'h.project_id IS NOT NULL',
+    [],
+    windowStart,
+  );
+
+  const habitsByProject = new Map<string, RollupHabitRow[]>();
+  for (const habit of habitRows) {
+    const rows = habitsByProject.get(habit.project_id) ?? [];
+    rows.push(habit);
+    habitsByProject.set(habit.project_id, rows);
+  }
+  const completionsByProject = new Map<string, RollupCompletionRow[]>();
+  const projectIdByHabit = new Map(habitRows.map((habit) => [habit.id, habit.project_id]));
+  for (const row of completionRows) {
+    const projectId = projectIdByHabit.get(row.habit_id);
+    if (!projectId) continue;
+    const rows = completionsByProject.get(projectId) ?? [];
+    rows.push(row);
+    completionsByProject.set(projectId, rows);
+  }
 
   const rollups: Record<string, ProjectRollup> = {};
   const ensure = (id: string): ProjectRollup => {
@@ -423,7 +521,13 @@ export async function listProjectRollups(): Promise<Record<string, ProjectRollup
       rollups[id] = {
         todos: { total: 0, done: 0 },
         goals: { count: 0, averageProgressPercent: 0 },
-        habits: { habitCount: 0, recentCompletions: 0, windowDays: PROJECT_HABIT_WINDOW_DAYS },
+        habits: {
+          habitCount: 0,
+          recentCompletions: 0,
+          windowDays: PROJECT_HABIT_WINDOW_DAYS,
+          completedOccurrences: 0,
+          expectedOccurrences: 0,
+        },
       };
     }
     return rollups[id];
@@ -437,12 +541,15 @@ export async function listProjectRollups(): Promise<Record<string, ProjectRollup
     if (!r.project_id) continue;
     ensure(r.project_id).goals = { count: r.count, averageProgressPercent: r.avgProgress ?? 0 };
   }
-  for (const r of habitRows) {
-    if (!r.project_id) continue;
-    ensure(r.project_id).habits = {
-      habitCount: r.count,
-      recentCompletions: r.completions,
+  for (const [projectId, habits] of habitsByProject) {
+    const completions = completionsByProject.get(projectId) ?? [];
+    const summary = summarizeHabitOccurrences(habits, completions, windowStart);
+    ensure(projectId).habits = {
+      habitCount: summary.habitCount,
+      recentCompletions: completions.length,
       windowDays: PROJECT_HABIT_WINDOW_DAYS,
+      completedOccurrences: summary.completedOccurrences,
+      expectedOccurrences: summary.expectedOccurrences,
     };
   }
   return rollups;
