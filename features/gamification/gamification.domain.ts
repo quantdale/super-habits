@@ -442,6 +442,26 @@ export function badgeStates(stats: BadgeStats, unlockedIds: readonly string[]): 
   return states;
 }
 
+/**
+ * Highest earned tier per family, most advanced first. `BadgeState` carries no
+ * earn timestamp, so "most advanced" is the honest ordering: the highest TIER
+ * the user has actually reached (tier is the one advancement scale shared by
+ * every family — raw thresholds are incommensurable across families: 250
+ * check-ins is not more advanced than 100 workouts). Same-tier ties break on
+ * the family threshold, then id, for a stable order.
+ */
+export function earnedMilestones(badges: readonly BadgeState[]): BadgeState[] {
+  const byFamily = new Map<string, BadgeState>();
+  for (const badge of badges) {
+    if (!badge.unlocked) continue;
+    const current = byFamily.get(badge.family);
+    if (!current || badge.threshold > current.threshold) byFamily.set(badge.family, badge);
+  }
+  return [...byFamily.values()].sort(
+    (a, b) => b.tier - a.tier || b.threshold - a.threshold || a.id.localeCompare(b.id),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // celebration
 // ---------------------------------------------------------------------------
