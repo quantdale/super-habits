@@ -1,7 +1,12 @@
+> **HISTORICAL (superseded — do not implement from this document).** Pop is
+> no longer the current design language. The visual successor is
+> [`16-playful-momentum.md`](./16-playful-momentum.md) ("Playful Momentum", v2,
+> which also supersedes the V3/V4 visual rules). Kept for background only.
+
 # Pop — SuperHabits design system (v2 redesign)
 
-The app's visual language was replaced wholesale. This document is the contract
-every screen must follow. Read it before touching UI.
+The app's visual language was replaced wholesale. (Historical note: Pop's own
+rules below are superseded; see the banner above.)
 
 ## Identity
 
