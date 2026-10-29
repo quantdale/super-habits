@@ -48,6 +48,38 @@ describe('validateCalorieEntry', () => {
   it('accepts valid entry', () => {
     expect(validateCalorieEntry('Chicken', '30', '0', '5', '0')).toBeNull();
   });
+
+  // The entry form submits whole-gram macros via `parseNumericInput` (no
+  // `allowDecimal`), which returns null for decimals — and `handleSubmit`
+  // falls back to `?? 0`. Validation must therefore REJECT decimal macro
+  // text with a field-named message instead of letting submit silently store
+  // 0 (the typed grams vanished from every total).
+  it('rejects decimal macro text instead of letting submit store 0', () => {
+    expect(validateCalorieEntry('Chicken', '12.5', '50', '10', '0')).toBe(
+      'Protein must be a whole number.',
+    );
+    expect(validateCalorieEntry('Chicken', '12', '50.5', '10', '0')).toBe(
+      'Carbs must be a whole number.',
+    );
+    expect(validateCalorieEntry('Chicken', '12', '50', '10', '0.5')).toBe(
+      'Fiber must be a whole number.',
+    );
+    expect(validateCalorieEntry('Chicken', '12', '50', '.5', '0')).toBe(
+      'Fats must be a whole number.',
+    );
+    // Whitespace-padded decimals are still decimals.
+    expect(validateCalorieEntry('Chicken', ' 12.5 ', '50', '10', '0')).toBe(
+      'Protein must be a whole number.',
+    );
+  });
+
+  it('keeps the empty-means-zero and whole-number contracts', () => {
+    // Empty macro strings stay valid (treated as 0 by the entry form).
+    expect(validateCalorieEntry('Chicken', '', '50', '10', '0')).toBeNull();
+    // Whole numbers (including a trailing-dot partial that parses to one)
+    // stay valid.
+    expect(validateCalorieEntry('Chicken', '12.', '50', '10', '0')).toBeNull();
+  });
 });
 
 describe('validateCalorieComputedKcal', () => {
