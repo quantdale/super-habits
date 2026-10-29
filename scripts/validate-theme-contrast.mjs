@@ -16,7 +16,9 @@
  * Checks (all AA thresholds; AAA reported where achieved):
  *   - text          vs background / surface / surfaceElevated  >= 4.5
  *   - textMuted     vs surface / surfaceElevated               >= 4.5
+ *   - textSubtle    vs surface                                 >= 4.5
  *   - buttonText    vs button / buttonHover / buttonActive     >= 4.5
+ *   - buttonText    vs buttonLip (press depth, WCAG 1.4.11)    >= 3.0
  *   - accent        vs surface                                 >= 4.5
  *   - primary       vs surface (non-text UI, WCAG 1.4.11)      >= 3.0
  */
@@ -54,9 +56,13 @@ const CHECKS = [
   ['text on surfaceElevated', 'text', 'surfaceElevated', AA],
   ['textMuted on surface', 'textMuted', 'surface', AA],
   ['textMuted on surfaceElevated', 'textMuted', 'surfaceElevated', AA],
+  ['textSubtle on surface', 'textSubtle', 'surface', AA],
   ['buttonText on button', 'buttonText', 'button', AA],
   ['buttonText on buttonHover', 'buttonText', 'buttonHover', AA],
   ['buttonText on buttonActive', 'buttonText', 'buttonActive', AA],
+  // The lip is the press depth *under* the face — an adjacent color, not the
+  // label's resting place — so it holds the WCAG 1.4.11 non-text minimum.
+  ['buttonText on buttonLip (press depth)', 'buttonText', 'buttonLip', NON_TEXT],
   ['accent on surface', 'accent', 'surface', AA],
   ['primary on surface (non-text)', 'primary', 'surface', NON_TEXT],
 ];

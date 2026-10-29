@@ -5,6 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 import { dialogA11yProps } from '@/core/ui/dialogA11y';
+import { spacing } from '@/core/theme/designTokens';
 
 export type MenuItem = {
   icon: keyof typeof MaterialIcons.glyphMap;
@@ -77,8 +78,8 @@ export function MenuSheet({ visible, onClose, title, items, children }: MenuShee
             />
             {title ? (
               <Text
-                className="mb-2 text-center text-sm font-semibold"
-                style={{ color: tokens.text }}
+                variant="titleMd"
+                style={{ color: tokens.text, textAlign: 'center', marginBottom: spacing.sm }}
               >
                 {title}
               </Text>
@@ -114,7 +115,7 @@ export function MenuSheet({ visible, onClose, title, items, children }: MenuShee
                 ]}
                 onPress={onClose}
               >
-                <Text className="text-base font-semibold" style={{ color: tokens.text }}>
+                <Text variant="button" style={{ color: tokens.text }}>
                   Cancel
                 </Text>
               </Pressable>
@@ -151,8 +152,8 @@ function MenuSheetItem({ icon, label, destructive, onPress }: MenuItem) {
     >
       <MaterialIcons name={icon} size={22} color={destructive ? tokens.dangerText : tokens.text} />
       <Text
-        className="flex-1 text-base"
-        style={{ color: destructive ? tokens.dangerText : tokens.text }}
+        variant="bodyLg"
+        style={{ color: destructive ? tokens.dangerText : tokens.text, flex: 1 }}
       >
         {label}
       </Text>

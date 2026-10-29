@@ -397,6 +397,12 @@ test.describe('W11.5 planning write-failure regressions', () => {
       .click();
     await page.getByRole('button', { name: 'Complete project' }).click();
     await page.getByRole('button', { name: 'Confirm' }).click();
+    // The confirm panel collapses only in the handler's `finally`, i.e. after
+    // updateProject resolves, so an absent Confirm is the write's completion
+    // signal (same wait the first half of this test uses). Clicking Back first
+    // unmounts the detail view and races the list's mount-time read against the
+    // in-flight commit, leaving a stale 'Active' row (W11.5 flake, #141).
+    await expect(page.getByRole('button', { name: 'Confirm' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Back to projects' }).click();
 
     await expect(

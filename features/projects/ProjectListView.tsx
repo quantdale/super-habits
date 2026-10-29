@@ -4,7 +4,7 @@ import { Pressable, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { IconButton } from '@/core/ui/IconButton';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
-import { SECTION_COLORS } from '@/constants/sectionColors';
+import { SECTION_COLORS, SECTION_ON_BRIGHT_INK } from '@/constants/sectionColors';
 import { PlanningSummaryRow } from '@/features/planning-hub/PlanningSummaryRow';
 import {
   listProjects,
@@ -151,7 +151,7 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
                     <Text
                       className="text-xs"
                       style={{
-                        color: statusFilter === f.key ? tokens.textOnAccent : tokens.textMuted,
+                        color: statusFilter === f.key ? SECTION_ON_BRIGHT_INK : tokens.textMuted,
                       }}
                     >
                       {f.label}
@@ -181,7 +181,9 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
                   >
                     <Text
                       className="text-xs"
-                      style={{ color: sortKey === o.key ? tokens.textOnAccent : tokens.textMuted }}
+                      style={{
+                        color: sortKey === o.key ? SECTION_ON_BRIGHT_INK : tokens.textMuted,
+                      }}
                     >
                       {o.label}
                     </Text>

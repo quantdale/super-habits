@@ -540,6 +540,35 @@ and so the quarantine-register parity guard
 
 ---
 
+### 23. Browser Forward re-entry cannot restore the section (OPEN — quarantined `test.fixme`)
+
+**Gate site:** `e2e/navigation-history.spec.ts`
+
+**Reason:** the `forward re-enters the newer section` case is quarantined with `test.fixme`. Root
+cause is a browser/expo-router race, not a product defect: on Forward the browser fires `popstate`
+**once** with a TRANSIENT EMPTY hash, and expo-router then settles `location.hash` to `#section`
+WITHOUT firing `popstate` or `hashchange`; the shell meanwhile remounts and resets
+`activeSection` to `overview`. Probe-verified: the URL reads `#habits` from ~50 ms onward while the
+tab still shows Today, and no event ever reports the settled value. Adopting the section from a
+`popstate` handler therefore cannot work for Forward; three bounded-poll designs (popstate
+rechecks, module-scoped rechecks surviving the remount, and a mount-time read-path poll) were tried
+and all lost the race, so they were reverted rather than merged unverified. The other two cases in
+the same file — Back between sections and reload-keeps-section — are **not** gated and run green.
+
+**Owning lane:** web/PWA runtime robustness (bughunt16).
+
+**Exit criteria:** the case un-fixmes only when Forward restores the section in the standard Chromium
+battery, via a mechanism that does not depend on a popstate-delivered hash — either driving sections
+through the router (section in the route path, so the router's own settled-navigation callback
+supplies it) or a documented URL-settle observer. Re-run `e2e/navigation-history.spec.ts` (3/3) and
+remove this entry in the same change (the reverse-direction check in
+`scripts/quarantine-register-parity.mjs` fails on a register entry that outlives its gate).
+
+**Closing path:** do not weaken the Back/reload assertions, and do not fake the clock or poll
+indefinitely to mask the race.
+
+---
+
 ## Related
 
 - Missions that probe these gaps by hand: `docs/testing/exploratory-missions.md`.

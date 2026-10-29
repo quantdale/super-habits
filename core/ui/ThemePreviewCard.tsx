@@ -53,16 +53,20 @@ export function ThemePreviewCard({ theme, selected, onPress }: ThemePreviewCardP
         ) : null}
       </View>
       <View className="items-center">
-        <Text
-          className="text-xs font-semibold"
-          numberOfLines={1}
-          style={{ color: activeTokens.text }}
-        >
+        <Text variant="label" numberOfLines={1} style={{ color: activeTokens.text }}>
           {theme.name}
         </Text>
+        {/* Appearance badge: the one upright-case exception in this card, and a
+            pure CSS transform — the accessible name comes from the radio label
+            above, so asserted copy is unchanged. */}
         <Text
-          className="text-[10px] uppercase tracking-[0.5px]"
-          style={{ color: activeTokens.textMuted }}
+          variant="caption"
+          numberOfLines={1}
+          style={{
+            color: activeTokens.textMuted,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+          }}
         >
           {theme.appearance}
         </Text>

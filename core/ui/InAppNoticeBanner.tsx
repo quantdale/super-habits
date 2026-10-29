@@ -4,6 +4,7 @@ import { useAppNavigation } from '@/core/providers/navigationContext';
 import { Pressable, SafeAreaView, View } from 'react-native';
 import { useInAppNotices } from '@/core/providers/inAppNoticeContext';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { spacing } from '@/core/theme/designTokens';
 
 function formatContextLabel(label?: string, fallbackFeature?: string) {
   return label?.trim() || fallbackFeature || 'item';
@@ -65,13 +66,22 @@ export function InAppNoticeBanner() {
             </View>
 
             <View className="min-w-0 flex-1">
-              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+              <Text variant="bodyLg" style={{ color: tokens.text }}>
                 {payload.message}
               </Text>
-              <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+              <Text variant="bodyMd" style={{ color: tokens.textMuted }}>
                 {payload.reason}
               </Text>
-              <Text className="mt-2 text-xs font-medium uppercase" style={{ color: noticeAccent }}>
+              {/* Allowed single `label` overline (§5.5); casing is a transform,
+                  so the accessible/asserted string stays unchanged. */}
+              <Text
+                variant="label"
+                style={{
+                  color: noticeAccent,
+                  textTransform: 'uppercase',
+                  marginTop: spacing.sm,
+                }}
+              >
                 {sourceLabel} to {targetLabel}
               </Text>
             </View>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
-import { REWARD_COLORS } from '@/constants/sectionColors';
+import { REWARD_COLORS, REWARD_TEXT_COLORS, type RewardKey } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { layers, radius, spacing, typography } from '@/core/theme/designTokens';
 import { useReducedMotion } from '@/core/theme/motion';
@@ -30,6 +30,8 @@ const AUTO_DISMISS_MS = 2800;
 
 type TierVisual = {
   color: string;
+  /** Readable text tone for the tier on light appearance (§5.1 text column). */
+  textColor: string;
   icon: keyof typeof MaterialIcons.glyphMap;
   surface: 'accent' | 'surface';
 };
@@ -37,20 +39,35 @@ type TierVisual = {
 function tierVisual(
   tier: CelebrationTier,
   tokens: ReturnType<typeof useAppTheme>['tokens'],
+  appearance: 'light' | 'dark',
 ): TierVisual {
+  // The bright hue stays the shape/wash color; text on the near-white chip
+  // needs the appearance-aware text tone (Gold ink, Flame/Ice solids, …).
+  const reward = (key: RewardKey, fill: string) => ({
+    color: fill,
+    textColor: appearance === 'light' ? REWARD_TEXT_COLORS[key] : fill,
+  });
   switch (tier) {
     case 'level':
-      return { color: REWARD_COLORS.accent, icon: 'military-tech', surface: 'accent' };
+      return {
+        ...reward('accent', REWARD_COLORS.accent),
+        icon: 'military-tech',
+        surface: 'accent',
+      };
     case 'badge':
-      return { color: REWARD_COLORS.badge, icon: 'emoji-events', surface: 'accent' };
+      return { ...reward('badge', REWARD_COLORS.badge), icon: 'emoji-events', surface: 'accent' };
     case 'day':
-      return { color: REWARD_COLORS.day, icon: 'task-alt', surface: 'accent' };
+      return { ...reward('day', REWARD_COLORS.day), icon: 'task-alt', surface: 'accent' };
     case 'streak':
-      return { color: REWARD_COLORS.streak, icon: 'local-fire-department', surface: 'accent' };
+      return {
+        ...reward('streak', REWARD_COLORS.streak),
+        icon: 'local-fire-department',
+        surface: 'accent',
+      };
     case 'quest':
-      return { color: REWARD_COLORS.quest, icon: 'check-circle', surface: 'accent' };
+      return { ...reward('quest', REWARD_COLORS.quest), icon: 'check-circle', surface: 'accent' };
     case 'small':
-      return { color: tokens.accent, icon: 'bolt', surface: 'surface' };
+      return { color: tokens.accent, textColor: tokens.accent, icon: 'bolt', surface: 'surface' };
   }
 }
 
@@ -152,7 +169,7 @@ function Confetti({ colors, active }: { colors: readonly string[]; active: boole
  * app root so any section's action can trigger it.
  */
 export function RewardCelebrationOverlay() {
-  const { tokens } = useAppTheme();
+  const { tokens, resolvedTheme } = useAppTheme();
   const reducedMotion = useReducedMotion();
   const { celebration, dismissCelebration } = useGamification();
   const visible = celebration !== null;
@@ -167,7 +184,7 @@ export function RewardCelebrationOverlay() {
 
   if (!celebration) return null;
 
-  const visual = tierVisual(celebration.tier, tokens);
+  const visual = tierVisual(celebration.tier, tokens, resolvedTheme);
   const confettiColors = [visual.color, REWARD_COLORS.accent, tokens.accent, REWARD_COLORS.badge];
 
   return (
@@ -234,7 +251,9 @@ export function RewardCelebrationOverlay() {
               backgroundColor: `${visual.color}1F`,
             }}
           >
-            <Text style={{ ...typography.label, color: visual.color }}>+{celebration.xp} XP</Text>
+            <Text style={{ ...typography.label, color: visual.textColor }}>
+              +{celebration.xp} XP
+            </Text>
           </View>
         ) : null}
         <Button

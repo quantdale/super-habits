@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import { REWARD_COLORS } from '@/constants/sectionColors';
+import { REWARD_COLORS, SECTION_ON_BRIGHT_INK } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { radius, spacing, typography } from '@/core/theme/designTokens';
 import { dateKeyToLocalDate } from '@/lib/time';
@@ -62,7 +62,10 @@ export function WeekStrip({ week, todayKey, accent }: WeekStripProps) {
               <Text
                 style={{
                   ...typography.caption,
-                  color: day.active ? tokens.buttonText : tokens.textMuted,
+                  // §5.1 rule 1: the active fill is a bright-tier reward hue
+                  // (Gold from GamificationCard/AchievementsScreen), where a
+                  // white label reads 1.55:1. Ink on Gold is 11.98:1.
+                  color: day.active ? SECTION_ON_BRIGHT_INK : tokens.textMuted,
                 }}
               >
                 {WEEKDAY_INITIALS[dateKeyToLocalDate(day.dateKey).getDay()]}

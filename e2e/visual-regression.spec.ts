@@ -625,7 +625,13 @@ test.describe('W15 planning hub', () => {
   test('daily plan intent-first (phone, light)', async ({ page }) => {
     await openWithFixture(page, PHONE, 'TYPICAL');
     await page.getByRole('button', { name: 'Plan today' }).click();
-    await expect(page.getByRole('tab', { name: 'Today', exact: true })).toBeVisible({
+    // The app shell rail also exposes a "Today" tab, so scope to the hub's own
+    // tablist ("Planning hub views") instead of matching both.
+    await expect(
+      page
+        .getByRole('tablist', { name: 'Planning hub views' })
+        .getByRole('tab', { name: 'Today', exact: true }),
+    ).toBeVisible({
       timeout: 20_000,
     });
     await expect(page.getByText('Intention')).toBeVisible();

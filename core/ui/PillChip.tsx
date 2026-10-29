@@ -83,10 +83,7 @@ export function PillChip({ label, accessibilityLabel, active, color, onPress, ic
             {icon}
           </Text>
         ) : null}
-        <Text
-          variant="label"
-          style={{ color: active ? tokens.onSolid : tokens.text, fontSize: 13.5 }}
-        >
+        <Text variant="label" style={{ color: active ? tokens.onSolid : tokens.text }}>
           {label}
         </Text>
       </Pressable>
