@@ -85,15 +85,15 @@ export const typography = {
   /** Celebration number (streak 30, Level 4). 900, reserved for rewards. */
   display: {
     fontSize: 40,
-    lineHeight: 44,
+    lineHeight: 48,
     fontFamily: fonts.black,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
-  /** Idle-timer scale hero number (56/60). Tabular so the digits do not jitter. */
+  /** Idle-timer scale hero number (56/68). Tabular so the digits do not jitter. */
   metricLg: {
     fontSize: 56,
-    lineHeight: 60,
+    lineHeight: 68,
     fontFamily: fonts.bold,
     fontWeight: '800',
     letterSpacing: -0.5,

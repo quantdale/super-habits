@@ -221,8 +221,8 @@ dependency**. Fun comes from weight and size discipline, not more families. Opti
 
 | Role           | Size / line     | Family (weight)                | Tracking                | Use                                                                                 |
 | -------------- | --------------- | ------------------------------ | ----------------------- | ----------------------------------------------------------------------------------- |
-| `display`      | 40 / 44         | `Nunito_900Black`              | −0.5                    | celebration numbers (streak 30, Level 4)                                            |
-| `metric`       | 30 / 36         | `Nunito_800ExtraBold`, tabular | −0.3                    | kcal left, timer (idle 56/60 = `metricLg`), totals                                  |
+| `display`      | 40 / 48         | `Nunito_900Black`              | −0.5                    | celebration numbers (streak 30, Level 4)                                            |
+| `metric`       | 30 / 36         | `Nunito_800ExtraBold`, tabular | −0.3                    | kcal left, timer (idle 56/68 = `metricLg`), totals                                  |
 | `titleXl`      | 28 / 34         | 800                            | −0.3                    | hero titles, empty-state headline                                                   |
 | `titleLg`      | 24 / 30         | 800                            | −0.2                    | screen title                                                                        |
 | `titleMd`      | 18 / 24         | 800                            | 0                       | card, sheet and group titles                                                        |
@@ -234,6 +234,10 @@ dependency**. Fun comes from weight and size discipline, not more families. Opti
 
 Bans: raw `text-[9–11px]` and `text-xs/sm` on product text (lint), weight 400 (looks thin next to 800), uppercase
 eyebrows (one `label` overline per screen allowed, e.g. "UP NEXT", which stays because tests assert it).
+
+Every role keeps `lineHeight ≥ 1.2 × fontSize`, rounded up to a multiple of 4: `display` is 40/48 and `metricLg` is
+56/68 rather than 40/44 and 56/60, because Nunito's descenders and tabular digits clip under a 1.2× line at those
+sizes once Android's default font padding is applied.
 
 ### 5.6 Spacing, layout, radii
 
