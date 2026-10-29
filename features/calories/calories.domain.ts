@@ -40,6 +40,38 @@ export function kcalFromMacros(
   return Math.max(0, Math.round(proteinG * 4 + digestibleCarbG * 4 + fiberG * 2 + fatsG * 9));
 }
 
+/** Stored kcal + macros of an entry/meal (edit modal or chip prefill source). */
+export type EntryKcalSource = {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
+};
+
+/**
+ * Effective kcal while editing or re-logging a stored entry/meal.
+ *
+ * A row's stored kcal is authoritative while the draft macros still match the
+ * source: "Quick add" rows (all macros 0) and explicit-kcal rows created by
+ * the command path / linked actions ("500 calories … 20g protein") carry kcal
+ * no macro sum can derive. Only once the user actually edits a macro does the
+ * value become macro-derived, matching `updateCalorieEntry`'s recompute rule.
+ */
+export function resolveEntryKcal(
+  source: EntryKcalSource,
+  draft: { protein: number; carbs: number; fats: number; fiber: number },
+): number {
+  const macrosUnchanged =
+    source.protein === draft.protein &&
+    source.carbs === draft.carbs &&
+    source.fats === draft.fats &&
+    source.fiber === draft.fiber;
+  return macrosUnchanged
+    ? source.calories
+    : kcalFromMacros(draft.protein, draft.carbs, draft.fats, draft.fiber);
+}
+
 export function caloriesTotal(entries: { calories: number }[]): number {
   return entries.reduce((sum, entry) => {
     const cal = entry.calories;

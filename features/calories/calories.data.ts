@@ -254,10 +254,11 @@ export async function updateCalorieEntry(
      */
     consumedOn?: string;
     /**
-     * Explicit kcal for kcal-only edits: a "Quick add" entry stores its
-     * calories directly (no macro derivation), so when every macro is 0 the
-     * stored value is kept instead of recomputing 0. Any non-zero macro
-     * recomputes kcal as usual and ignores this value.
+     * Explicit kcal the caller resolved for this edit: rows whose kcal no
+     * macro sum can derive ("Quick add" rows with every macro 0, explicit-kcal
+     * rows the command path / linked actions create) must keep it while the
+     * macros are unchanged. Any macro change recomputes kcal as usual and
+     * ignores this value.
      */
     calories?: number;
   },
@@ -267,12 +268,32 @@ export async function updateCalorieEntry(
   }
   const macrosAllZero =
     updates.protein === 0 && updates.carbs === 0 && updates.fats === 0 && updates.fiber === 0;
+  const db = await getDatabase();
+  // Explicit kcal is a fallback, never an override: it stands in exactly when
+  // the macros cannot derive it (all-zero "Quick add" rows) or when the edit
+  // leaves the stored row's macros untouched (explicit-kcal rows like
+  // "500 calories … 20g protein"). A macro change recomputes kcal as usual.
+  let keepExplicitKcal = macrosAllZero && updates.calories !== undefined;
+  if (updates.calories !== undefined && !keepExplicitKcal) {
+    const stored = await db.getFirstAsync<
+      Pick<CalorieEntry, 'protein' | 'carbs' | 'fats' | 'fiber'>
+    >(
+      'SELECT protein, carbs, fats, fiber FROM calorie_entries WHERE id = ? AND deleted_at IS NULL',
+      [id],
+    );
+    keepExplicitKcal =
+      stored !== null &&
+      stored.protein === updates.protein &&
+      stored.carbs === updates.carbs &&
+      stored.fats === updates.fats &&
+      stored.fiber === updates.fiber;
+  }
   const calories =
-    macrosAllZero && updates.calories !== undefined
+    keepExplicitKcal && updates.calories !== undefined
       ? updates.calories
       : kcalFromMacros(updates.protein, updates.carbs, updates.fats, updates.fiber);
   // Same write contract as the add path (kcal is recomputed from macros,
-  // except for a kcal-only edit which keeps its explicit stored calories).
+  // except when the explicit value above stands in for the untouched macros).
   assertCalorieEntryWrite({
     foodName: updates.foodName,
     protein: updates.protein,
@@ -282,7 +303,6 @@ export async function updateCalorieEntry(
     calories,
     mealType: updates.mealType,
   });
-  const db = await getDatabase();
   const now = nowIso();
   const dayMove = updates.consumedOn !== undefined ? ', consumed_on = ?' : '';
   const result = await runSyncedMutation<'updated' | 'not_found'>({
