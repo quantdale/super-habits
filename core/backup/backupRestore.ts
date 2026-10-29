@@ -8,6 +8,9 @@ import {
 import { withSQLiteTransaction } from '@/core/db/transactions';
 import { requestHabitReminderReconciliation } from '@/core/notifications/habitReminderSignals';
 import { requestWorkoutReminderReconciliation } from '@/core/notifications/workoutReminderSignals';
+import { reconcileTodoReminders } from '@/core/notifications/todoReminderScheduler';
+import { syncDailyPlanReminder } from '@/core/notifications/dailyPlanReminderScheduler';
+import { syncWeeklyReviewReminder } from '@/core/notifications/weeklyReviewReminderScheduler';
 import { getSupabaseAuthUserId, isRemoteEnabled, supabase } from '@/lib/supabase';
 import { syncEngine, type BlockedOutboxSummary } from '@/core/sync/sync.engine';
 import { nowIso } from '@/lib/time';
@@ -925,6 +928,14 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
   await applyPendingThemeApplication();
   requestHabitReminderReconciliation();
   requestWorkoutReminderReconciliation();
+  // The todo-reminder family follows the same post-restore rule. The restored
+  // preferences are live in AsyncStorage now (and the caches just invalidated),
+  // so reconciling here is what schedules reminders for the restored due-dated
+  // todos and the repeating nudges immediately — the foreground-refresh pass
+  // alone would leave them silent for the rest of the session.
+  void reconcileTodoReminders();
+  void syncDailyPlanReminder().catch(() => undefined);
+  void syncWeeklyReviewReminder().catch(() => undefined);
 
   const importedCounts = Object.fromEntries(
     BACKUP_ENTITIES.map((entity) => [entity, (rowsByEntity[entity] ?? []).length]),
