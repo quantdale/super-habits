@@ -2,6 +2,7 @@ import { View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
+import { formatGrams } from './caloriesFormat';
 import { Text } from '@/core/ui/Text';
 
 export type MacroSummaryRow = {
@@ -48,10 +49,12 @@ export function CaloriesMacroSummary({ rows, accentColor, onEditTargets }: Props
               <Text variant="bodyMd">{row.label}</Text>
               <View className="flex-row items-center gap-2">
                 <Text variant="bodyMd" style={{ color: tokens.text }}>
-                  {row.actual}g / {row.target}g
+                  {formatGrams(row.actual)}g / {formatGrams(row.target)}g
                 </Text>
                 <Text variant="caption" tone="muted">
-                  {row.over ? `${row.actual - row.target}g over` : `${row.remaining}g left`}
+                  {row.over
+                    ? `${formatGrams(row.actual - row.target)}g over`
+                    : `${row.remaining}g left`}
                 </Text>
               </View>
             </View>
