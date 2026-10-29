@@ -63,3 +63,23 @@ edits.
 hermetic `build:e2e` (Supabase env unset) → serve :8087 → `visual:update` →
 inspect diff PNGs → targeted chromium: `a11y.spec`, `a11y-audit-contract`,
 `health-nav-w10`, `settings.spec`. Record what was and was not run.
+
+## Close-out (21:13 Asia/Manila)
+
+Status: ACTIVE — shipped as draft PR #148, one open follow-up remains.
+
+Done: designTokens radius/depth/elevation/contentMaxWidth+dashboardMaxWidth,
+`:focus-visible` hook, token-swap wiring, 29 linux goldens inspected, gates
+(typecheck, lint, test:unit 2183, validate:themes 168, hermetic build:e2e,
+visual:update, targeted a11y/health-nav/settings 27/27).
+
+Open follow-up (NOT applied — time-boxed): `e2e/habits-w7.spec.ts` 2/11 red
+(`:301`, `:365`) because those cases `.focus()` programmatically after pointer
+input, so Chromium's `:focus-visible` is false and the ring is (correctly)
+absent. Planned fix: `isFocusVisible() || !pointerPressActive`, flag spanning
+pointerdown → ~100 ms after pointerup.
+
+Exact next action: apply that fallback on ui/v2-p03-geometry, rerun
+`habits-w7` + a no-update visual pass (inspect any moved golden), commit, push
+(never force), comment on #148. Then await @codex review and the #139/#145
+squash-merges, `git rebase --onto origin/main 7f23746b`, and start P4.
