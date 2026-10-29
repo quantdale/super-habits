@@ -343,6 +343,47 @@ describe('buildActivityTimeline data layer', () => {
     expect(decremented?.title.startsWith('Completed')).toBe(false);
     expect(decremented?.dateKey).toBe('2026-08-10');
   });
+
+  // F3 history rule for workout sessions: `workout.data.ts` retains a log when
+  // its routine template is removed, and Progress counts those rows (no routine
+  // join). The feed must agree — and must use the log's own `routine_name`
+  // snapshot so a later routine rename cannot rewrite what was performed.
+  it('keeps workouts whose routine is gone and prefers the log name snapshot', async () => {
+    const db = makeDb({
+      workout_logs: [
+        {
+          id: 'wrk_renamed',
+          routine_id: 'wrk_routine',
+          completed_at: '2026-08-20T09:00:00.000Z',
+          name: 'Leg Day', // snapshot from completion time
+        },
+        {
+          id: 'wrk_orphan',
+          routine_id: 'wrk_deleted',
+          completed_at: '2026-08-19T09:00:00.000Z',
+          name: null, // routine row soft-deleted before the snapshot existed
+        },
+      ],
+    });
+    getDatabase.mockResolvedValue(db);
+
+    const { items } = await buildActivityTimeline({
+      days: 30,
+      now: new Date('2026-08-20T12:00:00'),
+    });
+    const workouts = items.filter((item) => item.source === 'workout');
+    expect(workouts.map((item) => item.title)).toEqual([
+      'Workout · Leg Day',
+      'Workout · a deleted routine',
+    ]);
+
+    const sql = db.getAllAsync.mock.calls.find((call) =>
+      call[0].includes('FROM workout_logs'),
+    )?.[0] as string;
+    expect(sql).toContain('COALESCE(wl.routine_name, wr.name)');
+    expect(sql).toContain('LEFT JOIN workout_routines');
+    expect(sql).not.toContain('wr.deleted_at IS NULL');
+  });
 });
 
 describe('formatHabitTimelineTitle', () => {
