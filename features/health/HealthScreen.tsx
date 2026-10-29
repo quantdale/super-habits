@@ -3,6 +3,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useAppNavigation, type AppSection } from '@/core/providers/navigationContext';
+import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { Card } from '@/core/ui/Card';
 import { Screen } from '@/core/ui/Screen';
 import { SectionLabel } from '@/core/ui/SectionLabel';
@@ -11,6 +12,7 @@ import { PageHeader } from '@/core/ui/PageHeader';
 import { listWorkoutLogsForRange } from '@/features/workout/workout.data';
 import { getCalorieGoal, listCalorieEntries } from '@/features/calories/calories.data';
 import { caloriesTotal } from '@/features/calories/calories.domain';
+import { kcalGoalDeltaLabel } from '@/features/health/health.domain';
 import { toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 
@@ -25,6 +27,9 @@ import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 export function HealthScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
   const navigation = useAppNavigation();
+  // Day rollover: today's totals must follow the local day across midnight,
+  // matching every other section screen's refresh wiring.
+  const dayGeneration = useDayRolloverGeneration();
   const [workoutToday, setWorkoutToday] = useState<boolean | null>(null);
   const [kcalState, setKcalState] = useState<{ eaten: number; goal: number } | null>(null);
 
@@ -43,11 +48,9 @@ export function HealthScreen({ isActive }: { isActive: boolean }) {
     }
   }, []);
 
-  useActiveForegroundRefresh(isActive, refresh);
+  useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 
   const openSection = (section: AppSection) => navigation.setActiveSection(section);
-
-  const kcalLeft = kcalState ? Math.max(kcalState.goal - kcalState.eaten, 0) : null;
 
   return (
     <Screen scroll>
@@ -89,7 +92,7 @@ export function HealthScreen({ isActive }: { isActive: boolean }) {
             </Text>
             <Text variant="caption" tone="muted">
               {kcalState
-                ? `${kcalState.eaten} / ${kcalState.goal} kcal eaten · ${kcalLeft} left`
+                ? `${kcalState.eaten} / ${kcalState.goal} kcal eaten · ${kcalGoalDeltaLabel(kcalState.eaten, kcalState.goal)}`
                 : 'Nutrition —'}
             </Text>
           </View>
