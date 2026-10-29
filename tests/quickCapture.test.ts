@@ -62,7 +62,7 @@ describe('parseQuickCapture — due dates', () => {
   });
 
   it('does not read ordinary words as bare weekday abbreviations', () => {
-    // "sun", "sat", "wed" are ordinary English words; consuming them as a
+    // "sun", "sat", "wed" are common English words; consuming them as a
     // weekday token silently rewrites the title AND invents a due date.
     expect(parseQuickCapture('Buy sun cream', { now: NOW })).toMatchObject({
       title: 'Buy sun cream',
@@ -81,11 +81,15 @@ describe('parseQuickCapture — due dates', () => {
   });
 
   it('keeps unambiguous abbreviations matching bare and qualifies ambiguous ones', () => {
-    // "fri"/"tue"/"thu" are not English words, so the common shorthand keeps
-    // working without an "on" qualifier.
+    // "fri"/"mon"/"tue"/"thu" are not common English words, so the common
+    // shorthand keeps working without an "on" qualifier.
     const bareFri = parseQuickCapture('Call mom fri', { now: NOW });
     expect(bareFri.dueDateKey).toBe('2026-08-21');
     expect(bareFri.title).toBe('Call mom');
+
+    const bareMon = parseQuickCapture('Standup mon', { now: NOW });
+    expect(bareMon.dueDateKey).toBe('2026-08-24');
+    expect(bareMon.title).toBe('Standup');
 
     expect(parseQuickCapture('Standup tue', { now: NOW })).toMatchObject({
       title: 'Standup',

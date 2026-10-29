@@ -35,10 +35,10 @@ const WEEKDAYS = [
 /**
  * Abbreviations that are also ordinary English words (`sun cream`, `sat nav`).
  * Matching these bare rewrote the title and invented a due date, so they only
- * count in the qualified `on sat` form. The remaining abbreviations (`tue`,
- * `thu`, `fri`) stay unambiguous and keep matching bare.
+ * count in the qualified `on sat` form. Every other abbreviation (`mon`, `tue`,
+ * `thu`, `fri`) stays unambiguous and keeps matching bare.
  */
-const AMBIGUOUS_WEEKDAY_ABBREVIATIONS = new Set(['sun', 'mon', 'wed', 'sat']);
+const AMBIGUOUS_WEEKDAY_ABBREVIATIONS = new Set(['sun', 'wed', 'sat']);
 
 function nextWeekdayKey(targetDow: number, today: Date): string {
   const d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -113,8 +113,8 @@ function matchMention(
  *
  * Recognized tokens:
  * - Due dates: "today", "tomorrow", weekday names ("friday", "on fri", and
- *   bare unambiguous abbreviations like "fri"; `sun`/`mon`/`wed`/`sat` are
- *   ordinary English words, so those need the "on" qualifier), and explicit
+ *   bare unambiguous abbreviations like "fri" and "mon"; `sun`/`wed`/`sat` are
+ *   common English words, so those need the "on" qualifier), and explicit
  *   `YYYY-MM-DD`.
  * - Priority: trailing/leading `!urgent` / `!low`, or the bare word "urgent".
  * - Leading mentions: `#project name` and `@goal name`.
