@@ -232,6 +232,53 @@ export function swapProjectInOrder(
   return next;
 }
 
+/** Projects whose status puts them in the trailing list group. */
+function isTrailingGroupStatus(status: ProjectStatus): boolean {
+  return status === 'completed' || status === 'archived';
+}
+
+/**
+ * Whether the manual-order neighbour at `index ± direction` shares the row's
+ * list group.
+ *
+ * The data layer renders completed/archived projects LAST regardless of
+ * `sort_order` (`PROJECT_ORDER` in projects.data.ts), so a swap that crosses
+ * that boundary persists a new order while every rendered row stays put — the
+ * press looks ignored, and the reordering surfaces later, when the touched
+ * project is re-activated. Such a move is refused rather than persisted.
+ */
+function isManualProjectMoveAllowed(
+  rows: ProjectListRow[],
+  index: number,
+  direction: -1 | 1,
+): boolean {
+  if (index < 0 || index >= rows.length) return false;
+  const target = index + direction;
+  if (target < 0 || target >= rows.length) return false;
+  return (
+    isTrailingGroupStatus(rows[index].project.status) ===
+    isTrailingGroupStatus(rows[target].project.status)
+  );
+}
+
+/**
+ * Manual-order move for the Projects list, group-aware. Returns the FULL manual
+ * id order (so the caller keeps writing absolute sort_order 1..N) or null when
+ * the move crosses the completed/archived list-group boundary.
+ */
+export function manualProjectMoveOrder(
+  rows: ProjectListRow[],
+  index: number,
+  direction: -1 | 1,
+): string[] | null {
+  if (!isManualProjectMoveAllowed(rows, index, direction)) return null;
+  return swapProjectInOrder(
+    rows.map((row) => row.project.id),
+    index,
+    direction,
+  );
+}
+
 export function sortProjectRows(rows: ProjectListRow[], sortKey: ProjectSortKey): ProjectListRow[] {
   const copy = [...rows];
   switch (sortKey) {
