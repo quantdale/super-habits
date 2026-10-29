@@ -6,6 +6,12 @@ export function formatKcal(kcal: number): string {
   return Math.round(kcal).toLocaleString('en-US');
 }
 
+/** Whole-gram display for macro sums (raw float adds like 0.1 + 0.2 must not render). */
+export function formatGrams(grams: number): string {
+  if (!Number.isFinite(grams)) return '0';
+  return String(Math.round(grams));
+}
+
 /** "Today" / "Yesterday" / "Mon, Oct 5" for the hero's context line. */
 export function formatDayContext(dateKey: string, today: Date = new Date()): string {
   const todayKey = toDateKey(today);
