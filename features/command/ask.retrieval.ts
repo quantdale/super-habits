@@ -566,6 +566,9 @@ export async function retrieveTodayFocus(dateKey: string): Promise<TodayFocusFac
   let scheduledCount = 0;
   let habitCompletedCount = 0;
   for (const habit of habits) {
+    // Paused/archived habits are not current obligations (Area 8 F1 site 7),
+    // matching retrieveDailyOverview / retrieveHabitStreak / retrieveHabitProgress.
+    if (!isActiveHabit(habit)) continue;
     const creationDateKey = timestampToLocalDateKey(habit.created_at);
     if (
       !isHabitScheduledOn(
