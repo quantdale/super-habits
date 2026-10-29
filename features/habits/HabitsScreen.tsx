@@ -167,11 +167,20 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     Record<string, Record<string, number>>
   >({});
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey());
+  // D9b (the Calories day-selection contract): a selection that pointed at
+  // "today" follows the new day so check-ins never keep targeting yesterday
+  // after midnight; an explicitly selected past day (backfilling) stays put.
+  const [followsToday, setFollowsToday] = useState(true);
+  const handleSelectDate = useCallback((dateKey: string) => {
+    setFollowsToday(dateKey === toDateKey());
+    setSelectedDateKey(dateKey);
+  }, []);
   // Day rollover: the strip selection is captured at mount, so without this
   // snap the ring/check-ins would keep targeting yesterday after midnight.
   useEffect(() => {
+    if (!followsToday) return;
     queueMicrotask(() => setSelectedDateKey(toDateKey()));
-  }, [dayGeneration]);
+  }, [dayGeneration, followsToday]);
   const [streakMap, setStreakMap] = useState<Record<string, number>>({});
   const [modalVisible, setModalVisible] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
@@ -840,7 +849,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
                 days={stripDays}
                 selectedDateKey={selectedDateKey}
                 todayKey={todayKey}
-                onSelect={setSelectedDateKey}
+                onSelect={handleSelectDate}
               />
             </View>
           ) : null}
