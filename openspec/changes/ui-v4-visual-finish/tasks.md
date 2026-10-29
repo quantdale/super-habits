@@ -7,8 +7,10 @@ One PR per phase, presentation-only, branch `ui/v4-pNN-<slug>` off fresh
 
 - [x] P0 — Spec + guardrails: this ledger doc, the `ui-v4-visual-finish`
       OpenSpec change, three WARN ESLint guardrails (`text-[Npx]`, raw Tailwind
-      palette utilities, emoji in UI text) scoped to `core/ui/**` + `features/**`
-      TSX; zero runtime diff
+      palette utilities, emoji in UI text) in the new opt-in
+      `eslint.v4-guardrails.config.mjs` — run `npx eslint -c
+    eslint.v4-guardrails.config.mjs core/ui features` — scoped to `core/ui/**` + `features/**` TSX; zero runtime diff (main `eslint.config.mjs` unchanged
+      so the `npm run lint` gate stays green)
 - [ ] P1 — Color tokens (default light/dark): `core/theme` values per §5.1/§5.2
       (+`textSubtle`, `focusRing`), contrast checks extended
 - [ ] P2 — Section hues: harmonized Radix-scale hues per §5.3, reward colors,
@@ -40,4 +42,5 @@ One PR per phase, presentation-only, branch `ui/v4-pNN-<slug>` off fresh
 - [ ] P19 — Secondary surfaces + 12 themes: accent-variant rework, validate:
       themes ≥ baseline
 - [ ] P20 — Close-out: win32 goldens on Windows, `VISUAL_AUDIT=1` re-capture,
-      ledger close, lint guardrails → error, Michael sign-off
+      ledger close, lint guardrails → error and folded into the main
+      `eslint.config.mjs`, Michael sign-off

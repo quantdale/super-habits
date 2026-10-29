@@ -59,10 +59,13 @@ None.
 
 - `docs/ui-ux/16-v4-calm-momentum-finish.md` (new spec + ledger),
   `openspec/changes/ui-v4-visual-finish/*` (this change),
-  `eslint.config.mjs` (three WARN `no-restricted-syntax` guardrails scoped to
-  `core/ui/**/*.tsx` and `features/**/*.tsx`).
+  `eslint.v4-guardrails.config.mjs` (new opt-in config — imports
+  `eslint.config.mjs`, which stays byte-identical to `main`, and appends three
+  WARN `no-restricted-syntax` guardrails scoped to `core/ui/**/*.tsx` and
+  `features/**/*.tsx`; run `npx eslint -c eslint.v4-guardrails.config.mjs core/ui features`).
 - Zero runtime diff in P0: no app code, tokens, themes, components, test
   assertions, or `package*.json` changes. P1–P20 carry the surface changes per
   ledger §8; each phase is its own PR off fresh `main`.
-- Lint guardrails run at WARN through P0–P19 (counts tracked in the ledger and
-  each PR body) and tighten to `error` at P20 close-out.
+- Lint guardrails run at WARN through P0–P19 via the opt-in config (counts
+  tracked in the ledger and each PR body) and tighten to `error`, folded into
+  the main `eslint.config.mjs`, at P20 close-out.
