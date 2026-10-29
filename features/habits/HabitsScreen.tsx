@@ -772,11 +772,15 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const habitsById = useMemo(() => new Map(habits.map((habit) => [habit.id, habit])), [habits]);
 
   // Last 7 days ending at today (today anchored last), with per-day
-  // scheduled/completed aggregates over durable-active habits only.
+  // scheduled/completed aggregates over durable-active habits only. Keyed on
+  // the day signal so the window and the trailing "today" pill re-anchor after
+  // local midnight even when a refresh is superseded, bails, or errors and the
+  // data identities stay unchanged.
   const stripDays = useMemo<HabitDayStripDay[]>(
     () =>
       buildHabitDayStrip({ activeHabits, ruleHistoryById, countsByHabitDate, today: new Date() }),
-    [activeHabits, ruleHistoryById, countsByHabitDate],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- todayKey/dayGeneration are intentional extra deps: they re-anchor the window and trailing "today" pill at local midnight even when data identities are unchanged (stale refresh/load error).
+    [activeHabits, ruleHistoryById, countsByHabitDate, todayKey, dayGeneration],
   );
 
   const listItems = useMemo<CheckInListItem[]>(
