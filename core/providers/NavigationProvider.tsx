@@ -36,10 +36,7 @@ function readHistorySection(): AppSection | null {
 
 function stampHistorySection(section: AppSection): void {
   if (typeof window === 'undefined') return;
-  // `overview` maps to the clean URL; the hash carries every other section.
-  const url =
-    section === 'overview' ? window.location.pathname + window.location.search : `#${section}`;
-  window.history.pushState(window.history.state, '', url);
+  window.history.pushState(window.history.state, '', `#${section}`);
 }
 
 export function NavigationProvider({ children }: PropsWithChildren) {
@@ -115,6 +112,15 @@ export function NavigationProvider({ children }: PropsWithChildren) {
     if (typeof window === 'undefined') return;
     const stamped = readHistorySection();
     if (stamped && stamped !== activeSectionRef.current) applySection(stamped);
+    // Stamp THIS entry too, so the entry the session started on carries its
+    // section like every pushed one. Without it, going back from `#todos`
+    // lands on a hash-less `/`, which expo-router's linking layer treats as a
+    // route change and which remounts the bootstrap (probe-proven: the gate
+    // then reports "already open in another tab" for a lock this same tab
+    // still holds). replaceState keeps the entry count intact.
+    if (!readHistorySection()) {
+      window.history.replaceState(window.history.state, '', `#${activeSectionRef.current}`);
+    }
     const handlePopState = () => {
       applySection(readHistorySection() ?? 'overview');
     };
