@@ -1,12 +1,47 @@
 # Calm Momentum — SuperHabits design system (V3)
 
-Status: **CAMPAIGN CANONICAL** (Frontend V3 "Calm Momentum").
-Supersedes the _visual_ rules of `12-pop-design-system.md`; Pop's component
-inventory, section-hue concept, and gamification layer remain, but their
-styling contracts below replace Pop's. When this document and any older
-`docs/ui-ux/*` file disagree, **this document wins** for V3 work.
+Status: **AMENDED 2026-10-29** by P0 of [`16-playful-momentum.md`](./16-playful-momentum.md)
+(BRIEF v2 "Playful Momentum"). Where the amendments below — or doc 16 itself —
+conflict with this document, **doc 16 wins** for visual values. See
+"Amendments (v2 Playful Momentum, P0)" below.
+
+Campaign record (Frontend V3 "Calm Momentum"). Supersedes the _visual_ rules
+of `12-pop-design-system.md` (now HISTORICAL); Pop's component inventory,
+section-hue concept, and gamification layer remain, but their styling contracts
+below replace Pop's. When this document and any older `docs/ui-ux/*` file
+disagree (and doc 16 does not speak), **this document wins** for V3 work.
 
 ---
+
+## Amendments (v2 Playful Momentum, P0 — 2026-10-29)
+
+`16-playful-momentum.md` §9 resolves the conflicts with the v2 direction as
+follows (short notes only; doc 16 carries the normative values):
+
+- **C1 (§7):** the pressable 3D lip returns as the **default** affordance on
+  primary/secondary buttons and selectable option rows (`depth.lip.*`, doc 16
+  §5.7). Gradients stay retired (single celebration radial exception, §5.7).
+- **C2 (§3 rule 4, §15):** radii table replaced by doc 16 §5.6 — buttons 16,
+  cards 20, sheets/dialogs 28 (cap 28). "26–34pt radii rejected" is void.
+- **C3 (§3 rule 3):** the lip is a 2–4px solid bottom **border**, not a
+  shadow; blur shadows remain z-only (level3: sheets, dialogs, celebration).
+- **C4 (§5):** type table replaced by doc 16 §5.5 — Nunito kept; titles,
+  buttons, numbers 800, body 600, `display` 900 for celebration numbers only;
+  weight 400 banned.
+- **C5 (§4):** a screen MAY own one solid/bright section-hue hero and its
+  primary CTA takes the section solid; card bodies and canvas stay neutral.
+- **C6 (§12):** ambient motion allowed only in Garden/empty/celebration
+  contexts (mascot idle breath ≤3 cycles); the Focus sapling grows in discrete
+  stages; everything off under reduced motion.
+- **C7 (§11):** tier clarification — an inline ≤400ms pop + light haptic per
+  action is "feedback", not "celebration"; full celebrations stay
+  milestone-only (doc 16 §5.8).
+- **C8 (§15):** unchanged — no XP floats or mascot inside Workout session or
+  Calories form (check pops only).
+- **C9 (§15):** no conflict — v2 keeps sentence-case buttons and at most one
+  overline per screen.
+- **C10:** `12-pop-design-system.md` is HISTORICAL (banner added there); doc 16
+  supersedes this document for visual values.
 
 ## 1. Why V3 exists
 
