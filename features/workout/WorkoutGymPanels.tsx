@@ -89,6 +89,7 @@ export function WorkoutProgressCard({
           catalogExerciseId: row.catalogExerciseId,
           modality: row.modality ?? undefined,
           weight: row.weight,
+          weightUnit: row.weightUnit,
           reps: row.reps,
           durationSeconds: row.durationSeconds,
           distance: row.distance,

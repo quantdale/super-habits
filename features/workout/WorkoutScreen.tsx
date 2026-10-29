@@ -792,6 +792,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
           catalogExerciseId: row.catalogExerciseId,
           modality: row.modality ?? undefined,
           weight: row.weight,
+          weightUnit: row.weightUnit,
           reps: row.reps,
           durationSeconds: row.durationSeconds,
           distance: row.distance,
@@ -810,6 +811,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         sets: (performanceByLog.get(log.id) ?? []).map((row) => ({
           completed: row.completed === 1,
           weight: row.weight,
+          weightUnit: row.weightUnit,
           reps: row.reps,
           modality: row.modality ?? undefined,
         })),

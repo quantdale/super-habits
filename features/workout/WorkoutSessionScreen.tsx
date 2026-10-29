@@ -165,10 +165,14 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       },
     );
     // Seed entry defaults and retain skipped/unknown outcomes for progression.
-    void Promise.all([listRecentLoggedSets(), listRecentWorkoutSetOutcomes()])
-      .then(([rows, outcomes]) => {
+    void Promise.all([
+      listRecentLoggedSets(),
+      listRecentWorkoutSetOutcomes(),
+      getWorkoutPreferences(),
+    ])
+      .then(([rows, outcomes, prefs]) => {
         if (!cancelled) {
-          setPreviousLookup(buildPreviousSetLookup(rows));
+          setPreviousLookup(buildPreviousSetLookup(rows, prefs.goalWeight?.unit ?? 'kg'));
           setRecentSetOutcomes(outcomes);
         }
       })
@@ -316,6 +320,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
           .map((row) => ({
             completed: row.completed === 1,
             weight: row.weight,
+            weightUnit: row.weightUnit,
             reps: row.reps,
             durationSeconds: row.durationSeconds,
             distance: row.distance,
@@ -601,21 +606,24 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
             exerciseName: phase.exerciseName,
             catalogExerciseId: phase.catalogExerciseId,
             weight,
+            weightUnit,
             reps,
           },
         ],
         [...history, ...sessionWeightedSetsRef.current],
+        weightUnit,
       );
       sessionWeightedSetsRef.current.push({
         exerciseName: phase.exerciseName,
         catalogExerciseId: phase.catalogExerciseId,
         weight,
+        weightUnit,
         reps,
       });
       if (records.length === 0) return;
       showPrNotice(phase.exerciseName, estimate1RM(weight, reps));
     },
-    [sequence, showPrNotice],
+    [sequence, showPrNotice, weightUnit],
   );
 
   // Fire the live PR check when the cursor advances past a naturally
@@ -910,9 +918,10 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
           catalogExerciseId: r.catalogExerciseId,
           modality: r.modality,
           weight: r.weight,
+          weightUnit,
           reps: r.reps,
         }));
-        newRecords = findNewPersonalRecords(sessionSets, historySets);
+        newRecords = findNewPersonalRecords(sessionSets, historySets, weightUnit);
       }
 
       const logResult = await logWorkoutSession({
@@ -1021,7 +1030,10 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     const summary = summarizeCompletedSets(sequence, currentIndex, dispositions);
     const totalSets = computeSessionTotalSets(summary);
     const totalVolume = computeSessionTotalVolume(
-      collectSessionSetRecords(sequence, currentIndex, dispositions, enteredSets, effortScale),
+      collectSessionSetRecords(sequence, currentIndex, dispositions, enteredSets, effortScale).map(
+        (r) => ({ ...r, weightUnit }),
+      ),
+      weightUnit,
     );
     return (
       <Screen>
@@ -1120,7 +1132,10 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     const summary = summarizeCompletedSets(sequence, currentIndex, dispositions);
     const totalSets = computeSessionTotalSets(summary);
     const totalVolume = computeSessionTotalVolume(
-      collectSessionSetRecords(sequence, currentIndex, dispositions, enteredSets, effortScale),
+      collectSessionSetRecords(sequence, currentIndex, dispositions, enteredSets, effortScale).map(
+        (r) => ({ ...r, weightUnit }),
+      ),
+      weightUnit,
     );
     return (
       <Screen>

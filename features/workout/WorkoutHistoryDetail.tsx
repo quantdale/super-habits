@@ -147,6 +147,7 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose, onDeleted }
           catalogExerciseId: catalogExerciseIdByExerciseId.get(set.session_exercise_id) ?? null,
           modality: modalityByExerciseId.get(set.session_exercise_id) ?? undefined,
           weight: set.weight,
+          weightUnit: set.weight_unit,
           reps: set.reps,
           durationSeconds: set.duration_seconds,
           distance: set.distance,
@@ -158,6 +159,7 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose, onDeleted }
   const totalVolume = computeSessionTotalVolume(
     (detail?.sets ?? []).map((set) => ({
       weight: set.weight,
+      weightUnit: set.weight_unit,
       reps: set.reps,
       completed: set.completed === 1,
       modality: modalityByExerciseId.get(set.session_exercise_id) ?? undefined,
