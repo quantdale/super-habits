@@ -575,8 +575,17 @@ describe('action source keys', () => {
       actionSourceKey('habit', 'habit_1', '2026-06-11'),
     );
     expect(actionSourceKey('nutrition', TODAY, TODAY)).toBe(TODAY);
-    expect(actionSourceKey('todo', 'todo_1', TODAY)).toBe('todo_1');
     expect(actionSourceKey('focus', 'pom_1', TODAY)).toBe('pom_1');
+  });
+
+  // A todo id outlives its completion, so the key must include the day: a
+  // re-opened todo completed again on a later day is a new action, while the
+  // same-day 0→1→0→1 toggle stays one award.
+  it('keys a todo per day so a later-day re-completion pays again', () => {
+    expect(actionSourceKey('todo', 'todo_1', TODAY)).toBe(`${TODAY}:todo_1`);
+    expect(actionSourceKey('todo', 'todo_1', TODAY)).not.toBe(
+      actionSourceKey('todo', 'todo_1', '2026-06-11'),
+    );
   });
 });
 
