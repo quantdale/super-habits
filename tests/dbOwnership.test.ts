@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  __resetPageDbOwnershipForTests,
+  acquirePageDbOwnership,
   DB_OWNERSHIP_LOCK_NAME,
   getDbOwnedByOtherTabMessage,
   tryAcquireDbOwnership,
@@ -116,6 +118,64 @@ describe('tryAcquireDbOwnership', () => {
     for (const r of results) r.release();
     await flushRelease();
     expect(locks.holders).toBe(0);
+  });
+});
+
+/**
+ * CORR-A-05: the writer claim is per PAGE LOAD, not per provider instance.
+ *
+ * A history navigation that resets the web shell unmounts `AppProviders` and
+ * immediately remounts it. Because `release()` only resolves the lock callback
+ * (the browser frees the actual Web Lock asynchronously), the remount's probe
+ * saw this same tab's dying hold and reported `contended` — the fatal "already
+ * open in another tab" gate for a lock no other tab held.
+ */
+describe('acquirePageDbOwnership', () => {
+  beforeEach(() => {
+    __resetPageDbOwnershipForTests();
+  });
+
+  it('reuses the same claim across a remount instead of reporting itself contended', async () => {
+    const locks = fakeLocks();
+    const first = await acquirePageDbOwnership(locks);
+    expect(first.status).toBe('acquired');
+
+    // The shell resets: the provider unmounts and remounts within one tick,
+    // so the browser has not yet freed the previous hold.
+    const remount = await acquirePageDbOwnership(locks);
+    expect(remount.status).toBe('acquired');
+    expect(remount).toBe(first);
+    // Exactly one probe reached the lock manager: the remount reused the claim.
+    expect(locks.requestCalls).toEqual([DB_OWNERSHIP_LOCK_NAME]);
+    expect(locks.holders).toBe(1);
+  });
+
+  it('shares one in-flight probe between concurrent callers', async () => {
+    const locks = fakeLocks();
+    const [a, b] = await Promise.all([
+      acquirePageDbOwnership(locks),
+      acquirePageDbOwnership(locks),
+    ]);
+    expect(a.status).toBe('acquired');
+    expect(b).toBe(a);
+    expect(locks.requestCalls).toEqual([DB_OWNERSHIP_LOCK_NAME]);
+  });
+
+  it('still refuses when ANOTHER tab really holds the lock, and can retry after it closes', async () => {
+    const locks = fakeLocks();
+    const otherTab = await tryAcquireDbOwnership(locks);
+    expect(otherTab.status).toBe('acquired');
+
+    const refused = await acquirePageDbOwnership(locks);
+    expect(refused.status).toBe('contended');
+
+    // A contended result is NOT cached for the page: once the other tab closes
+    // the startup gate's retry must be able to acquire (shipped recovery copy:
+    // "close the other tab, then try again here").
+    otherTab.release();
+    await flushRelease();
+    const retry = await acquirePageDbOwnership(locks);
+    expect(retry.status).toBe('acquired');
   });
 });
 

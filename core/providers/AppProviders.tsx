@@ -23,8 +23,8 @@ import {
 } from '@/core/providers/localDbPhase';
 import { describeStorageBootstrapFailure } from '@/core/storage/storageSafety';
 import {
+  acquirePageDbOwnership,
   getDbOwnedByOtherTabMessage,
-  tryAcquireDbOwnership,
   type DbOwnership,
 } from '@/core/storage/dbOwnership';
 import { StorageSafetyHost } from '@/core/storage/StorageSafetyHost';
@@ -90,16 +90,20 @@ export function AppProviders({ children }: PropsWithChildren) {
   /**
    * Cross-tab database ownership (CORR-A-03): held for the app's session and
    * REUSED across bootstrap retries — re-probing while holding our own lock
-   * would report ourselves as a competing tab.
+   * would report ourselves as a competing tab. The claim itself is page-scoped
+   * (CORR-A-05, `acquirePageDbOwnership`) so a shell reset that remounts this
+   * provider reuses it instead of racing its own asynchronously-released lock.
    */
   const dbOwnershipRef = useRef<DbOwnership | null>(null);
-  // Release the writer-role claim only on true unmount (final review P2:
-  // a route-level ErrorBoundary remount would otherwise probe against this
-  // instance's still-held lock and report the user's own tab as a competitor).
-  // Bootstrap retries deliberately REUSE the claim — see dbOwnershipRef.
+  // Deliberately NO release on unmount (CORR-A-05): `release()` only resolves
+  // the lock callback, and the browser frees the Web Lock asynchronously — so
+  // unmount-then-remount (browser back/forward resetting the shell) probed
+  // against this page's own dying hold and reported `contended`, showing the
+  // fatal "already open in another tab" gate for a lock no other tab held.
+  // The claim is per page load and dies with the document, which is also
+  // safer: the lock is never handed over while this tab is still writing.
   useEffect(
     () => () => {
-      dbOwnershipRef.current?.release();
       dbOwnershipRef.current = null;
     },
     [],
@@ -147,7 +151,7 @@ export function AppProviders({ children }: PropsWithChildren) {
         // answered with recovery UX instead of a 30-second silent hang. Where
         // Web Locks is unavailable this degrades to the bounded-open path.
         if (dbOwnershipRef.current?.status !== 'acquired') {
-          const ownership = await tryAcquireDbOwnership();
+          const ownership = await acquirePageDbOwnership();
           dbOwnershipRef.current = ownership;
           if (ownership.status === 'contended') {
             if (!cancelled) {

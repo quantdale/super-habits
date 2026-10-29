@@ -132,3 +132,55 @@ export function getDbOwnedByOtherTabMessage(): string {
     'Your data is still safe on this device.'
   );
 }
+
+/**
+ * The writer claim for THIS page load, shared across provider remounts.
+ *
+ * WHY MODULE SCOPE (CORR-A-05): the claim is per TAB, but it used to be held in
+ * a component ref released on unmount. A history navigation that resets the
+ * shell (browser back/forward between entries) unmounts `AppProviders` and
+ * immediately remounts it, and `release()` only resolves the callback promise —
+ * the browser releases the actual Web Lock ASYNCHRONOUSLY afterwards. The
+ * remount's `ifAvailable` probe therefore ran while this same tab's dying hold
+ * was still in place and reported `contended`, surfacing the fatal "already open
+ * in another tab" gate for a lock nobody else held.
+ *
+ * A page load owns at most one claim, so it lives for the page: an unmount
+ * keeps it, a remount reuses it, and closing/reloading the tab lets the browser
+ * drop the lock automatically (Web Locks and the OPFS handle both die with the
+ * document). That is strictly safer than an explicit early release: the lock is
+ * never handed to another tab while this one is still alive and writing.
+ */
+let pageOwnership: DbOwnership | null = null;
+let pageOwnershipAttempt: Promise<DbOwnership> | null = null;
+
+/**
+ * Acquire (once per page load) or reuse this tab's writer claim. Concurrent
+ * callers share one in-flight probe, so a remount racing the previous
+ * bootstrap can never probe against itself.
+ */
+export function acquirePageDbOwnership(locks?: LockManagerLike | null): Promise<DbOwnership> {
+  if (pageOwnership && pageOwnership.status === 'acquired') {
+    return Promise.resolve(pageOwnership);
+  }
+  if (pageOwnershipAttempt) return pageOwnershipAttempt;
+  pageOwnershipAttempt = tryAcquireDbOwnership(locks)
+    .then((ownership) => {
+      // A contended/unavailable result is NOT cached for the page: the owning
+      // tab may close later, and the startup gate's retry must be able to
+      // acquire then (matches the shipped "close the other tab, then retry"
+      // copy). Only a real hold is page-scoped.
+      if (ownership.status === 'acquired') pageOwnership = ownership;
+      return ownership;
+    })
+    .finally(() => {
+      pageOwnershipAttempt = null;
+    });
+  return pageOwnershipAttempt;
+}
+
+/** Test-only: forget the page-level claim so each case starts clean. */
+export function __resetPageDbOwnershipForTests(): void {
+  pageOwnership = null;
+  pageOwnershipAttempt = null;
+}
