@@ -261,6 +261,53 @@ describe('calories.data', () => {
     );
   });
 
+  it('updateCalorieEntry keeps the stored kcal of a kcal-only entry (explicit calories, all macros 0)', async () => {
+    // A "Quick add" entry stores calories with no macro derivation, so an
+    // edit that keeps every macro at 0 must keep the stored kcal instead of
+    // recomputing 0 (which also failed assertCalorieEntryWrite).
+    await updateCalorieEntry('cal_quick', {
+      foodName: 'Quick add',
+      protein: 0,
+      carbs: 0,
+      fats: 0,
+      fiber: 0,
+      mealType: 'lunch',
+      consumedOn: '2026-04-06',
+      calories: 200,
+    });
+
+    // The explicit value is a fallback, never an override: a non-zero macro
+    // recomputes kcal from macros as usual.
+    await updateCalorieEntry('cal_quick', {
+      foodName: 'Quick add',
+      protein: 10,
+      carbs: 0,
+      fats: 0,
+      fiber: 0,
+      mealType: 'lunch',
+      calories: 200,
+    });
+
+    const updateParams = db.runAsync.mock.calls
+      .filter(([sql]) => typeof sql === 'string' && sql.includes('UPDATE calorie_entries SET'))
+      .map(([, params]) => params);
+    expect(updateParams).toEqual([
+      [
+        'Quick add',
+        200,
+        0,
+        0,
+        0,
+        0,
+        'lunch',
+        '2026-04-06T10:00:00.000Z',
+        '2026-04-06',
+        'cal_quick',
+      ],
+      ['Quick add', 40, 10, 0, 0, 0, 'lunch', '2026-04-06T10:00:00.000Z', 'cal_quick'],
+    ]);
+  });
+
   it('deleteCalorieEntry soft-deletes the row and enqueues delete', async () => {
     await deleteCalorieEntry('cal_9');
 
