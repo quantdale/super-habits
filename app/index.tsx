@@ -108,28 +108,89 @@ type TabButtonProps = {
   /** Contrast-safe accent for the icon/label (falls back to `accent`). */
   accentInk?: string;
   layout: 'bar' | 'rail';
+  /** DOM id of the section panel this tab controls (`aria-controls`). */
+  controlsId: string;
   onPress: () => void;
+  /** Receives Arrow key presses; returns the section focus should follow. */
+  onArrowKey?: (direction: -1 | 1) => AppSection | null;
 };
 
-/** One navigation destination: icon over label, with a tinted active capsule. */
+/** DOM ids linking every nav tab to the section panel it controls. */
+const sectionTabId = (section: AppSection) => `sh-section-tab-${section}`;
+const sectionPanelId = (section: AppSection) => `sh-section-panel-${section}`;
+
+/**
+ * One navigation destination: icon over label, with a tinted active capsule.
+ *
+ * Audit C §11: this is a `tab` inside a `tablist` (matching
+ * `core/ui/SegmentedControl.tsx`), not a `button` inside a `tablist` — a
+ * `tablist` whose children are buttons is invalid ARIA, so assistive tech
+ * neither announces position/count nor honours `aria-selected`.
+ */
 function TabButton({
   item,
   isFocused,
   accent,
   accentInk,
   layout: layoutRole,
+  controlsId,
   onPress,
+  onArrowKey,
 }: TabButtonProps) {
   const { tokens } = useAppTheme();
   const ink = accentInk ?? accent;
   const [keyboardFocused, setKeyboardFocused] = useState(false);
   const isRail = layoutRole === 'rail';
+  const railRef = useRef<View>(null);
+  // The parent rebuilds `onArrowKey` on every render; keeping it in a ref lets
+  // the DOM listener subscribe once instead of churning on each layout pass.
+  const arrowKeyRef = useRef(onArrowKey);
+  useEffect(() => {
+    arrowKeyRef.current = onArrowKey;
+  }, [onArrowKey]);
+
+  /**
+   * WAI-ARIA tabs keyboard support (web only): ArrowRight/ArrowLeft move the
+   * selection (and the roving tab stop) with the existing navigation path, so
+   * the rail behaves the way `role="tablist"` promises. Registered as a DOM
+   * listener on the tab element itself, matching
+   * `core/ui/SegmentedControl.tsx`.
+   */
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    // SAFETY: only web reaches here; on web the ref is an HTMLElement.
+    const node = railRef.current as unknown as HTMLElement | null;
+    if (!node) return;
+    const listener = (event: KeyboardEvent) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      const handler = arrowKeyRef.current;
+      if (!handler) return;
+      event.preventDefault();
+      const nextSection = handler(event.key === 'ArrowLeft' ? -1 : 1);
+      // Roving tabindex: focus follows selection, so the newly selected tab is
+      // the tab stop the user continues from.
+      if (nextSection) document.getElementById(sectionTabId(nextSection))?.focus();
+    };
+    node.addEventListener('keydown', listener);
+    return () => node.removeEventListener('keydown', listener);
+  }, []);
 
   return (
     <Pressable
-      accessibilityRole="button"
+      ref={railRef}
+      id={sectionTabId(item.name)}
+      accessibilityRole="tab"
       accessibilityLabel={item.label}
       accessibilityState={{ selected: isFocused }}
+      aria-selected={isFocused}
+      aria-controls={controlsId}
+      // Roving tabindex (WAI-ARIA tabs): only the selected destination is a
+      // tab stop, so a keyboard user tabs INTO the rail once and then moves
+      // with the arrow keys instead of tabbing through all six destinations on
+      // every pass. `tabIndex` is forwarded verbatim by RN-Web. Web only:
+      // native RN maps `tabIndex={-1}` to `focusable={false}`, and the arrow-key
+      // handler above is web-only, so native keeps every destination focusable.
+      tabIndex={Platform.OS === 'web' ? (isFocused ? 0 : -1) : undefined}
       focusable
       onPress={onPress}
       onFocus={() => setKeyboardFocused(true)}
@@ -231,8 +292,9 @@ function CaptureButton({ onPress, variant }: { onPress: () => void; variant: 'ba
 function SectionContainer({
   children,
   isActive,
+  section,
   ...rest
-}: { isActive: boolean; children: React.ReactNode } & ViewProps) {
+}: { isActive: boolean; children: React.ReactNode; section: AppSection } & ViewProps) {
   const [opacity] = useState(() => new Animated.Value(isActive ? 1 : 0));
   const [translate] = useState(() => new Animated.Value(isActive ? 0 : 12));
   const containerRef = useRef<View>(null);
@@ -271,6 +333,12 @@ function SectionContainer({
     <Animated.View
       ref={containerRef}
       {...rest}
+      id={sectionPanelId(section)}
+      // `role` (not `accessibilityRole`): RN's `AccessibilityRole` union omits
+      // `tabpanel`, while the ARIA `Role` union includes it and RN maps `role`
+      // to native accessibility on iOS/Android.
+      role="tabpanel"
+      aria-labelledby={sectionTabId(section)}
       aria-hidden={!isActive}
       style={[
         StyleSheet.absoluteFill,
@@ -385,7 +453,7 @@ export default function Index() {
           const isActive = activeSection === section;
           const isMounted = mountedSections[section] || isActive;
           return (
-            <SectionContainer key={section} isActive={isActive}>
+            <SectionContainer key={section} section={section} isActive={isActive}>
               {isMounted ? <ScreenComponent isActive={isActive} /> : null}
             </SectionContainer>
           );
@@ -422,7 +490,15 @@ export default function Index() {
         accent={accent}
         accentInk={accentInk}
         layout={layoutRole}
+        controlsId={sectionPanelId(item.name)}
         onPress={() => setActiveSection(item.name)}
+        onArrowKey={(direction) => {
+          const index = railIndexFor(item.name);
+          if (index < 0) return null;
+          const nextIndex = (index + direction + NAV_TAB_COUNT) % NAV_TAB_COUNT;
+          navigateToIndex(nextIndex);
+          return NAV_ITEMS[nextIndex].name;
+        }}
       />
     );
   }

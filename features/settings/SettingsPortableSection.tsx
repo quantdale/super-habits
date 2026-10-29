@@ -123,8 +123,18 @@ export function SettingsPortableSection() {
     }
   }, []);
 
+  // A new pick REPLACES the armed file: an unreadable selection must disarm the
+  // previous preview, otherwise Import would still restore the earlier file
+  // while the error message describes the file the user just chose.
+  const discardPendingImport = useCallback(() => {
+    setPreview(null);
+    setPendingFile(null);
+    setSelectedFileName(null);
+  }, []);
+
   const handlePickWeb = useCallback(
     async (file: File) => {
+      discardPendingImport();
       const read = await readPickedPortableFileWeb(file);
       if ('error' in read) {
         setError(read.error);
@@ -132,7 +142,7 @@ export function SettingsPortableSection() {
       }
       await runImportPreparation(read.name, read.text);
     },
-    [runImportPreparation],
+    [discardPendingImport, runImportPreparation],
   );
 
   const handlePickNative = useCallback(async () => {
@@ -141,16 +151,18 @@ export function SettingsPortableSection() {
     setMessage(null);
     try {
       const picked = await pickPortableFileNative();
-      if (picked === null) return; // user cancelled the picker
+      if (picked === null) return; // user cancelled the picker, keep the preview
+      discardPendingImport();
       if ('error' in picked) {
         setError(picked.error);
         return;
       }
       await runImportPreparation(picked.name, picked.text);
     } catch (pickError) {
+      discardPendingImport();
       setError(pickError instanceof Error ? pickError.message : 'The file could not be selected.');
     }
-  }, [importing, validating, runImportPreparation]);
+  }, [discardPendingImport, importing, validating, runImportPreparation]);
 
   const handleCancelImport = useCallback(() => {
     setPreview(null);

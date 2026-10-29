@@ -146,7 +146,8 @@ export type GoalTodoRollupInput = { total: number; done: number };
 export type GoalHabitRollupInput = {
   habitCount: number;
   completionsInWindow: number;
-  windowDays: number;
+  /** Eligible scheduled occurrences in the window (rest days are neutral). */
+  expectedOccurrences: number;
 };
 
 export type GoalRollup = {
@@ -167,7 +168,7 @@ export function computeGoalRollup(input: {
 }): GoalRollup {
   const todoRatio =
     input.todos.total > 0 ? Math.max(0, Math.min(1, input.todos.done / input.todos.total)) : null;
-  const expectedSlots = input.habits.habitCount * Math.max(0, input.habits.windowDays);
+  const expectedSlots = Math.max(0, input.habits.expectedOccurrences);
   const habitConsistency =
     input.habits.habitCount > 0 && expectedSlots > 0
       ? Math.max(0, Math.min(1, input.habits.completionsInWindow / expectedSlots))

@@ -1,8 +1,9 @@
 import type { HabitCompletion } from './types';
 import type { HabitLifecycleInterval, HabitLifecycleStatus } from '@/core/db/types';
-import type { ActivityDay, HeatmapDay } from '@/features/shared/activityTypes';
+import type { HeatmapDay } from '@/features/shared/activityTypes';
+import { computeStreakRun, type StreakRunDay } from './habitStreak.domain';
 import {
-  buildDateRange,
+  addLocalDays,
   buildDateRangeOldestFirst,
   dateKeyToLocalDate,
   timestampToLocalDateKey,
@@ -78,7 +79,41 @@ function normalizeRule(value: unknown): HabitRule | null {
   }
 }
 
+/**
+ * Bounded memo for serialized histories.
+ *
+ * A 364-day grid resolves a rule and the lifecycle mask for every cell, and
+ * every resolution used to `JSON.parse` the same serialized history again
+ * (~364 parses per habit per refresh). Histories are immutable values: a
+ * write serializes a NEW string, so the raw string is a safe cache key — a
+ * change produces a new key instead of a stale hit, and no invalidation is
+ * needed. The cache is bounded because a long session could otherwise retain
+ * every historical variant it ever read.
+ */
+const PARSED_HISTORY_CACHE_LIMIT = 64;
+const ruleHistoryCache = new Map<string, HabitRule[]>();
+const lifecycleHistoryCache = new Map<string, HabitLifecycleInterval[]>();
+
+function memoized<T>(cache: Map<string, T>, key: string, parse: () => T): T {
+  const cached = cache.get(key);
+  if (cached !== undefined) return cached;
+  const parsed = parse();
+  if (cache.size >= PARSED_HISTORY_CACHE_LIMIT) {
+    const oldest = cache.keys().next();
+    if (!oldest.done) cache.delete(oldest.value);
+  }
+  cache.set(key, parsed);
+  return parsed;
+}
+
 export function parseHabitRuleHistory(value: HabitRuleHistoryInput): HabitRule[] {
+  if (typeof value !== 'string') return parseRuleHistoryValue(value);
+  // Copies keep the cached entry safe from a caller that mutates its result;
+  // the rule objects themselves are treated as immutable values.
+  return [...memoized(ruleHistoryCache, value, () => parseRuleHistoryValue(value))];
+}
+
+function parseRuleHistoryValue(value: HabitRuleHistoryInput): HabitRule[] {
   let parsed: unknown = value;
   if (typeof value === 'string') {
     try {
@@ -160,6 +195,11 @@ function normalizeLifecycleInterval(value: unknown): HabitLifecycleInterval | nu
 export function parseHabitLifecycleHistory(
   value: HabitLifecycleHistoryInput,
 ): HabitLifecycleInterval[] {
+  if (typeof value !== 'string') return parseLifecycleHistoryValue(value);
+  return [...memoized(lifecycleHistoryCache, value, () => parseLifecycleHistoryValue(value))];
+}
+
+function parseLifecycleHistoryValue(value: HabitLifecycleHistoryInput): HabitLifecycleInterval[] {
   let parsed: unknown = value;
   if (typeof value === 'string') {
     try {
@@ -186,9 +226,12 @@ export function serializeHabitLifecycleHistory(value: HabitLifecycleHistoryInput
  * Apply a lifecycle transition to an interval history. Intervals are inclusive
  * on both bounds; `to_date_key === null` marks the ongoing interval.
  * - Entering paused/archived closes any open interval at `dateKey` (archiving
- *   therefore also closes an open pause) and opens the matching one.
- * - Returning to active just closes open intervals — active is the default
- *   state and records no interval of its own.
+ *   therefore also closes an open pause) and opens the matching one; the habit
+ *   is already inactive on `dateKey` itself.
+ * - Returning to active closes the open interval the day BEFORE `dateKey`: the
+ *   habit resumes on `dateKey` inclusive, so that day is scheduled and
+ *   actionable again. A same-day pause + resume closes an empty interval and
+ *   therefore leaves none behind.
  * Idempotent: re-entering the current state leaves the history unchanged.
  */
 export function applyHabitLifecycleTransition(
@@ -199,9 +242,15 @@ export function applyHabitLifecycleTransition(
   const intervals = parseHabitLifecycleHistory(history);
 
   if (nextStatus === 'active') {
-    return intervals.map((interval) =>
-      interval.to_date_key === null ? { ...interval, to_date_key: dateKey } : interval,
-    );
+    const lastCoveredDateKey = addLocalDays(dateKey, -1);
+    return intervals.flatMap((interval) => {
+      if (interval.to_date_key !== null) return [interval];
+      // Masking uses inclusive bounds, so closing earlier leaves the resume day
+      // actionable; an interval that closes before it opens covered no day.
+      return lastCoveredDateKey < interval.from_date_key
+        ? []
+        : [{ ...interval, to_date_key: lastCoveredDateKey }];
+    });
   }
 
   const alreadyInState = intervals.some(
@@ -241,17 +290,18 @@ export function habitCreationDateKey(timestamp: string | undefined): string | un
 }
 
 /**
- * Resolve the rule active on a local date. A null result is an ineligible
- * pre-creation date when valid history exists. Legacy-shaped callers without
- * history get a conservative every-day fallback for compatibility.
+ * Resolve the rule active on a local date from an ALREADY-PARSED history.
+ *
+ * Grid builders resolve one date per cell over a year of cells, so the parse
+ * and the sort must not repeat per call — this is the single-pass resolver
+ * both the public entry point and the grid builders use.
  */
-export function getHabitRuleForDate(
-  history: HabitRuleHistoryInput,
+function resolveParsedRuleForDate(
+  rules: readonly HabitRule[],
   dateKey: string,
-  fallbackTargetPerDay = 1,
+  fallbackTargetPerDay: number,
   fallbackEffectiveFromDate?: string,
 ): HabitRule | null {
-  const rules = parseHabitRuleHistory(history);
   if (rules.length === 0) {
     if (fallbackEffectiveFromDate && dateKey < fallbackEffectiveFromDate) return null;
     return createHabitRule(
@@ -267,6 +317,25 @@ export function getHabitRuleForDate(
     active = rule;
   }
   return active;
+}
+
+/**
+ * Resolve the rule active on a local date. A null result is an ineligible
+ * pre-creation date when valid history exists. Legacy-shaped callers without
+ * history get a conservative every-day fallback for compatibility.
+ */
+export function getHabitRuleForDate(
+  history: HabitRuleHistoryInput,
+  dateKey: string,
+  fallbackTargetPerDay = 1,
+  fallbackEffectiveFromDate?: string,
+): HabitRule | null {
+  return resolveParsedRuleForDate(
+    parseHabitRuleHistory(history),
+    dateKey,
+    fallbackTargetPerDay,
+    fallbackEffectiveFromDate,
+  );
 }
 
 export function getHabitTargetForDate(
@@ -414,6 +483,9 @@ export function buildDayCompletions(
   rangeStartDateKey?: string,
 ): DayCompletion[] {
   const rules = parseHabitRuleHistory(history);
+  // Resolve the lifecycle intervals once per call: the per-cell check used to
+  // re-parse the serialized history for every date in the window.
+  const lifecycleIntervals = parseHabitLifecycleHistory(lifecycleHistory);
   // Derived read models can provide a bounded local window without changing
   // the full-history behavior used by streaks and the existing habit UI.
   const startDateKey =
@@ -428,11 +500,11 @@ export function buildDayCompletions(
   for (const completion of completions) map.set(completion.date_key, completion.count);
 
   return dateKeys.map((dateKey) => {
-    const rule = getHabitRuleForDate(rules, dateKey, targetPerDay, fallbackEffectiveFromDate);
+    const rule = resolveParsedRuleForDate(rules, dateKey, targetPerDay, fallbackEffectiveFromDate);
     const scheduled =
       rule !== null &&
       rule.weekdays.includes(weekdayForDateKey(dateKey)) &&
-      !isHabitLifecycleMaskedOn(lifecycleHistory, dateKey);
+      !isHabitLifecycleMaskedOn(lifecycleIntervals, dateKey);
     const eligible = scheduled && dateKey <= todayKey;
     const count = map.get(dateKey) ?? 0;
     const target = rule?.target_per_day ?? targetPerDay;
@@ -448,46 +520,44 @@ export function buildDayCompletions(
 }
 
 /**
- * Count completed scheduled occurrences ending at today. An incomplete
- * scheduled today is granted grace while today is active; a prior scheduled
- * miss breaks the streak. Unscheduled and ineligible dates are ignored.
+ * The shared streak engine's view of a habit day history.
+ *
+ * A habit day is REQUIRED when it is a scheduled, eligible (not future, not
+ * pre-creation, not inside a paused/archived interval) occurrence. Everything
+ * else — a weekly off-day, a masked pause day — carried no obligation and
+ * therefore bridges a run instead of breaking it, which is the documented Habit
+ * Engine V2 semantics (`openspec/specs/habit-scheduling-and-history-semantics`).
+ */
+export function toHabitStreakDays(dayCompletions: readonly DayCompletion[]): StreakRunDay[] {
+  return dayCompletions.map((day) => {
+    const required = day.scheduled && day.eligible;
+    return {
+      dateKey: day.dateKey,
+      required,
+      completed: required && day.completed,
+    };
+  });
+}
+
+/**
+ * Current completed scheduled occurrences, using the app-wide streak engine
+ * (`habitStreak.domain`). An incomplete scheduled today is granted grace while
+ * today is active; a prior scheduled miss breaks the streak; off-days and
+ * paused/archived days bridge instead of breaking (audit C #10).
  */
 export function calculateCurrentStreak(
   dayCompletions: DayCompletion[],
   todayKey = toDateKey(),
 ): number {
-  const eligibleDays = dayCompletions
-    .filter((day) => day.scheduled && day.eligible && day.dateKey <= todayKey)
-    .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
-  if (eligibleDays.length === 0) return 0;
-
-  let index = eligibleDays.length - 1;
-  const latest = eligibleDays[index];
-  if (latest.dateKey === todayKey && !latest.completed) index -= 1;
-
-  let streak = 0;
-  for (; index >= 0; index -= 1) {
-    const day = eligibleDays[index];
-    if (!day.completed) break;
-    streak += 1;
-  }
-  return streak;
+  return computeStreakRun(toHabitStreakDays(dayCompletions), todayKey).current;
 }
 
 /** Calculate the longest completed run across all eligible scheduled dates. */
-export function calculateLongestStreak(dayCompletions: DayCompletion[]): number {
-  let longest = 0;
-  let current = 0;
-  for (const day of [...dayCompletions].sort((a, b) => a.dateKey.localeCompare(b.dateKey))) {
-    if (!day.scheduled || !day.eligible) continue;
-    if (day.completed) {
-      current += 1;
-      longest = Math.max(longest, current);
-    } else {
-      current = 0;
-    }
-  }
-  return longest;
+export function calculateLongestStreak(
+  dayCompletions: DayCompletion[],
+  todayKey = toDateKey(),
+): number {
+  return computeStreakRun(toHabitStreakDays(dayCompletions), todayKey).longest;
 }
 
 export type HabitGridHabit = {
@@ -547,13 +617,19 @@ export function buildHabitGrid(
   return habits.map((habit) => {
     const habitMap = lookup.get(habit.id) ?? new Map<string, number>();
     const rules = parseHabitRuleHistory(habit.rule_history);
+    const lifecycleIntervals = parseHabitLifecycleHistory(habit.lifecycle_history);
     const fallbackCreationDate = habitCreationDateKey(habit.created_at);
     const cells = dateKeys.map((dateKey) => {
-      const rule = getHabitRuleForDate(rules, dateKey, habit.target_per_day, fallbackCreationDate);
+      const rule = resolveParsedRuleForDate(
+        rules,
+        dateKey,
+        habit.target_per_day,
+        fallbackCreationDate,
+      );
       const scheduled =
         rule !== null &&
         rule.weekdays.includes(weekdayForDateKey(dateKey)) &&
-        !isHabitLifecycleMaskedOn(habit.lifecycle_history, dateKey);
+        !isHabitLifecycleMaskedOn(lifecycleIntervals, dateKey);
       const eligible = scheduled && dateKey <= todayKey;
       const count = habitMap.get(dateKey) ?? 0;
       const target = rule?.target_per_day ?? habit.target_per_day;
@@ -614,32 +690,6 @@ export function buildAggregatedHabitHeatmap(
   });
 }
 
-function buildEmptyActivityDays(days: number): ActivityDay[] {
-  return buildDateRange(days).map((dateKey) => ({ dateKey, active: false }));
-}
-
-export function buildHabitActivityDays(grid: HabitGridRow[], days: number = 30): ActivityDay[] {
-  if (grid.length === 0) return buildEmptyActivityDays(days);
-  const dateKeys = (grid[0].cells.slice(-days) ?? []).map((cell) => cell.dateKey).reverse();
-  const indexedRows = grid.map((row) => new Map(row.cells.map((cell) => [cell.dateKey, cell])));
-
-  return dateKeys.map((dateKey) => {
-    let completed = 0;
-    let scheduled = 0;
-    for (const row of indexedRows) {
-      const cell = row.get(dateKey);
-      if (!cell?.eligible) continue;
-      scheduled += 1;
-      if (cell.completed) completed += 1;
-    }
-    return {
-      dateKey,
-      active: completed > 0,
-      value: scheduled > 0 ? completed / scheduled : 0,
-    };
-  });
-}
-
 // ---------------------------------------------------------------------------
 // List filtering / sorting
 // ---------------------------------------------------------------------------
@@ -683,32 +733,4 @@ export function sortHabits<T extends { id: string; name: string }>(
     copy.sort((a, b) => (streaks?.[b.id] ?? 0) - (streaks?.[a.id] ?? 0));
   }
   return copy;
-}
-
-// ---------------------------------------------------------------------------
-// Lifecycle summaries
-// ---------------------------------------------------------------------------
-
-export type HabitLifecycleSummary = {
-  activeCount: number;
-  pausedCount: number;
-  archivedCount: number;
-};
-
-/** Count habits per durable lifecycle bucket (missing status counts as active). */
-export function summarizeHabitLifecycle(
-  habits: {
-    status?: HabitLifecycleStatus;
-  }[],
-): HabitLifecycleSummary {
-  let activeCount = 0;
-  let pausedCount = 0;
-  let archivedCount = 0;
-  for (const habit of habits) {
-    const status = habit.status ?? 'active';
-    if (status === 'archived') archivedCount += 1;
-    else if (status === 'paused') pausedCount += 1;
-    else activeCount += 1;
-  }
-  return { activeCount, pausedCount, archivedCount };
 }

@@ -60,6 +60,59 @@ describe('parseQuickCapture — due dates', () => {
     expect(r.dueDateKey).toBeNull();
     expect(r.title).toBe('Buy 4 apples');
   });
+
+  it('does not read ordinary words as bare weekday abbreviations', () => {
+    // "sun", "sat", "wed" are common English words; consuming them as a
+    // weekday token silently rewrites the title AND invents a due date.
+    expect(parseQuickCapture('Buy sun cream', { now: NOW })).toMatchObject({
+      title: 'Buy sun cream',
+      dueDateKey: null,
+    });
+    expect(parseQuickCapture('Fix sat nav', { now: NOW })).toMatchObject({
+      title: 'Fix sat nav',
+      dueDateKey: null,
+    });
+    // A real date token later in the text must win over a word that only
+    // looks like an abbreviation.
+    expect(parseQuickCapture('Buy a sun hat tomorrow', { now: NOW })).toMatchObject({
+      title: 'Buy a sun hat',
+      dueDateKey: '2026-08-21',
+    });
+  });
+
+  it('keeps unambiguous abbreviations matching bare and qualifies ambiguous ones', () => {
+    // "fri"/"mon"/"tue"/"thu" are not common English words, so the common
+    // shorthand keeps working without an "on" qualifier.
+    const bareFri = parseQuickCapture('Call mom fri', { now: NOW });
+    expect(bareFri.dueDateKey).toBe('2026-08-21');
+    expect(bareFri.title).toBe('Call mom');
+
+    const bareMon = parseQuickCapture('Standup mon', { now: NOW });
+    expect(bareMon.dueDateKey).toBe('2026-08-24');
+    expect(bareMon.title).toBe('Standup');
+
+    expect(parseQuickCapture('Standup tue', { now: NOW })).toMatchObject({
+      title: 'Standup',
+      dueDateKey: '2026-08-25',
+    });
+
+    // Ambiguous abbreviations are still available in the qualified form.
+    const onSat = parseQuickCapture('Call mom on sat', { now: NOW });
+    expect(onSat.dueDateKey).toBe('2026-08-22');
+    expect(onSat.title).toBe('Call mom');
+
+    // …but not bare.
+    expect(parseQuickCapture('Book sat test', { now: NOW })).toMatchObject({
+      title: 'Book sat test',
+      dueDateKey: null,
+    });
+  });
+
+  it('still parses the qualified "on <abbr>" weekday form', () => {
+    const r = parseQuickCapture('Pay water bill on fri', { now: NOW });
+    expect(r.dueDateKey).toBe('2026-08-21');
+    expect(r.title).toBe('Pay water bill');
+  });
 });
 
 describe('parseQuickCapture — priority', () => {

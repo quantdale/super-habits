@@ -3,7 +3,7 @@
  * Read-only aggregation from existing feature data layers with bounded
  * queries; no writes and no direct DB access.
  */
-import { toDateKey } from '@/lib/time';
+import { addLocalDays, toDateKey } from '@/lib/time';
 import { listTodos } from '@/features/todos/todos.data';
 import { listPomodoroSessionsForDateRange } from '@/features/pomodoro/pomodoro.data';
 import { countActiveProjects } from '@/features/projects/projects.data';
@@ -30,14 +30,8 @@ export type TodayBriefing = {
   yesterdayFocusMinutes: number;
 };
 
-function shiftDateKey(dateKey: string, days: number): string {
-  const d = new Date(`${dateKey}T00:00:00`);
-  d.setDate(d.getDate() + days);
-  return toDateKey(d);
-}
-
 export async function buildTodayBriefing(todayKey: string = toDateKey()): Promise<TodayBriefing> {
-  const yesterdayKey = shiftDateKey(todayKey, -1);
+  const yesterdayKey = addLocalDays(todayKey, -1);
 
   const [todos, sessions, projectCount, goalCount, plan] = await Promise.all([
     listTodos(),

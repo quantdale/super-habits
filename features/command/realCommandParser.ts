@@ -80,16 +80,6 @@ function toNonEmptyString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function isValidDateKey(dateKey: string): boolean {
-  const date = new Date(`${dateKey}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return false;
-
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}` === dateKey;
-}
-
 function normalizeWarnings(value: unknown): DraftWarning[] {
   if (!Array.isArray(value)) return [];
 
@@ -205,7 +195,7 @@ function deriveTodoDueDateDirective(
 
   if (explicitMatches.length === 1) {
     const dateKey = explicitMatches[0];
-    if (!isValidDateKey(dateKey)) {
+    if (!isValidCommandDateKey(dateKey)) {
       return {
         kind: 'invalid',
         reason: 'Use a real YYYY-MM-DD date when you include an explicit due date.',

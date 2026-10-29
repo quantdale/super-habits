@@ -225,6 +225,48 @@ test.describe('Pomodoro', () => {
     expect(Number(rows[0]?.n ?? 0)).toBe(0);
   });
 
+  test('a paused-then-resumed session is interrupted, never logged as complete, after reload', async ({
+    page,
+  }) => {
+    // Regression (AUD-SH10-A resurfacing through persistence): resume persists
+    // `runningDeadlineIso`, but the intent normalizer dropped it on save, so a
+    // reload fell back to `startedAt + totalSeconds`. Five minutes of focus,
+    // a long pause and a resume then reconciled as a finished session and
+    // logged 25 phantom minutes that never ran.
+    await installClock(page);
+    await page.getByText('Start focus', { exact: true }).click();
+    await expect(page.getByText('Pause', { exact: true })).toBeEnabled({ timeout: 3_000 });
+    await page.clock.fastForward(5 * 60 * 1000);
+    await page.getByText('Pause', { exact: true }).click();
+    await expect(page.getByText('Resume', { exact: true })).toBeVisible();
+    // Paused far past the nominal deadline, then resumed with the whole
+    // remainder still owed.
+    await page.clock.fastForward(30 * 60 * 1000);
+    await page.getByText('Resume', { exact: true }).click();
+    await expect(page.getByText('Pause', { exact: true })).toBeVisible();
+
+    // The deadline must survive persistence as the RESUMED one.
+    const stored = await queryRows(
+      page,
+      `SELECT value FROM app_meta WHERE key = 'pomodoro.active_timer'`,
+    );
+    const intent = JSON.parse(String(stored[0]?.value));
+    expect(typeof intent.runningDeadlineIso).toBe('string');
+    expect(new Date(intent.runningDeadlineIso).getTime()).toBeGreaterThan(
+      new Date(intent.startedAtIso).getTime() + 20 * 60 * 1000,
+    );
+
+    await page.reload();
+    await page.waitForLoadState('load');
+    await goToTab(page, 'pomodoro');
+
+    // Still mid-session: interrupted, not recovered, and nothing logged.
+    await expect(page.getByText('Previous session interrupted')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Session recovered')).toHaveCount(0);
+    const rows = await queryRows(page, 'SELECT COUNT(*) AS n FROM pomodoro_sessions');
+    expect(Number(rows[0]?.n ?? 0)).toBe(0);
+  });
+
   test('cancelling the end confirmation keeps a paused clock frozen', async ({ page }) => {
     await page.getByText('Start focus', { exact: true }).click();
     await expect(page.getByText('Pause', { exact: true })).toBeEnabled({ timeout: 3_000 });

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { addLocalDays, toDateKey } from '@/lib/time';
 import { freshDatabase, type TestDatabase } from './helpers/db';
 
 /**
@@ -38,6 +39,28 @@ describe('habit lifecycle and linked rules (real SQLite)', () => {
 
     // Unarchiving an already-active habit is a no-op.
     expect(await habits.unarchiveHabit(habitId)).toBe(false);
+  });
+
+  it('reopens the habit on the day it is resumed', async () => {
+    db = await freshDatabase();
+    const habits = await import('@/features/habits/habits.data');
+    const todayKey = toDateKey();
+
+    const habitId = await habits.addHabit('Read 20 pages', 1);
+
+    // Pausing only to change your mind must not cost the rest of the day.
+    expect(await habits.pauseHabit(habitId, todayKey)).toBe(true);
+    expect(await habits.resumeHabit(habitId, todayKey)).toBe(true);
+    await expect(habits.incrementHabit(habitId, todayKey)).resolves.toMatchObject({ count: 1 });
+
+    // A pause that spans a day still masks the paused day but not the resume day.
+    const yesterdayKey = addLocalDays(todayKey, -1);
+    expect(await habits.pauseHabit(habitId, yesterdayKey)).toBe(true);
+    expect(await habits.resumeHabit(habitId, todayKey)).toBe(true);
+    await expect(habits.incrementHabit(habitId, todayKey)).resolves.toMatchObject({ count: 2 });
+    await expect(habits.incrementHabit(habitId, yesterdayKey)).resolves.toMatchObject({
+      count: 0,
+    });
   });
 
   it('saves, lists, and clears habit linked-action rules durably', async () => {

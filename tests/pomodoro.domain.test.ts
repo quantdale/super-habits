@@ -1,15 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  nextPomodoroState,
-  calculateGrowthProgress,
-  getPlantStage,
   formatSessionTime,
   formatSessionDuration,
   getModeDuration,
   getNextMode,
   getModeLabel,
   getModeColor,
-  parseMinutesSeconds,
   DEFAULT_SETTINGS,
   BUILT_IN_PRESETS,
   buildPomodoroHeatmapDays,
@@ -49,50 +45,6 @@ describe('getModeColor', () => {
       bar: 'bg-violet-500',
     });
   });
-});
-
-describe('nextPomodoroState', () => {
-  it('returns finished at zero', () => {
-    expect(nextPomodoroState(0, true)).toBe('finished');
-  });
-
-  it('returns running when active', () => {
-    expect(nextPomodoroState(300, true)).toBe('running');
-  });
-
-  it('returns idle when paused and remaining', () => {
-    expect(nextPomodoroState(300, false)).toBe('idle');
-  });
-});
-
-describe('calculateGrowthProgress', () => {
-  it('returns 0 at full remaining (just started)', () => {
-    expect(calculateGrowthProgress(1500, 1500)).toBe(0);
-  });
-
-  it('returns 1 at 0 remaining (complete)', () => {
-    expect(calculateGrowthProgress(0, 1500)).toBe(1);
-  });
-
-  it('returns 0.5 at halfway', () => {
-    expect(calculateGrowthProgress(750, 1500)).toBe(0.5);
-  });
-
-  it('clamps to 0 if remaining exceeds total', () => {
-    expect(calculateGrowthProgress(2000, 1500)).toBe(0);
-  });
-
-  it('clamps to 1 if remaining is negative', () => {
-    expect(calculateGrowthProgress(-10, 1500)).toBe(1);
-  });
-});
-
-describe('getPlantStage', () => {
-  it('seed at 0', () => expect(getPlantStage(0)).toBe('seed'));
-  it('sprout at 0.2', () => expect(getPlantStage(0.2)).toBe('sprout'));
-  it('seedling at 0.5', () => expect(getPlantStage(0.5)).toBe('seedling'));
-  it('growing at 0.8', () => expect(getPlantStage(0.8)).toBe('growing'));
-  it('grown at 1', () => expect(getPlantStage(1)).toBe('grown'));
 });
 
 describe('formatSessionDuration', () => {
@@ -210,28 +162,6 @@ describe('getModeLabel', () => {
     expect(getModeLabel('focus')).toBe('Focus');
     expect(getModeLabel('short_break')).toBe('Short Break');
     expect(getModeLabel('long_break')).toBe('Long Break');
-  });
-});
-
-describe('parseMinutesSeconds', () => {
-  it('returns null for malformed input', () => {
-    expect(parseMinutesSeconds('abc')).toBeNull();
-    expect(parseMinutesSeconds('12:')).toBeNull();
-    expect(parseMinutesSeconds(':34')).toBeNull();
-    expect(parseMinutesSeconds('12:60')).toBeNull();
-    expect(parseMinutesSeconds('-1:30')).toBeNull();
-  });
-  it('parses valid input', () => {
-    expect(parseMinutesSeconds('1:30')).toEqual({ minutes: 1, seconds: 30 });
-  });
-  it('parses valid MM:SS', () => {
-    expect(parseMinutesSeconds('25:00')).toEqual({ minutes: 25, seconds: 0 });
-    expect(parseMinutesSeconds('5:30')).toEqual({ minutes: 5, seconds: 30 });
-  });
-  it('returns null for invalid input', () => {
-    expect(parseMinutesSeconds('abc')).toBeNull();
-    expect(parseMinutesSeconds('25')).toBeNull();
-    expect(parseMinutesSeconds('5:99')).toBeNull();
   });
 });
 

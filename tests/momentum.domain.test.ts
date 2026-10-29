@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   ALL_HABIT_WEEKDAYS,
   createHabitRule,
@@ -9,6 +9,7 @@ import {
   buildMomentumGarden,
   buildMomentumSourceExplanations,
   buildMomentumWindow,
+  formatMomentumDateLabel,
   formatMomentumTodaySummary,
 } from '@/features/momentum/momentum.domain';
 import type { Habit } from '@/core/db/types';
@@ -297,5 +298,34 @@ describe('buildMomentumGarden', () => {
 
     expect(model.activeDays).toBe(0);
     expect(model.today.activeSources).toEqual([]);
+  });
+});
+
+/**
+ * Audit C §9: the garden row label's day gap is calendar-based (it used to be
+ * `Math.round(diff / 86_400_000)`).
+ */
+describe('formatMomentumDateLabel', () => {
+  const previousTz = process.env.TZ;
+
+  afterEach(() => {
+    if (previousTz === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTz;
+  });
+
+  it('labels today and yesterday on ordinary days', () => {
+    expect(formatMomentumDateLabel('2026-08-20', '2026-08-20')).toBe('Today');
+    expect(formatMomentumDateLabel('2026-08-19', '2026-08-20')).toBe('Yesterday');
+  });
+
+  it('resolves Yesterday across the 23-hour DST day', () => {
+    process.env.TZ = 'America/New_York';
+    expect(formatMomentumDateLabel('2026-03-07', '2026-03-08')).toBe('Yesterday');
+  });
+
+  it('does not call the skipped date-line day Yesterday', () => {
+    process.env.TZ = 'Pacific/Apia';
+    // 2011-12-30 did not exist locally, so Dec 29 is two calendar days back.
+    expect(formatMomentumDateLabel('2011-12-29', '2011-12-31')).not.toBe('Yesterday');
   });
 });

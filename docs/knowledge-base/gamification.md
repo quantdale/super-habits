@@ -43,9 +43,13 @@ what makes the reward math unit-testable (`tests/gamification.domain.test.ts`).
   A day is active when it has a non-grant ledger row. Grace: an open today never
   breaks a live streak (`atRisk` flags it). A frozen day bridges a run without
   adding to it.
-- **Freezes**: `planAutoFreeze` saves only the most recent gap, and only when
-  the run before it is still alive. A missed day has no ledger row at all, so an
-  absent row _is_ the gap.
+- **Freezes**: `planAutoFreeze` bridges the trailing gap one missed day at a
+  time, walking back from yesterday, and stops at the first day the ledger
+  already counts as active or frozen. The spend is bounded by both the bank and
+  `MAX_BANKED_FREEZES`, so a multi-day absence up to the bank size is covered
+  while an unbounded gap simply ends the run instead of retroactively
+  resurrecting history. A missed day has no ledger row at all, so an absent row
+  _is_ the gap.
 - **Quests**: `selectDailyQuestTemplates` is a seeded shuffle of the pool keyed
   by the date, one quest per metric, so the same day always yields the same
   three quests on every device without coordination.
@@ -69,7 +73,7 @@ what makes the reward math unit-testable (`tests/gamification.domain.test.ts`).
   source of truth: habit reminder quick-actions and command-center writes earn
   XP even though they never touch a gamification-aware screen. Silent by design
   (no celebration for something done minutes ago elsewhere).
-- `ensureStreakFreeze()` — spends a banked freeze on the most recent gap.
+- `ensureStreakFreeze()` — spends banked freezes on the trailing missed days.
 
 ## Feedback (`lib/rewardFeedback.ts`)
 

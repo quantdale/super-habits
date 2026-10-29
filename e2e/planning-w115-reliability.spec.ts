@@ -1,5 +1,5 @@
 import { test, expect, type Page } from './fixtures';
-import { goToTab } from './helpers/navigation';
+import { goToTab, planningHubTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
 import { browserLocalTodayKey } from './helpers/browserDate';
 import { seedSql } from './helpers/seed';
@@ -42,7 +42,7 @@ const SEED = {
 async function openPlanning(page: Page): Promise<void> {
   await goToTab(page, 'overview');
   await page.getByRole('button', { name: 'Plan today' }).click();
-  await expect(page.getByRole('tab', { name: 'Projects' })).toBeVisible({ timeout: 20_000 });
+  await expect(planningHubTab(page, 'Projects')).toBeVisible({ timeout: 20_000 });
 }
 
 /** Seed a committed plan for today (raw rows carry no outbox intent). */
@@ -245,7 +245,7 @@ test.describe('W11.5 planning write-failure regressions', () => {
          BEGIN SELECT RAISE(ABORT, 'goal-write-blocked'); END;`,
     );
     await openPlanning(page);
-    await page.getByRole('tab', { name: 'Goals' }).click();
+    await planningHubTab(page, 'Goals').click();
     await page.getByRole('button', { name: 'Create goal' }).click();
     await page.getByPlaceholder('Goal title').fill('Blocked goal');
     await page.getByRole('button', { name: '+10' }).click();
@@ -266,7 +266,7 @@ test.describe('W11.5 planning write-failure regressions', () => {
 
     await returnToApp(page);
     await openPlanning(page);
-    await page.getByRole('tab', { name: 'Goals' }).click();
+    await planningHubTab(page, 'Goals').click();
     await page.getByRole('button', { name: 'Create goal' }).click();
     await page.getByPlaceholder('Goal title').fill('Recovered goal');
     await page.getByRole('button', { name: '+10' }).click();
@@ -297,7 +297,7 @@ test.describe('W11.5 planning write-failure regressions', () => {
          BEGIN SELECT RAISE(ABORT, 'goal-delete-blocked'); END;`,
     );
     await openPlanning(page);
-    await page.getByRole('tab', { name: 'Goals' }).click();
+    await planningHubTab(page, 'Goals').click();
     await page.getByRole('button', { name: 'Doomed goal, Active, 0 percent', exact: true }).click();
     await expect(page.getByText('Goal', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Delete Goal' }).click();
@@ -320,7 +320,7 @@ test.describe('W11.5 planning write-failure regressions', () => {
 
     await returnToApp(page);
     await openPlanning(page);
-    await page.getByRole('tab', { name: 'Goals' }).click();
+    await planningHubTab(page, 'Goals').click();
     await page.getByRole('button', { name: 'Doomed goal, Active, 0 percent', exact: true }).click();
     await page.getByRole('button', { name: 'Delete Goal' }).click();
     await expect(page.getByRole('button', { name: 'Create goal' })).toBeVisible();
@@ -354,7 +354,7 @@ test.describe('W11.5 planning write-failure regressions', () => {
          BEGIN SELECT RAISE(ABORT, 'project-complete-blocked'); END;`,
     );
     await openPlanning(page);
-    await page.getByRole('tab', { name: 'Projects' }).click();
+    await planningHubTab(page, 'Projects').click();
     await page
       .getByRole('button', { name: 'Lifecycle Project, Active, 0 percent progress' })
       .click();
@@ -391,7 +391,7 @@ test.describe('W11.5 planning write-failure regressions', () => {
 
     await returnToApp(page);
     await openPlanning(page);
-    await page.getByRole('tab', { name: 'Projects' }).click();
+    await planningHubTab(page, 'Projects').click();
     await page
       .getByRole('button', { name: 'Lifecycle Project, Active, 0 percent progress' })
       .click();
@@ -426,7 +426,7 @@ test.describe('W11.5 planning write-failure regressions', () => {
          BEGIN SELECT RAISE(ABORT, 'goal-rename-blocked'); END;`,
     );
     await openPlanning(page);
-    await page.getByRole('tab', { name: 'Goals' }).click();
+    await planningHubTab(page, 'Goals').click();
     await page.getByRole('button', { name: 'Doomed goal, Active, 0 percent', exact: true }).click();
     await page.getByPlaceholder('Goal title').fill('Renamed goal');
     await page.getByRole('button', { name: '+10' }).click();
@@ -451,7 +451,7 @@ test.describe('W11.5 planning write-failure regressions', () => {
 
     await returnToApp(page);
     await openPlanning(page);
-    await page.getByRole('tab', { name: 'Goals' }).click();
+    await planningHubTab(page, 'Goals').click();
     await page.getByRole('button', { name: 'Doomed goal, Active, 0 percent', exact: true }).click();
     await page.getByPlaceholder('Goal title').fill('Renamed goal');
     await page.getByRole('button', { name: '+10' }).click();
@@ -487,7 +487,7 @@ test.describe('W11.5 planning write-failure regressions', () => {
          BEGIN SELECT RAISE(ABORT, 'goal-outbox-blocked'); END;`,
     );
     await openPlanning(page);
-    await page.getByRole('tab', { name: 'Goals' }).click();
+    await planningHubTab(page, 'Goals').click();
     await page.getByRole('button', { name: 'Create goal' }).click();
     await page.getByPlaceholder('Goal title').fill('Outbox-blocked goal');
     await page.getByRole('button', { name: 'Create Goal' }).click();
@@ -509,7 +509,7 @@ test.describe('W11.5 planning write-failure regressions', () => {
 
     await returnToApp(page);
     await openPlanning(page);
-    await page.getByRole('tab', { name: 'Goals' }).click();
+    await planningHubTab(page, 'Goals').click();
     await page.getByRole('button', { name: 'Create goal' }).click();
     await page.getByPlaceholder('Goal title').fill('Outbox-blocked goal');
     await page.getByRole('button', { name: 'Create Goal' }).click();
@@ -539,7 +539,7 @@ test.describe('W11.5 planning write-failure regressions', () => {
          BEGIN SELECT RAISE(ABORT, 'project-delete-blocked'); END;`,
     );
     await openPlanning(page);
-    await page.getByRole('tab', { name: 'Projects' }).click();
+    await planningHubTab(page, 'Projects').click();
     await page
       .getByRole('button', { name: 'Lifecycle Project, Active, 0 percent progress' })
       .click();
@@ -567,7 +567,7 @@ test.describe('W11.5 planning write-failure regressions', () => {
 
     await returnToApp(page);
     await openPlanning(page);
-    await page.getByRole('tab', { name: 'Projects' }).click();
+    await planningHubTab(page, 'Projects').click();
     await page
       .getByRole('button', { name: 'Lifecycle Project, Active, 0 percent progress' })
       .click();

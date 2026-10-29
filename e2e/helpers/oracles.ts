@@ -236,10 +236,10 @@ export async function expectAcrossSurfaces(
 export async function switchSection(page: Page, tab: keyof typeof TAB_LABELS): Promise<void> {
   // Scope to the tab rail landmark: onboarding interest chips on Overview can
   // duplicate a tab label (Habits/Focus/Workout), so an unscoped lookup
-  // strict-matches two buttons.
+  // strict-matches two buttons. Rail destinations are ARIA `tab` (audit C §11).
   const tabButton = page
     .getByRole('tablist', { name: 'Section tabs' })
-    .getByRole('button', { name: TAB_LABELS[tab], exact: true });
+    .getByRole('tab', { name: TAB_LABELS[tab], exact: true });
   await tabButton.click();
   // The six screens remain mounted behind the active one. Wait for the
   // navigation state itself before a caller queries a screen-specific control;

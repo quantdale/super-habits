@@ -1,5 +1,5 @@
 import type { Project, ProjectStatus, TodoPriority } from '@/core/db/types';
-import { dateKeyToLocalDate, isValidDateKey } from '@/lib/time';
+import { diffLocalDays, isValidDateKey } from '@/lib/time';
 import {
   PROJECT_COLORS,
   PROJECT_STATUS_VALUES,
@@ -96,6 +96,10 @@ export type ProjectHabitRollupInput = {
   habitCount: number;
   recentCompletions: number;
   windowDays: number;
+  /** Completed eligible scheduled occurrences in the window. */
+  completedOccurrences: number;
+  /** Eligible scheduled occurrences in the window (rest days are neutral). */
+  expectedOccurrences: number;
 };
 
 export type ProjectProgressComponents = {
@@ -130,10 +134,14 @@ export function computeProjectProgress(input: {
     input.goals.count > 0
       ? ratio(clampProgressPercent(input.goals.averageProgressPercent), 100)
       : null;
-  const expectedSlots = input.habits.habitCount * Math.max(0, input.habits.windowDays);
+  // Denominator = eligible scheduled occurrences, not calendar slots: rest
+  // days, pre-creation days, and paused/archived intervals are neutral and
+  // never count as misses (habit-scheduling-and-history-semantics spec), which
+  // keeps project consistency aligned with goal consistency.
+  const expectedSlots = Math.max(0, input.habits.expectedOccurrences);
   const habitRatio =
     input.habits.habitCount > 0 && expectedSlots > 0
-      ? ratio(input.habits.recentCompletions, expectedSlots)
+      ? ratio(input.habits.completedOccurrences, expectedSlots)
       : null;
 
   const parts = [todoRatio, goalRatio, habitRatio].filter((r): r is number => r !== null);
@@ -145,12 +153,15 @@ export function computeProjectProgress(input: {
   return { todoRatio, goalRatio, habitRatio, percent, isEmpty: parts.length === 0 };
 }
 
-/** Days from `todayKey` until `targetKey` (negative when overdue). */
+/**
+ * Days from `todayKey` until `targetKey` (negative when overdue).
+ *
+ * Delegates to `lib/time`'s calendar-day differ: this compares two date KEYS,
+ * and fixed-millisecond subtraction miscounts when a local calendar day is
+ * 23/25 hours long or skipped outright by a zone change.
+ */
 export function daysUntilDate(targetKey: string, todayKey: string): number {
-  const msPerDay = 86_400_000;
-  const target = dateKeyToLocalDate(targetKey).getTime();
-  const today = dateKeyToLocalDate(todayKey).getTime();
-  return Math.round((target - today) / msPerDay);
+  return diffLocalDays(todayKey, targetKey);
 }
 
 export type TargetDateCountdown = {

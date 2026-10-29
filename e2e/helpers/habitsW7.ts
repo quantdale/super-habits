@@ -40,7 +40,7 @@ const quote = (value: string) => `'${value.replace(/'/g, "''")}'`;
 export async function openW7Habits(page: Page): Promise<void> {
   await page
     .getByRole('tablist', { name: 'Section tabs' })
-    .getByRole('button', { name: 'Habits', exact: true })
+    .getByRole('tab', { name: 'Habits', exact: true })
     .click();
   // Opacity-zero mounted sections are still "visible" to Playwright. Wait
   // for the actual section crossfade to finish, not merely for mounted copy.

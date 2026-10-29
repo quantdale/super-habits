@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   buildTimerSequence,
   buildVolumePerWeek,
-  classifyPersonalRecordEvents,
   computePersonalRecords,
   computeSessionTotalSets,
   E1RM_MAX_REPS,
@@ -138,78 +137,6 @@ describe('findNewPersonalRecords', () => {
     expect(findNewPersonalRecords([{ exerciseName: 'Row', weight: 50, reps: 8 }], history)).toEqual(
       ['Row'],
     );
-  });
-});
-
-describe('classifyPersonalRecordEvents', () => {
-  it('matches durable exercise identity even when the display name changes', () => {
-    const events = classifyPersonalRecordEvents(
-      [{ exerciseName: 'Flat Press', catalogExerciseId: 'bench', weight: 105, reps: 5 }],
-      [{ exerciseName: 'Bench Press', catalogExerciseId: 'bench', weight: 100, reps: 5 }],
-    );
-    expect(events.some((event) => event.kind === 'estimated_1rm')).toBe(true);
-  });
-
-  it('reports timed duration PRs separately from strength PRs', () => {
-    const events = classifyPersonalRecordEvents(
-      [
-        {
-          exerciseName: 'Plank',
-          modality: 'timed',
-          weight: null,
-          reps: null,
-          durationSeconds: 45,
-        },
-      ],
-      [
-        {
-          exerciseName: 'Plank',
-          modality: 'timed',
-          weight: null,
-          reps: null,
-          durationSeconds: 30,
-        },
-      ],
-    );
-    expect(events).toContainEqual({
-      exerciseName: 'Plank',
-      kind: 'timed_duration',
-      value: 45,
-      previousValue: 30,
-      unit: 'seconds',
-    });
-  });
-
-  it('reports cardio distance PRs as a separate measurement', () => {
-    const events = classifyPersonalRecordEvents(
-      [
-        {
-          exerciseName: 'Treadmill',
-          modality: 'cardio',
-          weight: null,
-          reps: null,
-          durationSeconds: 1_800,
-          distance: 5.2,
-        },
-      ],
-      [
-        {
-          exerciseName: 'Treadmill',
-          modality: 'cardio',
-          weight: null,
-          reps: null,
-          durationSeconds: 1_800,
-          distance: 5,
-        },
-      ],
-    );
-    expect(events).toContainEqual({
-      exerciseName: 'Treadmill',
-      kind: 'cardio_distance',
-      value: 5.2,
-      previousValue: 5,
-      unit: 'distance',
-    });
   });
 });
 

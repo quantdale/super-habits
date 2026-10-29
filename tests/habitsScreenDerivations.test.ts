@@ -3,7 +3,6 @@ import type { Habit } from '@/features/habits/types';
 import {
   buildHabitDayStrip,
   buildHabitRuleHistoryIndex,
-  summarizeHabitsToday,
   type HabitCompletionCounts,
 } from '@/features/habits/habitsScreen.derivations';
 import * as habitsDomain from '@/features/habits/habits.domain';
@@ -58,90 +57,6 @@ describe('buildHabitRuleHistoryIndex', () => {
     expect(parseSpy).toHaveBeenCalledTimes(3);
     expect(index.size).toBe(3);
     expect(index.get('h1')?.length).toBe(1);
-    parseSpy.mockRestore();
-  });
-});
-
-describe('summarizeHabitsToday', () => {
-  const allHabits = [
-    habit({ id: 'h1' }),
-    habit({ id: 'h2' }),
-    habit({ id: 'h3', status: 'paused' }),
-    habit({ id: 'h4', status: 'archived' }),
-  ];
-  // The screen passes only durable-active rows (F1); the derivation trusts that.
-  const activeHabits = allHabits.filter((h) => (h.status ?? 'active') === 'active');
-  const ruleHistoryById = buildHabitRuleHistoryIndex(activeHabits);
-
-  it('counts only durable-active habits in both denominators', () => {
-    const summary = summarizeHabitsToday({
-      activeHabits,
-      ruleHistoryById,
-      countsByHabitDate: counts(['h1', '2026-03-09', 1], ['h3', '2026-03-09', 1]),
-      todayKey: '2026-03-09',
-    });
-
-    expect(summary.scheduledTodayCount).toBe(2);
-    expect(summary.completedTodayCount).toBe(1);
-    expect(summary.todayProgress).toBe(50);
-  });
-
-  it('reports a rest day as null progress rather than a fake zero', () => {
-    // Scheduled on Wednesdays only, so the reference Monday is a rest day.
-    const restOnly = [
-      habit({
-        id: 'h1',
-        rule_history: JSON.stringify([
-          { effective_from_date: '2026-01-01', weekdays: [3], target_per_day: 1 },
-        ]),
-      }),
-    ];
-    const summary = summarizeHabitsToday({
-      activeHabits: restOnly,
-      ruleHistoryById: buildHabitRuleHistoryIndex(restOnly),
-      countsByHabitDate: {},
-      todayKey: '2026-03-09',
-    });
-
-    expect(summary.scheduledTodayCount).toBe(0);
-    expect(summary.todayProgress).toBeNull();
-  });
-
-  it('excludes lifecycle-masked obligations and pre-creation legacy dates', () => {
-    const corpus = [
-      habit({ id: 'eligible' }),
-      habit({ id: 'later', created_at: '2026-03-10T00:00:00.000Z', rule_history: '[]' }),
-      habit({
-        id: 'masked',
-        lifecycle_history: JSON.stringify([
-          { status: 'archived', from_date_key: '2026-03-01', to_date_key: '2026-03-10' },
-        ]),
-      }),
-    ];
-    const summary = summarizeHabitsToday({
-      activeHabits: corpus,
-      ruleHistoryById: buildHabitRuleHistoryIndex(corpus),
-      countsByHabitDate: counts(
-        ['eligible', '2026-03-09', 1],
-        ['later', '2026-03-09', 99],
-        ['masked', '2026-03-09', 99],
-      ),
-      todayKey: '2026-03-09',
-    });
-    expect(summary).toEqual({ scheduledTodayCount: 1, completedTodayCount: 1, todayProgress: 100 });
-  });
-
-  it('does not parse rule history at all when the index is prebuilt', () => {
-    const parseSpy = vi.spyOn(habitsDomain, 'parseHabitRuleHistory');
-
-    summarizeHabitsToday({
-      activeHabits,
-      ruleHistoryById,
-      countsByHabitDate: {},
-      todayKey: '2026-03-09',
-    });
-
-    expect(parseSpy).not.toHaveBeenCalled();
     parseSpy.mockRestore();
   });
 });

@@ -6,14 +6,13 @@ import type {
   WorkoutModality,
   WorkoutPlanKind,
   WorkoutProgressionMode,
-  WorkoutScheduleOverride,
-  WorkoutWeeklyPlanEntry,
   WorkoutWeightUnit,
 } from '@/core/db/types';
 import {
-  buildDateRange,
   buildDateRangeOldestFirst,
+  buildDateRangeTodayFirst,
   dateKeyToLocalDate,
+  diffLocalDays,
   timestampToLocalDateKey,
   toDateKey,
 } from '@/lib/time';
@@ -27,7 +26,7 @@ export function buildWorkoutActivityDays(logs: WorkoutLog[], days: number = 364)
   for (const log of logs) {
     set.add(timestampToLocalDateKey(log.completed_at));
   }
-  return buildDateRange(days).map((dateKey) => ({
+  return buildDateRangeTodayFirst(days).map((dateKey) => ({
     dateKey,
     active: set.has(dateKey),
   }));
@@ -74,8 +73,9 @@ export function formatWorkoutTime(totalSeconds: number): string {
 export function formatLastPerformedLabel(iso: string, now: Date = new Date()): string | null {
   const then = new Date(iso);
   if (Number.isNaN(then.getTime())) return null;
-  const startOfDayMs = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const dayGap = Math.round((startOfDayMs(now) - startOfDayMs(then)) / (24 * 60 * 60 * 1000));
+  // Calendar-day gap via `lib/time`, not fixed-millisecond subtraction: the two
+  // endpoints are local midnights that can be 23/25 hours apart.
+  const dayGap = diffLocalDays(toDateKey(then), toDateKey(now));
   if (dayGap <= 0) return 'Today';
   if (dayGap === 1) return 'Yesterday';
   if (dayGap < 30) return `${dayGap} days ago`;
@@ -113,6 +113,22 @@ export type TimerPhase = {
   targetPace?: number | null;
 };
 
+/**
+ * Deep-clone a stored routine snapshot so recovery never hands out the live
+ * template object. The snapshot came from our own serializer, so a failure here
+ * means the stored payload is corrupt; report that as a recovery error rather
+ * than leaking a raw `SyntaxError` out of the caller's render path.
+ */
+function cloneRoutineSnapshot(snapshot: RoutineWithExercises): RoutineWithExercises {
+  try {
+    return JSON.parse(JSON.stringify(snapshot)) as RoutineWithExercises;
+  } catch {
+    throw new Error(
+      'This workout stored an unreadable exercise structure. Keep this record or explicitly discard it.',
+    );
+  }
+}
+
 /** Recover from performed identity, never the current editable template. */
 export function getPendingWorkoutRoutine(state: {
   routineSnapshot?: RoutineWithExercises;
@@ -122,7 +138,7 @@ export function getPendingWorkoutRoutine(state: {
       'This older finished workout did not store its exercise structure. Your entered values are kept, but recovery cannot safely assign them to the current routine. Keep this record or explicitly discard it.',
     );
   }
-  return JSON.parse(JSON.stringify(state.routineSnapshot)) as RoutineWithExercises;
+  return cloneRoutineSnapshot(state.routineSnapshot);
 }
 
 /** Active drafts also retain positional measurements against performed identity. */
@@ -134,7 +150,7 @@ export function getDraftWorkoutRoutine(state: {
       'This older workout draft did not store its exercise structure. Your entered values are kept, but cannot safely be assigned to the current routine. Keep this draft or explicitly discard it.',
     );
   }
-  return JSON.parse(JSON.stringify(state.routineSnapshot)) as RoutineWithExercises;
+  return cloneRoutineSnapshot(state.routineSnapshot);
 }
 
 /** One mapping shared by live entry and immutable pending-save recovery. */
@@ -437,96 +453,6 @@ export function computePersonalRecords(sets: LoggedSet[]): PersonalRecord[] {
   }
   records.sort((a, b) => a.exerciseName.localeCompare(b.exerciseName));
   return records;
-}
-
-export type PersonalRecordKind =
-  'estimated_1rm' | 'load' | 'reps_at_load' | 'timed_duration' | 'cardio_distance';
-
-export type PersonalRecordEvent = {
-  exerciseName: string;
-  kind: PersonalRecordKind;
-  value: number;
-  previousValue: number | null;
-  unit: 'load' | 'reps' | 'seconds' | 'distance';
-};
-
-/**
- * Classify truthful exercise-level PRs without treating every improvement as
- * an estimated-1RM win. High-rep sets can still earn load/rep PRs, while
- * estimated 1RM remains limited to `E1RM_MAX_REPS`.
- */
-export function classifyPersonalRecordEvents(
-  sessionSets: LoggedSet[],
-  historySets: LoggedSet[],
-): PersonalRecordEvent[] {
-  const history = computePersonalRecords(historySets);
-  const bestHistory = new Map(history.map((record) => [record.exerciseKey, record]));
-  const bestHistoryByName = new Map(
-    history.map((record) => [record.exerciseName.trim().toLocaleLowerCase(), record]),
-  );
-  const currentRecords = computePersonalRecords(sessionSets);
-  const events: PersonalRecordEvent[] = [];
-  for (const record of currentRecords) {
-    const prior =
-      bestHistory.get(record.exerciseKey) ??
-      bestHistoryByName.get(record.exerciseName.trim().toLocaleLowerCase());
-    if (record.best1RMSet && record.bestEstimated1RM > (prior?.bestEstimated1RM ?? 0)) {
-      events.push({
-        exerciseName: record.exerciseName,
-        kind: 'estimated_1rm',
-        value: record.bestEstimated1RM,
-        previousValue: prior?.bestEstimated1RM || null,
-        unit: 'load',
-      });
-    }
-    if (record.bestTopSet && record.bestTopSetWeight > (prior?.bestTopSetWeight ?? 0)) {
-      events.push({
-        exerciseName: record.exerciseName,
-        kind: 'load',
-        value: record.bestTopSetWeight,
-        previousValue: prior?.bestTopSetWeight || null,
-        unit: 'load',
-      });
-    }
-    if (
-      record.bestRepSet &&
-      (!prior?.bestRepSet ||
-        (record.bestRepSet.reps > prior.bestRepSet.reps &&
-          record.bestRepSet.weight === prior.bestRepSet.weight))
-    ) {
-      events.push({
-        exerciseName: record.exerciseName,
-        kind: 'reps_at_load',
-        value: record.bestRepSet.reps,
-        previousValue: prior?.bestRepSet?.reps ?? null,
-        unit: 'reps',
-      });
-    }
-    if (
-      record.bestTimedSet &&
-      record.bestTimedDurationSeconds > (prior?.bestTimedDurationSeconds ?? 0)
-    ) {
-      events.push({
-        exerciseName: record.exerciseName,
-        kind: 'timed_duration',
-        value: record.bestTimedDurationSeconds,
-        previousValue: prior?.bestTimedDurationSeconds || null,
-        unit: 'seconds',
-      });
-    }
-    if (record.bestCardioSet && record.bestCardioDistance > (prior?.bestCardioDistance ?? 0)) {
-      events.push({
-        exerciseName: record.exerciseName,
-        kind: 'cardio_distance',
-        value: record.bestCardioDistance,
-        previousValue: prior?.bestCardioDistance || null,
-        unit: 'distance',
-      });
-    }
-  }
-  return events.sort(
-    (a, b) => a.exerciseName.localeCompare(b.exerciseName) || a.kind.localeCompare(b.kind),
-  );
 }
 
 /**
@@ -1160,54 +1086,6 @@ export type ScheduleResolution = {
   movedFromDateKey: string | null;
   note: string | null;
 };
-
-function mondayWeekdayForDateKey(dateKey: string): number {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  const value = new Date(year, month - 1, day, 12, 0, 0, 0);
-  return ((value.getDay() + 6) % 7) + 1;
-}
-
-/** Resolve one local-calendar date without mutating the recurring plan. */
-export function resolveWorkoutSchedule(
-  dateKey: string,
-  weeklyPlan: readonly WorkoutWeeklyPlanEntry[],
-  overrides: readonly WorkoutScheduleOverride[],
-): ScheduleResolution {
-  const override = overrides.find(
-    (entry) => entry.date_key === dateKey && entry.deleted_at === null,
-  );
-  if (override) {
-    return {
-      dateKey,
-      source: 'override',
-      planKind: override.override_kind,
-      routineId: override.routine_id,
-      movedFromDateKey: override.moved_from_date_key,
-      note: override.note,
-    };
-  }
-  const weekly = weeklyPlan.find(
-    (entry) => entry.weekday === mondayWeekdayForDateKey(dateKey) && entry.deleted_at === null,
-  );
-  if (!weekly) {
-    return {
-      dateKey,
-      source: 'rest',
-      planKind: 'rest',
-      routineId: null,
-      movedFromDateKey: null,
-      note: null,
-    };
-  }
-  return {
-    dateKey,
-    source: 'weekly',
-    planKind: weekly.plan_kind,
-    routineId: weekly.routine_id,
-    movedFromDateKey: null,
-    note: weekly.note,
-  };
-}
 
 export type ProgressionSet = {
   completed: boolean;

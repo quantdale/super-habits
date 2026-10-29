@@ -156,6 +156,13 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const [frequentFoods, setFrequentFoods] = useState<FrequentFood[]>([]);
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  /**
+   * Stored kcal of the edited entry when it is kcal-only ("Quick add": every
+   * macro 0). Such calories are not derivable from macros, so the edit modal
+   * must keep them as the effective kcal until the user enters a macro —
+   * recomputing 0 there would block Save (`validateCalorieComputedKcal`).
+   */
+  const [kcalOnlyBase, setKcalOnlyBase] = useState<number | null>(null);
   const [entryDateKey, setEntryDateKey] = useState<string>(() => toDateKey());
   const [showEntryDatePicker, setShowEntryDatePicker] = useState(false);
   const [entryModalVisible, setEntryModalVisible] = useState(false);
@@ -360,6 +367,20 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     [protein, carbs, fats, fiber],
   );
   /**
+   * Effective kcal for the edit modal: while a kcal-only entry is being
+   * edited with all macros still 0, its stored kcal stands in for the
+   * macro-derived 0 (display + validation). As soon as any macro is non-zero
+   * the value is computed from macros as usual.
+   */
+  const effectiveKcal = useMemo(() => {
+    const macrosAllZero =
+      (parseNumericInput(protein) ?? 0) === 0 &&
+      (parseNumericInput(carbs) ?? 0) === 0 &&
+      (parseNumericInput(fats) ?? 0) === 0 &&
+      (parseNumericInput(fiber) ?? 0) === 0;
+    return editingEntryId && macrosAllZero && kcalOnlyBase !== null ? kcalOnlyBase : computedKcal;
+  }, [editingEntryId, kcalOnlyBase, computedKcal, protein, carbs, fats, fiber]);
+  /**
    * Pre-submit consumed-date validation for the edit modal (mirrors
    * `assertConsumableDateKey`): the error surfaces as soon as the date
    * becomes invalid/future, and Save stays disabled until it is saveable.
@@ -390,6 +411,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     setEntryDateKey(logDateKey);
     setShowEntryDatePicker(false);
     setEditingEntryId(null);
+    setKcalOnlyBase(null);
     setCalorieError(null);
   }, [logDateKey]);
 
@@ -414,6 +436,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const applyMealToDraft = useCallback((meal: MealPrefillSource) => {
     setCalorieError(null);
     setEditingEntryId(null);
+    setKcalOnlyBase(null);
     setFood(meal.food_name);
     setProtein(String(meal.protein));
     setCarbs(String(meal.carbs));
@@ -452,6 +475,11 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     setEntryDateKey(entry.consumed_on);
     setShowEntryDatePicker(false);
     setEditingEntryId(entry.id);
+    setKcalOnlyBase(
+      entry.protein === 0 && entry.carbs === 0 && entry.fats === 0 && (entry.fiber ?? 0) === 0
+        ? entry.calories
+        : null,
+    );
     // Surface a legacy future date immediately (Save is also disabled
     // via entryDateError); today/past entries clear any stale error.
     setCalorieError(validateConsumedDateKey(entry.consumed_on));
@@ -578,7 +606,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       return;
     }
 
-    const kcalError = validateCalorieComputedKcal(computedKcal);
+    const kcalError = validateCalorieComputedKcal(effectiveKcal);
     if (kcalError) {
       setCalorieError(kcalError);
       return;
@@ -615,6 +643,9 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
             fiber: fiberN,
             mealType,
             consumedOn: entryDateKey,
+            // Kept only while all macros are 0 (kcal-only edit); otherwise
+            // the data layer recomputes kcal from macros as usual.
+            calories: kcalOnlyBase ?? undefined,
           });
         } else {
           // Both modes log to the day the surface is showing (selectedDateKey),
@@ -930,7 +961,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           fiber={fiber}
           mealType={mealType}
           mealOptions={MEAL_OPTIONS}
-          computedKcal={computedKcal}
+          computedKcal={effectiveKcal}
           calorieError={calorieError}
           accentColor={COLOR}
           onFoodChange={(value) => {

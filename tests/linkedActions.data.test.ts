@@ -1,16 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  createLinkedActionRule,
   deleteLinkedActionRulesForTargetEntity,
-  deleteLinkedActionRule,
   getAppliedHabitIncrementExecution,
   getAppliedHabitDayCalorieExecution,
-  getLinkedActionRule,
-  listActiveLinkedActionRulesForSource,
   listLinkedActionRulesForSourceEntity,
-  listLinkedActionRules,
   replaceLinkedActionRulesForSourceEntity,
-  updateLinkedActionRuleStatus,
 } from '@/core/linked-actions/linkedActions.data';
 import type { LinkedActionRuleRow } from '@/core/linked-actions/linkedActions.types';
 
@@ -27,95 +21,7 @@ describe('core/linked-actions/linkedActions.data', () => {
     vi.clearAllMocks();
   });
 
-  it('creates a linked action rule with serialized effect payload', async () => {
-    const db = {
-      withTransactionAsync: async (task: () => Promise<void>) => {
-        await task();
-      },
-      getFirstAsync: vi.fn().mockResolvedValue({ owner_user_id: null }),
-      runAsync: vi.fn().mockResolvedValue(undefined),
-    };
-    getDatabase.mockResolvedValue(db);
-
-    const created = await createLinkedActionRule({
-      source: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: 'habit_1',
-        triggerType: 'habit.completed_for_day',
-      },
-      target: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: 'todo_1',
-        effect: {
-          kind: 'binary',
-          type: 'todo.complete',
-        },
-      },
-      directionPolicy: 'bidirectional_peer',
-      bidirectionalGroupId: 'group_1',
-    });
-
-    expect(created.status).toBe('active');
-    expect(created.directionPolicy).toBe('bidirectional_peer');
-    // The backup transaction also writes sync_outbox + app_meta rows, so scope
-    // to the single rule INSERT.
-    const ruleInserts = db.runAsync.mock.calls.filter(
-      ([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO linked_action_rules'),
-    );
-    expect(ruleInserts).toHaveLength(1);
-    const [, args] = ruleInserts[0];
-    expect(args[0]).toMatch(/^link_/);
-    expect(args[1]).toBe('active');
-    expect(args[2]).toBe('bidirectional_peer');
-    expect(args[3]).toBe('group_1');
-    expect(args[12]).toBe(JSON.stringify({}));
-  });
-
-  it('creates todo.completed -> habit.increment with the fixed +1 source-date payload', async () => {
-    const db = {
-      withTransactionAsync: async (task: () => Promise<void>) => {
-        await task();
-      },
-      getFirstAsync: vi.fn().mockResolvedValue({ owner_user_id: null }),
-      runAsync: vi.fn().mockResolvedValue(undefined),
-    };
-    getDatabase.mockResolvedValue(db);
-
-    await createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: 'todo_1',
-        triggerType: 'todo.completed',
-      },
-      target: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: 'habit_1',
-        effect: {
-          kind: 'progress',
-          type: 'habit.increment',
-          amount: 1,
-          dateStrategy: 'source_date',
-        },
-      },
-    });
-
-    const ruleInserts = db.runAsync.mock.calls.filter(
-      ([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO linked_action_rules'),
-    );
-    const [, args] = ruleInserts[0];
-    expect(args[4]).toBe('todos');
-    expect(args[7]).toBe('todo.completed');
-    expect(args[8]).toBe('habits');
-    expect(args[10]).toBe('habit_1');
-    expect(args[11]).toBe('habit.increment');
-    expect(args[12]).toBe(JSON.stringify({ amount: 1, dateStrategy: 'source_date' }));
-  });
-
-  it('normalizes stored rows when listing or fetching rules without crashing on legacy targets', async () => {
+  it('normalizes stored rows when listing a source entity without crashing on legacy targets', async () => {
     const row: LinkedActionRuleRow = {
       id: 'link_1',
       status: 'active',
@@ -144,7 +50,13 @@ describe('core/linked-actions/linkedActions.data', () => {
     };
     getDatabase.mockResolvedValue(db);
 
-    await expect(listLinkedActionRules()).resolves.toEqual([
+    await expect(
+      listLinkedActionRulesForSourceEntity({
+        feature: 'workout',
+        entityType: 'workout_routine',
+        entityId: 'wrk_1',
+      }),
+    ).resolves.toEqual([
       {
         id: 'link_1',
         status: 'active',
@@ -179,37 +91,6 @@ describe('core/linked-actions/linkedActions.data', () => {
         deletedAt: null,
       },
     ]);
-
-    await expect(getLinkedActionRule('link_1')).resolves.toMatchObject({
-      id: 'link_1',
-      isUnsupported: true,
-      rawTargetFeature: 'pomodoro',
-    });
-  });
-
-  it('updates status and soft deletes without changing other runtime behavior', async () => {
-    const db = {
-      withTransactionAsync: async (task: () => Promise<void>) => {
-        await task();
-      },
-      getFirstAsync: vi.fn().mockResolvedValue({ owner_user_id: null }),
-      runAsync: vi.fn().mockResolvedValue(undefined),
-    };
-    getDatabase.mockResolvedValue(db);
-
-    await updateLinkedActionRuleStatus('link_1', 'paused');
-    await deleteLinkedActionRule('link_1');
-
-    // Each write now runs inside a backup transaction that also touches
-    // sync_outbox + app_meta, so scope to the status and tombstone UPDATEs.
-    const statusUpdate = db.runAsync.mock.calls.find(
-      ([sql]) => typeof sql === 'string' && sql.includes('SET status = ?, updated_at = ?'),
-    );
-    const deleteUpdate = db.runAsync.mock.calls.find(
-      ([sql]) => typeof sql === 'string' && sql.includes('SET deleted_at = ?, updated_at = ?'),
-    );
-    expect(statusUpdate?.[1]).toEqual(['paused', expect.any(String), 'link_1']);
-    expect(deleteUpdate?.[1]).toEqual([expect.any(String), expect.any(String), 'link_1']);
   });
 
   it('soft deletes rules when a linked target entity is removed', async () => {
@@ -238,50 +119,6 @@ describe('core/linked-actions/linkedActions.data', () => {
       'habits',
       'habit',
       'habit_target',
-    ]);
-  });
-
-  it('filters active rules by exact source entity and trigger', async () => {
-    const row: LinkedActionRuleRow = {
-      id: 'link_2',
-      status: 'active',
-      direction_policy: 'one_way',
-      bidirectional_group_id: null,
-      source_feature: 'habits',
-      source_entity_type: 'habit',
-      source_entity_id: 'habit_1',
-      trigger_type: 'habit.completed_for_day',
-      target_feature: 'habits',
-      target_entity_type: 'habit',
-      target_entity_id: 'habit_2',
-      effect_type: 'habit.increment',
-      effect_payload: JSON.stringify({
-        amount: 1,
-        dateStrategy: 'today',
-      }),
-      created_at: '2026-04-13T00:00:00.000Z',
-      updated_at: '2026-04-13T00:00:00.000Z',
-      deleted_at: null,
-    };
-    const db = {
-      getAllAsync: vi.fn().mockResolvedValue([row]),
-    };
-    getDatabase.mockResolvedValue(db);
-
-    await expect(
-      listActiveLinkedActionRulesForSource({
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: 'habit_1',
-        triggerType: 'habit.completed_for_day',
-      }),
-    ).resolves.toHaveLength(1);
-
-    expect(db.getAllAsync).toHaveBeenCalledWith(expect.stringContaining("status = 'active'"), [
-      'habits',
-      'habit',
-      'habit_1',
-      'habit.completed_for_day',
     ]);
   });
 

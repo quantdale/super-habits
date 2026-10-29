@@ -11,11 +11,16 @@ import { SECTION_COLORS } from '@/constants/sectionColors';
 import { spacing } from '@/core/theme/designTokens';
 import { toDateKey } from '@/lib/time';
 import { useForegroundRefresh } from '@/lib/useForegroundRefresh';
-import { buildActivityTimeline } from '@/features/activity/activityTimeline.data';
+import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
+import {
+  ACTIVITY_TIMELINE_PAGE_SIZE,
+  buildActivityTimeline,
+} from '@/features/activity/activityTimeline.data';
 import {
   filterTimelineByDay,
   filterTimelineByRange,
   filterTimelineBySources,
+  formatTimelineDayLabel,
   getTimelineDayKeys,
   groupTimelineByDay,
   hasClockTime,
@@ -36,11 +41,11 @@ const SOURCE_FILTERS: { key: ActivityTimelineSourceFilter; label: string }[] = [
   { key: 'planning', label: 'Planning' },
 ];
 
-const RANGE_FILTERS: { key: ActivityTimelineRangeFilter; label: string }[] = [
-  { key: '7', label: '7d' },
-  { key: '30', label: '30d' },
-  { key: '90', label: '90d' },
-  { key: 'all', label: 'All' },
+const RANGE_FILTERS: { key: ActivityTimelineRangeFilter; label: string; spoken: string }[] = [
+  { key: '7', label: '7d', spoken: 'the last 7 days' },
+  { key: '30', label: '30d', spoken: 'the last 30 days' },
+  { key: '90', label: '90d', spoken: 'the last 90 days' },
+  { key: 'all', label: 'All', spoken: 'all time' },
 ];
 
 /** Short category label shown in each row's metadata line (never colour-only). */
@@ -53,17 +58,14 @@ const CATEGORY_LABEL: Record<string, string> = {
 const DEFAULT_SOURCE: ActivityTimelineSourceFilter = 'all';
 const DEFAULT_RANGE: ActivityTimelineRangeFilter = '30';
 
-function formatDayLabel(dateKey: string): string {
-  if (dateKey === 'unknown') return 'Earlier';
-  // Browser-local day boundary, matching `toDateKey()`: never `new Date(key)`
-  // (UTC-parsed) for the "today/yesterday" comparison.
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const d = new Date(`${dateKey}T00:00:00`);
-  const diffDays = Math.round((today.getTime() - d.getTime()) / (24 * 60 * 60 * 1000));
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  return dateKey;
+/** The SQL window a range chip asks for: only "All" is unbounded. */
+const daysForRange = (range: ActivityTimelineRangeFilter) =>
+  range === 'all' ? ('all' as const) : Number(range);
+
+/** The paging cursor after a page: its last row (the feed is newest-first). */
+function cursorAfter(page: ActivityTimelineItem[]) {
+  const last = page[page.length - 1];
+  return last ? { occurredAt: last.occurredAt, id: last.id } : null;
 }
 
 /**
@@ -86,6 +88,11 @@ function formatTime(occurredAt: string): string | null {
 export function ActivityTimelineView() {
   const { tokens } = useAppTheme();
   const [items, setItems] = useState<ActivityTimelineItem[]>([]);
+  // Cursor for the next page: the last loaded item identifies the resume point,
+  // so a page appended after a refresh can never skip or duplicate rows the way
+  // a raw `items.length` offset would.
+  const [nextCursor, setNextCursor] = useState<{ occurredAt: string; id: string } | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<ActivityTimelineSourceFilter>(DEFAULT_SOURCE);
   const [rangeFilter, setRangeFilter] = useState<ActivityTimelineRangeFilter>(DEFAULT_RANGE);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -94,30 +101,78 @@ export function ActivityTimelineView() {
   const [loadError, setLoadError] = useState<string | null>(null);
   // F8: the hub stays mounted across midnight — reload when the local day rolls over.
   const dayGeneration = useDayRolloverGeneration();
+  const { begin } = useGuardedAsyncRefresh();
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      // Widest bounded window; narrower ranges are pure domain filtering.
-      setItems(await buildActivityTimeline({ days: 90 }));
-      setLoadError(null);
-    } catch (err) {
-      // F8: no unhandled rejections; a failed load must not read as
-      // "Nothing to show yet". The error panel below offers a retry.
-      console.error('[ActivityTimelineView] load failed', err);
-      setLoadError(err instanceof Error ? err.message : 'Could not load your timeline.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const load = useCallback(
+    async (window: ActivityTimelineRangeFilter = DEFAULT_RANGE) => {
+      // One guard instance per refresh unit: `begin()` is acquired once here and
+      // shared by every sub-read, so a filter change or unmount invalidates the
+      // whole unit instead of letting a stale run clear the newer spinner
+      // (audit C §12).
+      const isCurrent = begin();
+      // A reload unit takes ownership of BOTH spinners: it supersedes any
+      // in-flight page append, whose own finally will (correctly) decline to
+      // write. Clearing the paging flag here is what keeps a superseded append
+      // from stranding "Loading…" on the Load more button forever.
+      setIsLoadingMore(false);
+      setIsLoading(true);
+      try {
+        const page = await buildActivityTimeline({
+          days: daysForRange(window),
+          limit: ACTIVITY_TIMELINE_PAGE_SIZE,
+        });
+        if (!isCurrent()) return;
+        setItems(page.items);
+        setNextCursor(page.hasMore ? cursorAfter(page.items) : null);
+        setLoadError(null);
+      } catch (err) {
+        if (!isCurrent()) return;
+        // F8: no unhandled rejections; a failed load must not read as
+        // "Nothing to show yet". The error panel below offers a retry.
+        console.error('[ActivityTimelineView] load failed', err);
+        setLoadError(err instanceof Error ? err.message : 'Could not load your timeline.');
+      } finally {
+        if (isCurrent()) setIsLoading(false);
+      }
+    },
+    [begin],
+  );
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional async data-load
-    void load();
-  }, [load, dayGeneration]);
+    // The initial/unbounded read is asynchronous; scheduling it on a microtask
+    // keeps the effect free of a synchronous setState cascade.
+    queueMicrotask(() => void load(rangeFilter));
+  }, [dayGeneration, load, rangeFilter]);
 
   // F8: refresh while the hub modal is open after backgrounding the app.
-  useForegroundRefresh(load);
+  useForegroundRefresh(useCallback(() => void load(rangeFilter), [load, rangeFilter]));
+
+  /** Append the next page of the same window; never re-reads from zero. */
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || !nextCursor) return;
+    const isCurrent = begin();
+    // Symmetrically, a page unit supersedes the reload it interrupts and owns
+    // both spinners, so the stale reload's finally cannot strand the initial
+    // spinner.
+    setIsLoading(false);
+    setIsLoadingMore(true);
+    try {
+      const page = await buildActivityTimeline({
+        days: daysForRange(rangeFilter),
+        after: nextCursor,
+        limit: ACTIVITY_TIMELINE_PAGE_SIZE,
+      });
+      if (!isCurrent()) return;
+      setItems((previous) => [...previous, ...page.items]);
+      setNextCursor(page.hasMore ? cursorAfter(page.items) : null);
+    } catch (err) {
+      if (!isCurrent()) return;
+      console.error('[ActivityTimelineView] load more failed', err);
+      setLoadError(err instanceof Error ? err.message : 'Could not load more activity.');
+    } finally {
+      if (isCurrent()) setIsLoadingMore(false);
+    }
+  }, [begin, isLoadingMore, nextCursor, rangeFilter]);
 
   // Hooks run unconditionally (rules-of-hooks); the loadError early return
   // happens AFTER all hooks, using the already-computed values where needed.
@@ -140,8 +195,10 @@ export function ActivityTimelineView() {
   // silently show an empty list.
   useEffect(() => {
     if (selectedDay && !dayKeys.includes(selectedDay)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- keep selection valid
-      setSelectedDay(null);
+      queueMicrotask(() => {
+        // Re-check inside the microtask: a newer render may have restored it.
+        setSelectedDay((current) => (current === selectedDay ? null : current));
+      });
     }
   }, [dayKeys, selectedDay]);
 
@@ -182,7 +239,7 @@ export function ActivityTimelineView() {
             <Button
               label="Try again"
               onPress={() => {
-                void load();
+                void load(rangeFilter);
               }}
               color={tokens.textMuted}
             />
@@ -235,7 +292,7 @@ export function ActivityTimelineView() {
               (one text node, so it reads as one sentence to a screen reader). */}
           <Text className="text-xs" style={{ color: tokens.textMuted }}>
             {`${sourceSummary} · ${rangeSummary}${
-              selectedDay ? ` · ${formatDayLabel(selectedDay)}` : ''
+              selectedDay ? ` · ${formatTimelineDayLabel(selectedDay, todayKey)}` : ''
             }`}
           </Text>
 
@@ -259,7 +316,7 @@ export function ActivityTimelineView() {
                     <PillChip
                       key={f.key}
                       label={f.label}
-                      accessibilityLabel={`Show activity from the last ${f.label}`}
+                      accessibilityLabel={`Show activity from ${f.spoken}`}
                       active={rangeFilter === f.key}
                       color={SECTION_COLORS.focus}
                       onPress={() => setRangeFilter(f.key)}
@@ -277,7 +334,7 @@ export function ActivityTimelineView() {
                     {dayKeys.slice(0, 14).map((key) => (
                       <PillChip
                         key={key}
-                        label={formatDayLabel(key)}
+                        label={formatTimelineDayLabel(key, todayKey)}
                         accessibilityLabel={`Show activity from ${key}`}
                         active={selectedDay === key}
                         color={SECTION_COLORS.habits}
@@ -323,7 +380,7 @@ export function ActivityTimelineView() {
                     marginTop: spacing.sm,
                   }}
                 >
-                  {formatDayLabel(group.dateKey)}
+                  {formatTimelineDayLabel(group.dateKey, todayKey)}
                 </Text>
                 <View
                   className="rounded-2xl border"
@@ -341,6 +398,20 @@ export function ActivityTimelineView() {
               </View>
             ))
           )}
+
+          {/* Older pages of the same window; the button is the whole
+              affordance, so the feed never silently truncates. */}
+          {nextCursor && !isLoading ? (
+            <View className="items-center">
+              <Button
+                label={isLoadingMore ? 'Loading…' : 'Load more'}
+                variant="ghost"
+                size="sm"
+                disabled={isLoadingMore}
+                onPress={() => void loadMore()}
+              />
+            </View>
+          ) : null}
         </>
       ) : null}
     </View>

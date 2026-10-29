@@ -71,6 +71,71 @@ describe('project rollups (F8 / task 11.1)', () => {
     expect(rollup.habits.habitCount).toBe(1);
     expect(rollup.habits.recentCompletions).toBe(1);
     expect(rollup.habits.windowDays).toBe(30);
+    // The habit was created today, so the window holds exactly one eligible
+    // occurrence and it was completed.
+    expect(rollup.habits.expectedOccurrences).toBe(1);
+    expect(rollup.habits.completedOccurrences).toBe(1);
+  });
+
+  it('counts only scheduled weekdays in the project habit denominator', async () => {
+    const db = await freshDatabase();
+    const projects = await import('@/features/projects/projects.data');
+    const habits = await import('@/features/habits/habits.data');
+
+    const projectId = await projects.addProject({ name: 'Weekday project' });
+    const habitId = await habits.addHabit('Weekday habit', 1);
+    // Backdate past the 30-day window with a weekdays-only schedule so the
+    // window holds rest days that must stay out of the denominator.
+    const { createHabitRule } = await import('@/features/habits/habits.domain');
+    await db.runAsync('UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?', [
+      new Date(`${shiftKey(TODAY, -40)}T12:00:00`).toISOString(),
+      JSON.stringify([createHabitRule(shiftKey(TODAY, -40), [1, 2, 3, 4, 5], 1)]),
+      habitId,
+    ]);
+    await habits.setHabitProjectGoal(habitId, { projectId });
+
+    // Expected = Mon-Fri local days inside the inclusive 30-day window.
+    let expectedScheduledDays = 0;
+    for (let offset = 29; offset >= 0; offset -= 1) {
+      const [y, m, d] = shiftKey(TODAY, -offset).split('-').map(Number);
+      const jsWeekday = new Date(y, m - 1, d).getDay(); // 0=Sun..6=Sat
+      const habitWeekday = ((jsWeekday + 6) % 7) + 1; // 1=Mon..7=Sun
+      if (habitWeekday <= 5) expectedScheduledDays += 1;
+    }
+
+    const rollup = await projects.getProjectRollup(projectId);
+    expect(rollup.habits.habitCount).toBe(1);
+    expect(rollup.habits.expectedOccurrences).toBe(expectedScheduledDays);
+    expect(rollup.habits.expectedOccurrences).toBeLessThan(30);
+    expect(rollup.habits.completedOccurrences).toBe(0);
+  });
+
+  it('counts a partial target day as incomplete in the project numerator', async () => {
+    const db = await freshDatabase();
+    const projects = await import('@/features/projects/projects.data');
+    const habits = await import('@/features/habits/habits.data');
+
+    const projectId = await projects.addProject({ name: 'Target project' });
+    const habitId = await habits.addHabit('Water', 3);
+    const { createHabitRule } = await import('@/features/habits/habits.domain');
+    await db.runAsync('UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?', [
+      new Date(`${shiftKey(TODAY, -2)}T12:00:00`).toISOString(),
+      JSON.stringify([createHabitRule(shiftKey(TODAY, -2), [1, 2, 3, 4, 5, 6, 7], 3)]),
+      habitId,
+    ]);
+    await habits.setHabitProjectGoal(habitId, { projectId });
+    // Yesterday: 1 of 3 (partial, not a completed occurrence).
+    await habits.incrementHabit(habitId, shiftKey(TODAY, -1));
+    // Today: 3 of 3 (a completed occurrence).
+    for (let i = 0; i < 3; i += 1) await habits.incrementHabit(habitId, TODAY);
+
+    const single = await projects.getProjectRollup(projectId);
+    expect(single.habits.expectedOccurrences).toBe(3); // creation day, yesterday, today
+    expect(single.habits.completedOccurrences).toBe(1);
+    expect(single.habits.recentCompletions).toBe(2);
+
+    const all = await projects.listProjectRollups();
+    expect(all[projectId].habits).toEqual(single.habits);
   });
 
   it('listProjectRollups covers every project without N+1 and skips unlinked rows', async () => {
@@ -120,14 +185,102 @@ describe('goal rollups (F8 / task 11.1)', () => {
 
     const weekRollup = await goals.getGoalRollup(weekGoal);
     expect(weekRollup.todos).toEqual({ total: 2, done: 1 });
-    expect(weekRollup.habits.windowDays).toBe(7);
+    expect(weekRollup.habits.expectedOccurrences).toBe(0); // no habits linked to the week goal
     expect(weekRollup.habits.completionsInWindow).toBe(0); // habit belongs to the other goal
 
     const yearRollup = await goals.getGoalRollup(yearGoal);
     expect(yearRollup.todos.total).toBe(0);
-    expect(yearRollup.habits.windowDays).toBe(365);
+    expect(yearRollup.habits.expectedOccurrences).toBe(31); // rule effective TODAY-30, daily: 31 eligible days, not 365 calendar days
     expect(yearRollup.habits.completionsInWindow).toBe(2);
     expect(yearRollup.habits.habitCount).toBe(1);
+  });
+
+  it('scheduled-habit consistency denominator counts only scheduled days in the window', async () => {
+    const db = await freshDatabase();
+    const goals = await import('@/features/goals/goals.data');
+    const habits = await import('@/features/habits/habits.data');
+
+    const goalId = await goals.addGoal({ title: 'Scheduled denominator', horizon: 'month' });
+    const habitId = await habits.addHabit('Weekday habit', 1);
+    // Backdate the habit (>30 days) with a weekdays-only schedule so the
+    // 30-day window contains rest days that must stay out of the denominator.
+    const { createHabitRule } = await import('@/features/habits/habits.domain');
+    await db.runAsync('UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?', [
+      new Date(`${shiftKey(TODAY, -40)}T12:00:00`).toISOString(),
+      JSON.stringify([createHabitRule(shiftKey(TODAY, -40), [1, 2, 3, 4, 5], 1)]),
+      habitId,
+    ]);
+    await habits.setHabitProjectGoal(habitId, { goalId });
+
+    // Expected = Mon-Fri local days inside the inclusive 30-day window,
+    // computed from the date keys (weekday-dependent, never hardcoded).
+    let expectedScheduledDays = 0;
+    for (let offset = 29; offset >= 0; offset -= 1) {
+      const [y, m, d] = shiftKey(TODAY, -offset).split('-').map(Number);
+      const jsWeekday = new Date(y, m - 1, d).getDay(); // 0=Sun..6=Sat
+      const habitWeekday = ((jsWeekday + 6) % 7) + 1; // 1=Mon..7=Sun
+      if (habitWeekday <= 5) expectedScheduledDays += 1;
+    }
+
+    const rollup = await goals.getGoalRollup(goalId);
+    expect(rollup.habits.habitCount).toBe(1);
+    expect(rollup.habits.expectedOccurrences).toBe(expectedScheduledDays);
+    expect(rollup.habits.expectedOccurrences).toBeLessThan(30);
+  });
+
+  it('completions on lifecycle-masked days leave the consistency numerator', async () => {
+    const db = await freshDatabase();
+    const goals = await import('@/features/goals/goals.data');
+    const habits = await import('@/features/habits/habits.data');
+
+    const goalId = await goals.addGoal({ title: 'Pause scenario', horizon: 'month' });
+    const habitId = await habits.addHabit('Daily habit', 1);
+    // Backdate so the prior days are eligible misses and today is actionable.
+    const { createHabitRule } = await import('@/features/habits/habits.domain');
+    await db.runAsync('UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?', [
+      new Date(`${shiftKey(TODAY, -3)}T12:00:00`).toISOString(),
+      JSON.stringify([createHabitRule(shiftKey(TODAY, -3), [1, 2, 3, 4, 5, 6, 7], 1)]),
+      habitId,
+    ]);
+    await habits.setHabitProjectGoal(habitId, { goalId });
+    // Two missed days stay missed; check in today, then pause today — the
+    // pause masks today inclusively without deleting today's check-in, so a
+    // raw count would read 1 while the day no longer carries an obligation.
+    await habits.incrementHabit(habitId, TODAY);
+    await habits.pauseHabit(habitId, TODAY);
+
+    const rollup = await goals.getGoalRollup(goalId);
+    expect(rollup.habits.completionsInWindow).toBe(0);
+  });
+
+  it('a partial day is not a completed occurrence in goal consistency', async () => {
+    const db = await freshDatabase();
+    const goals = await import('@/features/goals/goals.data');
+    const habits = await import('@/features/habits/habits.data');
+
+    const goalId = await goals.addGoal({ title: 'Target-three habit', horizon: 'month' });
+    const habitId = await habits.addHabit('Water', 3);
+    // Backdate so both probe days are eligible scheduled occurrences inside the
+    // 30-day window and the per-day rule target (3) is the graded target.
+    const { createHabitRule } = await import('@/features/habits/habits.domain');
+    await db.runAsync('UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?', [
+      new Date(`${shiftKey(TODAY, -3)}T12:00:00`).toISOString(),
+      JSON.stringify([createHabitRule(shiftKey(TODAY, -3), [1, 2, 3, 4, 5, 6, 7], 3)]),
+      habitId,
+    ]);
+    await habits.setHabitProjectGoal(habitId, { goalId });
+
+    const partialDay = shiftKey(TODAY, -1);
+    const fullDay = shiftKey(TODAY, -2);
+    await habits.incrementHabit(habitId, partialDay); // 1 of 3 — partial
+    for (let i = 0; i < 3; i += 1) await habits.incrementHabit(habitId, fullDay); // 3 of 3
+
+    const rollup = await goals.getGoalRollup(goalId);
+    // Eligible occurrences run from the creation boundary (TODAY-3) through today.
+    expect(rollup.habits.expectedOccurrences).toBe(4);
+    // Only the fully satisfied day is a completed eligible occurrence, matching
+    // the habit engine's own consistency (count >= that date's target).
+    expect(rollup.habits.completionsInWindow).toBe(1);
   });
 
   it('listHabitsForGoal returns only non-deleted linked habits', async () => {

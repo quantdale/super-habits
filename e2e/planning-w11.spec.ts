@@ -1,13 +1,13 @@
 import { test, expect, type Page } from './fixtures';
 import { clearDatabase } from './helpers/db';
-import { goToTab } from './helpers/navigation';
+import { goToTab, planningHubTab } from './helpers/navigation';
 import { queryRows } from './helpers/dbHarness';
 
 /** W11 disclosure & planning journeys. SQLite oracles come last because the
  * database harness replaces the active app page/worker. */
 async function openPlanning(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Plan today' }).click();
-  await expect(page.getByRole('tab', { name: 'Projects' })).toBeVisible({ timeout: 20_000 });
+  await expect(planningHubTab(page, 'Projects')).toBeVisible({ timeout: 20_000 });
 }
 
 test.describe('W11 Planning disclosure hierarchy', () => {
@@ -20,7 +20,7 @@ test.describe('W11 Planning disclosure hierarchy', () => {
 
   test('projects show objective first; filters preserve state when collapsed', async ({ page }) => {
     await openPlanning(page);
-    await page.getByRole('tab', { name: 'Projects' }).click();
+    await planningHubTab(page, 'Projects').click();
     await page.getByRole('button', { name: 'Create project' }).click();
     await expect(page.getByRole('button', { name: 'Project more options' })).toHaveAttribute(
       'aria-expanded',
@@ -82,7 +82,7 @@ test.describe('W11 Planning disclosure hierarchy', () => {
 
   test('goals share the row grammar and preserve manual progress', async ({ page }) => {
     await openPlanning(page);
-    await page.getByRole('tab', { name: 'Goals' }).click();
+    await planningHubTab(page, 'Goals').click();
     await page.getByRole('button', { name: 'Create goal' }).click();
     await expect(page.getByRole('button', { name: 'Goal more options' })).toHaveAttribute(
       'aria-expanded',
@@ -127,6 +127,27 @@ test.describe('W11 Planning disclosure hierarchy', () => {
       'SELECT title, status, progress_percent FROM goals WHERE deleted_at IS NULL',
     );
     expect(rows).toEqual([{ title: 'W11 Run', status: 'active', progress_percent: 10 }]);
+  });
+
+  test('typed goal progress is saved without pressing Set first', async ({ page }) => {
+    // Regression: the save path used the last committed percentage, so a value
+    // typed into the progress field and saved directly (no "Set" press) was
+    // silently discarded — the row was created at 0%.
+    await openPlanning(page);
+    await planningHubTab(page, 'Goals').click();
+    await page.getByRole('button', { name: 'Create goal' }).click();
+    await page.getByPlaceholder('Goal title').fill('W11 Typed Progress');
+    await page.getByRole('textbox', { name: 'Goal progress percent' }).fill('50');
+    await page.getByRole('button', { name: 'Create Goal' }).click();
+    await expect(
+      page.getByRole('button', { name: /^W11 Typed Progress, Active, 50 percent/ }),
+    ).toBeVisible();
+
+    const rows = await queryRows(
+      page,
+      'SELECT title, progress_percent FROM goals WHERE deleted_at IS NULL',
+    );
+    expect(rows).toEqual([{ title: 'W11 Typed Progress', progress_percent: 50 }]);
   });
 
   test('Daily Plan hides optional fields, retains drafts, commits and completes', async ({

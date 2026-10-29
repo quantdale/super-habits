@@ -1,31 +1,26 @@
 import { Text } from '@/core/ui/Text';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { useForegroundRefresh } from '@/lib/useForegroundRefresh';
-import { dateKeyToLocalDate } from '@/lib/time';
+import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { Card } from '@/core/ui/Card';
 import { Button } from '@/core/ui/Button';
 import { PillChip } from '@/core/ui/PillChip';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { getMomentumGarden } from './momentum.data';
-import { buildMomentumSourceExplanations, formatMomentumTodaySummary } from './momentum.domain';
+import {
+  buildMomentumSourceExplanations,
+  formatMomentumDateLabel,
+  formatMomentumTodaySummary,
+} from './momentum.domain';
 import { MomentumGardenArt } from './MomentumGardenArt';
 import type { MomentumGardenModel, MomentumSource } from './momentum.types';
 
 type MomentumDetailViewProps = {
   initialDays?: 7 | 28;
 };
-
-function formatDateLabel(dateKey: string, todayKey: string): string {
-  if (dateKey === todayKey) return 'Today';
-  const today = dateKeyToLocalDate(todayKey);
-  const date = dateKeyToLocalDate(dateKey);
-  const difference = Math.round((today.getTime() - date.getTime()) / 86_400_000);
-  if (difference === 1) return 'Yesterday';
-  return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-}
 
 function sourceColor(
   source: MomentumSource,
@@ -64,7 +59,7 @@ function MomentumDayRow({ model, dateKey }: { model: MomentumGardenModel; dateKe
     >
       <View className="w-[72px]">
         <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-          {formatDateLabel(day.dateKey, model.todayKey)}
+          {formatMomentumDateLabel(day.dateKey, model.todayKey)}
         </Text>
         <Text className="text-[11px]" style={{ color: tokens.textMuted }}>
           {day.dateKey}
@@ -104,33 +99,30 @@ export function MomentumDetailView({ initialDays = 7 }: MomentumDetailViewProps)
   const [model, setModel] = useState<MomentumGardenModel | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const loadRequestRef = useRef(0);
-  const mountedRef = useRef(true);
+  const { begin } = useGuardedAsyncRefresh();
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  const load = useCallback(async (days: 7 | 28) => {
-    const requestId = ++loadRequestRef.current;
-    const isCurrent = () => mountedRef.current && loadRequestRef.current === requestId;
-    setIsLoading(true);
-    try {
-      const nextModel = await getMomentumGarden({ days });
-      if (!isCurrent()) return;
-      setModel(nextModel);
-      setLoadError(null);
-    } catch (error) {
-      if (!isCurrent()) return;
-      console.error('[MomentumDetailView] load failed', error);
-      setLoadError(error instanceof Error ? error.message : 'Could not load your garden.');
-    } finally {
-      if (isCurrent()) setIsLoading(false);
-    }
-  }, []);
+  const load = useCallback(
+    async (days: 7 | 28) => {
+      // One guard instance per refresh unit (audit C §12): a newer window or
+      // day-rollover load invalidates this one, so a stale run can neither
+      // overwrite fresher state nor clear the newer load's spinner.
+      const isCurrent = begin();
+      setIsLoading(true);
+      try {
+        const nextModel = await getMomentumGarden({ days });
+        if (!isCurrent()) return;
+        setModel(nextModel);
+        setLoadError(null);
+      } catch (error) {
+        if (!isCurrent()) return;
+        console.error('[MomentumDetailView] load failed', error);
+        setLoadError(error instanceof Error ? error.message : 'Could not load your garden.');
+      } finally {
+        if (isCurrent()) setIsLoading(false);
+      }
+    },
+    [begin],
+  );
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional async data-load

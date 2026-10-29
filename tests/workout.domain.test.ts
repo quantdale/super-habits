@@ -3,6 +3,7 @@ import {
   buildTimerSequence,
   buildPreviousSetLookup,
   collectSessionSetRecords,
+  formatLastPerformedLabel,
   formatWorkoutTime,
   groupSessionExercises,
   lookupPreviousSet,
@@ -18,7 +19,6 @@ import {
   isQuickLoggedSession,
   normalizeEffort,
   recommendProgression,
-  resolveWorkoutSchedule,
 } from '@/features/workout/workout.domain';
 import type { HeatmapDay } from '@/features/shared/activityTypes';
 import type { BodyWeightEntry, WorkoutLog } from '@/core/db/types';
@@ -476,45 +476,6 @@ describe('buildExerciseHistory', () => {
 });
 
 describe('Gym V2 training domain', () => {
-  it('resolves local weekly weekdays and lets a date override win without changing the plan', () => {
-    const weeklyPlan = [
-      {
-        id: 'plan-mon',
-        weekday: 1,
-        routine_id: 'push',
-        plan_kind: 'workout' as const,
-        note: null,
-        created_at: '2026-08-01T00:00:00.000Z',
-        updated_at: '2026-08-01T00:00:00.000Z',
-        deleted_at: null,
-      },
-    ];
-    const override = [
-      {
-        id: 'override-aug-24',
-        date_key: '2026-08-24',
-        override_kind: 'rest' as const,
-        routine_id: null,
-        moved_from_date_key: null,
-        note: 'Recovery day',
-        created_at: '2026-08-01T00:00:00.000Z',
-        updated_at: '2026-08-01T00:00:00.000Z',
-        deleted_at: null,
-      },
-    ];
-
-    expect(resolveWorkoutSchedule('2026-08-17', weeklyPlan, [])).toMatchObject({
-      source: 'weekly',
-      planKind: 'workout',
-      routineId: 'push',
-    });
-    expect(resolveWorkoutSchedule('2026-08-24', weeklyPlan, override)).toMatchObject({
-      source: 'override',
-      planKind: 'rest',
-      routineId: null,
-    });
-  });
-
   it('gives linear progression an explicit successful-work explanation', () => {
     expect(
       recommendProgression({
@@ -729,5 +690,39 @@ describe('isQuickLoggedSession', () => {
   it('treats non-positive counts as quick logs (absence of evidence)', () => {
     expect(isQuickLoggedSession(-1)).toBe(true);
     expect(isQuickLoggedSession(Number.NaN)).toBe(true);
+  });
+});
+
+/**
+ * Audit C §9: the last-performed gap is a calendar-day count. Anchoring both
+ * endpoints on local midnight makes an ordinary DST transition harmless, but a
+ * skipped date-line day still loses a day under fixed-millisecond math.
+ */
+describe('formatLastPerformedLabel calendar-day gap', () => {
+  const previousTz = process.env.TZ;
+
+  afterEach(() => {
+    if (previousTz === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTz;
+  });
+
+  it('labels the day before as Yesterday across a DST boundary', () => {
+    process.env.TZ = 'America/New_York';
+    // Spring forward: the 23-hour day between Mar 7 and Mar 8.
+    expect(formatLastPerformedLabel('2026-03-07T18:00:00', new Date('2026-03-08T09:00:00'))).toBe(
+      'Yesterday',
+    );
+    // Fall back: the 25-hour day between Oct 31 and Nov 1.
+    expect(formatLastPerformedLabel('2026-10-31T18:00:00', new Date('2026-11-01T09:00:00'))).toBe(
+      'Yesterday',
+    );
+  });
+
+  it('counts a skipped date-line day instead of collapsing it', () => {
+    process.env.TZ = 'Pacific/Apia';
+    // 2011-12-30 never existed locally, so Dec 29 → Dec 31 is two days.
+    expect(formatLastPerformedLabel('2011-12-29T18:00:00', new Date('2011-12-31T09:00:00'))).toBe(
+      '2 days ago',
+    );
   });
 });

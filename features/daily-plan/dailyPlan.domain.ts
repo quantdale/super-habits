@@ -4,7 +4,7 @@ import type {
   HabitLifecycleHistoryInput,
   HabitRuleHistoryInput,
 } from '@/features/habits/habits.domain';
-import { dateKeyToLocalDate } from '@/lib/time';
+import { addLocalDays } from '@/lib/time';
 import {
   ENERGY_SCORE_MAX,
   ENERGY_SCORE_MIN,
@@ -88,14 +88,9 @@ export type DailyPlanAdherence = {
   completedStreak: number;
 };
 
-/** Shift a date key by whole local-calendar days (DST-safe via local midnight). */
+/** Shift a date key by whole local-calendar days (DST-safe via `lib/time`). */
 export function shiftDateKeyByDays(dateKey: string, days: number): string {
-  const d = dateKeyToLocalDate(dateKey);
-  d.setDate(d.getDate() + days);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return addLocalDays(dateKey, days);
 }
 
 const shiftDateKey = shiftDateKeyByDays;

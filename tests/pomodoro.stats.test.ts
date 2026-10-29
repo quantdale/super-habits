@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeFocusStats, getAbandonNotice } from '@/features/pomodoro/pomodoro.domain';
+import { computeFocusStats } from '@/features/pomodoro/pomodoro.domain';
 import type { PomodoroSession } from '@/core/db/types';
 
 function session(input: {
@@ -106,54 +106,3 @@ describe('computeFocusStats', () => {
     expect(stats.bestDay?.minutes).toBe(10);
   });
 });
-
-describe('getAbandonNotice', () => {
-  it('returns null when idle', () => {
-    expect(
-      getAbandonNotice({ mode: 'focus', phase: 'idle', remaining: 1500, totalSeconds: 1500 }),
-    ).toBeNull();
-  });
-
-  it('returns null when nothing has elapsed yet', () => {
-    expect(
-      getAbandonNotice({ mode: 'focus', phase: 'running', remaining: 1500, totalSeconds: 1500 }),
-    ).toBeNull();
-  });
-
-  it('explains that an interrupted focus is never logged', () => {
-    const notice = getAbandonNotice({
-      mode: 'focus',
-      phase: 'running',
-      remaining: 1500 - 19 * 60,
-      totalSeconds: 1500,
-    });
-    expect(notice?.title).toBe('Abandon this focus?');
-    expect(notice?.body).toContain('19 minutes');
-    expect(notifyBody(notice)).toContain('never logged');
-  });
-
-  it('uses discard wording for a paused focus', () => {
-    const notice = getAbandonNotice({
-      mode: 'focus',
-      phase: 'paused',
-      remaining: 600,
-      totalSeconds: 1500,
-    });
-    expect(notice?.title).toBe('Discard paused focus?');
-  });
-
-  it('clarifies breaks are not logged and streaks are unaffected', () => {
-    const notice = getAbandonNotice({
-      mode: 'short_break',
-      phase: 'running',
-      remaining: 120,
-      totalSeconds: 300,
-    });
-    expect(notice?.body).toContain('not logged');
-    expect(notice?.body).toContain('streak');
-  });
-});
-
-function notifyBody(notice: { title: string; body: string } | null): string {
-  return notice ? notice.title + ' ' + notice.body : '';
-}

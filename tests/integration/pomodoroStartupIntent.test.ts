@@ -59,6 +59,9 @@ describe('pomodoro startup durable intent (real SQLite)', () => {
       completedFocus: 2,
       notificationId: 'notif_started',
       pausedRemainingSeconds: null,
+      runningDeadlineIso: new Date(
+        startedAt.getTime() + DEFAULT_SETTINGS.focusMinutes * 60_000,
+      ).toISOString(),
     });
   });
 
@@ -146,6 +149,7 @@ describe('pomodoro startup durable intent (real SQLite)', () => {
       completedFocus: 1,
       notificationId: null,
       pausedRemainingSeconds: null,
+      runningDeadlineIso: new Date(startedAt.getTime() + 45 * 60_000).toISOString(),
     });
   });
 

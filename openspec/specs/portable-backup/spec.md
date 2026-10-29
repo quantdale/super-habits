@@ -18,7 +18,8 @@ self-contained JSON file with envelope fields `format =
 "superhabits-portable-backup"`, `formatVersion` (currently 1),
 `backupSchemaVersion` (the domain backup schema version, currently 2),
 `exportedAt` (ISO-8601), `source {appVersion, platform, ownerFingerprint}`,
-`entities` (the 12 recoverable entity arrays), `settings` (the recoverable
+`entities` (the 21 recoverable entity arrays — the canonical list is
+`BACKUP_ENTITIES` in `core/backup/backup.types.ts`), `settings` (the recoverable
 settings allowlist payload), and `integrity {entities, settings,
 payloadChecksum}`. The file SHALL use the `.json` extension and MIME
 `application/json`, SHALL contain no executable content and no arbitrary SQL,
@@ -30,8 +31,10 @@ user UUIDs, `sync_outbox` rows, or raw internal `app_meta` values.
 - **WHEN** the user exports a portable backup on a device with todos,
   habits, habit completions, calorie entries, saved meals, workout
   routines/exercises/sets, workout logs, session exercises, pomodoro
-  sessions, linked action rules, and recoverable settings,
-- **THEN** the file contains `entities` arrays for all 12 entities with
+  sessions, linked action rules, weekly reviews, projects, goals, daily plans,
+  custom exercises, weekly workout plans, schedule overrides, body weight
+  entries, and recoverable settings,
+- **THEN** the file contains `entities` arrays for all 21 entities with
   every active and soft-deleted row, `settings` matching the recoverable
   settings snapshot, and a `payloadChecksum` that verifies against the
   documented canonical payload text.
@@ -105,7 +108,7 @@ guard SHALL be re-verified inside the import transaction.
 Before any local write, the app SHALL validate, in order: file size (≤ 100
 MB), JSON parseability, envelope shape, format version (unknown future
 version rejected), backup schema version (unknown future or legacy version
-rejected), presence of all 12 entity arrays with no unknown entity keys,
+rejected), presence of all 21 entity arrays with no unknown entity keys,
 every row via the shared backup row validators, settings runtime
 validation, per-entity row counts and SHA-256 checksums, settings checksum
 and version, the envelope payload checksum, the dependency graph via the

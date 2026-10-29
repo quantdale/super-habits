@@ -2,6 +2,7 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import { toDateKey } from '@/lib/time';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
+import { saveHabitRules, saveTodoRules } from './helpers/linkedActionRules';
 
 /**
  * Fault-injection proof for the durable linked-action dispatch handoff
@@ -19,33 +20,29 @@ import { freshDatabase } from './helpers/db';
 async function createTodoHabitIncrementCycle(db: TestDatabase, targetPerDay = 1) {
   const todos = await import('@/features/todos/todos.data');
   const habits = await import('@/features/habits/habits.data');
-  const linked = await import('@/core/linked-actions/linkedActions.data');
   const engineModule = await import('@/core/linked-actions/linkedActions.engine');
 
   const sourceTodoId = await todos.addTodo({ title: 'Ship the report' });
   const targetHabitId = await habits.addHabit('Drink water', targetPerDay);
 
-  await linked.createLinkedActionRule({
-    source: {
-      feature: 'todos',
-      entityType: 'todo',
-      entityId: sourceTodoId,
+  await saveTodoRules(sourceTodoId, [
+    {
       triggerType: 'todo.completed',
-    },
-    target: {
-      feature: 'habits',
-      entityType: 'habit',
-      entityId: targetHabitId,
-      effect: {
-        kind: 'progress',
-        type: 'habit.increment',
-        amount: 1,
-        dateStrategy: 'source_date',
+      target: {
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: targetHabitId,
+        effect: {
+          kind: 'progress',
+          type: 'habit.increment',
+          amount: 1,
+          dateStrategy: 'source_date',
+        },
       },
     },
-  });
+  ]);
 
-  return { todos, habits, linked, engineModule, sourceTodoId, targetHabitId };
+  return { todos, habits, engineModule, sourceTodoId, targetHabitId };
 }
 
 async function crashPostCommitDispatch(
@@ -145,27 +142,23 @@ describe('crash between habit threshold crossing and dispatch (in-app habit path
   it('persists the event atomically with the crossing completion and recovery applies the chained effect once', async () => {
     const db = await freshDatabase();
     const habits = await import('@/features/habits/habits.data');
-    const linked = await import('@/core/linked-actions/linkedActions.data');
     const todos = await import('@/features/todos/todos.data');
     const engineModule = await import('@/core/linked-actions/linkedActions.engine');
 
     const targetTodoId = await todos.addTodo({ title: 'Stretch after workout' });
     const sourceHabitId = await habits.addHabit('Morning run', 1);
 
-    await linked.createLinkedActionRule({
-      source: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: sourceHabitId,
+    await saveHabitRules(sourceHabitId, [
+      {
         triggerType: 'habit.completed_for_day',
+        target: {
+          feature: 'todos',
+          entityType: 'todo',
+          entityId: targetTodoId,
+          effect: { kind: 'binary', type: 'todo.complete' },
+        },
       },
-      target: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: targetTodoId,
-        effect: { kind: 'binary', type: 'todo.complete' },
-      },
-    });
+    ]);
 
     const crash = await crashPostCommitDispatch(engineModule);
     await expect(habits.incrementHabit(sourceHabitId)).rejects.toThrow(
@@ -218,27 +211,23 @@ describe('crash between notification marker commit and dispatch', () => {
   it('persists the event with the marker transaction and recovery dispatches exactly once', async () => {
     const db = await freshDatabase();
     const habits = await import('@/features/habits/habits.data');
-    const linked = await import('@/core/linked-actions/linkedActions.data');
     const todos = await import('@/features/todos/todos.data');
     const engineModule = await import('@/core/linked-actions/linkedActions.engine');
 
     const targetTodoId = await todos.addTodo({ title: 'Log the session' });
     const sourceHabitId = await habits.addHabit('Evening wind-down', 1);
 
-    await linked.createLinkedActionRule({
-      source: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: sourceHabitId,
+    await saveHabitRules(sourceHabitId, [
+      {
         triggerType: 'habit.completed_for_day',
+        target: {
+          feature: 'todos',
+          entityType: 'todo',
+          entityId: targetTodoId,
+          effect: { kind: 'binary', type: 'todo.complete' },
+        },
       },
-      target: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: targetTodoId,
-        effect: { kind: 'binary', type: 'todo.complete' },
-      },
-    });
+    ]);
 
     const crash = await crashPostCommitDispatch(engineModule);
     await expect(

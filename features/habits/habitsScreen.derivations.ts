@@ -47,60 +47,6 @@ export function buildHabitRuleHistoryIndex(
   return index;
 }
 
-export type HabitTodaySummary = {
-  scheduledTodayCount: number;
-  completedTodayCount: number;
-  todayProgress: number | null;
-};
-
-/**
- * Today's scheduled/completed counts over durable-active habits. Paused or
- * archived habits carry no obligation today, so they never enter either
- * denominator (F1).
- */
-export function summarizeHabitsToday(input: {
-  activeHabits: readonly Habit[];
-  ruleHistoryById: ReadonlyMap<string, HabitRule[]>;
-  countsByHabitDate: HabitCompletionCounts;
-  todayKey: string;
-}): HabitTodaySummary {
-  let scheduledTodayCount = 0;
-  let completedTodayCount = 0;
-
-  for (const habit of input.activeHabits) {
-    const history = input.ruleHistoryById.get(habit.id);
-    const creationKey = habitCreationDateKey(habit.created_at);
-    if (
-      !isHabitActionableOn(
-        history,
-        input.todayKey,
-        habit.target_per_day,
-        creationKey,
-        habit.lifecycle_history,
-      )
-    )
-      continue;
-    scheduledTodayCount += 1;
-    const completed = input.countsByHabitDate[habit.id]?.[input.todayKey] ?? 0;
-    const target = getHabitTargetForDate(
-      history,
-      input.todayKey,
-      habit.target_per_day,
-      creationKey,
-    );
-    if (completed >= target) completedTodayCount += 1;
-  }
-
-  return {
-    scheduledTodayCount,
-    completedTodayCount,
-    todayProgress:
-      scheduledTodayCount === 0
-        ? null
-        : Math.round((completedTodayCount / scheduledTodayCount) * 100),
-  };
-}
-
 /**
  * The last `HABIT_STRIP_DAYS` local days ending at `today` (today anchored
  * last), with per-day scheduled/completed aggregates over durable-active habits

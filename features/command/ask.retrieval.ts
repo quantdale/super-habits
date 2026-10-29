@@ -34,6 +34,7 @@ import { listRoutines, listWorkoutLogsForRange } from '@/features/workout/workou
 import {
   timestampToLocalDateKey,
   dateKeyToLocalDate,
+  diffLocalDays,
   toDateKey,
   getUtcIsoRangeForLocalDateKeys,
 } from '@/lib/time';
@@ -81,9 +82,9 @@ function validateRange(startDateKey: string, endDateKey: string): AskDateRange {
   if (!isValidCommandDateKey(startDateKey) || !isValidCommandDateKey(endDateKey)) {
     throw new AskRetrievalError('invalid_range', 'Ask date range is invalid.');
   }
-  const start = dateKeyToLocalDate(startDateKey);
-  const end = dateKeyToLocalDate(endDateKey);
-  const dayCount = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+  // Inclusive span in LOCAL calendar days (see `diffLocalDays`): this is the
+  // both-ends-are-date-keys case fixed-millisecond math miscounts.
+  const dayCount = diffLocalDays(startDateKey, endDateKey) + 1;
   if (startDateKey > endDateKey || dayCount < 1 || dayCount > MAX_ASK_RANGE_DAYS) {
     throw new AskRetrievalError(
       'invalid_range',

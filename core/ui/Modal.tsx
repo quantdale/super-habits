@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Text } from '@/core/ui/Text';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
+import { dialogA11yProps } from '@/core/ui/dialogA11y';
 import { elevation, layers, layout, radius, size, spacing } from '@/core/theme/designTokens';
 import { useReducedMotion } from '@/core/theme/motion';
 
@@ -25,6 +26,12 @@ export type ModalProps = {
   onDismiss?: () => void;
   /** When omitted, only the close control is shown (e.g. when an inner `Card variant="header"` supplies the label). */
   title?: string;
+  /**
+   * Accessible name for the dialog container itself. Defaults to `title`; pass
+   * it when the visible label lives in a child `Card variant="header"` so the
+   * dialog is still announced by name.
+   */
+  accessibilityLabel?: string;
   children: ReactNode;
   scroll?: boolean;
   modalLayout?: ModalLayout;
@@ -57,6 +64,7 @@ export function Modal({
   onClose,
   onDismiss,
   title,
+  accessibilityLabel,
   children,
   scroll = false,
   modalLayout = 'dialog',
@@ -67,6 +75,8 @@ export function Modal({
   const closeFocusRing = useKeyboardFocusRing(tokens.accent);
   const insets = useSafeAreaInsets();
   const [progress] = useState(() => new Animated.Value(0));
+  // Names RN-Web's own `role="dialog"` container: see core/ui/dialogA11y.
+  const dialogName = dialogA11yProps({ accessibilityLabel, title });
 
   const isDrawer = modalLayout === 'drawer';
   const isBottomSheet = modalLayout === 'bottom-sheet';
@@ -112,6 +122,7 @@ export function Modal({
       animationType="none"
       onRequestClose={onClose}
       onDismiss={onDismiss}
+      {...dialogName}
     >
       <View style={styles.root} accessibilityViewIsModal>
         <Animated.View

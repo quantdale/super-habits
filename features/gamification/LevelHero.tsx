@@ -99,7 +99,7 @@ export function LevelHero({ level, streak, freezes, size = 'compact' }: LevelHer
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
           <StreakChip
-            label="day streak"
+            label="reward streak"
             value={`${streak.current}`}
             color={rewardAccents.streak.text}
           />

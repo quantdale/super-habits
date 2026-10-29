@@ -88,6 +88,45 @@ test.describe('Workout', () => {
     await expect(page.getByText('Leg press')).not.toBeVisible();
   });
 
+  test('deleting a planned routine clears its weekday instead of leaving a ghost plan', async ({
+    page,
+  }) => {
+    await fillRoutineName(page, 'Planned leg day');
+    await page.getByText('Add routine', { exact: true }).click();
+    const weekday = await page.evaluate(() => {
+      const names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      return names[(new Date().getDay() + 6) % 7];
+    });
+    await page.getByText('Plan week', { exact: true }).click();
+    const plan = page.getByRole('dialog', { name: 'Plan your week' });
+    await plan
+      .getByText(weekday, { exact: true })
+      .locator('..')
+      .getByRole('button', { name: `${weekday} Planned leg day`, exact: true })
+      .click();
+    await plan.getByLabel('Close').click();
+    await expect(page.getByText("Start today's workout", { exact: true })).toBeVisible();
+
+    await swipeLeftRevealWorkoutRoutineRow(page);
+    await clickSwipeDeleteAction(page, 'Planned leg day');
+    await page.getByText('Delete routine', { exact: true }).click({ force: true });
+    await expect(page.getByRole('button', { name: 'Open Planned leg day routine' })).toHaveCount(0);
+
+    // The weekday must stop pointing at the tombstoned routine: the dangling
+    // reference made Today's hero promise "Planned for today" for a routine
+    // that no longer exists while Workout itself said the day was unplanned.
+    const planRows = await queryRows(
+      page,
+      `SELECT plan_kind, routine_id FROM workout_weekly_plan WHERE deleted_at IS NULL`,
+    );
+    expect(planRows).toEqual([]);
+
+    await returnToApp(page);
+    await page.waitForLoadState('load');
+    await goToTab(page, 'overview');
+    await expect(page.getByText('Planned for today', { exact: true })).toHaveCount(0);
+  });
+
   test('timed session records weight/reps, timing, and a new personal record', async ({ page }) => {
     // Create a routine with one exercise whose active phase is short enough
     // to time out naturally inside the test budget.
@@ -415,15 +454,29 @@ test.describe('Workout', () => {
     await page.getByText('Add routine', { exact: true }).click();
     await page.getByText('Custom manager', { exact: true }).first().click();
 
-    const builder = page.getByRole('dialog');
+    const builder = page.getByRole('dialog', { name: 'Custom manager' });
     await builder.getByRole('button', { name: 'Manage custom exercises' }).click();
-    const manager = page.getByRole('dialog').last();
-    await expect(manager.getByText('Custom exercises')).toBeVisible();
+    // Scope by the dialog's ACCESSIBLE NAME, never by stack position.
+    // `page.getByRole('dialog').last()` was the real flake here: a locator is
+    // lazy, so it re-resolved on every use, and across the confirm→archive
+    // transition the modal stack passes through
+    // `Archive custom exercise` → `<unnamed>` → `Custom exercises`. Whenever a
+    // later assertion ran on a frame whose topmost dialog was the confirmation
+    // sheet (or RN-Web's still-activating container), `.last()` bound to the
+    // wrong container and the lookup failed. Every Modal is named via
+    // `dialogA11yProps`, so the name is the stable identity.
+    const manager = page.getByRole('dialog', { name: 'Custom exercises' });
     await expect(manager.getByText('Cable Fly')).toBeVisible();
 
     await manager.getByRole('button', { name: 'Archive custom exercise Cable Fly' }).click();
     await page.getByText('Archive exercise', { exact: true }).last().click({ force: true });
-    await expect(manager.getByText('Archived')).toBeVisible();
+    // Assert the badge on THIS exercise's row, not anywhere in the dialog, so
+    // the claim under test is "the archived row is marked archived". Row
+    // scoping also removes the old dependence on `exact: true` merely to dodge
+    // the "Showing archived" filter pill: a substring match on the pill could
+    // not satisfy a lookup anchored to the Cable Fly row.
+    const archivedRow = manager.getByText('Cable Fly', { exact: true }).locator('..');
+    await expect(archivedRow.getByText('Archived', { exact: true })).toBeVisible();
     await manager.getByRole('button', { name: 'Restore custom exercise Cable Fly' }).click();
     await expect(
       manager.getByRole('button', { name: 'Archive custom exercise Cable Fly' }),
@@ -437,7 +490,9 @@ test.describe('Workout', () => {
     await manager.getByLabel('Close').click();
     // Library picker now lists the renamed exercise for routine building.
     await builder.getByText('Choose from exercise library', { exact: true }).click();
-    const picker = page.getByRole('dialog').last();
+    // Name-scoped for the same reason as `manager` above: `.last()` re-resolves
+    // to whatever is topmost while the builder and picker overlap.
+    const picker = page.getByRole('dialog', { name: 'Exercise library' });
     await picker.getByRole('textbox', { name: 'Exercise library search' }).fill('Pec Deck');
     await expect(picker.getByRole('button', { name: 'Add Pec Deck' })).toBeVisible();
   });

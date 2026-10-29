@@ -28,16 +28,6 @@ export async function getWeeklyReviewByWeekKey(weekKey: string): Promise<WeeklyR
   return row ?? null;
 }
 
-/** Get a review by ID. */
-export async function getWeeklyReviewById(id: string): Promise<WeeklyReview | null> {
-  const db = await getDatabase();
-  const row = await db.getFirstAsync<WeeklyReview>(
-    `SELECT * FROM weekly_reviews WHERE id = ? AND deleted_at IS NULL`,
-    [id],
-  );
-  return row ?? null;
-}
-
 /**
  * Save (create or update) a completed weekly review.
  * Idempotent by week_key — updates if one already exists for that week.

@@ -21,6 +21,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { freshDatabase, type TestDatabase } from './helpers/db';
+import { saveHabitRules, saveTodoRules } from './helpers/linkedActionRules';
 
 const NOW = '2026-01-01T00:00:00.000Z';
 
@@ -42,27 +43,23 @@ async function seedLinkedRuleWorld(db: TestDatabase): Promise<{
     [now, now],
   );
   // A rule that increments the habit target when the todo completes.
-  const linked = await import('@/core/linked-actions/linkedActions.data');
-  const rule = await linked.createLinkedActionRule({
-    source: {
-      feature: 'todos',
-      entityType: 'todo',
-      entityId: 'todo_src',
+  const [ruleId] = await saveTodoRules('todo_src', [
+    {
       triggerType: 'todo.completed',
-    },
-    target: {
-      feature: 'habits',
-      entityType: 'habit',
-      entityId: 'habit_target',
-      effect: {
-        kind: 'progress',
-        type: 'habit.increment',
-        amount: 1,
-        dateStrategy: 'source_date',
+      target: {
+        feature: 'habits',
+        entityType: 'habit',
+        entityId: 'habit_target',
+        effect: {
+          kind: 'progress',
+          type: 'habit.increment',
+          amount: 1,
+          dateStrategy: 'source_date',
+        },
       },
     },
-  });
-  return { todoId: 'todo_src', habitId: 'habit_target', ruleId: rule.id };
+  ]);
+  return { todoId: 'todo_src', habitId: 'habit_target', ruleId };
 }
 
 async function countEvents(db: TestDatabase): Promise<number> {
@@ -170,21 +167,17 @@ describe('AUD-SH06-A: the source event commit is durable with the completion', (
        VALUES ('todo_target', 'Target todo', NULL, 0, ?, ?, NULL)`,
       [now, now],
     );
-    const linked = await import('@/core/linked-actions/linkedActions.data');
-    await linked.createLinkedActionRule({
-      source: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: 'habit_src',
+    await saveHabitRules('habit_src', [
+      {
         triggerType: 'habit.completed_for_day',
+        target: {
+          feature: 'todos',
+          entityType: 'todo',
+          entityId: 'todo_target',
+          effect: { kind: 'binary', type: 'todo.complete' },
+        },
       },
-      target: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: 'todo_target',
-        effect: { kind: 'binary', type: 'todo.complete' },
-      },
-    });
+    ]);
 
     const habits = await import('@/features/habits/habits.data');
     await habits.incrementHabit('habit_src');

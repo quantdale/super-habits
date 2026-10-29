@@ -49,7 +49,7 @@ test.describe('Accessibility conformance', () => {
   }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(
-      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('button', { name: 'Today' }),
+      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('tab', { name: 'Today' }),
     ).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(3000);
     await auditSections(page, 'light');
@@ -64,7 +64,7 @@ test.describe('Accessibility conformance', () => {
     await page.evaluate(() => localStorage.setItem('superhabits.theme.mode', 'dark'));
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(
-      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('button', { name: 'Today' }),
+      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('tab', { name: 'Today' }),
     ).toBeVisible({ timeout: 30_000 });
     await expect
       .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme')))
@@ -87,7 +87,7 @@ test.describe('Accessibility conformance', () => {
     });
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(
-      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('button', { name: 'Today' }),
+      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('tab', { name: 'Today' }),
     ).toBeVisible({ timeout: 30_000 });
     await expect
       .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme-id')))
@@ -130,7 +130,7 @@ test.describe('Accessibility conformance', () => {
     await page.evaluate(() => localStorage.setItem('superhabits.theme.mode', 'dark'));
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(
-      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('button', { name: 'Today' }),
+      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('tab', { name: 'Today' }),
     ).toBeVisible({ timeout: 30_000 });
     await expect
       .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme')))
@@ -167,7 +167,7 @@ test.describe('Accessibility conformance', () => {
     });
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(
-      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('button', { name: 'Today' }),
+      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('tab', { name: 'Today' }),
     ).toBeVisible({ timeout: 30_000 });
     await expect
       .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme-id')))
@@ -228,7 +228,7 @@ test.describe('Accessibility conformance', () => {
     await page.evaluate(() => localStorage.setItem('superhabits.theme.mode', 'dark'));
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(
-      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('button', { name: 'Today' }),
+      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('tab', { name: 'Today' }),
     ).toBeVisible({ timeout: 30_000 });
     await expect
       .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme')))
@@ -280,7 +280,7 @@ test.describe('Accessibility conformance', () => {
     });
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(
-      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('button', { name: 'Today' }),
+      page.getByRole('tablist', { name: 'Section tabs' }).getByRole('tab', { name: 'Today' }),
     ).toBeVisible({ timeout: 30_000 });
     await expect
       .poll(() => page.evaluate(() => document.documentElement.getAttribute('data-theme-id')))
@@ -314,5 +314,243 @@ test.describe('Accessibility conformance', () => {
       parsed.hiddenFocusable,
       'command cyberpunk parsed: focusable content inside aria-hidden',
     ).toEqual([]);
+  });
+
+  // Audit C §11: the primary navigation is the most-used control in the app and
+  // it emitted a `tablist` whose children were `button`s. A `tablist` with
+  // button children is invalid ARIA — assistive tech neither announces
+  // position/count nor honours `aria-selected` — so this pins the correct
+  // `tab`/`tablist` idiom (matching core/ui/SegmentedControl.tsx) and the
+  // `aria-controls` link to each section panel.
+  test('the section tabs are ARIA tabs wired to their section panels', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    const rail = page.getByRole('tablist', { name: 'Section tabs' });
+    await expect(rail).toBeVisible({ timeout: 30_000 });
+    await rail.getByRole('tab', { name: 'Today' }).waitFor({ timeout: 30_000 });
+
+    // Every destination is a `tab`, and none of them is a `button` any more.
+    const tabs = rail.getByRole('tab');
+    expect(await tabs.count()).toBeGreaterThanOrEqual(6);
+    expect(await rail.getByRole('button', { name: 'Today', exact: true }).count()).toBe(0);
+
+    // Exactly one tab is selected, and aria-selected tracks navigation.
+    await expect(rail.getByRole('tab', { selected: true })).toHaveCount(1);
+    await expect(rail.getByRole('tab', { name: 'Today' })).toHaveAttribute('aria-selected', 'true');
+
+    // Every tab controls a real section panel that labels itself by that tab.
+    const wiring = await page.evaluate(() => {
+      const tablist = document.querySelector('[aria-label="Section tabs"]');
+      if (!tablist) return null;
+      return Array.from(tablist.querySelectorAll('[role="tab"]')).map((tab) => {
+        const controlsId = tab.getAttribute('aria-controls');
+        const panel = controlsId ? document.getElementById(controlsId) : null;
+        return {
+          label: tab.getAttribute('aria-label'),
+          selected: tab.getAttribute('aria-selected'),
+          controlsId,
+          panelExists: panel != null,
+          panelRole: panel?.getAttribute('role') ?? null,
+          panelLabelledBy: panel?.getAttribute('aria-labelledby') ?? null,
+          tabId: tab.getAttribute('id'),
+        };
+      });
+    });
+    expect(wiring, 'the tablist is present').not.toBeNull();
+    expect(wiring!.length).toBeGreaterThanOrEqual(6);
+    for (const tab of wiring!) {
+      expect(tab.controlsId, `${tab.label} has aria-controls`).toBeTruthy();
+      expect(tab.panelExists, `${tab.label} controls an existing panel`).toBe(true);
+      expect(tab.panelRole, `${tab.label} panel is a tabpanel`).toBe('tabpanel');
+      expect(tab.panelLabelledBy, `${tab.label} panel is labelled by its tab`).toBe(tab.tabId);
+    }
+    expect(wiring!.filter((tab) => tab.selected === 'true')).toHaveLength(1);
+
+    // Navigation moves the selection rather than adding a second selected tab.
+    await rail.getByRole('tab', { name: 'To Do', exact: true }).click();
+    await expect(rail.getByRole('tab', { name: 'To Do', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await expect(rail.getByRole('tab', { name: 'Today' })).toHaveAttribute(
+      'aria-selected',
+      'false',
+    );
+    await expect(rail.getByRole('tab', { selected: true })).toHaveCount(1);
+  });
+
+  // Audit C §4.7 #3 / §11: the two long-lived overlays must actually TRAP
+  // keyboard focus. RN-Web's `Modal` installs a focus trap around its own
+  // `[role="dialog"]` container, but nothing pinned that behaviour: a future
+  // shell that dropped `role="dialog"` (or moved sheet content into a portal
+  // outside the trap) would silently let Tab walk into the page behind the
+  // overlay while every other a11y assertion here stayed green.
+  //
+  // The check drives real keyboard focus rather than inspecting attributes: it
+  // tabs forward past every control in the sheet (more presses than the sheet
+  // has controls) and then backwards, asserting focus never lands outside the
+  // dialog at any step.
+  for (const overlay of [
+    {
+      name: 'Settings',
+      open: async (page: Page) => {
+        await page.getByRole('button', { name: 'Open settings' }).click();
+      },
+      dialogName: 'Settings',
+    },
+    {
+      name: 'Command Center',
+      open: async (page: Page) => {
+        await openCommandScreen(page);
+        await expect(page.getByText('Command center', { exact: true })).toBeVisible();
+      },
+      dialogName: 'Command center',
+    },
+  ]) {
+    test(`the ${overlay.name} overlay traps keyboard focus`, async ({ page }) => {
+      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await expect(
+        page.getByRole('tablist', { name: 'Section tabs' }).getByRole('tab', { name: 'Today' }),
+      ).toBeVisible({ timeout: 30_000 });
+      await page.waitForTimeout(2000);
+      await overlay.open(page);
+
+      const dialog = page.getByRole('dialog', { name: overlay.dialogName });
+      await expect(dialog).toBeVisible({ timeout: 15_000 });
+      await expect(dialog).toHaveAttribute('aria-modal', 'true');
+
+      const focusInsideDialog = () =>
+        page.evaluate((name) => {
+          const dialogs = Array.from(document.querySelectorAll('[role="dialog"]'));
+          const target = dialogs.find((node) => node.getAttribute('aria-label') === name);
+          if (!target) return false;
+          return target.contains(document.activeElement);
+        }, overlay.dialogName);
+
+      // Identity of the currently focused control, so "focus stayed inside"
+      // cannot pass vacuously by never moving at all.
+      const focusedIdentity = () =>
+        page.evaluate(() => {
+          const active = document.activeElement as HTMLElement | null;
+          if (!active) return null;
+          return [
+            active.tagName,
+            active.getAttribute('role'),
+            active.getAttribute('aria-label'),
+            active.textContent?.trim().slice(0, 40),
+          ]
+            .filter(Boolean)
+            .join('|');
+        });
+
+      // Focus enters the overlay on open, so the first Tab press has somewhere
+      // legitimate to start from.
+      await expect.poll(focusInsideDialog, { timeout: 5000 }).toBe(true);
+      const stops = new Set<string>();
+      const firstStop = await focusedIdentity();
+      if (firstStop) stops.add(firstStop);
+      // Comfortably more presses than the sheet has focusable controls: if the
+      // trap is missing, focus escapes the dialog within a few presses.
+      for (let step = 1; step <= 40; step += 1) {
+        await page.keyboard.press('Tab');
+        expect(
+          await focusInsideDialog(),
+          `Tab ${step} stays inside the ${overlay.name} overlay`,
+        ).toBe(true);
+        const id = await focusedIdentity();
+        if (id) stops.add(id);
+      }
+      // Non-vacuity: Tab really did cycle through several distinct controls of
+      // the sheet (a trap that pinned focus to one element would satisfy every
+      // containment assertion above while being unusable).
+      expect(stops.size, `Tab visits multiple ${overlay.name} controls`).toBeGreaterThan(2);
+      // Backwards too: Shift+Tab from the first control must wrap to the last
+      // instead of escaping to the page behind.
+      for (let step = 1; step <= 40; step += 1) {
+        await page.keyboard.press('Shift+Tab');
+        expect(
+          await focusInsideDialog(),
+          `Shift+Tab ${step} stays inside the ${overlay.name} overlay`,
+        ).toBe(true);
+      }
+    });
+  }
+
+  // Audit C §4.7 #3: the section rail is a `tablist`, so it must also follow the
+  // roving-tabindex keyboard idiom — exactly ONE tab is a tab stop (the
+  // selected one) and ArrowRight/ArrowLeft move selection within the rail. A
+  // tablist where all six destinations are tab stops makes a keyboard user tab
+  // through the whole nav on every pass, and arrow keys doing nothing makes the
+  // rail feel broken to assistive tech that announces it as tabs.
+  test('the section rail uses a roving tabindex with arrow-key navigation', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    const rail = page.getByRole('tablist', { name: 'Section tabs' });
+    await expect(rail.getByRole('tab', { name: 'Today' })).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(2000);
+
+    const tabStops = () =>
+      page.evaluate(() => {
+        const tablist = document.querySelector('[aria-label="Section tabs"]');
+        if (!tablist) return null;
+        return Array.from(tablist.querySelectorAll('[role="tab"]')).map((tab) => ({
+          label: tab.getAttribute('aria-label'),
+          tabIndex: tab.getAttribute('tabindex'),
+          selected: tab.getAttribute('aria-selected'),
+        }));
+      });
+
+    const before = await tabStops();
+    expect(before, 'the section rail exposes tabs').not.toBeNull();
+    // Exactly one roving tab stop, and it is the selected destination.
+    expect(before!.filter((tab) => tab.tabIndex === '0').map((tab) => tab.label)).toEqual([
+      'Today',
+    ]);
+    expect(before!.every((tab) => tab.tabIndex === '0' || tab.tabIndex === '-1')).toBe(true);
+
+    // ArrowRight moves the selection forward and the roving stop with it.
+    await rail.getByRole('tab', { name: 'Today' }).focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(rail.getByRole('tab', { name: 'To Do', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    const afterRight = await tabStops();
+    expect(afterRight!.filter((tab) => tab.tabIndex === '0').map((tab) => tab.label)).toEqual([
+      'To Do',
+    ]);
+
+    // ArrowLeft moves it back.
+    await page.keyboard.press('ArrowLeft');
+    await expect(rail.getByRole('tab', { name: 'Today' })).toHaveAttribute('aria-selected', 'true');
+    const afterLeft = await tabStops();
+    expect(afterLeft!.filter((tab) => tab.tabIndex === '0').map((tab) => tab.label)).toEqual([
+      'Today',
+    ]);
+  });
+
+  // Audit C §11: nothing emitted `role="dialog"` with a name, so the web focus
+  // trap that queries `[role="dialog"]` had nothing to describe. Modal sheets
+  // must now render a named, modal dialog so the trap and screen readers agree
+  // on the same container.
+  test('modal sheets are named, modal dialogs', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Open settings' }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Settings' });
+    await expect(dialog).toBeVisible({ timeout: 15_000 });
+    await expect(dialog).toHaveAttribute('aria-modal', 'true');
+
+    // The named dialog is the container that actually holds the sheet body, so
+    // a focus trap scoped to it can reach the content.
+    await expect(dialog.getByRole('button', { name: 'Close' }).first()).toBeVisible();
+
+    // Dismissing removes the dialog from the role query entirely.
+    await dialog.getByRole('button', { name: 'Close' }).first().click();
+    await expect(page.getByRole('dialog', { name: 'Settings' })).toHaveCount(0);
+
+    // A second, differently-titled sheet proves the name is the sheet's own
+    // title and not a constant applied to every modal.
+    await page.getByRole('button', { name: 'Quick capture' }).click();
+    await expect(page.getByRole('dialog', { name: 'Add' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('dialog', { name: 'Add' })).toHaveAttribute('aria-modal', 'true');
   });
 });

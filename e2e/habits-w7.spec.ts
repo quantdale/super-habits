@@ -462,7 +462,7 @@ test.describe('W7 Habits reconstruction regressions', () => {
     expect(mounted).toBeLessThan(120);
     await page
       .getByRole('tablist', { name: 'Section tabs' })
-      .getByRole('button', { name: 'To Do', exact: true })
+      .getByRole('tab', { name: 'To Do', exact: true })
       .click();
     const activationStart = performance.now();
     await openW7Habits(page);

@@ -286,7 +286,7 @@ async function protectSourceOwner(page: Page): Promise<void> {
 
 async function seedPortableTodo(page: Page, title: string): Promise<void> {
   await page.getByRole('button', { name: 'Close settings', exact: true }).click();
-  await page.getByRole('button', { name: TAB_LABELS.todos, exact: true }).click();
+  await page.getByRole('tab', { name: TAB_LABELS.todos, exact: true }).click();
   await page.getByRole('button', { name: 'Add task with details', exact: true }).click();
   await page.getByPlaceholder(/Add a task/i).fill(title);
   await page.getByText('Add task', { exact: true }).locator('..').click({ force: true });
@@ -363,7 +363,7 @@ defineJourney({
         // The imported dataset is durably bound to the source owner and the
         // imported rows are unchanged.
         await page.getByRole('button', { name: 'Close settings', exact: true }).click();
-        await page.getByRole('button', { name: TAB_LABELS.todos, exact: true }).click();
+        await page.getByRole('tab', { name: TAB_LABELS.todos, exact: true }).click();
         await expect(page.getByText('Portable owner todo', { exact: true }).first()).toBeVisible();
         const owner = await queryRows(
           page,

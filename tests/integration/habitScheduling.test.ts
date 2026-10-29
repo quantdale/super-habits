@@ -7,6 +7,7 @@ import {
 } from '@/features/habits/habits.domain';
 import { toDateKey } from '@/lib/time';
 import { freshDatabase } from './helpers/db';
+import { saveTodoRules } from './helpers/linkedActionRules';
 
 describe('real SQLite habit scheduling persistence', () => {
   function nextWeekdayOutside(weekdays: readonly number[]): string {
@@ -138,7 +139,6 @@ describe('real SQLite habit scheduling persistence', () => {
     const db = await freshDatabase();
     const habits = await import('@/features/habits/habits.data');
     const todos = await import('@/features/todos/todos.data');
-    const linked = await import('@/core/linked-actions/linkedActions.data');
     const { linkedActionsEngine } = await import('@/core/linked-actions/linkedActions.engine');
     const habitDomain = await import('@/features/habits/habits.domain');
     const habitId = await habits.addHabit(
@@ -152,25 +152,22 @@ describe('real SQLite habit scheduling persistence', () => {
     const sourceTodoId = await todos.addTodo({ title: 'Trigger gym' });
     const offDay = nextWeekdayOutside([1, 3, 5]);
 
-    await linked.createLinkedActionRule({
-      source: {
-        feature: 'todos',
-        entityType: 'todo',
-        entityId: sourceTodoId,
+    await saveTodoRules(sourceTodoId, [
+      {
         triggerType: 'todo.completed',
-      },
-      target: {
-        feature: 'habits',
-        entityType: 'habit',
-        entityId: habitId,
-        effect: {
-          kind: 'progress',
-          type: 'habit.increment',
-          amount: 1,
-          dateStrategy: 'source_date',
+        target: {
+          feature: 'habits',
+          entityType: 'habit',
+          entityId: habitId,
+          effect: {
+            kind: 'progress',
+            type: 'habit.increment',
+            amount: 1,
+            dateStrategy: 'source_date',
+          },
         },
       },
-    });
+    ]);
 
     const source = {
       feature: 'todos' as const,
@@ -184,13 +181,21 @@ describe('real SQLite habit scheduling persistence', () => {
     const first = await linkedActionsEngine.processSourceAction(source);
     const second = await linkedActionsEngine.processSourceAction(source);
 
-    expect(first.effects[0]).toMatchObject({ status: 'applied' });
-    expect(second.effects[0]).toMatchObject({ status: 'duplicate' });
+    // ONE write gate (audit C #6): the linked-action writer must refuse an
+    // off-schedule date exactly like the UI checkbox does, instead of writing a
+    // completion the day grid then hides. The refused execution is still
+    // terminal, so the identical re-fire is deduplicated rather than retried.
+    expect(first.effects[0]).toMatchObject({ status: 'skipped', reason: 'target_inactive' });
+    expect(second.effects[0]).toMatchObject({
+      status: 'duplicate',
+      reason: 'source_identity_already_executed',
+    });
     const completion = await db.getFirstAsync<{ count: number }>(
       'SELECT count FROM habit_completions WHERE habit_id = ? AND date_key = ?',
       [habitId, offDay],
     );
-    expect(completion?.count).toBe(1);
+    expect(completion).toBeNull();
+
     const habit = (await habits.listHabits())[0];
     const day = habitDomain
       .buildDayCompletions(
@@ -233,6 +238,110 @@ describe('real SQLite habit scheduling persistence', () => {
     });
     expect(targetApplied.status).toBe('skipped');
     expect(targetApplied.reason).toBe('already_satisfied');
+
+    await db.closeAsync();
+  });
+});
+
+describe('one habit write gate for linked-action writers (audit C #6)', () => {
+  /** Next local weekday NOT in `weekdays` (so the fixture date is a real off-day). */
+  function nextWeekdayOutside(weekdays: readonly number[]): string {
+    const candidate = new Date();
+    do {
+      candidate.setDate(candidate.getDate() + 1);
+      const isoWeekday = candidate.getDay() === 0 ? 7 : candidate.getDay();
+      if (!weekdays.includes(isoWeekday)) return toDateKey(candidate);
+    } while (true);
+  }
+
+  it('refuses an off-schedule day in both writers with target_inactive', async () => {
+    const db = await freshDatabase();
+    const habits = await import('@/features/habits/habits.data');
+    // Monday/Wednesday/Friday only: the fixture date is deliberately a rest day.
+    const habitId = await habits.addHabit(
+      'Gym',
+      1,
+      'anytime',
+      'fitness-center',
+      '#10b981',
+      [1, 3, 5],
+    );
+    const offDay = nextWeekdayOutside([1, 3, 5]);
+
+    await expect(
+      habits.incrementHabitFromLinkedAction({ habitId, amount: 1, dateKey: offDay }),
+    ).resolves.toMatchObject({ status: 'skipped', reason: 'target_inactive' });
+
+    await expect(
+      habits.ensureHabitDailyTargetFromLinkedAction({
+        habitId,
+        minimumCount: 'target_per_day',
+        dateKey: offDay,
+      }),
+    ).resolves.toMatchObject({ status: 'skipped', reason: 'target_inactive' });
+
+    const completions = await db.getAllAsync<{ date_key: string }>(
+      'SELECT date_key FROM habit_completions WHERE habit_id = ?',
+      [habitId],
+    );
+    expect(completions).toEqual([]);
+    // A refused write must not enqueue a durable backup intent either.
+    const intents = await db.getAllAsync<{ id: string }>(
+      `SELECT id FROM sync_outbox WHERE entity = 'habit_completions'`,
+    );
+    expect(intents).toEqual([]);
+
+    await db.closeAsync();
+  });
+
+  it('still applies both writers on a scheduled day', async () => {
+    const db = await freshDatabase();
+    const habits = await import('@/features/habits/habits.data');
+    const habitId = await habits.addHabit('Read', 2);
+
+    await expect(
+      habits.incrementHabitFromLinkedAction({ habitId, amount: 1, dateKey: toDateKey() }),
+    ).resolves.toMatchObject({ status: 'applied' });
+
+    // One of two done, so `ensure_daily_target` lifts the row to the target.
+    await expect(
+      habits.ensureHabitDailyTargetFromLinkedAction({
+        habitId,
+        minimumCount: 'target_per_day',
+        dateKey: toDateKey(),
+      }),
+    ).resolves.toMatchObject({ status: 'applied' });
+
+    const row = await db.getFirstAsync<{ count: number }>(
+      'SELECT count FROM habit_completions WHERE habit_id = ? AND date_key = ?',
+      [habitId, toDateKey()],
+    );
+    expect(row).toEqual({ count: 2 });
+
+    await db.closeAsync();
+  });
+
+  it('refuses a pre-creation date (the effective-from boundary) from linked actions', async () => {
+    const db = await freshDatabase();
+    const habits = await import('@/features/habits/habits.data');
+    const habitId = await habits.addHabit('Read', 1);
+    const beforeCreation = (() => {
+      const date = new Date();
+      date.setDate(date.getDate() - 3);
+      return toDateKey(date);
+    })();
+
+    await expect(
+      habits.incrementHabitFromLinkedAction({ habitId, amount: 1, dateKey: beforeCreation }),
+    ).resolves.toMatchObject({ status: 'skipped', reason: 'target_inactive' });
+
+    await expect(
+      habits.ensureHabitDailyTargetFromLinkedAction({
+        habitId,
+        minimumCount: 'target_per_day',
+        dateKey: beforeCreation,
+      }),
+    ).resolves.toMatchObject({ status: 'skipped', reason: 'target_inactive' });
 
     await db.closeAsync();
   });

@@ -211,11 +211,11 @@ describe('calories soft delete', () => {
     expect(summary).toHaveLength(1);
     expect(summary[0].totalCalories).toBe(300);
     expect(await calories.countCalorieEntriesByRange('2026-07-01', '2026-07-01')).toBe(1);
-    expect(await calories.hasAnyCalorieEntries()).toBe(true);
+    expect(await calories.hasCalorieEntriesInRange('2026-07-01', '2026-07-01')).toBe(true);
 
-    // Delete the last live entry: the "has any" aggregate must go false.
+    // Delete the last live entry: the "has any" existence check must go false.
     await calories.deleteCalorieEntry(entries.find((e) => e.food_name === 'Salad')!.id);
-    expect(await calories.hasAnyCalorieEntries()).toBe(false);
+    expect(await calories.hasCalorieEntriesInRange('2026-07-01', '2026-07-01')).toBe(false);
 
     // Tombstone survives; no hard delete on the synced table; revival restores.
     const tombstone = await db.getFirstAsync<{ deleted_at: string }>(
@@ -342,9 +342,6 @@ describe('pomodoro and workout logs have no soft delete', () => {
     );
 
     // No tombstone column exists, so every row is visible to every read path.
-    expect(await workout.listWorkoutLogs()).toHaveLength(2);
-    // completed_at comes from the wall clock, so a "today" range — real local
-    // keys converted through getUtcIsoRangeForLocalDateKeys — must catch both.
     const { toDateKey } = await import('@/lib/time');
     const today = toDateKey(new Date());
     expect(await workout.listWorkoutLogsForRange(today, today)).toHaveLength(2);
