@@ -13,6 +13,7 @@ import {
   computeWorkoutStreakFromHeatmapDays,
   computeBodyAreaDistribution,
   buildExerciseHistory,
+  type ExerciseHistoryEntry,
   computeBodyWeightTrend,
   computeModalityVolume,
   computeTrainingTotals,
@@ -507,6 +508,35 @@ describe('buildExerciseHistory', () => {
         { performedSets: 1, bestTimedDurationSeconds: 45 },
       ],
     });
+  });
+
+  it('normalizes the summary exerciseKey to the same format as recorded-set keys', () => {
+    const entry = (overrides: Partial<ExerciseHistoryEntry>): ExerciseHistoryEntry => ({
+      logId: 'log-1',
+      completedAt: '2026-08-20T10:00:00.000Z',
+      exerciseName: 'Bench Press',
+      catalogExerciseId: 'ex_bench',
+      modality: 'weighted_strength',
+      weight: null,
+      reps: null,
+      durationSeconds: null,
+      completed: true,
+      setNumber: 1,
+      ...overrides,
+    });
+
+    // A recorded set yields the namespaced catalog key via exerciseHistoryKey.
+    const recorded = buildExerciseHistory([entry({ weight: 80, reps: 5 })]);
+    expect(recorded?.exerciseKey).toBe('catalog:ex_bench');
+
+    // No valid measured sets: the fallback must use the same namespaced key,
+    // not the bare catalog id (which cannot join PR/history lookups).
+    const unmeasured = buildExerciseHistory([entry({})]);
+    expect(unmeasured?.exerciseKey).toBe('catalog:ex_bench');
+
+    // Name-only history without a catalog id falls back to the name: form.
+    const nameOnly = buildExerciseHistory([entry({ catalogExerciseId: null })]);
+    expect(nameOnly?.exerciseKey).toBe('name:bench press');
   });
 });
 
