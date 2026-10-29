@@ -396,7 +396,10 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
           />
         }
       >
-        <View className="mx-auto w-full" style={{ maxWidth: layout.contentMaxWidth }}>
+        <View
+          className="mx-auto w-full"
+          style={{ maxWidth: isWideLayout ? layout.dashboardMaxWidth : layout.contentMaxWidth }}
+        >
           <View style={{ gap: spacing.md }}>
             <View
               style={{

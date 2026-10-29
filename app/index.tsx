@@ -22,6 +22,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { type AppSection, useAppNavigation } from '@/core/providers/navigationContext';
 import { Modal } from '@/core/ui/Modal';
 import { Text } from '@/core/ui/Text';
+import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 import { elevation, layout, radius, size, spacing } from '@/core/theme/designTokens';
 import { OverviewScreen } from '@/features/overview/OverviewScreen';
 import { TodosScreen } from '@/features/todos/TodosScreen';
@@ -143,7 +144,7 @@ function TabButton({
 }: TabButtonProps) {
   const { tokens } = useAppTheme();
   const ink = accentInk ?? accent;
-  const [keyboardFocused, setKeyboardFocused] = useState(false);
+  const focusRing = useKeyboardFocusRing(tokens.accent);
   const isRail = layoutRole === 'rail';
   const railRef = useRef<View>(null);
   // The parent rebuilds `onArrowKey` on every render; keeping it in a ref lets
@@ -197,8 +198,8 @@ function TabButton({
       tabIndex={Platform.OS === 'web' ? (isFocused ? 0 : -1) : undefined}
       focusable
       onPress={onPress}
-      onFocus={() => setKeyboardFocused(true)}
-      onBlur={() => setKeyboardFocused(false)}
+      onFocus={focusRing.onFocus}
+      onBlur={focusRing.onBlur}
       style={[
         {
           // Bar destinations hug their label and share the leftover width, so a
@@ -221,9 +222,7 @@ function TabButton({
           borderRadius: radius.md,
           backgroundColor: isFocused ? `${accent}1F` : 'transparent',
         },
-        keyboardFocused && Platform.OS === 'web'
-          ? { outlineColor: tokens.accent, outlineStyle: 'solid', outlineWidth: 2 }
-          : null,
+        focusRing.focusRingStyle,
       ]}
     >
       <MaterialIcons

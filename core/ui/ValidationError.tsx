@@ -2,7 +2,7 @@ import { Text } from '@/core/ui/Text';
 import React from 'react';
 import { View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { typography } from '@/core/theme/designTokens';
+import { radius, typography } from '@/core/theme/designTokens';
 
 type Props = {
   message: string | null;
@@ -17,7 +17,7 @@ export function ValidationError({ message }: Props) {
       accessibilityRole="alert"
       style={{
         backgroundColor: tokens.dangerBackground,
-        borderRadius: 8,
+        borderRadius: radius.xs,
         paddingHorizontal: 12,
         paddingVertical: 8,
         marginBottom: 8,
