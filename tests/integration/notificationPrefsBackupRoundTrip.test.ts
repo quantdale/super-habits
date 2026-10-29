@@ -153,6 +153,58 @@ describe('notification preference backup round-trip (settings V4)', () => {
     expect(asyncStorageMock.state.get(KEY_WEEKLY)).toContain('"weekday":0');
   });
 
+  it('applying staged prefs invalidates the in-memory caches with no manual reset', async () => {
+    const db = await freshDatabase();
+    const backupSettings = await import('@/core/backup/backupSettings');
+    const notificationPreferences = await import('@/core/notifications/notificationPreferences');
+    const sqliteDb = db as unknown as SQLite.SQLiteDatabase;
+    notificationPreferences.resetNotificationPreferenceCaches();
+
+    // Warm the caches the way the app always does before a restore can run:
+    // the todo-reminder reconcile at bootstrap and the Settings load both read
+    // every preference getter, so the caches are never cold at restore time.
+    await expect(notificationPreferences.getTodoRemindersEnabled()).resolves.toBe(false);
+    await expect(notificationPreferences.getDailyPlanReminderTime()).resolves.toEqual({
+      hour: 8,
+      minute: 0,
+    });
+    await notificationPreferences.getWeeklyReviewReminder();
+
+    await backupSettings.stagePendingThemeApplication(
+      sqliteDb,
+      {
+        calorieGoal: null,
+        pomodoroSettings: null,
+        theme: { mode: null, slots: null },
+        macroTargets: null,
+        pomodoroPresets: null,
+        workoutRestSeconds: null,
+        notificationPreferences: {
+          todoRemindersEnabled: true,
+          dailyPlanReminderTime: { hour: 9, minute: 5 },
+          weeklyReviewReminder: { enabled: true, weekday: 0, hour: 18, minute: 30 },
+        },
+      },
+      'sig-2',
+    );
+    expect(await backupSettings.applyPendingThemeApplication()).toBe(true);
+
+    // NO manual resetNotificationPreferenceCaches() here: the apply step must
+    // invalidate the runtime caches itself, or every reader in the session
+    // (schedulers, Settings UI) keeps the pre-restore values until restart.
+    await expect(notificationPreferences.getTodoRemindersEnabled()).resolves.toBe(true);
+    await expect(notificationPreferences.getDailyPlanReminderTime()).resolves.toEqual({
+      hour: 9,
+      minute: 5,
+    });
+    expect(await notificationPreferences.getWeeklyReviewReminder()).toMatchObject({
+      enabled: true,
+      weekday: 0,
+      hour: 18,
+      minute: 30,
+    });
+  });
+
   it('keeps the V3 canonical text byte-stable when a payload carries the V4 field', async () => {
     const backupSettings = await import('@/core/backup/backupSettings');
 

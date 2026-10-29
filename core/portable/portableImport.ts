@@ -30,6 +30,9 @@ import { portableOwnerFingerprint } from '@/lib/portableOwnerFingerprint';
 import { nowIso } from '@/lib/time';
 import { requestHabitReminderReconciliation } from '@/core/notifications/habitReminderSignals';
 import { requestWorkoutReminderReconciliation } from '@/core/notifications/workoutReminderSignals';
+import { reconcileTodoReminders } from '@/core/notifications/todoReminderScheduler';
+import { syncDailyPlanReminder } from '@/core/notifications/dailyPlanReminderScheduler';
+import { syncWeeklyReviewReminder } from '@/core/notifications/weeklyReviewReminderScheduler';
 import type {
   CalorieEntry,
   BodyWeightEntry,
@@ -423,6 +426,14 @@ export async function confirmPortableImport(input: {
   await applyPendingThemeApplication();
   requestHabitReminderReconciliation();
   requestWorkoutReminderReconciliation();
+  // The todo-reminder family follows the same post-import rule as Restore V2:
+  // the restored preferences are live in AsyncStorage now (caches invalidated
+  // by the apply), so reconciling here schedules reminders for the imported
+  // due-dated todos and the repeating nudges immediately instead of leaving
+  // them silent for the rest of the session.
+  void reconcileTodoReminders();
+  void syncDailyPlanReminder().catch(() => undefined);
+  void syncWeeklyReviewReminder().catch(() => undefined);
 
   // If a durable owner now exists, enqueue the imported state for that
   // owner's cloud backup (never claims completeness; the checkpoint cycle
