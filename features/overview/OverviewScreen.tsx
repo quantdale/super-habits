@@ -18,6 +18,7 @@ import { spacing, layout, radius } from '@/core/theme/designTokens';
 
 import { getDailyPlan } from '@/features/daily-plan/dailyPlan.data';
 import { GamificationCard } from './cards/GamificationCard';
+import { useGamification } from '@/features/gamification/gamificationContext';
 import { ShellRewardChips } from '@/features/gamification/ShellRewardChips';
 import { getMomentumGarden } from '@/features/momentum/momentum.data';
 import { MomentumCard } from '@/features/momentum/MomentumCard';
@@ -53,6 +54,7 @@ import { WorkoutCard } from './cards/WorkoutCard';
 import { CustomizeCardsPanel } from './CustomizeCardsPanel';
 import { FirstRunOnboardingCard } from './FirstRunOnboardingCard';
 import { NextBestActionHero } from './NextBestActionHero';
+import { TodayPath } from './TodayPath';
 import { TodayProgressStrip } from './TodayProgressStrip';
 import { loadCardLayout, saveCardLayout } from './cardLayout.storage';
 import {
@@ -220,6 +222,10 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
   const { openPlanningHub, setActiveSection, openSettings, openWeeklyReview } = useAppNavigation();
   const dayGeneration = useDayRolloverGeneration();
   const { tokens, sectionAccents } = useAppTheme();
+  // P11: Today's path presents the existing daily quests (same snapshot and
+  // order as the QuestRow cards on the Level & Streaks card). Presentation
+  // only — the quest data and behavior stay in the gamification layer.
+  const { snapshot: gamificationSnapshot } = useGamification();
 
   const [cardLayout, setCardLayout] = useState<OverviewCardId[]>([]);
   const [isCustomizing, setIsCustomizing] = useState(false);
@@ -506,6 +512,11 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
           {!isLoading && !loadError ? (
             <View className="mt-5 gap-4">
               {nextBestAction ? <NextBestActionHero action={nextBestAction} /> : null}
+              <TodayPath
+                quests={gamificationSnapshot?.quests ?? []}
+                plan={summaries.plan}
+                hasGarden={(momentum?.activeDays ?? 0) > 0}
+              />
               <TodayProgressStrip
                 todayKey={todayKey}
                 todos={summaries.todos}
