@@ -32,6 +32,14 @@ const WEEKDAYS = [
   'saturday',
 ] as const;
 
+/**
+ * Abbreviations that are also ordinary English words (`sun cream`, `sat nav`).
+ * Matching these bare rewrote the title and invented a due date, so they only
+ * count in the qualified `on sat` form. The remaining abbreviations (`tue`,
+ * `thu`, `fri`) stay unambiguous and keep matching bare.
+ */
+const AMBIGUOUS_WEEKDAY_ABBREVIATIONS = new Set(['sun', 'mon', 'wed', 'sat']);
+
 function nextWeekdayKey(targetDow: number, today: Date): string {
   const d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   let addDays = (targetDow - d.getDay() + 7) % 7;
@@ -104,8 +112,10 @@ function matchMention(
  * matching against projects/goals uses the lists passed in by the caller.
  *
  * Recognized tokens:
- * - Due dates: "today", "tomorrow", weekday names ("friday", "on fri"),
- *   and explicit `YYYY-MM-DD`.
+ * - Due dates: "today", "tomorrow", weekday names ("friday", "on fri", and
+ *   bare unambiguous abbreviations like "fri"; `sun`/`mon`/`wed`/`sat` are
+ *   ordinary English words, so those need the "on" qualifier), and explicit
+ *   `YYYY-MM-DD`.
  * - Priority: trailing/leading `!urgent` / `!low`, or the bare word "urgent".
  * - Leading mentions: `#project name` and `@goal name`.
  */
@@ -167,16 +177,23 @@ export function parseQuickCapture(
       text = text.replace(/(^|\s)(tomorrow|tmr|tmrw)(?=\s|$)/i, ' ');
     } else {
       for (let i = 0; i < WEEKDAYS.length; i++) {
-        const names = [WEEKDAYS[i], WEEKDAYS[i].slice(0, 3)];
-        for (const name of names) {
-          const re = new RegExp(`(^|\\s)(on\\s+)?${name}(?=\\s|$)`, 'i');
-          if (re.test(text)) {
-            dueDateKey = nextWeekdayKey(i, now);
-            text = text.replace(re, ' ');
-            break;
-          }
+        const fullName = WEEKDAYS[i];
+        const abbreviation = fullName.slice(0, 3);
+        const patterns = [
+          // Full names always count ("friday", "on friday").
+          new RegExp(`(^|\\s)(on\\s+)?${fullName}(?=\\s|$)`, 'i'),
+          // Unambiguous abbreviations count bare ("fri"); ambiguous ones only
+          // with the "on" qualifier ("on sat").
+          AMBIGUOUS_WEEKDAY_ABBREVIATIONS.has(abbreviation)
+            ? new RegExp(`(^|\\s)on\\s+${abbreviation}(?=\\s|$)`, 'i')
+            : new RegExp(`(^|\\s)(on\\s+)?${abbreviation}(?=\\s|$)`, 'i'),
+        ];
+        const pattern = patterns.find((candidate) => candidate.test(text));
+        if (pattern) {
+          dueDateKey = nextWeekdayKey(i, now);
+          text = text.replace(pattern, ' ');
+          break;
         }
-        if (dueDateKey) break;
       }
     }
   }
