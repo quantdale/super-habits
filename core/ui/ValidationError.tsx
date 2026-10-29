@@ -1,8 +1,9 @@
 import { Text } from '@/core/ui/Text';
 import React from 'react';
 import { View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { radius, typography } from '@/core/theme/designTokens';
+import { radius } from '@/core/theme/designTokens';
 
 type Props = {
   message: string | null;
@@ -29,7 +30,9 @@ export function ValidationError({ message }: Props) {
       }}
     >
       {/* Decorative glyph: `label` scale, no product text. */}
-      <Text style={{ ...typography.label }}>⚠️</Text>
+      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+        <MaterialIcons name="error-outline" size={18} color={tokens.dangerText} />
+      </View>
       <Text variant="bodyMd" style={{ color: tokens.dangerText, flex: 1 }}>
         {message}
       </Text>

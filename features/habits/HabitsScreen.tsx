@@ -119,10 +119,10 @@ import {
 } from '@/lib/notifications';
 
 const TIME_GROUPS = [
-  { key: 'anytime' as const, label: 'Anytime', icon: '🔄' },
-  { key: 'morning' as const, label: 'Morning', icon: '☀️' },
-  { key: 'afternoon' as const, label: 'Afternoon', icon: '⛅' },
-  { key: 'evening' as const, label: 'Evening', icon: '🌙' },
+  { key: 'anytime' as const, label: 'Anytime', icon: 'autorenew' as const },
+  { key: 'morning' as const, label: 'Morning', icon: 'wb-sunny' as const },
+  { key: 'afternoon' as const, label: 'Afternoon', icon: 'wb-cloudy' as const },
+  { key: 'evening' as const, label: 'Evening', icon: 'nights-stay' as const },
 ] as const;
 
 const COLOR = SECTION_COLORS.habits;
@@ -1286,7 +1286,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
               <PillChip
                 key={g.key}
                 label={g.label}
-                icon={g.icon}
+                icon={<MaterialIcons name={g.icon} size={16} />}
                 active={category === g.key}
                 color={COLOR}
                 onPress={() => {

@@ -8,6 +8,7 @@ import { Screen } from '@/core/ui/Screen';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
+import { TrophyIcon, WorkoutIcon } from '@/core/ui/illustrations/icons';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { TextField } from '@/core/ui/TextField';
 import { NumberStepperField } from '@/core/ui/NumberStepperField';
@@ -1023,7 +1024,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         <View className="flex-1 justify-center">
           <Card accentColor={WORKOUT_COLOR}>
             <View className="items-center gap-4 py-4">
-              <Text className="text-4xl">🎉</Text>
+              <TrophyIcon size={48} bright={WORKOUT_COLOR} lip={WORKOUT_COLOR} />
               <Text className="text-center text-2xl font-semibold" style={{ color: tokens.text }}>
                 Workout saved
               </Text>
@@ -1092,7 +1093,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                   }}
                 >
                   <Text className="text-sm font-semibold" style={{ color: WORKOUT_COLOR }}>
-                    🏆 New personal records
+                    New personal records
                   </Text>
                   {savedOutcome.newRecords.map((name) => (
                     <Text key={name} className="mt-1 text-sm" style={{ color: tokens.text }}>
@@ -1122,7 +1123,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         <View className="flex-1 justify-center">
           <Card accentColor={WORKOUT_COLOR}>
             <View className="items-center gap-4 py-4">
-              <Text className="text-4xl">🎉</Text>
+              <TrophyIcon size={48} bright={WORKOUT_COLOR} lip={WORKOUT_COLOR} />
               <Text className="text-center text-2xl font-semibold" style={{ color: tokens.text }}>
                 Workout complete!
               </Text>
@@ -1219,7 +1220,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
             accentColor={WORKOUT_COLOR}
             title="No exercises in this routine"
             description="Add at least one exercise before starting the workout timer."
-            icon={<Text style={{ fontSize: 24 }}>🏋️</Text>}
+            icon={<WorkoutIcon size={48} bright={WORKOUT_COLOR} lip={WORKOUT_COLOR} />}
           />
         </ScreenSection>
         <ScreenSection className="mb-0">
