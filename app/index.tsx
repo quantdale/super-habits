@@ -298,13 +298,15 @@ function TabButton({
  * Pressable3D with a white "+" — the brand face replaces the old gradient so
  * the capture control follows the §5.7 "no gradients on surfaces" rule. The
  * `add` glyph stays a MaterialIcons fallback where `a11yAudit` expects it.
+ * The face is the SOLID Sprout tier (§5.1: solid = white-label AA variant):
+ * white on solid #1A7F2B is 5.10:1, white on bright #4DC93A only 2.16:1.
  */
 function CaptureButton({ onPress, variant }: { onPress: () => void; variant: 'bar' | 'rail' }) {
   const diameter = variant === 'bar' ? 52 : 44;
   return (
     <Pressable3D
       lip={4}
-      faceColor={SECTION_HUES.habits.bright}
+      faceColor={SECTION_HUES.habits.solid}
       lipColor={SECTION_HUES.habits.lip}
       radius={radius.full}
       onPress={onPress}
@@ -596,7 +598,7 @@ export default function Index() {
             {isWideSidebar ? (
               <Pressable3D
                 lip={4}
-                faceColor={SECTION_HUES.habits.bright}
+                faceColor={SECTION_HUES.habits.solid}
                 lipColor={SECTION_HUES.habits.lip}
                 radius={16}
                 onPress={openCapture}
