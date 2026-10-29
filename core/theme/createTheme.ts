@@ -50,7 +50,10 @@ const DEFAULT_STATUS_TOKENS: Record<
   dark: {
     dangerBackground: '#432A34',
     dangerBorder: '#911D2A',
-    dangerText: '#FF5A5F',
+    // Text on the tintDark wash needs a lifted Cherry: the §5.1 bright
+    // `#FF5A5F` lands at 4.25:1 there (needs 4.5); `#FF8A8F` keeps the hue at
+    // 5.73:1. `dangerSolid` keeps the exact §5.1 bright for fills/marks.
+    dangerText: '#FF8A8F',
     dangerSolid: '#FF5A5F',
     warningBackground: '#433D29',
     warningBorder: '#E0A800',
