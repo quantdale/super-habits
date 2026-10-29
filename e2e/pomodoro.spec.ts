@@ -93,6 +93,20 @@ test.describe('Pomodoro', () => {
     await expect(page.getByRole('dialog').getByText('Laptop focus')).toBeVisible();
   });
 
+  test('rejects an over-length preset name instead of silently truncating it', async ({ page }) => {
+    await page.getByRole('button', { name: 'Manage presets' }).click();
+    const manager = page.getByRole('dialog');
+    await manager.getByRole('button', { name: 'New preset' }).click();
+    const longName = 'A very long preset name that exceeds the forty character cap';
+    await manager.getByRole('textbox', { name: 'Preset name' }).fill(longName);
+    await manager.getByRole('button', { name: 'Create preset' }).click();
+    // Over-length names are refused with the app-standard explicit error…
+    await expect(manager.getByText('Preset name must be 40 characters or less.')).toBeVisible();
+    // …and no silently truncated preset row is created (built-ins are not
+    // deletable, so any Delete button here would be the created preset).
+    await expect(manager.getByRole('button', { name: /^Delete preset / })).toHaveCount(0);
+  });
+
   test('logged session gets a post-hoc note and todo link from history', async ({ page }) => {
     await goToTab(page, 'todos');
     await openNewTodoModal(page);
