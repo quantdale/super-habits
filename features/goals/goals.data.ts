@@ -120,8 +120,14 @@ export async function updateGoal(id: string, updates: GoalUpdate): Promise<void>
         `SELECT status, completed_at FROM goals WHERE id = ? AND deleted_at IS NULL`,
         [id],
       );
+      // Write contract: a missing or soft-deleted goal must reject, not
+      // silently succeed — otherwise a stale editor reports success while the
+      // edit is discarded (and a deleted goal can never be resurrected).
+      if (!existing) {
+        throw new Error('Goal not found.');
+      }
       const nextStatus =
-        updates.status !== undefined ? normalizeGoalStatus(updates.status) : existing?.status;
+        updates.status !== undefined ? normalizeGoalStatus(updates.status) : existing.status;
 
       const fields: string[] = ['updated_at = ?'];
       const values: (string | number | null)[] = [now];
@@ -143,9 +149,9 @@ export async function updateGoal(id: string, updates: GoalUpdate): Promise<void>
       }
       if (updates.status !== undefined) {
         fields.push('status = ?');
-        values.push(nextStatus!);
+        values.push(nextStatus);
         // Stable completion fact: set on entering completed, clear on leaving.
-        const wasCompleted = existing?.status === 'completed';
+        const wasCompleted = existing.status === 'completed';
         const willBeCompleted = nextStatus === 'completed';
         if (!wasCompleted && willBeCompleted) {
           fields.push('completed_at = ?');
