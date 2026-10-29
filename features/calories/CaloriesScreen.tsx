@@ -40,6 +40,7 @@ import {
   kcalFromMacros,
   buildTargetProgress,
   resolveCalorieLogDateKey,
+  calorieEditSaveError,
 } from '@/features/calories/calories.domain';
 import type {
   CalorieGoal,
@@ -643,7 +644,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         const fiberN = parseNumericInput(fiber) ?? 0;
 
         if (editingEntryId) {
-          await updateCalorieEntry(editingEntryId, {
+          const updateResult = await updateCalorieEntry(editingEntryId, {
             foodName: food.trim(),
             protein: proteinN,
             carbs: carbsN,
@@ -655,6 +656,15 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
             // the data layer recomputes kcal from macros as usual.
             calories: kcalOnlyBase ?? undefined,
           });
+          // A row deleted meanwhile (e.g. by sync from another device) must
+          // never look saved: keep the modal open with the reason and reload
+          // the day log so the vanished entry disappears immediately.
+          const editError = calorieEditSaveError(updateResult);
+          if (editError) {
+            setCalorieError(editError);
+            await refresh();
+            return;
+          }
         } else {
           // Both modes log to the day the surface is showing (selectedDateKey),
           // never an implicit "today": a meal added while the diary sits on

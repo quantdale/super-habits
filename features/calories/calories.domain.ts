@@ -347,3 +347,14 @@ export function buildFrequentFoods(entries: CalorieEntry[], limit: number = 5): 
     .slice(0, Math.max(0, limit))
     .map(({ foodName, logCount, latestEntry }) => ({ foodName, logCount, latestEntry }));
 }
+
+/**
+ * UI decision for an edit save against a row that no longer exists (deleted
+ * meanwhile — e.g. by sync from another device). The modal must not close as
+ * saved: the caller keeps the draft on screen and shows this inline error,
+ * then reloads the day log so the vanished entry disappears immediately.
+ * Returns null when the edit committed.
+ */
+export function calorieEditSaveError(result: 'updated' | 'not_found'): string | null {
+  return result === 'not_found' ? 'This entry was deleted, so the edit could not be saved.' : null;
+}
