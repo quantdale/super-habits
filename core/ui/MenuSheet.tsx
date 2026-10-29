@@ -5,7 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 import { dialogA11yProps } from '@/core/ui/dialogA11y';
-import { spacing } from '@/core/theme/designTokens';
+import { radius, spacing } from '@/core/theme/designTokens';
 
 export type MenuItem = {
   icon: keyof typeof MaterialIcons.glyphMap;
@@ -66,20 +66,26 @@ export function MenuSheet({ visible, onClose, title, items, children }: MenuShee
             className="px-4 pb-6 pt-3"
             style={{
               backgroundColor: tokens.surface,
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
+              borderTopLeftRadius: radius.xl,
+              borderTopRightRadius: radius.xl,
               borderColor: tokens.border,
-              borderWidth: 1,
+              borderWidth: 2,
+              borderBottomWidth: 0,
             }}
           >
             <View
               className="mb-3 h-1 w-10 self-center rounded-full"
-              style={{ backgroundColor: tokens.border }}
+              style={{ backgroundColor: tokens.borderStrong, height: 5 }}
             />
             {title ? (
               <Text
                 variant="titleMd"
-                style={{ color: tokens.text, textAlign: 'center', marginBottom: spacing.sm }}
+                style={{
+                  color: tokens.text,
+                  textAlign: 'center',
+                  marginBottom: spacing.sm,
+                  fontWeight: '800',
+                }}
               >
                 {title}
               </Text>

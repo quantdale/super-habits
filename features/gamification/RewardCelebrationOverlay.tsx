@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
-import { REWARD_COLORS, REWARD_TEXT_COLORS, type RewardKey } from '@/constants/sectionColors';
+import {
+  REWARD_COLORS,
+  REWARD_HUES,
+  REWARD_TEXT_COLORS,
+  SECTION_ON_BRIGHT_INK,
+  type RewardKey,
+} from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { layers, radius, spacing, typography } from '@/core/theme/designTokens';
 import { useReducedMotion } from '@/core/theme/motion';
@@ -24,12 +30,14 @@ import type { CelebrationTier } from './gamification.types';
  * shows this).
  */
 
-const CONFETTI_COUNT = 16;
-/** Long enough to read one line, short enough to stay out of the way. */
+const CONFETTI_COUNT = 24;
+/** Long enough to read one line, short enough to stay out of the way. The duration contract is pinned behaviorally in `tests/rewardCelebrationOverlay.test.ts` (spy on the scheduled auto-dismiss). */
 const AUTO_DISMISS_MS = 2800;
 
 type TierVisual = {
   color: string;
+  /** Solid lip under the reward-hue bright face (§5.7 depth, no blur shadow). */
+  lipColor: string;
   /** Readable text tone for the tier on light appearance (§5.1 text column). */
   textColor: string;
   icon: keyof typeof MaterialIcons.glyphMap;
@@ -45,6 +53,7 @@ function tierVisual(
   // needs the appearance-aware text tone (Gold ink, Flame/Ice solids, …).
   const reward = (key: RewardKey, fill: string) => ({
     color: fill,
+    lipColor: REWARD_HUES[key].lip,
     textColor: appearance === 'light' ? REWARD_TEXT_COLORS[key] : fill,
   });
   switch (tier) {
@@ -67,7 +76,13 @@ function tierVisual(
     case 'quest':
       return { ...reward('quest', REWARD_COLORS.quest), icon: 'check-circle', surface: 'accent' };
     case 'small':
-      return { color: tokens.accent, textColor: tokens.accent, icon: 'bolt', surface: 'surface' };
+      return {
+        color: tokens.accent,
+        lipColor: tokens.borderStrong,
+        textColor: tokens.accent,
+        icon: 'bolt',
+        surface: 'surface',
+      };
   }
 }
 
@@ -186,6 +201,12 @@ export function RewardCelebrationOverlay() {
 
   const visual = tierVisual(celebration.tier, tokens, resolvedTheme);
   const confettiColors = [visual.color, REWARD_COLORS.accent, tokens.accent, REWARD_COLORS.badge];
+  // Milestone tiers paint the reward hue's bright face; ink on bright is the
+  // only label contrast that passes §5.1 on every hue (SECTION_ON_BRIGHT_INK).
+  const brightFace = visual.surface === 'accent';
+  const faceColor = brightFace ? visual.color : tokens.surface;
+  const ink = brightFace ? SECTION_ON_BRIGHT_INK : tokens.text;
+  const inkMuted = brightFace ? SECTION_ON_BRIGHT_INK : tokens.textMuted;
 
   return (
     <View
@@ -212,13 +233,16 @@ export function RewardCelebrationOverlay() {
           paddingVertical: spacing.xl,
           paddingHorizontal: spacing.xl,
           borderRadius: radius.xl,
-          backgroundColor: tokens.surface,
-          borderWidth: 1,
-          borderColor: tokens.border,
+          backgroundColor: faceColor,
+          // §5.7 celebration card: 2px ring + solid lip edge, never a blur halo.
+          borderWidth: 2,
+          borderColor: brightFace ? visual.lipColor : tokens.border,
+          borderBottomWidth: 4,
+          borderBottomColor: visual.lipColor,
           shadowColor: tokens.shadowColor,
           shadowOffset: { width: 0, height: 12 },
           shadowOpacity: 0.18,
-          shadowRadius: 24,
+          shadowRadius: 32,
           elevation: 4,
         }}
       >
@@ -229,37 +253,27 @@ export function RewardCelebrationOverlay() {
             borderRadius: radius.full,
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: `${visual.color}22`,
+            backgroundColor: tokens.surface,
             borderWidth: 2,
             borderColor: visual.color,
           }}
         >
           <MaterialIcons name={visual.icon} size={36} color={visual.color} />
         </View>
-        <Text style={{ ...typography.titleLg, color: tokens.text, textAlign: 'center' }}>
+        <Text style={{ ...typography.titleLg, color: ink, textAlign: 'center' }}>
           {celebration.title}
         </Text>
-        <Text style={{ ...typography.bodyMd, color: tokens.textMuted, textAlign: 'center' }}>
+        <Text style={{ ...typography.bodyMd, color: inkMuted, textAlign: 'center' }}>
           {celebration.message}
         </Text>
         {celebration.xp > 0 ? (
-          <View
-            style={{
-              paddingVertical: spacing.xs,
-              paddingHorizontal: spacing.md,
-              borderRadius: radius.full,
-              backgroundColor: `${visual.color}1F`,
-            }}
-          >
-            <Text style={{ ...typography.label, color: visual.textColor }}>
-              +{celebration.xp} XP
-            </Text>
-          </View>
+          <Text style={{ ...typography.display, color: ink, textAlign: 'center' }}>
+            +{celebration.xp} XP
+          </Text>
         ) : null}
         <Button
           label="Continue"
           variant="celebrate"
-          color={visual.color}
           onPress={dismissCelebration}
           className="mt-2"
         />
