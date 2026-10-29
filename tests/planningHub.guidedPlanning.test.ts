@@ -216,6 +216,32 @@ describe('carry-forward selection seeding', () => {
     expect(selection).toEqual(['todo_1']);
   });
 
+  it('never resurrects a deselected priority when carry is pressed again', () => {
+    // Flow wiring: `planIdsBeforeCarry` is captured at flow open, so a repeat
+    // press sees the same stale baseline while the idempotent plan rewrite
+    // keeps the carried id in `planIdsAfterCarry`. The user's explicit
+    // deselection must win over the re-detected delta.
+    const press1 = applyCarriedForwardSelection({
+      selection: ['todo_1'],
+      planIdsBeforeCarry: ['todo_1'],
+      planIdsAfterCarry: ['todo_1', 'todo_2'],
+    });
+    expect(press1).toEqual(['todo_1', 'todo_2']);
+
+    // The user deselects todo_2 in the priority step.
+    const afterDeselect = press1.filter((id) => id !== 'todo_2');
+
+    // Repeat press rewrites the same plan ([todo_1, todo_2]); todo_2 must not
+    // come back to the selection.
+    const press2 = applyCarriedForwardSelection({
+      selection: afterDeselect,
+      planIdsBeforeCarry: ['todo_1'],
+      planIdsAfterCarry: ['todo_1', 'todo_2'],
+      deselectedIds: ['todo_2'],
+    });
+    expect(press2).toEqual(['todo_1']);
+  });
+
   it('respects MAX_TOP_PRIORITIES when seeding on top of existing picks', () => {
     const selection = applyCarriedForwardSelection({
       selection: ['picked_1', 'picked_2', 'picked_3'],

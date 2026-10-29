@@ -68,6 +68,10 @@ export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
   // Today's plan ids as of flow open — the baseline the carry-forward delta
   // is measured against so deliberate deselections are never resurrected.
   const planIdsAtOpenRef = useRef<string[]>([]);
+  // Ids the user explicitly removed from the selection this session: a repeat
+  // carry press must never re-add them (the idempotent plan rewrite keeps them
+  // in the re-read plan, and the flow-open baseline re-reports them as new).
+  const deselectedIdsRef = useRef<Set<string>>(new Set());
 
   // Step 4/5 — focus + intention, then save. notes/reflection/energyScore
   // have no guided-flow inputs but ride along from today's existing plan so
@@ -150,8 +154,10 @@ export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
   const togglePriority = useCallback((todoId: string) => {
     setSelectedIds((current) => {
       if (current.includes(todoId)) {
+        deselectedIdsRef.current.add(todoId);
         return current.filter((id) => id !== todoId);
       }
+      deselectedIdsRef.current.delete(todoId);
       if (current.length >= MAX_TOP_PRIORITIES) {
         return current;
       }
@@ -173,6 +179,7 @@ export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
           selection: current,
           planIdsBeforeCarry: planIdsAtOpenRef.current,
           planIdsAfterCarry: parseTopTodoIds(afterPlan?.top_todo_ids ?? '[]'),
+          deselectedIds: [...deselectedIdsRef.current],
         }),
       );
       setStep(1);
