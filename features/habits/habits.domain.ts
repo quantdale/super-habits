@@ -495,7 +495,13 @@ export function buildDayCompletions(
   const dateKeys =
     days === undefined
       ? buildDateKeysBetween(startDateKey, todayKey)
-      : buildDateRangeOldestFirst(days);
+      : // The requested N-day window is "the last N days ending at todayKey" —
+        // anchored at the INJECTED local day, never the wall clock. A default
+        // `new Date()` reference silently moves the window to the real current
+        // day whenever a caller resolves a past/future day (e.g. the reward
+        // layer's per-day keys across local midnight), dropping that day's
+        // completions and resolving the wrong rule/lifecycle.
+        buildDateRangeOldestFirst(days, dateKeyToLocalDate(todayKey));
   const map = new Map<string, number>();
   for (const completion of completions) map.set(completion.date_key, completion.count);
 

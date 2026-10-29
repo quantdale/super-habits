@@ -113,6 +113,41 @@ describe('parseQuickCapture — due dates', () => {
     expect(r.dueDateKey).toBe('2026-08-21');
     expect(r.title).toBe('Pay water bill');
   });
+
+  it('consumes next/this/coming qualifiers with the weekday instead of stranding them in the title', () => {
+    // "next monday" is one date phrase: the qualifier must travel with the
+    // weekday token, or the captured Todo is titled "Pay rent next".
+    expect(parseQuickCapture('Pay rent next monday', { now: NOW })).toMatchObject({
+      title: 'Pay rent',
+      dueDateKey: '2026-08-24',
+    });
+    expect(parseQuickCapture('Gym this friday', { now: NOW })).toMatchObject({
+      title: 'Gym',
+      dueDateKey: '2026-08-21',
+    });
+    expect(parseQuickCapture('Dentist coming tuesday', { now: NOW })).toMatchObject({
+      title: 'Dentist',
+      dueDateKey: '2026-08-25',
+    });
+  });
+
+  it('consumes qualifiers in abbreviated weekday forms too', () => {
+    // Unambiguous abbreviations match bare and with qualifiers…
+    expect(parseQuickCapture('Standup next fri', { now: NOW })).toMatchObject({
+      title: 'Standup',
+      dueDateKey: '2026-08-21',
+    });
+    // …and ambiguous ones still require a qualifier, but then travel clean.
+    expect(parseQuickCapture('Call mom on next sat', { now: NOW })).toMatchObject({
+      title: 'Call mom',
+      dueDateKey: '2026-08-22',
+    });
+    // A qualifier alone is not a date token.
+    expect(parseQuickCapture('Bring the next cake', { now: NOW })).toMatchObject({
+      title: 'Bring the next cake',
+      dueDateKey: null,
+    });
+  });
 });
 
 describe('parseQuickCapture — priority', () => {
