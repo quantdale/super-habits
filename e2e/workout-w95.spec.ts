@@ -220,7 +220,7 @@ test.describe('W9.5 Workout convergence', () => {
     await expect(page.getByText('Wide Day')).toBeVisible();
 
     // The landing's content column is capped and centered at content-max
-    // widths: layout.contentMaxWidth = 760.
+    // widths: layout.contentMaxWidth = 640 (v2 §5.6 phone-like column).
     const capped = await page.evaluate(() => {
       const section = document.querySelector<HTMLElement>(
         'div[style*="pointer-events: auto"][style*="z-index: 1"][style*="opacity: 1"]',
@@ -236,8 +236,8 @@ test.describe('W9.5 Workout convergence', () => {
         maxWidth: parseFloat(getComputedStyle(cappedEl).maxWidth),
       };
     });
-    expect(capped?.maxWidth).toBe(760);
-    expect(capped!.width).toBeLessThanOrEqual(760);
+    expect(capped?.maxWidth).toBe(640);
+    expect(capped!.width).toBeLessThanOrEqual(640);
   });
 
   test('keyboard focus in the routine form stays usable inside the scroll page', async ({
