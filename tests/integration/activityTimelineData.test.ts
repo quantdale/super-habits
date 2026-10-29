@@ -9,8 +9,9 @@ import { freshDatabase, type TestDatabase } from './helpers/db';
  * proving the documented semantics end-to-end:
  *
  *   - one correct item per source with real titles/date buckets;
- *   - F3 history preservation for completions of soft-deleted habits vs
- *     exclusion of soft-deleted todos/workout routines;
+ *   - F3 history preservation for completions of soft-deleted habits and for
+ *     sessions of soft-deleted workout routines, vs exclusion of soft-deleted
+ *     todos;
  *   - F5 authoritative `date_key` bucketing beating `updated_at` for habits;
  *   - F6 local-midnight-anchored window bounds;
  *   - per-day calorie aggregation and create+complete project/goal events.
@@ -140,7 +141,11 @@ describe('activityTimeline.data (real SQLite)', () => {
     expect(titles.has('Focus session · 25 min')).toBe(true);
     expect(titles.has('Break · 5 min')).toBe(true);
     expect(titles.has('Workout · Timeline Legs')).toBe(true);
-    expect(titles.has('Workout · Erased Routine')).toBe(false);
+    // F3 history rule for workout logs: the session still happened, so the
+    // feed keeps it (with its own name snapshot) after its template is removed.
+    // Progress counts these same rows via countWorkouts (no routine join), and
+    // workout.data.ts deliberately retains the log when its routine is deleted.
+    expect(titles.has('Workout · Erased Routine')).toBe(true);
     expect(titles.has('Logged 2 meals · 500 kcal')).toBe(true);
     expect(titles.has('Weekly review completed')).toBe(true);
     expect(titles.has('Daily plan completed')).toBe(true);

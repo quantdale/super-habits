@@ -27,7 +27,10 @@ export async function listGoals(includeDeleted = false): Promise<Goal[]> {
 
 export async function getGoal(id: string): Promise<Goal | null> {
   const db = await getDatabase();
-  return db.getFirstAsync<Goal>(`SELECT ${GOAL_SELECT} FROM goals WHERE id = ?`, [id]);
+  return db.getFirstAsync<Goal>(
+    `SELECT ${GOAL_SELECT} FROM goals WHERE id = ? AND deleted_at IS NULL`,
+    [id],
+  );
 }
 
 /**

@@ -190,23 +190,35 @@ export async function buildActivityTimeline(
     items.push(makeItem('focus', s.id, s.started_at, `${label} · ${minutes} min`, 'Focus'));
   }
 
-  // Workout: logs.
+  // Workout: logs. Same history rule as habits (F3): a completed session is a
+  // past fact, so removing its routine template must not erase it from the
+  // feed — workout.data.ts deliberately keeps those logs (and this read model
+  // must agree with Progress's routine-join-free countWorkouts). The log's own
+  // `routine_name` snapshot is preferred over the live row so a later routine
+  // rename cannot rewrite what was actually performed.
   const workouts = await db.getAllAsync<{
     id: string;
     routine_id: string;
     completed_at: string;
-    name: string;
+    name: string | null;
   }>(
-    `SELECT wl.id, wl.routine_id, wl.completed_at, wr.name
+    `SELECT wl.id, wl.routine_id, wl.completed_at,
+            COALESCE(wl.routine_name, wr.name) AS name
      FROM workout_logs wl
-     JOIN workout_routines wr ON wr.id = wl.routine_id
-     WHERE ${whereSince('wl.completed_at')} AND wr.deleted_at IS NULL
+     LEFT JOIN workout_routines wr ON wr.id = wl.routine_id
+     WHERE ${whereSince('wl.completed_at')}
      ORDER BY wl.completed_at DESC`,
     sinceParam(sinceIso),
   );
   for (const w of workouts) {
     items.push(
-      makeItem('workout', w.id, w.completed_at, `Workout · ${truncate(w.name)}`, 'Workout'),
+      makeItem(
+        'workout',
+        w.id,
+        w.completed_at,
+        `Workout · ${truncate(w.name ?? 'a deleted routine')}`,
+        'Workout',
+      ),
     );
   }
 

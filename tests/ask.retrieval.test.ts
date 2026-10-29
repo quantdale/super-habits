@@ -369,6 +369,41 @@ describe('features/command/ask.retrieval', () => {
     });
   });
 
+  describe('retrieveTodayFocus', () => {
+    it('excludes paused/archived habits from the remaining count, matching retrieveDailyOverview', async () => {
+      // Two habits scheduled for 2026-04-17 (empty rule_history => every day):
+      // one active obligation, one paused (not a current obligation).
+      listHabits.mockResolvedValue([
+        {
+          id: 'habit_active',
+          name: 'Active habit',
+          target_per_day: 1,
+          rule_history: null,
+          created_at: '2026-04-01T12:00:00.000Z',
+          status: 'active',
+        },
+        {
+          id: 'habit_paused',
+          name: 'Paused habit',
+          target_per_day: 1,
+          rule_history: null,
+          created_at: '2026-04-01T12:00:00.000Z',
+          status: 'paused',
+        },
+      ]);
+      getAllHabitCompletionsForRange.mockResolvedValue([]);
+      getDailyPlan.mockResolvedValue(null);
+      countPendingTodos.mockResolvedValue(0);
+      listTodos.mockResolvedValue([]);
+
+      const facts = await retrieveTodayFocus('2026-04-17');
+
+      // Only the active habit is a live obligation; the paused one must not
+      // inflate the "habits left today" load (retrieveDailyOverview agrees).
+      expect(facts.habitsRemainingCount).toBe(1);
+    });
+  });
+
   describe('retrieveProjectStatus', () => {
     it('resolves a named project with its open Todo count', async () => {
       listProjects.mockResolvedValue([

@@ -188,6 +188,29 @@ export function parseTopTodoTitles(raw: string | null | undefined): string[] {
   }
 }
 
+/**
+ * Display titles for the current top-priority selection.
+ *
+ * The saved snapshot (`savedIds` + `savedTitles`) is index-aligned at save
+ * time, but the live selection can diverge from it (unsaved add/remove in the
+ * plan editor), so each title must resolve against its OWN todo id.
+ */
+export function resolveTopTodoTitles(input: {
+  selectedIds: string[];
+  savedIds: string[];
+  savedTitles: string[];
+  liveTitleFor: (todoId: string) => string | undefined;
+}): string[] {
+  const snapshotById = new Map<string, string>();
+  input.savedIds.forEach((id, index) => {
+    const title = input.savedTitles[index];
+    if (title) snapshotById.set(id, title);
+  });
+  return input.selectedIds.map(
+    (id) => snapshotById.get(id) ?? input.liveTitleFor(id) ?? '(unavailable)',
+  );
+}
+
 /** Add a Todo to the top-priority set, preserving selection order; no-op if already present. */
 export function addTopTodoId(current: string[], todoId: string): string[] {
   if (current.includes(todoId)) return current;
