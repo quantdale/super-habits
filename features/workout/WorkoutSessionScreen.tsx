@@ -70,7 +70,7 @@ import {
   REST_SECONDS_STEP,
   clampRestSeconds,
 } from './restTimerPreferences';
-import type { WorkoutEffortScale } from '@/core/db/types';
+import type { WorkoutEffortScale, WorkoutWeightUnit } from '@/core/db/types';
 import type { RoutineWithExercises } from './types';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 
@@ -133,6 +133,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   const [restDefault, setRestDefault] = useState<number | null>(null);
   const [persistedRestDefault, setPersistedRestDefault] = useState<number | null>(null);
   const [effortScale, setEffortScale] = useState<WorkoutEffortScale>(resume?.effortScale ?? 'off');
+  // The user's weight unit (same resolution as the body-weight modal): stamped
+  // on logged sets so history never fabricates 'kg' for an lb user.
+  const [weightUnit, setWeightUnit] = useState<WorkoutWeightUnit>('kg');
   // The engine exercises, mapped once. The live sequence composes these
   // with any session-local added sets — the routine template is never written.
   const baseExercises = useMemo(() => buildSessionExerciseInputs(routine), [routine]);
@@ -156,6 +159,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
           setRestDefault(seconds);
           setPersistedRestDefault(seconds);
           if (!resume?.effortScale) setEffortScale(preferences.effortScale);
+          setWeightUnit(preferences.goalWeight?.unit ?? 'kg');
         }
       },
     );
@@ -913,7 +917,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       const logResult = await logWorkoutSession({
         routineId: routine.id,
         notes: notes.trim() ? notes.trim() : undefined,
-        exercises: buildSessionLogExercises(routine, summary, records),
+        exercises: buildSessionLogExercises(routine, summary, records, weightUnit),
         startedAt: startedAtMs !== null ? new Date(startedAtMs).toISOString() : null,
         endedAt: new Date(endedAtMs).toISOString(),
         // Resumed sessions log active time, not wall-clock: the gap between the

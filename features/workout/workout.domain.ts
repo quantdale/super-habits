@@ -953,6 +953,7 @@ export function buildSessionLogExercises(
   routine: RoutineWithExercises,
   summary: readonly CompletedExerciseSummary[],
   records: readonly SessionSetRecord[],
+  weightUnit: WorkoutWeightUnit,
 ) {
   return groupSessionExercises(summary, records).map((group) => {
     const exercise = routine.exercises[group.exerciseIndex];
@@ -976,7 +977,10 @@ export function buildSessionLogExercises(
         weight: set.weight,
         reps: set.reps,
         completed: set.completed,
-        weightUnit: set.weight !== null ? ('kg' as const) : null,
+        // The unit the values were entered in — the caller passes the user's
+        // workout weight unit; it is never fabricated. A missing measurement
+        // stays unknown (null), never a labeled zero.
+        weightUnit: set.weight !== null ? weightUnit : null,
         durationSeconds: set.durationSeconds,
         distance: set.distance,
         pace: set.pace,
