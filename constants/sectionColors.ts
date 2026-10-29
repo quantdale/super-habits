@@ -1,73 +1,146 @@
 /**
- * Per-section accent colors — based on color psychology
- * for productivity applications.
+ * Section and reward hues — "Playful Momentum" §5.1
+ * (docs/ui-ux/16-playful-momentum.md). Every hue has three tiers plus two
+ * tints:
  *
- * Todos:    Calm Blue   — focus, clarity, orderly thinking
- * Habits:   Fresh Green — growth, consistency, balance
- * Focus:    Deep Purple — concentration, calm, introspection
- * Workout:  Red-Orange  — physical energy, drive, power
- * Calories: Warm Amber  — warmth, nutrition, appetite awareness
+ * - `bright` — shapes, nodes, bars, rings, illustrations and icons.
+ *   Never put white text on it.
+ * - `solid`  — the button face (white label) and the colored-text color in
+ *   light mode.
+ * - `lip`    — the pressable depth under a solid.
+ * - `tintLight` = bright mixed 14% into white; `tintDark` = bright mixed 18%
+ *   into `#1A1F2B` (the §5.1 table's precomputed values).
  *
  * Naming boundary:
  * - "pomodoro" remains the canonical internal feature/module key
  * - "focus" remains the user-facing section label and accent namespace
  */
-export const SECTION_COLORS = {
-  todos: '#3B82F6', // Calm Blue
-  habits: '#10B981', // Fresh Green
-  focus: '#8B5CF6', // Deep Purple
-  workout: '#F97316', // Red-Orange
-  calories: '#F59E0B', // Warm Amber
-  /** Health parent surface (Workout + Nutrition home). */
-  health: '#14B8A6', // Vitality Teal
-} as const;
 
-export type SectionKey = keyof typeof SECTION_COLORS;
+export type SectionHue = {
+  bright: string;
+  solid: string;
+  lip: string;
+  tintLight: string;
+  tintDark: string;
+};
+
+/** §5.1 section hues. Sprout doubles as the app brand and the Habits hue. */
+export const SECTION_HUES = {
+  todos: {
+    bright: '#2FA8F7',
+    solid: '#1769D8',
+    lip: '#114C9C',
+    tintLight: '#E2F3FE',
+    tintDark: '#1E3850',
+  }, // Sky
+  habits: {
+    bright: '#4DC93A',
+    solid: '#1A7F2B',
+    lip: '#135B1F',
+    tintLight: '#E6F7E3',
+    tintDark: '#233E2E',
+  }, // Sprout
+  focus: {
+    bright: '#A37BFF',
+    solid: '#6F45E6',
+    lip: '#5032A6',
+    tintLight: '#F2EDFF',
+    tintDark: '#333051',
+  }, // Grape
+  workout: {
+    bright: '#FF6A4D',
+    solid: '#BF351E',
+    lip: '#8A2616',
+    tintLight: '#FFEAE6',
+    tintDark: '#432C31',
+  }, // Coral
+  calories: {
+    bright: '#FF6FAE',
+    solid: '#C02670',
+    lip: '#8A1B51',
+    tintLight: '#FFEBF4',
+    tintDark: '#432D43',
+  }, // Berry
+  health: {
+    bright: '#22CCB8',
+    solid: '#0B7A72',
+    lip: '#085852',
+    tintLight: '#E0F8F5',
+    tintDark: '#1B3E44',
+  }, // Lagoon
+} as const satisfies Record<string, SectionHue>;
+
+/** §5.1 danger hue — write failures and destructive confirms only. */
+export const DANGER_HUE: SectionHue = {
+  bright: '#FF5A5F', // Cherry
+  solid: '#C9283A',
+  lip: '#911D2A',
+  tintLight: '#FFE8E9',
+  tintDark: '#432A34',
+};
+
+export type SectionKey = keyof typeof SECTION_HUES;
 
 /** User-facing section token used by the pomodoro feature/tab. */
 export const POMODORO_SECTION_KEY = 'focus' as const satisfies SectionKey;
 
 /**
+ * Shape/border/icon fill per section (the §5.1 `bright` tier — never a
+ * white-label button face).
+ */
+export const SECTION_COLORS = {
+  todos: SECTION_HUES.todos.bright,
+  habits: SECTION_HUES.habits.bright,
+  focus: SECTION_HUES.focus.bright,
+  workout: SECTION_HUES.workout.bright,
+  calories: SECTION_HUES.calories.bright,
+  /** Health parent surface (Workout + Nutrition home). */
+  health: SECTION_HUES.health.bright,
+} as const;
+
+/**
  * Light tinted background for each section — used for
- * card accent backgrounds and pill chips.
- * 15% opacity version of each section color on white.
+ * card accent backgrounds and pill chips (the §5.1 `tintLight` tier).
  */
 export const SECTION_COLORS_LIGHT = {
-  todos: '#EFF6FF', // blue-50
-  habits: '#ECFDF5', // emerald-50
-  focus: '#F5F3FF', // violet-50
-  workout: '#FFF7ED', // orange-50
-  calories: '#FFFBEB', // amber-50
-  health: '#F0FDFA', // teal-50
+  todos: SECTION_HUES.todos.tintLight,
+  habits: SECTION_HUES.habits.tintLight,
+  focus: SECTION_HUES.focus.tintLight,
+  workout: SECTION_HUES.workout.tintLight,
+  calories: SECTION_HUES.calories.tintLight,
+  health: SECTION_HUES.health.tintLight,
 } as const;
 
 /**
- * Darker same-family hues for text and icons on white, `SECTION_COLORS_LIGHT`,
- * or app surface (#f8f7ff). Keeps `SECTION_COLORS` for fills, borders, and
- * solid headers. Target ~4.5:1 contrast on light backgrounds.
+ * Light-mode colored-text colors (the §5.1 `solid` tier): also the button face
+ * under a white label. Target ≥4.5:1 on white and on the light tint.
  */
 export const SECTION_TEXT_COLORS = {
-  todos: '#1D4ED8', // blue-700
-  habits: '#047857', // emerald-700
-  focus: '#6D28D9', // violet-700
-  workout: '#C2410C', // orange-700
-  calories: '#92400E', // amber-800 (deeper for yellow-50 / warm surface)
-  health: '#0F766E', // teal-700
+  todos: SECTION_HUES.todos.solid,
+  habits: SECTION_HUES.habits.solid,
+  focus: SECTION_HUES.focus.solid,
+  workout: SECTION_HUES.workout.solid,
+  calories: SECTION_HUES.calories.solid,
+  health: SECTION_HUES.health.solid,
 } as const;
 
 /**
- * Dark-appearance text variants. The base `SECTION_COLORS` are mid-tone fills;
- * painted as small text over a dark surface or a 12% tint of themselves they
- * land near 2:1 (measured). These 300/400-level hues keep the section identity
- * and clear WCAG AA on dark surfaces.
+ * Dark-appearance text variants. On dark surfaces the §5.1 `bright` tier is
+ * the readable colored text (the table's "bright on surface D" column, ≥5.3:1).
+ *
+ * Exception: Grape's bright `#A37BFF` clears 5.36:1 on the plain dark surface
+ * but only **4.06:1** on its own `tintDark` wash `#333051` — short of the 4.5
+ * text floor. Selected chips and rows paint the section tint (e.g. the
+ * FirstRunOnboardingCard Focus chip), so Focus uses a lifted Grape that reads
+ * 5.39:1 on `#333051` and stays visually identical at glyph size.
  */
 export const SECTION_TEXT_COLORS_DARK = {
-  todos: '#60A5FA', // blue-400
-  habits: '#34D399', // emerald-400
-  focus: '#A78BFA', // violet-400
-  workout: '#FB923C', // orange-400
-  calories: '#FCD34D', // amber-300
-  health: '#2DD4BF', // teal-400
+  todos: SECTION_HUES.todos.bright,
+  habits: SECTION_HUES.habits.bright,
+  focus: '#B49BFF',
+  workout: SECTION_HUES.workout.bright,
+  calories: SECTION_HUES.calories.bright,
+  health: SECTION_HUES.health.bright,
 } as const;
 
 export type SectionAccent = { fill: string; text: string; tint: string };
@@ -78,33 +151,75 @@ export type SectionAccent = { fill: string; text: string; tint: string };
  * everywhere — dashboard card, achievements screen, and celebration overlay —
  * so a reward reads the same wherever it appears.
  */
+export type RewardHue = {
+  bright: string;
+  lip: string;
+  tintLight: string;
+  tintDark: string;
+  /** Light-mode colored text / ink label on a bright face. */
+  text: string;
+};
+
+/** §5.1 reward hues. Gold and Flame appear only on reward elements. */
+export const REWARD_HUES = {
+  /** XP, levels, and quest progress — Gold. Ink label `#1F2430` on its face. */
+  accent: {
+    bright: '#FFC81F',
+    lip: '#E0A800',
+    tintLight: '#FFF7E0',
+    tintDark: '#433D29',
+    text: '#1F2430',
+  },
+  /** Streak — Flame. */
+  streak: {
+    bright: '#FF9A1F',
+    lip: '#D97A00',
+    tintLight: '#FFF1E0',
+    tintDark: '#433529',
+    text: '#B34D00',
+  },
+  /** A freeze-protected day — Ice. */
+  frozen: {
+    bright: '#5CCBFF',
+    lip: '#2FA3D9',
+    tintLight: '#E8F8FF',
+    tintDark: '#263E51',
+    text: '#0B6E99',
+  },
+  /** Badge faces use Gold with a bronze text tone. */
+  badge: {
+    bright: '#FFC81F',
+    lip: '#E0A800',
+    tintLight: '#FFF7E0',
+    tintDark: '#433D29',
+    text: '#9A5B00',
+  },
+  /** Complete-day celebration — Sprout. */
+  day: { ...SECTION_HUES.habits, text: SECTION_HUES.habits.solid },
+  /** Quest completion — Grape. */
+  quest: { ...SECTION_HUES.focus, text: SECTION_HUES.focus.solid },
+} as const satisfies Record<string, RewardHue>;
+
 export const REWARD_COLORS = {
-  /** XP, levels, and quest progress. */
-  accent: '#6366F1',
-  streak: '#F97316',
-  badge: '#F59E0B',
-  /** A freeze-protected day, matching the "saved" state in the week strip. */
-  frozen: '#38BDF8',
-  /** Complete-day celebration, aligned with the Habits section green. */
-  day: '#10B981',
-  /** Quest completion. */
-  quest: '#8B5CF6',
+  accent: REWARD_HUES.accent.bright,
+  streak: REWARD_HUES.streak.bright,
+  badge: REWARD_HUES.badge.bright,
+  frozen: REWARD_HUES.frozen.bright,
+  day: REWARD_HUES.day.bright,
+  quest: REWARD_HUES.quest.bright,
 } as const;
 
 /**
- * Light-appearance text variants for the reward hues. The base
- * `REWARD_COLORS` are fills and marks; painted as small text on a light
- * surface they land between 1.8:1 and 2.7:1. These 700/800-level hues keep
- * the reward identity and clear WCAG AA on the app's light surfaces, while
- * dark themes keep the bright base hues.
+ * Light-appearance text variants for the reward hues (the §5.1 table's text /
+ * ink-label column). Dark themes keep the bright base hues as text.
  */
 export const REWARD_TEXT_COLORS = {
-  accent: '#4338CA',
-  streak: '#C2410C',
-  badge: '#92400E',
-  frozen: '#0369A1',
-  day: '#047857',
-  quest: '#6D28D9',
+  accent: REWARD_HUES.accent.text,
+  streak: REWARD_HUES.streak.text,
+  badge: REWARD_HUES.badge.text,
+  frozen: REWARD_HUES.frozen.text,
+  day: REWARD_HUES.day.text,
+  quest: REWARD_HUES.quest.text,
 } as const;
 
 export type RewardKey = keyof typeof REWARD_COLORS;
@@ -127,10 +242,11 @@ export function getRewardAccents(appearance: 'light' | 'dark'): Record<RewardKey
 
 /**
  * Section identity colors are theme-invariant by default (a Todos card is
- * blue in every theme) — but `text`/`tint` must adapt to appearance: the
- * light-mode 700-level text and *-50 pastel tints go muddy or illegible on
- * dark surfaces. `overrides` lets a theme replace the whole set for cases
- * where even the fill clashes (e.g. Cyberpunk Neon, Crimson Red).
+ * Sky in every theme) — but `text`/`tint` must adapt to appearance:
+ * light mode paints the `solid` tier as colored text over the `tintLight`
+ * wash; dark mode paints the `bright` tier over `tintDark` (the §5.1 table's
+ * "bright on surface D" column). `overrides` lets a theme replace the whole
+ * set for cases where even the fill clashes (e.g. Cyberpunk Neon).
  */
 export function getSectionAccents(
   appearance: 'light' | 'dark',
@@ -144,11 +260,20 @@ export function getSectionAccents(
       result[key] = override;
       continue;
     }
-    const fill = SECTION_COLORS[key];
+    const hue = SECTION_HUES[key];
     result[key] =
       appearance === 'dark'
-        ? { fill, text: SECTION_TEXT_COLORS_DARK[key], tint: `${fill}1F` }
-        : { fill, text: SECTION_TEXT_COLORS[key], tint: SECTION_COLORS_LIGHT[key] };
+        ? { fill: hue.bright, text: SECTION_TEXT_COLORS_DARK[key], tint: hue.tintDark }
+        : { fill: hue.bright, text: hue.solid, tint: hue.tintLight };
   }
   return result;
 }
+
+/**
+ * §5.1 Rule 1: `bright` is never under white text. Any consumer that paints a
+ * label/glyph directly on a raw `bright` fill must use this ink — white on
+ * bright lands between 2.02:1 (Lagoon) and 3.07:1 (Grape), below the 3:1
+ * non-text floor and far below the 4.5:1 text floor, while ink on bright is
+ * 6.05–9.20:1. Consumers that keep a white label must use the `solid` tier.
+ */
+export const SECTION_ON_BRIGHT_INK = '#10131A';

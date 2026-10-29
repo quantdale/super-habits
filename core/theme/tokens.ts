@@ -15,12 +15,16 @@ export type ThemeAppearance = 'light' | 'dark';
 export type ThemeTokens = {
   // ── Brand & interaction ─────────────────────────────────────────────
   primary: string;
+  /** Shapes/nodes brand hue; never text, never a white-label face. */
+  primaryBright: string;
   secondary: string;
   accent: string;
   button: string;
   buttonText: string;
   buttonHover: string;
   buttonActive: string;
+  /** Pressable depth lip under `button`. */
+  buttonLip: string;
 
   // ── Surfaces ────────────────────────────────────────────────────────
   background: string;
@@ -43,6 +47,8 @@ export type ThemeTokens = {
   // ── Content ─────────────────────────────────────────────────────────
   text: string;
   textMuted: string;
+  /** Placeholders and meta — quieter than textMuted, still ≥4.5 on surface. */
+  textSubtle: string;
   iconMuted: string;
   textOnAccent: string;
   /** Text/glyph color that must sit on a saturated solid fill. */
@@ -99,6 +105,9 @@ export type ThemeInput = Pick<
   Partial<
     Pick<
       ThemeTokens,
+      | 'primaryBright'
+      | 'buttonLip'
+      | 'textSubtle'
       | 'surfaceSunken'
       | 'surfaceHover'
       | 'surfaceActive'

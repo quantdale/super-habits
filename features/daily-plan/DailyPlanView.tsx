@@ -5,7 +5,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { IconButton } from '@/core/ui/IconButton';
 import { TextField } from '@/core/ui/TextField';
-import { SECTION_COLORS } from '@/constants/sectionColors';
+import { SECTION_COLORS, SECTION_ON_BRIGHT_INK } from '@/constants/sectionColors';
 import {
   getDailyPlan,
   upsertDailyPlan,
@@ -450,7 +450,7 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
                   }}
                 >
                   <Text
-                    style={{ color: energyScore === score ? tokens.textOnAccent : tokens.text }}
+                    style={{ color: energyScore === score ? SECTION_ON_BRIGHT_INK : tokens.text }}
                   >
                     {score}
                   </Text>

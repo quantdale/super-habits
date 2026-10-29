@@ -20,6 +20,12 @@ export const cyberpunkNeon = createTheme({
   tabRailBorder: '#202440',
   text: '#eaf2ff',
   textMuted: '#8b93b8',
+  // This canvas (#07080f) is far darker than the default dark (#131722), so the
+  // §5.1 danger wash (#432A34) would lift the panel and drop this theme's
+  // already-muted textMuted to 4.30:1. A deeper Cherry wash keeps both the
+  // danger text (6.75:1) and textMuted (5.07:1) AA-clean on this canvas.
+  dangerBackground: '#361E29',
+  dangerBorder: '#911D2A',
   // Large fields stay dark; neon is reserved for interactive elements —
   // the default (muted) section fills would look flat here, so tab icons
   // get a neon-grade variant of each section's hue.

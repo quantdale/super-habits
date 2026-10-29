@@ -1,31 +1,41 @@
 import { createTheme } from '@/core/theme/createTheme';
 
 /**
- * Pop Dark — the default dark appearance. Deep indigo-black canvas, plum
- * surfaces, and a bright violet brand so saturated accents stay legible
- * without glare.
+ * Dark — the default dark appearance. Playful Momentum §5.3: blue-charcoal
+ * canvas (not indigo-plum) and bright-fill buttons with an ink label.
  */
 export const dark = createTheme({
   id: 'dark',
   name: 'Dark',
   appearance: 'dark',
-  description: 'Deep indigo canvas, plum surfaces, bright violet brand.',
-  primary: '#A78BFA',
-  secondary: '#241F45',
-  accent: '#F472B6',
-  button: '#6D4BE8',
-  buttonText: '#FFFFFF',
-  buttonHover: '#5E3CD6',
-  buttonActive: '#4F2FC0',
-  background: '#0C0A1D',
-  surface: '#171436',
-  surfaceElevated: '#1F1B42',
-  border: '#2A2550',
-  tabRail: '#171436',
-  tabRailBorder: '#2A2550',
-  text: '#F3F1FF',
-  textMuted: '#A9A4C9',
-  iconMuted: '#8F89B8',
-  overlayScrim: 'rgba(6, 4, 20, 0.72)',
-  shadowColor: '#04021A',
+  description: 'Blue-charcoal canvas, bright Sprout fills with ink labels.',
+  primary: '#4DC93A',
+  primaryBright: '#4DC93A',
+  secondary: '#232938',
+  accent: '#2FA8F7',
+  button: '#4DC93A',
+  buttonText: '#10131A',
+  buttonHover: '#5AD447',
+  buttonActive: '#3DB52C',
+  buttonLip: '#1A7F2B',
+  background: '#131722',
+  surface: '#1A1F2B',
+  surfaceElevated: '#232938',
+  surfaceSunken: '#0F121A',
+  surfaceHover: '#202635',
+  surfaceActive: '#2A3142',
+  border: '#2E3546',
+  borderStrong: '#0B0E14',
+  tabRail: '#1A1F2B',
+  tabRailBorder: '#2E3546',
+  text: '#F4F6FB',
+  textMuted: '#AAB2C3',
+  textSubtle: '#8A93A6',
+  iconMuted: '#6D7690',
+  overlayScrim: 'rgba(0, 0, 0, 0.65)',
+  shadowColor: '#0B0E14',
+  brandGradient: ['#4DC93A', '#4DC93A'],
+  glow: 'transparent',
+  webThemeColor: '#131722',
+  statusBarStyle: 'light',
 });

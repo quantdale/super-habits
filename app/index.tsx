@@ -13,7 +13,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
+import {
+  POMODORO_SECTION_KEY,
+  SECTION_COLORS,
+  SECTION_ON_BRIGHT_INK,
+} from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { type AppSection, useAppNavigation } from '@/core/providers/navigationContext';
 import { Modal } from '@/core/ui/Modal';
@@ -283,7 +287,12 @@ function CaptureButton({ onPress, variant }: { onPress: () => void; variant: 'ba
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <MaterialIcons name="add" size={variant === 'bar' ? 28 : 24} color={tokens.buttonText} />
+      {/*
+        §5.1 rule 1: the capture face is the BRIGHT brand gradient (Sprout
+        #4DC93A), where `buttonText` is white in light mode — 2.16:1. Ink is
+        8.61:1 and matches dark mode, whose buttonText is already ink.
+      */}
+      <MaterialIcons name="add" size={variant === 'bar' ? 28 : 24} color={SECTION_ON_BRIGHT_INK} />
     </Pressable>
   );
 }

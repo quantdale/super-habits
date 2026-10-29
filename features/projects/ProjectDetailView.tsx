@@ -5,7 +5,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { IconButton } from '@/core/ui/IconButton';
 import { TextField } from '@/core/ui/TextField';
-import { SECTION_COLORS } from '@/constants/sectionColors';
+import { SECTION_COLORS, SECTION_ON_BRIGHT_INK } from '@/constants/sectionColors';
 import {
   addProject,
   getProject,
@@ -258,7 +258,7 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
                 }
                 onPress={() => setStatus(s)}
               >
-                <Text style={{ color: status === s ? tokens.textOnAccent : tokens.textMuted }}>
+                <Text style={{ color: status === s ? SECTION_ON_BRIGHT_INK : tokens.textMuted }}>
                   {PROJECT_STATUS_LABELS[s]}
                 </Text>
               </Pressable>

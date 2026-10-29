@@ -5,7 +5,7 @@ import { Pressable, TextInput, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { PillChip } from '@/core/ui/PillChip';
-import { SECTION_COLORS } from '@/constants/sectionColors';
+import { SECTION_COLORS, SECTION_ON_BRIGHT_INK } from '@/constants/sectionColors';
 import { useCommandCenter } from '@/features/command/commandCenterContext';
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { addTodo, removeTodo } from '@/features/todos/todos.data';
@@ -630,7 +630,7 @@ function LinkPicker({
           }
           onPress={() => onSelect(null)}
         >
-          <Text style={{ color: selectedId === null ? tokens.textOnAccent : tokens.textMuted }}>
+          <Text style={{ color: selectedId === null ? SECTION_ON_BRIGHT_INK : tokens.textMuted }}>
             None
           </Text>
         </Pressable>
@@ -649,7 +649,7 @@ function LinkPicker({
             onPress={() => onSelect(o.id)}
           >
             <Text
-              style={{ color: selectedId === o.id ? tokens.textOnAccent : tokens.textMuted }}
+              style={{ color: selectedId === o.id ? SECTION_ON_BRIGHT_INK : tokens.textMuted }}
               numberOfLines={1}
             >
               {o.name}

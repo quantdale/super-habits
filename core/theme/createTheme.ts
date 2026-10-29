@@ -29,33 +29,40 @@ const DEFAULT_STATUS_TOKENS: Record<
     | 'successSolid'
   >
 > = {
+  // Playful Momentum §5.1/§5.2: success = Sprout, warning = Gold,
+  // danger = Cherry. Light uses the tintLight wash + solid text; dark uses
+  // the tintDark wash + bright text/solid (dark buttons are bright fill with
+  // an ink label).
   light: {
-    dangerBackground: '#FFF1F0',
+    dangerBackground: '#FFE8E9',
     dangerBorder: '#FFC9C4',
-    dangerText: '#B42318',
-    dangerSolid: '#E5484D',
-    warningBackground: '#FFF7E6',
+    dangerText: '#C9283A',
+    dangerSolid: '#C9283A',
+    warningBackground: '#FFF7E0',
     warningBorder: '#FFD699',
-    warningText: '#8A4B00',
-    warningSolid: '#F5A524',
-    successBackground: '#E9FBF1',
+    warningText: '#9A5B00',
+    warningSolid: '#FFC81F',
+    successBackground: '#E6F7E3',
     successBorder: '#A7EFC8',
-    successText: '#0B6B44',
-    successSolid: '#12B76A',
+    successText: '#1A7F2B',
+    successSolid: '#1A7F2B',
   },
   dark: {
-    dangerBackground: '#3A1620',
-    dangerBorder: '#7A2230',
-    dangerText: '#FFC9C9',
-    dangerSolid: '#E5484D',
-    warningBackground: '#3A2A10',
-    warningBorder: '#8A5A13',
-    warningText: '#FFE0A3',
-    warningSolid: '#F5A524',
-    successBackground: '#122E22',
-    successBorder: '#1B5C40',
-    successText: '#BBF7D0',
-    successSolid: '#12B76A',
+    dangerBackground: '#432A34',
+    dangerBorder: '#911D2A',
+    // Text on the tintDark wash needs a lifted Cherry: the §5.1 bright
+    // `#FF5A5F` lands at 4.25:1 there (needs 4.5); `#FF8A8F` keeps the hue at
+    // 5.73:1. `dangerSolid` keeps the exact §5.1 bright for fills/marks.
+    dangerText: '#FF8A8F',
+    dangerSolid: '#FF5A5F',
+    warningBackground: '#433D29',
+    warningBorder: '#E0A800',
+    warningText: '#FFC81F',
+    warningSolid: '#FFC81F',
+    successBackground: '#233E2E',
+    successBorder: '#1A7F2B',
+    successText: '#4DC93A',
+    successSolid: '#4DC93A',
   },
 };
 
@@ -81,6 +88,10 @@ function assertContrast(id: string, input: ThemeTokens): void {
     ['buttonText on button', input.buttonText, input.button, WCAG_AA_TEXT],
     ['buttonText on buttonHover', input.buttonText, input.buttonHover, WCAG_AA_TEXT],
     ['buttonText on buttonActive', input.buttonText, input.buttonActive, WCAG_AA_TEXT],
+    ['textSubtle on surface', input.textSubtle, input.surface, WCAG_AA_TEXT],
+    // The lip shows as the press depth *under* the face (adjacent color, not
+    // the label resting place) — WCAG 1.4.11 non-text minimum.
+    ['buttonText on buttonLip (press depth)', input.buttonText, input.buttonLip, WCAG_AA_NON_TEXT],
     ['accent on surface', input.accent, input.surface, WCAG_AA_TEXT],
     ['primary on surface (non-text)', input.primary, input.surface, WCAG_AA_NON_TEXT],
   ];
@@ -114,6 +125,9 @@ export function createTheme(input: ThemeInput): ThemeDefinition {
   const tokens: ThemeTokens = {
     ...DEFAULT_STATUS_TOKENS[appearance],
     ...rest,
+    primaryBright: input.primaryBright ?? input.primary,
+    buttonLip: input.buttonLip ?? input.buttonActive,
+    textSubtle: input.textSubtle ?? input.textMuted,
     surfaceSunken: input.surfaceSunken ?? blend(input.surface, input.text, dark ? 0.06 : 0.045),
     surfaceHover: input.surfaceHover ?? blend(input.surface, input.text, 0.06),
     surfaceActive: input.surfaceActive ?? blend(input.surface, input.text, 0.1),

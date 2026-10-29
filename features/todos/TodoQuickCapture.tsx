@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Animated, Pressable, TextInput, View } from 'react-native';
+import { SECTION_ON_BRIGHT_INK } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useReducedMotion } from '@/core/theme/motion';
 import { opacity, radius, size, spacing, springs } from '@/core/theme/designTokens';
@@ -110,7 +111,8 @@ export function TodoQuickCapture({ title, onTitleChange, onSubmit, onPersistErro
             opacity: canSubmit ? 1 : opacity.disabled,
           }}
         >
-          <MaterialIcons name="add" size={26} color={tokens.textOnAccent} />
+          {/* §5.1: `bright` is never under white — ink label on the bright fill. */}
+          <MaterialIcons name="add" size={26} color={SECTION_ON_BRIGHT_INK} />
         </Pressable>
       </Animated.View>
     </View>
