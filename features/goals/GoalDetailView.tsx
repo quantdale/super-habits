@@ -6,7 +6,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { IconButton } from '@/core/ui/IconButton';
 import { TextField } from '@/core/ui/TextField';
-import { SECTION_COLORS } from '@/constants/sectionColors';
+import { SECTION_COLORS, SECTION_ON_BRIGHT_INK } from '@/constants/sectionColors';
 import {
   addGoal,
   getGoal,
@@ -331,7 +331,7 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
                 }
                 onPress={() => setHorizon(h)}
               >
-                <Text style={{ color: horizon === h ? tokens.textOnAccent : tokens.textMuted }}>
+                <Text style={{ color: horizon === h ? SECTION_ON_BRIGHT_INK : tokens.textMuted }}>
                   {GOAL_HORIZON_LABELS[h]}
                 </Text>
               </Pressable>
@@ -358,7 +358,7 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
                 }
                 onPress={() => setStatus(s)}
               >
-                <Text style={{ color: status === s ? tokens.textOnAccent : tokens.textMuted }}>
+                <Text style={{ color: status === s ? SECTION_ON_BRIGHT_INK : tokens.textMuted }}>
                   {GOAL_STATUS_LABELS[s]}
                 </Text>
               </Pressable>
@@ -413,7 +413,9 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
               }
               onPress={() => setProjectId(null)}
             >
-              <Text style={{ color: projectId === null ? tokens.textOnAccent : tokens.textMuted }}>
+              <Text
+                style={{ color: projectId === null ? SECTION_ON_BRIGHT_INK : tokens.textMuted }}
+              >
                 None
               </Text>
             </Pressable>
@@ -430,7 +432,7 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
                 onPress={() => setProjectId(p.id)}
               >
                 <Text
-                  style={{ color: projectId === p.id ? tokens.textOnAccent : tokens.textMuted }}
+                  style={{ color: projectId === p.id ? SECTION_ON_BRIGHT_INK : tokens.textMuted }}
                   numberOfLines={1}
                 >
                   {p.name}

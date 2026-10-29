@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DANGER_HUE,
+  SECTION_ON_BRIGHT_INK,
   REWARD_COLORS,
   REWARD_HUES,
   REWARD_TEXT_COLORS,
@@ -12,6 +13,7 @@ import {
   getRewardAccents,
   getSectionAccents,
 } from '@/constants/sectionColors';
+import { contrastRatio } from '@/core/theme/contrast';
 
 // Playful Momentum §5.1 (docs/ui-ux/16-playful-momentum.md) — the shipped hue
 // tiers are pinned to the spec table so a drift here is a spec violation.
@@ -180,5 +182,63 @@ describe('getRewardAccents', () => {
     const accents = getRewardAccents('dark');
     expect(accents.day).toEqual({ fill: '#4DC93A', text: '#4DC93A' });
     expect(accents.quest).toEqual({ fill: '#A37BFF', text: '#A37BFF' });
+  });
+});
+
+// Codex P2 on #139: brightened §5.1 fills broke white-label consumers. §5.1
+// Rule 1 — `bright` is never under white text. These pairs are the exact
+// combinations shipped by the fixed consumers, asserted against the WCAG
+// floors (4.5 for text, 3.0 for non-text glyphs/borders).
+describe('§5.1 fill/label contrast (bright is never under white)', () => {
+  const SECTION_KEYS = Object.keys(SECTION_HUES) as (keyof typeof SECTION_HUES)[];
+
+  it('ink labels on every bright fill clear the 4.5 text floor', () => {
+    for (const key of SECTION_KEYS) {
+      const ratio = contrastRatio(SECTION_ON_BRIGHT_INK, SECTION_HUES[key].bright);
+      expect(ratio, `${key}: ink on bright — ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('the ink glyph on a bright fill clears the 3.0 non-text floor', () => {
+    for (const key of SECTION_KEYS) {
+      const ratio = contrastRatio(SECTION_ON_BRIGHT_INK, SECTION_HUES[key].bright);
+      expect(ratio, `${key}: ink glyph on bright`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('every bright fill fails a white label, so white must never be used on it', () => {
+    // The regression guard: if a future edit re-introduces white on bright,
+    // this documents why the consumer crashed. `focus` sits closest to the
+    // floor (3.07) and would still fail the 4.5 text requirement.
+    for (const key of SECTION_KEYS) {
+      const ratio = contrastRatio('#FFFFFF', SECTION_HUES[key].bright);
+      expect(ratio, `${key}: white on bright — ${ratio.toFixed(2)}:1`).toBeLessThan(4.5);
+    }
+  });
+
+  it('white labels on the solid tier clear the 4.5 text floor (the alternative fix)', () => {
+    for (const key of SECTION_KEYS) {
+      const ratio = contrastRatio('#FFFFFF', SECTION_HUES[key].solid);
+      expect(ratio, `${key}: white on solid — ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('reward labels on their bright faces clear the floors (ink on Gold/Flame)', () => {
+    // §5.1 gives Gold and Flame an ink label (`#1F2430`), not white. The
+    // reward *text* tones (`#B34D00`, `#0B6E99`, …) are for painting small text
+    // on surfaces/washes — never on the bright face itself.
+    for (const key of ['accent', 'streak', 'frozen', 'badge'] as const) {
+      const ratio = contrastRatio(SECTION_ON_BRIGHT_INK, REWARD_HUES[key].bright);
+      expect(ratio, `${key}: ink on bright — ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('reward text tones clear 4.5 on the light surfaces they are painted on', () => {
+    for (const key of Object.keys(REWARD_TEXT_COLORS) as (keyof typeof REWARD_TEXT_COLORS)[]) {
+      const ratio = contrastRatio(REWARD_TEXT_COLORS[key], '#FFFFFF');
+      expect(ratio, `${key}: text tone on white — ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(
+        4.5,
+      );
+    }
   });
 });

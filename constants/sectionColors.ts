@@ -262,3 +262,12 @@ export function getSectionAccents(
   }
   return result;
 }
+
+/**
+ * §5.1 Rule 1: `bright` is never under white text. Any consumer that paints a
+ * label/glyph directly on a raw `bright` fill must use this ink — white on
+ * bright lands between 2.02:1 (Lagoon) and 3.07:1 (Grape), below the 3:1
+ * non-text floor and far below the 4.5:1 text floor, while ink on bright is
+ * 6.05–9.20:1. Consumers that keep a white label must use the `solid` tier.
+ */
+export const SECTION_ON_BRIGHT_INK = '#10131A';
