@@ -5,6 +5,8 @@ import {
   type PlanningHubView,
 } from '@/core/providers/navigationContext';
 
+import { isHistoryMirrorAvailable } from '@/core/providers/historyMirror';
+
 export type { AppSection, PlanningHubView } from '@/core/providers/navigationContext';
 
 const KNOWN_SECTIONS: readonly string[] = [
@@ -81,13 +83,13 @@ function scheduleHistorySectionAdoption(): void {
  * (`/#habits`). Back/forward between sections depends on this stamp.
  */
 function readHistorySection(): AppSection | null {
-  if (typeof window === 'undefined') return null;
+  if (!isHistoryMirrorAvailable()) return null;
   const hash = window.location.hash.replace(/^#/, '');
   return KNOWN_SECTIONS.includes(hash) ? (hash as AppSection) : null;
 }
 
 function stampHistorySection(section: AppSection): void {
-  if (typeof window === 'undefined') return;
+  if (!isHistoryMirrorAvailable()) return;
   window.history.pushState(window.history.state, '', `#${section}`);
 }
 
@@ -161,7 +163,7 @@ export function NavigationProvider({ children }: PropsWithChildren) {
   // so this must not run during render — also makes `/#habits` a deep link)
   // and restore the stamped section on back/forward.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (!isHistoryMirrorAvailable()) return;
     const stamped = readHistorySection();
     if (stamped && stamped !== activeSectionRef.current) applySection(stamped);
     // Stamp THIS entry too, so the entry the session started on carries its
