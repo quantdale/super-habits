@@ -38,6 +38,9 @@ const EMPTY_DRAFT: Draft = {
   autoStartFocus: false,
 };
 
+/** Same cap the persistence normalizer enforces (`normalizePreset`). */
+const MAX_PRESET_NAME_LENGTH = 40;
+
 function toDraft(preset: PomodoroPreset): Draft {
   return {
     id: preset.id,
@@ -59,6 +62,12 @@ function parseBound(raw: string, min: number, max: number): number | null {
 
 function validateDraft(draft: Draft): string | null {
   if (!draft.name.trim()) return 'Give the preset a name.';
+  // Reject, never silently truncate (the app-wide name contract): slicing
+  // here would persist a name the user never typed — and could split a
+  // surrogate pair mid-emoji.
+  if (draft.name.trim().length > MAX_PRESET_NAME_LENGTH) {
+    return `Preset name must be ${MAX_PRESET_NAME_LENGTH} characters or fewer.`;
+  }
   if (parseBound(draft.focusMinutes, 1, 120) === null) {
     return 'Focus minutes must be a whole number from 1 to 120.';
   }
@@ -102,7 +111,7 @@ export function PomodoroPresetManagerModal({ visible, presets, onClose, onChange
     }
     const preset: PomodoroPreset = {
       id: draft.id ?? createId('ppre'),
-      name: draft.name.trim().slice(0, 40),
+      name: draft.name.trim(),
       focusMinutes: Number(draft.focusMinutes.trim()),
       shortBreakMinutes: Number(draft.shortBreakMinutes.trim()),
       longBreakMinutes: Number(draft.longBreakMinutes.trim()),
