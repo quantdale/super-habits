@@ -1,13 +1,11 @@
-import { useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { ActivityIndicator, Animated, Pressable, View, type TextStyle } from 'react-native';
+import { ActivityIndicator, View, type TextStyle } from 'react-native';
 import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { useReducedMotion } from '@/core/theme/motion';
-import { radius, size, spacing, springs, typography } from '@/core/theme/designTokens';
-import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
-import { readableSurface } from '@/core/theme/contrast';
+import { radius, size, spacing, typography } from '@/core/theme/designTokens';
+import { readableAccent, readableSurface } from '@/core/theme/contrast';
+import { Pressable3D, type Pressable3DLip } from '@/core/ui/Pressable3D';
+import { REWARD_HUES } from '@/constants/sectionColors';
 
 export type ButtonVariant =
   | 'primary'
@@ -33,9 +31,6 @@ type ButtonProps = {
   className?: string;
 };
 
-/** Height of the 3D lip under the celebrate button face. */
-const LIP_HEIGHT = 5;
-
 /** Deterministic per-channel shade of a hex color; non-hex values pass through. */
 function shade(color: string, amount: number): string {
   if (!/^#[0-9a-fA-F]{6}$/.test(color)) return color;
@@ -50,12 +45,17 @@ function shade(color: string, amount: number): string {
  * Size → geometry plus the type role that paints the label (§5.5/§6). The
  * compact face uses the `label` role; `md`/`lg` use the `button` role, with
  * `lg` one step up ("16/20 (lg 17)") rather than a second hand-picked size.
+ * `lip` is the §5.7 slab depth under the face: sm 36+2, md 44+3, lg 52+4.
  */
-const SIZES: Record<ButtonSize, { height: number; padding: number; label: TextStyle }> = {
-  sm: { height: 36, padding: spacing.md, label: typography.label },
-  md: { height: size.buttonHeight, padding: spacing.lg, label: typography.button },
+const SIZES: Record<
+  ButtonSize,
+  { height: number; lip: Pressable3DLip; padding: number; label: TextStyle }
+> = {
+  sm: { height: 36, lip: 2, padding: spacing.md, label: typography.label },
+  md: { height: size.buttonHeight, lip: 3, padding: spacing.lg, label: typography.button },
   lg: {
     height: size.buttonHeightLg,
+    lip: 4,
     padding: spacing.xl,
     label: { ...typography.button, fontSize: typography.button.fontSize + 1 },
   },
@@ -78,18 +78,18 @@ const COMPACT_TOUCH_TARGET = 44;
 const SM_TOUCH_SLOP_VERTICAL = (COMPACT_TOUCH_TARGET - SIZES.sm.height) / 2;
 
 /**
- * The V3 action hierarchy (docs/ui-ux/13 §7). One loud action per view:
+ * The v2 action hierarchy (Playful Momentum §6): the chunky lip slab, flat
+ * solid fills, no gradient.
  *
- * - `primary`   — solid accent fill, white ink. The "do it" button.
- * - `secondary` — tonal chip fill, accent-safe ink. Supporting actions.
- * - `ghost`     — quiet surface, hairline outline. Dismiss / rare paths.
- * - `danger`    — solid danger fill. Destructive confirms.
- * - `celebrate` — the retired Pop treatment (gradient face + 3D lip + spring):
- *                 reserved for gamification milestones only.
+ * **One primary per screen** (§4 "one dominant action per state"): a view
+ * renders at most one `primary` Button — the screen's one loud action.
+ * Supporting actions use `secondary`, quiet/dismiss paths `ghost`, destructive
+ * confirms `danger`, and `celebrate` is reserved for gamification reward CTAs
+ * (Gold face, ink label).
  *
- * Default buttons are calm: radius 12, no gradient, no lip, a 150ms press
- * settle instead of a spring. Reduced motion keeps the pressed state but
- * removes the travel.
+ * Every variant rides `Pressable3D` (§5.7): face down into the lip on press
+ * (80ms down / 120ms up), reduced motion = opacity only. Disabled/loading
+ * (§5.7) = sunken face, subtle label, neutral lip.
  */
 export function Button({
   label,
@@ -105,145 +105,98 @@ export function Button({
   className,
 }: ButtonProps) {
   const { tokens } = useAppTheme();
-  const reducedMotion = useReducedMotion();
-  const focusRing = useKeyboardFocusRing(tokens.accent);
-  const [offset] = useState(() => new Animated.Value(0));
   const inactive = disabled || loading;
   const metrics = SIZES[sizeRole];
   const isCelebration = variant === 'celebrate';
+  const solid = variant === 'primary' || variant === 'danger' || isCelebration;
 
   // A caller-supplied hue paints the solid face carrying white text; deepen it
   // until the label clears WCAG AA (section hues measure ~4.2:1 as-is).
   const face = color ?? (variant === 'danger' ? tokens.dangerSolid : tokens.button);
-  const solidFace =
-    (variant === 'primary' || variant === 'danger' || isCelebration) && color
-      ? readableSurface(face, tokens.buttonText)
-      : face;
-  const gradient: readonly [string, string] =
-    isCelebration && !color ? tokens.brandGradient : [solidFace, solidFace];
-  const lip = shade(solidFace, 0.76);
-  const labelColor =
-    variant === 'primary' || variant === 'danger' || isCelebration
-      ? tokens.buttonText
-      : variant === 'secondary'
-        ? readableSurface(face, tokens.chipBackground)
-        : tokens.text;
+  const solidFace = solid && color ? readableSurface(face, tokens.buttonText) : face;
 
-  const settle = (toValue: number) => {
-    if (reducedMotion) {
-      offset.setValue(toValue);
-      return;
-    }
-    if (isCelebration) {
-      Animated.spring(offset, { toValue, useNativeDriver: true, ...springs.press }).start();
-    } else {
-      Animated.timing(offset, {
-        toValue,
-        duration: 120,
-        useNativeDriver: true,
-      }).start();
-    }
-  };
+  const faceColor = inactive
+    ? tokens.surfaceSunken
+    : variant === 'secondary'
+      ? tokens.surface
+      : variant === 'ghost'
+        ? 'transparent'
+        : isCelebration && !color
+          ? REWARD_HUES.accent.bright
+          : solidFace;
+  const lipColor = inactive
+    ? tokens.border
+    : variant === 'secondary'
+      ? tokens.borderStrong
+      : variant === 'ghost'
+        ? 'transparent'
+        : isCelebration && !color
+          ? REWARD_HUES.accent.lip
+          : solidFace === tokens.button
+            ? tokens.buttonLip
+            : shade(solidFace, 0.76);
+  const labelColor = inactive
+    ? tokens.textSubtle
+    : isCelebration && !color
+      ? REWARD_HUES.accent.text
+      : solid
+        ? tokens.buttonText
+        : readableAccent(
+            color ?? tokens.button,
+            variant === 'ghost' ? tokens.background : tokens.surface,
+          );
 
   return (
-    <View
-      className={className}
-      style={{
-        alignSelf: fullWidth ? 'stretch' : 'flex-start',
-        borderRadius: radius.md,
-        backgroundColor: isCelebration ? lip : 'transparent',
-        paddingBottom: isCelebration ? LIP_HEIGHT : 0,
-        opacity: inactive ? 0.5 : 1,
-      }}
-    >
-      <Animated.View style={{ transform: [{ translateY: offset }] }}>
-        <Pressable
-          disabled={inactive}
-          accessibilityRole="button"
-          accessibilityLabel={accessibilityLabel ?? label}
-          accessibilityState={{ disabled: inactive, busy: loading }}
-          onFocus={focusRing.onFocus}
-          onBlur={focusRing.onBlur}
-          hitSlop={
-            sizeRole === 'sm'
-              ? { top: SM_TOUCH_SLOP_VERTICAL, bottom: SM_TOUCH_SLOP_VERTICAL }
-              : undefined
-          }
-          onPressIn={() => settle(isCelebration ? LIP_HEIGHT : 1)}
-          onPressOut={() => settle(0)}
-          onPress={onPress}
-          style={[
-            {
-              minHeight: metrics.height,
-              paddingHorizontal: metrics.padding,
-              borderRadius: radius.md,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: spacing.sm,
-              overflow: 'hidden',
-            },
-            isCelebration
-              ? null
-              : variant === 'ghost'
-                ? {
-                    backgroundColor: tokens.surface,
-                    borderWidth: 1,
-                    borderColor: tokens.border,
-                  }
-                : variant === 'secondary'
-                  ? {
-                      backgroundColor: tokens.chipBackground,
-                      borderWidth: 1,
-                      borderColor: tokens.chipBorder,
-                    }
-                  : null,
-            focusRing.focusRingStyle,
-          ]}
-        >
-          {isCelebration ? (
-            <LinearGradient
-              colors={[gradient[0], gradient[1]]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
-            />
-          ) : variant === 'primary' || variant === 'danger' ? (
-            <View
+    <View className={className} style={{ alignSelf: fullWidth ? 'stretch' : 'flex-start' }}>
+      <Pressable3D
+        lip={metrics.lip}
+        faceColor={faceColor}
+        lipColor={lipColor}
+        radius={sizeRole === 'sm' ? radius.sm : radius.md}
+        disabled={inactive}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? label}
+        accessibilityState={{ disabled: inactive, busy: loading }}
+        hitSlop={
+          sizeRole === 'sm'
+            ? { top: SM_TOUCH_SLOP_VERTICAL, bottom: SM_TOUCH_SLOP_VERTICAL }
+            : undefined
+        }
+        faceStyle={
+          variant === 'secondary' ? { borderWidth: 2, borderColor: tokens.border } : undefined
+        }
+        contentStyle={{
+          minHeight: metrics.height,
+          paddingHorizontal: metrics.padding,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: spacing.sm,
+        }}
+      >
+        {loading ? (
+          <ActivityIndicator size="small" color={labelColor} />
+        ) : (
+          <>
+            {icon ? (
+              <MaterialIcons name={icon} size={iconSizeFor(metrics.label)} color={labelColor} />
+            ) : null}
+            <Text
+              // Sentence case by construction: the `button` role carries no
+              // `textTransform`, so accessible names stay the product string.
               style={{
-                position: 'absolute',
-                left: 0,
-                right: 0,
-                top: 0,
-                bottom: 0,
-                backgroundColor: gradient[0],
-                borderRadius: radius.md,
+                ...metrics.label,
+                color: labelColor,
+                textAlign: 'center',
               }}
-            />
-          ) : null}
-          {loading ? (
-            <ActivityIndicator size="small" color={labelColor} />
-          ) : (
-            <>
-              {icon ? (
-                <MaterialIcons name={icon} size={iconSizeFor(metrics.label)} color={labelColor} />
-              ) : null}
-              <Text
-                // Sentence case by construction: the `button` role carries no
-                // `textTransform`, so accessible names stay the product string.
-                style={{
-                  ...metrics.label,
-                  color: labelColor,
-                  textAlign: 'center',
-                }}
-                numberOfLines={1}
-              >
-                {label}
-              </Text>
-            </>
-          )}
-        </Pressable>
-      </Animated.View>
+              numberOfLines={1}
+            >
+              {label}
+            </Text>
+          </>
+        )}
+      </Pressable3D>
     </View>
   );
 }
