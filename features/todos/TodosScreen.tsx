@@ -29,6 +29,7 @@ import { TodoEmptyStateScroll } from './TodoEmptyStateScroll';
 import { TextField } from '@/core/ui/TextField';
 import { Button } from '@/core/ui/Button';
 import { PillChip } from '@/core/ui/PillChip';
+import { Sprout } from '@/core/ui/illustrations/Sprout';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useMotionDuration, useReducedMotion } from '@/core/theme/motion';
@@ -921,7 +922,8 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
       accentColor={todosAccent}
       className="mb-0"
       title="No pending tasks"
-      description="Use quick add above to capture something new."
+      description="Nothing on your plate. Enjoy it!"
+      illustration={<Sprout pose="nap" size={120} />}
     >
       <Button label="Add your first task" icon="add" onPress={openNewTodoModal} />
     </EmptyStateCard>
@@ -1108,6 +1110,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                         className="mb-0"
                         title="No matching tasks"
                         description="Try a different search or reset the filters."
+                        illustration={<Sprout pose="think" size={120} />}
                       />
                     }
                     renderSectionHeader={({ section }) =>
