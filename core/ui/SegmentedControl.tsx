@@ -68,7 +68,7 @@ function SegmentOptionButton<T extends string>({
     >
       <Text
         variant="label"
-        style={{ color: active ? tokens.onSolid : tokens.textMuted, fontSize: 13 }}
+        style={{ color: active ? tokens.onSolid : tokens.textMuted }}
         numberOfLines={1}
       >
         {option.label}

@@ -63,37 +63,119 @@ export const fonts = {
 export type FontFamilyRole = keyof typeof fonts;
 
 /**
- * Semantic typography roles. `fontWeight` is retained for call sites that read
- * it directly, but rendering is driven by `fontFamily`.
+ * Semantic typography roles — the v2 "Playful Momentum" type scale
+ * (docs/ui-ux/16-playful-momentum.md §5.5). Nunito stays the only family
+ * (§5.5 decision: no new dependency); fun comes from weight and size
+ * discipline, not more faces.
  *
- * V3 weight ladder (docs/ui-ux/13 §5): 800/900 are celebration-scale only;
- * titles are 700; body/labels 600. Heavy weights must stay rare enough to
- * create hierarchy.
+ * `fontWeight` is retained for call sites that read it directly, but rendering
+ * is driven by `fontFamily` (RN does not synthesise weights for a custom
+ * family). Weight ladder, per §5.5:
+ *
+ * - 900 (`display`) — celebration numbers only (streak 30, Level 4).
+ * - 800 — headings, buttons, metric numbers.
+ * - 700 — chips, tabs, badges, `label`.
+ * - 600 — body copy.
+ * - 400 — banned: it reads thin next to 800 and destroys the hierarchy.
+ *
+ * Every role carries its own `lineHeight` so vertical rhythm is a token, not a
+ * per-call-site accident (`size / line` in the §5.5 table).
  */
 export const typography = {
-  /** Celebratory values and hero numbers (level up, streak record). */
-  display: { fontSize: 34, fontFamily: fonts.bold, fontWeight: '800', letterSpacing: -0.6 },
-  /** Rare emphasis title (empty-state art headers). */
-  titleXl: { fontSize: 26, fontFamily: fonts.bold, fontWeight: '800', letterSpacing: -0.3 },
-  /** Screen title. */
-  titleLg: { fontSize: 22, fontFamily: fonts.semibold, fontWeight: '700', letterSpacing: -0.3 },
-  /** Card / sheet title. */
-  titleMd: { fontSize: 17, fontFamily: fonts.semibold, fontWeight: '700', letterSpacing: -0.2 },
-  /** Primary reading text. */
-  bodyLg: { fontSize: 16, fontFamily: fonts.medium, fontWeight: '600' },
-  /** Standard rows and descriptions. */
-  bodyMd: { fontSize: 15, fontFamily: fonts.medium, fontWeight: '600' },
-  /** Controls, chips, metadata labels. */
-  label: { fontSize: 13, fontFamily: fonts.medium, fontWeight: '600', letterSpacing: 0.1 },
-  /** Secondary metadata. */
-  caption: { fontSize: 12, fontFamily: fonts.medium, fontWeight: '600' },
-  /** Key number/value (timer, totals, kcal). Tabular to avoid jitter. */
+  /** Celebration number (streak 30, Level 4). 900, reserved for rewards. */
+  display: {
+    fontSize: 40,
+    lineHeight: 44,
+    fontFamily: fonts.black,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+  },
+  /** Idle-timer scale hero number (56/60). Tabular so the digits do not jitter. */
+  metricLg: {
+    fontSize: 56,
+    lineHeight: 60,
+    fontFamily: fonts.bold,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    fontVariant: ['tabular-nums'],
+  },
+  /** Key number/value (kcal left, timer, totals). Tabular to avoid jitter. */
   metric: {
     fontSize: 30,
+    lineHeight: 36,
     fontFamily: fonts.bold,
     fontWeight: '800',
     letterSpacing: -0.3,
     fontVariant: ['tabular-nums'],
+  },
+  /** Hero titles, empty-state headline. */
+  titleXl: {
+    fontSize: 28,
+    lineHeight: 34,
+    fontFamily: fonts.bold,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  /** Screen title. */
+  titleLg: {
+    fontSize: 24,
+    lineHeight: 30,
+    fontFamily: fonts.bold,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  /** Card, sheet and group titles. */
+  titleMd: {
+    fontSize: 18,
+    lineHeight: 24,
+    fontFamily: fonts.bold,
+    fontWeight: '800',
+    letterSpacing: 0,
+  },
+  /** Inputs and primary reading text. */
+  bodyLg: {
+    fontSize: 17,
+    lineHeight: 24,
+    fontFamily: fonts.medium,
+    fontWeight: '600',
+    letterSpacing: 0,
+  },
+  /** Rows and descriptions (row titles may set 700 locally). */
+  bodyMd: {
+    fontSize: 15,
+    lineHeight: 22,
+    fontFamily: fonts.medium,
+    fontWeight: '600',
+    letterSpacing: 0,
+  },
+  /**
+   * Button label. Sentence case — never a CSS `uppercase` transform, so
+   * accessible names and asserted copy stay identical (§5.5). Large buttons
+   * step to 17 (see `core/ui/Button.tsx`).
+   */
+  button: {
+    fontSize: 16,
+    lineHeight: 20,
+    fontFamily: fonts.bold,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+    textTransform: 'none',
+  },
+  /** Controls, chips, tabs (12/16), badges. */
+  label: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: fonts.semibold,
+    fontWeight: '700',
+    letterSpacing: 0.1,
+  },
+  /** Secondary metadata. */
+  caption: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: fonts.medium,
+    fontWeight: '600',
+    letterSpacing: 0,
   },
 } as const;
 

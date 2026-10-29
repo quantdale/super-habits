@@ -2,6 +2,7 @@ import { Text } from '@/core/ui/Text';
 import { MaterialIcons } from '@expo/vector-icons';
 import { View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { spacing } from '@/core/theme/designTokens';
 import { Card } from './Card';
 
 type FeatureStatCardProps = {
@@ -39,23 +40,20 @@ export function FeatureStatCard({
               <MaterialIcons name={icon} size={22} color={textColor} />
             </View>
             <View className="min-w-0 flex-1">
-              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+              <Text variant="bodyMd" style={{ color: tokens.text }}>
                 {title}
               </Text>
-              <Text className="mt-0.5 text-xs" style={{ color: tokens.textMuted }}>
+              <Text variant="caption" tone="muted" style={{ marginTop: spacing.xs / 2 }}>
                 {subtitle}
               </Text>
             </View>
           </View>
 
-          <Text
-            className="mt-4 text-3xl font-bold tabular-nums tracking-tight"
-            style={{ color: tokens.text }}
-          >
+          <Text variant="metric" style={{ color: tokens.text, marginTop: spacing.lg }}>
             {value}
           </Text>
           {note ? (
-            <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+            <Text variant="bodyMd" tone="muted" style={{ marginTop: spacing.xs }}>
               {note}
             </Text>
           ) : null}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ActivityIndicator, Animated, Pressable, View } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, View, type TextStyle } from 'react-native';
 import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useReducedMotion } from '@/core/theme/motion';
@@ -46,11 +46,26 @@ function shade(color: string, amount: number): string {
   return `#${channel(1)}${channel(3)}${channel(5)}`;
 }
 
-const SIZES: Record<ButtonSize, { height: number; padding: number; fontSize: number }> = {
-  sm: { height: 36, padding: spacing.md, fontSize: 13 },
-  md: { height: size.buttonHeight, padding: spacing.lg, fontSize: 15 },
-  lg: { height: size.buttonHeightLg, padding: spacing.xl, fontSize: 16 },
+/**
+ * Size → geometry plus the type role that paints the label (§5.5/§6). The
+ * compact face uses the `label` role; `md`/`lg` use the `button` role, with
+ * `lg` one step up ("16/20 (lg 17)") rather than a second hand-picked size.
+ */
+const SIZES: Record<ButtonSize, { height: number; padding: number; label: TextStyle }> = {
+  sm: { height: 36, padding: spacing.md, label: typography.label },
+  md: { height: size.buttonHeight, padding: spacing.lg, label: typography.button },
+  lg: {
+    height: size.buttonHeightLg,
+    padding: spacing.xl,
+    label: { ...typography.button, fontSize: typography.button.fontSize + 1 },
+  },
 };
+
+/** Leading icon size for a button label: a step above the text, per §6 ("icon 20"). */
+function iconSizeFor(label: TextStyle): number {
+  const fontSize = typeof label.fontSize === 'number' ? label.fontSize : 16;
+  return Math.round(fontSize) + 4;
+}
 
 /**
  * Minimum logical-point interactive target (WCAG/HIG): a control's touch area
@@ -211,13 +226,13 @@ export function Button({
           ) : (
             <>
               {icon ? (
-                <MaterialIcons name={icon} size={metrics.fontSize + 4} color={labelColor} />
+                <MaterialIcons name={icon} size={iconSizeFor(metrics.label)} color={labelColor} />
               ) : null}
               <Text
+                // Sentence case by construction: the `button` role carries no
+                // `textTransform`, so accessible names stay the product string.
                 style={{
-                  ...typography.label,
-                  fontSize: metrics.fontSize,
-                  fontFamily: typography.label.fontFamily,
+                  ...metrics.label,
                   color: labelColor,
                   textAlign: 'center',
                 }}

@@ -61,9 +61,8 @@ export function BootSplash() {
       }}
     >
       <View style={{ alignItems: 'center', gap: spacing.xs }}>
-        <Text variant="titleLg" style={{ fontSize: 34, letterSpacing: -0.8 }}>
-          super-habits
-        </Text>
+        {/* Brand wordmark: celebration-scale display role (§5.5), never a raw size. */}
+        <Text variant="display">super-habits</Text>
         <Text variant="label" tone="muted">
           TODAY · HABITS · FOCUS · TRAIN · FOOD
         </Text>

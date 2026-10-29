@@ -2,6 +2,7 @@ import { Text } from '@/core/ui/Text';
 import React from 'react';
 import { View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { typography } from '@/core/theme/designTokens';
 
 type Props = {
   message: string | null;
@@ -27,8 +28,11 @@ export function ValidationError({ message }: Props) {
         gap: 6,
       }}
     >
-      <Text style={{ fontSize: 14 }}>⚠️</Text>
-      <Text style={{ fontSize: 13, color: tokens.dangerText, flex: 1 }}>{message}</Text>
+      {/* Decorative glyph: `label` scale, no product text. */}
+      <Text style={{ ...typography.label }}>⚠️</Text>
+      <Text variant="bodyMd" style={{ color: tokens.dangerText, flex: 1 }}>
+        {message}
+      </Text>
     </View>
   );
 }

@@ -110,7 +110,7 @@ export function useConfirmationDialog() {
       onClose={() => resolvePendingConfirmation(false)}
       title={pendingConfirmation?.title}
     >
-      <Text className="text-sm" style={{ color: tokens.textMuted }}>
+      <Text variant="bodyLg" style={{ color: tokens.textMuted }}>
         {pendingConfirmation?.message}
       </Text>
       <View className="mt-4 flex-row flex-wrap justify-end gap-2">
