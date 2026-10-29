@@ -251,6 +251,27 @@ test.describe('Calories', () => {
     expect(rows).toEqual([{ calories: 200, meal_type: 'lunch' }]);
   });
 
+  test('re-logging a kcal-only frequent food keeps its kcal', async ({ page }) => {
+    // Quick add stores a kcal-only entry (all macros 0) and skips saved-meal
+    // maintenance — but it still becomes a "Frequent" chip. Tapping that chip
+    // used to prefill a macro-derived 0 kcal and block Add with "Enter macro
+    // amounts…", so the advertised one-tap re-log was a dead end. The same
+    // prefill path serves kcal-only saved meals (quick capture / commands).
+    await page.getByLabel('Quick add 200 kilocalories').click();
+    await expect(page.getByText('1,800 kcal left')).toBeVisible({ timeout: 15_000 });
+
+    await page.getByLabel('Log Quick add, logged 1 times recently').click();
+    await clickCaloriesAddEntry(page);
+    await expect(page.getByText('1,600 kcal left')).toBeVisible({ timeout: 15_000 });
+
+    // Row oracle (page-destroying query, so last): both rows keep 200 kcal.
+    const rows = await queryRows(
+      page,
+      `SELECT calories FROM calorie_entries WHERE food_name = 'Quick add' AND deleted_at IS NULL ORDER BY created_at`,
+    );
+    expect(rows).toEqual([{ calories: 200 }, { calories: 200 }]);
+  });
+
   test('macro targets modal rejects empty fields instead of saving zero', async ({ page }) => {
     // `Number('') === 0` used to pass the non-negative check, so clearing a
     // field silently saved 0 and hid that macro bar (`buildTargetProgress`
