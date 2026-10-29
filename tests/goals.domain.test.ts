@@ -53,7 +53,7 @@ describe('computeGoalRollup', () => {
   it('returns empty when no linked entities', () => {
     const r = computeGoalRollup({
       todos: { total: 0, done: 0 },
-      habits: { habitCount: 0, completionsInWindow: 0, windowDays: 30 },
+      habits: { habitCount: 0, completionsInWindow: 0, expectedOccurrences: 0 },
     });
     expect(r.isEmpty).toBe(true);
     expect(r.suggestedPercent).toBe(0);
@@ -62,7 +62,7 @@ describe('computeGoalRollup', () => {
   it('computes linked-todo done/total ratio', () => {
     const r = computeGoalRollup({
       todos: { total: 4, done: 3 },
-      habits: { habitCount: 0, completionsInWindow: 0, windowDays: 30 },
+      habits: { habitCount: 0, completionsInWindow: 0, expectedOccurrences: 0 },
     });
     expect(r.todoRatio).toBeCloseTo(0.75);
     expect(r.suggestedPercent).toBe(75);
@@ -71,13 +71,13 @@ describe('computeGoalRollup', () => {
   it('computes habit consistency capped at 1', () => {
     const over = computeGoalRollup({
       todos: { total: 0, done: 0 },
-      habits: { habitCount: 1, completionsInWindow: 50, windowDays: 30 },
+      habits: { habitCount: 1, completionsInWindow: 50, expectedOccurrences: 30 },
     });
     expect(over.habitConsistency).toBe(1);
 
     const half = computeGoalRollup({
       todos: { total: 0, done: 0 },
-      habits: { habitCount: 2, completionsInWindow: 30, windowDays: 30 },
+      habits: { habitCount: 2, completionsInWindow: 30, expectedOccurrences: 60 },
     });
     expect(half.habitConsistency).toBeCloseTo(0.5);
     expect(half.suggestedPercent).toBe(50);
@@ -86,7 +86,7 @@ describe('computeGoalRollup', () => {
   it('blends todo ratio and habit consistency evenly', () => {
     const r = computeGoalRollup({
       todos: { total: 2, done: 1 }, // 0.5
-      habits: { habitCount: 1, completionsInWindow: 15, windowDays: 30 }, // 0.5
+      habits: { habitCount: 1, completionsInWindow: 15, expectedOccurrences: 30 }, // 0.5
     });
     expect(r.suggestedPercent).toBe(50);
   });

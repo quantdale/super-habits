@@ -106,7 +106,7 @@ describe('day-window reads at a DST boundary (forced America/New_York)', () => {
     ]);
 
     const rollup = await goals.getGoalRollup(goalId);
-    expect(rollup.habits.windowDays).toBe(30);
+    expect(rollup.habits.expectedOccurrences).toBe(1); // habit created today: one eligible day, not 30 calendar days
     expect(rollup.habits.completionsInWindow).toBe(1);
   });
 
@@ -125,7 +125,7 @@ describe('day-window reads at a DST boundary (forced America/New_York)', () => {
     ]);
 
     const rollup = await goals.getGoalRollup(goalId);
-    expect(rollup.habits.windowDays).toBe(30);
+    expect(rollup.habits.expectedOccurrences).toBe(1); // habit created today: one eligible day, not 30 calendar days
     expect(rollup.habits.completionsInWindow).toBe(1);
   });
 

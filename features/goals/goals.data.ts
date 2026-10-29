@@ -2,7 +2,8 @@ import type * as SQLite from 'expo-sqlite';
 import { getDatabase } from '@/core/db/client';
 import { runBackupMutation } from '@/core/sync/syncedMutation';
 import { createId } from '@/lib/id';
-import { inclusiveWindowStartDateKey, nowIso } from '@/lib/time';
+import { inclusiveWindowStartDateKey, nowIso, toDateKey } from '@/lib/time';
+import { buildDayCompletions, habitCreationDateKey } from '@/features/habits/habits.domain';
 import {
   clampProgressPercent,
   GOAL_HORIZON_WINDOW_DAYS,
@@ -341,7 +342,7 @@ export async function applyRemoteGoals(
 
 export type GoalRollupData = {
   todos: { total: number; done: number };
-  habits: { habitCount: number; completionsInWindow: number; windowDays: number };
+  habits: { habitCount: number; completionsInWindow: number; expectedOccurrences: number };
 };
 
 /**
@@ -365,8 +366,15 @@ export async function getGoalRollup(goalId: string): Promise<GoalRollupData> {
      FROM todos WHERE goal_id = ? AND deleted_at IS NULL`,
     [goalId],
   );
-  const habitCountRow = await db.getFirstAsync<{ count: number }>(
-    `SELECT COUNT(*) AS count FROM habits WHERE goal_id = ? AND deleted_at IS NULL`,
+  const habitRows = await db.getAllAsync<{
+    id: string;
+    target_per_day: number;
+    rule_history: string | null;
+    created_at: string;
+    lifecycle_history: string | null;
+  }>(
+    `SELECT id, target_per_day, rule_history, created_at, lifecycle_history
+     FROM habits WHERE goal_id = ? AND deleted_at IS NULL`,
     [goalId],
   );
   const completionRow = await db.getFirstAsync<{ completions: number }>(
@@ -378,12 +386,33 @@ export async function getGoalRollup(goalId: string): Promise<GoalRollupData> {
     [goalId, windowStart],
   );
 
+  // Denominator = eligible scheduled occurrences in the window, resolved
+  // through the one habit engine: rest days, pre-creation days, and
+  // paused/archived intervals are neutral and never count as misses
+  // (habit-progress-insights spec: off-days do not contribute to a
+  // scheduled-rate denominator).
+  const todayKey = toDateKey(new Date(nowIso()));
+  let expectedOccurrences = 0;
+  for (const habit of habitRows) {
+    const days = buildDayCompletions(
+      [],
+      habit.target_per_day,
+      undefined,
+      habit.rule_history,
+      habitCreationDateKey(habit.created_at),
+      todayKey,
+      habit.lifecycle_history,
+      windowStart,
+    );
+    expectedOccurrences += days.filter((day) => day.eligible).length;
+  }
+
   return {
     todos: { total: todoRow?.total ?? 0, done: todoRow?.done ?? 0 },
     habits: {
-      habitCount: habitCountRow?.count ?? 0,
+      habitCount: habitRows.length,
       completionsInWindow: completionRow?.completions ?? 0,
-      windowDays: effectiveDays,
+      expectedOccurrences,
     },
   };
 }

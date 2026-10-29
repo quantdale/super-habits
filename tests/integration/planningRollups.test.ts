@@ -120,12 +120,12 @@ describe('goal rollups (F8 / task 11.1)', () => {
 
     const weekRollup = await goals.getGoalRollup(weekGoal);
     expect(weekRollup.todos).toEqual({ total: 2, done: 1 });
-    expect(weekRollup.habits.windowDays).toBe(7);
+    expect(weekRollup.habits.expectedOccurrences).toBe(0); // no habits linked to the week goal
     expect(weekRollup.habits.completionsInWindow).toBe(0); // habit belongs to the other goal
 
     const yearRollup = await goals.getGoalRollup(yearGoal);
     expect(yearRollup.todos.total).toBe(0);
-    expect(yearRollup.habits.windowDays).toBe(365);
+    expect(yearRollup.habits.expectedOccurrences).toBe(31); // rule effective TODAY-30, daily: 31 eligible days, not 365 calendar days
     expect(yearRollup.habits.completionsInWindow).toBe(2);
     expect(yearRollup.habits.habitCount).toBe(1);
   });
