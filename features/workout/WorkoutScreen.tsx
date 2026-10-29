@@ -365,6 +365,8 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const [bodyWeightUnit, setBodyWeightUnit] = useState<WorkoutWeightUnit>('kg');
   const [bodyWeightNote, setBodyWeightNote] = useState('');
   const [bodyWeightGoalValue, setBodyWeightGoalValue] = useState('');
+  // True once the user types in the goal field during this dialog session.
+  const [bodyWeightGoalEdited, setBodyWeightGoalEdited] = useState(false);
   const [workoutPreferences, setWorkoutPreferences] = useState<WorkoutPreferences | null>(null);
   useCommandLauncherSuppressed('workout-session-active', currentView.type === 'session');
   // At content-max widths the history/analytics stack composes into a
@@ -899,6 +901,10 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     setBodyWeightValue(entry ? String(entry.weight) : '');
     setBodyWeightUnit(entry?.unit ?? workoutPreferences?.goalWeight?.unit ?? 'kg');
     setBodyWeightNote(entry?.note ?? '');
+    setBodyWeightGoalValue(
+      workoutPreferences?.goalWeight ? String(workoutPreferences.goalWeight.value) : '',
+    );
+    setBodyWeightGoalEdited(false);
     setBodyWeightModalVisible(true);
   };
 
@@ -1290,9 +1296,10 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         <TextField
           label="Goal weight (optional)"
           value={bodyWeightGoalValue}
-          onChangeText={(value) =>
-            setBodyWeightGoalValue(sanitizeNumericInput(value, { allowDecimal: true }))
-          }
+          onChangeText={(value) => {
+            setBodyWeightGoalEdited(true);
+            setBodyWeightGoalValue(sanitizeNumericInput(value, { allowDecimal: true }));
+          }}
           placeholder="75.0"
           keyboardType="numeric"
         />
@@ -1337,11 +1344,12 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                 goalWeight:
                   bodyWeightGoalValue.trim() === ''
                     ? null
-                    : // An untouched goal keeps its stored value AND unit (the
-                      // kg/lb toggle belongs to the measurement; reusing it
-                      // reinterpreted a 75 kg goal as 75 lb). A changed or
-                      // new goal is entered in the currently selected unit.
-                      storedGoal && goal === storedGoal.value
+                    : // A goal the user did not touch in this dialog keeps its
+                      // stored value AND unit (the kg/lb toggle belongs to the
+                      // measurement; reusing it reinterpreted a 75 kg goal as
+                      // 75 lb). A goal typed here (even the same number, to
+                      // correct its unit) uses the currently selected unit.
+                      storedGoal && !bodyWeightGoalEdited
                       ? storedGoal
                       : { value: goal, unit: bodyWeightUnit },
               };

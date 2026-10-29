@@ -486,5 +486,17 @@ test.describe('Workout Gym V2', () => {
     await lbDialog.getByText('Save weight and goal', { exact: true }).click();
     await expect(page.getByText('176 lb', { exact: true })).toBeVisible();
     await expect(page.getByText('Goal · 75 kg', { exact: true })).toBeVisible();
+
+    // Re-typing the same number with the toggle on lb is an explicit unit
+    // correction: the goal becomes 75 lb.
+    await page.getByText('Log weight', { exact: true }).click();
+    const fixDialog = page.getByRole('dialog');
+    await fixDialog.getByText('lb', { exact: true }).click();
+    await fixDialog.getByRole('textbox', { name: 'Weight', exact: true }).fill('175');
+    const fixGoal = fixDialog.getByRole('textbox', { name: 'Goal weight (optional)' });
+    await fixGoal.fill('');
+    await fixGoal.fill('75');
+    await fixDialog.getByText('Save weight and goal', { exact: true }).click();
+    await expect(page.getByText('Goal · 75 lb', { exact: true })).toBeVisible();
   });
 });
