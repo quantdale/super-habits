@@ -127,11 +127,17 @@ export const SECTION_TEXT_COLORS = {
 /**
  * Dark-appearance text variants. On dark surfaces the §5.1 `bright` tier is
  * the readable colored text (the table's "bright on surface D" column, ≥5.3:1).
+ *
+ * Exception: Grape's bright `#A37BFF` clears 5.36:1 on the plain dark surface
+ * but only **4.06:1** on its own `tintDark` wash `#333051` — short of the 4.5
+ * text floor. Selected chips and rows paint the section tint (e.g. the
+ * FirstRunOnboardingCard Focus chip), so Focus uses a lifted Grape that reads
+ * 5.39:1 on `#333051` and stays visually identical at glyph size.
  */
 export const SECTION_TEXT_COLORS_DARK = {
   todos: SECTION_HUES.todos.bright,
   habits: SECTION_HUES.habits.bright,
-  focus: SECTION_HUES.focus.bright,
+  focus: '#B49BFF',
   workout: SECTION_HUES.workout.bright,
   calories: SECTION_HUES.calories.bright,
   health: SECTION_HUES.health.bright,
@@ -257,7 +263,7 @@ export function getSectionAccents(
     const hue = SECTION_HUES[key];
     result[key] =
       appearance === 'dark'
-        ? { fill: hue.bright, text: hue.bright, tint: hue.tintDark }
+        ? { fill: hue.bright, text: SECTION_TEXT_COLORS_DARK[key], tint: hue.tintDark }
         : { fill: hue.bright, text: hue.solid, tint: hue.tintLight };
   }
   return result;

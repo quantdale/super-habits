@@ -242,3 +242,57 @@ describe('§5.1 fill/label contrast (bright is never under white)', () => {
     }
   });
 });
+
+// Codex P2 on #139 (round 2): a section's colored TEXT must clear 4.5:1 on the
+// section's own TINT wash — that pair is what selected chips/rows paint. Grape
+// shipped 4.06:1 on its dark tint, so this now covers every section, both
+// appearances.
+describe('§5.1 section text on section tint (light + dark)', () => {
+  const SECTION_KEYS = Object.keys(SECTION_HUES) as (keyof typeof SECTION_HUES)[];
+
+  it('light: the solid text tone clears 4.5 on the tintLight wash', () => {
+    for (const key of SECTION_KEYS) {
+      const { solid, tintLight } = SECTION_HUES[key];
+      const ratio = contrastRatio(solid, tintLight);
+      expect(ratio, `${key}: solid on tintLight — ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(
+        4.5,
+      );
+    }
+  });
+
+  it('dark: the resolved dark text tone clears 4.5 on the tintDark wash', () => {
+    for (const key of SECTION_KEYS) {
+      const text = SECTION_TEXT_COLORS_DARK[key];
+      const { tintDark } = SECTION_HUES[key];
+      const ratio = contrastRatio(text, tintDark);
+      expect(ratio, `${key}: dark text on tintDark — ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(
+        4.5,
+      );
+    }
+  });
+
+  it('resolves those text tones through getSectionAccents for both appearances', () => {
+    for (const appearance of ['light', 'dark'] as const) {
+      const accents = getSectionAccents(appearance);
+      for (const key of SECTION_KEYS) {
+        const ratio = contrastRatio(accents[key].text, accents[key].tint);
+        expect(
+          ratio,
+          `${appearance} ${key}: resolved text on resolved tint — ${ratio.toFixed(2)}:1`,
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+});
+
+// Codex P2 on #139 (round 2): WeekStrip paints weekday initials on the reward
+// accent (Gold) supplied by GamificationCard / AchievementsScreen.
+describe('WeekStrip active-day initials', () => {
+  it('use ink, not white, on the reward accent face', () => {
+    const ink = contrastRatio(SECTION_ON_BRIGHT_INK, REWARD_COLORS.accent);
+    expect(ink, `ink on reward accent — ${ink.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5);
+    // The regression this pins: white on Gold is 1.55:1.
+    const white = contrastRatio('#FFFFFF', REWARD_COLORS.accent);
+    expect(white, `white on reward accent — ${white.toFixed(2)}:1`).toBeLessThan(4.5);
+  });
+});
