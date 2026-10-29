@@ -214,10 +214,10 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
     [editingId, items],
   );
   const isRecurringLinkedActionSource = editingTodo?.recurrence === 'daily' || isRecurring;
-  const overdueTasksCount = useMemo(() => {
-    const today = toDateKey();
-    return pendingTasks.filter((todo) => todo.due_date && todo.due_date < today).length;
-  }, [pendingTasks]);
+  const overdueTasksCount = useMemo(
+    () => pendingTasks.filter((todo) => todo.due_date && todo.due_date < todayKey).length,
+    [pendingTasks, todayKey],
+  );
   const dueTodayCount = useMemo(
     () => pendingTasks.filter((todo) => todo.due_date === todayKey).length,
     [pendingTasks, todayKey],
@@ -890,6 +890,9 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
         projectName={item.project_id ? (projectNameById.get(item.project_id) ?? null) : null}
       />
     );
+  // Cell rows are memoized on (item, extraData); "today"-derived row meta must
+  // re-render at local-midnight rollover even when no todo row changed.
+  const groupedExtraData = useMemo(() => ({ selectedIds, todayKey }), [selectedIds, todayKey]);
 
   const completedDisclosure = hasCompleted ? (
     <View className="flex-row py-2">
@@ -1087,7 +1090,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                     key={selectionMode ? 'selection' : queryActive ? 'query' : 'history'}
                     className="min-h-0 flex-1"
                     sections={listSections}
-                    extraData={selectedIds}
+                    extraData={groupedExtraData}
                     keyExtractor={todoKeyExtractor}
                     renderItem={renderGroupedTodoItem}
                     initialNumToRender={12}
@@ -1127,6 +1130,10 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                   />
                 ) : (
                   <DraggableFlatList
+                    // Rows render "today"-derived due meta; remount the list
+                    // when the local day changes so the meta cannot survive a
+                    // midnight rollover inside memoized rows.
+                    key={todayKey}
                     data={visiblePending}
                     keyExtractor={todoKeyExtractor}
                     containerStyle={{ flex: 1 }}
@@ -1140,6 +1147,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
                     ListEmptyComponent={<View className="mb-3">{noPendingTasksCard}</View>}
                     ListFooterComponent={completedDisclosure}
                     renderItem={renderTodoItem}
+                    extraData={todayKey}
                   />
                 )}
               </ScreenSection>
