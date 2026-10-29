@@ -225,6 +225,32 @@ test.describe('Calories', () => {
     expect(Number(rows[0]?.n)).toBe(1);
   });
 
+  test('editing a quick-add entry keeps its kcal', async ({ page }) => {
+    // A kcal-only "Quick add" entry stores its calories with all macros 0.
+    // Editing it (meal type here) must keep the stored kcal: the edit modal
+    // used to derive 0 kcal from the zero macros, block Save, and a direct
+    // update would have zeroed the calories.
+    await page.getByLabel('Quick add 200 kilocalories').click();
+    await expect(page.getByText('1,800 kcal left')).toBeVisible({ timeout: 15_000 });
+
+    await page.getByLabel('Edit Quick add').click();
+    const dialog = page.getByRole('dialog', { name: 'Edit entry' });
+    await expect(dialog).toBeVisible();
+    // The modal shows the stored kcal, not a macro-derived 0.
+    await expect(dialog).toContainText('200');
+    await dialog.getByRole('button', { name: 'Lunch' }).click();
+    await dialog.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByRole('dialog', { name: 'Edit entry' })).toHaveCount(0);
+    await expect(page.getByText('1,800 kcal left')).toBeVisible({ timeout: 15_000 });
+
+    // Row oracle (page-destroying query, so last): kcal kept, meal moved.
+    const rows = await queryRows(
+      page,
+      `SELECT calories, meal_type FROM calorie_entries WHERE food_name = 'Quick add' AND deleted_at IS NULL`,
+    );
+    expect(rows).toEqual([{ calories: 200, meal_type: 'lunch' }]);
+  });
+
   test('macro targets modal rejects empty fields instead of saving zero', async ({ page }) => {
     // `Number('') === 0` used to pass the non-negative check, so clearing a
     // field silently saved 0 and hid that macro bar (`buildTargetProgress`

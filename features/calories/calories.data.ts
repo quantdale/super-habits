@@ -253,13 +253,26 @@ export async function updateCalorieEntry(
      * days self-correct from `consumed_on` at query time.
      */
     consumedOn?: string;
+    /**
+     * Explicit kcal for kcal-only edits: a "Quick add" entry stores its
+     * calories directly (no macro derivation), so when every macro is 0 the
+     * stored value is kept instead of recomputing 0. Any non-zero macro
+     * recomputes kcal as usual and ignores this value.
+     */
+    calories?: number;
   },
 ): Promise<'updated' | 'not_found'> {
   if (updates.consumedOn !== undefined) {
     assertConsumableDateKey(updates.consumedOn);
   }
-  const calories = kcalFromMacros(updates.protein, updates.carbs, updates.fats, updates.fiber);
-  // Same write contract as the add path (kcal is recomputed from macros here).
+  const macrosAllZero =
+    updates.protein === 0 && updates.carbs === 0 && updates.fats === 0 && updates.fiber === 0;
+  const calories =
+    macrosAllZero && updates.calories !== undefined
+      ? updates.calories
+      : kcalFromMacros(updates.protein, updates.carbs, updates.fats, updates.fiber);
+  // Same write contract as the add path (kcal is recomputed from macros,
+  // except for a kcal-only edit which keeps its explicit stored calories).
   assertCalorieEntryWrite({
     foodName: updates.foodName,
     protein: updates.protein,
