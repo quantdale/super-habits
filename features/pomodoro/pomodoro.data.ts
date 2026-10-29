@@ -71,6 +71,13 @@ async function insertPomodoroSessionRecord(input: {
   durationSeconds: number;
   type: PomodoroMode;
   meta?: PomodoroSessionMetaInput;
+  /**
+   * Completion-path inserts also dedupe on session identity (exact
+   * `started_at`): the crash-reconciliation insert and the pending-log retry
+   * both recover the same finished session under different row ids, so
+   * without this the retry replays a row reconciliation already logged.
+   */
+  dedupeByStartedAt?: boolean;
 }): Promise<{
   id: string;
   sessionType: PomodoroSession['session_type'];
@@ -91,8 +98,8 @@ async function insertPomodoroSessionRecord(input: {
       >(
         `SELECT id, session_type
          FROM pomodoro_sessions
-         WHERE id = ?`,
-        [input.id],
+         WHERE id = ?${input.dedupeByStartedAt ? ' OR started_at = ?' : ''}`,
+        input.dedupeByStartedAt ? [input.id, input.startedAtIso] : [input.id],
       );
 
       if (existing) {
@@ -213,7 +220,10 @@ export async function logPomodoroSession(
  * Completion-path insert used by the timer screen and crash reconciliation.
  * Accepts an explicit id (minted here when absent) so a retried or replayed
  * completion — pending-log retry, double-fired handler — dedupes by id
- * instead of inserting a second row for the same focus.
+ * instead of inserting a second row for the same focus. It also dedupes by
+ * session identity (exact `started_at`), so the crash-reconciliation insert
+ * and the pending-log retry can never both log the same finished session
+ * under two different ids (double focus minutes, double reward XP).
  */
 export async function recordCompletedPomodoroSession(input: {
   id?: string;
@@ -231,6 +241,7 @@ export async function recordCompletedPomodoroSession(input: {
     durationSeconds: input.durationSeconds,
     type: input.type,
     meta: input.meta,
+    dedupeByStartedAt: true,
   });
   return { id: record.id, inserted: record.inserted };
 }
@@ -631,6 +642,10 @@ async function retryPendingPomodoroLogsInner(): Promise<PendingLogRetryResult> {
         durationSeconds: entry.durationSeconds,
         type: entry.type,
         meta: entry.meta ?? undefined,
+        // The same finished session may already have been recovered by crash
+        // reconciliation under a different row id; identity dedupe drops the
+        // replay instead of double-logging it.
+        dedupeByStartedAt: true,
       });
       succeededIds.add(entry.id);
     } catch {
