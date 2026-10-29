@@ -3,7 +3,7 @@ import { Animated, Pressable } from 'react-native';
 import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { radius, spacing, springs, typography } from '@/core/theme/designTokens';
-import { readableSurface } from '@/core/theme/contrast';
+import { readableAccent, tintOver } from '@/core/theme/contrast';
 import { useReducedMotion } from '@/core/theme/motion';
 
 type Props = {
@@ -15,19 +15,25 @@ type Props = {
   icon?: string; // optional emoji or text prefix
 };
 
+export type ChipProps = Props;
+
 /**
- * Chip: a compact pill that fills with its accent when selected and settles
- * quickly under the finger. Used for filters, time-of-day pickers, quick
- * presets, and food quick-log chips. V3 quiets the inactive state (neutral
- * surface, hairline border, muted ink) so a row of inactive chips stops
- * competing with content.
+ * Chip — the v2 compact pill (Playful Momentum §6): radius full, 2px border,
+ * `label` type; selected = section tint face + section solid border/text so a
+ * selected chip reads as "chosen", not "filled". Inactive = neutral
+ * `chipBackground`/`chipBorder` so a row of inactive chips stops competing
+ * with content.
+ *
+ * The visible face stays at the W4.5 touch-contract 40pt minimum (the §6
+ * 32px pill cannot shrink below the repo's 44pt hit contract without slop
+ * games on web, where `hitSlop` does not expand the DOM hit box).
  *
  * Chips hug their content and never exceed their container width: inside a
  * wrapping row a long label wraps instead of overflowing or truncating
  * (SYS-18), and inside a horizontal scroller the natural width is preserved.
  */
-export function PillChip({ label, accessibilityLabel, active, color, onPress, icon }: Props) {
-  const { tokens } = useAppTheme();
+export function Chip({ label, accessibilityLabel, active, color, onPress, icon }: Props) {
+  const { tokens, resolvedTheme } = useAppTheme();
   const reducedMotion = useReducedMotion();
   const [scale] = useState(() => new Animated.Value(1));
 
@@ -38,6 +44,12 @@ export function PillChip({ label, accessibilityLabel, active, color, onPress, ic
     }
     Animated.spring(scale, { toValue, useNativeDriver: true, ...springs.press }).start();
   };
+
+  // §5.1 tint: the hue mixed 14% into white (light) / 18% into the dark card
+  // face; the selected label is the solid, contrast-guaranteed on that tint.
+  const tintBase = resolvedTheme === 'dark' ? '#1A1F2B' : '#FFFFFF';
+  const activeBackground = tintOver(tintBase, color, resolvedTheme === 'dark' ? 0.18 : 0.14);
+  const activeInk = readableAccent(color, activeBackground);
 
   return (
     <Animated.View
@@ -65,7 +77,7 @@ export function PillChip({ label, accessibilityLabel, active, color, onPress, ic
         hitSlop={{ top: 2, bottom: 2 }}
         style={{
           borderRadius: radius.full,
-          borderWidth: 1,
+          borderWidth: 2,
           paddingHorizontal: spacing.md + 2,
           paddingVertical: spacing.xs + 2,
           minHeight: 40,
@@ -74,19 +86,22 @@ export function PillChip({ label, accessibilityLabel, active, color, onPress, ic
           alignItems: 'center',
           justifyContent: 'center',
           gap: spacing.xs,
-          backgroundColor: active ? readableSurface(color, tokens.onSolid) : tokens.surface,
-          borderColor: active ? readableSurface(color, tokens.onSolid) : tokens.border,
+          backgroundColor: active ? activeBackground : tokens.chipBackground,
+          borderColor: active ? color : tokens.chipBorder,
         }}
       >
         {icon ? (
-          <Text style={{ ...typography.label, color: active ? tokens.onSolid : tokens.textMuted }}>
+          <Text style={{ ...typography.label, color: active ? activeInk : tokens.textMuted }}>
             {icon}
           </Text>
         ) : null}
-        <Text variant="label" style={{ color: active ? tokens.onSolid : tokens.text }}>
+        <Text variant="label" style={{ color: active ? activeInk : tokens.text }}>
           {label}
         </Text>
       </Pressable>
     </Animated.View>
   );
 }
+
+/** Back-compat alias: callers keep importing `PillChip` unchanged. */
+export const PillChip = Chip;

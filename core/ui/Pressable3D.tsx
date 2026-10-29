@@ -58,6 +58,8 @@ export type Pressable3DProps = {
   accessibilityRole?: AccessibilityRole;
   accessibilityLabel?: string;
   accessibilityState?: AccessibilityState;
+  /** DOM-checked semantics for web AT (this RN-web does not map `accessibilityState`). */
+  'aria-checked'?: boolean;
 };
 
 export function Pressable3D({
@@ -77,6 +79,7 @@ export function Pressable3D({
   accessibilityRole,
   accessibilityLabel,
   accessibilityState,
+  'aria-checked': ariaChecked,
 }: Pressable3DProps) {
   const { tokens } = useAppTheme();
   const focusRing = useKeyboardFocusRing(tokens.accent);
@@ -101,6 +104,7 @@ export function Pressable3D({
           accessibilityRole={accessibilityRole}
           accessibilityLabel={accessibilityLabel}
           accessibilityState={accessibilityState}
+          aria-checked={ariaChecked}
           onFocus={focusRing.onFocus}
           onBlur={focusRing.onBlur}
           className={className}
