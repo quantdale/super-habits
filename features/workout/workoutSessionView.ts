@@ -190,9 +190,6 @@ export function appendAddedSets(
     const added = Array.from({ length: count }, (_, offset) => ({
       ...template,
       set_number: template.set_number + 1 + offset,
-      // The new final set runs back-to-back like every exercise-final set;
-      // inherited rest keeps the added sets paced like the prescription.
-      rest_seconds: offset === count - 1 ? 0 : template.rest_seconds,
     }));
     return { ...exercise, sets: [...exercise.sets, ...added] };
   });
