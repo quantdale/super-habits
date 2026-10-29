@@ -27,6 +27,7 @@ import {
   TodayIcon,
   TodosIcon,
   WorkoutIcon,
+  heroIconMonochromeTones,
   type HeroIconProps,
 } from '@/core/ui/illustrations/icons';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
@@ -160,6 +161,9 @@ function TabButton({
   const hue = item.hue;
   const tint = isDark ? hue.tintDark : hue.tintLight;
   const ink = isDark ? hue.bright : hue.solid;
+  // r2 defect fix: the inactive icon keeps its duotone detail in two distinct
+  // muted tones (never one flat silhouette); both stay >= 3:1 vs the tile.
+  const monochrome = heroIconMonochromeTones(tokens.textMuted, tokens.iconMuted);
   const focusRing = useKeyboardFocusRing(tokens.accent);
   const isRail = layoutRole !== 'bar';
   const isWide = layoutRole === 'rail-wide';
@@ -264,8 +268,8 @@ function TabButton({
       ) : null}
       <HeroIcon
         size={28}
-        bright={isFocused ? hue.bright : tokens.iconMuted}
-        lip={isFocused ? hue.lip : tokens.iconMuted}
+        bright={isFocused ? hue.bright : monochrome.bright}
+        lip={isFocused ? hue.lip : monochrome.lip}
       />
       <Text
         variant="caption"
