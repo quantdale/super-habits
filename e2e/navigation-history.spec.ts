@@ -14,6 +14,55 @@ async function expectActive(page: import('@playwright/test').Page, label: string
   await expect(sectionTab(page, label)).toHaveAttribute('aria-selected', 'true');
 }
 
+/**
+ * The Health section panel oracle: Health is a valid AppSection (deep links,
+ * linked actions, command routing) without a rail destination, so its active
+ * state is read from the panel's `aria-hidden` rather than a rail tab.
+ * React Native Web renders `aria-hidden="true"` for inactive panels and drops
+ * the attribute entirely when the panel is active (probe-verified), so active
+ * asserts the attribute is NOT "true".
+ */
+const HEALTH_PANEL = (page: import('@playwright/test').Page) =>
+  page.locator('#sh-section-panel-health');
+const OVERVIEW_PANEL = (page: import('@playwright/test').Page) =>
+  page.locator('#sh-section-panel-overview');
+
+async function expectHealthActive(page: import('@playwright/test').Page) {
+  await expect(HEALTH_PANEL(page)).not.toHaveAttribute('aria-hidden', 'true');
+  await expect(OVERVIEW_PANEL(page)).toHaveAttribute('aria-hidden', 'true');
+}
+
+test.describe('Deep-linked section hashes', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+  });
+
+  test('direct load of /#health adopts the Health section and keeps the hash', async ({ page }) => {
+    await page.goto('/#health', { waitUntil: 'domcontentloaded' });
+    await BAR(page).waitFor({ state: 'visible', timeout: 20_000 });
+    await expectHealthActive(page);
+    // expo-router history re-syncs run after the shell settles; the stamped
+    // hash must survive them and the section must not fall back to overview.
+    await page.waitForTimeout(800);
+    expect(await page.evaluate(() => window.location.hash)).toBe('#health');
+    await expectHealthActive(page);
+  });
+
+  test('back returns to a deep-linked non-rail section', async ({ page }) => {
+    await page.goto('/#health', { waitUntil: 'domcontentloaded' });
+    await BAR(page).waitFor({ state: 'visible', timeout: 20_000 });
+    await expectHealthActive(page);
+
+    await sectionTab(page, TAB_LABELS.habits).click();
+    await expectActive(page, TAB_LABELS.habits);
+
+    await page.goBack();
+    await expect(BAR(page)).toBeVisible();
+    await expectHealthActive(page);
+    expect(await page.evaluate(() => window.location.hash)).toBe('#health');
+  });
+});
+
 test.describe('Browser back/forward between sections', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -37,14 +86,12 @@ test.describe('Browser back/forward between sections', () => {
     await expectActive(page, TAB_LABELS.overview);
   });
 
-  // FIXME(bughunt16): blocked by a browser/expo-router race, not a product defect.
-  // On Forward the browser fires popstate ONCE with a TRANSIENT empty hash and
-  // expo-router then settles the location to `#section` without firing
-  // popstate or hashchange, so the section cannot be adopted from an event.
-  // The URL is correct (`#habits`) while the tab shows Today. Back and reload
-  // are covered and green above; the writer-ownership half of this lane is
-  // fixed and pinned by tests/dbOwnership.test.ts.
-  test.fixme('forward re-enters the newer section', async ({ page }) => {
+  // Forward navigation history: popstate fires ONCE with a TRANSIENT empty
+  // hash and expo-router settles the location to `#section` without firing a
+  // second event. NavigationProvider's bounded recheck schedule
+  // (POPSTATE_RECHECK_MS) re-reads the URL after the settle and adopts the
+  // stamped section; this test pins that recovery.
+  test('forward re-enters the newer section', async ({ page }) => {
     await sectionTab(page, TAB_LABELS.habits).click();
     await expectActive(page, TAB_LABELS.habits);
 

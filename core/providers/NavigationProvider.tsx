@@ -27,20 +27,24 @@ const KNOWN_SECTIONS: readonly string[] = [
  * transient state (the shell may also remount, cancelling a timer in effect
  * cleanup — later attempts run from the new provider instance). The section is
  * adopted from the first attempt that reads a stamp; 'overview' is only
- * applied once every attempt has failed.
+ * applied once every attempt has failed. The tail runs past 400ms because the
+ * settled hash can arrive late (a shell remount between the transient strip
+ * and the settle was probe-observed ~45ms out; slower machines need headroom).
  */
-const POPSTATE_RECHECK_MS = [40, 120, 260, 420];
+const POPSTATE_RECHECK_MS = [40, 120, 260, 420, 800, 1400];
 
 /**
  * The live section applier for background history rechecks.
  *
  * The rechecks must OUTLIVE a provider remount: a shell-resetting history
- * transition unmounts and remounts this provider, whose effect cleanup would
- * otherwise cancel every pending recheck exactly when the URL is about to
- * settle. Timers therefore live at module scope and act through this ref; a
- * null ref (nothing mounted) simply makes them no-ops.
+ * transition unmounts and remounts this provider, whose effect cleanup must
+ * NOT cancel every pending recheck exactly when the URL is about to settle.
+ * Timers therefore live at module scope, are never cancelled by unmount
+ * (only by the next popstate or by a successful adoption), and act through
+ * this ref; a null ref (nothing mounted) simply makes them no-ops.
  */
 let applySectionFromHistory: ((section: AppSection) => void) | null = null;
+let readActiveSectionFromHistory: (() => AppSection) | null = null;
 let popStateRecheckTimers: ReturnType<typeof setTimeout>[] = [];
 
 function clearPopStateRechecks(): void {
@@ -49,24 +53,43 @@ function clearPopStateRechecks(): void {
 }
 
 /**
- * Read the destination section after a popstate, retrying on a bounded
- * schedule. A forward navigation reports a TRANSIENT empty hash and never
- * fires a second event when the settled `#section` appears, so a single read
- * is not enough; 'overview' is applied only after every recheck has failed.
+ * Read the destination section after a popstate or an empty-hash mount,
+ * retrying on a bounded schedule. A forward navigation reports a TRANSIENT
+ * empty hash and never fires a second event when the settled `#section`
+ * appears, and the shell remount mid-transition can even miss the popstate
+ * entirely, so a single read is not enough. A stamp that differs from the
+ * active section is adopted immediately; one that matches keeps the remaining
+ * attempts alive (it may be this provider's own mount stamp racing a late
+ * settle). 'overview' is applied only when the schedule ends with NO stamp.
  */
 function scheduleHistorySectionAdoption(): void {
   clearPopStateRechecks();
+  const lastIndex = POPSTATE_RECHECK_MS.length - 1;
   popStateRecheckTimers = POPSTATE_RECHECK_MS.map((delay, index) =>
     setTimeout(() => {
       const apply = applySectionFromHistory;
-      if (!apply) return;
+      const readActive = readActiveSectionFromHistory;
+      if (!apply || !readActive) return;
       const stamped = readHistorySection();
       if (stamped) {
-        clearPopStateRechecks();
-        apply(stamped);
+        if (stamped !== readActive()) {
+          clearPopStateRechecks();
+          apply(stamped);
+        } else if (index === lastIndex) {
+          clearPopStateRechecks();
+        }
         return;
       }
-      if (index === POPSTATE_RECHECK_MS.length - 1) apply('overview');
+      if (index === lastIndex) {
+        clearPopStateRechecks();
+        apply('overview');
+        // Stamp the fallback entry too (same contract as the mount effect):
+        // a hash-less entry would make a later back/forward transition remount
+        // the bootstrap. replaceState keeps the entry count intact.
+        if (!readHistorySection()) {
+          window.history.replaceState(window.history.state, '', '#overview');
+        }
+      }
     }, delay),
   );
 }
@@ -174,16 +197,27 @@ export function NavigationProvider({ children }: PropsWithChildren) {
     // still holds). replaceState keeps the entry count intact.
     if (!readHistorySection()) {
       window.history.replaceState(window.history.state, '', `#${activeSectionRef.current}`);
+      // The empty hash may be TRANSIENT: a forward navigation and even a
+      // shell remount mid-transition land here between expo-router's hash
+      // strip and its settle — which fires no popstate the new instance could
+      // hear. Keep re-reading the URL so a settled `#section` still wins over
+      // the stamp written above.
+      scheduleHistorySectionAdoption();
     }
     // Browser back/forward restores the section stamped on the destination
     // entry. The read is deferred and retried (module-scoped so a provider
     // remount cannot cancel it — see scheduleHistorySectionAdoption).
     applySectionFromHistory = applySection;
+    const readActive = () => activeSectionRef.current;
+    readActiveSectionFromHistory = readActive;
     const handlePopState = () => scheduleHistorySectionAdoption();
     window.addEventListener('popstate', handlePopState);
     return () => {
       if (applySectionFromHistory === applySection) applySectionFromHistory = null;
-      clearPopStateRechecks();
+      if (readActiveSectionFromHistory === readActive) readActiveSectionFromHistory = null;
+      // Deliberately NOT clearPopStateRechecks(): a shell-resetting history
+      // transition remounts this provider mid-adoption, and cancelling here
+      // is exactly the bug the module-scope timers exist to survive.
       window.removeEventListener('popstate', handlePopState);
     };
   }, [applySection]);
