@@ -128,7 +128,13 @@ function parseCalorieEntry(input: ParseCommandInput): DraftLogCalorieEntry | nul
   }
 
   const calorieMatch = text.match(CALORIE_PATTERN);
-  const calories = calorieMatch ? Number(calorieMatch[1]) : null;
+  const matchedCalories = calorieMatch ? Number(calorieMatch[1]) : null;
+  // Calories are whole numbers by contract (command.validation +
+  // realCommandParser). A fractional amount must not surface as a ready
+  // draft whose Confirm is guaranteed to be rejected — fall through to the
+  // missing-calories prompt so the user can enter a whole number.
+  const calories =
+    matchedCalories !== null && Number.isInteger(matchedCalories) ? matchedCalories : null;
   const macros: Record<'protein' | 'carbs' | 'fats' | 'fiber', number | null> = {
     protein: null,
     carbs: null,
