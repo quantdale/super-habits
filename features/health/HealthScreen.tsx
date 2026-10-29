@@ -11,6 +11,7 @@ import { PageHeader } from '@/core/ui/PageHeader';
 import { listWorkoutLogsForRange } from '@/features/workout/workout.data';
 import { getCalorieGoal, listCalorieEntries } from '@/features/calories/calories.data';
 import { caloriesTotal } from '@/features/calories/calories.domain';
+import { kcalGoalDeltaLabel } from '@/features/health/health.domain';
 import { toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 
@@ -46,8 +47,6 @@ export function HealthScreen({ isActive }: { isActive: boolean }) {
   useActiveForegroundRefresh(isActive, refresh);
 
   const openSection = (section: AppSection) => navigation.setActiveSection(section);
-
-  const kcalLeft = kcalState ? Math.max(kcalState.goal - kcalState.eaten, 0) : null;
 
   return (
     <Screen scroll>
@@ -89,7 +88,7 @@ export function HealthScreen({ isActive }: { isActive: boolean }) {
             </Text>
             <Text variant="caption" tone="muted">
               {kcalState
-                ? `${kcalState.eaten} / ${kcalState.goal} kcal eaten · ${kcalLeft} left`
+                ? `${kcalState.eaten} / ${kcalState.goal} kcal eaten · ${kcalGoalDeltaLabel(kcalState.eaten, kcalState.goal)}`
                 : 'Nutrition —'}
             </Text>
           </View>
