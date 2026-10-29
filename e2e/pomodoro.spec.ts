@@ -101,7 +101,7 @@ test.describe('Pomodoro', () => {
     await manager.getByRole('textbox', { name: 'Preset name' }).fill(longName);
     await manager.getByRole('button', { name: 'Create preset' }).click();
     // Over-length names are refused with the app-standard explicit error…
-    await expect(manager.getByText('Preset name must be 40 characters or less.')).toBeVisible();
+    await expect(manager.getByText('Preset name must be 40 characters or fewer.')).toBeVisible();
     // …and no silently truncated preset row is created (built-ins are not
     // deletable, so any Delete button here would be the created preset).
     await expect(manager.getByRole('button', { name: /^Delete preset / })).toHaveCount(0);

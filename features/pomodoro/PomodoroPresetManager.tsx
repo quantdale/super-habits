@@ -66,7 +66,7 @@ function validateDraft(draft: Draft): string | null {
   // here would persist a name the user never typed — and could split a
   // surrogate pair mid-emoji.
   if (draft.name.trim().length > MAX_PRESET_NAME_LENGTH) {
-    return `Preset name must be ${MAX_PRESET_NAME_LENGTH} characters or less.`;
+    return `Preset name must be ${MAX_PRESET_NAME_LENGTH} characters or fewer.`;
   }
   if (parseBound(draft.focusMinutes, 1, 120) === null) {
     return 'Focus minutes must be a whole number from 1 to 120.';
