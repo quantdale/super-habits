@@ -300,7 +300,12 @@ This directory is the implementation source of truth for the UI overhaul:
 - [`09-warm-momentum-2-2.md`](./09-warm-momentum-2-2.md) — Warm Momentum 2.2 interaction-primitives/tablet-density/accessibility-order contract.
 - [`10-warm-momentum-2-3.md`](./10-warm-momentum-2-3.md) — Warm Momentum 2.3 data-entry/modal determinism contract.
 - [`11-warm-momentum-2-4.md`](./11-warm-momentum-2-4.md) — Warm Momentum 2.4 reliability/performance completion contract.
-- [`12-pop-design-system.md`](./12-pop-design-system.md) — **current** Pop design language (Nunito type, chunky geometry, section hues, tactile motion) that replaced Warm Momentum across the app; read this before touching UI.
+- [`12-pop-design-system.md`](./12-pop-design-system.md) — **HISTORICAL** Pop design language (Nunito type, chunky geometry, section hues, tactile motion); superseded, kept for background only.
+- [`13-calm-momentum-design-system.md`](./13-calm-momentum-design-system.md) — V3 Calm Momentum design system; **amended 2026-10-29** by v2 P0 (short amendment notes; doc 16 wins for visual values).
+- [`14-v3-reference-ledger.md`](./14-v3-reference-ledger.md) — V3 reference ledger.
+- [`15-v3-defect-ledger.md`](./15-v3-defect-ledger.md) — V3 rendered-truth defect ledger.
+- [`16-playful-momentum.md`](./16-playful-momentum.md) — **current** "Playful Momentum" v2 design spec + delivery ledger (BRIEF v2, P0–P22 plan, §9 conflict resolutions, §12 provisional decisions); read this before touching UI.
+- [`16-v4-calm-momentum-finish.md`](./16-v4-calm-momentum-finish.md) — **SUPERSEDED** V4 neutral finish spec (rejected direction; kept for the record).
 - [`2026-09-01-friction-inventory.md`](./2026-09-01-friction-inventory.md) — baseline per-surface friction inventory for the 2.0 campaign.
 - [`2026-09-01-feature-disposition-ledger.md`](./2026-09-01-feature-disposition-ledger.md) — disposition of each feature surface across campaigns.
 - [`2026-09-01-mobbin-pattern-ledger.md`](./2026-09-01-mobbin-pattern-ledger.md) — transferable reference UI patterns (principles, not trade dress).

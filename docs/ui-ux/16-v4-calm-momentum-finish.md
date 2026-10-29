@@ -1,7 +1,16 @@
+> **SUPERSEDED by [`16-playful-momentum.md`](./16-playful-momentum.md)** (2026-10-29,
+> BRIEF v2 "Playful Momentum"): the neutral V4 direction was rejected as "too
+> professional". Kept for the record only — where this file conflicts with doc
+> 16, doc 16 wins. Do not implement from this document. The
+> `openspec/changes/ui-v4-visual-finish` change was deleted (never applied);
+> its replacement is `openspec/changes/ui-v2-playful-momentum`.
+
 # SuperHabits — V4 "Calm Momentum, finished" — visual finish spec & ledger
 
 Owner: Michael Dale Palaca · Repo: `quantdale/super-habits` · Baseline: `origin/main` @ `b6761699` (2026-10-29)
-Status: **ACTIVE** — P0 (spec + guardrails) shipped 2026-10-29; P1–P20 pending per §8, tracked in the §10 ledger.
+Status: **SUPERSEDED** (2026-10-29 by `16-playful-momentum.md`) — P0 shipped
+2026-10-29 under the old direction; P1–P20 never ran and are void (replaced by
+doc 16's P0–P22 plan).
 Scope: **visual/UX only.** No domain, data, sync, backup, migration or routing changes. Every test ID, accessible
 role/label, product-facing label, and the one global Add flow (`Add → Describe it`) stays exactly as is.
 
