@@ -80,7 +80,7 @@ type CaloriesViewMode = 'form' | 'diary';
 /** Narrow prefill shape shared by saved-meal and frequent-food chip taps. */
 type MealPrefillSource = Pick<
   SavedMeal,
-  'food_name' | 'protein' | 'carbs' | 'fats' | 'fiber' | 'meal_type'
+  'food_name' | 'calories' | 'protein' | 'carbs' | 'fats' | 'fiber' | 'meal_type'
 >;
 
 const MEAL_OPTIONS: readonly { value: MealType; label: string }[] = [
@@ -367,10 +367,10 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     [protein, carbs, fats, fiber],
   );
   /**
-   * Effective kcal for the edit modal: while a kcal-only entry is being
-   * edited with all macros still 0, its stored kcal stands in for the
-   * macro-derived 0 (display + validation). As soon as any macro is non-zero
-   * the value is computed from macros as usual.
+   * Effective kcal for the entry form and edit modal: while a kcal-only row
+   * (edited entry or chip prefill) still has all macros at 0, its stored kcal
+   * stands in for the macro-derived 0 (display + validation). As soon as any
+   * macro is non-zero the value is computed from macros as usual.
    */
   const effectiveKcal = useMemo(() => {
     const macrosAllZero =
@@ -378,8 +378,8 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       (parseNumericInput(carbs) ?? 0) === 0 &&
       (parseNumericInput(fats) ?? 0) === 0 &&
       (parseNumericInput(fiber) ?? 0) === 0;
-    return editingEntryId && macrosAllZero && kcalOnlyBase !== null ? kcalOnlyBase : computedKcal;
-  }, [editingEntryId, kcalOnlyBase, computedKcal, protein, carbs, fats, fiber]);
+    return macrosAllZero && kcalOnlyBase !== null ? kcalOnlyBase : computedKcal;
+  }, [kcalOnlyBase, computedKcal, protein, carbs, fats, fiber]);
   /**
    * Pre-submit consumed-date validation for the edit modal (mirrors
    * `assertConsumableDateKey`): the error surfaces as soon as the date
@@ -436,7 +436,15 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const applyMealToDraft = useCallback((meal: MealPrefillSource) => {
     setCalorieError(null);
     setEditingEntryId(null);
-    setKcalOnlyBase(null);
+    // A kcal-only meal (quick-add rows, quick-capture saved meals) carries
+    // calories no macro sum can derive; keep them as the effective kcal —
+    // the same `kcalOnlyBase` mechanism as `openEntryEditModal` — or the
+    // prefill would submit a macro-derived 0 and be rejected.
+    setKcalOnlyBase(
+      meal.protein === 0 && meal.carbs === 0 && meal.fats === 0 && (meal.fiber ?? 0) === 0
+        ? meal.calories
+        : null,
+    );
     setFood(meal.food_name);
     setProtein(String(meal.protein));
     setCarbs(String(meal.carbs));
@@ -654,7 +662,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           // rejects a future day, so this cannot create a forward-dated row.
           await addCalorieEntry({
             foodName: food.trim(),
-            calories: computedKcal,
+            calories: effectiveKcal,
             protein: proteinN,
             carbs: carbsN,
             fats: fatsN,
@@ -779,7 +787,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           fiber={fiber}
           mealType={mealType}
           mealOptions={MEAL_OPTIONS}
-          computedKcal={computedKcal}
+          computedKcal={effectiveKcal}
           calorieError={calorieError}
           onSelectSavedMeal={handleSelectSavedMeal}
           onSelectFrequentFood={handleSelectFrequentFood}
