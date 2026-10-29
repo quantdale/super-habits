@@ -302,11 +302,27 @@ export function buildTodoRowMeta<T extends TodoLikeForRowMeta>(
  *
  * Mirror of shouldAwardHabitFastPath: only a confirmed completion
  * (result.completed equals 1 from toggleTodo, completeTodo, or
- * setTodoCompletionState) may award. A failed toggle (missing or deleted row
- * or lost race yields completed 0) must not mint XP for an action that never
- * happened. The un-complete direction (completed 0) never awards. A real
- * completion that misses the fast path degrades to reconcile backfill.
+ * setTodoCompletionState) may award, and only when the completion belongs to
+ * the award's own local day (`actionDateKey === todayKey`). A failed toggle
+ * (missing or deleted row or lost race yields completed 0) must not mint XP
+ * for an action that never happened. The un-complete direction (completed 0)
+ * never awards.
+ *
+ * The day match is correctness, not latency (same refusal as the habit
+ * guard's backdated-write check): the midnight-straddle race — the write
+ * stamps `completed_at` just before local midnight and the award re-reads the
+ * day just after — must not award under the NEXT day's key. Todo source keys
+ * are per-todo-per-day (`${dateKey}:${todoId}`), so a next-day-keyed award
+ * never matches reconcile's action-day key: housekeeping would pay the same
+ * completion a second time (double XP) and the stray row would mark a
+ * zero-activity day active. A completion that misses the fast path degrades
+ * to reconcile backfill (exact + silent), the same miss+reconcile policy as
+ * the habit guard.
  */
-export function shouldAwardTodoFastPath(completed: 0 | 1): boolean {
-  return completed === 1;
+export function shouldAwardTodoFastPath(
+  completed: 0 | 1,
+  actionDateKey: string,
+  todayKey: string,
+): boolean {
+  return completed === 1 && actionDateKey === todayKey;
 }
