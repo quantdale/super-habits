@@ -188,6 +188,36 @@ describe('goal rollups (F8 / task 11.1)', () => {
     expect(rollup.habits.completionsInWindow).toBe(0);
   });
 
+  it('a partial day is not a completed occurrence in goal consistency', async () => {
+    const db = await freshDatabase();
+    const goals = await import('@/features/goals/goals.data');
+    const habits = await import('@/features/habits/habits.data');
+
+    const goalId = await goals.addGoal({ title: 'Target-three habit', horizon: 'month' });
+    const habitId = await habits.addHabit('Water', 3);
+    // Backdate so both probe days are eligible scheduled occurrences inside the
+    // 30-day window and the per-day rule target (3) is the graded target.
+    const { createHabitRule } = await import('@/features/habits/habits.domain');
+    await db.runAsync('UPDATE habits SET created_at = ?, rule_history = ? WHERE id = ?', [
+      new Date(`${shiftKey(TODAY, -3)}T12:00:00`).toISOString(),
+      JSON.stringify([createHabitRule(shiftKey(TODAY, -3), [1, 2, 3, 4, 5, 6, 7], 3)]),
+      habitId,
+    ]);
+    await habits.setHabitProjectGoal(habitId, { goalId });
+
+    const partialDay = shiftKey(TODAY, -1);
+    const fullDay = shiftKey(TODAY, -2);
+    await habits.incrementHabit(habitId, partialDay); // 1 of 3 — partial
+    for (let i = 0; i < 3; i += 1) await habits.incrementHabit(habitId, fullDay); // 3 of 3
+
+    const rollup = await goals.getGoalRollup(goalId);
+    // Eligible occurrences run from the creation boundary (TODAY-3) through today.
+    expect(rollup.habits.expectedOccurrences).toBe(4);
+    // Only the fully satisfied day is a completed eligible occurrence, matching
+    // the habit engine's own consistency (count >= that date's target).
+    expect(rollup.habits.completionsInWindow).toBe(1);
+  });
+
   it('listHabitsForGoal returns only non-deleted linked habits', async () => {
     await freshDatabase();
     const goals = await import('@/features/goals/goals.data');
