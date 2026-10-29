@@ -81,6 +81,135 @@ describe('gamification ledger', () => {
     expect(snapshot.todayFacts.habitCheckins).toBe(1);
   });
 
+  // A todo id outlives one completion. Re-opening a task and completing it
+  // again on a LATER local day is a second real action: it must pay XP again
+  // and make that day active (streak/week pip), while a same-day 0→1→0→1
+  // toggle still pays exactly once (asserted in the first test above).
+  it('pays a todo again when it is reopened and completed on a later day', async () => {
+    const { todos, gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    const yesterday = domain.shiftDateKey(today, -1);
+
+    await todos.addTodo({ title: 'Water the plants' });
+    const [todo] = await todos.listTodos();
+
+    // Day 1: complete it and let that day's pass pay for it.
+    await todos.toggleTodo(todo);
+    await db.runAsync(`UPDATE todos SET completed_at = ? WHERE id = ?`, [
+      new Date(`${yesterday}T10:00:00`).toISOString(),
+      todo.id,
+    ]);
+    expect(
+      (await gamification.reconcileGamificationActivity({ todayKey: yesterday })).awarded,
+    ).toBe(1);
+
+    // Day 2: reopen and complete it again.
+    await db.runAsync(`UPDATE todos SET completed = 0, completed_at = NULL WHERE id = ?`, [
+      todo.id,
+    ]);
+    const reopened = await db.getFirstAsync<{ completed: 0 | 1; completed_at: string | null }>(
+      `SELECT completed, completed_at FROM todos WHERE id = ?`,
+      [todo.id],
+    );
+    expect(reopened?.completed).toBe(0);
+    const { listTodos } = todos;
+    const [pending] = await listTodos();
+    await todos.toggleTodo({ ...todo, ...pending });
+
+    const todayPass = await gamification.reconcileGamificationActivity({ todayKey: today });
+    expect(todayPass.awarded).toBe(1);
+    // Today is now an active reward day: the streak reads 2 (both days paid).
+    expect(todayPass.snapshot.streak).toMatchObject({ current: 2, activeToday: true });
+    expect(todayPass.snapshot.week.at(-1)).toMatchObject({ dateKey: today, active: true });
+
+    // Repeated passes never re-pay either day.
+    expect((await gamification.reconcileGamificationActivity({ todayKey: today })).awarded).toBe(0);
+    const dates = await db.getAllAsync<{ date_key: string }>(
+      `SELECT date_key FROM gamification_events WHERE event_kind = 'todo' ORDER BY date_key ASC`,
+    );
+    expect(dates.map((row) => row.date_key)).toEqual([yesterday, today]);
+  });
+
+  /**
+   * Upgrade compatibility. Before todos were keyed per day, a todo award was
+   * stored under the bare todo id; those rows survive an app update. The first
+   * reconcile after upgrading must recognize that row as already covering the
+   * completion day, or every previously-rewarded task would be paid a second
+   * time on the one day the user upgrades.
+   */
+  it('an old bare-id ledger row suppresses the same-day award under the new key', async () => {
+    const { todos, gamification, time } = await loadModules();
+    const today = time.toDateKey();
+
+    await todos.addTodo({ title: 'Water the plants' });
+    const [todo] = await todos.listTodos();
+    await todos.toggleTodo(todo);
+    // An earlier build's row: bare id, the day it paid for.
+    await db.runAsync(
+      `INSERT INTO gamification_events (id, event_kind, source_key, date_key, xp, created_at)
+       VALUES ('gxp_legacy_todo', 'todo', ?, ?, 5, ?)`,
+      [todo.id, today, `${today}T10:00:00.000Z`],
+    );
+
+    // Both the fast path and the reconcile backfill must see it as paid.
+    expect(
+      await gamification.awardGamificationAction({ kind: 'todo', entityId: todo.id }),
+    ).toBeNull();
+    const reconciled = await gamification.reconcileGamificationActivity({ todayKey: today });
+    expect(reconciled.awarded).toBe(0);
+
+    const rows = await db.getAllAsync<{ source_key: string; date_key: string; xp: number }>(
+      `SELECT source_key, date_key, xp FROM gamification_events WHERE event_kind = 'todo'`,
+    );
+    // The legacy row is left untouched — no migration, no key rewrite — and no
+    // second row was minted for the same day.
+    expect(rows).toEqual([{ source_key: todo.id, date_key: today, xp: 5 }]);
+    // The day still counts as active (the legacy row carries xp > 0).
+    expect(reconciled.snapshot.streak).toMatchObject({ current: 1, activeToday: true });
+  });
+
+  it('a legacy bare-id row only covers its own day, so a later re-completion still pays', async () => {
+    const { todos, gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    const yesterday = domain.shiftDateKey(today, -1);
+
+    await todos.addTodo({ title: 'Water the plants' });
+    const [todo] = await todos.listTodos();
+    await todos.toggleTodo(todo);
+    await db.runAsync(`UPDATE todos SET completed_at = ? WHERE id = ?`, [
+      new Date(`${yesterday}T10:00:00`).toISOString(),
+      todo.id,
+    ]);
+    // Yesterday was paid by the OLD build under the bare id.
+    await db.runAsync(
+      `INSERT INTO gamification_events (id, event_kind, source_key, date_key, xp, created_at)
+       VALUES ('gxp_legacy_todo', 'todo', ?, ?, 5, ?)`,
+      [todo.id, yesterday, `${yesterday}T10:00:00.000Z`],
+    );
+
+    // Reopened and completed again today: a genuinely new action.
+    await db.runAsync(`UPDATE todos SET completed = 0, completed_at = NULL WHERE id = ?`, [
+      todo.id,
+    ]);
+    const [pending] = await todos.listTodos();
+    await todos.toggleTodo({ ...todo, ...pending });
+
+    const todayPass = await gamification.reconcileGamificationActivity({ todayKey: today });
+    expect(todayPass.awarded).toBe(1);
+    expect(todayPass.snapshot.streak).toMatchObject({ current: 2, activeToday: true });
+
+    const keys = await db.getAllAsync<{ source_key: string; date_key: string }>(
+      `SELECT source_key, date_key FROM gamification_events WHERE event_kind = 'todo'
+        ORDER BY date_key ASC`,
+    );
+    expect(keys).toEqual([
+      { source_key: todo.id, date_key: yesterday },
+      { source_key: `${today}:${todo.id}`, date_key: today },
+    ]);
+    // Replays of either day stay free.
+    expect((await gamification.reconcileGamificationActivity({ todayKey: today })).awarded).toBe(0);
+  });
+
   it('keeps rewards local-only: the reward tables exist and never enter the outbox', async () => {
     const { habits, gamification } = await loadModules();
 

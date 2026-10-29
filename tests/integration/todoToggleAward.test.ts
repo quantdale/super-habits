@@ -62,7 +62,10 @@ describe('todo toggle-result gating', () => {
       entityId: todo.id,
       todayKey: today,
     });
-    expect(outcome?.result.events[0]).toMatchObject({ kind: 'todo', sourceKey: todo.id });
+    expect(outcome?.result.events[0]).toMatchObject({
+      kind: 'todo',
+      sourceKey: `${today}:${todo.id}`,
+    });
 
     // Replays can never double-award; reconcile stays quiet afterwards.
     expect(
@@ -120,7 +123,7 @@ describe('todo toggle-result gating', () => {
     const keys = await db.getAllAsync<{ source_key: string }>(
       `SELECT source_key FROM gamification_events WHERE event_kind = 'todo'`,
     );
-    expect(keys.map((row) => row.source_key)).toEqual([todo.id]);
+    expect(keys.map((row) => row.source_key)).toEqual([`${today}:${todo.id}`]);
 
     const second = await gamification.reconcileGamificationActivity({ todayKey: today });
     expect(second.awarded).toBe(0);

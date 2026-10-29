@@ -497,20 +497,46 @@ export function celebrationForBadge(unlock: BadgeUnlock): Celebration {
  * Habits are per-habit-per-day (a 0→1→0→1 toggle cannot farm XP), nutrition is
  * per-day (the first logged meal is the day's nutrition credit), and every
  * other action is keyed by its own durable entity id.
+ *
+ * Todos are per-todo-per-day. A todo id outlives its completion: re-opening a
+ * task and completing it again on a LATER day is a second real action (and the
+ * day it lands on must become an active reward day), while a 0→1→0→1 toggle
+ * inside one day must still pay once. Keying by id alone paid the first
+ * completion forever, so every later-day re-completion minted no XP and left
+ * that day's streak pip empty. Focus sessions and workout logs are single-use
+ * rows (one session == one action), so their ids alone stay sufficient.
  */
 export function actionSourceKey(kind: ActionKind, entityId: string, dateKey: string): string {
   switch (kind) {
     case 'habit':
+    case 'todo':
       return `${dateKey}:${entityId}`;
     case 'nutrition':
       return dateKey;
-    case 'todo':
     case 'focus':
     case 'workout':
     case 'plan':
     case 'review':
       return entityId;
   }
+}
+
+/**
+ * Source keys an EARLIER build used for the same real action.
+ *
+ * Before todos were keyed per day, a todo award was stored under the bare todo
+ * id. Those rows survive an upgrade, so the id-only key no longer matches the
+ * key this build computes and the same completion would be paid a second time
+ * on the first reconcile after the update. Callers check these keys against the
+ * row's own `date_key`, which is what makes the legacy row suppress only the
+ * day it already paid for: a genuine re-completion on a later day still earns.
+ *
+ * `habit` has always been day-scoped, `nutrition` is day-keyed, and
+ * `focus`/`workout`/`plan`/`review` are unchanged single-use ids, so `todo` is
+ * the only kind with a legacy form.
+ */
+export function legacyActionSourceKeys(kind: ActionKind, entityId: string): string[] {
+  return kind === 'todo' ? [entityId] : [];
 }
 
 /**

@@ -31,6 +31,7 @@ import {
   computeStreakSummary,
   evaluateBadges,
   isDayComplete,
+  legacyActionSourceKeys,
   levelFromXp,
   pickCelebration,
   planAutoFreeze,
@@ -783,6 +784,21 @@ async function computeAward(input: {
       [input.kind, sourceKey],
     );
     if (existing) return null;
+
+    // Upgrade compatibility: an earlier build keyed todo awards by the bare
+    // todo id, and those rows survive. Without this check the first reconcile
+    // after the update would pay the same completion again under the new
+    // day-qualified key. The row's own `date_key` bounds the suppression to the
+    // day it already paid for, so a genuine later-day re-completion still earns
+    // (`legacyActionSourceKeys` documents why only `todo` has a legacy form).
+    for (const legacyKey of legacyActionSourceKeys(input.kind, entityId)) {
+      const legacy = await transactionDb.getFirstAsync<{ id: string }>(
+        `SELECT id FROM gamification_events
+          WHERE event_kind = ? AND source_key = ? AND date_key = ?`,
+        [input.kind, legacyKey, todayKey],
+      );
+      if (legacy) return null;
+    }
 
     const award = computeActionReward({
       kind: input.kind,

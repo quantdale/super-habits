@@ -93,7 +93,9 @@ describe('non-workout id-less award alignment', () => {
     const keys = await db.getAllAsync<{ source_key: string }>(
       `SELECT source_key FROM gamification_events WHERE event_kind = 'todo'`,
     );
-    expect(keys.map((row) => row.source_key).sort()).toEqual([firstId, secondId].sort());
+    expect(keys.map((row) => row.source_key).sort()).toEqual(
+      [`${today}:${firstId}`, `${today}:${secondId}`].sort(),
+    );
   });
 
   it('awarding the newest todo leaves the oldest for reconcile (no cross-attribution)', async () => {
@@ -105,14 +107,19 @@ describe('non-workout id-less award alignment', () => {
       kind: 'todo',
       entityId: secondId,
     });
-    expect(outcome?.result.events[0]).toMatchObject({ kind: 'todo', sourceKey: secondId });
+    expect(outcome?.result.events[0]).toMatchObject({
+      kind: 'todo',
+      sourceKey: `${today}:${secondId}`,
+    });
 
     const reconciled = await gamification.reconcileGamificationActivity({ todayKey: today });
     expect(reconciled.awarded).toBe(1);
     const keys = await db.getAllAsync<{ source_key: string }>(
       `SELECT source_key FROM gamification_events WHERE event_kind = 'todo'`,
     );
-    expect(keys.map((row) => row.source_key).sort()).toEqual([firstId, secondId].sort());
+    expect(keys.map((row) => row.source_key).sort()).toEqual(
+      [`${today}:${firstId}`, `${today}:${secondId}`].sort(),
+    );
   });
 
   it('a focus award without entityId is a miss; the exact session id awards precisely', async () => {
