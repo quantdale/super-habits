@@ -212,7 +212,8 @@ export function buildTimerSequence(
   const sequence: TimerPhase[] = [];
 
   exercises.forEach((exercise, exIndex) => {
-    exercise.sets.forEach((set) => {
+    exercise.sets.forEach((set, setIndex) => {
+      const isFinalSetOfExercise = setIndex === exercise.sets.length - 1;
       sequence.push({
         exerciseName: exercise.name,
         exerciseIndex: exIndex,
@@ -245,11 +246,15 @@ export function buildTimerSequence(
         ...(set.target_pace !== undefined ? { targetPace: set.target_pace } : {}),
       });
       const nextExercise = exercises[exIndex + 1];
+      // Last-set detection is positional: `deleteSet` soft-deletes without
+      // renumbering, so set numbers can be non-contiguous (e.g. [1, 3]) and
+      // `set_number === sets.length` wrongly reports "not the last set",
+      // appending a trailing rest at session end and breaking superset flow.
       const staysInsideSuperset =
-        set.set_number === exercise.sets.length &&
+        isFinalSetOfExercise &&
         Boolean(exercise.superset_group) &&
         nextExercise?.superset_group === exercise.superset_group;
-      const isLastSet = exIndex === exercises.length - 1 && set.set_number === exercise.sets.length;
+      const isLastSet = exIndex === exercises.length - 1 && isFinalSetOfExercise;
       // Zero rest is intentional no-rest: emit no phase so sets run back-to-back.
       if (!isLastSet && !staysInsideSuperset && set.rest_seconds > 0) {
         sequence.push({
