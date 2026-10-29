@@ -37,14 +37,14 @@ export function EmptyStateCard({
       <View style={{ alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md }}>
         <View
           style={{
-            width: 96,
-            height: 96,
+            width: 120,
+            height: 120,
             borderRadius: radius.lg,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          {illustration ?? icon ?? <SparkIllustration color={accentColor} size={84} />}
+          {illustration ?? icon ?? <SparkIllustration color={accentColor} size={120} />}
         </View>
         <Text variant="titleMd" style={{ textAlign: 'center' }}>
           {title}
