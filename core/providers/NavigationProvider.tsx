@@ -18,6 +18,58 @@ const KNOWN_SECTIONS: readonly string[] = [
 ];
 
 /**
+ * Bounded re-check schedule (ms after a popstate) for reading the destination
+ * URL. A forward navigation fires popstate ONCE with a transient empty hash
+ * while expo-router re-syncs the location, and never fires a second event for
+ * the settled `#section`, so a single settled read can still catch the
+ * transient state (the shell may also remount, cancelling a timer in effect
+ * cleanup — later attempts run from the new provider instance). The section is
+ * adopted from the first attempt that reads a stamp; 'overview' is only
+ * applied once every attempt has failed.
+ */
+const POPSTATE_RECHECK_MS = [40, 120, 260, 420];
+
+/**
+ * The live section applier for background history rechecks.
+ *
+ * The rechecks must OUTLIVE a provider remount: a shell-resetting history
+ * transition unmounts and remounts this provider, whose effect cleanup would
+ * otherwise cancel every pending recheck exactly when the URL is about to
+ * settle. Timers therefore live at module scope and act through this ref; a
+ * null ref (nothing mounted) simply makes them no-ops.
+ */
+let applySectionFromHistory: ((section: AppSection) => void) | null = null;
+let popStateRecheckTimers: ReturnType<typeof setTimeout>[] = [];
+
+function clearPopStateRechecks(): void {
+  for (const timer of popStateRecheckTimers) clearTimeout(timer);
+  popStateRecheckTimers = [];
+}
+
+/**
+ * Read the destination section after a popstate, retrying on a bounded
+ * schedule. A forward navigation reports a TRANSIENT empty hash and never
+ * fires a second event when the settled `#section` appears, so a single read
+ * is not enough; 'overview' is applied only after every recheck has failed.
+ */
+function scheduleHistorySectionAdoption(): void {
+  clearPopStateRechecks();
+  popStateRecheckTimers = POPSTATE_RECHECK_MS.map((delay, index) =>
+    setTimeout(() => {
+      const apply = applySectionFromHistory;
+      if (!apply) return;
+      const stamped = readHistorySection();
+      if (stamped) {
+        clearPopStateRechecks();
+        apply(stamped);
+        return;
+      }
+      if (index === POPSTATE_RECHECK_MS.length - 1) apply('overview');
+    }, delay),
+  );
+}
+
+/**
  * URL-hash stamp for the section a history entry represents (web only).
  *
  * The hash — not `history.state` — is deliberate: expo-router's
@@ -121,11 +173,17 @@ export function NavigationProvider({ children }: PropsWithChildren) {
     if (!readHistorySection()) {
       window.history.replaceState(window.history.state, '', `#${activeSectionRef.current}`);
     }
-    const handlePopState = () => {
-      applySection(readHistorySection() ?? 'overview');
-    };
+    // Browser back/forward restores the section stamped on the destination
+    // entry. The read is deferred and retried (module-scoped so a provider
+    // remount cannot cancel it — see scheduleHistorySectionAdoption).
+    applySectionFromHistory = applySection;
+    const handlePopState = () => scheduleHistorySectionAdoption();
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    return () => {
+      if (applySectionFromHistory === applySection) applySectionFromHistory = null;
+      clearPopStateRechecks();
+      window.removeEventListener('popstate', handlePopState);
+    };
   }, [applySection]);
   const openHabit = useCallback(
     (habitId: string) => {
