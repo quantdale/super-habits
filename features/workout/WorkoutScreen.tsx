@@ -367,6 +367,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const [bodyWeightGoalValue, setBodyWeightGoalValue] = useState('');
   // True once the user types in the goal field during this dialog session.
   const [bodyWeightGoalEdited, setBodyWeightGoalEdited] = useState(false);
+  // Inline validation: `Alert.alert` is a NO-OP on react-native-web, so every
+  // rejected save in this dialog was silent there.
+  const [bodyWeightError, setBodyWeightError] = useState<string | null>(null);
   const [workoutPreferences, setWorkoutPreferences] = useState<WorkoutPreferences | null>(null);
   useCommandLauncherSuppressed('workout-session-active', currentView.type === 'session');
   // At content-max widths the history/analytics stack composes into a
@@ -905,6 +908,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       workoutPreferences?.goalWeight ? String(workoutPreferences.goalWeight.value) : '',
     );
     setBodyWeightGoalEdited(false);
+    setBodyWeightError(null);
     setBodyWeightModalVisible(true);
   };
 
@@ -1264,9 +1268,10 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         <TextField
           label="Weight"
           value={bodyWeightValue}
-          onChangeText={(value) =>
-            setBodyWeightValue(sanitizeNumericInput(value, { allowDecimal: true }))
-          }
+          onChangeText={(value) => {
+            setBodyWeightError(null);
+            setBodyWeightValue(sanitizeNumericInput(value, { allowDecimal: true }));
+          }}
           placeholder="80.0"
           keyboardType="numeric"
         />
@@ -1298,33 +1303,63 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
           value={bodyWeightGoalValue}
           onChangeText={(value) => {
             setBodyWeightGoalEdited(true);
+            setBodyWeightError(null);
             setBodyWeightGoalValue(sanitizeNumericInput(value, { allowDecimal: true }));
           }}
           placeholder="75.0"
           keyboardType="numeric"
         />
+        <ValidationError message={bodyWeightError} />
         <Button
           label={editingBodyWeight ? 'Save changes' : 'Save weight and goal'}
           color={COLOR}
           onPress={() => {
             const value = Number(bodyWeightValue);
             const goal = Number(bodyWeightGoalValue);
+            const goalTrimmed = bodyWeightGoalValue.trim();
             const hasMeasurement = Number.isFinite(value) && value > 0;
-            const hasGoal =
-              bodyWeightGoalValue.trim() === '' || (Number.isFinite(goal) && goal > 0);
-            const clearingExistingGoal = workoutPreferences?.goalWeight != null;
-            if (!hasMeasurement && bodyWeightGoalValue.trim() === '' && !clearingExistingGoal) {
-              Alert.alert(
-                'Enter a weight or goal',
-                'Add a positive measurement, a goal weight, or both.',
-              );
+            const hasGoal = goalTrimmed === '' || (Number.isFinite(goal) && goal > 0);
+            const storedGoal = workoutPreferences?.goalWeight ?? null;
+            // The goal this save would persist; an untouched goal keeps its
+            // stored value AND unit (the kg/lb toggle belongs to the
+            // measurement; reusing it reinterpreted a 75 kg goal as 75 lb).
+            const nextGoal =
+              goalTrimmed === ''
+                ? null
+                : storedGoal && !bodyWeightGoalEdited
+                  ? storedGoal
+                  : { value: goal, unit: bodyWeightUnit };
+            const goalChanged =
+              (nextGoal?.value ?? null) !== (storedGoal?.value ?? null) ||
+              (nextGoal?.unit ?? null) !== (storedGoal?.unit ?? null);
+            // Nothing to persist: no measurement and no goal change. Dismissing
+            // this as a success (the pre-fix behaviour) told the user a weight
+            // was logged when the row count never moved.
+            if (!editingBodyWeight && !hasMeasurement && !goalChanged) {
+              setBodyWeightError('Enter a weight to log.');
+              return;
+            }
+            if (editingBodyWeight && !hasMeasurement) {
+              setBodyWeightError('Enter a weight.');
               return;
             }
             if (!hasGoal) {
-              Alert.alert('Enter a valid goal', 'Use a positive number for the goal weight.');
+              setBodyWeightError('Use a positive number for the goal weight.');
               return;
             }
             void (async () => {
+              try {
+                await saveBodyWeightAndGoal();
+              } catch (error) {
+                // A rejected write (e.g. above the 1,000 cap) must surface in
+                // the open dialog and never escape as an unhandled rejection.
+                setBodyWeightError(
+                  error instanceof Error ? error.message : 'Could not save this weight.',
+                );
+              }
+            })();
+
+            async function saveBodyWeightAndGoal(): Promise<void> {
               if (editingBodyWeight) {
                 await updateBodyWeightEntry(editingBodyWeight.id, {
                   weight: value,
@@ -1338,29 +1373,19 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                   note: bodyWeightNote,
                 });
               }
-              const storedGoal = workoutPreferences?.goalWeight ?? null;
               const nextPreferences: WorkoutPreferences = {
                 ...(workoutPreferences ?? { effortScale: 'off', workoutReminder: null }),
-                goalWeight:
-                  bodyWeightGoalValue.trim() === ''
-                    ? null
-                    : // A goal the user did not touch in this dialog keeps its
-                      // stored value AND unit (the kg/lb toggle belongs to the
-                      // measurement; reusing it reinterpreted a 75 kg goal as
-                      // 75 lb). A goal typed here (even the same number, to
-                      // correct its unit) uses the currently selected unit.
-                      storedGoal && !bodyWeightGoalEdited
-                      ? storedGoal
-                      : { value: goal, unit: bodyWeightUnit },
+                goalWeight: nextGoal,
               };
               await saveWorkoutPreferences(nextPreferences);
               setWorkoutPreferences(nextPreferences);
               setBodyWeightValue('');
               setBodyWeightNote('');
               setEditingBodyWeight(null);
+              setBodyWeightError(null);
               setBodyWeightModalVisible(false);
               await refresh();
-            })();
+            }
           }}
         />
       </Modal>
