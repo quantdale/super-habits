@@ -1,5 +1,5 @@
 import { Text } from '@/core/ui/Text';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
@@ -59,6 +59,11 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
   const [showRelatedWork, setShowRelatedWork] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // A lifecycle write owns the row until it settles. `ProjectListView` loads
+  // exactly once on mount, so leaving the detail view before this commit lands
+  // makes the list's single read win the race and freeze the pre-write status
+  // on screen forever. The back action therefore queues behind it.
+  const pendingStatusWrite = useRef<Promise<void> | null>(null);
 
   const [linkedTodos, setLinkedTodos] = useState<{ id: string; title: string }[]>([]);
   const [linkedHabits, setLinkedHabits] = useState<{ id: string; name: string }[]>([]);
@@ -174,7 +179,15 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
   return (
     <View className="gap-3">
       <View className="flex-row items-center justify-between">
-        <IconButton icon="arrow-back" onPress={onBack} accessibilityLabel="Back to projects" />
+        <IconButton
+          icon="arrow-back"
+          onPress={() => {
+            // Serialise behind an in-flight lifecycle write so the list that
+            // mounts on the way out reads the committed row, not a stale one.
+            void (pendingStatusWrite.current ?? Promise.resolve()).then(onBack);
+          }}
+          accessibilityLabel="Back to projects"
+        />
         <Text className="text-lg font-bold" style={{ color: tokens.text }}>
           {isCreate ? 'New Project' : 'Project'}
         </Text>
@@ -283,22 +296,29 @@ export function ProjectDetailView({ projectId, onBack }: ProjectDetailViewProps)
       {!isCreate && projectId ? (
         <ProjectLifecycleActions
           status={status}
-          onStatusChange={async (next) => {
+          onStatusChange={(next) => {
             // Persist first: a rejected transition must never leave an
             // optimistic status on screen.
-            try {
-              setStatusError(null);
-              await updateProject(projectId, { status: next });
-              const refreshed = await getProject(projectId);
-              if (refreshed) setStatus(refreshed.status);
-            } catch (e) {
-              setStatusError(
-                describePlanningWriteError(
-                  e,
-                  'Could not update the project status. Please try again.',
-                ),
-              );
-            }
+            const write = (async () => {
+              try {
+                setStatusError(null);
+                await updateProject(projectId, { status: next });
+                const refreshed = await getProject(projectId);
+                if (refreshed) setStatus(refreshed.status);
+              } catch (e) {
+                setStatusError(
+                  describePlanningWriteError(
+                    e,
+                    'Could not update the project status. Please try again.',
+                  ),
+                );
+              }
+            })();
+            pendingStatusWrite.current = write;
+            void write.finally(() => {
+              if (pendingStatusWrite.current === write) pendingStatusWrite.current = null;
+            });
+            return write;
           }}
         />
       ) : null}
