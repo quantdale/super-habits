@@ -66,6 +66,14 @@ export type ShellNavLayout = 'bar' | 'rail' | 'rail-wide';
 const BAR_TAB_MIN_WIDTH = 44;
 
 /**
+ * Phone-bar pill height (P10 §7 Shell): 2px border + `spacing.xs` bar padding
+ * + the tallest child — the capture slot's 52px face + 4px lip = 56px.
+ * Together with the bar's `Math.max(safeAreaBottom, spacing.sm)` bottom offset
+ * this is the band the floating pill owns above the viewport bottom.
+ */
+const PHONE_BAR_PILL_HEIGHT = 68;
+
+/**
  * Six phone destinations (D3 validation gate, W10 — measured evidence in
  * `docs/ui-ux/v3-audit/w10/`): Today, To Do, Habits, Focus, Workout,
  * Calories, plus the capture slot. The five-destination Health-parent model
@@ -418,6 +426,13 @@ export default function Index() {
   const { width: screenWidth } = useWindowDimensions();
   const { top: safeAreaTop, bottom: safeAreaBottom } = useSafeAreaInsets();
   const useSideRail = screenWidth >= layout.railBreakpoint;
+  // Content must end above the floating phone bar (§7 Shell). Without this
+  // reserve the sections viewport runs under the pill: the last rows rest
+  // hidden behind the bar, and a scroll-into-view can park a row under it
+  // where pointer/forced clicks land on the pill instead of the control.
+  const phoneBarReserve = useSideRail
+    ? 0
+    : Math.max(safeAreaBottom, spacing.sm) + PHONE_BAR_PILL_HEIGHT + spacing.sm;
   // P10 (§7 Shell): 900–1279 keeps an 80px tile rail; >=1280 gets the full
   // 248px sidebar with labels, the Sprout Add button and the reward chips.
   const isWideSidebar = screenWidth >= 1280;
@@ -490,7 +505,10 @@ export default function Index() {
 
   const sections = (
     <GestureDetector gesture={pan}>
-      <View className="flex-1" style={{ flex: 1, backgroundColor: tokens.background }}>
+      <View
+        className="flex-1"
+        style={{ flex: 1, backgroundColor: tokens.background, marginBottom: phoneBarReserve }}
+      >
         {(Object.keys(SECTION_SCREENS) as AppSection[]).map((section) => {
           const ScreenComponent = SECTION_SCREENS[section];
           const isActive = activeSection === section;
