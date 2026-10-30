@@ -872,3 +872,9 @@ trigger technique the W10 Calories suite uses, asserting the UI failure state
 and the durable row/outbox outcome (8/8 PASS at W11.5 closure; evidence in
 `docs/ui-ux/v3-audit/w11.5/`). The opt-in status of this visual instrument is
 unchanged.
+
+### 25. decode-uri-component 0.5.1 override — `query-string.parse()` would throw if ever reached (2026-10-30)
+
+**Reason:** the `query-string`-scoped npm `overrides` pin to `decode-uri-component@0.5.1` (fixing GHSA-vcc3-ghjq-m6fr and GHSA-qr28-fpjm-wq7f) crosses to an ESM-only release (`type: module`, `export default` at `index.js:139`). `query-string@7.1.3` consumes it as CJS — `const decodeComponent = require('decode-uri-component')` (`index.js:3`) — so under both Node `require(ESM)` and Metro's ESM→CJS transform the binding is a non-callable module namespace: `decodeComponent(value)` inside `parse()` (`index.js:233`) would throw a `TypeError` if `parse()` were ever called. No shipped path calls it today: expo-router 55.0.18 only uses `queryString.stringify` (`build/fork/getPathFromState.js:276`, `build/fork/getPathFromState-forks.js:71`), which never touches `decodeComponent`; the single `queryString.parse` reference is commented out (`build/fork/getStateFromPath.js:538`), and `parseUrl`/`stringifyUrl` (which call `parse` internally) are unused. No lane reaches `query-string.parse()`, so the latent break is invisible to the suite by construction.
+
+**Closing path:** revisit the override on any expo-router or query-string upgrade. If `parse()`/`parseUrl()`/`stringifyUrl()` become reachable, patch query-string's `require` interop (or bump query-string to an ESM-aware release) before shipping — the failure mode would be a `TypeError` crash, not the advisories' DoS.
