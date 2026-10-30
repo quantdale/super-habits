@@ -14,6 +14,7 @@ import {
   listSavedMealCategories,
   sortSavedMealsForSearch,
   resolveCalorieLogDateKey,
+  calorieEditSaveError,
   resolveEntryKcal,
 } from '@/features/calories/calories.domain';
 import type { DailySummary } from '@/features/calories/types';
@@ -469,6 +470,18 @@ describe('resolveCalorieLogDateKey', () => {
 
   it('treats today itself as selectable (no clamp drift)', () => {
     expect(resolveCalorieLogDateKey(TODAY, TODAY)).toBe(TODAY);
+  });
+});
+
+describe('calorieEditSaveError', () => {
+  it('is silent when the edit committed (modal may close as saved)', () => {
+    expect(calorieEditSaveError('updated')).toBeNull();
+  });
+
+  it('names the deleted row when the edit found no live entry (never close as saved)', () => {
+    expect(calorieEditSaveError('not_found')).toBe(
+      'This entry was deleted, so the edit could not be saved.',
+    );
   });
 });
 
