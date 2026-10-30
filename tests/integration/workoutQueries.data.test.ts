@@ -139,11 +139,18 @@ describe('workout Gym V2 queries (real SQLite)', () => {
         catalogExerciseId: null,
         setNumber: 1,
         weight: 60,
+        weightUnit: 'kg',
         reps: 10,
       },
     ]);
     expect(await workout.listLoggedSetsForExerciseNames(['Row'])).toEqual([
-      { exerciseName: 'Row', catalogExerciseId: null, weight: 60, reps: 10 },
+      {
+        exerciseName: 'Row',
+        catalogExerciseId: null,
+        weight: 60,
+        weightUnit: 'kg',
+        reps: 10,
+      },
     ]);
     const outcomes = await workout.listRecentWorkoutSetOutcomes();
     expect(outcomes.map((outcome) => [outcome.setNumber, outcome.completed])).toEqual([

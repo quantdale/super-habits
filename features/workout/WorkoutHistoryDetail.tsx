@@ -20,7 +20,7 @@ import {
 import { QuickLogBadge } from './QuickLogBadge';
 import { deleteWorkoutLog, getWorkoutLogDetail, type WorkoutLogDetail } from './workout.data';
 import { SECTION_COLORS } from '@/constants/sectionColors';
-import type { WorkoutModality, WorkoutSessionSet } from '@/core/db/types';
+import type { WorkoutModality, WorkoutSessionSet, WorkoutWeightUnit } from '@/core/db/types';
 
 const COLOR = SECTION_COLORS.workout;
 
@@ -85,6 +85,8 @@ function formatMetricNumber(value: number): string {
 type Props = {
   visible: boolean;
   logId: string | null;
+  /** Display unit for record/volume math (the user's weight unit). */
+  weightUnit?: WorkoutWeightUnit;
   onClose: () => void;
   onDeleted: () => void;
 };
@@ -93,7 +95,13 @@ type Props = {
  * Per-session history detail: every logged exercise with its recorded sets,
  * session totals, and any personal records recorded in the session.
  */
-export function WorkoutHistoryDetailModal({ visible, logId, onClose, onDeleted }: Props) {
+export function WorkoutHistoryDetailModal({
+  visible,
+  logId,
+  weightUnit = 'kg',
+  onClose,
+  onDeleted,
+}: Props) {
   const { tokens } = useAppTheme();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const { begin } = useGuardedAsyncRefresh();
@@ -147,21 +155,24 @@ export function WorkoutHistoryDetailModal({ visible, logId, onClose, onDeleted }
           catalogExerciseId: catalogExerciseIdByExerciseId.get(set.session_exercise_id) ?? null,
           modality: modalityByExerciseId.get(set.session_exercise_id) ?? undefined,
           weight: set.weight,
+          weightUnit: set.weight_unit,
           reps: set.reps,
           durationSeconds: set.duration_seconds,
           distance: set.distance,
         },
       ];
     });
-  const prs = computePersonalRecords(loggedSets);
+  const prs = computePersonalRecords(loggedSets, weightUnit);
   const isQuickLog = detail ? isQuickLoggedSession(detail.exercises.length) : false;
   const totalVolume = computeSessionTotalVolume(
     (detail?.sets ?? []).map((set) => ({
       weight: set.weight,
+      weightUnit: set.weight_unit,
       reps: set.reps,
       completed: set.completed === 1,
       modality: modalityByExerciseId.get(set.session_exercise_id) ?? undefined,
     })),
+    weightUnit,
   );
 
   const handleDeleteSession = useCallback(async () => {
