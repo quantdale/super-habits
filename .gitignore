@@ -102,3 +102,17 @@ supabase/.temp/
 # false because of these files).
 /gym-v2-custom-exercise-submit.png
 /gym-v2-session-custom-exercise-submit.png
+
+# Agent evidence and visual-audit captures are run artifacts, not source.
+# CI and local gates re-run on the current tree; committed logs and screenshots
+# go stale (see openspec/specs/release-candidate-closure). Images that docs
+# still link were kept as tracked files and are unaffected; to add a new
+# referenced doc image, use `git add -f`. Visual-test goldens live in
+# e2e/__screenshots__/ and are not matched here.
+/.agent/hardening-evidence/*.log
+/docs/ui-ux/v3-audit/**/*.png
+/docs/ui-ux/v3-audit/**/*.jpg
+/docs/ui-ux/v3-audit/**/*.jpeg
+/docs/ui-ux/v3-audit/**/*.webp
+/docs/ui-ux/baseline-screenshots/
+/docs/ui-ux/*-screenshots/
