@@ -19,7 +19,7 @@ import {
   GardenIcon,
 } from './rewardIcons';
 
-export { heroIconDecorative, type HeroIconProps } from './heroIconCommon';
+export { heroIconDecorative, heroIconMonochromeTones, type HeroIconProps } from './heroIconCommon';
 export { TodayIcon, TodosIcon, HabitsIcon, FocusIcon, WorkoutIcon, CaloriesIcon } from './tabIcons';
 export {
   FlameIcon,

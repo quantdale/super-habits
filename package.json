@@ -122,6 +122,9 @@
     "workbox-window": "^7.4.0"
   },
   "overrides": {
+    "query-string": {
+      "decode-uri-component": "0.5.1"
+    },
     "glob": "^9.3.5",
     "shell-quote": "^1.12.0",
     "axios": "^1.18.1",

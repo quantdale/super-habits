@@ -6,7 +6,7 @@ import { Button } from '@/core/ui/Button';
 import { PillChip } from '@/core/ui/PillChip';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { SECTION_COLORS } from '@/constants/sectionColors';
-import type { BodyWeightEntry, WorkoutModality } from '@/core/db/types';
+import type { BodyWeightEntry, WorkoutModality, WorkoutWeightUnit } from '@/core/db/types';
 import type { BodyWeightTrend, PersonalRecord, ExerciseHistoryEntry } from './workout.domain';
 import {
   buildExerciseHistory,
@@ -64,12 +64,15 @@ export function WorkoutProgressCard({
   bodyAreas,
   onSelectExercise,
   selectedExercise,
+  weightUnit = 'kg',
 }: {
   rows: WorkoutPerformanceRow[];
   records: PersonalRecord[];
   bodyAreas: { area: string; sets: number }[];
   onSelectExercise: (name: string) => void;
   selectedExercise: string | null;
+  /** Display unit for exercise-history math (the user's weight unit). */
+  weightUnit?: WorkoutWeightUnit;
 }) {
   const { tokens } = useAppTheme();
   const exerciseNames = [...new Set(rows.map((row) => row.exerciseName))];
@@ -89,12 +92,14 @@ export function WorkoutProgressCard({
           catalogExerciseId: row.catalogExerciseId,
           modality: row.modality ?? undefined,
           weight: row.weight,
+          weightUnit: row.weightUnit,
           reps: row.reps,
           durationSeconds: row.durationSeconds,
           distance: row.distance,
           completed: row.completed === 1,
           setNumber: row.setNumber,
         })),
+        weightUnit,
       )
     : null;
   return (

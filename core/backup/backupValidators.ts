@@ -990,6 +990,29 @@ export function validateBackupGraph(
     }
   }
 
+  // Active-only key uniqueness (partial UNIQUE indexes WHERE deleted_at IS
+  // NULL). Tombstoned rows may share keys with active rows.
+  const activePlanDates = new Set<string>();
+  for (const row of rowsByEntity.daily_plans ?? []) {
+    if (row.deleted_at !== null && row.deleted_at !== undefined) continue;
+    if (typeof row.date_key === 'string') {
+      if (activePlanDates.has(row.date_key)) {
+        errors.push(`daily_plans duplicate active date_key: ${row.date_key}`);
+      }
+      activePlanDates.add(row.date_key);
+    }
+  }
+  const activeReviewWeeks = new Set<string>();
+  for (const row of rowsByEntity.weekly_reviews ?? []) {
+    if (row.deleted_at !== null && row.deleted_at !== undefined) continue;
+    if (typeof row.week_key === 'string') {
+      if (activeReviewWeeks.has(row.week_key)) {
+        errors.push(`weekly_reviews duplicate active week_key: ${row.week_key}`);
+      }
+      activeReviewWeeks.add(row.week_key);
+    }
+  }
+
   for (const row of rowsByEntity.daily_plans ?? []) {
     let topTodoIds: unknown;
     try {

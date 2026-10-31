@@ -40,6 +40,38 @@ export function kcalFromMacros(
   return Math.max(0, Math.round(proteinG * 4 + digestibleCarbG * 4 + fiberG * 2 + fatsG * 9));
 }
 
+/** Stored kcal + macros of an entry/meal (edit modal or chip prefill source). */
+export type EntryKcalSource = {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  fiber: number;
+};
+
+/**
+ * Effective kcal while editing or re-logging a stored entry/meal.
+ *
+ * A row's stored kcal is authoritative while the draft macros still match the
+ * source: "Quick add" rows (all macros 0) and explicit-kcal rows created by
+ * the command path / linked actions ("500 calories … 20g protein") carry kcal
+ * no macro sum can derive. Only once the user actually edits a macro does the
+ * value become macro-derived, matching `updateCalorieEntry`'s recompute rule.
+ */
+export function resolveEntryKcal(
+  source: EntryKcalSource,
+  draft: { protein: number; carbs: number; fats: number; fiber: number },
+): number {
+  const macrosUnchanged =
+    source.protein === draft.protein &&
+    source.carbs === draft.carbs &&
+    source.fats === draft.fats &&
+    source.fiber === draft.fiber;
+  return macrosUnchanged
+    ? source.calories
+    : kcalFromMacros(draft.protein, draft.carbs, draft.fats, draft.fiber);
+}
+
 export function caloriesTotal(entries: { calories: number }[]): number {
   return entries.reduce((sum, entry) => {
     const cal = entry.calories;
@@ -346,4 +378,15 @@ export function buildFrequentFoods(entries: CalorieEntry[], limit: number = 5): 
     .sort((a, b) => b.logCount - a.logCount || a.foodName.localeCompare(b.foodName))
     .slice(0, Math.max(0, limit))
     .map(({ foodName, logCount, latestEntry }) => ({ foodName, logCount, latestEntry }));
+}
+
+/**
+ * UI decision for an edit save against a row that no longer exists (deleted
+ * meanwhile — e.g. by sync from another device). The modal must not close as
+ * saved: the caller keeps the draft on screen and shows this inline error,
+ * then reloads the day log so the vanished entry disappears immediately.
+ * Returns null when the edit committed.
+ */
+export function calorieEditSaveError(result: 'updated' | 'not_found'): string | null {
+  return result === 'not_found' ? 'This entry was deleted, so the edit could not be saved.' : null;
 }
