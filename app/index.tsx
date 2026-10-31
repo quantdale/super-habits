@@ -13,15 +13,23 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  POMODORO_SECTION_KEY,
-  SECTION_COLORS,
-  SECTION_ON_BRIGHT_INK,
-} from '@/constants/sectionColors';
+import { SECTION_HUES } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { type AppSection, useAppNavigation } from '@/core/providers/navigationContext';
 import { Modal } from '@/core/ui/Modal';
+import { Pressable3D } from '@/core/ui/Pressable3D';
 import { Text } from '@/core/ui/Text';
+import { Sprout } from '@/core/ui/illustrations/Sprout';
+import {
+  CaloriesIcon,
+  FocusIcon,
+  HabitsIcon,
+  TodayIcon,
+  TodosIcon,
+  WorkoutIcon,
+  heroIconMonochromeTones,
+  type HeroIconProps,
+} from '@/core/ui/illustrations/icons';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 import { elevation, layout, radius, size, spacing } from '@/core/theme/designTokens';
 import { OverviewScreen } from '@/features/overview/OverviewScreen';
@@ -36,13 +44,19 @@ import { WeeklyReviewScreen } from '@/features/weekly-review/WeeklyReviewScreen'
 import { PlanningHubScreen } from '@/features/planning-hub/PlanningHubScreen';
 import { QuickCaptureOverlay } from '@/features/quick-capture/QuickCaptureOverlay';
 import { AchievementsScreen } from '@/features/gamification/AchievementsScreen';
+import { ShellRewardChips } from '@/features/gamification/ShellRewardChips';
 
 type NavItem = {
   name: AppSection;
   label: string;
-  icon: keyof typeof MaterialIcons.glyphMap;
-  sectionKey?: keyof typeof SECTION_COLORS;
+  /** P10: duotone hero icon for the destination tile (§5.9). */
+  heroIcon: React.ComponentType<HeroIconProps>;
+  /** P10: section hue painting the active tile + duotone icon (§7 Shell). */
+  hue: (typeof SECTION_HUES)[keyof typeof SECTION_HUES];
 };
+
+/** How a destination tile lays out: phone bar, narrow rail, wide sidebar. */
+export type ShellNavLayout = 'bar' | 'rail' | 'rail-wide';
 
 /**
  * Minimum width of a phone-bar destination. V3 §9/§13 require >=44pt touch
@@ -50,6 +64,14 @@ type NavItem = {
  * a 360px viewport when each destination keeps this floor.
  */
 const BAR_TAB_MIN_WIDTH = 44;
+
+/**
+ * Phone-bar pill height (P10 §7 Shell): 2px border + `spacing.xs` bar padding
+ * + the tallest child — the capture slot's 52px face + 4px lip = 56px.
+ * Together with the bar's `Math.max(safeAreaBottom, spacing.sm)` bottom offset
+ * this is the band the floating pill owns above the viewport bottom.
+ */
+const PHONE_BAR_PILL_HEIGHT = 68;
 
 /**
  * Six phone destinations (D3 validation gate, W10 — measured evidence in
@@ -63,13 +85,15 @@ const BAR_TAB_MIN_WIDTH = 44;
  * (`journey-label-parity`), so any label change updates the parity guard's
  * consumers in the same commit.
  */
+// NOTE: `journey-label-parity.mjs` parses `{ name: '…', label: '…'` pairs from
+// this block — keep each entry's `name`/`label` prefix contiguous on one line.
 const NAV_ITEMS: NavItem[] = [
-  { name: 'overview', label: 'Today', icon: 'today' },
-  { name: 'todos', label: 'To Do', icon: 'checklist', sectionKey: 'todos' },
-  { name: 'habits', label: 'Habits', icon: 'auto-awesome', sectionKey: 'habits' },
-  { name: 'pomodoro', label: 'Focus', icon: 'timer', sectionKey: POMODORO_SECTION_KEY },
-  { name: 'workout', label: 'Workout', icon: 'fitness-center', sectionKey: 'workout' },
-  { name: 'calories', label: 'Calories', icon: 'restaurant', sectionKey: 'calories' },
+  { name: 'overview', label: 'Today', heroIcon: TodayIcon, hue: SECTION_HUES.habits },
+  { name: 'todos', label: 'To Do', heroIcon: TodosIcon, hue: SECTION_HUES.todos },
+  { name: 'habits', label: 'Habits', heroIcon: HabitsIcon, hue: SECTION_HUES.habits },
+  { name: 'pomodoro', label: 'Focus', heroIcon: FocusIcon, hue: SECTION_HUES.focus },
+  { name: 'workout', label: 'Workout', heroIcon: WorkoutIcon, hue: SECTION_HUES.workout },
+  { name: 'calories', label: 'Calories', heroIcon: CaloriesIcon, hue: SECTION_HUES.calories },
 ];
 
 const NAV_TAB_COUNT = NAV_ITEMS.length;
@@ -109,10 +133,7 @@ const SECTION_SCREENS: Record<AppSection, React.ComponentType<{ isActive: boolea
 type TabButtonProps = {
   item: NavItem;
   isFocused: boolean;
-  accent: string;
-  /** Contrast-safe accent for the icon/label (falls back to `accent`). */
-  accentInk?: string;
-  layout: 'bar' | 'rail';
+  layout: ShellNavLayout;
   /** DOM id of the section panel this tab controls (`aria-controls`). */
   controlsId: string;
   onPress: () => void;
@@ -135,17 +156,26 @@ const sectionPanelId = (section: AppSection) => `sh-section-panel-${section}`;
 function TabButton({
   item,
   isFocused,
-  accent,
-  accentInk,
   layout: layoutRole,
   controlsId,
   onPress,
   onArrowKey,
 }: TabButtonProps) {
-  const { tokens } = useAppTheme();
-  const ink = accentInk ?? accent;
+  const { tokens, resolvedTheme } = useAppTheme();
+  const isDark = resolvedTheme === 'dark';
+  // P10 tiles (§7 Shell): active tile = section tint face + 2px section-bright
+  // ring; the duotone hero icon paints in the section hue when active and in
+  // monochrome `iconMuted` when not.
+  const hue = item.hue;
+  const tint = isDark ? hue.tintDark : hue.tintLight;
+  const ink = isDark ? hue.bright : hue.solid;
+  // r2 defect fix: the inactive icon keeps its duotone detail in two distinct
+  // muted tones (never one flat silhouette); both stay >= 3:1 vs the tile.
+  const monochrome = heroIconMonochromeTones(tokens.textMuted, tokens.iconMuted);
   const focusRing = useKeyboardFocusRing(tokens.accent);
-  const isRail = layoutRole === 'rail';
+  const isRail = layoutRole !== 'bar';
+  const isWide = layoutRole === 'rail-wide';
+  const HeroIcon = item.heroIcon;
   const railRef = useRef<View>(null);
   // The parent rebuilds `onArrowKey` on every render; keeping it in a ref lets
   // the DOM listener subscribe once instead of churning on each layout pass.
@@ -213,28 +243,48 @@ function TabButton({
           // (the old `minWidth: 0` let six destinations shrink under it at 360).
           minWidth: isRail ? undefined : BAR_TAB_MIN_WIDTH,
           width: isRail ? '100%' : undefined,
+          flexDirection: isWide ? 'row' : 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          gap: 2,
+          justifyContent: isWide ? 'flex-start' : 'center',
+          gap: isWide ? spacing.sm : 2,
           paddingVertical: isRail ? spacing.sm : spacing.xs,
-          paddingHorizontal: isRail ? spacing.sm : 0,
-          minHeight: size.touchTargetMin,
-          borderRadius: radius.md,
-          backgroundColor: isFocused ? `${accent}1F` : 'transparent',
+          paddingHorizontal: isWide ? spacing.md : isRail ? spacing.sm : 0,
+          minHeight: isWide ? 48 : size.touchTargetMin,
+          borderRadius: 14,
+          backgroundColor: isFocused ? tint : 'transparent',
         },
         focusRing.focusRingStyle,
       ]}
     >
-      <MaterialIcons
-        name={item.icon}
-        size={isRail ? 24 : 23}
-        color={isFocused ? ink : tokens.iconMuted}
+      {isFocused ? (
+        // The active tile's 2px section-bright border (§6 Tabs). Painted as an
+        // absolute ring so the label keeps the full slot width and never
+        // truncates at 360px.
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            borderRadius: 14,
+            borderWidth: 2,
+            borderColor: hue.bright,
+          }}
+        />
+      ) : null}
+      <HeroIcon
+        size={28}
+        bright={isFocused ? hue.bright : monochrome.bright}
+        lip={isFocused ? hue.lip : monochrome.lip}
       />
       <Text
         variant="caption"
         style={{
           color: isFocused ? ink : tokens.textMuted,
-          fontSize: isRail ? 12 : 11,
+          fontSize: isWide ? 15 : isRail ? 12 : 11,
+          fontWeight: isWide ? '800' : undefined,
           letterSpacing: 0.1,
           // W16 (native qualification): Android's Nunito metrics render wider
           // than the web build's, so `numberOfLines={1}` ellipsised long
@@ -255,44 +305,35 @@ function TabButton({
 }
 
 /**
- * The quick-capture affordance: the phone bar's raised center slot (or the
- * rail's header action on wide screens). V3 replaces Pop's free-floating FAB,
- * which overlapped card content and form fields on 4 of 6 sections (defect
- * SYS-04). This is the one surface the brand gradient survives on.
+ * The quick-capture affordance: the phone bar's round Sprout slot (or the
+ * rail's header action on wide screens). P10 (§6 Tabs): a 52px round Sprout
+ * Pressable3D with a white "+" — the brand face replaces the old gradient so
+ * the capture control follows the §5.7 "no gradients on surfaces" rule. The
+ * `add` glyph stays a MaterialIcons fallback where `a11yAudit` expects it.
+ * The face is the SOLID Sprout tier (§5.1: solid = white-label AA variant):
+ * white on solid #1A7F2B is 5.10:1, white on bright #4DC93A only 2.16:1.
  */
 function CaptureButton({ onPress, variant }: { onPress: () => void; variant: 'bar' | 'rail' }) {
-  const { tokens } = useAppTheme();
   const diameter = variant === 'bar' ? 52 : 44;
   return (
-    <Pressable
+    <Pressable3D
+      lip={4}
+      faceColor={SECTION_HUES.habits.solid}
+      lipColor={SECTION_HUES.habits.lip}
+      radius={radius.full}
+      onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="Quick capture"
-      onPress={onPress}
-      style={{
+      contentStyle={{
         width: diameter,
         height: diameter,
         borderRadius: radius.full,
         alignItems: 'center',
         justifyContent: 'center',
-        overflow: 'hidden',
-        ...elevation.level2,
-        shadowColor: tokens.glow,
-        shadowOpacity: 0.3,
       }}
     >
-      <LinearGradient
-        colors={[tokens.brandGradient[0], tokens.brandGradient[1]]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-      {/*
-        §5.1 rule 1: the capture face is the BRIGHT brand gradient (Sprout
-        #4DC93A), where `buttonText` is white in light mode — 2.16:1. Ink is
-        8.61:1 and matches dark mode, whose buttonText is already ink.
-      */}
-      <MaterialIcons name="add" size={variant === 'bar' ? 28 : 24} color={SECTION_ON_BRIGHT_INK} />
-    </Pressable>
+      <MaterialIcons name="add" size={variant === 'bar' ? 28 : 24} color="#FFFFFF" />
+    </Pressable3D>
   );
 }
 
@@ -364,7 +405,7 @@ function SectionContainer({
 }
 
 export default function Index() {
-  const { tokens, resolvedTheme, sectionAccents } = useAppTheme();
+  const { tokens } = useAppTheme();
   const {
     activeSection,
     mountedSections,
@@ -384,8 +425,17 @@ export default function Index() {
   } = useAppNavigation();
   const { width: screenWidth } = useWindowDimensions();
   const { top: safeAreaTop, bottom: safeAreaBottom } = useSafeAreaInsets();
-  const overviewColor = resolvedTheme === 'dark' ? tokens.text : tokens.textMuted;
   const useSideRail = screenWidth >= layout.railBreakpoint;
+  // Content must end above the floating phone bar (§7 Shell). Without this
+  // reserve the sections viewport runs under the pill: the last rows rest
+  // hidden behind the bar, and a scroll-into-view can park a row under it
+  // where pointer/forced clicks land on the pill instead of the control.
+  const phoneBarReserve = useSideRail
+    ? 0
+    : Math.max(safeAreaBottom, spacing.sm) + PHONE_BAR_PILL_HEIGHT + spacing.sm;
+  // P10 (§7 Shell): 900–1279 keeps an 80px tile rail; >=1280 gets the full
+  // 248px sidebar with labels, the Sprout Add button and the reward chips.
+  const isWideSidebar = screenWidth >= 1280;
 
   // The highlighted bar destination: with the six-tab model every section
   // owns its destination, so the active section highlights exactly.
@@ -455,7 +505,10 @@ export default function Index() {
 
   const sections = (
     <GestureDetector gesture={pan}>
-      <View className="flex-1" style={{ flex: 1, backgroundColor: tokens.background }}>
+      <View
+        className="flex-1"
+        style={{ flex: 1, backgroundColor: tokens.background, marginBottom: phoneBarReserve }}
+      >
         {(Object.keys(SECTION_SCREENS) as AppSection[]).map((section) => {
           const ScreenComponent = SECTION_SCREENS[section];
           const isActive = activeSection === section;
@@ -471,32 +524,12 @@ export default function Index() {
   );
 
   /** One navigation destination button; highlight + layout resolved by caller. */
-  function buildTabButton(item: NavItem, isFocused: boolean, layoutRole: 'bar' | 'rail') {
-    const accent =
-      item.sectionKey && item.sectionKey !== POMODORO_SECTION_KEY
-        ? sectionAccents[item.sectionKey].fill
-        : item.name === 'overview'
-          ? overviewColor
-          : item.name === 'pomodoro'
-            ? sectionAccents[POMODORO_SECTION_KEY].fill
-            : sectionAccents.health.fill;
-    // The active capsule tints from the fill; the icon/label use the
-    // contrast-safe variant (identical on dark themes, darker on light).
-    const accentInk =
-      item.sectionKey && item.sectionKey !== POMODORO_SECTION_KEY
-        ? sectionAccents[item.sectionKey].text
-        : item.name === 'overview'
-          ? overviewColor
-          : item.name === 'pomodoro'
-            ? sectionAccents[POMODORO_SECTION_KEY].text
-            : sectionAccents.health.text;
+  function buildTabButton(item: NavItem, isFocused: boolean, layoutRole: ShellNavLayout) {
     return (
       <TabButton
         key={item.name}
         item={item}
         isFocused={isFocused}
-        accent={accent}
-        accentInk={accentInk}
         layout={layoutRole}
         controlsId={sectionPanelId(item.name)}
         onPress={() => setActiveSection(item.name)}
@@ -512,16 +545,17 @@ export default function Index() {
   }
 
   const navItems = NAV_ITEMS.map((item) =>
-    buildTabButton(item, navActiveSection === item.name, useSideRail ? 'rail' : 'bar'),
+    buildTabButton(
+      item,
+      navActiveSection === item.name,
+      useSideRail ? (isWideSidebar ? 'rail-wide' : 'rail') : 'bar',
+    ),
   );
 
-  /** Rail buttons highlight exactly — every rail child is directly visible. */
-  const buildRailButton = useCallback(
-    (item: NavItem) => buildTabButton(item, activeSection === item.name, 'rail'),
-    // buildTabButton closes over render-scope theme/navigation values; the
-    // activeSection dep is the only reactive input the callback captures.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeSection],
+  /** Rail/sidebar buttons highlight exactly — every child is directly visible. */
+  const railLayout: ShellNavLayout = isWideSidebar ? 'rail-wide' : 'rail';
+  const railItems = RAIL_ITEMS.map((item) =>
+    buildTabButton(item, activeSection === item.name, railLayout),
   );
 
   return (
@@ -539,7 +573,7 @@ export default function Index() {
           accessibilityLabel="Section tabs"
           accessibilityRole="tablist"
           style={{
-            width: 104,
+            width: isWideSidebar ? 248 : 80,
             paddingHorizontal: spacing.sm,
             paddingVertical: spacing.lg,
             gap: spacing.sm,
@@ -548,27 +582,75 @@ export default function Index() {
             borderRightColor: tokens.tabRailBorder,
           }}
         >
-          <View style={{ alignItems: 'center', marginBottom: spacing.md, gap: spacing.sm }}>
+          <View
+            style={{
+              alignItems: isWideSidebar ? 'stretch' : 'center',
+              marginBottom: spacing.md,
+              gap: spacing.sm,
+            }}
+          >
             <View
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: radius.md,
+                flexDirection: 'row',
                 alignItems: 'center',
-                justifyContent: 'center',
+                justifyContent: isWideSidebar ? 'flex-start' : 'center',
+                gap: spacing.sm,
               }}
             >
-              <LinearGradient
-                colors={[tokens.brandGradient[0], tokens.brandGradient[1]]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-              <MaterialIcons name="bolt" size={24} color={tokens.buttonText} />
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: radius.md,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <LinearGradient
+                  colors={[tokens.brandGradient[0], tokens.brandGradient[1]]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <MaterialIcons name="bolt" size={24} color={tokens.buttonText} />
+              </View>
+              {/* Mascot mark (§7 Shell sidebar): Sprout beside the logo. */}
+              {isWideSidebar ? <Sprout pose="idle" size={28} /> : null}
             </View>
-            <CaptureButton onPress={openCapture} variant="rail" />
+            {isWideSidebar ? (
+              <Pressable3D
+                lip={4}
+                faceColor={SECTION_HUES.habits.solid}
+                lipColor={SECTION_HUES.habits.lip}
+                radius={16}
+                onPress={openCapture}
+                accessibilityRole="button"
+                accessibilityLabel="Quick capture"
+                contentStyle={{
+                  height: 52,
+                  borderRadius: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: spacing.sm,
+                }}
+              >
+                <MaterialIcons name="add" size={24} color="#FFFFFF" />
+                <Text variant="label" style={{ fontSize: 16, fontWeight: '800', color: '#FFFFFF' }}>
+                  Add
+                </Text>
+              </Pressable3D>
+            ) : (
+              <CaptureButton onPress={openCapture} variant="rail" />
+            )}
           </View>
-          {RAIL_ITEMS.map(buildRailButton)}
+          {railItems}
+          {/* Sidebar footer (§7 Shell): Streak + XP chips on desktop. */}
+          {isWideSidebar ? (
+            <View style={{ marginTop: 'auto', paddingTop: spacing.md }}>
+              <ShellRewardChips />
+            </View>
+          ) : null}
         </View>
       ) : null}
 
@@ -594,7 +676,8 @@ export default function Index() {
               paddingVertical: spacing.xs,
               borderRadius: radius.xl,
               backgroundColor: tokens.tabRail,
-              borderWidth: 1,
+              // P10 (§7 Shell): the bar is a 2px-border white pill of tiles.
+              borderWidth: 2,
               borderColor: tokens.tabRailBorder,
               ...elevation.level2,
               shadowColor: tokens.glow,
