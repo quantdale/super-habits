@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Animated, Pressable, TextInput, View } from 'react-native';
-import { SECTION_ON_BRIGHT_INK } from '@/constants/sectionColors';
+import { TextInput, View } from 'react-native';
+import { SECTION_HUES, SECTION_ON_BRIGHT_INK } from '@/constants/sectionColors';
+import { Pressable3D } from '@/core/ui/Pressable3D';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { useReducedMotion } from '@/core/theme/motion';
-import { opacity, radius, size, spacing, springs } from '@/core/theme/designTokens';
+import { radius, spacing } from '@/core/theme/designTokens';
 import { createSubmitGuard } from '@/lib/submitGuard';
 import { submitInlineQuickAdd } from '@/features/todos/todoQuickCapture.submit';
 
@@ -43,21 +43,13 @@ type Props = {
  * presentation.
  */
 export function TodoQuickCapture({ title, onTitleChange, onSubmit, onPersistError }: Props) {
-  const { tokens, sectionAccents } = useAppTheme();
-  const reducedMotion = useReducedMotion();
+  const { tokens } = useAppTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [pressScale] = useState(() => new Animated.Value(1));
+  const [focused, setFocused] = useState(false);
   const submitGuard = useRef(createSubmitGuard());
   const trimmed = title.trim();
   const canSubmit = trimmed.length > 0 && !isSubmitting;
-
-  const settle = (toValue: number) => {
-    if (reducedMotion) {
-      pressScale.setValue(toValue);
-      return;
-    }
-    Animated.spring(pressScale, { toValue, useNativeDriver: true, ...springs.press }).start();
-  };
+  const hue = SECTION_HUES.todos;
 
   const handleSubmit = async () => {
     await submitInlineQuickAdd({
@@ -77,44 +69,46 @@ export function TodoQuickCapture({ title, onTitleChange, onSubmit, onPersistErro
         accessibilityLabel="Quick add task title"
         className="min-w-0 flex-1 text-base"
         style={{
-          minHeight: size.touchTargetMin,
-          borderRadius: radius.md,
-          borderWidth: 1,
-          borderColor: tokens.border,
-          backgroundColor: tokens.surfaceSunken,
+          minHeight: 52,
+          borderRadius: radius.sm,
+          borderWidth: 2,
+          borderColor: focused ? tokens.accent : 'transparent',
+          backgroundColor: focused ? tokens.surface : tokens.surfaceSunken,
           color: tokens.text,
           paddingHorizontal: spacing.md,
           paddingVertical: spacing.sm,
         }}
         value={title}
         onChangeText={onTitleChange}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         placeholder="Quick add"
-        placeholderTextColor={tokens.textMuted}
+        placeholderTextColor={tokens.textSubtle}
         returnKeyType="done"
         onSubmitEditing={() => void handleSubmit()}
       />
-      <Animated.View style={{ transform: [{ scale: pressScale }] }}>
-        <Pressable
-          onPress={() => void handleSubmit()}
-          onPressIn={() => settle(0.88)}
-          onPressOut={() => settle(1)}
-          disabled={!canSubmit}
-          accessibilityRole="button"
-          accessibilityLabel="Add task"
-          accessibilityState={{ disabled: !canSubmit }}
-          className="items-center justify-center"
-          style={{
-            width: size.touchTargetMin,
-            height: size.touchTargetMin,
-            borderRadius: radius.full,
-            backgroundColor: sectionAccents.todos.fill,
-            opacity: canSubmit ? 1 : opacity.disabled,
-          }}
-        >
-          {/* §5.1: `bright` is never under white — ink label on the bright fill. */}
-          <MaterialIcons name="add" size={26} color={SECTION_ON_BRIGHT_INK} />
-        </Pressable>
-      </Animated.View>
+      {/* The one "Add task" control (§7 composer): 52px Sky round Pressable3D
+          — bright face, ink glyph (§5.1), 4px Sky lip sinking under the press. */}
+      <Pressable3D
+        lip={4}
+        faceColor={canSubmit ? hue.bright : tokens.surfaceSunken}
+        lipColor={canSubmit ? hue.lip : tokens.border}
+        radius={radius.full}
+        onPress={() => void handleSubmit()}
+        disabled={!canSubmit}
+        accessibilityRole="button"
+        accessibilityLabel="Add task"
+        accessibilityState={{ disabled: !canSubmit }}
+        style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center' }}
+        faceStyle={{ alignItems: 'center', justifyContent: 'center' }}
+      >
+        {/* §5.1: `bright` is never under white — ink label on the bright fill. */}
+        <MaterialIcons
+          name="add"
+          size={28}
+          color={canSubmit ? SECTION_ON_BRIGHT_INK : tokens.textSubtle}
+        />
+      </Pressable3D>
     </View>
   );
 }
