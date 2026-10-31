@@ -18,6 +18,7 @@ import { spacing, layout, radius } from '@/core/theme/designTokens';
 
 import { getDailyPlan } from '@/features/daily-plan/dailyPlan.data';
 import { GamificationCard } from './cards/GamificationCard';
+import { ShellRewardChips } from '@/features/gamification/ShellRewardChips';
 import { getMomentumGarden } from '@/features/momentum/momentum.data';
 import { MomentumCard } from '@/features/momentum/MomentumCard';
 import type { MomentumGardenModel } from '@/features/momentum/momentum.types';
@@ -419,7 +420,9 @@ export function OverviewScreen({ isActive }: { isActive: boolean }) {
                 </Text>
                 <Text variant="titleLg">{greeting}</Text>
               </View>
-              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
+                {/* P10 (§7 Shell): Streak + XP chips live in the Today header. */}
+                <ShellRewardChips />
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={isCustomizing ? 'Done customizing' : 'Customize dashboard'}
