@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
  * not release unqualified source (see `docs/reports/web-export-todo-durability-
  * acceptance-report.md`). That defect is fixed (PR previews build READY), CI
  * quality is green, and the duplicate `superhabits` Vercel project has been
- * disconnected from this repository, so the hold is lifted: every `main` push
+ * deleted (2026-10-31), so the hold is lifted: every `main` push
  * now produces exactly one Production deployment, on the `super-habits`
  * project (super-habits.vercel.app).
  *
