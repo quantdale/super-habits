@@ -55,7 +55,7 @@ describe('todo toggle-result gating', () => {
     const [todo] = await todos.listTodos();
     const result = await todos.toggleTodo(todo);
     expect(result.completed).toBe(1);
-    expect(domain.shouldAwardTodoFastPath(result.completed)).toBe(true);
+    expect(domain.shouldAwardTodoFastPath(result.completed, today, today)).toBe(true);
 
     const outcome = await gamification.awardGamificationAction({
       kind: 'todo',
@@ -88,7 +88,7 @@ describe('todo toggle-result gating', () => {
     // Missing row: the data layer returns completed 0 instead of throwing.
     const missing = await todos.setTodoCompletionState('todo_missing_ghost', 1);
     expect(missing.completed).toBe(0);
-    expect(domain.shouldAwardTodoFastPath(missing.completed)).toBe(false);
+    expect(domain.shouldAwardTodoFastPath(missing.completed, today, today)).toBe(false);
 
     // Un-complete direction: completing then reopening ends pending.
     await todos.addTodo({ title: 'Gate un-complete direction' });
@@ -97,7 +97,7 @@ describe('todo toggle-result gating', () => {
     expect(completed.completed).toBe(1);
     const reopened = await todos.toggleTodo({ ...todo, completed: 1 });
     expect(reopened.completed).toBe(0);
-    expect(domain.shouldAwardTodoFastPath(reopened.completed)).toBe(false);
+    expect(domain.shouldAwardTodoFastPath(reopened.completed, today, today)).toBe(false);
 
     // The screen follows the gate, so no fast-path award fires for either.
     // The reopened todo ends pending, the ghost never existed: reconcile

@@ -14,6 +14,8 @@ import {
   listSavedMealCategories,
   sortSavedMealsForSearch,
   resolveCalorieLogDateKey,
+  calorieEditSaveError,
+  resolveEntryKcal,
 } from '@/features/calories/calories.domain';
 import type { DailySummary } from '@/features/calories/types';
 import type { SavedMeal } from '@/core/db/types';
@@ -468,5 +470,72 @@ describe('resolveCalorieLogDateKey', () => {
 
   it('treats today itself as selectable (no clamp drift)', () => {
     expect(resolveCalorieLogDateKey(TODAY, TODAY)).toBe(TODAY);
+  });
+});
+
+describe('calorieEditSaveError', () => {
+  it('is silent when the edit committed (modal may close as saved)', () => {
+    expect(calorieEditSaveError('updated')).toBeNull();
+  });
+
+  it('names the deleted row when the edit found no live entry (never close as saved)', () => {
+    expect(calorieEditSaveError('not_found')).toBe(
+      'This entry was deleted, so the edit could not be saved.',
+    );
+  });
+});
+
+describe('resolveEntryKcal', () => {
+  it('keeps the stored kcal while the draft macros match the source', () => {
+    // Explicit kcal + macros the row cannot derive (command path
+    // "500 calories ... 20g protein"): untouched macros keep 500.
+    expect(
+      resolveEntryKcal(
+        { calories: 500, protein: 20, carbs: 0, fats: 0, fiber: 0 },
+        { protein: 20, carbs: 0, fats: 0, fiber: 0 },
+      ),
+    ).toBe(500);
+    // Kcal-only "Quick add" rows survive the same way.
+    expect(
+      resolveEntryKcal(
+        { calories: 250, protein: 0, carbs: 0, fats: 0, fiber: 0 },
+        { protein: 0, carbs: 0, fats: 0, fiber: 0 },
+      ),
+    ).toBe(250);
+    // Ordinary derived rows are unchanged by the passthrough.
+    expect(
+      resolveEntryKcal(
+        { calories: 360, protein: 30, carbs: 40, fats: 10, fiber: 5 },
+        { protein: 30, carbs: 40, fats: 10, fiber: 5 },
+      ),
+    ).toBe(360);
+  });
+
+  it('derives kcal from macros as soon as any macro is edited', () => {
+    expect(
+      resolveEntryKcal(
+        { calories: 500, protein: 20, carbs: 0, fats: 0, fiber: 0 },
+        { protein: 25, carbs: 0, fats: 0, fiber: 0 },
+      ),
+    ).toBe(100);
+    expect(
+      resolveEntryKcal(
+        { calories: 250, protein: 0, carbs: 0, fats: 0, fiber: 0 },
+        { protein: 10, carbs: 0, fats: 0, fiber: 0 },
+      ),
+    ).toBe(40);
+    // Changed-and-restored macros resolve back to the stored value.
+    expect(
+      resolveEntryKcal(
+        { calories: 500, protein: 20, carbs: 0, fats: 0, fiber: 0 },
+        { protein: 30, carbs: 0, fats: 0, fiber: 0 },
+      ),
+    ).toBe(120);
+    expect(
+      resolveEntryKcal(
+        { calories: 500, protein: 20, carbs: 0, fats: 0, fiber: 0 },
+        { protein: 20, carbs: 0, fats: 0, fiber: 0 },
+      ),
+    ).toBe(500);
   });
 });

@@ -27,6 +27,7 @@ import {
   TodayIcon,
   TodosIcon,
   WorkoutIcon,
+  heroIconMonochromeTones,
   type HeroIconProps,
 } from '@/core/ui/illustrations/icons';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
@@ -63,6 +64,14 @@ export type ShellNavLayout = 'bar' | 'rail' | 'rail-wide';
  * a 360px viewport when each destination keeps this floor.
  */
 const BAR_TAB_MIN_WIDTH = 44;
+
+/**
+ * Phone-bar pill height (P10 §7 Shell): 2px border + `spacing.xs` bar padding
+ * + the tallest child — the capture slot's 52px face + 4px lip = 56px.
+ * Together with the bar's `Math.max(safeAreaBottom, spacing.sm)` bottom offset
+ * this is the band the floating pill owns above the viewport bottom.
+ */
+const PHONE_BAR_PILL_HEIGHT = 68;
 
 /**
  * Six phone destinations (D3 validation gate, W10 — measured evidence in
@@ -160,6 +169,9 @@ function TabButton({
   const hue = item.hue;
   const tint = isDark ? hue.tintDark : hue.tintLight;
   const ink = isDark ? hue.bright : hue.solid;
+  // r2 defect fix: the inactive icon keeps its duotone detail in two distinct
+  // muted tones (never one flat silhouette); both stay >= 3:1 vs the tile.
+  const monochrome = heroIconMonochromeTones(tokens.textMuted, tokens.iconMuted);
   const focusRing = useKeyboardFocusRing(tokens.accent);
   const isRail = layoutRole !== 'bar';
   const isWide = layoutRole === 'rail-wide';
@@ -264,8 +276,8 @@ function TabButton({
       ) : null}
       <HeroIcon
         size={28}
-        bright={isFocused ? hue.bright : tokens.iconMuted}
-        lip={isFocused ? hue.lip : tokens.iconMuted}
+        bright={isFocused ? hue.bright : monochrome.bright}
+        lip={isFocused ? hue.lip : monochrome.lip}
       />
       <Text
         variant="caption"
@@ -298,13 +310,15 @@ function TabButton({
  * Pressable3D with a white "+" — the brand face replaces the old gradient so
  * the capture control follows the §5.7 "no gradients on surfaces" rule. The
  * `add` glyph stays a MaterialIcons fallback where `a11yAudit` expects it.
+ * The face is the SOLID Sprout tier (§5.1: solid = white-label AA variant):
+ * white on solid #1A7F2B is 5.10:1, white on bright #4DC93A only 2.16:1.
  */
 function CaptureButton({ onPress, variant }: { onPress: () => void; variant: 'bar' | 'rail' }) {
   const diameter = variant === 'bar' ? 52 : 44;
   return (
     <Pressable3D
       lip={4}
-      faceColor={SECTION_HUES.habits.bright}
+      faceColor={SECTION_HUES.habits.solid}
       lipColor={SECTION_HUES.habits.lip}
       radius={radius.full}
       onPress={onPress}
@@ -412,6 +426,13 @@ export default function Index() {
   const { width: screenWidth } = useWindowDimensions();
   const { top: safeAreaTop, bottom: safeAreaBottom } = useSafeAreaInsets();
   const useSideRail = screenWidth >= layout.railBreakpoint;
+  // Content must end above the floating phone bar (§7 Shell). Without this
+  // reserve the sections viewport runs under the pill: the last rows rest
+  // hidden behind the bar, and a scroll-into-view can park a row under it
+  // where pointer/forced clicks land on the pill instead of the control.
+  const phoneBarReserve = useSideRail
+    ? 0
+    : Math.max(safeAreaBottom, spacing.sm) + PHONE_BAR_PILL_HEIGHT + spacing.sm;
   // P10 (§7 Shell): 900–1279 keeps an 80px tile rail; >=1280 gets the full
   // 248px sidebar with labels, the Sprout Add button and the reward chips.
   const isWideSidebar = screenWidth >= 1280;
@@ -484,7 +505,10 @@ export default function Index() {
 
   const sections = (
     <GestureDetector gesture={pan}>
-      <View className="flex-1" style={{ flex: 1, backgroundColor: tokens.background }}>
+      <View
+        className="flex-1"
+        style={{ flex: 1, backgroundColor: tokens.background, marginBottom: phoneBarReserve }}
+      >
         {(Object.keys(SECTION_SCREENS) as AppSection[]).map((section) => {
           const ScreenComponent = SECTION_SCREENS[section];
           const isActive = activeSection === section;
@@ -596,7 +620,7 @@ export default function Index() {
             {isWideSidebar ? (
               <Pressable3D
                 lip={4}
-                faceColor={SECTION_HUES.habits.bright}
+                faceColor={SECTION_HUES.habits.solid}
                 lipColor={SECTION_HUES.habits.lip}
                 radius={16}
                 onPress={openCapture}

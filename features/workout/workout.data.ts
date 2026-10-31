@@ -1526,6 +1526,7 @@ export async function listRecentLoggedSets(): Promise<
     catalogExerciseId: string | null;
     setNumber: number;
     weight: number;
+    weightUnit: WorkoutWeightUnit | null;
     reps: number;
   }[]
 > {
@@ -1535,6 +1536,7 @@ export async function listRecentLoggedSets(): Promise<
             e.catalog_exercise_id AS catalogExerciseId,
             s.set_number AS setNumber,
             s.weight AS weight,
+            s.weight_unit AS weightUnit,
             s.reps AS reps
      FROM workout_session_sets s
      INNER JOIN workout_session_exercises e ON e.id = s.session_exercise_id
@@ -1601,7 +1603,13 @@ export async function listLoggedSetsForExerciseNames(
   exerciseNames: string[],
   catalogExerciseIds: string[] = [],
 ): Promise<
-  { exerciseName: string; catalogExerciseId: string | null; weight: number; reps: number }[]
+  {
+    exerciseName: string;
+    catalogExerciseId: string | null;
+    weight: number;
+    weightUnit: WorkoutWeightUnit | null;
+    reps: number;
+  }[]
 > {
   if (exerciseNames.length === 0 && catalogExerciseIds.length === 0) return [];
   const db = await getDatabase();
@@ -1616,6 +1624,7 @@ export async function listLoggedSetsForExerciseNames(
     `SELECT e.exercise_name AS exerciseName,
             e.catalog_exercise_id AS catalogExerciseId,
             s.weight AS weight,
+            s.weight_unit AS weightUnit,
             s.reps AS reps
      FROM workout_session_sets s
      INNER JOIN workout_session_exercises e ON e.id = s.session_exercise_id

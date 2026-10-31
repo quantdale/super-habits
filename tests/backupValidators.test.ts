@@ -292,6 +292,51 @@ describe('backup graph validation', () => {
     expect(errors.some((e) => e.includes('duplicate (habit_id, date_key)'))).toBe(true);
   });
 
+  it('rejects duplicate active daily_plans date_key rows', () => {
+    const errors = validateBackupGraph({
+      daily_plans: [
+        { ...validDailyPlan, id: 'dplan_1', date_key: '2026-08-01' },
+        { ...validDailyPlan, id: 'dplan_2', date_key: '2026-08-01' },
+      ],
+    });
+    expect(errors.some((e) => e.includes('daily_plans duplicate active date_key'))).toBe(true);
+  });
+
+  it('allows a soft-deleted daily_plan sharing a date_key with an active one', () => {
+    const errors = validateBackupGraph({
+      daily_plans: [
+        { ...validDailyPlan, id: 'dplan_1', date_key: '2026-08-01' },
+        {
+          ...validDailyPlan,
+          id: 'dplan_2',
+          date_key: '2026-08-01',
+          deleted_at: '2026-08-02T00:00:00.000Z',
+        },
+      ],
+    });
+    expect(errors.some((e) => e.includes('daily_plans duplicate active date_key'))).toBe(false);
+  });
+
+  it('rejects duplicate active weekly_reviews week_key rows', () => {
+    const errors = validateBackupGraph({
+      weekly_reviews: [
+        { id: 'wrev_1', week_key: '2026-W31', deleted_at: null },
+        { id: 'wrev_2', week_key: '2026-W31', deleted_at: null },
+      ],
+    });
+    expect(errors.some((e) => e.includes('weekly_reviews duplicate active week_key'))).toBe(true);
+  });
+
+  it('allows a soft-deleted weekly_review sharing a week_key with an active one', () => {
+    const errors = validateBackupGraph({
+      weekly_reviews: [
+        { id: 'wrev_1', week_key: '2026-W31', deleted_at: null },
+        { id: 'wrev_2', week_key: '2026-W31', deleted_at: '2026-08-05T00:00:00.000Z' },
+      ],
+    });
+    expect(errors.some((e) => e.includes('weekly_reviews duplicate active week_key'))).toBe(false);
+  });
+
   it('rejects duplicate saved-meal food names case-insensitively', () => {
     const base = {
       id: 'smeal_1',

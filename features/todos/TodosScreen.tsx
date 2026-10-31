@@ -463,6 +463,10 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
 
   const handleToggleTodo = useCallback(
     async (todo: Todo) => {
+      // The local day the completion belongs to is bracketed by the clock
+      // reads around the write; see shouldAwardTodoFastPath for why a
+      // midnight-straddle completion must not take the fast path.
+      const actionDateKey = toDateKey();
       let result: Awaited<ReturnType<typeof toggleTodo>>;
       try {
         result = await toggleTodo(todo);
@@ -506,7 +510,8 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
       // this only runs for a real state change; the un-complete direction
       // degrades to reconcile backfill/silence because a stale-prop award would
       // mint phantom XP, mirroring shouldAwardHabitFastPath.
-      if (shouldAwardTodoFastPath(result.completed)) recordAction('todo', todo.id);
+      if (shouldAwardTodoFastPath(result.completed, actionDateKey, toDateKey()))
+        recordAction('todo', todo.id);
       if (todo.completed === 0 && !reducedMotion) {
         // Hold the just-completed row in the list while the settle animation
         // plays, then let the normal refresh remove it.

@@ -293,10 +293,28 @@ export type LoggedSet = {
   catalogExerciseId?: string | null;
   modality?: WorkoutModality;
   weight: number | null;
+  /** Unit the weight was recorded in. Null/absent = legacy kg rows (and
+   * weightless sets, which keep no unit — unknown, never fabricated). */
+  weightUnit?: WorkoutWeightUnit | null;
   reps: number | null;
   durationSeconds?: number | null;
   distance?: number | null;
 };
+
+/** Per-set weights predate per-set units: a null/absent unit is the legacy
+ * kg world (#182 stamps real units going forward). */
+export function resolveWeightUnit(unit: WorkoutWeightUnit | null | undefined): WorkoutWeightUnit {
+  return unit ?? 'kg';
+}
+
+/** Convert a recorded set weight into one comparison/display unit so mixed
+ * kg/lb history is never compared or summed raw. */
+function setWeightInUnit(
+  set: { weight: number; weightUnit?: WorkoutWeightUnit | null },
+  unit: WorkoutWeightUnit,
+): number {
+  return convertWeight(set.weight, resolveWeightUnit(set.weightUnit), unit);
+}
 
 /** Epley is intentionally limited to ordinary strength-set rep counts. */
 export const E1RM_MAX_REPS = 12;
@@ -389,7 +407,10 @@ function isFirstSetBetter(a: ValidLoggedSet, b: ValidLoggedSet): boolean {
  * Sets without recorded weight/reps (null) are skipped; exercises with no
  * valid weighted sets are omitted.
  */
-export function computePersonalRecords(sets: LoggedSet[]): PersonalRecord[] {
+export function computePersonalRecords(
+  sets: LoggedSet[],
+  unit: WorkoutWeightUnit = 'kg',
+): PersonalRecord[] {
   const byExercise = new Map<string, LoggedSet[]>();
   for (const set of sets) {
     const isTimed = set.modality === 'timed' || set.modality === 'cardio';
@@ -418,19 +439,30 @@ export function computePersonalRecords(sets: LoggedSet[]): PersonalRecord[] {
         set.modality === 'cardio' && Number.isFinite(set.distance) && (set.distance ?? 0) > 0,
     );
     let best1RMSet: ValidLoggedSet | null = null;
+    let best1RMNorm: ValidLoggedSet | null = null;
     let bestTopSet: ValidPerformanceSet | null = null;
+    let bestTopNorm: ValidPerformanceSet | null = null;
     let bestRepSet: ValidPerformanceSet | null = null;
+    let bestRepNorm: ValidPerformanceSet | null = null;
     for (const set of weightedSets) {
-      if (isValidLoggedSet(set) && (!best1RMSet || isFirstSetBetter(set, best1RMSet))) {
+      // Load comparisons run in ONE display unit: raw kg/lb numbers never
+      // race each other (a 100 lb set is not heavier than an 80 kg PR).
+      const norm: ValidPerformanceSet = { ...set, weight: setWeightInUnit(set, unit) };
+      if (isValidLoggedSet(norm) && (!best1RMNorm || isFirstSetBetter(norm, best1RMNorm))) {
         best1RMSet = set;
+        best1RMNorm = norm;
       }
-      if (!bestTopSet || set.weight > bestTopSet.weight) bestTopSet = set;
+      if (!bestTopNorm || norm.weight > bestTopNorm.weight) {
+        bestTopSet = set;
+        bestTopNorm = norm;
+      }
       if (
-        !bestRepSet ||
-        set.reps > bestRepSet.reps ||
-        (set.reps === bestRepSet.reps && set.weight > bestRepSet.weight)
+        !bestRepNorm ||
+        norm.reps > bestRepNorm.reps ||
+        (norm.reps === bestRepNorm.reps && norm.weight > bestRepNorm.weight)
       ) {
         bestRepSet = set;
+        bestRepNorm = norm;
       }
     }
     const bestTimedSet = timedSets.reduce<LoggedSet | null>(
@@ -445,9 +477,9 @@ export function computePersonalRecords(sets: LoggedSet[]): PersonalRecord[] {
     records.push({
       exerciseKey,
       exerciseName: displayName,
-      bestEstimated1RM: best1RMSet ? estimate1RM(best1RMSet.weight, best1RMSet.reps) : 0,
+      bestEstimated1RM: best1RMNorm ? estimate1RM(best1RMNorm.weight, best1RMNorm.reps) : 0,
       best1RMSet,
-      bestTopSetWeight: bestTopSet?.weight ?? 0,
+      bestTopSetWeight: bestTopNorm?.weight ?? 0,
       bestTopSet,
       bestRepSet,
       bestTimedDurationSeconds: bestTimedSet?.durationSeconds ?? 0,
@@ -468,16 +500,17 @@ export function computePersonalRecords(sets: LoggedSet[]): PersonalRecord[] {
 export function findNewPersonalRecords(
   sessionSets: LoggedSet[],
   historySets: LoggedSet[],
+  unit: WorkoutWeightUnit = 'kg',
 ): string[] {
   const historyBest = new Map<string, number>();
   const historyBestByName = new Map<string, number>();
-  for (const record of computePersonalRecords(historySets)) {
+  for (const record of computePersonalRecords(historySets, unit)) {
     historyBest.set(record.exerciseKey, record.bestEstimated1RM);
     historyBestByName.set(record.exerciseName.trim().toLocaleLowerCase(), record.bestEstimated1RM);
   }
 
   const names: string[] = [];
-  for (const record of computePersonalRecords(sessionSets)) {
+  for (const record of computePersonalRecords(sessionSets, unit)) {
     const prior =
       historyBest.get(record.exerciseKey) ??
       historyBestByName.get(record.exerciseName.trim().toLocaleLowerCase());
@@ -526,6 +559,7 @@ export type ExerciseHistorySummary = {
  */
 export function buildExerciseHistory(
   entries: readonly ExerciseHistoryEntry[],
+  unit: WorkoutWeightUnit = 'kg',
 ): ExerciseHistorySummary | null {
   if (entries.length === 0) return null;
   const ordered = [...entries].sort(
@@ -533,6 +567,7 @@ export function buildExerciseHistory(
   );
   const records = computePersonalRecords(
     ordered.filter((entry) => entry.completed).map(({ completed: _completed, ...entry }) => entry),
+    unit,
   );
   const record = records[0] ?? null;
   const sessions = new Map<string, ExerciseHistoryEntry[]>();
@@ -545,6 +580,7 @@ export function buildExerciseHistory(
     const completedEntries = sessionEntries.filter((entry) => entry.completed);
     const sessionRecord = computePersonalRecords(
       completedEntries.map(({ completed: _completed, ...entry }) => entry),
+      unit,
     )[0];
     let measurableVolume = 0;
     for (const entry of completedEntries) {
@@ -552,6 +588,8 @@ export function buildExerciseHistory(
         computeModalityVolume({
           modality: entry.modality ?? 'weighted_strength',
           weight: entry.weight,
+          weightUnit: entry.weightUnit,
+          unit,
           reps: entry.reps,
           completed: true,
         }) ?? 0;
@@ -606,10 +644,12 @@ export function isQuickLoggedSession(exerciseCount: number): boolean {
 export function computeSessionTotalVolume(
   sets: {
     weight: number | null;
+    weightUnit?: WorkoutWeightUnit | null;
     reps: number | null;
     completed: boolean;
     modality?: WorkoutModality;
   }[],
+  unit: WorkoutWeightUnit = 'kg',
 ): number {
   let total = 0;
   for (const set of sets) {
@@ -623,7 +663,7 @@ export function computeSessionTotalVolume(
     )
       continue;
     if (!Number.isFinite(set.weight) || !Number.isFinite(set.reps)) continue;
-    total += set.weight * set.reps;
+    total += setWeightInUnit({ weight: set.weight, weightUnit: set.weightUnit }, unit) * set.reps;
   }
   return total;
 }
@@ -632,6 +672,9 @@ export function computeSessionTotalVolume(
 export function computeModalityVolume(input: {
   modality: WorkoutModality;
   weight: number | null;
+  weightUnit?: WorkoutWeightUnit | null;
+  /** Target unit for the returned volume (legacy callers: kg). */
+  unit?: WorkoutWeightUnit;
   reps: number | null;
   completed: boolean;
 }): number | null {
@@ -649,7 +692,10 @@ export function computeModalityVolume(input: {
   }
   // For bodyweight this is additional external load only; the app never
   // pretends to know the user's body mass.
-  return input.weight * input.reps;
+  return (
+    convertWeight(input.weight, resolveWeightUnit(input.weightUnit), input.unit ?? 'kg') *
+    input.reps
+  );
 }
 
 export type NormalizedEffort = {
@@ -953,6 +999,7 @@ export function buildSessionLogExercises(
   routine: RoutineWithExercises,
   summary: readonly CompletedExerciseSummary[],
   records: readonly SessionSetRecord[],
+  weightUnit: WorkoutWeightUnit,
 ) {
   return groupSessionExercises(summary, records).map((group) => {
     const exercise = routine.exercises[group.exerciseIndex];
@@ -976,7 +1023,10 @@ export function buildSessionLogExercises(
         weight: set.weight,
         reps: set.reps,
         completed: set.completed,
-        weightUnit: set.weight !== null ? ('kg' as const) : null,
+        // The unit the values were entered in — the caller passes the user's
+        // workout weight unit; it is never fabricated. A missing measurement
+        // stays unknown (null), never a labeled zero.
+        weightUnit: set.weight !== null ? weightUnit : null,
         durationSeconds: set.durationSeconds,
         distance: set.distance,
         pace: set.pace,
@@ -995,6 +1045,7 @@ export type PreviousSetRow = {
   catalogExerciseId?: string | null;
   setNumber: number;
   weight: number;
+  weightUnit?: WorkoutWeightUnit | null;
   reps: number;
 };
 
@@ -1017,14 +1068,20 @@ export type PreviousSetLookup = {
  * Index previous-session rows for default seeding. Rows must be ordered
  * newest-first; the first occurrence of each key wins.
  */
-export function buildPreviousSetLookup(rows: PreviousSetRow[]): PreviousSetLookup {
+export function buildPreviousSetLookup(
+  rows: PreviousSetRow[],
+  unit: WorkoutWeightUnit = 'kg',
+): PreviousSetLookup {
   const byCatalogExerciseSet = new Map<string, PreviousSetRow>();
   const byCatalogExercise = new Map<string, PreviousSetRow>();
   const byExerciseSet = new Map<string, PreviousSetRow>();
   const byExercise = new Map<string, PreviousSetRow>();
   const byLegacyExerciseSet = new Map<string, PreviousSetRow>();
   const byLegacyExercise = new Map<string, PreviousSetRow>();
-  for (const row of rows) {
+  for (const raw of rows) {
+    // Seeded defaults and progression loads must land in the display unit:
+    // a raw 100 lb previous set may not seed a 100 kg next target.
+    const row: PreviousSetRow = { ...raw, weight: setWeightInUnit(raw, unit) };
     if (row.catalogExerciseId) {
       const exactCatalogKey = `${row.catalogExerciseId}::${row.setNumber}`;
       if (!byCatalogExerciseSet.has(exactCatalogKey)) {
@@ -1095,6 +1152,7 @@ export type ScheduleResolution = {
 export type ProgressionSet = {
   completed: boolean;
   weight: number | null;
+  weightUnit?: WorkoutWeightUnit | null;
   reps: number | null;
   durationSeconds?: number | null;
   distance?: number | null;
@@ -1382,11 +1440,13 @@ export function computeTrainingTotals(
     sets: readonly {
       completed: boolean;
       weight: number | null;
+      weightUnit?: WorkoutWeightUnit | null;
       reps: number | null;
       modality?: WorkoutModality;
     }[];
     isPr?: boolean;
   }[],
+  unit: WorkoutWeightUnit = 'kg',
 ): TrainingTotals {
   const days = new Set<string>();
   let completedSets = 0;
@@ -1404,6 +1464,8 @@ export function computeTrainingTotals(
         computeModalityVolume({
           modality: set.modality ?? 'weighted_strength',
           weight: set.weight,
+          weightUnit: set.weightUnit,
+          unit,
           reps: set.reps,
           completed: set.completed,
         }) ?? 0;

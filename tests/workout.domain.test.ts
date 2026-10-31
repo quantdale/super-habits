@@ -6,6 +6,7 @@ import {
   formatLastPerformedLabel,
   formatWorkoutTime,
   groupSessionExercises,
+  buildSessionLogExercises,
   lookupPreviousSet,
   summarizeCompletedSets,
   buildWorkoutActivityDays,
@@ -20,9 +21,11 @@ import {
   isQuickLoggedSession,
   normalizeEffort,
   recommendProgression,
+  type SessionSetRecord,
 } from '@/features/workout/workout.domain';
 import type { HeatmapDay } from '@/features/shared/activityTypes';
 import type { BodyWeightEntry, WorkoutLog } from '@/core/db/types';
+import type { RoutineWithExercises } from '@/features/workout/types';
 import { toDateKey } from '@/lib/time';
 
 function workoutLog(completedAt: string): WorkoutLog {
@@ -404,6 +407,62 @@ describe('groupSessionExercises', () => {
     expect(grouped.map((g) => g.setsCompleted)).toEqual([0, 0]);
     expect(grouped.flatMap((g) => g.sets)).toHaveLength(4);
     expect(grouped.flatMap((g) => g.sets).every((s) => s.completed === false)).toBe(true);
+  });
+});
+
+describe('buildSessionLogExercises', () => {
+  const routine = {
+    id: 'wrk_r1',
+    name: 'Push',
+    exercises: [
+      {
+        id: 'ex_1',
+        routine_id: 'wrk_r1',
+        name: 'Bench',
+        sort_order: 1,
+        sets: [
+          {
+            id: 'eset_1',
+            exercise_id: 'ex_1',
+            set_number: 1,
+            active_seconds: 30,
+            rest_seconds: 10,
+          },
+        ],
+      },
+    ],
+  } as unknown as RoutineWithExercises;
+
+  it("stamps the user's weight unit on recorded sets instead of fabricating kg", () => {
+    const summary = [{ exerciseIndex: 0, exerciseName: 'Bench', setsCompleted: 1 }];
+    const records: SessionSetRecord[] = [
+      {
+        exerciseIndex: 0,
+        exerciseName: 'Bench',
+        setNumber: 1,
+        weight: 135,
+        reps: 5,
+        completed: true,
+      },
+    ];
+    const exercises = buildSessionLogExercises(routine, summary, records, 'lb');
+    expect(exercises[0].sets[0].weightUnit).toBe('lb');
+  });
+
+  it('keeps an unrecorded weight unit-less (unknown, never fabricated)', () => {
+    const summary = [{ exerciseIndex: 0, exerciseName: 'Bench', setsCompleted: 1 }];
+    const records: SessionSetRecord[] = [
+      {
+        exerciseIndex: 0,
+        exerciseName: 'Bench',
+        setNumber: 1,
+        weight: null,
+        reps: null,
+        completed: true,
+      },
+    ];
+    const exercises = buildSessionLogExercises(routine, summary, records, 'lb');
+    expect(exercises[0].sets[0].weightUnit).toBeNull();
   });
 });
 

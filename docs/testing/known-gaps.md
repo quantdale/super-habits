@@ -91,6 +91,13 @@ Every entry below is either a contract gap or a capability gap. If a new uncover
 - **Reason (reproduced 2026-09-03):** across seven full `npm test` runs, four different files failed sporadically — `caloriesIntegrity`, `portableOwnerRecovery`, `fixtures`, `portableLargeDataset` (integration: real SQLite bootstrap per test, file-backed imports, tens-of-thousands-row export/import), and `web-lifecycle` (spawns two real node HTTP servers). Two distinct mechanisms were proven with captured stack traces: (a) the 5s/30s bounds being tighter than the operation's meaning under parallel worker load (no assertion ever failed — pure timeouts); (b) a `pickPort()` TOCTOU bind race — the port scanner sees a port free while a previous test's server is still mid-shutdown, the spawned server dies instantly on `EADDRINUSE`, and a probe _not watching the child_ then burns its full 10s. Classification: `TEST_BUG` for both; no product, no flake of any assertion.
 - **Resolution (closed 2026-09-03):** integration project sets `testTimeout: 15_000` with rationale in `vitest.config.ts`; `portableLargeDataset` describe gets a proportional 120s ceiling (its own timing assertions at 30–60s remain the real contract); `fixtures` gets 30s; `web-lifecycle`'s tree-isolation spec gets 10s child-watching readiness probes, a bounded 3-attempt spawn retry on a fresh port for both owned and victim servers, a 60s describe ceiling exceeding the worst path, and a bounded cleanup wait (the only previously unbounded await). No assertion semantics changed; no blind retries — the retry is specifically the proven bind race, with the child watcher making genuine server failures fail fast. Verified by eight consecutive full parallel runs (see ExecPlan ledger).
 
+### CG-10 — `todos-390-dark` visual golden flakes at the tab-bar edge on the hosted runner — OPEN (known flake)
+
+**Decided contract (W15):** every visual golden compares strictly (`maxDiffPixels: 0`, no masks).
+
+- **Reason (observed 2026-10-30, UI v2 P6/P7):** `e2e/visual-regression.spec.ts:424` (`todos-390-dark`) failed on PR #168 run `40938811411` attempts 1 and 2 (5,613 px) and on PR #173 run `40940542299` (4,915 px), but passed on PR #168 run `40932996057` and PR #173 run `40947289113` with the same golden and no change to To Do code between them. The diffs are small, sub-threshold antialiasing deltas confined to the tab-bar edge and its icons (max channel delta 95), not a layout change, so the capture is nondeterministic on the hosted runner.
+- **Handling:** treated as a known flake for merge decisions (alongside the five W15 cases already failing on main). The flaky capture is **not** adopted as a golden (adopting it would only flip which state fails), the assertion is not loosened, and no mask is added. Close this entry once the tab-bar edge capture is made deterministic (for example by settling the tab-bar cross-fade before capture) and the test passes on consecutive hosted runs.
+
 ---
 
 ## Capability gaps
@@ -865,3 +872,9 @@ trigger technique the W10 Calories suite uses, asserting the UI failure state
 and the durable row/outbox outcome (8/8 PASS at W11.5 closure; evidence in
 `docs/ui-ux/v3-audit/w11.5/`). The opt-in status of this visual instrument is
 unchanged.
+
+### 25. decode-uri-component 0.5.1 override — `query-string.parse()` would throw if ever reached (2026-10-30)
+
+**Reason:** the `query-string`-scoped npm `overrides` pin to `decode-uri-component@0.5.1` (fixing GHSA-vcc3-ghjq-m6fr and GHSA-qr28-fpjm-wq7f) crosses to an ESM-only release (`type: module`, `export default` at `index.js:139`). `query-string@7.1.3` consumes it as CJS — `const decodeComponent = require('decode-uri-component')` (`index.js:3`) — so under both Node `require(ESM)` and Metro's ESM→CJS transform the binding is a non-callable module namespace: `decodeComponent(value)` inside `parse()` (`index.js:233`) would throw a `TypeError` if `parse()` were ever called. No shipped path calls it today: expo-router 55.0.18 only uses `queryString.stringify` (`build/fork/getPathFromState.js:276`, `build/fork/getPathFromState-forks.js:71`), which never touches `decodeComponent`; the single `queryString.parse` reference is commented out (`build/fork/getStateFromPath.js:538`), and `parseUrl`/`stringifyUrl` (which call `parse` internally) are unused. No lane reaches `query-string.parse()`, so the latent break is invisible to the suite by construction.
+
+**Closing path:** revisit the override on any expo-router or query-string upgrade. If `parse()`/`parseUrl()`/`stringifyUrl()` become reachable, patch query-string's `require` interop (or bump query-string to an ESM-aware release) before shipping — the failure mode would be a `TypeError` crash, not the advisories' DoS.

@@ -40,6 +40,8 @@ import {
   kcalFromMacros,
   buildTargetProgress,
   resolveCalorieLogDateKey,
+  calorieEditSaveError,
+  resolveEntryKcal,
 } from '@/features/calories/calories.domain';
 import type {
   CalorieGoal,
@@ -48,7 +50,11 @@ import type {
   MealType,
   SavedMeal,
 } from '@/features/calories/types';
-import type { FrequentFood, MacroTargets } from '@/features/calories/calories.domain';
+import type {
+  FrequentFood,
+  MacroTargets,
+  EntryKcalSource,
+} from '@/features/calories/calories.domain';
 import { isValidDateKey, toDateKey } from '@/lib/time';
 import { useActiveForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
@@ -157,12 +163,14 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const [searchSheetVisible, setSearchSheetVisible] = useState(false);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   /**
-   * Stored kcal of the edited entry when it is kcal-only ("Quick add": every
-   * macro 0). Such calories are not derivable from macros, so the edit modal
-   * must keep them as the effective kcal until the user enters a macro —
-   * recomputing 0 there would block Save (`validateCalorieComputedKcal`).
+   * Stored kcal + macros of the row being edited or the meal chip prefilled
+   * into the draft. The stored kcal stands in for the macro-derived value
+   * while the macro fields still match this source (kcal-only "Quick add"
+   * rows and explicit-kcal rows from the command path cannot be derived from
+   * macros at all); `resolveEntryKcal` switches to derivation as soon as the
+   * user edits a macro.
    */
-  const [kcalOnlyBase, setKcalOnlyBase] = useState<number | null>(null);
+  const [kcalSource, setKcalSource] = useState<EntryKcalSource | null>(null);
   const [entryDateKey, setEntryDateKey] = useState<string>(() => toDateKey());
   const [showEntryDatePicker, setShowEntryDatePicker] = useState(false);
   const [entryModalVisible, setEntryModalVisible] = useState(false);
@@ -367,19 +375,21 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     [protein, carbs, fats, fiber],
   );
   /**
-   * Effective kcal for the entry form and edit modal: while a kcal-only row
-   * (edited entry or chip prefill) still has all macros at 0, its stored kcal
-   * stands in for the macro-derived 0 (display + validation). As soon as any
-   * macro is non-zero the value is computed from macros as usual.
+   * Effective kcal for the entry form and edit modal: the edited row's (or
+   * prefilled meal's) stored kcal while the macro fields still match its
+   * source — this covers kcal-only rows, explicit-kcal rows the macro sum
+   * cannot derive, and ordinary derived rows alike. Once any macro is edited
+   * the value is computed from the draft macros as usual.
    */
   const effectiveKcal = useMemo(() => {
-    const macrosAllZero =
-      (parseNumericInput(protein) ?? 0) === 0 &&
-      (parseNumericInput(carbs) ?? 0) === 0 &&
-      (parseNumericInput(fats) ?? 0) === 0 &&
-      (parseNumericInput(fiber) ?? 0) === 0;
-    return macrosAllZero && kcalOnlyBase !== null ? kcalOnlyBase : computedKcal;
-  }, [kcalOnlyBase, computedKcal, protein, carbs, fats, fiber]);
+    if (kcalSource === null) return computedKcal;
+    return resolveEntryKcal(kcalSource, {
+      protein: parseNumericInput(protein) ?? 0,
+      carbs: parseNumericInput(carbs) ?? 0,
+      fats: parseNumericInput(fats) ?? 0,
+      fiber: parseNumericInput(fiber) ?? 0,
+    });
+  }, [kcalSource, computedKcal, protein, carbs, fats, fiber]);
   /**
    * Pre-submit consumed-date validation for the edit modal (mirrors
    * `assertConsumableDateKey`): the error surfaces as soon as the date
@@ -411,7 +421,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     setEntryDateKey(logDateKey);
     setShowEntryDatePicker(false);
     setEditingEntryId(null);
-    setKcalOnlyBase(null);
+    setKcalSource(null);
     setCalorieError(null);
   }, [logDateKey]);
 
@@ -436,15 +446,17 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const applyMealToDraft = useCallback((meal: MealPrefillSource) => {
     setCalorieError(null);
     setEditingEntryId(null);
-    // A kcal-only meal (quick-add rows, quick-capture saved meals) carries
-    // calories no macro sum can derive; keep them as the effective kcal —
-    // the same `kcalOnlyBase` mechanism as `openEntryEditModal` — or the
-    // prefill would submit a macro-derived 0 and be rejected.
-    setKcalOnlyBase(
-      meal.protein === 0 && meal.carbs === 0 && meal.fats === 0 && (meal.fiber ?? 0) === 0
-        ? meal.calories
-        : null,
-    );
+    // The meal's stored kcal stands in for the macro-derived value while the
+    // macro fields stay as prefilled: kcal-only rows and explicit-kcal rows
+    // (command path, quick-capture saved meals) carry calories no macro sum
+    // can derive — the same `kcalSource` mechanism as `openEntryEditModal`.
+    setKcalSource({
+      calories: meal.calories,
+      protein: meal.protein,
+      carbs: meal.carbs,
+      fats: meal.fats,
+      fiber: meal.fiber ?? 0,
+    });
     setFood(meal.food_name);
     setProtein(String(meal.protein));
     setCarbs(String(meal.carbs));
@@ -483,11 +495,13 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     setEntryDateKey(entry.consumed_on);
     setShowEntryDatePicker(false);
     setEditingEntryId(entry.id);
-    setKcalOnlyBase(
-      entry.protein === 0 && entry.carbs === 0 && entry.fats === 0 && (entry.fiber ?? 0) === 0
-        ? entry.calories
-        : null,
-    );
+    setKcalSource({
+      calories: entry.calories,
+      protein: entry.protein,
+      carbs: entry.carbs,
+      fats: entry.fats,
+      fiber: entry.fiber ?? 0,
+    });
     // Surface a legacy future date immediately (Save is also disabled
     // via entryDateError); today/past entries clear any stale error.
     setCalorieError(validateConsumedDateKey(entry.consumed_on));
@@ -643,7 +657,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         const fiberN = parseNumericInput(fiber) ?? 0;
 
         if (editingEntryId) {
-          await updateCalorieEntry(editingEntryId, {
+          const updateResult = await updateCalorieEntry(editingEntryId, {
             foodName: food.trim(),
             protein: proteinN,
             carbs: carbsN,
@@ -651,10 +665,20 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
             fiber: fiberN,
             mealType,
             consumedOn: entryDateKey,
-            // Kept only while all macros are 0 (kcal-only edit); otherwise
-            // the data layer recomputes kcal from macros as usual.
-            calories: kcalOnlyBase ?? undefined,
+            // The effective kcal the modal displayed: kept while the macros
+            // still match the row (kcal-only and explicit-kcal rows),
+            // recomputed by the data layer as soon as a macro changed.
+            calories: effectiveKcal,
           });
+          // A row deleted meanwhile (e.g. by sync from another device) must
+          // never look saved: keep the modal open with the reason and reload
+          // the day log so the vanished entry disappears immediately.
+          const editError = calorieEditSaveError(updateResult);
+          if (editError) {
+            setCalorieError(editError);
+            await refresh();
+            return;
+          }
         } else {
           // Both modes log to the day the surface is showing (selectedDateKey),
           // never an implicit "today": a meal added while the diary sits on
