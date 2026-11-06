@@ -2,7 +2,7 @@
 
 **Status: Phase 1 staged; full legacy-name retirement is not complete.**
 
-The canonical repository, public display brand, Expo project slug and display name, PWA name, and npm package name are `super-habits`. This first phase is a review-only source change. Production deployment remains on hold through `vercel.json` and is not authorized.
+The canonical repository, public display brand, Expo project slug and display name, PWA name, and npm package name are `super-habits`. This first phase was a review-only source change. The later lift of the `vercel.json` production hold is recorded in `tests/vercelProductionHold.test.ts`.
 
 ## Verified naming footprint
 
@@ -54,7 +54,7 @@ reported so the ledger stays complete without ever becoming a rename checklist.
 3. **Local storage and PWA:** keys `superhabits.*`, cache names `superhabits-shell-*`, database names and OPFS state must be migrated idempotently, with conflicts, legacy reads, rollback, and cross-origin domain effects tested.
 4. **Serialized backup formats:** `superhabits-portable-backup`, fingerprint domain separators and old JSON backups are persistent protocol values. Never break signature/hash validation or the ability to import backups created before rebranding. Introduce a versioned new format and legacy import compatibility, or retain the protocol token as a documented legacy exception.
 5. **Supabase:** `supabase/config.toml` has local project ID `superhabits`. The connected project named `superhabits` was reported **INACTIVE** at the audit date. Confirm cloud data/retention and rename availability independently before modifying it or linked keys/URLs.
-6. **Vercel:** two live project records exist: canonical `super-habits` and additional `superhabits`. Their domains, aliases, build histories and current serving deployments are independent. Do not delete the extra project until its traffic and data/retention responsibilities are verified and the canonical destination is qualified. The repo's `git.deploymentEnabled.main=false` must remain unchanged.
+6. **Vercel:** `super-habits` (super-habits.vercel.app) is the only Vercel project for this repository. The duplicate `superhabits` project was deleted on 2026-10-31 after ownership and domain verification, along with its GitHub environments `Preview – superhabits` and `Production – superhabits`. The unrelated `superhabits.vercel.app` host belongs to a different account and is not ours. The `main` production hold has been lifted (see `tests/vercelProductionHold.test.ts`).
 7. **Historical records:** immutable Git commits, PR comments, old artifacts, caches, links and signed evidence cannot be truthfully rewritten into having a different past. The goal is no unapproved current-use legacy labels and a documented compatibility exception list, not falsifying historical provenance.
 
 ## Completion criteria

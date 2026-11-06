@@ -196,7 +196,7 @@ Run **only after** Phases 1–3 have passed (local quality gate + live inspectio
 Use **GitHub MCP** to:
 
 1. Get the current branch name (`git branch --show-current`).
-2. Find the **open PR** for this branch on the **superhabits** repo.
+2. Find the **open PR** for this branch on the **quantdale/super-habits** repo.
 3. Fetch the **latest workflow run** associated with that PR (or the run for the latest push to the PR branch).
 4. Report the status of each job:
    - **quality** (typecheck + lint + unit tests)

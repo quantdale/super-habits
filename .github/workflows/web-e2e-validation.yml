@@ -106,7 +106,7 @@ jobs:
         with:
           name: web-e2e-validation-report-${{ github.run_id }}
           path: .cursor/playwright-output/e2e-report/
-          retention-days: 14
+          retention-days: 7
           if-no-files-found: warn
 
       - name: Upload failure artifacts
@@ -117,5 +117,5 @@ jobs:
           path: |
             test-results/
             .cursor/playwright-output/e2e-failures/
-          retention-days: 14
+          retention-days: 7
           if-no-files-found: warn
