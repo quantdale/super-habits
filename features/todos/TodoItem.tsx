@@ -5,10 +5,11 @@ import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from '
 import { Swipeable } from 'react-native-gesture-handler';
 import { MenuSheet } from '@/core/ui/MenuSheet';
 import { SwipeRightActions } from '@/core/ui/SwipeRightActions';
+import { useCheckBurst } from '@/core/ui/motion/useCheckBurst';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useMotionDuration, useReducedMotion } from '@/core/theme/motion';
-import { size, springs } from '@/core/theme/designTokens';
-import { SECTION_COLORS } from '@/constants/sectionColors';
+import { radius, size, springs } from '@/core/theme/designTokens';
+import { SECTION_COLORS, SECTION_HUES } from '@/constants/sectionColors';
 import { toDateKey } from '@/lib/time';
 import { buildTodoRowMeta, type TodoRowMetaTone } from './todos.domain';
 import type { Todo } from './types';
@@ -46,14 +47,16 @@ function RowMoreButton({ title, onPress }: { title: string; onPress: () => void 
 }
 
 /**
- * The chunky circular completion control. Sinks slightly under the finger and
- * pops with a spring when the todo flips to done; under Reduce Motion the state
- * change is instant. Quiet ring when incomplete (never louder than the title),
- * unmistakable filled check when done — the state is also carried by the
- * checkbox's checked semantics, not by color alone.
+ * The v2 chunky completion control (Playful Momentum §6 CheckNode visual):
+ * a 32px face circle with a 2px border riding a 2px lip — done = Sky bright
+ * fill, white ✓ glyph, lip = the Sky solid. The 48pt semantic wrapper keeps
+ * the checkbox contract (role, label, checked state) and is the measured
+ * touch target (`todos-convergence` asserts the role box ≥ 48).
  *
- * The Pressable keeps the semantic checkbox contract (role, label, checked
- * state) and stays a 48pt target.
+ * The completion pop + 6-dot burst ride `useCheckBurst` (Reanimated worklets,
+ * §5.8 `light` row), so the celebration runs off the JS critical path and
+ * never delays the state update or the durable write. Reduced motion: no
+ * scale, no dots — state change is instant.
  */
 function TodoCheckControl({
   title,
@@ -64,24 +67,13 @@ function TodoCheckControl({
   done: boolean;
   onPress: () => void;
 }) {
-  const { tokens, sectionAccents } = useAppTheme();
+  const { tokens } = useAppTheme();
   const reducedMotion = useReducedMotion();
+  const burst = useCheckBurst();
   const [scale] = useState(() => new Animated.Value(1));
-  const wasDoneRef = useRef(done);
-  const circleSize = 24;
+  const circleSize = 32;
   const targetSize = size.touchTargetMin;
-
-  useEffect(() => {
-    const wasDone = wasDoneRef.current;
-    wasDoneRef.current = done;
-    if (wasDone === done) return;
-    if (reducedMotion || !done) {
-      scale.setValue(1);
-      return;
-    }
-    scale.setValue(0.76);
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, ...springs.pop }).start();
-  }, [done, reducedMotion, scale]);
+  const hue = SECTION_HUES.todos;
 
   const settle = (toValue: number) => {
     if (reducedMotion) {
@@ -91,9 +83,16 @@ function TodoCheckControl({
     Animated.spring(scale, { toValue, useNativeDriver: true, ...springs.press }).start();
   };
 
+  const handlePress = () => {
+    // Juice follows causality (§4): the burst fires from the touched control
+    // and the toggle commits immediately — the pop never gates persistence.
+    burst.trigger();
+    onPress();
+  };
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
       onPressIn={() => settle(0.88)}
       onPressOut={() => settle(1)}
       hitSlop={6}
@@ -108,23 +107,70 @@ function TodoCheckControl({
         justifyContent: 'center',
       }}
     >
-      <Animated.View
-        style={{
-          width: circleSize,
-          height: circleSize,
-          borderRadius: circleSize / 2,
-          borderWidth: 2,
-          borderColor: done ? sectionAccents.todos.fill : tokens.borderStrong,
-          backgroundColor: done ? sectionAccents.todos.fill : 'transparent',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transform: [{ scale }],
-        }}
-      >
-        {done ? (
-          <MaterialIcons name="check" size={circleSize * 0.6} color={tokens.onSolid} />
+      <View style={{ width: circleSize, height: circleSize + 2 }}>
+        {/* Lip slab (§5.7): the Sky solid under the face, collapsing on press. */}
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 2,
+            height: circleSize,
+            borderRadius: radius.full,
+            backgroundColor: done ? hue.lip : tokens.borderStrong,
+          }}
+        />
+        {burst.burstCount > 0 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              burst.burstStyle,
+              {
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: circleSize,
+                height: circleSize,
+              },
+            ]}
+          >
+            {Array.from({ length: burst.burstCount }, (_, index) => {
+              const angle = (index / burst.burstCount) * Math.PI * 2;
+              return (
+                <View
+                  key={index}
+                  style={{
+                    position: 'absolute',
+                    top: circleSize / 2 - 2.5 + Math.sin(angle) * 22,
+                    left: circleSize / 2 - 2.5 + Math.cos(angle) * 22,
+                    width: 5,
+                    height: 5,
+                    borderRadius: radius.full,
+                    backgroundColor: hue.bright,
+                  }}
+                />
+              );
+            })}
+          </Animated.View>
         ) : null}
-      </Animated.View>
+        <Animated.View
+          style={{
+            width: circleSize,
+            height: circleSize,
+            borderRadius: circleSize / 2,
+            borderWidth: 2,
+            borderColor: done ? hue.bright : tokens.border,
+            backgroundColor: done ? hue.bright : tokens.surface,
+            alignItems: 'center',
+            justifyContent: 'center',
+            transform: [{ scale }],
+          }}
+        >
+          {done ? (
+            <MaterialIcons name="check" size={circleSize * 0.6} color={tokens.onSolid} />
+          ) : null}
+        </Animated.View>
+      </View>
     </Pressable>
   );
 }
@@ -191,6 +237,7 @@ export const TodoItem = memo(function TodoItem({
   }, [onDelete]);
 
   const titleColor = done ? tokens.textMuted : tokens.text;
+  const titleWeight = done ? '600' : '700';
 
   let metaLine: ReactNode = null;
   if (metaItems.length > 0) {
@@ -250,7 +297,7 @@ export const TodoItem = memo(function TodoItem({
               <Text
                 variant="bodyMd"
                 className={done ? 'line-through' : ''}
-                style={{ color: titleColor }}
+                style={{ color: titleColor, fontWeight: titleWeight }}
               >
                 {todo.title}
               </Text>
