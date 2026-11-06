@@ -67,8 +67,11 @@ function HabitDayButton({
   const { tokens } = useAppTheme();
   const focus = useKeyboardFocusRing(HUE.bright);
   const activeFill = readableSurface(HUE.bright, tokens.onSolid);
-  const filled = allComplete || selected;
-  const contentColor = filled ? tokens.onSolid : tokens.text;
+  // Done fills Sprout bright and keeps DARK text (tokens.text): white on the
+  // bright hue is below 4.5:1 for small text and fails the w7 rendered-AA
+  // audit. Selected fills the readableSurface tint, which is dark enough for
+  // onSolid. State is still shape-coded (check/dot), never color alone.
+  const contentColor = allComplete ? tokens.text : selected ? tokens.onSolid : tokens.text;
   return (
     <Pressable
       onPress={onPress}
