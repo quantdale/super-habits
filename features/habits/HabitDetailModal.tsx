@@ -17,6 +17,7 @@ import type { HabitCheckInRowModel } from './habitCheckIn.domain';
 import { formatHabitCheckInDatePhrase } from './habitCheckIn.domain';
 import { HabitProgressInsightsContent } from './HabitProgressInsightsModal';
 import { GitHubHeatmap } from '@/features/shared/GitHubHeatmap';
+import { FlameIcon } from '@/core/ui/illustrations/icons';
 
 type Props = {
   habit: Habit | null;
@@ -125,6 +126,30 @@ export function HabitDetailModal({
         ) : null}
         {section === 'today' ? (
           <>
+            {history?.insights ? (
+              <View
+                className="flex-row items-center gap-4 rounded-2xl p-4"
+                style={{ backgroundColor: tokens.surfaceSunken }}
+              >
+                <FlameIcon size={48} />
+                <View className="flex-1">
+                  <Text variant="display" style={{ color: accent }}>
+                    {history.insights.currentStreak}
+                  </Text>
+                  <Text variant="label" tone="muted">
+                    Current streak
+                  </Text>
+                </View>
+                <View className="items-end">
+                  <Text variant="titleLg" style={{ color: tokens.text }}>
+                    {history.insights.longestStreak}
+                  </Text>
+                  <Text variant="label" tone="muted">
+                    Best streak
+                  </Text>
+                </View>
+              </View>
+            ) : null}
             <View accessible accessibilityLabel={row.actionLabel} className="gap-1">
               <Text variant="titleMd">Check-in {phrase}</Text>
               <Text variant="bodyLg">
@@ -169,12 +194,6 @@ export function HabitDetailModal({
                 </>
               ) : null}
             </View>
-            {history?.insights ? (
-              <Text variant="caption" tone="muted">
-                Current streak: {history.insights.currentStreak} scheduled occurrences. Open
-                Progress for history and consistency.
-              </Text>
-            ) : null}
           </>
         ) : section === 'progress' ? (
           history?.insights ? (
