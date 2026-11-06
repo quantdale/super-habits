@@ -102,3 +102,21 @@ supabase/.temp/
 # false because of these files).
 /gym-v2-custom-exercise-submit.png
 /gym-v2-session-custom-exercise-submit.png
+
+# Local agent scratch (debug dumps and one-off file lists). Not source.
+/.tmp-*/
+/features_tsx_list.txt
+
+# Agent evidence logs and visual-audit captures are run artifacts, not source.
+# Certification is a fresh run on the current tree (openspec/specs/release-candidate-closure).
+# Images that docs still link stay tracked; `git add -f` is required to add a new
+# doc image under these paths. Visual-test goldens live in e2e/__screenshots__/ and
+# are not matched here.
+/.agent/hardening-evidence/*.log
+/.agent/hardening-evidence/lint-full.txt
+/docs/ui-ux/v3-audit/**/*.png
+/docs/ui-ux/v3-audit/**/*.jpg
+/docs/ui-ux/v3-audit/**/*.jpeg
+/docs/ui-ux/v3-audit/**/*.webp
+/docs/ui-ux/baseline-screenshots/
+/docs/ui-ux/*-screenshots/
