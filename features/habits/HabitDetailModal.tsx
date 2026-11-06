@@ -144,8 +144,10 @@ export function HabitDetailModal({
                   <Text variant="titleLg" style={{ color: tokens.text }}>
                     {history.insights.longestStreak}
                   </Text>
+                  {/* Vocabulary matches the preserved a11y shapes
+                      ("Current streak / Longest streak"). */}
                   <Text variant="label" tone="muted">
-                    Best streak
+                    Longest streak
                   </Text>
                 </View>
               </View>
