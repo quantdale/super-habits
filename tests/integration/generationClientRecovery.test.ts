@@ -862,12 +862,15 @@ describe('review R3: actual capture → publication → restore contracts', () =
     target.generations.heads.set('user_a', { snapshot_id: 'other_device', sequence: 3 });
     const transaction = db.withTransactionAsync.bind(db);
     vi.spyOn(db, 'withTransactionAsync').mockImplementationOnce(async (task) => {
-      // The replacement commits after push read its capture, before conflict's
-      // transaction opens. The conflict must refer to the durable replacement.
-      await setAppMetaJson(db as never, appMetaKeys.backupGenerationCapture, {
-        ...replacement.capture,
-        chunks: replacement.chunks,
-      });
+      // Inject an already-admitted competing commit at the raw adapter seam,
+      // after push read its capture but before conflict's transaction opens.
+      // Calling the public queued metadata helper here would wait on the very
+      // transaction whose adapter entry this spy is holding (not a real caller).
+      // The conflict must still refer to the durable replacement.
+      await db.runAsync('INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)', [
+        appMetaKeys.backupGenerationCapture.key,
+        JSON.stringify({ ...replacement.capture, chunks: replacement.chunks }),
+      ]);
       await transaction(task);
     });
     const before = target.writes.length;
