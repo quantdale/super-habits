@@ -1,13 +1,15 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { Text } from '@/core/ui/Text';
+import { GardenIcon } from '@/core/ui/illustrations/icons';
 import { MOMENTUM_SOURCE_LABELS } from './momentum.types';
 import { formatMomentumTodaySummary } from './momentum.domain';
 import { MomentumGardenArt } from './MomentumGardenArt';
 import type { MomentumGardenModel } from './momentum.types';
-import { radius, size, spacing } from '@/core/theme/designTokens';
+import { radius, spacing } from '@/core/theme/designTokens';
 
 type MomentumCardProps = {
   model: MomentumGardenModel;
@@ -50,7 +52,7 @@ export function MomentumCard({ model, onViewGarden }: MomentumCardProps) {
               borderColor: `${accent.fill}33`,
             }}
           >
-            <MaterialIcons name="spa" size={23} color={accent.text} />
+            <GardenIcon size={26} bright={accent.text} lip={accent.fill} />
           </View>
           <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 0 }}>
             <Text variant="titleMd">Momentum Garden</Text>
@@ -58,28 +60,14 @@ export function MomentumCard({ model, onViewGarden }: MomentumCardProps) {
               Useful actions grow separate roots. There is no score to chase.
             </Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
+          <Button
+            label="View garden"
             accessibilityLabel="View Momentum Garden"
+            variant="secondary"
+            size="sm"
+            icon="chevron-right"
             onPress={onViewGarden}
-            style={({ pressed }) => ({
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: spacing.xs,
-              minHeight: size.touchTargetMin - 4,
-              paddingHorizontal: spacing.md,
-              borderRadius: radius.full,
-              backgroundColor: tokens.chipBackground,
-              borderWidth: 1.5,
-              borderColor: tokens.chipBorder,
-              opacity: pressed ? 0.85 : 1,
-            })}
-          >
-            <Text variant="label" style={{ color: accent.text, fontSize: 12 }}>
-              View garden
-            </Text>
-            <MaterialIcons name="chevron-right" size={18} color={accent.text} />
-          </Pressable>
+          />
         </View>
 
         <View

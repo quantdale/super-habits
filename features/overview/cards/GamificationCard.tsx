@@ -2,6 +2,7 @@ import { REWARD_COLORS } from '@/constants/sectionColors';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Text, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { ChestIcon } from '@/core/ui/illustrations/icons';
 import { radius, spacing, typography } from '@/core/theme/designTokens';
 import { useGamification } from '@/features/gamification/gamificationContext';
 import { LevelHero } from '@/features/gamification/LevelHero';
@@ -68,9 +69,12 @@ export function GamificationCard() {
           />
 
           <View style={{ gap: spacing.md }}>
-            <Text style={{ ...typography.label, color: tokens.textMuted }}>
-              TODAY&apos;S QUESTS
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <ChestIcon size={20} />
+              <Text style={{ ...typography.label, color: tokens.textMuted }}>
+                TODAY&apos;S QUESTS
+              </Text>
+            </View>
             {snapshot.quests.map((quest) => (
               <QuestRow key={quest.id} quest={quest} accent={REWARD_COLORS.quest} />
             ))}

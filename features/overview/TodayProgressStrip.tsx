@@ -1,9 +1,16 @@
 import { Text } from '@/core/ui/Text';
-import { MaterialIcons } from '@expo/vector-icons';
 import { Pressable, View } from 'react-native';
 
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { Card } from '@/core/ui/Card';
+import {
+  CaloriesIcon,
+  FocusIcon,
+  HabitsIcon,
+  TodosIcon,
+  WorkoutIcon,
+} from '@/core/ui/illustrations/icons';
 import { radius, spacing } from '@/core/theme/designTokens';
 
 import type {
@@ -42,7 +49,7 @@ export function TodayProgressStrip({
   workout,
   calories,
 }: TodayProgressStripProps) {
-  const { tokens, sectionAccents } = useAppTheme();
+  const { tokens } = useAppTheme();
   const navigation = useAppNavigation();
 
   const focusMinutesToday =
@@ -63,8 +70,6 @@ export function TodayProgressStrip({
     id: 'todos' | 'habits' | 'focus' | 'workout' | 'calories';
     value: string;
     label: string;
-    /** Semantic state icon override (status, not decoration). */
-    icon?: keyof typeof MaterialIcons.glyphMap;
     /** Full sentence read by screen readers. */
     spoken: string;
   }[] = [
@@ -104,7 +109,6 @@ export function TodayProgressStrip({
               ? `${workout.sessionsThisWeek}/wk`
               : '—',
       label: 'Workout',
-      icon: workoutDoneToday ? 'check-circle' : undefined,
       spoken: workoutResumable
         ? 'Workout in progress and ready to resume'
         : workoutDoneToday
@@ -126,8 +130,16 @@ export function TodayProgressStrip({
     },
   ];
 
+  const heroGlyphs = {
+    todos: TodosIcon,
+    habits: HabitsIcon,
+    focus: FocusIcon,
+    workout: WorkoutIcon,
+    calories: CaloriesIcon,
+  } as const;
+
   return (
-    <View>
+    <Card variant="flat">
       <Text
         variant="caption"
         tone="muted"
@@ -138,8 +150,9 @@ export function TodayProgressStrip({
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
         {metrics.map((metric) => {
           const meta = OVERVIEW_CARD_META[metric.id];
-          // Hue marks identity on the icon only; value/label stay in primary
-          // ink on the neutral surface so the strip reads as one measurement.
+          // Hue marks identity on the hero icon only; value/label stay in
+          // primary ink so the row reads as one measurement (§4 one hue per job).
+          const HeroGlyph = heroGlyphs[metric.id];
           return (
             <Pressable
               key={metric.id}
@@ -155,19 +168,13 @@ export function TodayProgressStrip({
                 borderRadius: radius.md,
                 alignItems: 'center',
                 gap: 2,
-                minHeight: 64,
+                minHeight: 72,
                 justifyContent: 'center',
-                backgroundColor: tokens.surface,
-                borderWidth: 1,
-                borderColor: tokens.border,
+                backgroundColor: tokens.surfaceSunken,
                 opacity: pressed ? 0.85 : 1,
               })}
             >
-              <MaterialIcons
-                name={metric.icon ?? meta.icon}
-                size={16}
-                color={sectionAccents[metric.id].text}
-              />
+              <HeroGlyph size={22} />
               <Text
                 variant="metric"
                 style={{ color: tokens.text, fontSize: 19, lineHeight: 24 }}
@@ -182,6 +189,6 @@ export function TodayProgressStrip({
           );
         })}
       </View>
-    </View>
+    </Card>
   );
 }
