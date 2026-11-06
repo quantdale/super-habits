@@ -1103,13 +1103,16 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       ) : null}
 
       <ScreenSection>
+        {/* §6 hero face: `Text` forces the Card's AA ink unless a caller passes
+            an explicit `style.color`, which opts out. No text on this face may
+            set a muted color or dim with opacity — both fail AA on Grape. */}
         <Card variant="hero" accentColor={COLOR} className="mb-0">
           <View
             accessibilityRole="timer"
             accessibilityLabel={TIMER_REGION_LABEL}
             className="w-full items-center"
           >
-            <Text className="text-xs font-medium uppercase tracking-wide opacity-70">
+            <Text className="text-xs font-medium uppercase tracking-wide">
               {summaryVisible
                 ? 'Session complete'
                 : resolvePhaseHeadline(renderedPhase, getModeLabel(currentMode))}
@@ -1130,11 +1133,11 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                   Focused {completionSummary.minutes} min
                 </Text>
                 {completionSummary.linkedTodoTitle ? (
-                  <Text className="mt-1 text-center text-sm opacity-80" numberOfLines={1}>
+                  <Text className="mt-1 text-center text-sm" numberOfLines={1}>
                     {completionSummary.linkedTodoTitle}
                   </Text>
                 ) : null}
-                <Text className="mt-1 text-center text-xs opacity-70">
+                <Text className="mt-1 text-center text-xs">
                   {summaryTodayMinutes} min focused today
                 </Text>
               </>
@@ -1160,31 +1163,19 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
             )}
 
             {cycleSentence ? (
-              <Text
-                className="mt-2 text-center text-xs"
-                style={{ color: tokens.textMuted }}
-                accessibilityRole="text"
-              >
+              <Text className="mt-2 text-center text-xs" accessibilityRole="text">
                 {cycleSentence}
               </Text>
             ) : null}
 
             {activeSession && pendingAssociation ? (
-              <Text
-                className="mt-2 text-center text-xs"
-                style={{ color: tokens.textMuted }}
-                numberOfLines={1}
-              >
+              <Text className="mt-2 text-center text-xs" numberOfLines={1}>
                 Focusing on “{pendingAssociation.todoTitle}”
               </Text>
             ) : null}
 
             {phaseAnnouncement ? (
-              <Text
-                accessibilityLiveRegion="polite"
-                className="mt-1 text-center text-xs"
-                style={{ color: tokens.textMuted }}
-              >
+              <Text accessibilityLiveRegion="polite" className="mt-1 text-center text-xs">
                 {phaseAnnouncement}
               </Text>
             ) : null}
@@ -1284,7 +1275,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
             ) : null}
 
             {showConfiguration ? (
-              <Text className="text-center text-xs" style={{ color: tokens.textMuted }}>
+              <Text className="text-center text-xs">
                 Up next: {getModeLabel(upNextMode)} ({upNextMinutes} min)
               </Text>
             ) : null}
