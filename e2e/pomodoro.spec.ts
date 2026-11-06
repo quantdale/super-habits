@@ -76,9 +76,12 @@ test.describe('Pomodoro', () => {
     await manager.getByRole('button', { name: 'Create preset' }).click();
     await expect(manager.getByRole('button', { name: 'Delete preset Laptop focus' })).toBeVisible();
     await manager.getByLabel('Close').click();
-    // The new preset is immediately selectable on the main card; its chip
-    // label carries the focus/break summary, unlike the manager's buttons.
-    await expect(page.getByRole('button', { name: /^Laptop focus · / })).toBeVisible();
+    // The new preset is immediately selectable from the presets sheet; its
+    // row label carries the focus/break summary, unlike the manager's buttons.
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Choose preset' }).click();
+    await expect(page.getByRole('radio', { name: /^Laptop focus · / })).toBeVisible();
+    await page.getByRole('dialog').getByLabel('Close').click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
 
     const rows = await queryRows(page, `SELECT value FROM app_meta WHERE key = 'pomodoro_presets'`);
@@ -191,7 +194,8 @@ test.describe('Pomodoro', () => {
   test('automatic progression starts the next session once', async ({ page }) => {
     await installClock(page);
     // Sprint auto-starts the following break and the next focus.
-    await page.getByRole('button', { name: /^Sprint · / }).click();
+    await page.getByRole('button', { name: 'Choose preset' }).click();
+    await page.getByRole('radio', { name: /^Sprint · / }).click();
     await page.getByText('Start focus', { exact: true }).click();
     await expect(page.getByText('Pause', { exact: true })).toBeEnabled({ timeout: 3_000 });
     await page.clock.fastForward(15 * 60 * 1000);
@@ -431,7 +435,8 @@ test.describe('Pomodoro', () => {
     page,
   }) => {
     await installClock(page);
-    await page.getByRole('button', { name: /^Sprint · / }).click();
+    await page.getByRole('button', { name: 'Choose preset' }).click();
+    await page.getByRole('radio', { name: /^Sprint · / }).click();
     await page.getByText('Start focus', { exact: true }).click();
     await expect(page.getByText('Pause', { exact: true })).toBeEnabled({ timeout: 3_000 });
     await page.getByRole('button', { name: 'End', exact: true }).click();
