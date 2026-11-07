@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { contrastRatio, inkOnFill, readableSurface, WCAG_AA_TEXT } from '@/core/theme/contrast';
+import {
+  contrastRatio,
+  inkOnFill,
+  readableSurface,
+  WCAG_AA_NON_TEXT,
+  WCAG_AA_TEXT,
+} from '@/core/theme/contrast';
+import { habitDayNodeVisual } from '@/features/habits/habitDayNode.visual';
 import { THEME_REGISTRY } from '@/core/theme/registry';
 import { SECTION_HUES, SECTION_ON_BRIGHT_INK, getSectionAccents } from '@/constants/sectionColors';
 
@@ -123,18 +130,122 @@ describe('Habits contrast wiring', () => {
     'utf8',
   );
 
-  it('HabitDayStrip derives the completed-node ink from the actual fill', () => {
-    expect(dayStrip).toMatch(/inkOnFill\(HUE\.bright, tokens\.text, SECTION_ON_BRIGHT_INK\)/);
-    expect(dayStrip).toMatch(/allComplete \? doneInk/);
+  it('HabitDayStrip derives its node visuals from the shared derivation', () => {
+    // The ink/selection rules moved into habitDayNode.visual.ts (pure, so they
+    // are asserted directly below); the component must not reimplement them.
+    expect(dayStrip).toMatch(/const visual = habitDayNodeVisual\(\{/);
+    expect(dayStrip).toMatch(/style=\{\{ color: visual\.ink \}\}/);
   });
 
   it('HabitDayStrip never paints theme text directly on the fixed bright fill', () => {
-    expect(dayStrip).not.toMatch(/const contentColor = allComplete \? tokens\.text/);
+    expect(dayStrip).not.toMatch(/color: allComplete \? tokens\.text/);
+    expect(dayStrip).not.toMatch(/contentColor/);
   });
 
   it('HabitCheckInRow paints the quantitative count with the resolved accent text', () => {
     expect(checkInRow).toMatch(/const countColor = sectionAccents\.habits\.text;/);
     expect(checkInRow).toMatch(/color: count > 0 \? countColor : tokens\.textMuted/);
     expect(checkInRow).not.toMatch(/color: count > 0 \? HUE\.solid/);
+  });
+});
+
+/**
+ * Codex P2: a SELECTED COMPLETED day must stay visibly distinct. Completion
+ * used to win fill, border and label ink, so selecting a done day changed
+ * nothing on screen. The derivation now adds a shape-coded selection ring
+ * (Sprout `lip`, drawn inside the completed `bright` face) only for that
+ * combination — a selected non-completed day already changes fill, and an
+ * unselected day is untouched, so the goldens and the other states are
+ * unchanged.
+ */
+describe('HabitDayStrip selected + completed state', () => {
+  const SURFACE_BY_THEME = (id: string) => THEME_REGISTRY[id as keyof typeof THEME_REGISTRY].tokens;
+
+  const visual = (
+    tokens: { surface: string; border: string; text: string; onSolid: string },
+    allComplete: boolean,
+    selected: boolean,
+    isToday = false,
+  ) =>
+    habitDayNodeVisual({
+      allComplete,
+      selected,
+      isToday,
+      surface: tokens.surface,
+      border: tokens.border,
+      text: tokens.text,
+      onSolid: tokens.onSolid,
+    });
+
+  for (const id of Object.keys(THEME_REGISTRY)) {
+    const tokens = SURFACE_BY_THEME(id);
+
+    it(`${id}: selected+completed differs from unselected+completed`, () => {
+      const plain = visual(tokens, true, false);
+      const picked = visual(tokens, true, true);
+      // Something visible must change: the completed face keeps its fill and
+      // ink, so the difference is the selection ring itself.
+      expect(picked).not.toEqual(plain);
+      expect(plain.selectionRing).toBeNull();
+      expect(picked.selectionRing).not.toBeNull();
+      // The ring is a real shape, not a hairline, and it is its own token.
+      expect(picked.selectionRingWidth).toBeGreaterThanOrEqual(2);
+      // Selected+completed keeps the completion identity (fill, ink, lip).
+      expect(picked.fill).toBe(plain.fill);
+      expect(picked.ink).toBe(plain.ink);
+      expect(picked.lip).toBe(plain.lip);
+    });
+
+    it(`${id}: the selection ring is distinguishable from the completed fill`, () => {
+      const picked = visual(tokens, true, true);
+      const ratio = contrastRatio(picked.selectionRing ?? '', picked.fill);
+      // Non-text adjacent-shape floor (WCAG 1.4.11): the ring must be a
+      // perceivable boundary on the bright face, not a near-tone.
+      expect(
+        ratio,
+        `${id}: ring ${picked.selectionRing} on fill ${picked.fill} — ${ratio.toFixed(2)}:1`,
+      ).toBeGreaterThanOrEqual(WCAG_AA_NON_TEXT);
+    });
+
+    it(`${id}: selected+completed labels still clear 4.5 on their fill`, () => {
+      const picked = visual(tokens, true, true);
+      const ratio = contrastRatio(picked.ink, picked.fill);
+      expect(ratio, `${id}: label ${picked.ink} on ${picked.fill}`).toBeGreaterThanOrEqual(
+        WCAG_AA_TEXT,
+      );
+    });
+
+    it(`${id}: selected+completed today (2px ring-free face) is still distinct`, () => {
+      const plainToday = visual(tokens, true, false, true);
+      const pickedToday = visual(tokens, true, true, true);
+      expect(pickedToday).not.toEqual(plainToday);
+      expect(pickedToday.selectionRing).not.toBeNull();
+      expect(contrastRatio(pickedToday.ink, pickedToday.fill)).toBeGreaterThanOrEqual(WCAG_AA_TEXT);
+    });
+
+    it(`${id}: the other three states are byte-identical to before`, () => {
+      // Unselected+incomplete: surface face, theme ink, no ring.
+      const idle = visual(tokens, false, false);
+      expect(idle.fill).toBe(tokens.surface);
+      expect(idle.ink).toBe(tokens.text);
+      expect(idle.selectionRing).toBeNull();
+      // Unselected+complete: no ring (golden safety).
+      expect(visual(tokens, true, false).selectionRing).toBeNull();
+      // Selected+incomplete: keeps the readableSurface fill, no ring.
+      const pickedIncomplete = visual(tokens, false, true);
+      expect(pickedIncomplete.selectionRing).toBeNull();
+      expect(pickedIncomplete.fill).toBe(
+        readableSurface(SECTION_HUES.habits.bright, tokens.onSolid),
+      );
+      expect(contrastRatio(pickedIncomplete.ink, pickedIncomplete.fill)).toBeGreaterThanOrEqual(
+        WCAG_AA_TEXT,
+      );
+    });
+  }
+
+  it('the ring uses the theme-invariant Sprout lip in every theme', () => {
+    for (const id of Object.keys(THEME_REGISTRY)) {
+      expect(visual(SURFACE_BY_THEME(id), true, true).selectionRing).toBe(SECTION_HUES.habits.lip);
+    }
   });
 });

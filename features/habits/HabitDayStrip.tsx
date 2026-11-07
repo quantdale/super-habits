@@ -2,11 +2,11 @@ import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Text } from '@/core/ui/Text';
-import { inkOnFill, readableSurface } from '@/core/theme/contrast';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { SECTION_HUES, SECTION_ON_BRIGHT_INK } from '@/constants/sectionColors';
+import { SECTION_HUES } from '@/constants/sectionColors';
 import { dateKeyToLocalDate } from '@/lib/time';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
+import { habitDayNodeVisual } from '@/features/habits/habitDayNode.visual';
 
 const HUE = SECTION_HUES.habits;
 
@@ -66,17 +66,15 @@ function HabitDayButton({
 }) {
   const { tokens } = useAppTheme();
   const focus = useKeyboardFocusRing(HUE.bright);
-  const activeFill = readableSurface(HUE.bright, tokens.onSolid);
-  // The done face is the FIXED §5.1 Sprout bright, which is not theme-aware, so
-  // the label ink must be chosen against that actual fill — not against the
-  // theme. `tokens.text` reads 7.19:1 on it in the light default but only
-  // 2.00:1 in dark (white-ish ink on a mid-tone green), so light keeps its
-  // native ink and dark falls back to the §5.1 bright-fill ink (8.61:1).
-  // Selected fills the `readableSurface` deep tint, whose whole purpose is to
-  // be dark enough for `onSolid` (white clears 5.41:1 there). State is still
-  // shape-coded (check/dot), never color alone.
-  const doneInk = inkOnFill(HUE.bright, tokens.text, SECTION_ON_BRIGHT_INK);
-  const contentColor = allComplete ? doneInk : selected ? tokens.onSolid : tokens.text;
+  const visual = habitDayNodeVisual({
+    allComplete,
+    selected,
+    isToday,
+    surface: tokens.surface,
+    border: tokens.border,
+    text: tokens.text,
+    onSolid: tokens.onSolid,
+  });
   return (
     <Pressable
       onPress={onPress}
@@ -99,7 +97,7 @@ function HabitDayButton({
             width: 44,
             height: 44,
             borderRadius: radiusFull,
-            backgroundColor: allComplete ? HUE.lip : 'transparent',
+            backgroundColor: visual.lip,
           }}
         />
         <View
@@ -107,25 +105,39 @@ function HabitDayButton({
             width: 44,
             height: 44,
             borderRadius: radiusFull,
-            borderWidth: isToday ? 2 : 1,
-            borderColor: isToday
-              ? allComplete
-                ? HUE.solid
-                : HUE.bright
-              : allComplete
-                ? HUE.bright
-                : selected
-                  ? activeFill
-                  : tokens.border,
-            backgroundColor: allComplete ? HUE.bright : selected ? activeFill : tokens.surface,
+            borderWidth: visual.borderWidth,
+            borderColor: visual.borderColor,
+            backgroundColor: visual.fill,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Text variant="label" style={{ color: contentColor }}>
+          {/* Selection ring: drawn for a selected COMPLETED day, where the
+              completed fill would otherwise win every property and hide the
+              selection. It sits inside the face (inset by its own width) and
+              uses the Sprout lip, which is independent of the bright fill
+              (3.83:1 — past the 3:1 non-text floor) and theme-invariant. A
+              selected non-completed day keeps its `readableSurface` fill, and
+              an unselected day is untouched. */}
+          {visual.selectionRing ? (
+            <View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                top: visual.selectionRingWidth,
+                right: visual.selectionRingWidth,
+                bottom: visual.selectionRingWidth,
+                left: visual.selectionRingWidth,
+                borderRadius: radiusFull,
+                borderWidth: visual.selectionRingWidth,
+                borderColor: visual.selectionRing,
+              }}
+            />
+          ) : null}
+          <Text variant="label" style={{ color: visual.ink }}>
             {weekdayLabel}
           </Text>
-          <Text variant="label" style={{ color: contentColor }}>
+          <Text variant="label" style={{ color: visual.ink }}>
             {dayOfMonth}
           </Text>
         </View>
