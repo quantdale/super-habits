@@ -97,6 +97,17 @@ function HabitCheckNode({
   // checked state — while the §5.1 bright-fill ink reads 8.61:1. Scoped to this
   // feature-local node; `core/ui/CheckNode` is a separate component.
   const glyphInk = inkOnFill(HUE.bright, tokens.onSolid, SECTION_ON_BRIGHT_INK, WCAG_AA_NON_TEXT);
+  // The UNCHECKED outline is the only visual that says "this is a control": at
+  // `tokens.border` it measures 1.25:1 (light) / 1.34:1 (dark) against the
+  // surface — invisible at a glance. Restore main's `textMuted` outline, which
+  // clears the 3:1 UI-component boundary floor (5.29–8.31:1 across the 14
+  // themes) without touching the checked or disabled faces.
+  const uncheckedOutline = inkOnFill(
+    tokens.surface,
+    tokens.textMuted,
+    tokens.text,
+    WCAG_AA_NON_TEXT,
+  );
   const activate = () => {
     if (disabled) return;
     burst.trigger();
@@ -139,7 +150,7 @@ function HabitCheckNode({
               height: NODE_FACE,
               borderRadius: radius.full,
               borderWidth: 2,
-              borderColor: checked ? HUE.bright : tokens.border,
+              borderColor: checked ? HUE.bright : uncheckedOutline,
               backgroundColor: checked ? HUE.bright : tokens.surface,
               alignItems: 'center',
               justifyContent: 'center',

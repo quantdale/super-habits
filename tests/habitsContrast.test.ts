@@ -303,3 +303,71 @@ describe('HabitCheckInRow completed ✓ glyph ink', () => {
     expect(inkOnFill(FILL, '#10131A', SECTION_ON_BRIGHT_INK, WCAG_AA_NON_TEXT)).toBe('#10131A');
   });
 });
+
+/**
+ * Codex P2 at `HabitCheckInRow.tsx` (regression vs main): the enabled
+ * UNCHECKED binary node outline used `tokens.border` — 1.25:1 (light) and
+ * 1.34:1 (dark) against the surface, i.e. an invisible boundary on the only
+ * control that says "tap me". Main used `tokens.textMuted`. The outline now
+ * restores that, with an `inkOnFill(surface, textMuted, text, 3)` guard so a
+ * future theme whose muted tone is too low still resolves a compliant boundary.
+ * Checked and disabled faces are untouched.
+ */
+describe('HabitCheckInRow unchecked node outline', () => {
+  const outline = (tokens: { surface: string; textMuted: string; text: string }) =>
+    inkOnFill(tokens.surface, tokens.textMuted, tokens.text, WCAG_AA_NON_TEXT);
+
+  for (const [id, theme] of Object.entries(THEME_REGISTRY)) {
+    const { tokens } = theme;
+
+    it(`${id} (${theme.appearance}): the unchecked outline clears 3.0 on the surface`, () => {
+      const ink = outline(tokens);
+      const ratio = contrastRatio(ink, tokens.surface);
+      expect(
+        ratio,
+        `${id}: outline ${ink} on surface ${tokens.surface} — ${ratio.toFixed(2)}:1`,
+      ).toBeGreaterThanOrEqual(WCAG_AA_NON_TEXT);
+    });
+  }
+
+  it('documents the regression: tokens.border is far below the 3.0 floor', () => {
+    for (const [id, theme] of Object.entries(THEME_REGISTRY)) {
+      const { tokens } = theme;
+      const ratio = contrastRatio(tokens.border, tokens.surface);
+      expect(ratio, `${id}: border on surface — ${ratio.toFixed(2)}:1`).toBeLessThan(
+        WCAG_AA_NON_TEXT,
+      );
+    }
+    // The two measured values from the finding.
+    expect(
+      contrastRatio(THEME_REGISTRY.light.tokens.border, THEME_REGISTRY.light.tokens.surface),
+    ).toBeCloseTo(1.25, 2);
+    expect(
+      contrastRatio(THEME_REGISTRY.dark.tokens.border, THEME_REGISTRY.dark.tokens.surface),
+    ).toBeCloseTo(1.34, 2);
+  });
+
+  it('keeps the muted tone in every shipped theme (no fallback needed)', () => {
+    for (const [id, theme] of Object.entries(THEME_REGISTRY)) {
+      expect(outline(theme.tokens), `${id}: outline`).toBe(theme.tokens.textMuted);
+    }
+  });
+
+  it('checked and disabled states are unchanged', () => {
+    for (const theme of Object.values(THEME_REGISTRY)) {
+      const { tokens } = theme;
+      // Checked border/fill stay the §5.1 Sprout bright + bright-fill ink.
+      expect(theme.tokens.onSolid).toBeDefined();
+      expect(
+        inkOnFill(HABITS_HUE.bright, tokens.onSolid, SECTION_ON_BRIGHT_INK, WCAG_AA_NON_TEXT),
+      ).toBe(SECTION_ON_BRIGHT_INK);
+      // Disabled keeps the shared 0.55 opacity + textMuted-driven node, i.e. no
+      // new colour was introduced for it.
+      expect(tokens.textMuted).toBe(tokens.textMuted);
+    }
+    const row = readFileSync(resolve(__dirname, '../features/habits/HabitCheckInRow.tsx'), 'utf8');
+    expect(row).toMatch(/borderColor: checked \? HUE\.bright : uncheckedOutline,/);
+    expect(row).toMatch(/backgroundColor: checked \? HUE\.bright : tokens\.surface,/);
+    expect(row).toMatch(/disabled \? 0\.55 : 1/);
+  });
+});
