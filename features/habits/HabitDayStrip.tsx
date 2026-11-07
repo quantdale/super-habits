@@ -1,11 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Text } from '@/core/ui/Text';
 import { readableSurface } from '@/core/theme/contrast';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { SECTION_COLORS } from '@/constants/sectionColors';
+import { SECTION_HUES } from '@/constants/sectionColors';
 import { dateKeyToLocalDate } from '@/lib/time';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
+
+const HUE = SECTION_HUES.habits;
 
 export type HabitDayStripDay = {
   dateKey: string;
@@ -36,20 +39,39 @@ function displayDateLabel(dateKey: string): string {
   });
 }
 
+/**
+ * One round 44px day node (§7): a done day fills Sprout bright with the lip,
+ * today wears the 2px Sprout ring, and each node keeps a shape-coded mark
+ * (check = all scheduled complete, dot = some progress) so state never relies
+ * on color alone. Exact counts live in the accessibility label.
+ */
 function HabitDayButton({
-  label,
-  accessibilityLabel,
+  weekdayLabel,
+  dayOfMonth,
+  allComplete,
+  someProgress,
+  isToday,
   selected,
+  accessibilityLabel,
   onPress,
 }: {
-  label: string;
-  accessibilityLabel: string;
+  weekdayLabel: string;
+  dayOfMonth: string;
+  allComplete: boolean;
+  someProgress: boolean;
+  isToday: boolean;
   selected: boolean;
+  accessibilityLabel: string;
   onPress: () => void;
 }) {
-  const { tokens, sectionAccents } = useAppTheme();
-  const focus = useKeyboardFocusRing(sectionAccents.habits.text);
-  const activeFill = readableSurface(SECTION_COLORS.habits, tokens.onSolid);
+  const { tokens } = useAppTheme();
+  const focus = useKeyboardFocusRing(HUE.bright);
+  const activeFill = readableSurface(HUE.bright, tokens.onSolid);
+  // Done fills Sprout bright and keeps DARK text (tokens.text): white on the
+  // bright hue is below 4.5:1 for small text and fails the w7 rendered-AA
+  // audit. Selected fills the readableSurface tint, which is dark enough for
+  // onSolid. State is still shape-coded (check/dot), never color alone.
+  const contentColor = allComplete ? tokens.text : selected ? tokens.onSolid : tokens.text;
   return (
     <Pressable
       onPress={onPress}
@@ -59,28 +81,73 @@ function HabitDayButton({
       accessibilityState={{ selected }}
       onFocus={focus.onFocus}
       onBlur={focus.onBlur}
-      className="mb-2 mr-2 min-h-[44px] min-w-[44px] items-center justify-center rounded-full border px-3"
-      style={[
-        {
-          backgroundColor: selected ? activeFill : tokens.surface,
-          borderColor: selected ? activeFill : tokens.border,
-        },
-        focus.focusRingStyle,
-      ]}
+      className="mb-2 mr-1.5 items-center justify-center"
+      style={focus.focusRingStyle}
     >
-      <Text variant="label" style={{ color: selected ? tokens.onSolid : tokens.text }}>
-        {label}
-      </Text>
+      <View className="h-[46px] w-11 items-center justify-center">
+        {/* Lip slab under the done face (§7 day nodes). */}
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 2,
+            width: 44,
+            height: 44,
+            borderRadius: radiusFull,
+            backgroundColor: allComplete ? HUE.lip : 'transparent',
+          }}
+        />
+        <View
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: radiusFull,
+            borderWidth: isToday ? 2 : 1,
+            borderColor: isToday
+              ? allComplete
+                ? HUE.solid
+                : HUE.bright
+              : allComplete
+                ? HUE.bright
+                : selected
+                  ? activeFill
+                  : tokens.border,
+            backgroundColor: allComplete ? HUE.bright : selected ? activeFill : tokens.surface,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text variant="label" style={{ color: contentColor }}>
+            {weekdayLabel}
+          </Text>
+          <Text variant="label" style={{ color: contentColor }}>
+            {dayOfMonth}
+          </Text>
+        </View>
+        {/* Shape-coded completion mark (check = all complete, dot = some). */}
+        {allComplete ? (
+          <View
+            className="absolute right-0 top-0 h-3.5 w-3.5 items-center justify-center rounded-full"
+            style={{ backgroundColor: tokens.surface }}
+          >
+            <MaterialIcons name="check" size={10} color={HUE.solid} />
+          </View>
+        ) : someProgress ? (
+          <View
+            className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full"
+            style={{ backgroundColor: HUE.solid }}
+          />
+        ) : null}
+      </View>
     </Pressable>
   );
 }
 
+const radiusFull = 9999;
+
 /**
- * Compact past-week selector: quiet day pills ending at today,
- * which stays visually anchored and is the
- * default selection. Each pill carries a shape-coded completion mark (check =
- * all scheduled complete, dot = some progress) so state never relies on color
- * alone; exact counts are exposed through the accessibility label.
+ * Compact past-week selector: round day nodes ending at today, which stays
+ * visually anchored and is the default selection.
  */
 export function HabitDayStrip({ days, selectedDateKey, todayKey, onSelect }: HabitDayStripProps) {
   const { tokens, sectionAccents } = useAppTheme();
@@ -110,13 +177,16 @@ export function HabitDayStrip({ days, selectedDateKey, todayKey, onSelect }: Hab
           const isToday = day.dateKey === todayKey;
           const allComplete = day.scheduledCount > 0 && day.completedCount >= day.scheduledCount;
           const someProgress = !allComplete && day.completedCount > 0;
-          const completionMark = allComplete ? ' ✓' : someProgress ? ' •' : '';
           return (
             <HabitDayButton
               key={day.dateKey}
-              label={`${day.weekdayLabel} ${day.dayOfMonth}${completionMark}`}
-              accessibilityLabel={`${fullWeekdayLabel(day.dateKey)}${isToday ? ', today' : ''}: ${day.completedCount} of ${day.scheduledCount === 0 ? '0' : day.scheduledCount} scheduled habits complete`}
+              weekdayLabel={day.weekdayLabel}
+              dayOfMonth={day.dayOfMonth}
+              allComplete={allComplete}
+              someProgress={someProgress}
+              isToday={isToday}
               selected={isSelected}
+              accessibilityLabel={`${fullWeekdayLabel(day.dateKey)}${isToday ? ', today' : ''}: ${day.completedCount} of ${day.scheduledCount === 0 ? '0' : day.scheduledCount} scheduled habits complete`}
               onPress={() => onSelect(day.dateKey)}
             />
           );
