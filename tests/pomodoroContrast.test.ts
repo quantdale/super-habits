@@ -134,9 +134,16 @@ describe('Pomodoro hero ghost-action wiring', () => {
     'utf8',
   );
 
-  it('the running and paused End buttons paint on the hero face', () => {
-    expect(screen).toMatch(/label="End"\s+variant="ghost"\s+onColor=\{COLOR\}/g);
-    expect([...screen.matchAll(/onColor=\{COLOR\}/g)]).toHaveLength(3);
+  it('every face-less control on the hero states the hero face', () => {
+    // End (running), End (paused), Done (completion summary), Starting…
+    expect([...screen.matchAll(/onColor=\{COLOR\}/g)]).toHaveLength(4);
+    for (const label of ['End', 'Done', 'Starting…']) {
+      const idx = screen.indexOf(`label="${label}"`);
+      expect(idx, `${label} present`).toBeGreaterThan(-1);
+      const block = screen.slice(idx, idx + 220);
+      expect(block, `${label} passes onColor`).toContain('onColor={COLOR}');
+      expect(block, `${label} is a ghost control`).toContain('variant="ghost"');
+    }
   });
 
   it('the hero Card still owns the face colour the fix derives from', () => {
