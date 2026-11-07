@@ -76,6 +76,28 @@ export function readableSurface(background: string, text: string, min = WCAG_AA_
 }
 
 /**
+ * Ink for a FIXED-HUE fill: `preferred` when it already clears the text floor
+ * on `fill`, otherwise `fallback`.
+ *
+ * A section hue (`SECTION_HUES.*.bright`) does not follow the active theme, so
+ * the theme's own ink can land at ~2:1 on it in one appearance (white-ish ink
+ * on Grape bright) while reading ~5:1 in the other. Consumers that paint labels
+ * on such a fill must therefore choose the ink against the ACTUAL fill, not
+ * against the theme: keep `preferred` where it is legible (theme-native palette
+ * preserved) and switch to the §5.1 bright-fill ink (`SECTION_ON_BRIGHT_INK`)
+ * where it is not.
+ */
+export function inkOnFill(
+  fill: string,
+  preferred: string,
+  fallback: string,
+  min = WCAG_AA_TEXT,
+): string {
+  if (!isHex(fill) || !isHex(preferred)) return preferred;
+  return contrastRatio(preferred, fill) >= min ? preferred : fallback;
+}
+
+/**
  * Nudge `accent` toward a readable *text* colour against `background`. Used
  * where an accent must be painted as text (metric values, links) on a tinted
  * or neutral surface.

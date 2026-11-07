@@ -1208,6 +1208,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                     <Button
                       label="Done"
                       variant="ghost"
+                      onColor={COLOR}
                       onPress={dismissCompletionSummary}
                       fullWidth
                     />
@@ -1236,6 +1237,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                 label="Starting…"
                 accessibilityLabel={`${startLabel} — starting`}
                 variant="ghost"
+                onColor={COLOR}
                 disabled
                 onPress={() => {}}
                 fullWidth
@@ -1248,9 +1250,13 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                   <Button label="Pause" variant="secondary" onPress={pause} fullWidth />
                 </View>
                 <View className="min-w-[6rem] flex-1">
+                  {/* Ghost face = transparent, so the label is painted on the
+                      hero's fixed Grape fill: it must be derived from THAT
+                      fill, not `tokens.background`. */}
                   <Button
                     label="End"
                     variant="ghost"
+                    onColor={COLOR}
                     onPress={() => void requestEndSession()}
                     fullWidth
                   />
@@ -1267,6 +1273,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                   <Button
                     label="End"
                     variant="ghost"
+                    onColor={COLOR}
                     onPress={() => void requestEndSession()}
                     fullWidth
                   />

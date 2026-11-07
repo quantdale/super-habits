@@ -3,9 +3,9 @@ import { ActivityIndicator, View, type TextStyle } from 'react-native';
 import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { radius, size, spacing, typography } from '@/core/theme/designTokens';
-import { readableAccent, readableSurface } from '@/core/theme/contrast';
+import { inkOnFill, readableAccent, readableSurface } from '@/core/theme/contrast';
 import { Pressable3D, type Pressable3DLip } from '@/core/ui/Pressable3D';
-import { REWARD_HUES } from '@/constants/sectionColors';
+import { REWARD_HUES, SECTION_ON_BRIGHT_INK } from '@/constants/sectionColors';
 
 export type ButtonVariant =
   | 'primary'
@@ -29,6 +29,16 @@ type ButtonProps = {
   loading?: boolean;
   fullWidth?: boolean;
   className?: string;
+  /**
+   * The surface this button is painted ON, when it is not the theme surface.
+   * A `ghost` button draws no face, so its label has to resolve against the
+   * fill behind it — on a hero Card that is the fixed section bright face, not
+   * `tokens.background` (the default). Pass the real face colour here
+   * (`#A37BFF` for Focus) and the label is derived for THAT fill instead of
+   * inheriting the theme background and landing at ~1.4:1. Defaults are
+   * unchanged, so every other Button keeps its current label derivation.
+   */
+  onColor?: string;
 };
 
 /** Deterministic per-channel shade of a hex color; non-hex values pass through. */
@@ -103,6 +113,7 @@ export function Button({
   loading = false,
   fullWidth = false,
   className,
+  onColor,
 }: ButtonProps) {
   const { tokens } = useAppTheme();
   const inactive = disabled || loading;
@@ -141,10 +152,22 @@ export function Button({
       ? REWARD_HUES.accent.text
       : solid
         ? tokens.buttonText
-        : readableAccent(
-            color ?? tokens.button,
-            variant === 'ghost' ? tokens.background : tokens.surface,
-          );
+        : onColor
+          ? // The label inherits the fill behind a face-less button. Nudge the
+            // theme accent toward a legible ink for THAT fill, then enforce the
+            // floor: one direction alone cannot always reach 4.5 (a bright
+            // accent on a mid-tone hue caps at ~3:1 before it saturates), so
+            // fall back to the §5.1 bright-fill ink, which is also what the
+            // hero Card forces on its own text.
+            inkOnFill(
+              onColor,
+              readableAccent(color ?? tokens.button, onColor),
+              SECTION_ON_BRIGHT_INK,
+            )
+          : readableAccent(
+              color ?? tokens.button,
+              variant === 'ghost' ? tokens.background : tokens.surface,
+            );
 
   return (
     <View className={className} style={{ alignSelf: fullWidth ? 'stretch' : 'flex-start' }}>
