@@ -418,6 +418,20 @@ test.describe('W15 primary destinations', () => {
     await openWithFixture(page, DESKTOP, 'HEAVY');
     await goToTab(page, 'todos');
     await expect(page.getByText(/^\d+ open$/).first()).toBeVisible({ timeout: 30_000 });
+    // The desktop rail's reward chips are part of this capture, but they are
+    // driven by a separate gamification snapshot read that resolves AFTER the
+    // list does: `ShellRewardChips` renders the `snapshot ?? 0` fallback until
+    // it lands. A hosted run captured mid-read (streak 0 / XP 0) and only saw
+    // 7/703 in the aria snapshot taken right after the screenshot. Await the
+    // seeded values through the chips' accessible labels — the same
+    // "prove the reconciled view, not an intermediate startup snapshot" gate
+    // the TYPICAL fixture uses for its 93/233 XP line.
+    await expect(page.getByRole('button', { name: /^Streak 7 days/ })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByRole('button', { name: /^XP total 703/ })).toBeVisible({
+      timeout: 20_000,
+    });
     await capture(page, 'todos-heavy-1280-light');
   });
 

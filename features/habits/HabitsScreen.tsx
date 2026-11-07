@@ -146,7 +146,7 @@ const WEEKDAY_OPTIONS: { value: HabitWeekday; label: string; fullLabel: string }
 const DEFAULT_HABIT_REMINDER_TIME = '18:00';
 
 type CheckInListItem =
-  | { kind: 'header'; key: string; title: string }
+  | { kind: 'header'; key: string; title: string; icon: (typeof TIME_GROUPS)[number]['icon'] }
   | { kind: 'habit'; key: string; row: HabitCheckInRowModel };
 const EMPTY_COUNTS: Readonly<Record<string, number>> = {};
 
@@ -786,7 +786,12 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const listItems = useMemo<CheckInListItem[]>(
     () =>
       checkInGroups.flatMap((group) => [
-        { kind: 'header' as const, key: `group-${group.key}`, title: group.label },
+        {
+          kind: 'header' as const,
+          key: `group-${group.key}`,
+          title: group.label,
+          icon: TIME_GROUPS.find((g) => g.key === group.key)?.icon ?? 'autorenew',
+        },
         ...group.rows.map((row) => ({ kind: 'habit' as const, key: row.habitId, row })),
       ]),
     [checkInGroups],
@@ -909,9 +914,12 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
           renderItem={({ item }) => {
             if (item.kind === 'header')
               return (
-                <Text variant="label" tone="muted" className="pb-1 pt-4">
-                  {item.title}
-                </Text>
+                <View className="flex-row items-center gap-1.5 pb-1 pt-4">
+                  <MaterialIcons name={item.icon} size={16} color={tokens.iconMuted} />
+                  <Text variant="label" tone="muted">
+                    {item.title}
+                  </Text>
+                </View>
               );
             const habit = habitsById.get(item.row.habitId);
             if (!habit) return null;
