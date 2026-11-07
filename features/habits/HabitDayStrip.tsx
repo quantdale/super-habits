@@ -2,9 +2,9 @@ import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Text } from '@/core/ui/Text';
-import { readableSurface } from '@/core/theme/contrast';
+import { inkOnFill, readableSurface } from '@/core/theme/contrast';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { SECTION_HUES } from '@/constants/sectionColors';
+import { SECTION_HUES, SECTION_ON_BRIGHT_INK } from '@/constants/sectionColors';
 import { dateKeyToLocalDate } from '@/lib/time';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 
@@ -67,11 +67,16 @@ function HabitDayButton({
   const { tokens } = useAppTheme();
   const focus = useKeyboardFocusRing(HUE.bright);
   const activeFill = readableSurface(HUE.bright, tokens.onSolid);
-  // Done fills Sprout bright and keeps DARK text (tokens.text): white on the
-  // bright hue is below 4.5:1 for small text and fails the w7 rendered-AA
-  // audit. Selected fills the readableSurface tint, which is dark enough for
-  // onSolid. State is still shape-coded (check/dot), never color alone.
-  const contentColor = allComplete ? tokens.text : selected ? tokens.onSolid : tokens.text;
+  // The done face is the FIXED §5.1 Sprout bright, which is not theme-aware, so
+  // the label ink must be chosen against that actual fill — not against the
+  // theme. `tokens.text` reads 7.19:1 on it in the light default but only
+  // 2.00:1 in dark (white-ish ink on a mid-tone green), so light keeps its
+  // native ink and dark falls back to the §5.1 bright-fill ink (8.61:1).
+  // Selected fills the `readableSurface` deep tint, whose whole purpose is to
+  // be dark enough for `onSolid` (white clears 5.41:1 there). State is still
+  // shape-coded (check/dot), never color alone.
+  const doneInk = inkOnFill(HUE.bright, tokens.text, SECTION_ON_BRIGHT_INK);
+  const contentColor = allComplete ? doneInk : selected ? tokens.onSolid : tokens.text;
   return (
     <Pressable
       onPress={onPress}

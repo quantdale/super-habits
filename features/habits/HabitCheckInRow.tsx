@@ -170,9 +170,15 @@ function HabitProgressNode({
   countLabel: string;
   onIncrement: () => void;
 }) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const burst = useCheckBurst();
   const focus = useKeyboardFocusRing(HUE.bright);
+  // The count label is small text on the row surface, so it uses the
+  // theme-resolved section accent text (`sectionAccents.habits.text`) rather
+  // than the fixed §5.1 `solid` tier: the solid reads 5.10:1 on the light
+  // surface but only 3.23:1 on the dark one, while the resolved dark accent
+  // (the `bright` tier) reads 7.63:1 on `surface` / 8.29:1 on `background`.
+  const countColor = sectionAccents.habits.text;
   const onPress = () => {
     if (disabled) return;
     burst.trigger();
@@ -207,7 +213,7 @@ function HabitProgressNode({
             variant="label"
             accessibilityLabel={countLabel}
             style={{
-              color: count > 0 ? HUE.solid : tokens.textMuted,
+              color: count > 0 ? countColor : tokens.textMuted,
               fontWeight: '800',
             }}
           >
