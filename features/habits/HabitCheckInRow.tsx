@@ -6,7 +6,8 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 import { useCheckBurst } from '@/core/ui/motion/useCheckBurst';
 import { radius } from '@/core/theme/designTokens';
-import { SECTION_HUES } from '@/constants/sectionColors';
+import { inkOnFill, WCAG_AA_NON_TEXT } from '@/core/theme/contrast';
+import { SECTION_HUES, SECTION_ON_BRIGHT_INK } from '@/constants/sectionColors';
 import type { HabitCheckInRowModel } from './habitCheckIn.domain';
 import type { Habit } from './types';
 import { useHabitCheckboxKeyboard } from './useHabitCheckboxKeyboard';
@@ -90,6 +91,12 @@ function HabitCheckNode({
   const { tokens } = useAppTheme();
   const burst = useCheckBurst();
   const focus = useKeyboardFocusRing(HUE.bright);
+  // The done face is the FIXED §5.1 Sprout bright, so the ✓ glyph is chosen
+  // against that actual fill: `tokens.onSolid` (white in most themes) reads
+  // ~2.2:1 there — under the 3:1 non-text floor for a glyph that carries the
+  // checked state — while the §5.1 bright-fill ink reads 8.61:1. Scoped to this
+  // feature-local node; `core/ui/CheckNode` is a separate component.
+  const glyphInk = inkOnFill(HUE.bright, tokens.onSolid, SECTION_ON_BRIGHT_INK, WCAG_AA_NON_TEXT);
   const activate = () => {
     if (disabled) return;
     burst.trigger();
@@ -138,7 +145,7 @@ function HabitCheckNode({
               justifyContent: 'center',
             }}
           >
-            {checked ? <MaterialIcons name="check" size={20} color={tokens.onSolid} /> : null}
+            {checked ? <MaterialIcons name="check" size={20} color={glyphInk} /> : null}
           </View>
         </View>
       </Animated.View>

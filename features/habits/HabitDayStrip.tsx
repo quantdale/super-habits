@@ -114,9 +114,11 @@ function HabitDayButton({
         >
           {/* Selection ring: drawn for a selected COMPLETED day, where the
               completed fill would otherwise win every property and hide the
-              selection. It sits inside the face (inset by its own width) and
-              uses the Sprout lip, which is independent of the bright fill
-              (3.83:1 — past the 3:1 non-text floor) and theme-invariant. A
+              selection. It hugs the face edge (2pt wide, inset 1pt — just
+              inside the 1px border) so it never crowds the weekday/date
+              glyphs, and uses the Sprout lip, which is independent of the
+              bright fill (3.83:1 — past the 3:1 non-text floor) and
+              theme-invariant. A
               selected non-completed day keeps its `readableSurface` fill, and
               an unselected day is untouched. */}
           {visual.selectionRing ? (
@@ -124,10 +126,10 @@ function HabitDayButton({
               pointerEvents="none"
               style={{
                 position: 'absolute',
-                top: visual.selectionRingWidth,
-                right: visual.selectionRingWidth,
-                bottom: visual.selectionRingWidth,
-                left: visual.selectionRingWidth,
+                top: visual.selectionRingInset,
+                right: visual.selectionRingInset,
+                bottom: visual.selectionRingInset,
+                left: visual.selectionRingInset,
                 borderRadius: radiusFull,
                 borderWidth: visual.selectionRingWidth,
                 borderColor: visual.selectionRing,

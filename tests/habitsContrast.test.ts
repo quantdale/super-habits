@@ -8,7 +8,11 @@ import {
   WCAG_AA_NON_TEXT,
   WCAG_AA_TEXT,
 } from '@/core/theme/contrast';
-import { habitDayNodeVisual } from '@/features/habits/habitDayNode.visual';
+import {
+  habitDayNodeVisual,
+  SELECTION_RING_INSET,
+  SELECTION_RING_WIDTH,
+} from '@/features/habits/habitDayNode.visual';
 import { THEME_REGISTRY } from '@/core/theme/registry';
 import { SECTION_HUES, SECTION_ON_BRIGHT_INK, getSectionAccents } from '@/constants/sectionColors';
 
@@ -190,6 +194,11 @@ describe('HabitDayStrip selected + completed state', () => {
       expect(picked.selectionRing).not.toBeNull();
       // The ring is a real shape, not a hairline, and it is its own token.
       expect(picked.selectionRingWidth).toBeGreaterThanOrEqual(2);
+      // It hugs the edge: a 2pt ring inset 1pt leaves the 40pt centre (the
+      // weekday + date glyphs) untouched at every size.
+      expect(picked.selectionRingWidth).toBe(SELECTION_RING_WIDTH);
+      expect(picked.selectionRingInset).toBe(SELECTION_RING_INSET);
+      expect(picked.selectionRingWidth + picked.selectionRingInset).toBeLessThanOrEqual(3);
       // Selected+completed keeps the completion identity (fill, ink, lip).
       expect(picked.fill).toBe(plain.fill);
       expect(picked.ink).toBe(plain.ink);
@@ -247,5 +256,50 @@ describe('HabitDayStrip selected + completed state', () => {
     for (const id of Object.keys(THEME_REGISTRY)) {
       expect(visual(SURFACE_BY_THEME(id), true, true).selectionRing).toBe(SECTION_HUES.habits.lip);
     }
+  });
+});
+
+/**
+ * Codex P2 at `HabitCheckInRow.tsx` (completed binary checkbox): the ✓ glyph
+ * painted `tokens.onSolid` on the FIXED §5.1 Sprout bright fill. White on
+ * `#4DC93A` is 2.16:1 — under the 3:1 WCAG 1.4.11 non-text floor for a glyph
+ * that carries the checked state. The glyph ink is now derived from the ACTUAL
+ * fill with `inkOnFill(HUE.bright, tokens.onSolid, SECTION_ON_BRIGHT_INK, 3)`.
+ *
+ * Scope: this is the Habits feature-local `HabitCheckNode`. `core/ui/CheckNode`
+ * is a separate component (also fixed-white there) and is deliberately not
+ * changed by this fix, so its contracts in `tests/checkNode.test.ts` stand.
+ */
+describe('HabitCheckInRow completed ✓ glyph ink', () => {
+  const FILL = SECTION_HUES.habits.bright;
+
+  const glyphInk = (onSolid: string) =>
+    inkOnFill(FILL, onSolid, SECTION_ON_BRIGHT_INK, WCAG_AA_NON_TEXT);
+
+  for (const [id, theme] of Object.entries(THEME_REGISTRY)) {
+    const { tokens } = theme;
+
+    it(`${id} (${theme.appearance}): the ✓ glyph clears the 3.0 floor on the completed fill`, () => {
+      const ink = glyphInk(tokens.onSolid);
+      const ratio = contrastRatio(ink, FILL);
+      expect(
+        ratio,
+        `${id}: glyph ${ink} (onSolid ${tokens.onSolid}) on ${FILL} — ${ratio.toFixed(2)}:1`,
+      ).toBeGreaterThanOrEqual(WCAG_AA_NON_TEXT);
+    });
+  }
+
+  it('documents the shipped regression: white on the bright fill is below 3:1', () => {
+    const white = contrastRatio('#FFFFFF', FILL);
+    expect(white, `white on bright — ${white.toFixed(2)}:1`).toBeLessThan(WCAG_AA_NON_TEXT);
+    // The shipped default onSolid is white, so every theme took the fallback.
+    for (const [id, theme] of Object.entries(THEME_REGISTRY)) {
+      expect(glyphInk(theme.tokens.onSolid), `${id}: glyph ink`).toBe(SECTION_ON_BRIGHT_INK);
+    }
+  });
+
+  it('a theme whose onSolid already clears 3:1 keeps its native ink', () => {
+    // The helper must not churn a pair that is already legible.
+    expect(inkOnFill(FILL, '#10131A', SECTION_ON_BRIGHT_INK, WCAG_AA_NON_TEXT)).toBe('#10131A');
   });
 });

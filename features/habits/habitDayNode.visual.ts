@@ -29,10 +29,17 @@ export type HabitDayNodeVisual = {
   /** Inner selection ring; `null` unless the node is selected AND complete. */
   selectionRing: string | null;
   selectionRingWidth: number;
+  /** Inset from the face edge, so the ring hugs the border and clears the glyphs. */
+  selectionRingInset: number;
 };
 
-/** Width of the inner selection ring (logical points). */
-export const SELECTION_RING_WIDTH = 3;
+/**
+ * Geometry of the inner selection ring, in logical points. The face is 44pt
+ * with a 1-2pt border, so a 2pt ring inset 1pt rides just inside the border and
+ * leaves the 40pt centre free for the weekday + date glyphs.
+ */
+export const SELECTION_RING_WIDTH = 2;
+export const SELECTION_RING_INSET = 1;
 
 export function habitDayNodeVisual(input: {
   allComplete: boolean;
@@ -74,5 +81,6 @@ export function habitDayNodeVisual(input: {
     // existing goldens and states exactly as they were.
     selectionRing: allComplete && selected ? HUE.lip : null,
     selectionRingWidth: SELECTION_RING_WIDTH,
+    selectionRingInset: SELECTION_RING_INSET,
   };
 }
