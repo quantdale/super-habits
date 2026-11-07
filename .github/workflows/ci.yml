@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -137,7 +137,7 @@ jobs:
         run: node scripts/audit-runtime-deps.mjs
 
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # NO `needs: quality` — deliberately independent of the dependency-security
     # audit (change `security-blocked-ci-qualification-recovery`, 2026-10-21).
     # This job consumes NO output and NO artifact of `quality`: it checks out
@@ -403,7 +403,7 @@ jobs:
           if-no-files-found: warn
 
   nightly:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # NO `needs: quality` (same rationale as the `e2e` job above): these lanes
     # are schedule-only, report-only, and consume no `quality` output. Behind
     # `needs: quality` they never ran at all while the security gate was red
