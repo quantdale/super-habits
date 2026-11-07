@@ -8,11 +8,13 @@ import { FeatureStatCard } from '@/core/ui/FeatureStatCard';
 import { PageHeader } from '@/core/ui/PageHeader';
 import { SegmentedControl } from '@/core/ui/SegmentedControl';
 import { ScreenSection } from '@/core/ui/ScreenSection';
+import { ProgressRing } from '@/core/ui/ProgressRing';
+import { Sprout } from '@/core/ui/illustrations/Sprout';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { typography } from '@/core/theme/designTokens';
-import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
+import { POMODORO_SECTION_KEY, SECTION_COLORS, SECTION_HUES } from '@/constants/sectionColors';
 import { useCommandLauncherSuppressed } from '@/features/command/commandCenterContext';
 import { useGamification } from '@/features/gamification/gamificationContext';
 import {
@@ -49,7 +51,6 @@ import {
   DEFAULT_SETTINGS,
   BUILT_IN_PRESETS,
   findPresetById,
-  getModeColor,
   getModeDuration,
   getModeLabel,
   getNextMode,
@@ -93,6 +94,11 @@ import {
 } from './pomodoroCommandBridgeContext';
 
 const COLOR = SECTION_COLORS[POMODORO_SECTION_KEY];
+/** Section solid: the face of the screen's one Grape primary (v2 C5). */
+const SOLID = SECTION_HUES[POMODORO_SECTION_KEY].solid;
+
+/** Staged sapling sizes (v2 §7 Focus): discrete growth at 25/50/75/100%. */
+const SAPLING_SIZES = [32, 42, 52, 62] as const;
 
 /** Accessible name of the timer region; stable across all six timer states. */
 const TIMER_REGION_LABEL = 'Focus timer';
@@ -942,7 +948,13 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
 
   const minutes = String(Math.floor(remaining / 60)).padStart(2, '0');
   const seconds = String(remaining % 60).padStart(2, '0');
-  const modeColors = getModeColor(currentMode);
+  // Staged sapling + session ring progress. The stage moves only when a
+  // 25/50/75% threshold is crossed — static between stages, an event, never
+  // ambient motion (§9 C6).
+  const sessionProgress = activeSession && totalSeconds > 0 ? 1 - remaining / totalSeconds : 0;
+  const growthStage = activeSession
+    ? Math.min(SAPLING_SIZES.length - 1, Math.floor(sessionProgress * 4))
+    : 0;
   const startLabel =
     currentMode === 'focus' ? 'Start focus' : `Start ${getModeLabel(currentMode).toLowerCase()}`;
 
@@ -955,6 +967,22 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const timerStatus = completedVisible
     ? `Completed, ${completionSummary?.minutes} minutes focused`
     : resolveTimerStatus(renderedPhase, getModeLabel(currentMode), `${minutes}:${seconds}`);
+
+  const timerText = (
+    <Text
+      className="text-center text-5xl"
+      variant="metricLg"
+      // The `text-5xl` class is the stable e2e size hook; metricLg (56/68) is
+      // re-applied inline because a class-declared size wins over the role's.
+      style={{
+        fontSize: typography.metricLg.fontSize,
+        lineHeight: typography.metricLg.lineHeight,
+      }}
+      accessibilityLabel={timerStatus}
+    >
+      {minutes}:{seconds}
+    </Text>
+  );
 
   return (
     <Screen scroll>
@@ -1075,16 +1103,16 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       ) : null}
 
       <ScreenSection>
-        <Card variant="standard" accentColor={COLOR} className="mb-0">
+        {/* §6 hero face: `Text` forces the Card's AA ink unless a caller passes
+            an explicit `style.color`, which opts out. No text on this face may
+            set a muted color or dim with opacity — both fail AA on Grape. */}
+        <Card variant="hero" accentColor={COLOR} className="mb-0">
           <View
             accessibilityRole="timer"
             accessibilityLabel={TIMER_REGION_LABEL}
             className="w-full items-center"
           >
-            <Text
-              className="text-xs font-medium uppercase tracking-wide"
-              style={{ color: tokens.textMuted }}
-            >
+            <Text className="text-xs font-medium uppercase tracking-wide">
               {summaryVisible
                 ? 'Session complete'
                 : resolvePhaseHeadline(renderedPhase, getModeLabel(currentMode))}
@@ -1092,65 +1120,62 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
 
             {summaryVisible && completionSummary ? (
               <>
+                {/* Garden plant moment: the sapling lands in the garden with
+                    success feedback — inline and non-blocking (§7 Finish). */}
+                <View className="mt-2">
+                  <Sprout pose="proud" size={72} color={tokens.successSolid} />
+                </View>
                 <Text
                   className="mt-2 text-center"
-                  style={{
-                    fontSize: typography.metric.fontSize,
-                    fontWeight: typography.metric.fontWeight,
-                    color: tokens.text,
-                  }}
+                  variant="metric"
                   accessibilityLabel={timerStatus}
                 >
                   Focused {completionSummary.minutes} min
                 </Text>
                 {completionSummary.linkedTodoTitle ? (
-                  <Text
-                    className="mt-1 text-center text-sm"
-                    style={{ color: tokens.textMuted }}
-                    numberOfLines={1}
-                  >
+                  <Text className="mt-1 text-center text-sm" numberOfLines={1}>
                     {completionSummary.linkedTodoTitle}
                   </Text>
                 ) : null}
-                <Text className="mt-1 text-center text-xs" style={{ color: tokens.textMuted }}>
+                <Text className="mt-1 text-center text-xs">
                   {summaryTodayMinutes} min focused today
                 </Text>
               </>
             ) : (
-              <Text
-                className={`mt-2 text-center text-5xl font-semibold ${modeColors.text}`}
-                accessibilityLabel={timerStatus}
-              >
-                {minutes}:{seconds}
-              </Text>
+              <>
+                <View className="mt-2 h-[68px] items-end justify-end">
+                  <Sprout pose="idle" size={SAPLING_SIZES[growthStage]} />
+                </View>
+                {activeSession ? (
+                  <ProgressRing
+                    progress={sessionProgress}
+                    size={220}
+                    stroke={12}
+                    accentColor="#FFFFFF"
+                    trackColor="rgba(255,255,255,0.35)"
+                  >
+                    {timerText}
+                  </ProgressRing>
+                ) : (
+                  timerText
+                )}
+              </>
             )}
 
             {cycleSentence ? (
-              <Text
-                className="mt-2 text-center text-xs"
-                style={{ color: tokens.textMuted }}
-                accessibilityRole="text"
-              >
+              <Text className="mt-2 text-center text-xs" accessibilityRole="text">
                 {cycleSentence}
               </Text>
             ) : null}
 
             {activeSession && pendingAssociation ? (
-              <Text
-                className="mt-2 text-center text-xs"
-                style={{ color: tokens.textMuted }}
-                numberOfLines={1}
-              >
+              <Text className="mt-2 text-center text-xs" numberOfLines={1}>
                 Focusing on “{pendingAssociation.todoTitle}”
               </Text>
             ) : null}
 
             {phaseAnnouncement ? (
-              <Text
-                accessibilityLiveRegion="polite"
-                className="mt-1 text-center text-xs"
-                style={{ color: tokens.textMuted }}
-              >
+              <Text accessibilityLiveRegion="polite" className="mt-1 text-center text-xs">
                 {phaseAnnouncement}
               </Text>
             ) : null}
@@ -1173,8 +1198,9 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                   <View className="min-w-[8rem] flex-1">
                     <Button
                       label={startLabel}
+                      size="lg"
                       onPress={startBreakFromSummary}
-                      color={COLOR}
+                      color={SOLID}
                       fullWidth
                     />
                   </View>
@@ -1191,7 +1217,13 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
             ) : null}
 
             {idleUntouched ? (
-              <Button label={startLabel} onPress={() => void start()} color={COLOR} fullWidth />
+              <Button
+                label={startLabel}
+                size="lg"
+                onPress={() => void start()}
+                color={SOLID}
+                fullWidth
+              />
             ) : null}
 
             {/* Exactly one startup action: the press is accepted and its
@@ -1213,7 +1245,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
             {isRunning ? (
               <View className="flex-row flex-wrap gap-3">
                 <View className="min-w-[6rem] flex-1">
-                  <Button label="Pause" variant="ghost" onPress={pause} fullWidth />
+                  <Button label="Pause" variant="secondary" onPress={pause} fullWidth />
                 </View>
                 <View className="min-w-[6rem] flex-1">
                   <Button
@@ -1229,7 +1261,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
             {isPaused ? (
               <View className="flex-row flex-wrap gap-3">
                 <View className="min-w-[6rem] flex-1">
-                  <Button label="Resume" onPress={() => void resume()} color={COLOR} fullWidth />
+                  <Button label="Resume" onPress={() => void resume()} color={SOLID} fullWidth />
                 </View>
                 <View className="min-w-[6rem] flex-1">
                   <Button
@@ -1243,7 +1275,7 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
             ) : null}
 
             {showConfiguration ? (
-              <Text className="text-center text-xs" style={{ color: tokens.textMuted }}>
+              <Text className="text-center text-xs">
                 Up next: {getModeLabel(upNextMode)} ({upNextMinutes} min)
               </Text>
             ) : null}
