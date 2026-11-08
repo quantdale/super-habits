@@ -3,6 +3,7 @@ import {
   buildQuickStartRows,
   buildTrainingState,
   buildWeekStrip,
+  completedWeekdaysForWeek,
   weekdayLabel,
   weekdayShortLabel,
   type RoutineCounts,
@@ -268,6 +269,64 @@ describe('buildWeekStrip', () => {
     expect(cells[1]).toMatchObject({ state: 'rest', isOverride: true, routineName: null });
   });
 
+  it('assignment alone is not completion: planned stays planned without a log', () => {
+    const cells = buildWeekStrip({
+      weeklyPlan: [weeklyEntry(1, 'workout', 'r_push'), weeklyEntry(3, 'workout', 'r_pull')],
+      routines,
+      todayWeekday: 5,
+    });
+    expect(cells[0]).toMatchObject({ state: 'workout', routineName: 'Push Day', completed: false });
+    expect(cells[2]).toMatchObject({ state: 'workout', completed: false });
+  });
+
+  it('a completed session this week marks that day done, assignment or not', () => {
+    const cells = buildWeekStrip({
+      weeklyPlan: [weeklyEntry(1, 'workout', 'r_push')],
+      routines,
+      todayWeekday: 5,
+      // Monday (1) has a log; Tuesday (2) has one too, even with no assignment.
+      completedWeekdays: [1, 2],
+    });
+    expect(cells[0]).toMatchObject({ state: 'workout', routineName: 'Push Day', completed: true });
+    expect(cells[1]).toMatchObject({ state: 'unassigned', routineName: null, completed: true });
+    expect(cells[3]).toMatchObject({ completed: false });
+  });
+
+  it('an explicit rest day stays rest unless it was actually trained', () => {
+    const restOnly = buildWeekStrip({
+      weeklyPlan: [weeklyEntry(3, 'rest', null)],
+      routines,
+      todayWeekday: 5,
+    });
+    expect(restOnly[2]).toMatchObject({ state: 'rest', completed: false });
+    const restTrained = buildWeekStrip({
+      weeklyPlan: [weeklyEntry(3, 'rest', null)],
+      routines,
+      todayWeekday: 5,
+      completedWeekdays: [3],
+    });
+    expect(restTrained[2]).toMatchObject({ state: 'rest', completed: true });
+  });
+
+  it('a future assigned day is never done', () => {
+    const cells = buildWeekStrip({
+      weeklyPlan: [weeklyEntry(6, 'workout', 'r_push')],
+      routines,
+      todayWeekday: 3,
+      // Even a (corrupt) future weekday in the completed set cannot make it done.
+      completedWeekdays: [6],
+    });
+    expect(cells[5]).toMatchObject({ state: 'workout', routineName: 'Push Day', completed: false });
+    // Today itself CAN complete (its date has happened).
+    const todayDone = buildWeekStrip({
+      weeklyPlan: [weeklyEntry(3, 'workout', 'r_push')],
+      routines,
+      todayWeekday: 3,
+      completedWeekdays: [3],
+    });
+    expect(todayDone[2]).toMatchObject({ isToday: true, completed: true });
+  });
+
   it('a template assignment for a deleted routine degrades to unassigned rather than a stale name', () => {
     const cells = buildWeekStrip({
       weeklyPlan: [weeklyEntry(4, 'workout', 'r_deleted')],
@@ -275,6 +334,64 @@ describe('buildWeekStrip', () => {
       todayWeekday: 1,
     });
     expect(cells[3]).toMatchObject({ state: 'unassigned', routineName: null });
+  });
+});
+
+describe('completedWeekdaysForWeek', () => {
+  /** Local-calendar key, mirroring lib/time's toDateKey contract. */
+  const key = (date: Date) => {
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
+  };
+  const log = (localIso: string) => ({ completed_at: new Date(localIso).toISOString() });
+
+  it('starts the week on Monday and ends it on Sunday', () => {
+    // 2026-10-13 is a Tuesday; the week runs Mon 12 → Sun 18.
+    expect(completedWeekdaysForWeek([log('2026-10-12T09:00:00')], '2026-10-13', key)).toEqual([1]);
+    // Sunday closes the week: on Sunday 18 the window still starts Mon 12.
+    expect(completedWeekdaysForWeek([log('2026-10-18T09:00:00')], '2026-10-18', key)).toEqual([7]);
+    // The following week that Sunday is out of range.
+    expect(completedWeekdaysForWeek([log('2026-10-18T09:00:00')], '2026-10-20', key)).toEqual([]);
+    // A Wednesday mid-week key resolves the same Monday boundary.
+    expect(completedWeekdaysForWeek([log('2026-10-14T09:00:00')], '2026-10-14', key)).toEqual([3]);
+  });
+
+  it('excludes last Sunday (it belongs to the previous week)', () => {
+    expect(completedWeekdaysForWeek([log('2026-10-11T09:00:00')], '2026-10-13', key)).toEqual([]);
+    // ...while this week's Sunday IS included.
+    expect(completedWeekdaysForWeek([log('2026-10-18T09:00:00')], '2026-10-18', key)).toEqual([7]);
+  });
+
+  it('includes today, including a session logged late at night local time', () => {
+    // 23:55 local on Tuesday must count as Tuesday even though it is the next
+    // day in UTC (the local-calendar contract `toDateKey` encodes).
+    expect(completedWeekdaysForWeek([log('2026-10-13T23:55:00')], '2026-10-13', key)).toEqual([2]);
+    // 00:05 local Wednesday counts as Wednesday, not Tuesday.
+    expect(completedWeekdaysForWeek([log('2026-10-14T00:05:00')], '2026-10-14', key)).toEqual([3]);
+  });
+
+  it('dedupes repeated sessions on one day and sorts Monday-first', () => {
+    expect(
+      completedWeekdaysForWeek(
+        [log('2026-10-16T09:00:00'), log('2026-10-13T09:00:00'), log('2026-10-16T18:00:00')],
+        '2026-10-16',
+        key,
+      ),
+    ).toEqual([2, 5]);
+  });
+
+  it('moves the window with the day key (no stale week across a rollover)', () => {
+    const logs = [log('2026-10-16T09:00:00')]; // Friday of the 12–18 week
+    expect(completedWeekdaysForWeek(logs, '2026-10-16', key)).toEqual([5]);
+    // Next Monday: same logs, new week → nothing completed this week.
+    expect(completedWeekdaysForWeek(logs, '2026-10-19', key)).toEqual([]);
+    // And a log from the NEW week appears with the new Monday boundary.
+    expect(completedWeekdaysForWeek([log('2026-10-19T09:00:00')], '2026-10-19', key)).toEqual([1]);
+  });
+
+  it('returns nothing for an empty history or a malformed day key', () => {
+    expect(completedWeekdaysForWeek([], '2026-10-13', key)).toEqual([]);
+    expect(completedWeekdaysForWeek([log('2026-10-13T09:00:00')], '', key)).toEqual([]);
   });
 });
 

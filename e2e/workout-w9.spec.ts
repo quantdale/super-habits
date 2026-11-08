@@ -92,6 +92,52 @@ test.describe('W9 Workout', () => {
     const todayWeekdayNum = ((todayWeekday + 6) % 7) + 1; // Monday = 1
 
     const section = page.locator(ACTIVE_SECTION_SELECTOR);
+    // P15: "This week" day nodes are buttons, and TODAY is marked as a date
+    // reference (`aria-current=date`), never as a pressed toggle.
+    const todayNode = section.getByRole('button', {
+      name: new RegExp(`^${todayName}: `),
+    });
+    await expect(todayNode).toHaveAttribute('aria-current', 'date');
+    await expect(todayNode).not.toHaveAttribute('aria-pressed', /.*/);
+    // The negative case must be a DIFFERENT day. A hardcoded "Monday" collides
+    // with `todayNode` every Monday, and `filter({ hasNot })` only inspects
+    // DESCENDANTS (so it would still resolve to today), so pick deterministically
+    // from the already-computed weekday number instead.
+    const allDayNodes = section.getByRole('button', {
+      name: /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday): /,
+    });
+    await expect(allDayNodes).toHaveCount(7);
+    const otherName = todayWeekdayNum === 1 ? 'Tuesday' : 'Monday';
+    const nonTodayNode = section.getByRole('button', {
+      name: new RegExp(`^${otherName}: `),
+    });
+    await expect(nonTodayNode).not.toHaveAttribute('aria-current', /.*/);
+    await expect(nonTodayNode).not.toHaveAttribute('aria-pressed', /.*/);
+    // And it is genuinely a different day from today.
+    const nonTodayLabel = (await nonTodayNode.getAttribute('aria-label')) ?? '';
+    expect(nonTodayLabel.startsWith(`${todayName}: `)).toBe(false);
+
+    // P15 fix: 7 day nodes must fit narrow phones without clipping. At 360 and
+    // 375 the LAST node must sit fully inside the week card and stay ≥40 wide
+    // (the workout-w9 tap-target rule).
+    for (const width of [360, 375]) {
+      await page.setViewportSize({ width, height: 800 });
+      const sundayNode = section.getByRole('button', { name: /^Sunday: / });
+      await expect(sundayNode).toBeVisible();
+      const card = section.getByText('This week').locator('..').locator('..');
+      const sundayBox = await sundayNode.boundingBox();
+      const cardBox = await card.boundingBox();
+      expect(sundayBox, `Sunday node at ${width}px`).not.toBeNull();
+      expect(cardBox, `week card at ${width}px`).not.toBeNull();
+      // Fully inside the card horizontally (1pt slack for subpixel rounding).
+      expect(
+        sundayBox!.x + sundayBox!.width,
+        `Sunday right edge at ${width}px`,
+      ).toBeLessThanOrEqual(cardBox!.x + cardBox!.width + 1);
+      expect(sundayBox!.x, `Sunday left edge at ${width}px`).toBeGreaterThanOrEqual(cardBox!.x - 1);
+      expect(sundayBox!.width, `Sunday width at ${width}px`).toBeGreaterThanOrEqual(40);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
     // The strip exposes a per-day rest control and an assign control at 44pt.
     const mondayRest = section.getByRole('button', { name: 'Monday rest', exact: true });
     await expect(mondayRest).toBeVisible();

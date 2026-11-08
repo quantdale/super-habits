@@ -13,6 +13,12 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { SectionLabel } from '@/core/ui/SectionLabel';
+import {
+  quickStartCardVisual,
+  workoutDayNodeVisual,
+  workoutHeroVisual,
+  type WorkoutDayState,
+} from './workoutLanding.visual';
 import { TextField } from '@/core/ui/TextField';
 import { Button } from '@/core/ui/Button';
 import { MenuSheet } from '@/core/ui/MenuSheet';
@@ -75,6 +81,7 @@ import {
   buildQuickStartRows,
   buildTrainingState,
   buildWeekStrip,
+  completedWeekdaysForWeek,
   weekdayLabel,
   type QuickStartRow,
   type WeekStripCell,
@@ -135,7 +142,11 @@ function QuickStartRoutineRow({
   onRequestDelete: () => void | Promise<void>;
   accentColor: string;
 }) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
+  // §"Quick start": pressable routine card lede = dumbbell hero icon. The tile
+  // is the Coral tint wash; the glyph uses the theme accent TEXT tier
+  // (Coral bright on a wash is only 2.16-2.83:1).
+  const cardVisual = quickStartCardVisual({ accentText: sectionAccents.workout.text });
   const meta = [
     `${row.exerciseCount} exercise${row.exerciseCount === 1 ? '' : 's'}`,
     `${row.setCount} set${row.setCount === 1 ? '' : 's'}`,
@@ -157,28 +168,45 @@ function QuickStartRoutineRow({
           accessibilityLabel={`Open ${row.name} routine`}
           style={{ flex: 1, minWidth: 0, backgroundColor: 'transparent' }}
         >
-          <View className="flex-row items-center gap-2">
-            <Text
-              className="text-base font-semibold"
-              style={{ color: tokens.text, flexShrink: 1 }}
-              numberOfLines={2}
+          <View className="flex-row items-center gap-3">
+            <View
+              className="h-10 w-10 items-center justify-center rounded-xl"
+              style={{ backgroundColor: cardVisual.iconTile }}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
             >
-              {row.name}
-            </Text>
-            {row.isScheduledToday ? (
-              <View
-                className="rounded-full px-2 py-0.5"
-                style={{ backgroundColor: `${accentColor}22` }}
-              >
-                <Text className="text-[11px] font-semibold" style={{ color: accentColor }}>
-                  Today
+              <MaterialIcons name="fitness-center" size={22} color={cardVisual.iconInk} />
+            </View>
+            <View className="min-w-0 flex-1">
+              <View className="flex-row items-center gap-2">
+                <Text
+                  className="text-base font-semibold"
+                  style={{ color: tokens.text, flexShrink: 1 }}
+                  numberOfLines={2}
+                >
+                  {row.name}
                 </Text>
+                {row.isScheduledToday ? (
+                  <View
+                    className="rounded-full px-2 py-0.5"
+                    style={{ backgroundColor: `${accentColor}22` }}
+                  >
+                    {/* Coral bright on its own 13% wash is 2.46:1 — use the
+                        accent text tier resolved for this appearance. */}
+                    <Text
+                      className="text-[11px] font-semibold"
+                      style={{ color: cardVisual.iconInk }}
+                    >
+                      Today
+                    </Text>
+                  </View>
+                ) : null}
               </View>
-            ) : null}
+              <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+                {meta}
+              </Text>
+            </View>
           </View>
-          <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-            {meta}
-          </Text>
         </RectButton>
         <Button
           label="Start"
@@ -200,6 +228,123 @@ function QuickStartRoutineRow({
         </Text>
       </RectButton>
     </SwipeableCard>
+  );
+}
+
+/**
+ * "This week" day nodes (§"Workout landing"): 7 nodes in a row — done = Coral
+ * bright check, rest = moon on the sunken face, planned = outline, unassigned =
+ * outline without a mark. Each node opens the existing day sheet, keeps its
+ * 44pt target, and names the day + assignment for assistive tech (the assignment
+ * labels also stay visible in the compact rows below).
+ *
+ * Inks come from `workoutDayNodeVisual`, which resolves them against the ACTUAL
+ * node fill (the Coral bright face is theme-invariant, so theme ink lands at
+ * ~2.4:1 there) and never uses `tokens.border` for the outline (1.25-1.48:1).
+ */
+function WeekDayNodesRow({
+  cells,
+  onOpenDay,
+}: {
+  cells: WeekStripCell[];
+  onOpenDay: (cell: WeekStripCell) => void;
+}) {
+  const { tokens } = useAppTheme();
+  return (
+    // Narrow phones: 7 cells must fit 360 (and 375) without clipping, so each
+    // cell flexes to the available width with a 40pt floor (workout-w9's ≥40
+    // target rule; the pressable keeps 44pt vertical). No fixed gap: padding
+    // inside the cell supplies the visual rhythm.
+    <View className="flex-row items-stretch">
+      {cells.map((cell) => {
+        // Assignment is NOT completion: a planned routine renders `planned`
+        // (outline + dot) and only a real logged session this week renders
+        // `done` (Coral face + check). Rest is its own moon state.
+        const state: WorkoutDayState = cell.completed
+          ? 'done'
+          : cell.state === 'rest'
+            ? 'rest'
+            : cell.state === 'workout'
+              ? 'planned'
+              : 'unassigned';
+        const node = workoutDayNodeVisual({
+          state,
+          selected: cell.isToday,
+          surface: tokens.surface,
+          surfaceSunken: tokens.surfaceSunken,
+          text: tokens.text,
+          textMuted: tokens.textMuted,
+          onSolid: tokens.onSolid,
+        });
+        const assignment = cell.routineName ?? (cell.state === 'rest' ? 'Rest' : 'Not planned');
+        return (
+          <Pressable
+            key={cell.weekday}
+            onPress={() => onOpenDay(cell)}
+            accessibilityRole="button"
+            accessibilityLabel={`${weekdayLabel(cell.weekday)}: ${assignment}`}
+            // Today is a DATE reference, not a toggle: `aria-current` names it
+            // for assistive tech without impersonating a pressed button state
+            // (the selection semantics belong to the day sheet, not the node).
+            aria-current={cell.isToday ? 'date' : undefined}
+            className="flex-1 items-center gap-1"
+            style={{ minWidth: 40, minHeight: 44, paddingHorizontal: 1 }}
+          >
+            <View className="h-[38px] w-[38px] items-center justify-center">
+              <View
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 9999,
+                  borderWidth: node.borderWidth,
+                  borderColor: node.borderColor,
+                  backgroundColor: node.fill,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {node.selectionRing ? (
+                  <View
+                    pointerEvents="none"
+                    style={{
+                      position: 'absolute',
+                      top: node.selectionRingInset,
+                      right: node.selectionRingInset,
+                      bottom: node.selectionRingInset,
+                      left: node.selectionRingInset,
+                      borderRadius: 9999,
+                      borderWidth: node.selectionRingWidth,
+                      borderColor: node.selectionRing,
+                    }}
+                  />
+                ) : null}
+                {/* Shape-coded state mark (check / moon / dot), never colour alone. */}
+                {node.mark === 'check' ? (
+                  <MaterialIcons name="check" size={18} color={node.markInk} />
+                ) : node.mark === 'moon' ? (
+                  <MaterialIcons name="bedtime" size={16} color={node.markInk} />
+                ) : node.mark === 'dot' ? (
+                  <View
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: node.markInk,
+                    }}
+                  />
+                ) : null}
+              </View>
+            </View>
+            <Text
+              className="text-[10px] font-semibold"
+              style={{ color: cell.isToday ? tokens.text : tokens.textMuted }}
+            >
+              {cell.dayLabel}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -266,11 +411,12 @@ function WeekStripRow({
         accessibilityState={{ selected: cell.state === 'rest' }}
         className="items-center justify-center rounded-lg"
         style={{
+          // P15: the per-row bordered boxes go away — a quiet 44pt text
+          // control replaces the filled chip (target size is unchanged).
           minWidth: 44,
           minHeight: 44,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: cell.state === 'rest' ? `${COLOR}22` : tokens.surfaceElevated,
         }}
       >
         <Text
@@ -290,7 +436,6 @@ function WeekStripRow({
           minHeight: 44,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: tokens.surfaceElevated,
         }}
       >
         <MaterialIcons
@@ -304,10 +449,19 @@ function WeekStripRow({
 }
 
 export function WorkoutScreen({ isActive }: { isActive: boolean }) {
-  const { tokens, sectionAccents } = useAppTheme();
+  const { tokens, sectionAccents, resolvedTheme } = useAppTheme();
   const { recordAction } = useGamification();
   const dayGeneration = useDayRolloverGeneration();
   const colorText = sectionAccents.workout.text;
+  // Hero inks resolved against the fixed Coral face (see workoutLanding.visual).
+  const heroVisual = workoutHeroVisual({
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+    button: tokens.button,
+    appearance: resolvedTheme,
+  });
+  const heroInk = heroVisual.ink;
+  const heroMutedInk = heroVisual.muttedInk;
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const { begin: beginRefresh } = useGuardedAsyncRefresh();
   const [name, setName] = useState('');
@@ -732,6 +886,21 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     (log) => toDateKey(new Date(log.completed_at)) === todayKey,
   );
 
+  /**
+   * Weekdays (1 = Monday) with a completed session THIS week, derived from the
+   * existing log history (`workout_logs.completed_at`) — read-only, no schema
+   * or domain change.
+   *
+   * The week start comes from the per-render `todayKey`, NOT from `new Date()`
+   * inside the memo: keying on `[allLogs]` alone would pin last week's window
+   * across a midnight / Monday rollover while mounted and could keep marking
+   * last week's logs done.
+   */
+  const completedWeekdaysThisWeek = useMemo(
+    () => completedWeekdaysForWeek(allLogs, todayKey, toDateKey),
+    [allLogs, todayKey],
+  );
+
   // W9.1 landing view models. The training state decides the single dominant
   // action (resume > scheduled > quick-start chooser); rest context is compact
   // and never a hero (SYS-20).
@@ -776,8 +945,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
               isOverride: todaySchedule.source === 'override',
             }
           : undefined,
+        completedWeekdays: completedWeekdaysThisWeek,
       }),
-    [weeklyPlan, routines, todayWeekdayNum, todaySchedule],
+    [weeklyPlan, routines, todayWeekdayNum, todaySchedule, completedWeekdaysThisWeek],
   );
 
   // Heavy history derivations (records, totals, body-area split) run only
@@ -1459,11 +1629,29 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
               </Text>
             ) : null}
           </View>
-          <Card accentColor={COLOR} className="mt-3">
-            <Text className="text-lg font-semibold" style={{ color: tokens.text }}>
+          {/* §"Workout landing": Coral status hero (Rest day / Routine today)
+              with ONE Coral lg CTA. The hero face is the fixed §5.1 Coral
+              bright, so every ink on it is resolved against THAT fill
+              (`workoutHeroVisual`) — theme text lands at ~2.4:1 there — and the
+              face-less secondary actions pass `onColor` for the same reason. */}
+          <Card variant="hero" accentColor={COLOR} className="mt-3">
+            <Text
+              className="text-xs font-medium uppercase tracking-wide"
+              style={{ color: heroInk }}
+            >
+              {/* §"Workout landing": the hero names the day's status. The
+                  eyebrow never repeats the headline, so `getByText('Rest day')`
+                  stays a single node for the W9 hierarchy assertions. */}
+              {trainingState.kind === 'scheduled' ? 'Routine today' : 'Today'}
+            </Text>
+            <Text
+              variant="titleMd"
+              style={{ color: heroInk }}
+              accessibilityLabel={`Training status: ${trainingState.headline}`}
+            >
               {trainingState.headline}
             </Text>
-            <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+            <Text className="mt-1 text-sm" style={{ color: heroMutedInk }}>
               {trainingState.detail}
             </Text>
             {trainingState.primaryLabel ? (
@@ -1475,8 +1663,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                       ? `Resume workout · ${draftRoutineName}`
                       : undefined
                   }
+                  size="lg"
                   onPress={handlePrimaryAction}
-                  color={COLOR}
+                  color={heroVisual.ctaFace}
                   fullWidth
                 />
               </View>
@@ -1486,6 +1675,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                 <Button
                   label="Discard workout"
                   variant="ghost"
+                  onColor={COLOR}
                   onPress={() => void handleDiscardDraft()}
                   fullWidth
                 />
@@ -1496,6 +1686,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                 <Button
                   label="Discard finished workout"
                   variant="ghost"
+                  onColor={COLOR}
                   onPress={() => void handleDiscardPendingSave()}
                   fullWidth
                 />
@@ -1508,6 +1699,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                     label="Change today"
                     variant="ghost"
                     size="sm"
+                    onColor={COLOR}
                     onPress={() => setDaySheet({ weekday: todayWeekdayNum, scope: 'today' })}
                   />
                 </View>
@@ -1517,6 +1709,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                       label="Move workout to another day"
                       variant="ghost"
                       size="sm"
+                      onColor={COLOR}
                       onPress={() => {
                         const next = new Date();
                         next.setDate(next.getDate() + 1);
@@ -1531,6 +1724,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                       label="Plan week"
                       variant="ghost"
                       size="sm"
+                      onColor={COLOR}
                       onPress={() => setWeekEditorVisible(true)}
                     />
                   </View>
@@ -1595,6 +1789,17 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
             />
           </View>
           <Card accentColor={COLOR} className="mb-0">
+            <View className="pb-2">
+              <WeekDayNodesRow
+                cells={weekStrip}
+                onOpenDay={(cell) =>
+                  setDaySheet({
+                    weekday: cell.weekday,
+                    scope: cell.isToday ? 'today' : 'weekly',
+                  })
+                }
+              />
+            </View>
             {weekStrip.map((cell) => (
               <WeekStripRow
                 key={cell.weekday}

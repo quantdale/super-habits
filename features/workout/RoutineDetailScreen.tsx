@@ -32,6 +32,7 @@ import {
   type ExerciseCatalogItem,
 } from './exerciseCatalog';
 import { SECTION_COLORS } from '@/constants/sectionColors';
+import { workoutHeroVisual } from './workoutLanding.visual';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { validateExerciseName, validateRoutineName, validateSetTiming } from '@/lib/validation';
 import { parseNumericInput } from '@/lib/numericInput';
@@ -103,7 +104,15 @@ export function RoutineDetailModal({
   onUseAsTemplate,
   onRenamed,
 }: Props) {
-  const { tokens } = useAppTheme();
+  const { tokens, resolvedTheme } = useAppTheme();
+  const heroVisual = workoutHeroVisual({
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+    button: tokens.button,
+    appearance: resolvedTheme,
+  });
+  const heroInk = heroVisual.ink;
+  const heroMutedInk = heroVisual.muttedInk;
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [exercises, setExercises] = useState<ExerciseWithSets[]>([]);
   const [newExerciseName, setNewExerciseName] = useState('');
@@ -477,15 +486,15 @@ export function RoutineDetailModal({
           ) : null
         }
       >
-        <View
-          className="mb-4 rounded-2xl border px-4 py-3"
-          style={{ borderColor: `${COLOR}33`, backgroundColor: `${COLOR}14` }}
-        >
-          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+        {/* P15 routine-detail hero band: the Coral bright face with ink chosen
+            against THAT fill (theme text is ~2.4:1 on Coral). One Coral CTA
+            lives in the modal footer ("Start workout"). */}
+        <View className="mb-4 rounded-2xl px-4 py-3" style={{ backgroundColor: COLOR }}>
+          <Text variant="titleMd" style={{ color: heroInk }}>
             Routine builder
           </Text>
-          <Text className="mt-1 text-sm" style={{ color: tokens.text }}>
-            Add exercises, tune work and rest intervals, then start the routine when it is ready.
+          <Text className="mt-1 text-sm" style={{ color: heroMutedInk }}>
+            Add exercises, tune work and rest intervals, then start when it is ready.
           </Text>
         </View>
 
