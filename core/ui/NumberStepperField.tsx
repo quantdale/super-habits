@@ -86,6 +86,13 @@ export function NumberStepperField({
           accessibilityLabel={inputAccessibilityLabel ?? label}
           style={{
             height: 48,
+            // A web `<input>` is a replaced element, so `min-width: auto`
+            // resolves to its ~250px intrinsic width and a `flex-1` field
+            // REFUSES to shrink inside a narrow row — it overflows its parent
+            // instead (measured: 250px field in a 94px cell, pushing the control
+            // past the workout card edge at 360/375/390). `minWidth: 0` lets the
+            // flex shrink apply so the field fits whatever column it is given.
+            minWidth: 0,
             fontSize: typography.bodyLg.fontSize,
             borderRadius: radius.sm,
             borderWidth: 2,

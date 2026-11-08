@@ -1140,11 +1140,23 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   };
 
   const handleFinishEarly = () => {
-    // "Finish" ends the session exactly like reaching the last set does: the
-    // phases already performed keep their dispositions, the ones never reached
-    // are simply not recorded, and the existing completion summary takes over
-    // (including its pending-save recovery and save path). Nothing is logged
-    // here — only the summary's "Save and finish" commits.
+    // "Finish" ends the session before the last prescribed set. The set the
+    // cursor sits on was NOT performed, so it must not be counted: the
+    // collectors (`summarizeCompletedSets` / `collectSessionSetRecords`) walk
+    // phases UP TO the cursor and treat a MISSING disposition as completed, so
+    // an early Finish without a boundary would report the untouched set as
+    // done — including a timed/cardio set fabricating its full duration.
+    //
+    // The boundary is recorded as the phase's own explicit `skipped` outcome
+    // (an existing, already-persisted concept), so the summary, the logged
+    // sets and the durable pending-save recovery payload all exclude it by
+    // exactly the same rule. Phases beyond the cursor are already out of
+    // range, and a phase that already carries an outcome is never overwritten.
+    const index = currentIndexRef.current;
+    const phase = sequence[index];
+    if (phase?.phase === 'active' && dispositionsRef.current[index] === undefined) {
+      setDispositions((d) => ({ ...d, [index]: 'skipped' }));
+    }
     setIsRunning(false);
     setIsComplete(true);
   };
@@ -1487,10 +1499,17 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       phase.modality === 'bodyweight';
     const rowIsCardio = phase.modality === 'cardio';
     if (rowIsLoadBased) {
+      // Stacked, not side-by-side: the load column and the reps stepper share
+      // the set row's ~196px input column at 360/375/390, and a 40+8+field+8+40
+      // stepper cannot share it with a second field without pushing its own
+      // controls outside the exercise card. Stacking gives each control the
+      // full column width, so the field, the − / + faces and the completion
+      // node all stay inside the card at every phone width (measurement pinned
+      // by e2e/workout-w9.spec.ts "set row controls fit at 360/375/390").
       return (
-        <View className="min-w-0 flex-1 flex-row items-end gap-2">
+        <View className="min-w-0 flex-1 gap-2">
           {rowAllowsExternalLoad ? (
-            <View className="min-w-0 flex-1">
+            <View className="min-w-0">
               <Text className="mb-1 text-[11px] font-medium" style={{ color: tokens.textMuted }}>
                 {rowIsBodyweight ? 'Added load' : 'Weight'}
               </Text>
@@ -1499,6 +1518,10 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                 className="rounded-xl border px-3 py-2 text-center text-base"
                 style={{
                   height: 48,
+                  // Same replaced-element rule as NumberStepperField's input:
+                  // a web `<input>` needs `minWidth: 0` before a flex child may
+                  // shrink, or the weight field overflows the set row at 360.
+                  minWidth: 0,
                   borderColor: tokens.border,
                   backgroundColor: tokens.surfaceElevated,
                   color: tokens.text,
@@ -1515,7 +1538,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
               />
             </View>
           ) : null}
-          <View className={rowAllowsExternalLoad ? 'min-w-0 flex-1' : 'min-w-0 w-full'}>
+          <View className="min-w-0 w-full">
             <NumberStepperField
               label={phase.unilateral ? 'Reps / side' : 'Reps'}
               inputAccessibilityLabel={phase.unilateral ? 'Reps / side input' : 'Reps'}
@@ -1547,6 +1570,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                 className="rounded-xl border px-3 py-2 text-base"
                 style={{
                   height: 48,
+                  minWidth: 0,
                   borderColor: tokens.border,
                   backgroundColor: tokens.surfaceElevated,
                   color: tokens.text,
@@ -1568,6 +1592,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                 className="rounded-xl border px-3 py-2 text-base"
                 style={{
                   height: 48,
+                  minWidth: 0,
                   borderColor: tokens.border,
                   backgroundColor: tokens.surfaceElevated,
                   color: tokens.text,

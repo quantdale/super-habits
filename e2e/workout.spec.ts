@@ -179,6 +179,56 @@ test.describe('Workout', () => {
     await expect(page.getByText('Quick log — no exercises recorded.')).not.toBeVisible();
   });
 
+  test('finishing early never logs the set that was not performed', async ({ page }) => {
+    // P1 on PR 196: the header's "Finish" ends the session before the last
+    // prescribed set. The collectors walk phases up to the cursor and treat a
+    // MISSING disposition as completed, so without an explicit boundary the
+    // untouched set would be logged as done. Press Finish immediately, save, and
+    // assert the durable rows carry no completed work at all.
+    await fillRoutineName(page, 'Early finish day');
+    await page.getByText('Add routine', { exact: true }).click();
+    await expect(page.getByText('Early finish day')).toBeVisible();
+    await page.getByText('Early finish day', { exact: true }).first().click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByPlaceholder(/e\.g\. Rows, Curls, Push-ups/i).fill('Bench Press');
+    await dialog.getByText('Add', { exact: true }).click({ force: true });
+    await expect(dialog.getByText('Start workout', { exact: true })).toBeVisible();
+    await dialog.getByRole('textbox', { name: 'Active (seconds)' }).fill('8');
+    await expect(dialog.getByRole('textbox', { name: 'Active (seconds)' })).toHaveValue('8', {
+      timeout: 10_000,
+    });
+    await dialog.getByText('Start workout', { exact: true }).click({ force: true });
+
+    // Nothing performed: Finish straight away.
+    await expect(page.getByRole('button', { name: 'Complete set 1' })).toBeVisible();
+    await page.getByRole('button', { name: 'Finish workout' }).click();
+    await expect(page.getByText('Workout complete!')).toBeVisible({ timeout: 15_000 });
+    await page.getByText('Save and finish', { exact: true }).click();
+    await expect(page.getByText('Workout saved')).toBeVisible({ timeout: 10_000 });
+    await page.getByText('Done', { exact: true }).click();
+
+    // The log exists (the session was saved) but records ZERO completed sets.
+    const logs = await queryRows(
+      page,
+      "SELECT id FROM workout_logs WHERE routine_id IN (SELECT id FROM workout_routines WHERE name = 'Early finish day')",
+    );
+    expect(logs.length).toBe(1);
+    const logId = String(logs[0]?.id);
+    const completedSets = await queryRows(
+      page,
+      `SELECT COUNT(*) AS n
+         FROM workout_session_sets s
+         JOIN workout_session_exercises e ON e.id = s.session_exercise_id
+        WHERE e.log_id = '${logId}' AND s.completed = 1`,
+    );
+    expect(Number(completedSets[0]?.n)).toBe(0);
+    const setsCompleted = await queryRows(
+      page,
+      `SELECT SUM(sets_completed) AS n FROM workout_session_exercises WHERE log_id = '${logId}'`,
+    );
+    expect(Number(setsCompleted[0]?.n ?? 0)).toBe(0);
+  });
+
   test('double-tapping Save and finish logs exactly one workout', async ({ page }) => {
     // CG-3 defect class on the session finish path: two taps in the same tick
     // must not log two workouts. The finish handler holds a synchronous

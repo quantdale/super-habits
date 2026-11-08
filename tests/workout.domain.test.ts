@@ -850,3 +850,76 @@ describe('formatLastPerformedLabel calendar-day gap', () => {
     );
   });
 });
+
+/**
+ * P1 on PR 196: the header's "Finish" ends a session early. The collectors
+ * walk phases UP TO the cursor and treat a MISSING disposition as completed,
+ * so the untouched phase at the cursor must be excluded by an explicit boundary
+ * (the screen records that phase as `skipped`) — otherwise an early Finish
+ * reports work that was never done and a timed/cardio set fabricates its full
+ * duration.
+ */
+describe('early Finish (unperformed cursor phase)', () => {
+  const exercises = [
+    {
+      name: 'Rows',
+      sets: [
+        { set_number: 1, active_seconds: 40, rest_seconds: 20 },
+        { set_number: 2, active_seconds: 40, rest_seconds: 20 },
+      ],
+    },
+  ];
+
+  it('finishing before any work records zero completed sets', () => {
+    const seq = buildTimerSequence(exercises);
+    // Cursor still on the first set, and the early-finish boundary marks it
+    // skipped (the only outcome ever written for it).
+    const summary = summarizeCompletedSets(seq, 0, { 0: 'skipped' });
+    expect(summary).toEqual([]);
+    const records = collectSessionSetRecords(seq, 0, { 0: 'skipped' }, {});
+    expect(records.every((record) => record.completed === false)).toBe(true);
+    // And the logged exercise groups carry no completed set.
+    const groups = buildSessionLogExercises(
+      { id: 'wrk_r', name: 'Rows', exercises: [] } as unknown as RoutineWithExercises,
+      summary,
+      records,
+      'kg',
+    );
+    expect(groups.flatMap((g) => g.sets).filter((s) => s.completed)).toEqual([]);
+  });
+
+  it('finishing mid-session excludes only the untouched current set', () => {
+    const seq = buildTimerSequence(exercises);
+    // Set 1 completed and the rest phase after it also finished; the cursor
+    // now sits on set 2, which the user never performed.
+    const summary = summarizeCompletedSets(seq, 2, { 0: 'completed', 2: 'skipped' });
+    expect(summary).toEqual([{ exerciseIndex: 0, exerciseName: 'Rows', setsCompleted: 1 }]);
+    // Without the boundary the same cursor over-counts the untouched set.
+    expect(summarizeCompletedSets(seq, 2, { 0: 'completed' })[0]?.setsCompleted).toBe(2);
+  });
+
+  it('a timed set is never fabricated by finishing early', () => {
+    const timed = [
+      {
+        name: 'Plank',
+        modality: 'timed' as const,
+        sets: [{ set_number: 1, active_seconds: 60, rest_seconds: 0 }],
+      },
+    ];
+    const seq = buildTimerSequence(timed);
+    const records = collectSessionSetRecords(seq, 0, { 0: 'skipped' }, {});
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ completed: false, durationSeconds: null });
+    // Legend: the same cursor with no boundary would report the full 60s.
+    const overCounted = collectSessionSetRecords(seq, 0, {}, {});
+    expect(overCounted[0]?.durationSeconds).toBe(60);
+  });
+
+  it('a normal last-set completion is unchanged by the boundary rule', () => {
+    const seq = buildTimerSequence(exercises);
+    // Every active phase carries its own outcome, exactly as the timer/skip
+    // paths write them; the cursor rests on the final set.
+    const summary = summarizeCompletedSets(seq, 2, { 0: 'completed', 2: 'completed' });
+    expect(summary).toEqual([{ exerciseIndex: 0, exerciseName: 'Rows', setsCompleted: 2 }]);
+  });
+});
