@@ -1,6 +1,7 @@
 import { Text } from '@/core/ui/Text';
 import React, { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { Animated, Pressable, TextInput, View } from 'react-native';
+import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useAppTheme } from '@/core/providers/themeContext';
@@ -13,7 +14,12 @@ import { ScreenSection } from '@/core/ui/ScreenSection';
 import { TextField } from '@/core/ui/TextField';
 import { NumberStepperField } from '@/core/ui/NumberStepperField';
 import { useMotionDuration } from '@/core/theme/motion';
+import { useCheckBurst } from '@/core/ui/motion/useCheckBurst';
+import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
+import { fonts, radius } from '@/core/theme/designTokens';
+import { emitRewardFeedback } from '@/lib/rewardFeedback';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
+import { setCheckNodeVisual, workoutSessionHeaderVisual } from './workoutSessionSet.visual';
 import { useGamification } from '@/features/gamification/gamificationContext';
 import {
   buildPreviousSetLookup,
@@ -86,6 +92,145 @@ function formatMetricNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
+/** §6 set-check geometry: a 32px face inside the 48pt target. */
+const SET_NODE_FACE = 32;
+const SET_NODE_TARGET = 48;
+
+type SetCheckNodeProps = {
+  /** Renders the completed (Coral) face; false renders the actionable face. */
+  checked: boolean;
+  /** Accessible name of the live control (omit on the read-only mark). */
+  label?: string;
+  /** Supplied only while the set is still actionable — commits on press. */
+  onPress?: () => void;
+};
+
+/**
+ * SetCheckNode — the in-session set control (P16 §"Workout session").
+ *
+ * A 32pt face (`radius.full`) inside a 48pt target. Actionable rows render the
+ * live control: a surface face with a ≥3:1 ink outline that commits the set on
+ * press (honest `button` role, existing `Complete set N` label) and plays the
+ * §5.8 `light` moment — a check burst (`useCheckBurst`) plus one light haptic
+ * (`emitRewardFeedback('light')`), never an XP float or a mascot, with a
+ * keyboard `:focus-visible` ring painted outside the face. Already-performed
+ * rows render the same node checked (Coral bright face, ≥3:1 lip outline and a
+ * ✓ glyph chosen against that fill — see `setCheckNodeVisual`), non-interactive
+ * exactly as the previous read-only completed rows were.
+ *
+ * Reduced motion: opacity cross-fade only, no scale, no dots.
+ */
+function SetCheckNode({ checked, label, onPress }: SetCheckNodeProps) {
+  const { tokens } = useAppTheme();
+  const burst = useCheckBurst();
+  const focus = useKeyboardFocusRing(tokens.accent);
+  const visual = setCheckNodeVisual({
+    checked,
+    surface: tokens.surface,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+    onSolid: tokens.onSolid,
+  });
+
+  const dotSpread = useAnimatedStyle(() => ({
+    transform: [{ scale: Math.max(0.01, burst.burstProgress.value) }],
+  }));
+
+  const activate = () => {
+    burst.trigger();
+    // A landed set is the light tier: one short haptic, no chime (§5.8).
+    emitRewardFeedback('light');
+    onPress?.();
+  };
+
+  const face = (
+    <View
+      style={{
+        width: SET_NODE_FACE,
+        height: SET_NODE_FACE,
+        borderRadius: radius.full,
+        borderWidth: 2,
+        borderColor: visual.outline,
+        backgroundColor: visual.face,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {checked ? <MaterialIcons name="check" size={20} color={visual.glyphInk} /> : null}
+    </View>
+  );
+
+  const node = (
+    <Reanimated.View style={onPress ? burst.nodeStyle : null}>
+      {onPress && burst.burstCount > 0 ? (
+        <Reanimated.View
+          pointerEvents="none"
+          style={[
+            burst.burstStyle,
+            dotSpread,
+            {
+              position: 'absolute',
+              top: (SET_NODE_TARGET - SET_NODE_FACE) / 2,
+              left: (SET_NODE_TARGET - SET_NODE_FACE) / 2,
+              width: SET_NODE_FACE,
+              height: SET_NODE_FACE,
+            },
+          ]}
+        >
+          {Array.from({ length: burst.burstCount }, (_, index) => {
+            const angle = (index / burst.burstCount) * Math.PI * 2;
+            return (
+              <View
+                key={index}
+                style={{
+                  position: 'absolute',
+                  top: SET_NODE_FACE / 2 - 2.5 + Math.sin(angle) * 22,
+                  left: SET_NODE_FACE / 2 - 2.5 + Math.cos(angle) * 22,
+                  width: 5,
+                  height: 5,
+                  borderRadius: radius.full,
+                  backgroundColor: WORKOUT_COLOR,
+                }}
+              />
+            );
+          })}
+        </Reanimated.View>
+      ) : null}
+      {face}
+    </Reanimated.View>
+  );
+
+  if (!onPress) {
+    // Read-only completion mark: decorative, exactly like the previous
+    // completed-row icon (no control is introduced for a performed set).
+    return (
+      <View
+        className="items-center justify-center"
+        style={{ width: SET_NODE_TARGET, height: SET_NODE_TARGET }}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        aria-hidden
+      >
+        {node}
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      onPress={activate}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onFocus={focus.onFocus}
+      onBlur={focus.onBlur}
+      className="items-center justify-center"
+      style={[{ width: SET_NODE_TARGET, height: SET_NODE_TARGET }, focus.focusRingStyle]}
+    >
+      {node}
+    </Pressable>
+  );
+}
+
 /** Keep a restored phase cursor inside the (possibly edited) sequence. */
 function clampPhaseIndex(index: number, length: number): number {
   if (length <= 0) return 0;
@@ -124,7 +269,7 @@ type Props = {
 };
 
 export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Props) {
-  const { tokens } = useAppTheme();
+  const { tokens, resolvedTheme } = useAppTheme();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const { recordAction } = useGamification();
   // Rest policy (Option A): stored `rest_seconds === 0` is intentional no
@@ -994,6 +1139,16 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     setRemaining((prev) => Math.max(1, prev + delta));
   };
 
+  const handleFinishEarly = () => {
+    // "Finish" ends the session exactly like reaching the last set does: the
+    // phases already performed keep their dispositions, the ones never reached
+    // are simply not recorded, and the existing completion summary takes over
+    // (including its pending-save recovery and save path). Nothing is logged
+    // here — only the summary's "Save and finish" commits.
+    setIsRunning(false);
+    setIsComplete(true);
+  };
+
   const handleCancel = async () => {
     // Leaving keeps the draft: the landing offers a dominant Resume. Nothing
     // is logged, and discarding is the landing's separate confirmed path.
@@ -1473,30 +1628,60 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   const skippedLabel =
     sessionProgress.skippedSets > 0 ? ` · ${sessionProgress.skippedSets} skipped` : '';
 
+  const headerVisual = workoutSessionHeaderVisual({
+    surface: tokens.surface,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+    appearance: resolvedTheme,
+  });
+  const timerLabel = formatWorkoutTime(elapsedSeconds);
+
   return (
     <Screen>
       {confirmationDialog}
-      <View className="mb-3 flex-row items-center justify-between gap-2">
+      {/* Session header (§"Workout session"): tabular 800 timer + Coral Finish.
+          The band is a theme surface so content can never bleed through it, and
+          every ink on it resolves against that actual fill. */}
+      <View
+        className="mb-3 flex-row items-center justify-between gap-2 rounded-2xl border px-3 py-2"
+        style={{
+          backgroundColor: headerVisual.canvas,
+          borderColor: tokens.border,
+        }}
+      >
         <Pressable
           onPress={handleCancel}
           accessibilityRole="button"
           accessibilityLabel="End workout"
+          className="min-h-11 shrink-0 justify-center"
           hitSlop={8}
         >
-          <Text className="text-sm" style={{ color: tokens.textMuted }}>
-            End
+          <Text className="text-sm" style={{ color: headerVisual.mutedInk }}>
+            End workout
           </Text>
         </Pressable>
-        <Text
-          className="min-w-0 flex-1 text-center text-sm"
-          style={{ color: tokens.textMuted }}
-          numberOfLines={1}
-        >
-          {routine.name}
-        </Text>
-        <Text className="text-xs" style={{ color: tokens.iconMuted }}>
-          {formatWorkoutTime(elapsedSeconds)}
-        </Text>
+        <View className="min-w-0 flex-1 items-center">
+          <Text
+            className="text-2xl"
+            style={{
+              color: headerVisual.ink,
+              fontFamily: fonts.bold,
+              fontVariant: ['tabular-nums'],
+            }}
+          >
+            {timerLabel}
+          </Text>
+          <Text className="text-[11px]" style={{ color: headerVisual.mutedInk }} numberOfLines={1}>
+            {routine.name}
+          </Text>
+        </View>
+        <Button
+          label="Finish"
+          accessibilityLabel="Finish workout"
+          color={headerVisual.finishFace}
+          className="shrink-0"
+          onPress={handleFinishEarly}
+        />
       </View>
 
       <View className="mb-3 flex-row items-center justify-center gap-2">
@@ -1583,8 +1768,8 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                   : 'Previous · Duration'}
             </Text>
             <Text
-              className="w-11 text-center text-[11px] font-semibold uppercase"
-              style={{ color: tokens.textMuted }}
+              className="text-center text-[11px] font-semibold uppercase"
+              style={{ color: tokens.textMuted, width: SET_NODE_TARGET }}
             >
               Done
             </Text>
@@ -1596,6 +1781,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                 key={row.phaseIndex}
                 className="flex-row items-center gap-2 border-t py-2"
                 style={{
+                  minHeight: 48,
                   borderTopColor: tokens.border,
                   backgroundColor: isCurrent ? `${WORKOUT_COLOR}0D` : 'transparent',
                   borderRadius: isCurrent ? 12 : 0,
@@ -1628,17 +1814,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                   )}
                 </View>
                 {row.state === 'completed' ? (
-                  <View className="w-11 items-center">
-                    <MaterialIcons name="check-circle" size={22} color={tokens.successText} />
-                    <Text
-                      className="text-[9px] font-semibold uppercase"
-                      style={{ color: tokens.successText }}
-                    >
-                      Done
-                    </Text>
-                  </View>
+                  <SetCheckNode checked />
                 ) : row.state === 'skipped' ? (
-                  <View className="w-11 items-center">
+                  <View className="items-center" style={{ width: SET_NODE_TARGET }}>
                     <MaterialIcons
                       name="remove-circle-outline"
                       size={22}
@@ -1652,26 +1830,26 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                     </Text>
                   </View>
                 ) : row.state === 'current' ? (
-                  <Pressable
+                  <SetCheckNode
+                    checked={false}
+                    label={`Complete set ${row.setNumber}`}
                     onPress={handleCompleteSet}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Complete set ${row.setNumber}`}
-                    className="items-center justify-center rounded-full"
-                    style={{
-                      width: 44,
-                      height: 44,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: WORKOUT_COLOR,
-                    }}
-                  >
-                    <MaterialIcons name="check" size={22} color={tokens.textOnAccent} />
-                  </Pressable>
+                  />
                 ) : (
-                  <View className="w-11 items-center">
+                  <View className="items-center" style={{ width: SET_NODE_TARGET }}>
                     <View
                       className="rounded-full border"
-                      style={{ width: 22, height: 22, borderColor: tokens.border }}
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderColor: setCheckNodeVisual({
+                          checked: false,
+                          surface: tokens.surface,
+                          text: tokens.text,
+                          textMuted: tokens.textMuted,
+                          onSolid: tokens.onSolid,
+                        }).outline,
+                      }}
                     />
                   </View>
                 )}
