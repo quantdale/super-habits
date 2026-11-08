@@ -81,6 +81,7 @@ import {
   buildQuickStartRows,
   buildTrainingState,
   buildWeekStrip,
+  completedWeekdaysForWeek,
   weekdayLabel,
   type QuickStartRow,
   type WeekStripCell,
@@ -888,29 +889,17 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   /**
    * Weekdays (1 = Monday) with a completed session THIS week, derived from the
    * existing log history (`workout_logs.completed_at`) — read-only, no schema
-   * or domain change. The week starts on Monday and today is mid-week, so only
-   * elapsed days can appear; `buildWeekStrip` also refuses future days.
+   * or domain change.
+   *
+   * The week start comes from the per-render `todayKey`, NOT from `new Date()`
+   * inside the memo: keying on `[allLogs]` alone would pin last week's window
+   * across a midnight / Monday rollover while mounted and could keep marking
+   * last week's logs done.
    */
-  const completedWeekdaysThisWeek = useMemo(() => {
-    const monday = new Date();
-    monday.setHours(0, 0, 0, 0);
-    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-    const startKey = toDateKey(monday);
-    const endDate = new Date(monday);
-    endDate.setDate(monday.getDate() + 7);
-    const endKey = toDateKey(endDate);
-    return Array.from(
-      new Set(
-        allLogs
-          .map((log) => toDateKey(new Date(log.completed_at)))
-          .filter((key) => key >= startKey && key < endKey)
-          .map((key) => {
-            const [y, m, d] = key.split('-').map(Number);
-            return ((new Date(y, m - 1, d).getDay() + 6) % 7) + 1;
-          }),
-      ),
-    );
-  }, [allLogs]);
+  const completedWeekdaysThisWeek = useMemo(
+    () => completedWeekdaysForWeek(allLogs, todayKey, toDateKey),
+    [allLogs, todayKey],
+  );
 
   // W9.1 landing view models. The training state decides the single dominant
   // action (resume > scheduled > quick-start chooser); rest context is compact

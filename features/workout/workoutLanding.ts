@@ -197,6 +197,46 @@ export function buildQuickStartRows(
   });
 }
 
+/**
+ * Weekdays (1 = Monday … 7 = Sunday) that carry a completed session in the week
+ * containing `todayKey`.
+ *
+ * Pure and clock-free: the week start is derived from `todayKey` (the app's
+ * local-calendar key), never from `new Date()`, so a mounted screen that
+ * crosses midnight or a Monday rollover cannot keep last week's completion
+ * marks — the caller re-derives with the new key and this recomputes.
+ *
+ * `logs` are the log rows' `completed_at` timestamps; they are converted with
+ * the same local-calendar `toDateKey` the rest of the app uses, so a session
+ * logged at 23:55 local belongs to that local day, not to UTC's next day.
+ */
+export function completedWeekdaysForWeek(
+  logs: readonly { completed_at: string }[],
+  todayKey: string,
+  toDateKeyImpl: (date: Date) => string = (date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  },
+): number[] {
+  const [year, month, day] = todayKey.split('-').map(Number);
+  if (!year || !month || !day) return [];
+  const today = new Date(year, month - 1, day);
+  const monday = new Date(year, month - 1, day);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  const nextMonday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 7);
+  const startKey = toDateKeyImpl(monday);
+  const endKey = toDateKeyImpl(nextMonday);
+  const weekdays = new Set<number>();
+  for (const log of logs) {
+    const key = toDateKeyImpl(new Date(log.completed_at));
+    // Half-open [Monday, next Monday): last Sunday is excluded by construction.
+    if (key < startKey || key >= endKey) continue;
+    const [y, m, d] = key.split('-').map(Number);
+    weekdays.add(((new Date(y, m - 1, d).getDay() + 6) % 7) + 1);
+  }
+  return [...weekdays].sort((a, b) => a - b);
+}
+
 export type WeekStripCell = {
   weekday: number;
   dayLabel: string;

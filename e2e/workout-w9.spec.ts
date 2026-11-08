@@ -99,8 +99,23 @@ test.describe('W9 Workout', () => {
     });
     await expect(todayNode).toHaveAttribute('aria-current', 'date');
     await expect(todayNode).not.toHaveAttribute('aria-pressed', /.*/);
-    const nonTodayNode = section.getByRole('button', { name: /^Monday: / });
+    // The negative case must be a DIFFERENT day. A hardcoded "Monday" collides
+    // with `todayNode` every Monday, and `filter({ hasNot })` only inspects
+    // DESCENDANTS (so it would still resolve to today), so pick deterministically
+    // from the already-computed weekday number instead.
+    const allDayNodes = section.getByRole('button', {
+      name: /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday): /,
+    });
+    await expect(allDayNodes).toHaveCount(7);
+    const otherName = todayWeekdayNum === 1 ? 'Tuesday' : 'Monday';
+    const nonTodayNode = section.getByRole('button', {
+      name: new RegExp(`^${otherName}: `),
+    });
     await expect(nonTodayNode).not.toHaveAttribute('aria-current', /.*/);
+    await expect(nonTodayNode).not.toHaveAttribute('aria-pressed', /.*/);
+    // And it is genuinely a different day from today.
+    const nonTodayLabel = (await nonTodayNode.getAttribute('aria-label')) ?? '';
+    expect(nonTodayLabel.startsWith(`${todayName}: `)).toBe(false);
 
     // P15 fix: 7 day nodes must fit narrow phones without clipping. At 360 and
     // 375 the LAST node must sit fully inside the week card and stay ≥40 wide

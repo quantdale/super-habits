@@ -3,6 +3,7 @@ import {
   buildQuickStartRows,
   buildTrainingState,
   buildWeekStrip,
+  completedWeekdaysForWeek,
   weekdayLabel,
   weekdayShortLabel,
   type RoutineCounts,
@@ -333,6 +334,64 @@ describe('buildWeekStrip', () => {
       todayWeekday: 1,
     });
     expect(cells[3]).toMatchObject({ state: 'unassigned', routineName: null });
+  });
+});
+
+describe('completedWeekdaysForWeek', () => {
+  /** Local-calendar key, mirroring lib/time's toDateKey contract. */
+  const key = (date: Date) => {
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
+  };
+  const log = (localIso: string) => ({ completed_at: new Date(localIso).toISOString() });
+
+  it('starts the week on Monday and ends it on Sunday', () => {
+    // 2026-10-13 is a Tuesday; the week runs Mon 12 → Sun 18.
+    expect(completedWeekdaysForWeek([log('2026-10-12T09:00:00')], '2026-10-13', key)).toEqual([1]);
+    // Sunday closes the week: on Sunday 18 the window still starts Mon 12.
+    expect(completedWeekdaysForWeek([log('2026-10-18T09:00:00')], '2026-10-18', key)).toEqual([7]);
+    // The following week that Sunday is out of range.
+    expect(completedWeekdaysForWeek([log('2026-10-18T09:00:00')], '2026-10-20', key)).toEqual([]);
+    // A Wednesday mid-week key resolves the same Monday boundary.
+    expect(completedWeekdaysForWeek([log('2026-10-14T09:00:00')], '2026-10-14', key)).toEqual([3]);
+  });
+
+  it('excludes last Sunday (it belongs to the previous week)', () => {
+    expect(completedWeekdaysForWeek([log('2026-10-11T09:00:00')], '2026-10-13', key)).toEqual([]);
+    // ...while this week's Sunday IS included.
+    expect(completedWeekdaysForWeek([log('2026-10-18T09:00:00')], '2026-10-18', key)).toEqual([7]);
+  });
+
+  it('includes today, including a session logged late at night local time', () => {
+    // 23:55 local on Tuesday must count as Tuesday even though it is the next
+    // day in UTC (the local-calendar contract `toDateKey` encodes).
+    expect(completedWeekdaysForWeek([log('2026-10-13T23:55:00')], '2026-10-13', key)).toEqual([2]);
+    // 00:05 local Wednesday counts as Wednesday, not Tuesday.
+    expect(completedWeekdaysForWeek([log('2026-10-14T00:05:00')], '2026-10-14', key)).toEqual([3]);
+  });
+
+  it('dedupes repeated sessions on one day and sorts Monday-first', () => {
+    expect(
+      completedWeekdaysForWeek(
+        [log('2026-10-16T09:00:00'), log('2026-10-13T09:00:00'), log('2026-10-16T18:00:00')],
+        '2026-10-16',
+        key,
+      ),
+    ).toEqual([2, 5]);
+  });
+
+  it('moves the window with the day key (no stale week across a rollover)', () => {
+    const logs = [log('2026-10-16T09:00:00')]; // Friday of the 12–18 week
+    expect(completedWeekdaysForWeek(logs, '2026-10-16', key)).toEqual([5]);
+    // Next Monday: same logs, new week → nothing completed this week.
+    expect(completedWeekdaysForWeek(logs, '2026-10-19', key)).toEqual([]);
+    // And a log from the NEW week appears with the new Monday boundary.
+    expect(completedWeekdaysForWeek([log('2026-10-19T09:00:00')], '2026-10-19', key)).toEqual([1]);
+  });
+
+  it('returns nothing for an empty history or a malformed day key', () => {
+    expect(completedWeekdaysForWeek([], '2026-10-13', key)).toEqual([]);
+    expect(completedWeekdaysForWeek([log('2026-10-13T09:00:00')], '', key)).toEqual([]);
   });
 });
 
