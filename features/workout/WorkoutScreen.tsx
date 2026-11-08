@@ -250,16 +250,22 @@ function WeekDayNodesRow({
 }) {
   const { tokens } = useAppTheme();
   return (
-    <View className="flex-row items-stretch justify-between gap-1">
+    // Narrow phones: 7 cells must fit 360 (and 375) without clipping, so each
+    // cell flexes to the available width with a 40pt floor (workout-w9's ≥40
+    // target rule; the pressable keeps 44pt vertical). No fixed gap: padding
+    // inside the cell supplies the visual rhythm.
+    <View className="flex-row items-stretch">
       {cells.map((cell) => {
-        const state: WorkoutDayState =
-          cell.state === 'rest'
+        // Assignment is NOT completion: a planned routine renders `planned`
+        // (outline + dot) and only a real logged session this week renders
+        // `done` (Coral face + check). Rest is its own moon state.
+        const state: WorkoutDayState = cell.completed
+          ? 'done'
+          : cell.state === 'rest'
             ? 'rest'
             : cell.state === 'workout'
-              ? 'done'
-              : cell.routineName
-                ? 'planned'
-                : 'unassigned';
+              ? 'planned'
+              : 'unassigned';
         const node = workoutDayNodeVisual({
           state,
           selected: cell.isToday,
@@ -276,10 +282,12 @@ function WeekDayNodesRow({
             onPress={() => onOpenDay(cell)}
             accessibilityRole="button"
             accessibilityLabel={`${weekdayLabel(cell.weekday)}: ${assignment}`}
-            aria-pressed={cell.isToday}
-            accessibilityState={{ selected: cell.isToday }}
-            className="items-center gap-1"
-            style={{ minWidth: 44, minHeight: 44 }}
+            // Today is a DATE reference, not a toggle: `aria-current` names it
+            // for assistive tech without impersonating a pressed button state
+            // (the selection semantics belong to the day sheet, not the node).
+            aria-current={cell.isToday ? 'date' : undefined}
+            className="flex-1 items-center gap-1"
+            style={{ minWidth: 40, minHeight: 44, paddingHorizontal: 1 }}
           >
             <View className="h-[38px] w-[38px] items-center justify-center">
               <View
@@ -877,6 +885,33 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     (log) => toDateKey(new Date(log.completed_at)) === todayKey,
   );
 
+  /**
+   * Weekdays (1 = Monday) with a completed session THIS week, derived from the
+   * existing log history (`workout_logs.completed_at`) — read-only, no schema
+   * or domain change. The week starts on Monday and today is mid-week, so only
+   * elapsed days can appear; `buildWeekStrip` also refuses future days.
+   */
+  const completedWeekdaysThisWeek = useMemo(() => {
+    const monday = new Date();
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    const startKey = toDateKey(monday);
+    const endDate = new Date(monday);
+    endDate.setDate(monday.getDate() + 7);
+    const endKey = toDateKey(endDate);
+    return Array.from(
+      new Set(
+        allLogs
+          .map((log) => toDateKey(new Date(log.completed_at)))
+          .filter((key) => key >= startKey && key < endKey)
+          .map((key) => {
+            const [y, m, d] = key.split('-').map(Number);
+            return ((new Date(y, m - 1, d).getDay() + 6) % 7) + 1;
+          }),
+      ),
+    );
+  }, [allLogs]);
+
   // W9.1 landing view models. The training state decides the single dominant
   // action (resume > scheduled > quick-start chooser); rest context is compact
   // and never a hero (SYS-20).
@@ -921,8 +956,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
               isOverride: todaySchedule.source === 'override',
             }
           : undefined,
+        completedWeekdays: completedWeekdaysThisWeek,
       }),
-    [weeklyPlan, routines, todayWeekdayNum, todaySchedule],
+    [weeklyPlan, routines, todayWeekdayNum, todaySchedule, completedWeekdaysThisWeek],
   );
 
   // Heavy history derivations (records, totals, body-area split) run only

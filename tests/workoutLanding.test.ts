@@ -268,6 +268,64 @@ describe('buildWeekStrip', () => {
     expect(cells[1]).toMatchObject({ state: 'rest', isOverride: true, routineName: null });
   });
 
+  it('assignment alone is not completion: planned stays planned without a log', () => {
+    const cells = buildWeekStrip({
+      weeklyPlan: [weeklyEntry(1, 'workout', 'r_push'), weeklyEntry(3, 'workout', 'r_pull')],
+      routines,
+      todayWeekday: 5,
+    });
+    expect(cells[0]).toMatchObject({ state: 'workout', routineName: 'Push Day', completed: false });
+    expect(cells[2]).toMatchObject({ state: 'workout', completed: false });
+  });
+
+  it('a completed session this week marks that day done, assignment or not', () => {
+    const cells = buildWeekStrip({
+      weeklyPlan: [weeklyEntry(1, 'workout', 'r_push')],
+      routines,
+      todayWeekday: 5,
+      // Monday (1) has a log; Tuesday (2) has one too, even with no assignment.
+      completedWeekdays: [1, 2],
+    });
+    expect(cells[0]).toMatchObject({ state: 'workout', routineName: 'Push Day', completed: true });
+    expect(cells[1]).toMatchObject({ state: 'unassigned', routineName: null, completed: true });
+    expect(cells[3]).toMatchObject({ completed: false });
+  });
+
+  it('an explicit rest day stays rest unless it was actually trained', () => {
+    const restOnly = buildWeekStrip({
+      weeklyPlan: [weeklyEntry(3, 'rest', null)],
+      routines,
+      todayWeekday: 5,
+    });
+    expect(restOnly[2]).toMatchObject({ state: 'rest', completed: false });
+    const restTrained = buildWeekStrip({
+      weeklyPlan: [weeklyEntry(3, 'rest', null)],
+      routines,
+      todayWeekday: 5,
+      completedWeekdays: [3],
+    });
+    expect(restTrained[2]).toMatchObject({ state: 'rest', completed: true });
+  });
+
+  it('a future assigned day is never done', () => {
+    const cells = buildWeekStrip({
+      weeklyPlan: [weeklyEntry(6, 'workout', 'r_push')],
+      routines,
+      todayWeekday: 3,
+      // Even a (corrupt) future weekday in the completed set cannot make it done.
+      completedWeekdays: [6],
+    });
+    expect(cells[5]).toMatchObject({ state: 'workout', routineName: 'Push Day', completed: false });
+    // Today itself CAN complete (its date has happened).
+    const todayDone = buildWeekStrip({
+      weeklyPlan: [weeklyEntry(3, 'workout', 'r_push')],
+      routines,
+      todayWeekday: 3,
+      completedWeekdays: [3],
+    });
+    expect(todayDone[2]).toMatchObject({ isToday: true, completed: true });
+  });
+
   it('a template assignment for a deleted routine degrades to unassigned rather than a stale name', () => {
     const cells = buildWeekStrip({
       weeklyPlan: [weeklyEntry(4, 'workout', 'r_deleted')],

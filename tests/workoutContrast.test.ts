@@ -304,6 +304,46 @@ describe('Workout landing wiring', () => {
     );
   });
 
+  it('the today day node is a date reference, not a pressed toggle', () => {
+    // P15 fix: `aria-pressed`/`accessibilityState.selected` tied to `isToday`
+    // turned the "today" marker into a toggle state. `aria-current=date` names
+    // the reference instead, and nothing in the node keeps a pressed state.
+    expect(screen).toMatch(/aria-current=\{cell\.isToday \? 'date' : undefined\}/);
+    expect(screen).not.toMatch(/aria-pressed=\{cell\.isToday\}/);
+    expect(screen).not.toMatch(/accessibilityState=\{\{ selected: cell\.isToday \}\}/);
+    // The node stays an honest button that opens the existing day sheet.
+    // Slice the whole node: from its onPress to the aria-current marker.
+    const nodeStart = screen.indexOf('onPress={() => onOpenDay(cell)}');
+    const nodeEnd = screen.indexOf('aria-current={cell.isToday');
+    expect(nodeStart, 'node onPress present').toBeGreaterThan(-1);
+    expect(nodeEnd, 'node aria-current present').toBeGreaterThan(nodeStart);
+    const block = screen.slice(nodeStart, nodeEnd);
+    expect(block).toContain('accessibilityRole="button"');
+    expect(block).toContain('accessibilityLabel={`${weekdayLabel(cell.weekday)}: ${assignment}`}');
+    // One stray space survives prettier's wrapping of the onPress prop.
+    expect(block.replace(/\s+/g, ' ')).toContain('onPress={() => onOpenDay(cell)}');
+    // The rest toggle keeps ITS selected semantics (unchanged).
+    expect(screen).toMatch(/accessibilityLabel=\{`\$\{weekdayLabel\(cell\.weekday\)\} rest`\}/);
+    expect(screen).toMatch(/accessibilityState=\{\{ selected: cell\.state === 'rest' \}\}/);
+  });
+
+  it('assignment never renders as done: completion comes from history', () => {
+    // P15 fix: assigned routine days used to render as `done` (Coral check).
+    expect(screen).toMatch(/const state: WorkoutDayState = cell\.completed\s*\? 'done'/);
+    expect(screen).not.toMatch(/cell\.state === 'workout'\s*\? 'done'/);
+    // Completion is derived from the log history, read-only.
+    expect(screen).toMatch(/const completedWeekdaysThisWeek = useMemo\(/);
+    expect(screen).toMatch(/completedWeekdays: completedWeekdaysThisWeek/);
+  });
+
+  it('the day-node row fits narrow phones without clipping', () => {
+    // 7 flex-1 cells with a 40pt floor and no fixed gap: 360/7 = 51.4, 375/7 = 53.6.
+    expect(screen).toMatch(/<View className="flex-row items-stretch">/);
+    expect(screen).toMatch(/className="flex-1 items-center gap-1"/);
+    expect(screen).toMatch(/style=\{\{ minWidth: 40, minHeight: 44, paddingHorizontal: 1 \}\}/);
+    expect(screen).not.toMatch(/justify-between gap-1/);
+  });
+
   it('quick-start cards carry the dumbbell hero icon', () => {
     expect(screen).toMatch(/const cardVisual = quickStartCardVisual\(\{/);
     expect(screen).toMatch(

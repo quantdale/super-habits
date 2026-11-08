@@ -206,6 +206,14 @@ export type WeekStripCell = {
   routineName: string | null;
   /** True when today's cell reflects a one-day override over the template. */
   isOverride: boolean;
+  /**
+   * True when a completed session was actually logged on this date this week.
+   *
+   * Assignment and completion are DIFFERENT facts: a planned routine is
+   * `state: 'workout'` whether or not it was trained, and only a real history
+   * entry makes a node "done". Future days can never be done.
+   */
+  completed: boolean;
 };
 
 /**
@@ -218,12 +226,22 @@ export function buildWeekStrip(input: {
   routines: readonly WorkoutRoutine[];
   todayWeekday: number;
   todayResolution?: { planKind: 'workout' | 'rest'; routineId: string | null; isOverride: boolean };
+  /**
+   * Weekdays (1 = Monday) whose date this week carries a completed session in
+   * the workout history. Read-only derived data: the caller maps log
+   * `completed_at` values onto the current week. Omitted = nothing completed.
+   */
+  completedWeekdays?: readonly number[];
 }): WeekStripCell[] {
   const { weeklyPlan, routines, todayWeekday, todayResolution } = input;
   const nameById = new Map(routines.map((routine) => [routine.id, routine.name]));
   const entryByDay = new Map(weeklyPlan.map((entry) => [entry.weekday, entry]));
+  const completedDays = new Set(input.completedWeekdays ?? []);
   return Array.from({ length: 7 }, (_, index) => index + 1).map((weekday) => {
     const isToday = weekday === todayWeekday;
+    // Completion is only possible for days that have already happened (today
+    // included): a future assignment is planned, never done.
+    const completed = weekday <= todayWeekday && completedDays.has(weekday);
     if (isToday && todayResolution) {
       const routineName = todayResolution.routineId
         ? (nameById.get(todayResolution.routineId) ?? null)
@@ -238,6 +256,7 @@ export function buildWeekStrip(input: {
             : ('rest' as const),
         routineName,
         isOverride: todayResolution.isOverride,
+        completed,
       };
     }
     const entry = entryByDay.get(weekday);
@@ -250,6 +269,7 @@ export function buildWeekStrip(input: {
         state: 'workout' as const,
         routineName,
         isOverride: false,
+        completed,
       };
     }
     if (entry?.plan_kind === 'rest') {
@@ -260,6 +280,7 @@ export function buildWeekStrip(input: {
         state: 'rest' as const,
         routineName: null,
         isOverride: false,
+        completed,
       };
     }
     return {
@@ -269,6 +290,7 @@ export function buildWeekStrip(input: {
       state: 'unassigned' as const,
       routineName: null,
       isOverride: false,
+      completed,
     };
   });
 }
