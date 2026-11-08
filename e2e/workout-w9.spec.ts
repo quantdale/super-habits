@@ -254,6 +254,12 @@ test.describe('W9 Workout', () => {
     await expect(page.getByText('Rest', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Skip rest' }).click();
     await expect(page.getByText('Set 2 of 2', { exact: true })).toBeVisible();
+    // P2 on PR 196: the checked node is decorative (hidden from assistive
+    // tech), so a completed row must announce its state as plain text — and
+    // the row's completion control is gone (the cursor is on set 2).
+    await expect(page.getByText('Set 1 completed', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Complete set 1' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Set 1 completed' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Complete set 2' }).click();
     await expect(page.getByText('Workout complete!')).toBeVisible();
     await page.getByText('Save and finish', { exact: true }).click();

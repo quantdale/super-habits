@@ -1837,6 +1837,17 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
                   ) : (
                     renderRecordedSet(row)
                   )}
+                  {/* Completion status as plain text: the checked node above is
+                      decorative (hidden from assistive tech), so without this
+                      line a completed row would expose only its number and
+                      measurements. Non-interactive — never a button, and never
+                      the old visible "Done" caption that collides with the
+                      summary's Done button in test selectors. */}
+                  {row.state === 'completed' ? (
+                    <Text className="text-[11px]" style={{ color: tokens.textMuted }}>
+                      {`Set ${row.setNumber} completed`}
+                    </Text>
+                  ) : null}
                 </View>
                 {row.state === 'completed' ? (
                   <SetCheckNode checked />
