@@ -254,6 +254,12 @@ test.describe('W9 Workout', () => {
     await expect(page.getByText('Rest', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Skip rest' }).click();
     await expect(page.getByText('Set 2 of 2', { exact: true })).toBeVisible();
+    // P2 on PR 196: the checked node is decorative (hidden from assistive
+    // tech), so a completed row must announce its state as plain text — and
+    // the row's completion control is gone (the cursor is on set 2).
+    await expect(page.getByText('Set 1 completed', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Complete set 1' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Set 1 completed' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Complete set 2' }).click();
     await expect(page.getByText('Workout complete!')).toBeVisible();
     await page.getByText('Save and finish', { exact: true }).click();
@@ -304,6 +310,72 @@ test.describe('W9 Workout', () => {
     await goToTab(page, 'workout');
     await page.getByRole('button', { name: 'Resume workout · Draft Day' }).click();
     await expect(page.getByRole('textbox', { name: 'Weight' })).toHaveValue('60');
+  });
+
+  test('set row controls fit at 360/375/390 inside the exercise card', async ({ page }) => {
+    // P16: the live set row carries the weight field, the reps stepper and the
+    // 48pt completion node. A web `<input>` is a replaced element whose
+    // `min-width: auto` resolves to ~250px, so a `flex-1` field used to refuse
+    // to shrink: the reps input measured 250px inside its cell and pushed both
+    // itself and the completion node past the card edge at phone widths.
+    await openRoutineBuilder(page, 'Fit Day');
+    const builder = page.getByRole('dialog');
+    await builder.getByPlaceholder(/e\.g\. Rows, Curls, Push-ups/i).fill('Bench Press');
+    await builder.getByText('Add', { exact: true }).click({ force: true });
+    await builder.getByRole('textbox', { name: 'Active (seconds)' }).fill('8');
+    await builder.getByText('Start workout', { exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Complete set 1' })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    for (const width of [360, 375, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.waitForTimeout(200);
+      const measured = await page.evaluate(() => {
+        const box = (el: Element | null) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+        };
+        return {
+          viewport: document.documentElement.clientWidth,
+          weight: box(document.querySelector('input[aria-label="Weight"]')),
+          minus: box(document.querySelector('[aria-label="Decrease Reps"]')),
+          reps: box(document.querySelector('input[aria-label="Reps"]')),
+          plus: box(document.querySelector('[aria-label="Increase Reps"]')),
+          done: box(document.querySelector('[aria-label="Complete set 1"]')),
+        };
+      });
+      expect(measured.viewport).toBe(width);
+      for (const key of ['weight', 'minus', 'reps', 'plus', 'done'] as const) {
+        const box = measured[key];
+        expect(box, `${width}px: ${key} present`).not.toBeNull();
+        expect(box!.left, `${width}px: ${key} starts inside the viewport`).toBeGreaterThanOrEqual(
+          0,
+        );
+        expect(box!.right, `${width}px: ${key} ends inside the viewport`).toBeLessThanOrEqual(
+          measured.viewport,
+        );
+        expect(
+          box!.bottom - box!.top,
+          `${width}px: ${key} is at least 24pt tall`,
+        ).toBeGreaterThanOrEqual(24);
+      }
+      // Controls sit side by side without overlapping each other.
+      expect(measured.minus!.right, `${width}px: minus / reps`).toBeLessThanOrEqual(
+        measured.reps!.left,
+      );
+      expect(measured.reps!.right, `${width}px: reps / plus`).toBeLessThanOrEqual(
+        measured.plus!.left,
+      );
+      expect(measured.reps!.right, `${width}px: reps / completion node`).toBeLessThanOrEqual(
+        measured.done!.left,
+      );
+      // And the whole row stays inside the card's inner content box.
+      expect(measured.plus!.right, `${width}px: stepper ends before the node`).toBeLessThanOrEqual(
+        measured.done!.left,
+      );
+    }
   });
 
   test('the rest dock stays visible without covering the next set inputs', async ({ page }) => {
