@@ -1,12 +1,14 @@
-import { Text } from '@/core/ui/Text';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Pressable, TextInput } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { Text } from '@/core/ui/Text';
 import { Screen } from '@/core/ui/Screen';
 import { Card } from '@/core/ui/Card';
 import { Button } from '@/core/ui/Button';
 import { SectionLabel } from '@/core/ui/SectionLabel';
+import { PlanningDisclosure } from '@/features/planning-hub/PlanningDisclosure';
+import { radius, spacing } from '@/core/theme/designTokens';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { spacing } from '@/core/theme/designTokens';
 import { buildWeeklyReviewSummary } from './weeklyReview.summary';
 import {
   validateReviewDraft,
@@ -21,6 +23,14 @@ import { applyNextWeekPlanSuggestions } from './weeklyReview.applyNextWeek';
 import { getWeeklyReviewByWeekKey } from './weeklyReview.data';
 import { ReviewHistoryView } from './ReviewHistoryView';
 import { weekHasAnyScheduledOrRecordedActivity } from './weeklyReviewScreenGuards';
+import {
+  planningPrimaryFace,
+  planningRowVisual,
+  planningStatusVisual,
+  planningStepNodeFill,
+  planningTintFace,
+  planningToneText,
+} from '@/features/planning-hub/planningHub.visual';
 import type {
   WeeklyReviewSummaryV1,
   WeeklyReviewDraft,
@@ -39,7 +49,7 @@ import type {
  */
 type Step = 'review' | 'decide' | 'plan' | 'reflect' | 'confirm' | 'done';
 
-const STEP_ORDER: Step[] = ['review', 'decide', 'plan', 'reflect', 'confirm'];
+const STEP_ORDER: Exclude<Step, 'done'>[] = ['review', 'decide', 'plan', 'reflect', 'confirm'];
 
 const STEP_LABELS: Record<Exclude<Step, 'done'>, string> = {
   review: 'Review',
@@ -48,6 +58,99 @@ const STEP_LABELS: Record<Exclude<Step, 'done'>, string> = {
   reflect: 'Reflect',
   confirm: 'Confirm',
 };
+
+/** Short step names for the progress strip (the long labels stay in the caption). */
+const STEP_SHORT: Record<Exclude<Step, 'done'>, string> = {
+  review: 'Review',
+  decide: 'Decide',
+  plan: 'Plan',
+  reflect: 'Reflect',
+  confirm: 'Confirm',
+};
+
+/**
+ * v2 step strip (P21 part A): five Gold nodes — the Weekly Review's reflective
+ * "you vs your past weeks" surface takes the reward Gold as a *shape* only
+ * (§5.1: Gold never becomes a label or a button face). Reached nodes fill Gold
+ * bright with §5.1 ink checks; upcoming nodes stay on the sunken track. The
+ * caption keeps the exact "Step N of 5 · Label" string the specs assert.
+ */
+function StepStrip({
+  step,
+  index,
+  label,
+}: {
+  step: Exclude<Step, 'done'>;
+  index: number;
+  label: string;
+}) {
+  const { tokens, resolvedTheme } = useAppTheme();
+  return (
+    <View style={{ gap: spacing.sm }}>
+      <Text variant="caption" tone="muted">
+        Step {index + 1} of {STEP_ORDER.length} · {label}
+      </Text>
+      <View
+        style={{ flexDirection: 'row', gap: spacing.xs }}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        {STEP_ORDER.map((name, i) => {
+          const reached = i <= index;
+          const current = name === step;
+          return (
+            <View
+              key={name}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                gap: spacing.xs,
+                alignItems: 'center',
+              }}
+            >
+              <View
+                style={{
+                  width: '100%',
+                  height: 8,
+                  borderRadius: radius.full,
+                  backgroundColor: planningStepNodeFill({
+                    tone: 'gold',
+                    appearance: resolvedTheme,
+                    surfaceSunken: tokens.surfaceSunken,
+                    reached,
+                  }),
+                }}
+              />
+              <Text
+                variant="caption"
+                style={{ color: current ? tokens.text : tokens.textMuted }}
+                numberOfLines={1}
+              >
+                {STEP_SHORT[name]}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+/** Sunken input well matching `TextField`'s geometry (52pt, radius 12). */
+function useInputStyle() {
+  const { tokens } = useAppTheme();
+  return {
+    minHeight: 52,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.sm,
+    borderWidth: 2,
+    borderColor: tokens.border,
+    backgroundColor: tokens.surfaceSunken,
+    color: tokens.text,
+    fontSize: 17,
+  } as const;
+}
 
 export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
   const { tokens } = useAppTheme();
@@ -104,7 +207,7 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
     };
   }, [week.weekKey]);
 
-  const currentStepIndex = STEP_ORDER.indexOf(step);
+  const currentStepIndex = step === 'done' ? STEP_ORDER.length : STEP_ORDER.indexOf(step);
   const canGoBack = currentStepIndex > 0 && step !== 'done';
   const canGoForward = currentStepIndex < STEP_ORDER.length - 1 && step !== 'done';
 
@@ -212,31 +315,49 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
     }
   }, [nextWeekSuggestions, carryForwardTodoIds.length]);
 
+  const success = planningStatusVisual({
+    face: tokens.successBackground,
+    surface: tokens.surface,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+    ink: tokens.successText,
+    border: tokens.successBorder,
+    solid: tokens.successSolid,
+  });
+  const warning = planningStatusVisual({
+    face: tokens.warningBackground,
+    surface: tokens.surface,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+    ink: tokens.warningText,
+    border: tokens.warningBorder,
+    solid: tokens.warningSolid,
+  });
+  const danger = planningStatusVisual({
+    face: tokens.dangerBackground,
+    surface: tokens.surface,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+    ink: tokens.dangerText,
+    border: tokens.dangerBorder,
+    solid: tokens.dangerSolid,
+  });
+
   const historyToggle = (
-    <Pressable
-      accessibilityRole="button"
+    <PlanningDisclosure
+      label={showHistory ? 'Hide past reviews' : 'Past reviews'}
       accessibilityLabel={showHistory ? 'Hide past reviews' : 'Show past reviews'}
-      accessibilityState={{ expanded: showHistory }}
-      aria-expanded={showHistory}
-      className="mb-3 self-start justify-center rounded-xl border px-3"
-      style={{
-        borderColor: tokens.border,
-        backgroundColor: tokens.surface,
-        minHeight: 44,
-      }}
+      expanded={showHistory}
+      icon="history"
       onPress={() => setShowHistory((current) => !current)}
-    >
-      <Text className="text-sm" style={{ color: tokens.text }}>
-        {showHistory ? 'Hide past reviews' : 'Past reviews'}
-      </Text>
-    </Pressable>
+    />
   );
 
   if (loading) {
     return (
       <Screen scroll>
-        <View className="items-center py-12">
-          <Text className="text-base" style={{ color: tokens.textMuted }}>
+        <View style={{ alignItems: 'center', paddingVertical: spacing.xxxl }}>
+          <Text variant="bodyMd" tone="muted">
             Loading weekly summary…
           </Text>
         </View>
@@ -247,11 +368,22 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
   if (error || !summary) {
     return (
       <Screen scroll>
-        <Card>
-          <Text className="text-base text-center py-6" style={{ color: tokens.dangerText }}>
+        <View
+          style={{
+            borderRadius: radius.md,
+            borderWidth: 2,
+            borderColor: danger.border,
+            backgroundColor: danger.face,
+            padding: spacing.lg,
+            alignItems: 'center',
+            gap: spacing.sm,
+          }}
+        >
+          <MaterialIcons name="error-outline" size={20} color={danger.icon} />
+          <Text variant="bodyMd" style={{ color: danger.ink, textAlign: 'center' }}>
             {error ?? 'Failed to load summary'}
           </Text>
-        </Card>
+        </View>
         <Button label="Close" variant="ghost" onPress={onClose} />
       </Screen>
     );
@@ -262,29 +394,60 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
       <Screen scroll>
         {historyToggle}
         {showHistory ? (
-          <View className="mb-4">
+          <View style={{ marginBottom: spacing.lg }}>
             <ReviewHistoryView />
           </View>
         ) : null}
         <Card
-          accentColor={
-            failedCommitmentCount > 0
-              ? (tokens.warningText ?? '#d97706')
-              : (tokens.successText ?? '#16a34a')
-          }
+          accentColor={failedCommitmentCount > 0 ? warning.border : success.border}
+          innerClassName="p-0"
         >
-          <View className="py-8 items-center">
+          <View
+            style={{
+              borderRadius: radius.lg,
+              backgroundColor: failedCommitmentCount > 0 ? warning.face : success.face,
+              padding: spacing.lg,
+              alignItems: 'center',
+            }}
+          >
+            <MaterialIcons
+              name={failedCommitmentCount > 0 ? 'error-outline' : 'check-circle'}
+              size={32}
+              color={failedCommitmentCount > 0 ? warning.icon : success.icon}
+            />
             {/* The review row IS saved in both cases; when a commitment was
                 rejected the heading and copy say so instead of celebrating. */}
-            <Text variant="titleLg" className="mb-2" style={{ color: tokens.text }}>
+            <Text
+              variant="titleLg"
+              style={{
+                color: failedCommitmentCount > 0 ? warning.ink : success.ink,
+                marginTop: spacing.sm,
+                marginBottom: spacing.sm,
+                textAlign: 'center',
+              }}
+            >
               {failedCommitmentCount > 0 ? 'Review saved — some items need retry' : 'Review saved'}
             </Text>
-            <Text className="text-base text-center mb-6" style={{ color: tokens.textMuted }}>
+            <Text
+              variant="bodyMd"
+              style={{
+                textAlign: 'center',
+                color: failedCommitmentCount > 0 ? warning.mutedInk : success.mutedInk,
+              }}
+            >
               Your weekly review for {week.startDateKey} – {week.endDateKey} is saved.
             </Text>
             {failedCommitmentCount > 0 ? (
-              <View className="mb-4 w-full items-center gap-1">
-                <Text className="text-center text-sm" style={{ color: tokens.dangerText }}>
+              <View
+                style={{
+                  marginTop: spacing.lg,
+                  marginBottom: spacing.lg,
+                  width: '100%',
+                  alignItems: 'center',
+                  gap: spacing.xs,
+                }}
+              >
+                <Text variant="bodyMd" style={{ color: danger.ink, textAlign: 'center' }}>
                   {failedCommitmentCount === 1
                     ? 'One new commitment was not created:'
                     : `${failedCommitmentCount} new commitments were not created:`}
@@ -292,13 +455,13 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
                 {failedCommitments.map((outcome) => (
                   <Text
                     key={outcome.commitmentId}
-                    className="text-center text-sm"
-                    style={{ color: tokens.dangerText }}
+                    variant="bodyMd"
+                    style={{ color: danger.ink, textAlign: 'center' }}
                   >
                     • {outcome.title || '(untitled)'}
                   </Text>
                 ))}
-                <Text className="text-center text-xs" style={{ color: tokens.textMuted }}>
+                <Text variant="caption" style={{ textAlign: 'center', color: danger.mutedInk }}>
                   Retrying creates only the missing items; ones already created are not duplicated.
                 </Text>
               </View>
@@ -312,8 +475,22 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
               />
             ) : null}
             {nextWeekSuggestions.length > 0 && applyStatus !== 'applied' ? (
-              <View className="mb-6 mt-4 w-full items-center gap-2">
-                <Text className="text-center text-sm" style={{ color: tokens.textMuted }}>
+              <View
+                style={{
+                  marginTop: spacing.lg,
+                  marginBottom: spacing.lg,
+                  width: '100%',
+                  alignItems: 'center',
+                  gap: spacing.sm,
+                }}
+              >
+                <Text
+                  variant="bodyMd"
+                  style={{
+                    textAlign: 'center',
+                    color: failedCommitmentCount > 0 ? warning.mutedInk : success.mutedInk,
+                  }}
+                >
                   {carryForwardTodoIds.length} carry-forward candidate
                   {carryForwardTodoIds.length === 1 ? '' : 's'} can seed next week&apos;s daily
                   plans (up to 3 per day over the first 7 days).
@@ -326,100 +503,132 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
                   }
                   onPress={() => void handleApplyNextWeek()}
                   disabled={applyStatus === 'applying'}
+                  color={planningPrimaryFace('sky')}
                 />
               </View>
             ) : null}
             {applyMessage ? (
               <Text
-                className="mb-6 mt-3 text-center text-sm"
-                style={{ color: applyStatus === 'error' ? tokens.dangerText : tokens.textMuted }}
+                variant="bodyMd"
+                style={{
+                  marginTop: spacing.md,
+                  textAlign: 'center',
+                  color:
+                    applyStatus === 'error'
+                      ? danger.mutedInk
+                      : failedCommitmentCount > 0
+                        ? warning.mutedInk
+                        : success.mutedInk,
+                }}
               >
                 {applyMessage}
               </Text>
             ) : null}
-            <Button label="Done" variant="ghost" onPress={onClose} />
+            <View style={{ marginTop: spacing.lg }}>
+              <Button label="Done" variant="ghost" onPress={onClose} />
+            </View>
           </View>
         </Card>
       </Screen>
     );
   }
 
+  const stepLabel = STEP_LABELS[step];
+  const stepIndex = STEP_ORDER.indexOf(step);
+
   return (
     <Screen scroll>
-      {historyToggle}
-      {showHistory ? (
-        <View className="mb-4">
-          <ReviewHistoryView />
+      <View style={{ gap: spacing.md }}>
+        {historyToggle}
+        {showHistory ? (
+          <View style={{ marginBottom: spacing.lg }}>
+            <ReviewHistoryView />
+          </View>
+        ) : null}
+
+        {/* Labelled step progress — the baseline's seven unlabelled dots did not
+            tell the user which step they were on or how many remained. */}
+        <StepStrip step={step} index={stepIndex} label={stepLabel} />
+
+        {/* Existing review warning */}
+        {existingReview && step === 'review' ? (
+          <View
+            style={{
+              borderRadius: radius.sm,
+              borderWidth: 2,
+              borderColor: warning.border,
+              backgroundColor: warning.face,
+              padding: spacing.md,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.sm,
+            }}
+          >
+            <MaterialIcons name="info-outline" size={18} color={warning.icon} />
+            <Text variant="bodyMd" style={{ color: warning.ink, flex: 1 }}>
+              A review for this week already exists. Saving will update it.
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Step content */}
+        <View style={{ marginBottom: spacing.lg }}>
+          {step === 'review' && (
+            <ReviewStep
+              summary={summary}
+              showAllNumbers={showAllNumbers}
+              onToggleAllNumbers={() => setShowAllNumbers((open) => !open)}
+            />
+          )}
+          {step === 'decide' && (
+            <TodoDecisionsStep
+              summary={summary}
+              decisions={todoDecisions}
+              onChange={setTodoDecisions}
+            />
+          )}
+          {step === 'plan' && (
+            <PlanStep
+              priorities={priorities}
+              onPrioritiesChange={setPriorities}
+              commitments={newCommitments}
+              onCommitmentsChange={setNewCommitments}
+              nextWeekStartDateKey={week.nextWeekStartDateKey}
+            />
+          )}
+          {step === 'reflect' && (
+            <ReflectionStep reflection={reflection} onChange={setReflection} />
+          )}
+          {step === 'confirm' && (
+            <ConfirmStep
+              todoDecisions={todoDecisions}
+              priorities={priorities}
+              newCommitments={newCommitments}
+              reflection={reflection}
+              validationErrors={validationErrors}
+              saveError={saveError}
+            />
+          )}
         </View>
-      ) : null}
 
-      {/* Labelled step progress — the baseline's seven unlabelled dots did not
-          tell the user which step they were on or how many remained. */}
-      <Text className="text-xs mb-3" style={{ color: tokens.textMuted }}>
-        Step {currentStepIndex + 1} of {STEP_ORDER.length} · {STEP_LABELS[step]}
-      </Text>
-
-      {/* Existing review warning */}
-      {existingReview && step === 'review' && (
-        <Card className="mb-3">
-          <Text className="text-sm" style={{ color: tokens.warningText ?? '#d97706' }}>
-            A review for this week already exists. Saving will update it.
-          </Text>
-        </Card>
-      )}
-
-      {/* Step content */}
-      <View className="mb-4">
-        {step === 'review' && (
-          <ReviewStep
-            summary={summary}
-            showAllNumbers={showAllNumbers}
-            onToggleAllNumbers={() => setShowAllNumbers((open) => !open)}
-          />
-        )}
-        {step === 'decide' && (
-          <TodoDecisionsStep
-            summary={summary}
-            decisions={todoDecisions}
-            onChange={setTodoDecisions}
-          />
-        )}
-        {step === 'plan' && (
-          <PlanStep
-            priorities={priorities}
-            onPrioritiesChange={setPriorities}
-            commitments={newCommitments}
-            onCommitmentsChange={setNewCommitments}
-            nextWeekStartDateKey={week.nextWeekStartDateKey}
-          />
-        )}
-        {step === 'reflect' && <ReflectionStep reflection={reflection} onChange={setReflection} />}
-        {step === 'confirm' && (
-          <ConfirmStep
-            todoDecisions={todoDecisions}
-            priorities={priorities}
-            newCommitments={newCommitments}
-            reflection={reflection}
-            validationErrors={validationErrors}
-            saveError={saveError}
-          />
-        )}
-      </View>
-
-      {/* Navigation */}
-      <View className="flex-row justify-between mt-2">
-        {canGoBack ? <Button label="Back" variant="ghost" onPress={goBack} /> : <View />}
-        {step === 'confirm' ? (
-          <Button
-            label={executing ? 'Saving…' : 'Confirm & Save'}
-            onPress={handleConfirmPress}
-            disabled={executing}
-          />
-        ) : canGoForward ? (
-          <Button label="Next" onPress={goForward} />
-        ) : (
-          <View />
-        )}
+        {/* Navigation — one loud action per step (§6 "one primary"). */}
+        <View
+          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          {canGoBack ? <Button label="Back" variant="ghost" onPress={goBack} /> : <View />}
+          {step === 'confirm' ? (
+            <Button
+              label={executing ? 'Saving…' : 'Confirm & Save'}
+              onPress={handleConfirmPress}
+              disabled={executing}
+              color={planningPrimaryFace('sky')}
+            />
+          ) : canGoForward ? (
+            <Button label="Next" onPress={goForward} color={planningPrimaryFace('sky')} />
+          ) : (
+            <View />
+          )}
+        </View>
       </View>
     </Screen>
   );
@@ -441,55 +650,72 @@ function ReviewStep({
   showAllNumbers: boolean;
   onToggleAllNumbers: () => void;
 }) {
-  const { tokens } = useAppTheme();
+  const { tokens, resolvedTheme } = useAppTheme();
   const w = summary.week;
   const observations = [...summary.wins, ...summary.attention];
+  const heading = planningToneText({
+    tone: 'gold',
+    appearance: resolvedTheme,
+    surface: tokens.surface,
+    text: tokens.text,
+  });
+  const goldWash = planningTintFace('gold', resolvedTheme);
 
   return (
-    <View>
-      <Text variant="titleLg" style={{ color: tokens.text }}>
-        {w.startDateKey} – {w.endDateKey}
-      </Text>
-      <Text className="text-sm mt-1 mb-3" style={{ color: tokens.textMuted }}>
-        {weekHasAnyScheduledOrRecordedActivity(summary)
-          ? `Week ${w.weekKey}`
-          : 'Nothing scheduled this week.'}
-      </Text>
+    <View style={{ gap: spacing.md }}>
+      <View style={{ gap: spacing.xs }}>
+        <Text variant="titleLg" style={{ color: heading }}>
+          {w.startDateKey} – {w.endDateKey}
+        </Text>
+        <Text variant="caption" tone="muted">
+          {weekHasAnyScheduledOrRecordedActivity(summary)
+            ? `Week ${w.weekKey}`
+            : 'Nothing scheduled this week.'}
+        </Text>
+      </View>
 
       {observations.length > 0 ? (
         <Card innerClassName="p-4">
-          <View className="gap-1.5">
+          <View style={{ gap: spacing.sm }}>
             {observations.map((item, i) => (
-              <Text key={`${item.kind}-${i}`} className="text-sm" style={{ color: tokens.text }}>
-                {item.message}
-              </Text>
+              <View
+                key={`${item.kind}-${i}`}
+                style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}
+              >
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: radius.full,
+                    marginTop: 6,
+                    backgroundColor: goldWash,
+                  }}
+                />
+                <Text variant="bodyMd" style={{ color: tokens.text, flex: 1 }}>
+                  {item.message}
+                </Text>
+              </View>
             ))}
           </View>
         </Card>
       ) : (
         <Card innerClassName="p-4">
-          <Text className="text-sm" style={{ color: tokens.textMuted }}>
+          <Text variant="bodyMd" tone="muted">
             No notable wins or attention items this week.
           </Text>
         </Card>
       )}
 
-      <Pressable
-        accessibilityRole="button"
+      <PlanningDisclosure
+        label={showAllNumbers ? 'Hide all numbers −' : 'All numbers +'}
         accessibilityLabel={showAllNumbers ? 'Hide all numbers' : 'Show all numbers'}
-        accessibilityState={{ expanded: showAllNumbers }}
-        aria-expanded={showAllNumbers}
-        className="min-h-11 mt-3 self-start justify-center rounded-xl border px-3"
-        style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+        expanded={showAllNumbers}
+        icon="insights"
         onPress={onToggleAllNumbers}
-      >
-        <Text className="text-sm" style={{ color: tokens.text }}>
-          {showAllNumbers ? 'Hide all numbers −' : 'All numbers +'}
-        </Text>
-      </Pressable>
+      />
 
       {showAllNumbers ? (
-        <View className="mt-3 gap-3">
+        <View style={{ gap: spacing.lg }}>
           <View>
             <SectionLabel>Todos</SectionLabel>
             <Card innerClassName="p-0">
@@ -573,6 +799,13 @@ function ReviewStep({
   );
 }
 
+/**
+ * Decide step: one card per unfinished todo with three exclusive decisions.
+ * v2 turns each decision into an OptionRow-weight choice (56pt, tint face +
+ * hue lip + trailing check) instead of a pill clamped by `minHeight`, so the
+ * selected state survives a theme whose `primary` is a bright hue (white on a
+ * bright primary measured 2.2:1 in cyberpunk/solarized).
+ */
 function TodoDecisionsStep({
   summary,
   decisions,
@@ -582,17 +815,21 @@ function TodoDecisionsStep({
   decisions: WeeklyTodoDecision[];
   onChange: (d: WeeklyTodoDecision[]) => void;
 }) {
-  const { tokens } = useAppTheme();
+  const { tokens, resolvedTheme } = useAppTheme();
   const incompleteTodos = summary.todos.carryForwardCandidates;
 
   if (incompleteTodos.length === 0) {
     return (
-      <View>
-        <Text variant="titleLg" className="mb-3" style={{ color: tokens.text }}>
+      <View style={{ gap: spacing.md }}>
+        <Text variant="titleLg" style={{ color: tokens.text }}>
           Decide
         </Text>
         <Card>
-          <Text className="text-sm text-center py-4" style={{ color: tokens.textMuted }}>
+          <Text
+            variant="bodyMd"
+            tone="muted"
+            style={{ textAlign: 'center', paddingVertical: spacing.lg }}
+          >
             No incomplete todos to decide on this week.
           </Text>
         </Card>
@@ -612,53 +849,84 @@ function TodoDecisionsStep({
     }
   };
 
+  const ACTION_LABELS = {
+    leave: 'Leave',
+    carry_forward: 'Carry forward',
+    reschedule: 'Reschedule',
+  } as const;
+
   return (
-    <View>
-      <Text variant="titleLg" style={{ color: tokens.text }}>
-        Decide
-      </Text>
-      <Text className="text-sm mt-1 mb-3" style={{ color: tokens.textMuted }}>
-        What happens to this week&apos;s unfinished todos?
-      </Text>
+    <View style={{ gap: spacing.md }}>
+      <View style={{ gap: spacing.xs }}>
+        <Text variant="titleLg" style={{ color: tokens.text }}>
+          Decide
+        </Text>
+        <Text variant="caption" tone="muted">
+          What happens to this week&apos;s unfinished todos?
+        </Text>
+      </View>
       {incompleteTodos.map((todo) => {
         const decision = decisions.find((d) => d.todoId === todo.id);
         const currentAction = decision?.action ?? 'leave';
+        const selectedRow = planningRowVisual({
+          tone: 'sky',
+          selected: true,
+          appearance: resolvedTheme,
+          surface: tokens.surface,
+          border: tokens.border,
+          borderStrong: tokens.borderStrong,
+          text: tokens.text,
+          textMuted: tokens.textMuted,
+        });
+        const idleRow = planningRowVisual({
+          tone: 'sky',
+          selected: false,
+          appearance: resolvedTheme,
+          surface: tokens.surface,
+          border: tokens.border,
+          borderStrong: tokens.borderStrong,
+          text: tokens.text,
+          textMuted: tokens.textMuted,
+        });
 
         return (
-          <Card key={todo.id} className="mb-2" innerClassName="p-3">
-            <Text className="text-sm font-medium mb-2" style={{ color: tokens.text }}>
+          <Card key={todo.id} innerClassName="p-3">
+            <Text
+              variant="bodyMd"
+              style={{ color: tokens.text, fontWeight: '700', marginBottom: spacing.sm }}
+            >
               {todo.title}
             </Text>
-            <View className="flex-row flex-wrap gap-2">
-              {(['leave', 'carry_forward', 'reschedule'] as const).map((action) => (
-                <Pressable
-                  key={action}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${action === 'leave' ? 'Leave' : action === 'carry_forward' ? 'Carry forward' : 'Reschedule'} ${todo.title}`}
-                  accessibilityState={{ selected: currentAction === action }}
-                  onPress={() => updateDecision(todo.id, action)}
-                  className="justify-center rounded-full px-3"
-                  style={{
-                    minHeight: 44,
-                    backgroundColor: currentAction === action ? tokens.primary : tokens.surface,
-                    borderWidth: 1,
-                    borderColor: currentAction === action ? tokens.primary : tokens.border,
-                  }}
-                >
-                  <Text
-                    className="text-xs"
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+              {(['leave', 'carry_forward', 'reschedule'] as const).map((action) => {
+                const selected = currentAction === action;
+                const row = selected ? selectedRow : idleRow;
+                return (
+                  <Pressable
+                    key={action}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${ACTION_LABELS[action]} ${todo.title}`}
+                    accessibilityState={{ selected }}
+                    onPress={() => updateDecision(todo.id, action)}
                     style={{
-                      color: currentAction === action ? '#fff' : tokens.text,
+                      minHeight: 44,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: spacing.xs,
+                      paddingHorizontal: spacing.lg,
+                      borderRadius: radius.full,
+                      borderWidth: 2,
+                      borderColor: row.border,
+                      backgroundColor: row.face,
                     }}
                   >
-                    {action === 'leave'
-                      ? 'Leave'
-                      : action === 'carry_forward'
-                        ? 'Carry forward'
-                        : 'Reschedule'}
-                  </Text>
-                </Pressable>
-              ))}
+                    {selected ? <MaterialIcons name="check" size={16} color={row.ink} /> : null}
+                    <Text variant="label" style={{ color: row.ink }}>
+                      {ACTION_LABELS[action]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </Card>
         );
@@ -687,6 +955,7 @@ function PlanStep({
   nextWeekStartDateKey: string;
 }) {
   const { tokens } = useAppTheme();
+  const inputStyle = useInputStyle();
   const [expandedCommitment, setExpandedCommitment] = useState<string | null>(null);
 
   const addPriority = () => {
@@ -723,53 +992,64 @@ function PlanStep({
   };
 
   return (
-    <View>
-      <Text variant="titleLg" style={{ color: tokens.text }}>
-        Plan
-      </Text>
-      <Text className="text-sm mt-1 mb-3" style={{ color: tokens.textMuted }}>
-        Protect 1–{MAX_PRIORITIES} priorities next week, and add any commitments.
-      </Text>
+    <View style={{ gap: spacing.md }}>
+      <View style={{ gap: spacing.xs }}>
+        <Text variant="titleLg" style={{ color: tokens.text }}>
+          Plan
+        </Text>
+        <Text variant="caption" tone="muted">
+          Protect 1–{MAX_PRIORITIES} priorities next week, and add any commitments.
+        </Text>
+      </View>
 
-      <SectionLabel>Next week priorities</SectionLabel>
-      {priorities.map((p, i) => (
-        <View key={p.id} className="flex-row items-center mb-2">
-          <Text className="text-sm mr-2 w-5" style={{ color: tokens.textMuted }}>
-            {i + 1}.
-          </Text>
-          <TextInput
-            value={p.text}
-            onChangeText={(text) => updatePriority(p.id, text)}
-            placeholder={`Priority ${i + 1}`}
-            accessibilityLabel={`Priority ${i + 1}`}
-            className="flex-1 px-3 py-2 rounded-lg text-sm"
+      <View>
+        <SectionLabel>Next week priorities</SectionLabel>
+        {priorities.map((p, i) => (
+          <View
+            key={p.id}
             style={{
-              minHeight: 44,
-              backgroundColor: tokens.surface,
-              color: tokens.text,
-              borderWidth: 1,
-              borderColor: tokens.border,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.sm,
+              marginBottom: spacing.sm,
             }}
-            maxLength={200}
-          />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Remove priority ${i + 1}`}
-            onPress={() => removePriority(p.id)}
-            className="ml-2 h-11 w-11 items-center justify-center"
           >
-            <Text style={{ color: tokens.dangerText }}>✕</Text>
-          </Pressable>
-        </View>
-      ))}
+            <Text variant="label" style={{ color: tokens.textMuted, width: 20 }}>
+              {i + 1}.
+            </Text>
+            <TextInput
+              value={p.text}
+              onChangeText={(text) => updatePriority(p.id, text)}
+              placeholder={`Priority ${i + 1}`}
+              accessibilityLabel={`Priority ${i + 1}`}
+              style={[inputStyle, { flex: 1, minWidth: 0 }]}
+              placeholderTextColor={tokens.textSubtle}
+              maxLength={200}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Remove priority ${i + 1}`}
+              onPress={() => removePriority(p.id)}
+              style={{
+                width: 44,
+                height: 44,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <MaterialIcons name="close" size={20} color={tokens.dangerText} />
+            </Pressable>
+          </View>
+        ))}
 
-      {priorities.length < MAX_PRIORITIES ? (
-        <Button label="Add priority" variant="ghost" onPress={addPriority} />
-      ) : null}
+        {priorities.length < MAX_PRIORITIES ? (
+          <Button label="Add priority" variant="secondary" icon="add" onPress={addPriority} />
+        ) : null}
+      </View>
 
-      <View className="mt-4">
+      <View>
         <SectionLabel>New commitments</SectionLabel>
-        <Text className="text-xs mb-2" style={{ color: tokens.textMuted }}>
+        <Text variant="caption" tone="muted" style={{ marginBottom: spacing.sm }}>
           Optional new todos for next week.
         </Text>
 
@@ -777,59 +1057,49 @@ function PlanStep({
           const expanded = expandedCommitment === c.id;
           return (
             <Card key={c.id} className="mb-2" innerClassName="p-3">
-              <View className="flex-row items-center">
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                 <TextInput
                   value={c.title}
                   onChangeText={(text) => updateCommitment(c.id, { title: text })}
                   placeholder="Todo title"
                   accessibilityLabel="Commitment title"
-                  className="flex-1 px-3 py-2 rounded-lg text-sm"
-                  style={{
-                    minHeight: 44,
-                    backgroundColor: tokens.surface,
-                    color: tokens.text,
-                    borderWidth: 1,
-                    borderColor: tokens.border,
-                  }}
+                  style={[inputStyle, { flex: 1, minWidth: 0 }]}
+                  placeholderTextColor={tokens.textSubtle}
                 />
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Remove commitment ${c.title || 'untitled'}`}
                   onPress={() => removeCommitment(c.id)}
-                  className="ml-2 h-11 w-11 items-center justify-center"
+                  style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <Text style={{ color: tokens.dangerText }}>✕</Text>
+                  <MaterialIcons name="close" size={20} color={tokens.dangerText} />
                 </Pressable>
               </View>
-              <View className="flex-row items-center mt-1">
-                <Text className="text-xs mr-2" style={{ color: tokens.textMuted }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing.sm,
+                  marginTop: spacing.sm,
+                }}
+              >
+                <Text variant="caption" tone="muted" style={{ flex: 1 }}>
                   Due {c.dueDate ?? nextWeekStartDateKey}
                 </Text>
-                <Pressable
-                  accessibilityRole="button"
+                {/* 44pt touch contract (W14-01); the visible label stays small. */}
+                <PlanningDisclosure
+                  label={expanded ? 'Options −' : 'Options +'}
                   accessibilityLabel={
                     expanded ? 'Hide commitment options' : 'Show commitment options'
                   }
-                  accessibilityState={{ expanded }}
-                  aria-expanded={expanded}
-                  className="justify-center rounded-lg border px-2"
-                  style={{
-                    // 44pt touch contract (W14-01); the visible label stays small.
-                    minHeight: 44,
-                    borderColor: tokens.border,
-                    backgroundColor: tokens.surface,
-                  }}
+                  expanded={expanded}
                   onPress={() => setExpandedCommitment(expanded ? null : c.id)}
-                >
-                  <Text className="text-xs" style={{ color: tokens.text }}>
-                    {expanded ? 'Options −' : 'Options +'}
-                  </Text>
-                </Pressable>
+                />
               </View>
               {expanded ? (
-                <View className="mt-2 gap-2">
-                  <View className="flex-row items-center">
-                    <Text className="text-xs mr-2 w-12" style={{ color: tokens.textMuted }}>
+                <View style={{ marginTop: spacing.sm, gap: spacing.sm }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                    <Text variant="caption" tone="muted" style={{ width: 44 }}>
                       Due
                     </Text>
                     <TextInput
@@ -837,18 +1107,12 @@ function PlanStep({
                       onChangeText={(text) => updateCommitment(c.id, { dueDate: text })}
                       placeholder="YYYY-MM-DD"
                       accessibilityLabel="Commitment due date"
-                      className="flex-1 px-3 py-1 rounded text-xs"
-                      style={{
-                        minHeight: 44,
-                        backgroundColor: tokens.surface,
-                        color: tokens.text,
-                        borderWidth: 1,
-                        borderColor: tokens.border,
-                      }}
+                      style={[inputStyle, { flex: 1, minWidth: 0, minHeight: 44 }]}
+                      placeholderTextColor={tokens.textSubtle}
                     />
                   </View>
-                  <View className="flex-row items-center">
-                    <Text className="text-xs mr-2 w-12" style={{ color: tokens.textMuted }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                    <Text variant="caption" tone="muted" style={{ width: 44 }}>
                       Notes
                     </Text>
                     <TextInput
@@ -857,14 +1121,8 @@ function PlanStep({
                       placeholder="Optional notes"
                       accessibilityLabel="Commitment notes"
                       multiline
-                      className="flex-1 px-3 py-1 rounded text-xs"
-                      style={{
-                        minHeight: 60,
-                        backgroundColor: tokens.surface,
-                        color: tokens.text,
-                        borderWidth: 1,
-                        borderColor: tokens.border,
-                      }}
+                      style={[inputStyle, { flex: 1, minWidth: 0, minHeight: 60 }]}
+                      placeholderTextColor={tokens.textSubtle}
                       maxLength={MAX_COMMITMENT_NOTES_LENGTH}
                     />
                   </View>
@@ -874,7 +1132,7 @@ function PlanStep({
           );
         })}
 
-        <Button label="Add commitment" variant="ghost" onPress={addCommitment} />
+        <Button label="Add commitment" variant="secondary" icon="add" onPress={addCommitment} />
       </View>
     </View>
   );
@@ -888,15 +1146,18 @@ function ReflectionStep({
   onChange: (r: string) => void;
 }) {
   const { tokens } = useAppTheme();
+  const inputStyle = useInputStyle();
 
   return (
-    <View>
-      <Text variant="titleLg" style={{ color: tokens.text }}>
-        Reflect
-      </Text>
-      <Text className="text-sm mt-1 mb-3" style={{ color: tokens.textMuted }}>
-        Optional notes about your week.
-      </Text>
+    <View style={{ gap: spacing.md }}>
+      <View style={{ gap: spacing.xs }}>
+        <Text variant="titleLg" style={{ color: tokens.text }}>
+          Reflect
+        </Text>
+        <Text variant="caption" tone="muted">
+          Optional notes about your week.
+        </Text>
+      </View>
       <TextInput
         value={reflection}
         onChangeText={onChange}
@@ -905,17 +1166,11 @@ function ReflectionStep({
         multiline
         numberOfLines={6}
         textAlignVertical="top"
-        className="px-3 py-2 rounded-lg text-sm"
-        style={{
-          backgroundColor: tokens.surface,
-          color: tokens.text,
-          borderWidth: 1,
-          borderColor: tokens.border,
-          minHeight: 120,
-        }}
+        style={[inputStyle, { minHeight: 120 }]}
+        placeholderTextColor={tokens.textSubtle}
         maxLength={MAX_REFLECTION_LENGTH}
       />
-      <Text className="text-xs mt-1 text-right" style={{ color: tokens.textMuted }}>
+      <Text variant="caption" tone="muted" style={{ textAlign: 'right' }}>
         {reflection.length}/{MAX_REFLECTION_LENGTH}
       </Text>
     </View>
@@ -938,35 +1193,70 @@ function ConfirmStep({
   saveError: string | null;
 }) {
   const { tokens } = useAppTheme();
+  const danger = planningStatusVisual({
+    face: tokens.dangerBackground,
+    surface: tokens.surface,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+    ink: tokens.dangerText,
+    border: tokens.dangerBorder,
+    solid: tokens.dangerSolid,
+  });
 
   const reschedules = todoDecisions.filter((d) => d.action === 'reschedule');
   const carryForwards = todoDecisions.filter((d) => d.action === 'carry_forward');
 
   return (
-    <View>
-      <Text variant="titleLg" className="mb-3" style={{ color: tokens.text }}>
+    <View style={{ gap: spacing.md }}>
+      <Text variant="titleLg" style={{ color: tokens.text }}>
         Review changes
       </Text>
 
       {validationErrors.length > 0 && (
-        <Card className="mb-3" innerClassName="p-3">
-          {validationErrors.map((e, i) => (
-            <Text key={i} className="text-sm" style={{ color: tokens.dangerText }}>
-              {e}
-            </Text>
-          ))}
-        </Card>
+        <View
+          style={{
+            borderRadius: radius.sm,
+            borderWidth: 2,
+            borderColor: danger.border,
+            backgroundColor: danger.face,
+            padding: spacing.md,
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            gap: spacing.sm,
+          }}
+        >
+          <MaterialIcons name="error-outline" size={18} color={danger.icon} />
+          <View style={{ flex: 1, gap: spacing.xs }}>
+            {validationErrors.map((e, i) => (
+              <Text key={i} variant="bodyMd" style={{ color: danger.ink }}>
+                {e}
+              </Text>
+            ))}
+          </View>
+        </View>
       )}
 
       {saveError ? (
-        <Card className="mb-3" innerClassName="p-3">
-          <Text className="text-sm" style={{ color: tokens.dangerText }}>
+        <View
+          style={{
+            borderRadius: radius.sm,
+            borderWidth: 2,
+            borderColor: danger.border,
+            backgroundColor: danger.face,
+            padding: spacing.md,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.sm,
+          }}
+        >
+          <MaterialIcons name="error-outline" size={18} color={danger.icon} />
+          <Text variant="bodyMd" style={{ color: danger.ink, flex: 1 }}>
             {saveError}
           </Text>
-        </Card>
+        </View>
       ) : null}
 
-      <Card className="mb-3" innerClassName="p-0">
+      <Card innerClassName="p-0">
         <StatRow label="Priorities" value={priorities.length} />
         <StatRow label="Carried forward" value={carryForwards.length} />
         <StatRow label="Rescheduled" value={reschedules.length} />
@@ -975,32 +1265,36 @@ function ConfirmStep({
       </Card>
 
       {priorities.length > 0 ? (
-        <View className="mb-3">
+        <View>
           <SectionLabel>Priorities</SectionLabel>
           <Card innerClassName="p-3">
-            {priorities.map((p, i) => (
-              <Text key={p.id} className="text-sm" style={{ color: tokens.text }}>
-                {i + 1}. {p.text || '(empty)'}
-              </Text>
-            ))}
+            <View style={{ gap: spacing.xs }}>
+              {priorities.map((p, i) => (
+                <Text key={p.id} variant="bodyMd" style={{ color: tokens.text }}>
+                  {i + 1}. {p.text || '(empty)'}
+                </Text>
+              ))}
+            </View>
           </Card>
         </View>
       ) : null}
 
       {newCommitments.length > 0 ? (
-        <View className="mb-3">
+        <View>
           <SectionLabel>New commitments</SectionLabel>
           <Card innerClassName="p-3">
-            {newCommitments.map((c) => (
-              <Text key={c.id} className="text-sm" style={{ color: tokens.text }}>
-                + {c.title || '(empty)'} {c.dueDate ? `due ${c.dueDate}` : ''}
-              </Text>
-            ))}
+            <View style={{ gap: spacing.xs }}>
+              {newCommitments.map((c) => (
+                <Text key={c.id} variant="bodyMd" style={{ color: tokens.text }}>
+                  + {c.title || '(empty)'} {c.dueDate ? `due ${c.dueDate}` : ''}
+                </Text>
+              ))}
+            </View>
           </Card>
         </View>
       ) : null}
 
-      <Text className="text-xs" style={{ color: tokens.textMuted }}>
+      <Text variant="caption" tone="muted">
         Saving writes this week&apos;s review and applies the decisions above. Applying
         carry-forwards to next week&apos;s daily plans is a separate action afterwards.
       </Text>
@@ -1014,13 +1308,19 @@ function StatRow({ label, value }: { label: string; value: number | string }) {
   const { tokens } = useAppTheme();
   return (
     <View
-      className="flex-row justify-between items-center px-4"
-      style={{ minHeight: 44, paddingVertical: spacing.xs }}
+      style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm,
+        minHeight: 44,
+      }}
     >
-      <Text className="text-sm" style={{ color: tokens.textMuted }}>
+      <Text variant="bodyMd" tone="muted">
         {label}
       </Text>
-      <Text className="text-sm font-medium tabular-nums" style={{ color: tokens.text }}>
+      <Text variant="bodyMd" style={{ color: tokens.text, fontWeight: '700' }}>
         {value}
       </Text>
     </View>

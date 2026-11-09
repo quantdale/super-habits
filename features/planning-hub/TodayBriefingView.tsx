@@ -1,27 +1,57 @@
 import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Card } from '@/core/ui/Card';
+import { Pressable3D } from '@/core/ui/Pressable3D';
+import { radius, spacing } from '@/core/theme/designTokens';
 import {
   buildTodayBriefing,
   type TodayBriefing,
 } from '@/features/planning-hub/planningHub.briefing';
+import {
+  planningRowVisual,
+  planningStatTileVisual,
+  planningStatusVisual,
+  planningToneText,
+} from '@/features/planning-hub/planningHub.visual';
 
+/**
+ * One briefing tile. Static information → `depth.flat` geometry (2px outline,
+ * no lip) with the Sky tint wash for the face, so the five counts read as one
+ * group of quiet tiles instead of five floating cards. The value ink and the
+ * caption ink are resolved against the TINT face (the §5.1 table certifies the
+ * Sky solid on `tintLight` and the Sky bright on `tintDark`; a theme that
+ * overrides its accents is floored the same way).
+ */
 function BriefingStat({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
-  const { tokens } = useAppTheme();
+  const { tokens, resolvedTheme } = useAppTheme();
+  const face = planningStatTileVisual({
+    tone: warn ? 'gold' : 'sky',
+    appearance: resolvedTheme,
+    surface: tokens.surface,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+  });
   return (
     <View
-      className="min-w-[45%] flex-1 rounded-xl border p-3"
-      style={{ borderColor: tokens.border }}
+      style={{
+        minWidth: '45%',
+        flexGrow: 1,
+        flexBasis: 0,
+        borderRadius: radius.md,
+        borderWidth: 2,
+        borderColor: face.border,
+        backgroundColor: face.face,
+        padding: spacing.md,
+        gap: spacing.xs,
+      }}
     >
-      <Text className="text-xs" style={{ color: tokens.textMuted }}>
+      <Text variant="caption" style={{ color: face.caption }} numberOfLines={1}>
         {label}
       </Text>
-      <Text
-        className="text-lg font-bold"
-        style={{ color: warn ? (tokens.warningText ?? '#d97706') : tokens.text }}
-      >
+      <Text variant="titleMd" style={{ color: face.ink }} numberOfLines={1}>
         {value}
       </Text>
     </View>
@@ -33,7 +63,7 @@ function BriefingStat({ label, value, warn }: { label: string; value: string; wa
  * Read-only; pull-to-refresh via the refresh button.
  */
 export function TodayBriefingView() {
-  const { tokens } = useAppTheme();
+  const { tokens, resolvedTheme } = useAppTheme();
   const [briefing, setBriefing] = useState<TodayBriefing | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,9 +99,35 @@ export function TodayBriefingView() {
     };
   }, []);
 
+  const danger = planningStatusVisual({
+    face: tokens.dangerBackground,
+    surface: tokens.surface,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+    ink: tokens.dangerText,
+    border: tokens.dangerBorder,
+    solid: tokens.dangerSolid,
+  });
+  const secondary = planningRowVisual({
+    tone: 'sky',
+    selected: false,
+    appearance: resolvedTheme,
+    surface: tokens.surface,
+    border: tokens.border,
+    borderStrong: tokens.borderStrong,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+  });
+  const heading = planningToneText({
+    tone: 'sky',
+    appearance: resolvedTheme,
+    surface: tokens.surface,
+    text: tokens.text,
+  });
+
   if (loading && !briefing) {
     return (
-      <Text className="py-2 text-sm" style={{ color: tokens.textMuted }}>
+      <Text variant="bodyMd" tone="muted" style={{ paddingVertical: spacing.sm }}>
         Loading today&apos;s briefing…
       </Text>
     );
@@ -80,28 +136,53 @@ export function TodayBriefingView() {
   if (error || !briefing) {
     return (
       <Card>
-        <Text className="py-2 text-sm" style={{ color: tokens.dangerText }}>
-          {error ?? 'Failed to load briefing'}
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Retry briefing"
-          onPress={() => void refresh()}
-          className="self-start rounded-full border px-3 py-1"
-          style={{ borderColor: tokens.border }}
-        >
-          <Text className="text-sm" style={{ color: tokens.text }}>
-            Retry
-          </Text>
-        </Pressable>
+        <View style={{ gap: spacing.md }}>
+          <View
+            style={{
+              borderRadius: radius.sm,
+              borderWidth: 2,
+              borderColor: danger.border,
+              backgroundColor: danger.face,
+              padding: spacing.md,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.sm,
+            }}
+          >
+            <MaterialIcons name="error-outline" size={18} color={danger.icon} />
+            <Text variant="bodyMd" style={{ color: danger.ink, flex: 1 }}>
+              {error ?? 'Failed to load briefing'}
+            </Text>
+          </View>
+          <Pressable3D
+            lip={3}
+            faceColor={secondary.face}
+            lipColor={secondary.lip}
+            radius={radius.md}
+            onPress={() => void refresh()}
+            accessibilityRole="button"
+            accessibilityLabel="Retry briefing"
+            faceStyle={{ borderWidth: 2, borderColor: secondary.border }}
+            contentStyle={{
+              minHeight: 44,
+              paddingHorizontal: spacing.lg,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text variant="button" style={{ color: tokens.text }}>
+              Retry
+            </Text>
+          </Pressable3D>
+        </View>
       </Card>
     );
   }
 
   return (
-    <View className="gap-2">
-      <View className="flex-row items-center justify-between">
-        <Text className="font-bold" style={{ color: tokens.text }}>
+    <View style={{ gap: spacing.sm }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text variant="titleMd" style={{ color: heading }}>
           Today&apos;s briefing
         </Text>
         <Pressable
@@ -109,15 +190,23 @@ export function TodayBriefingView() {
           accessibilityLabel="Refresh briefing"
           onPress={() => void refresh()}
           disabled={loading}
-          className="rounded-full border px-3 py-1"
-          style={{ borderColor: tokens.border }}
+          style={{
+            minHeight: 44,
+            minWidth: 44,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.xs,
+            paddingHorizontal: spacing.sm,
+            justifyContent: 'center',
+          }}
         >
-          <Text className="text-xs" style={{ color: tokens.textMuted }}>
+          <MaterialIcons name="refresh" size={20} color={secondary.mark} />
+          <Text variant="caption" style={{ color: secondary.mark }}>
             {loading ? '…' : 'Refresh'}
           </Text>
         </Pressable>
       </View>
-      <View className="flex-row flex-wrap gap-2">
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
         <BriefingStat
           label="Overdue todos"
           value={String(briefing.overdueTodoCount)}

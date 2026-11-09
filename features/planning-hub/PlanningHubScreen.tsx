@@ -1,11 +1,12 @@
-import { useCallback, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { memo, useCallback, useState } from 'react';
+import { View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { PlanningDisclosure } from '@/features/planning-hub/PlanningDisclosure';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Text } from '@/core/ui/Text';
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
-import { SECTION_COLORS } from '@/constants/sectionColors';
-import { spacing } from '@/core/theme/designTokens';
+import { radius, spacing } from '@/core/theme/designTokens';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
 import { SegmentedControl } from '@/core/ui/SegmentedControl';
@@ -20,6 +21,7 @@ import { GuidedPlanningFlow } from '@/features/planning-hub/GuidedPlanningFlow';
 import { ActivityTimelineView } from '@/features/activity/ActivityTimelineView';
 import { ProgressInsightsView } from '@/features/progress/ProgressInsightsView';
 import { MomentumDetailView } from '@/features/momentum/MomentumDetailView';
+import { planningPrimaryFace, planningToneText } from '@/features/planning-hub/planningHub.visual';
 
 type PlanningHubScreenProps = {
   initialView: PlanningHubView;
@@ -35,9 +37,19 @@ const TABS: { key: PlanningHubView; label: string }[] = [
   { key: 'timeline', label: 'Timeline' },
 ];
 
-export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
+/**
+ * The Planning Hub (v2 P21 part A) on the Sky section surface: one
+ * SegmentedControl for the five views, one primary action per view, and
+ * `depth.flat` groups beneath.
+ *
+ * Presentation only — every data path (guided-flow writes, the planner editor,
+ * project/goal detail navigation, weekly-review launch) is unchanged.
+ */
+export const PlanningHubScreen = memo(function PlanningHubScreen({
+  initialView,
+}: PlanningHubScreenProps) {
   const { openWeeklyReview } = useAppNavigation();
-  const { tokens } = useAppTheme();
+  const { tokens, resolvedTheme } = useAppTheme();
   const [showBriefing, setShowBriefing] = useState(false);
   const [view, setView] = useState<PlanningHubView>(initialView);
   const [detail, setDetail] = useState<Detail>(null);
@@ -53,13 +65,23 @@ export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
     setView(tab);
   }, []);
 
+  // Sky's colored-text tier resolved against the real surface: on the white
+  // canvas it is the §5.1 `solid` (#1769D8, 5.19:1); on a mid-tone theme canvas
+  // (Nord's slate) it floors to the theme text ink instead of dropping under 4.5.
+  const accentText = planningToneText({
+    tone: 'sky',
+    appearance: resolvedTheme,
+    surface: tokens.surface,
+    text: tokens.text,
+  });
+
   return (
     <View className="flex-1" style={{ gap: spacing.md }}>
       <SegmentedControl
         options={TABS.map((tab) => ({ value: tab.key, label: tab.label }))}
         value={view}
         onChange={selectTab}
-        accentColor={SECTION_COLORS.todos}
+        accentColor={accentText}
         accessibilityLabel="Planning hub views"
       />
 
@@ -75,19 +97,13 @@ export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
         ) : view === 'today' ? (
           <View className="gap-3">
             <GuidedPlanningFlow onPlanSaved={() => setTodayVersion((v) => v + 1)} />
-            <Pressable
-              accessibilityRole="button"
+            <PlanningDisclosure
+              label={`Today's briefing ${showBriefing ? '−' : '+'}`}
               accessibilityLabel="Planning briefing"
-              accessibilityState={{ expanded: showBriefing }}
-              aria-expanded={showBriefing}
-              className="min-h-11 self-start justify-center rounded-xl border px-3"
-              style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+              expanded={showBriefing}
+              icon="article"
               onPress={() => setShowBriefing((open) => !open)}
-            >
-              <Text className="text-sm" style={{ color: tokens.text }}>
-                Today&apos;s briefing {showBriefing ? '−' : '+'}
-              </Text>
-            </Pressable>
+            />
             {showBriefing ? (
               <TodayBriefingView key={`briefing-${todayVersion}-${dayGeneration}`} />
             ) : null}
@@ -104,18 +120,35 @@ export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
                 Momentum Garden follow as supporting items instead of consuming
                 the first fold. */}
             <ProgressInsightsView />
-            <Card innerClassName="p-3">
+            <Card innerClassName="p-4">
               <View className="gap-2">
-                <Text variant="titleMd" style={{ color: tokens.text }}>
-                  Weekly Review
-                </Text>
+                <View className="flex-row items-center gap-2">
+                  <View
+                    className="items-center justify-center"
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: radius.sm,
+                      backgroundColor: planningPrimaryFace('sky'),
+                    }}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                  >
+                    <MaterialIcons name="autorenew" size={20} color={tokens.onSolid} />
+                  </View>
+                  <Text variant="titleMd" style={{ color: tokens.text }}>
+                    Weekly Review
+                  </Text>
+                </View>
                 <Text variant="caption" tone="muted">
                   Carry this week&apos;s priorities and todos into the next one.
                 </Text>
                 <Button
                   label="Open weekly review"
                   accessibilityLabel="Open weekly review"
+                  color={planningPrimaryFace('sky')}
                   onPress={openWeeklyReview}
+                  fullWidth
                 />
               </View>
             </Card>
@@ -127,4 +160,4 @@ export function PlanningHubScreen({ initialView }: PlanningHubScreenProps) {
       </View>
     </View>
   );
-}
+});
