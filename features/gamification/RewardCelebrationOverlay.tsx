@@ -12,6 +12,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { layers, radius, spacing, typography } from '@/core/theme/designTokens';
 import { useReducedMotion } from '@/core/theme/motion';
 import { Button } from '@/core/ui/Button';
+import { TrophyIcon } from '@/core/ui/illustrations/icons';
 import { useGamification } from './gamificationContext';
 import type { CelebrationTier } from './gamification.types';
 
@@ -42,6 +43,8 @@ type TierVisual = {
   textColor: string;
   icon: keyof typeof MaterialIcons.glyphMap;
   surface: 'accent' | 'surface';
+  /** Hero SVG (§5.9) rendered instead of the MaterialIcons glyph. */
+  hero?: 'trophy';
 };
 
 function tierVisual(
@@ -82,6 +85,15 @@ function tierVisual(
         textColor: tokens.accent,
         icon: 'bolt',
         surface: 'surface',
+      };
+    case 'workout':
+      // The session-finish trophy card (P16): reward-Gold face, trophy hero
+      // icon, no emoji.
+      return {
+        ...reward('badge', REWARD_COLORS.badge),
+        icon: 'fitness-center',
+        surface: 'accent',
+        hero: 'trophy',
       };
   }
 }
@@ -258,7 +270,11 @@ export function RewardCelebrationOverlay() {
             borderColor: visual.color,
           }}
         >
-          <MaterialIcons name={visual.icon} size={36} color={visual.color} />
+          {visual.hero === 'trophy' ? (
+            <TrophyIcon size={40} bright={visual.color} lip={visual.lipColor} />
+          ) : (
+            <MaterialIcons name={visual.icon} size={36} color={visual.color} />
+          )}
         </View>
         <Text style={{ ...typography.titleLg, color: ink, textAlign: 'center' }}>
           {celebration.title}

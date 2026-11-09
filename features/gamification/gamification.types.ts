@@ -362,7 +362,13 @@ export const BADGE_TIER_LABELS: readonly [string, string, string, string] = [
 // Celebration
 // ---------------------------------------------------------------------------
 
-export type CelebrationTier = 'small' | 'quest' | 'streak' | 'day' | 'badge' | 'level';
+/**
+ * `workout` is the session-finish trophy card (P16,
+ * `docs/ui-ux/16-playful-momentum.md` § "Workout session"). Presentation
+ * only: the award engine never produces it — the Workout session enqueues it
+ * when a finished session is durably saved.
+ */
+export type CelebrationTier = 'small' | 'quest' | 'streak' | 'day' | 'badge' | 'level' | 'workout';
 
 export type Celebration = {
   tier: CelebrationTier;
@@ -381,6 +387,8 @@ export const CELEBRATION_PRIORITY: Record<CelebrationTier, number> = {
   day: 3,
   badge: 4,
   level: 5,
+  /** A finished workout sits at badge weight when several cards queue at once. */
+  workout: 4,
 };
 
 // ---------------------------------------------------------------------------

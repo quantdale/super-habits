@@ -104,6 +104,10 @@ vi.mock('@/core/theme/motion', () => ({
 
 vi.mock('@expo/vector-icons', () => ({ MaterialIcons: 'MaterialIcons' }));
 vi.mock('@/core/ui/Button', () => ({ Button: 'Button' }));
+// The hero trophy SVG pulls in react-native-svg; the contract under test is
+// WHICH icon the card renders, not the SVG geometry (pinned by the P9 hero
+// icon render contract).
+vi.mock('@/core/ui/illustrations/icons', () => ({ TrophyIcon: 'TrophyIcon' }));
 
 vi.mock('@/core/providers/themeContext', () => ({
   useAppTheme: () => ({
@@ -232,6 +236,54 @@ describe('RewardCelebrationOverlay auto-dismiss (§5.8: 2.8s, dismiss anywhere)'
         (call) => call[0] === harness.dismissCelebration,
       );
       expect(dismissCalls).toHaveLength(0);
+    } finally {
+      timeoutSpy.mockRestore();
+    }
+  });
+});
+
+describe('RewardCelebrationOverlay workout finish card (P16 trophy hero)', () => {
+  beforeEach(() => {
+    harness.celebration = {
+      tier: 'workout',
+      title: 'Session complete!',
+      message: '3 sets · 12:04',
+      xp: 0,
+    };
+  });
+
+  it('renders the trophy hero icon on the reward-Gold face, never a glyph or emoji', async () => {
+    const tree = await renderOverlay();
+    const trophies = findAll(tree, 'TrophyIcon');
+    expect(trophies).toHaveLength(1);
+    expect(trophies[0].props['bright']).toBe('#FFC81F');
+    expect(trophies[0].props['lip']).toBe('#E0A800');
+    // No MaterialIcons glyph and no XP float on the finish card.
+    expect(findAll(tree, 'MaterialIcons')).toHaveLength(0);
+  });
+
+  it('keeps the card static under reduced motion (no confetti at all)', async () => {
+    harness.reducedMotion = true;
+    const tree = await renderOverlay();
+    expect(findAll(tree, 'TrophyIcon')).toHaveLength(1);
+    const confettiLayer = findAll(tree, 'View').find(
+      (view) => view.props['pointerEvents'] === 'none',
+    );
+    expect(confettiLayer).toBeUndefined();
+    expect(findAll(tree, 'Animated.View')).toHaveLength(0);
+  });
+
+  it('stays non-blocking and self-dismissing like every celebration', async () => {
+    const tree = await renderOverlay();
+    expect(tree!.props['pointerEvents']).toBe('box-none');
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    try {
+      await renderOverlay();
+      const dismissCalls = timeoutSpy.mock.calls.filter(
+        (call) => call[0] === harness.dismissCelebration,
+      );
+      expect(dismissCalls).toHaveLength(1);
+      expect(dismissCalls[0][1]).toBe(AUTO_DISMISS_EXPECTED_MS);
     } finally {
       timeoutSpy.mockRestore();
     }

@@ -51,6 +51,7 @@ import {
   remapPhaseIndices,
   remapSessionMaps,
   resolveSessionSave,
+  buildWorkoutFinishCelebration,
   type SetRow,
 } from './workoutSessionView';
 import { tickCountdown } from './workoutTimerTick';
@@ -271,7 +272,7 @@ type Props = {
 export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Props) {
   const { tokens, resolvedTheme } = useAppTheme();
   const { confirm, confirmationDialog } = useConfirmationDialog();
-  const { recordAction } = useGamification();
+  const { recordAction, celebrate } = useGamification();
   // Rest policy (Option A): stored `rest_seconds === 0` is intentional no
   // rest and runs back-to-back. The preference below only seeds sets created
   // afterwards — it never rewrites this live sequence. Mid-session tweaks stay
@@ -394,6 +395,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   // check and log two workouts (CG-3 defect class). tryStart() is synchronous
   // and drops the second press before any write begins.
   const finishGuardRef = useRef(createSubmitGuard());
+  // The finish celebration card shows at most once per mounted session, and a
+  // recovery reopen (`resume.alreadyFinished`) never replays it.
+  const finishCelebrationShownRef = useRef(false);
   const [savedOutcome, setSavedOutcome] = useState<{
     newRecords: string[];
     /** True when the log committed but secondary post-commit bookkeeping
@@ -1111,6 +1115,21 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         }
         setSaveError(null);
         setSavedOutcome({ newRecords, bookkeepingFailed });
+        // P16 finish celebration ("Finish → PR/milestone celebration card
+        // (trophy hero icon, no emoji)"): the trophy card rides the existing
+        // celebration overlay at the durable finish, once per session. The
+        // summary state above is already committed to React before the card is
+        // queued, so the celebration never delays the saved view.
+        const finishCelebration = buildWorkoutFinishCelebration({
+          reopenedFinishedSession: resume?.alreadyFinished === true,
+          newRecords,
+          totalSets: computeSessionTotalSets(summary),
+          durationText: formatWorkoutTime(Math.max(0, elapsedSecondsRef.current)),
+        });
+        if (finishCelebration && !finishCelebrationShownRef.current) {
+          finishCelebrationShownRef.current = true;
+          celebrate(finishCelebration);
+        }
       } else {
         // Not saved: the session and every entered value stay exactly as they
         // are, and the durable recovery state records the real cause so an

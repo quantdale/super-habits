@@ -4,6 +4,7 @@ import {
   appendAddedSets,
   buildExerciseSetRows,
   buildSessionProgress,
+  buildWorkoutFinishCelebration,
   canAddSetToExercise,
   remapCurrentIndex,
   remapPhaseIndices,
@@ -317,5 +318,67 @@ describe('phase-index remap after an in-session add', () => {
       expect(after[newIndex].setNumber).toBe(before[oldIndex].setNumber);
       expect(after[newIndex].phase).toBe(before[oldIndex].phase);
     }
+  });
+});
+
+describe('buildWorkoutFinishCelebration (P16 trophy card)', () => {
+  const base = {
+    reopenedFinishedSession: false,
+    newRecords: [] as string[],
+    totalSets: 3,
+    durationText: '12:04',
+  };
+
+  it('a PR finish celebrates the records', () => {
+    expect(buildWorkoutFinishCelebration({ ...base, newRecords: ['Bench Press'] })).toEqual({
+      tier: 'workout',
+      title: 'Personal best!',
+      message: 'You set 1 new record.',
+      icon: 'fitness-center',
+      xp: 0,
+    });
+  });
+
+  it('multiple records pluralize the milestone line', () => {
+    expect(
+      buildWorkoutFinishCelebration({ ...base, newRecords: ['Bench Press', 'Squat'] }),
+    ).toMatchObject({
+      title: 'Personal best!',
+      message: 'You set 2 new records.',
+    });
+  });
+
+  it('a finished session without records earns the milestone card', () => {
+    expect(buildWorkoutFinishCelebration(base)).toEqual({
+      tier: 'workout',
+      title: 'Session complete!',
+      message: '3 sets · 12:04',
+      icon: 'fitness-center',
+      xp: 0,
+    });
+  });
+
+  it('a single set keeps the set line singular', () => {
+    expect(buildWorkoutFinishCelebration({ ...base, totalSets: 1 })).toMatchObject({
+      message: '1 set · 12:04',
+    });
+  });
+
+  it('a zero-work finish earns no celebration (sized to the achievement)', () => {
+    expect(buildWorkoutFinishCelebration({ ...base, totalSets: 0 })).toBeNull();
+    expect(
+      buildWorkoutFinishCelebration({ ...base, totalSets: 0, newRecords: ['Squat'] }),
+    ).toMatchObject({ title: 'Personal best!' });
+  });
+
+  it('a recovery reopen never replays the celebration', () => {
+    expect(buildWorkoutFinishCelebration({ ...base, reopenedFinishedSession: true })).toBeNull();
+    expect(
+      buildWorkoutFinishCelebration({
+        ...base,
+        reopenedFinishedSession: true,
+        newRecords: ['Bench Press'],
+      }),
+    ).toBeNull();
   });
 });

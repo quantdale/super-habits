@@ -1,3 +1,4 @@
+import type { Celebration } from '@/features/gamification/gamification.types';
 import {
   buildTimerSequence,
   lookupPreviousSet,
@@ -301,5 +302,53 @@ export function resolveSessionSave(result: SessionSaveResult): SessionSaveDecisi
     logId: null,
     message:
       result.reason === 'target_missing' ? ROUTINE_UNAVAILABLE_MESSAGE : GENERIC_NOT_SAVED_MESSAGE,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Finish celebration (P16, docs/ui-ux/16-playful-momentum.md § "Workout
+// session"): "Finish → PR/milestone celebration card (trophy hero icon, no
+// emoji)". The card is presentation-only and sized to the achievement: PR copy
+// when the save found new records, a milestone line for finished work, and
+// nothing at all for a zero-work finish or a recovery reopen — whose save must
+// never replay the celebration. No DB, no React.
+// ---------------------------------------------------------------------------
+
+export type WorkoutFinishCelebrationInput = {
+  /** The summary is a recovery reopen of a finished session (`resume.alreadyFinished`). */
+  reopenedFinishedSession: boolean;
+  /** Exercises that set a new best this session (the save-time list). */
+  newRecords: readonly string[];
+  /** Completed sets only — the same accounting the summary reports. */
+  totalSets: number;
+  /** Active training time, pre-formatted for display (e.g. `12:04`). */
+  durationText: string;
+};
+
+/**
+ * Build the trophy celebration card for a finished session, or `null` when the
+ * moment earns no celebration (celebrations sized to the achievement).
+ */
+export function buildWorkoutFinishCelebration(
+  input: WorkoutFinishCelebrationInput,
+): Celebration | null {
+  if (input.reopenedFinishedSession) return null;
+  const prCount = input.newRecords.length;
+  if (prCount === 0 && input.totalSets <= 0) return null;
+  if (prCount > 0) {
+    return {
+      tier: 'workout',
+      title: 'Personal best!',
+      message: `You set ${prCount} new record${prCount === 1 ? '' : 's'}.`,
+      icon: 'fitness-center',
+      xp: 0,
+    };
+  }
+  return {
+    tier: 'workout',
+    title: 'Session complete!',
+    message: `${input.totalSets} set${input.totalSets === 1 ? '' : 's'} · ${input.durationText}`,
+    icon: 'fitness-center',
+    xp: 0,
   };
 }

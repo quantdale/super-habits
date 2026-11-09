@@ -21,6 +21,13 @@ export type GamificationContextValue = {
   /** Celebration currently on screen, if any. */
   celebration: Celebration | null;
   dismissCelebration: () => void;
+  /**
+   * Run a presentation-level celebration end to end: the tier's feedback
+   * (haptic/tone, honoring the user's toggles) plus the celebration card when
+   * the tier earns one. Never touches the XP ledger — moments the award engine
+   * does not own (the workout session-finish trophy card) trigger through it.
+   */
+  celebrate: (celebration: Celebration) => void;
 };
 
 export const GamificationContext = createContext<GamificationContextValue | null>(null);
