@@ -39,6 +39,7 @@ const FEEDBACK_TIER_BY_CELEBRATION: Record<CelebrationTier, RewardFeedbackTier> 
   day: 'milestone',
   badge: 'milestone',
   level: 'milestone',
+  workout: 'milestone',
 };
 
 /**
@@ -58,6 +59,7 @@ const OVERLAY_TIERS: Record<CelebrationTier, boolean> = {
   badge: true,
   level: true,
   streak: true,
+  workout: true,
 };
 
 /** Housekeeping is cheap but not free; a minute is below any user-noticeable lag. */
@@ -104,6 +106,20 @@ export function GamificationProvider({ children }: PropsWithChildren) {
     queueRef.current = rest;
     setCelebration(next ?? null);
   }, []);
+
+  /**
+   * Presentation-level trigger for celebrations the award engine does not own
+   * (P16: the workout session-finish trophy card). Mirrors what `recordAction`
+   * does for engine-produced celebrations — tier feedback plus the overlay —
+   * without awarding anything.
+   */
+  const celebrate = useCallback(
+    (next: Celebration) => {
+      emitRewardFeedback(FEEDBACK_TIER_BY_CELEBRATION[next.tier]);
+      if (OVERLAY_TIERS[next.tier]) showCelebration(next);
+    },
+    [showCelebration],
+  );
 
   const refresh = useCallback(async () => {
     try {
@@ -152,7 +168,15 @@ export function GamificationProvider({ children }: PropsWithChildren) {
 
   return (
     <GamificationContext.Provider
-      value={{ snapshot, isLoading, refresh, recordAction, celebration, dismissCelebration }}
+      value={{
+        snapshot,
+        isLoading,
+        refresh,
+        recordAction,
+        celebration,
+        dismissCelebration,
+        celebrate,
+      }}
     >
       {children}
     </GamificationContext.Provider>
