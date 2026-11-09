@@ -51,12 +51,27 @@ describe('W6.5 Todo list contracts', () => {
   });
 
   it('uses the global theme accent for planning capture, not Health identity', () => {
+    // P19 moved the destination-hue table beside the tile picker (the mode →
+    // section translation lives in `captureType.mode.ts`); the CONTRACT is
+    // unchanged: planning destinations resolve the global theme accent, and
+    // the sheet never adopts the Health identity hue.
     const capture = readFileSync(
       join(root, 'features/quick-capture/QuickCaptureOverlay.tsx'),
       'utf8',
     );
-    expect(capture).toContain('MODE_ACCENT[mode] ?? tokens.accent');
-    expect(capture).toContain('MODE_ACCENT[m.key] ?? tokens.accent');
+    const modeMap = readFileSync(join(root, 'features/quick-capture/captureType.mode.ts'), 'utf8');
+    // Planning (no section) → the theme accent, never a section hue.
+    expect(modeMap).toContain(
+      'return { fill: tokens.primaryBright, text: tokens.accent, lip: tokens.buttonLip };',
+    );
+    expect(modeMap).toMatch(/project: null,\s*goal: null,/);
+    // The overlay delegates the destination hue to the picker instead of
+    // hard-coding a per-mode accent table of its own.
+    expect(capture).toContain("import { CaptureTypePicker } from './CaptureTypePicker';");
+    expect(capture).toContain(
+      '<CaptureTypePicker modes={MODES} selected={mode} onSelect={switchMode} />',
+    );
     expect(capture).not.toContain('SECTION_COLORS.health');
+    expect(modeMap).not.toContain('SECTION_COLORS.health');
   });
 });
