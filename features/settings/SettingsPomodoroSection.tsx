@@ -1,13 +1,12 @@
 import { View } from 'react-native';
 import { Button } from '@/core/ui/Button';
-import { Card } from '@/core/ui/Card';
+import { SettingsGroup, SettingsRow, SettingsSectionHeading } from './SettingsSharedUi';
 import { NumberStepperField } from '@/core/ui/NumberStepperField';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
 import type { PomodoroSettings } from '@/features/pomodoro/pomodoro.domain';
 import { formatPomodoroSummary, type PomodoroFormState } from './settingsShared';
-import { SettingsRow, SettingsSectionHeading } from './SettingsSharedUi';
 
 type SettingsPomodoroSectionProps = {
   pomodoroSettings: PomodoroSettings;
@@ -37,7 +36,7 @@ export function SettingsPomodoroSection({
         title="Focus defaults"
         accentColor={SECTION_COLORS[POMODORO_SECTION_KEY]}
       />
-      <Card accentColor={SECTION_COLORS[POMODORO_SECTION_KEY]} className="mb-0">
+      <SettingsGroup accentColor={SECTION_COLORS[POMODORO_SECTION_KEY]}>
         <SettingsRow
           first
           label="Saved timer sequence"
@@ -67,6 +66,7 @@ export function SettingsPomodoroSection({
             }}
             min={1}
             max={120}
+            accentColor={SECTION_COLORS[POMODORO_SECTION_KEY]}
           />
           <NumberStepperField
             label="Short break minutes"
@@ -76,6 +76,7 @@ export function SettingsPomodoroSection({
             }}
             min={1}
             max={60}
+            accentColor={SECTION_COLORS[POMODORO_SECTION_KEY]}
           />
           <NumberStepperField
             label="Long break minutes"
@@ -85,6 +86,7 @@ export function SettingsPomodoroSection({
             }}
             min={1}
             max={120}
+            accentColor={SECTION_COLORS[POMODORO_SECTION_KEY]}
           />
           <NumberStepperField
             label="Focus sessions before long break"
@@ -94,30 +96,32 @@ export function SettingsPomodoroSection({
             }}
             min={2}
             max={10}
+            accentColor={SECTION_COLORS[POMODORO_SECTION_KEY]}
           />
         </View>
 
         <ValidationError message={pomodoroError} />
 
-        <View className="mt-2 flex-row gap-2">
-          <View className="flex-1">
-            <Button
-              label={pomodoroSaving ? 'Saving...' : 'Save timer defaults'}
-              onPress={onSave}
-              disabled={pomodoroLoading || pomodoroSaving}
-              color={SECTION_COLORS[POMODORO_SECTION_KEY]}
-            />
-          </View>
-          <View className="flex-1">
-            <Button
-              label="Revert"
-              variant="ghost"
-              onPress={onRevert}
-              disabled={pomodoroLoading || pomodoroSaving}
-            />
-          </View>
+        {/* One primary action per state (§4.5): the save is the section's loud
+            control and spans the row; Revert is a quiet full-width ghost under
+            it. Two half-width buttons clipped their labels at 360/390. */}
+        <View className="mt-2 gap-2">
+          <Button
+            label={pomodoroSaving ? 'Saving...' : 'Save timer defaults'}
+            onPress={onSave}
+            disabled={pomodoroLoading || pomodoroSaving}
+            color={SECTION_COLORS[POMODORO_SECTION_KEY]}
+            fullWidth
+          />
+          <Button
+            label="Revert"
+            variant="ghost"
+            onPress={onRevert}
+            disabled={pomodoroLoading || pomodoroSaving}
+            fullWidth
+          />
         </View>
-      </Card>
+      </SettingsGroup>
     </ScreenSection>
   );
 }

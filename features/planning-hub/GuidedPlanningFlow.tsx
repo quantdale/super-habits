@@ -1,11 +1,14 @@
 import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { TextField } from '@/core/ui/TextField';
 import { NumberStepperField } from '@/core/ui/NumberStepperField';
-import { SECTION_COLORS } from '@/constants/sectionColors';
+import { Card } from '@/core/ui/Card';
+import { Pressable3D } from '@/core/ui/Pressable3D';
+import { radius, spacing } from '@/core/theme/designTokens';
 import { addLocalDays, toDateKey } from '@/lib/time';
 import {
   carryForwardFromPreviousDay,
@@ -28,6 +31,14 @@ import {
   resolveUnfinishedPriorities,
   type UnfinishedPriority,
 } from '@/features/planning-hub/guidedPlanning.model';
+import {
+  planningPrimaryFace,
+  planningRowVisual,
+  planningStatusVisual,
+  planningStepNodeFill,
+  planningStepNodeInk,
+  planningToneText,
+} from '@/features/planning-hub/planningHub.visual';
 
 type GuidedPlanningFlowProps = {
   /** Bump to refresh sibling surfaces after a guided save. */
@@ -37,13 +48,149 @@ type GuidedPlanningFlowProps = {
 const STEPS = ['Carry-over', 'Commitments', 'Priorities', 'Focus', 'Confirm'] as const;
 
 /**
+ * Step progress (§6/§7 "one question per screen"): the numbered caption stays
+ * (E2E and screen readers depend on "Step 3 of 5"), and a row of five Sky
+ * step nodes adds the at-a-glance position. Reached nodes fill with the Sky
+ * bright and carry an ink check; upcoming nodes stay on the sunken track — a
+ * quiet progress affordance, not a celebration (§5.8).
+ */
+function StepNodes({ step, label }: { step: number; label: string }) {
+  const { tokens, resolvedTheme } = useAppTheme();
+  return (
+    <View style={{ gap: spacing.xs }}>
+      <Text variant="caption" tone="muted">
+        {label}
+      </Text>
+      <View
+        style={{ flexDirection: 'row', gap: spacing.xs }}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        {STEPS.map((name, index) => {
+          const reached = index <= step;
+          const current = index === step;
+          return (
+            <View
+              key={name}
+              style={{
+                width: current ? 28 : 10,
+                height: 10,
+                borderRadius: radius.full,
+                backgroundColor: planningStepNodeFill({
+                  tone: 'sky',
+                  appearance: resolvedTheme,
+                  surfaceSunken: tokens.surfaceSunken,
+                  reached,
+                }),
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {current ? (
+                <MaterialIcons
+                  name="check"
+                  size={12}
+                  color={planningStepNodeInk({ reached: true, textMuted: tokens.textMuted })}
+                />
+              ) : null}
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * One selectable priority row — the §6 OptionRow rhythm (56pt, 2px border,
+ * 3px lip, tint face + trailing check badge when selected). Naming, role and
+ * the `selected` state are unchanged from the previous bare Pressable, so the
+ * E2E `Prioritize …` contract and the screen reader announcement hold.
+ */
+function PriorityRow({
+  title,
+  selected,
+  onPress,
+}: {
+  title: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const { tokens, resolvedTheme } = useAppTheme();
+  const row = planningRowVisual({
+    tone: 'sky',
+    selected,
+    appearance: resolvedTheme,
+    surface: tokens.surface,
+    border: tokens.border,
+    borderStrong: tokens.borderStrong,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+  });
+  return (
+    <Pressable3D
+      lip={3}
+      faceColor={row.face}
+      lipColor={row.lip}
+      radius={radius.md}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Prioritize ${title}`}
+      accessibilityState={{ selected }}
+      faceStyle={{ borderWidth: 2, borderColor: row.border }}
+      contentStyle={{
+        minHeight: 56,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm,
+      }}
+    >
+      <Text
+        variant="label"
+        style={{ color: row.mark }}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        {selected ? '✓' : '•'}
+      </Text>
+      <Text
+        variant="bodyMd"
+        style={{ color: row.ink, fontWeight: '700', flex: 1 }}
+        numberOfLines={1}
+      >
+        {title}
+      </Text>
+      {selected ? (
+        <View
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: radius.full,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: row.badgeFill,
+          }}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        >
+          <MaterialIcons name="check" size={16} color={row.badgeInk} />
+        </View>
+      ) : null}
+    </Pressable3D>
+  );
+}
+
+/**
  * Skippable five-step guided planning sequence for the Planning Hub Today
  * tab (carry-over → commitments → priorities → focus → confirm). Purely a
  * friendlier front door over the existing daily-plan data functions; the
  * full DailyPlanView below remains the complete editor.
  */
 export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
-  const { tokens, sectionAccents } = useAppTheme();
+  const { tokens, resolvedTheme } = useAppTheme();
   const todayKey = toDateKey();
   const yesterdayKey = addLocalDays(todayKey, -1);
 
@@ -240,261 +387,307 @@ export function GuidedPlanningFlow({ onPlanSaved }: GuidedPlanningFlowProps) {
     }
   }
 
+  const success = planningStatusVisual({
+    face: tokens.successBackground,
+    surface: tokens.surface,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+    ink: tokens.successText,
+    border: tokens.successBorder,
+    solid: tokens.successSolid,
+  });
+  const warning = planningStatusVisual({
+    face: tokens.warningBackground,
+    surface: tokens.surface,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+    ink: tokens.warningText,
+    border: tokens.warningBorder,
+    solid: tokens.warningSolid,
+  });
+  const danger = planningStatusVisual({
+    face: tokens.dangerBackground,
+    surface: tokens.surface,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+    ink: tokens.dangerText,
+    border: tokens.dangerBorder,
+    solid: tokens.dangerSolid,
+  });
+  // The guided flow's one loud action per step uses the Sky `solid` face (5.19:1
+  // under a white label in every theme); quieter moves use `ghost`.
+  const primaryFace = planningPrimaryFace('sky');
+  const accentText = planningToneText({
+    tone: 'sky',
+    appearance: resolvedTheme,
+    surface: tokens.surface,
+    text: tokens.text,
+  });
+
   if (saved) {
     return (
       <View
-        className="rounded-2xl border p-4"
-        style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+        style={{
+          borderRadius: radius.lg,
+          borderWidth: 2,
+          borderColor: success.border,
+          backgroundColor: success.face,
+          padding: spacing.lg,
+          gap: spacing.sm,
+        }}
       >
-        <Text className="text-base font-semibold" style={{ color: sectionAccents.todos.text }}>
-          {"Today's plan is set."}
-        </Text>
-        <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <MaterialIcons name="check-circle" size={20} color={success.icon} />
+          <Text variant="titleMd" style={{ color: success.ink }}>
+            {"Today's plan is set."}
+          </Text>
+        </View>
+        <Text variant="caption" style={{ color: success.mutedInk }}>
           Adjust anything below whenever the day changes.
         </Text>
-        <Pressable
-          accessibilityRole="button"
+        <Button
+          label="Use simple view next time"
           accessibilityLabel="Hide guided planning"
-          className="self-start rounded-full border px-3 py-2"
-          style={{
-            marginTop: 12,
-            borderColor: tokens.border,
-            backgroundColor: tokens.surfaceElevated,
-          }}
+          variant="secondary"
           onPress={dismiss}
-        >
-          <Text className="text-sm" style={{ color: tokens.text }}>
-            Use simple view next time
-          </Text>
-        </Pressable>
+        />
       </View>
     );
   }
 
   return (
-    <View
-      className="rounded-2xl border p-4"
-      style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-    >
-      <View className="mb-3 flex-row items-center justify-between">
-        <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-          Plan your day · {STEPS[step]}
-        </Text>
-        <Text className="text-xs" style={{ color: tokens.textMuted }}>
-          Step {step + 1} of {STEPS.length}
-        </Text>
-      </View>
+    <Card innerClassName="p-4">
+      <View style={{ gap: spacing.md }}>
+        <View style={{ gap: spacing.xs }}>
+          <Text variant="titleMd" style={{ color: tokens.text }}>
+            Plan your day · {STEPS[step]}
+          </Text>
+          <StepNodes step={step} label={`Step ${step + 1} of ${STEPS.length}`} />
+        </View>
 
-      {error ? (
-        <Text className="mb-2 text-sm" style={{ color: tokens.dangerText }}>
-          {error}
-        </Text>
-      ) : null}
-
-      {step === 0 ? (
-        <View>
-          {yesterdayUnfinished.length === 0 ? (
-            <Text className="text-sm" style={{ color: tokens.textMuted }}>
-              Nothing left over from yesterday. Fresh start.
+        {error ? (
+          <View
+            style={{
+              borderRadius: radius.sm,
+              borderWidth: 2,
+              borderColor: danger.border,
+              backgroundColor: danger.face,
+              padding: spacing.md,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.sm,
+            }}
+          >
+            <MaterialIcons name="error-outline" size={18} color={danger.icon} />
+            <Text variant="bodyMd" style={{ color: danger.ink, flex: 1 }}>
+              {error}
             </Text>
-          ) : (
-            <>
-              <Text className="mb-2 text-sm" style={{ color: tokens.textMuted }}>
-                Still open from yesterday:
+          </View>
+        ) : null}
+
+        {step === 0 ? (
+          <View style={{ gap: spacing.sm }}>
+            {yesterdayUnfinished.length === 0 ? (
+              <Text variant="bodyMd" tone="muted">
+                Nothing left over from yesterday. Fresh start.
               </Text>
-              {yesterdayUnfinished.slice(0, 3).map((item) => (
-                <Text
-                  key={item.id}
-                  className="text-sm"
-                  style={{ color: tokens.text }}
-                  numberOfLines={1}
-                >
-                  • {item.title}
+            ) : (
+              <>
+                <Text variant="bodyMd" tone="muted">
+                  Still open from yesterday:
                 </Text>
-              ))}
-              <Text className="mt-2 text-xs" style={{ color: tokens.textMuted }}>
-                {
-                  "They start selected as today's priorities — you can drop any of them in the next steps."
-                }
+                {yesterdayUnfinished.slice(0, 3).map((item) => (
+                  <Text
+                    key={item.id}
+                    variant="bodyMd"
+                    style={{ color: tokens.text }}
+                    numberOfLines={1}
+                  >
+                    • {item.title}
+                  </Text>
+                ))}
+                <Text variant="caption" tone="muted">
+                  {
+                    "They start selected as today's priorities — you can drop any of them in the next steps."
+                  }
+                </Text>
+              </>
+            )}
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+              {yesterdayUnfinished.length > 0 ? (
+                <View style={{ flex: 1 }}>
+                  <Button
+                    label={carryingForward ? 'Carrying…' : 'Carry forward'}
+                    onPress={() => void handleCarryForward()}
+                    disabled={carryingForward}
+                    color={primaryFace}
+                    fullWidth
+                  />
+                </View>
+              ) : null}
+              <View style={{ flex: 1 }}>
+                <Button label="Start fresh" onPress={() => setStep(1)} variant="ghost" fullWidth />
+              </View>
+            </View>
+          </View>
+        ) : null}
+
+        {step === 1 ? (
+          <View style={{ gap: spacing.sm }}>
+            {overdueTodos.length === 0 && dueTodayTodos.length === 0 ? (
+              <Text variant="bodyMd" tone="muted">
+                No deadlines today. Your time is yours.
               </Text>
-            </>
-          )}
-          <View className="mt-3 flex-row gap-2">
-            {yesterdayUnfinished.length > 0 ? (
-              <View className="flex-1">
+            ) : (
+              <>
+                {overdueTodos.length > 0 ? (
+                  <View style={{ gap: spacing.xs }}>
+                    <Text variant="label" style={{ color: warning.ink }}>
+                      Overdue ({overdueTodos.length})
+                    </Text>
+                    {overdueTodos.map((t) => (
+                      <Text
+                        key={t.id}
+                        variant="bodyMd"
+                        style={{ color: tokens.text }}
+                        numberOfLines={1}
+                      >
+                        • {t.title}
+                      </Text>
+                    ))}
+                  </View>
+                ) : null}
+                {dueTodayTodos.length > 0 ? (
+                  <View style={{ gap: spacing.xs }}>
+                    <Text variant="label" style={{ color: tokens.text }}>
+                      Due today ({dueTodayTodos.length})
+                    </Text>
+                    {dueTodayTodos.map((t) => (
+                      <Text
+                        key={t.id}
+                        variant="bodyMd"
+                        style={{ color: tokens.text }}
+                        numberOfLines={1}
+                      >
+                        • {t.title}
+                      </Text>
+                    ))}
+                  </View>
+                ) : null}
+              </>
+            )}
+            <View style={{ marginTop: spacing.sm }}>
+              <Button label="Next" onPress={() => setStep(2)} variant="ghost" />
+            </View>
+          </View>
+        ) : null}
+
+        {step === 2 ? (
+          <View style={{ gap: spacing.sm }}>
+            <Text variant="bodyMd" tone="muted">
+              What matters most? Pick up to {MAX_TOP_PRIORITIES}. ({selectedIds.length}/
+              {MAX_TOP_PRIORITIES})
+            </Text>
+            <View style={{ gap: spacing.sm }}>
+              {priorityRows.map((t) => (
+                <PriorityRow
+                  key={t.id}
+                  title={t.title}
+                  selected={selectedIds.includes(t.id)}
+                  onPress={() => togglePriority(t.id)}
+                />
+              ))}
+            </View>
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+              <View style={{ flex: 1 }}>
+                <Button label="Back" onPress={() => setStep(1)} variant="ghost" fullWidth />
+              </View>
+              <View style={{ flex: 1 }}>
                 <Button
-                  label={carryingForward ? 'Carrying…' : 'Carry forward'}
-                  onPress={() => void handleCarryForward()}
-                  disabled={carryingForward}
-                  color={SECTION_COLORS.todos}
+                  label="Next"
+                  onPress={() => setStep(3)}
+                  variant="secondary"
+                  color={accentText}
+                  fullWidth
                 />
               </View>
-            ) : null}
-            <View className="flex-1">
-              <Button label="Start fresh" onPress={() => setStep(1)} variant="ghost" />
             </View>
           </View>
-        </View>
-      ) : null}
+        ) : null}
 
-      {step === 1 ? (
-        <View>
-          {overdueTodos.length === 0 && dueTodayTodos.length === 0 ? (
-            <Text className="text-sm" style={{ color: tokens.textMuted }}>
-              No deadlines today. Your time is yours.
+        {step === 3 ? (
+          <View>
+            <TextField
+              label="Intention"
+              value={intention}
+              onChangeText={setIntention}
+              placeholder="What is the one thing that matters most today?"
+            />
+            <NumberStepperField
+              label="Focus target (minutes)"
+              value={focusMinutes}
+              onChange={setFocusMinutes}
+              min={0}
+              max={480}
+              placeholder="0"
+            />
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs }}>
+              <View style={{ flex: 1 }}>
+                <Button label="Back" onPress={() => setStep(2)} variant="ghost" fullWidth />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  label="Next"
+                  onPress={() => setStep(4)}
+                  variant="secondary"
+                  color={accentText}
+                  fullWidth
+                />
+              </View>
+            </View>
+          </View>
+        ) : null}
+
+        {step === 4 ? (
+          <View style={{ gap: spacing.sm }}>
+            <Text variant="bodyMd" style={{ color: tokens.text }}>
+              {selectedIds.length} priorit{selectedIds.length === 1 ? 'y' : 'ies'} ·{' '}
+              {Number(focusMinutes.replace(/\D/g, '')) || 0} focus minutes planned
             </Text>
-          ) : (
-            <>
-              {overdueTodos.length > 0 ? (
-                <Text className="mb-1 text-sm font-medium" style={{ color: tokens.warningText }}>
-                  Overdue ({overdueTodos.length})
-                </Text>
-              ) : null}
-              {overdueTodos.map((t) => (
-                <Text
-                  key={t.id}
-                  className="text-sm"
-                  style={{ color: tokens.text }}
-                  numberOfLines={1}
-                >
-                  • {t.title}
-                </Text>
-              ))}
-              {dueTodayTodos.length > 0 ? (
-                <Text className="mb-1 mt-2 text-sm font-medium" style={{ color: tokens.text }}>
-                  Due today ({dueTodayTodos.length})
-                </Text>
-              ) : null}
-              {dueTodayTodos.map((t) => (
-                <Text
-                  key={t.id}
-                  className="text-sm"
-                  style={{ color: tokens.text }}
-                  numberOfLines={1}
-                >
-                  • {t.title}
-                </Text>
-              ))}
-            </>
-          )}
-          <View className="mt-3">
-            <Button label="Next" onPress={() => setStep(2)} variant="ghost" />
+            <Text variant="caption" tone="muted">
+              A realistic plan beats a perfect one.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+              <View style={{ flex: 1 }}>
+                <Button label="Back" onPress={() => setStep(3)} variant="ghost" fullWidth />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  label={saving ? 'Saving…' : 'Save plan'}
+                  onPress={() => void handleSave()}
+                  disabled={saving}
+                  color={primaryFace}
+                  fullWidth
+                />
+              </View>
+            </View>
           </View>
-        </View>
-      ) : null}
+        ) : null}
 
-      {step === 2 ? (
-        <View>
-          <Text className="mb-2 text-sm" style={{ color: tokens.textMuted }}>
-            What matters most? Pick up to {MAX_TOP_PRIORITIES}. ({selectedIds.length}/
-            {MAX_TOP_PRIORITIES})
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Use simple view"
+          onPress={dismiss}
+          style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}
+        >
+          <Text
+            variant="caption"
+            style={{ color: tokens.textMuted, textDecorationLine: 'underline' }}
+          >
+            Use simple view
           </Text>
-          {priorityRows.map((t) => {
-            const selected = selectedIds.includes(t.id);
-            return (
-              <Pressable
-                key={t.id}
-                accessibilityRole="button"
-                accessibilityLabel={`Prioritize ${t.title}`}
-                accessibilityState={{ selected }}
-                className="mb-2 min-h-[44px] flex-row items-center gap-2 rounded-xl border p-2"
-                style={{
-                  borderColor: selected ? SECTION_COLORS.todos : tokens.border,
-                  backgroundColor: selected ? tokens.surfaceActive : tokens.surfaceElevated,
-                }}
-                onPress={() => togglePriority(t.id)}
-              >
-                <Text
-                  style={{
-                    fontSize: 16,
-                    color: selected ? SECTION_COLORS.todos : tokens.textMuted,
-                  }}
-                >
-                  {selected ? '✓' : '•'}
-                </Text>
-                <Text
-                  className="flex-1 text-sm"
-                  style={{ color: selected ? tokens.text : tokens.textMuted }}
-                  numberOfLines={1}
-                >
-                  {t.title}
-                </Text>
-              </Pressable>
-            );
-          })}
-          <View className="mt-1 flex-row gap-2">
-            <View className="flex-1">
-              <Button label="Back" onPress={() => setStep(1)} variant="ghost" />
-            </View>
-            <View className="flex-1">
-              <Button label="Next" onPress={() => setStep(3)} variant="ghost" />
-            </View>
-          </View>
-        </View>
-      ) : null}
-
-      {step === 3 ? (
-        <View>
-          <TextField
-            label="Intention"
-            value={intention}
-            onChangeText={setIntention}
-            placeholder="What is the one thing that matters most today?"
-          />
-          <NumberStepperField
-            label="Focus target (minutes)"
-            value={focusMinutes}
-            onChange={setFocusMinutes}
-            min={0}
-            max={480}
-            placeholder="0"
-          />
-          <View className="mt-1 flex-row gap-2">
-            <View className="flex-1">
-              <Button label="Back" onPress={() => setStep(2)} variant="ghost" />
-            </View>
-            <View className="flex-1">
-              <Button label="Next" onPress={() => setStep(4)} variant="ghost" />
-            </View>
-          </View>
-        </View>
-      ) : null}
-
-      {step === 4 ? (
-        <View>
-          <Text className="text-sm" style={{ color: tokens.text }}>
-            {selectedIds.length} priorit{selectedIds.length === 1 ? 'y' : 'ies'} ·{' '}
-            {Number(focusMinutes.replace(/\D/g, '')) || 0} focus minutes planned
-          </Text>
-          <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
-            A realistic plan beats a perfect one.
-          </Text>
-          <View className="mt-3 flex-row gap-2">
-            <View className="flex-1">
-              <Button label="Back" onPress={() => setStep(3)} variant="ghost" />
-            </View>
-            <View className="flex-1">
-              <Button
-                label={saving ? 'Saving…' : 'Save plan'}
-                onPress={() => void handleSave()}
-                disabled={saving}
-                color={SECTION_COLORS.todos}
-              />
-            </View>
-          </View>
-        </View>
-      ) : null}
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Use simple view"
-        className="self-start pt-3"
-        onPress={dismiss}
-      >
-        <Text className="text-xs underline" style={{ color: tokens.textMuted }}>
-          Use simple view
-        </Text>
-      </Pressable>
-    </View>
+        </Pressable>
+      </View>
+    </Card>
   );
 }

@@ -9,12 +9,16 @@ import type {
   SyncBackedEntity,
 } from '@/core/sync/restore.types';
 import { Button } from '@/core/ui/Button';
-import { Card } from '@/core/ui/Card';
+import {
+  SettingsGroup,
+  SettingsRow,
+  SettingsSectionHeading,
+  SettingsStatusPill,
+} from './SettingsSharedUi';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { TextField } from '@/core/ui/TextField';
 import { ValidationError } from '@/core/ui/ValidationError';
 import type { OutboxSummary, SettingsStatusTone } from './settingsShared';
-import { SettingsRow, SettingsSectionHeading, SettingsStatusPill } from './SettingsSharedUi';
 
 const BACKUP_ACCENT = '#0f766e';
 
@@ -259,7 +263,7 @@ export function SettingsBackupSection({
           onVerifyAccountRecovery={onVerifyAccountRecovery}
           onResendAccountRecovery={onResendAccountRecovery}
         />
-        <Card accentColor={BACKUP_ACCENT} className="mb-0">
+        <SettingsGroup accentColor={BACKUP_ACCENT}>
           <SettingsRow
             first
             label="Outbox sync"
@@ -330,17 +334,17 @@ export function SettingsBackupSection({
                 backgroundColor: tokens.warningBackground,
               }}
             >
-              <Text className="text-sm font-semibold" style={{ color: tokens.warningText }}>
+              <Text variant="bodyMd" className="font-bold" style={{ color: tokens.warningText }}>
                 Backup conflict needs review
               </Text>
-              <Text className="mt-2 text-sm leading-6" style={{ color: tokens.warningText }}>
+              <Text variant="caption" style={{ color: tokens.warningText }}>
                 This device has a pending recovery point{' '}
                 {restorePreview.backupConflict.localSnapshotId} that predates the newer remote
                 recovery point {restorePreview.backupConflict.remoteSnapshotId} (sequence{' '}
                 {restorePreview.backupConflict.remoteSequence}). Publication is paused so neither
                 recovery point is overwritten silently.
               </Text>
-              <Text className="mt-2 text-sm leading-6" style={{ color: tokens.warningText }}>
+              <Text variant="caption" style={{ color: tokens.warningText }}>
                 Keeping this device&apos;s data replaces the remote recovery point with a fresh
                 snapshot of this device. The previous remote generation stays retained. To use the
                 remote backup instead, export this device&apos;s data and restore on an empty
@@ -370,15 +374,11 @@ export function SettingsBackupSection({
               three-entity restore and a complete one must not look alike. */}
           {restoredCounts && restoredCounts.length > 0 ? (
             <View className="mt-2 gap-1">
-              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+              <Text variant="bodyMd" className="font-bold">
                 Restore complete. Records restored:
               </Text>
               {restoredCounts.map(({ entity, count }) => (
-                <Text
-                  key={entity}
-                  className="text-sm leading-6"
-                  style={{ color: tokens.textMuted }}
-                >
+                <Text key={entity} variant="caption" tone="muted">
                   {BACKUP_SCOPE_LABELS[entity] ?? entity}: {count.toLocaleString()}
                 </Text>
               ))}
@@ -390,15 +390,11 @@ export function SettingsBackupSection({
             disabled={restoreButtonDisabled}
             color={BACKUP_ACCENT}
           />
-        </Card>
+        </SettingsGroup>
 
-        <Card accentColor={BACKUP_ACCENT} className="mb-0">
-          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+        <SettingsGroup accentColor={BACKUP_ACCENT}>
+          <Text variant="bodyMd" className="font-bold">
             Phase-one coverage
-          </Text>
-          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-            The backup feed covers more than the current restore scope. The rows below show what is
-            backed up and what this phase can actually restore.
           </Text>
 
           <View className="mt-4">
@@ -445,15 +441,11 @@ export function SettingsBackupSection({
               className="mt-4 rounded-2xl border px-4 py-3"
               style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
             >
-              <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+              <Text variant="bodyMd" className="font-bold">
                 Current restore disclosures
               </Text>
               {restorePreview.disclosures.map((item) => (
-                <Text
-                  key={item}
-                  className="mt-2 text-sm leading-6"
-                  style={{ color: tokens.textMuted }}
-                >
+                <Text key={item} variant="caption" tone="muted" className="mt-2">
                   {item}
                 </Text>
               ))}
@@ -468,13 +460,14 @@ export function SettingsBackupSection({
                 backgroundColor: tokens.warningBackground,
               }}
             >
-              <Text className="text-sm font-semibold" style={{ color: tokens.warningText }}>
+              <Text variant="bodyMd" className="font-bold" style={{ color: tokens.warningText }}>
                 Warnings
               </Text>
               {restorePreview.warnings.map((warning) => (
                 <Text
                   key={warning}
-                  className="mt-2 text-sm leading-6"
+                  variant="caption"
+                  className="mt-2"
                   style={{ color: tokens.warningText }}
                 >
                   {warning}
@@ -482,7 +475,7 @@ export function SettingsBackupSection({
               ))}
             </View>
           ) : null}
-        </Card>
+        </SettingsGroup>
       </View>
     </ScreenSection>
   );
@@ -605,10 +598,8 @@ function SettingsAccountCard({
   };
 
   return (
-    <Card accentColor={BACKUP_ACCENT} className="mb-0">
-      <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-        Backup identity
-      </Text>
+    <SettingsGroup accentColor={BACKUP_ACCENT}>
+      <Text variant="titleMd">Backup identity</Text>
       <View className="mt-2 self-start">
         <SettingsStatusPill
           label={accountStatusLabel(accountState)}
@@ -616,19 +607,19 @@ function SettingsAccountCard({
           accentColor={BACKUP_ACCENT}
         />
       </View>
-      <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+      <Text variant="caption" tone="muted">
         {accountState.message}
       </Text>
 
       {accountState.status === 'protected' && accountState.email ? (
-        <Text className="mt-3 text-sm" style={{ color: tokens.text }}>
+        <Text variant="caption">
           Email: {maskAccountEmail(accountState.email) ?? 'Protected email'}
         </Text>
       ) : null}
 
       <ValidationError message={actionError} />
       {actionMessage ? (
-        <Text className="mt-3 text-sm leading-6" style={{ color: tokens.textMuted }}>
+        <Text variant="caption" tone="muted">
           {actionMessage}
         </Text>
       ) : null}
@@ -681,14 +672,14 @@ function SettingsAccountCard({
 
       {canRequestRecovery && !recoveryPending ? (
         <View className="mt-5 border-t pt-4" style={{ borderColor: tokens.border }}>
-          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+          <Text variant="bodyMd" className="font-bold">
             {ownerRecovery
               ? 'Sign back into this device account'
               : importedOwnerRecovery
                 ? 'Imported backup account required'
                 : 'Recover existing backup'}
           </Text>
-          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+          <Text variant="caption" tone="muted">
             {ownerRecovery
               ? 'Use the email that protects this device’s backup. Local data stays available while remote backup is paused.'
               : importedOwnerRecovery
@@ -745,6 +736,6 @@ function SettingsAccountCard({
           </View>
         </View>
       ) : null}
-    </Card>
+    </SettingsGroup>
   );
 }
