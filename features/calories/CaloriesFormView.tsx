@@ -66,6 +66,14 @@ function DayContextLine({
 }
 
 export type CaloriesFormViewProps = SharedProps & {
+  /**
+   * Face of this view's ONE primary action (the Berry "Add entry" CTA). It is
+   * the §5.1 appearance tier from `caloriesHeroVisual.ctaFace` (solid Berry in
+   * light, bright Berry in dark), not the raw `accentColor` fill: `Button`
+   * enforces the label floor on the face it is handed, so the tier decides
+   * white-vs-ink labels per appearance instead of one global choice.
+   */
+  primaryActionColor: string;
   groups: MealGroup[];
   collapsedMeals: Partial<Record<MealType, boolean>>;
   /** Local day every control in this view logs to (today unless the diary
@@ -107,6 +115,7 @@ export type CaloriesFormViewProps = SharedProps & {
  */
 export function CaloriesFormView({
   accentColor,
+  primaryActionColor,
   recentMeals,
   frequentFoods,
   savedMealCount,
@@ -178,8 +187,9 @@ export function CaloriesFormView({
             <Button
               label="Add entry"
               accessibilityLabel="Save calorie entry"
+              size="lg"
               onPress={onAddEntry}
-              color={accentColor}
+              color={primaryActionColor}
             />
           }
         />

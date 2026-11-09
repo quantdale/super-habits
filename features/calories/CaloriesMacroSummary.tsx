@@ -2,8 +2,10 @@ import { View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
-import { formatGrams } from './caloriesFormat';
 import { Text } from '@/core/ui/Text';
+import { radius } from '@/core/theme/designTokens';
+import { CALORIES_MINI_BAR_HEIGHT } from './caloriesHero.visual';
+import { formatGrams } from './caloriesFormat';
 
 export type MacroSummaryRow = {
   key: string;
@@ -17,17 +19,32 @@ export type MacroSummaryRow = {
 
 type Props = {
   rows: MacroSummaryRow[];
-  accentColor: string;
+  /** Berry fill resolved for the flat face (`caloriesHeroVisual.barFill`). */
+  barFill: string;
+  /** Berry-aware muted ink resolved for the flat face. */
+  mutedInk: string;
   onEditTargets: () => void;
 };
 
 /**
- * Compact macro summary (V3 W10): one row per macro with logged amount,
- * daily target and a slim progress bar. A macro whose target is unset or zero
- * renders no row. The proportional donut that used to repeat these three
- * values was removed with the W10 reconstruction.
+ * Macro summary (V3 W10, restyled by Playful Momentum P17): protein, carbs and
+ * fats as three **labeled mini bars** — one row per macro with the logged/target
+ * pair, the factual remainder, and an 8px Berry bar. A macro whose target is
+ * unset or zero renders no row. The proportional donut that used to repeat these
+ * three values stays removed and the three `0g / N g` pairs the W10 contract
+ * asserts are unchanged.
+ *
+ * One hue: every bar on the screen — the hero's 14px daily bar and these three
+ * mini bars — uses the same resolved Berry tier, so the surface never reads as
+ * a rainbow row (§4.2 "one hue per job"). The mini bars are static fills (no
+ * per-row sweep): they sit inside a static summary, so only the hero bar
+ * animates its value change.
+ *
+ * Accessibility: each bar is a decorative mark next to the same numbers stated
+ * as text (`P 95g / 150g`), so it is hidden from assistive tech rather than
+ * announced as a second, unlabeled progress value.
  */
-export function CaloriesMacroSummary({ rows, accentColor, onEditTargets }: Props) {
+export function CaloriesMacroSummary({ rows, barFill, mutedInk, onEditTargets }: Props) {
   const { tokens } = useAppTheme();
 
   return (
@@ -51,7 +68,7 @@ export function CaloriesMacroSummary({ rows, accentColor, onEditTargets }: Props
                 <Text variant="bodyMd" style={{ color: tokens.text }}>
                   {formatGrams(row.actual)}g / {formatGrams(row.target)}g
                 </Text>
-                <Text variant="caption" tone="muted">
+                <Text variant="caption" style={{ color: mutedInk }}>
                   {row.over
                     ? `${formatGrams(row.actual - row.target)}g over`
                     : `${row.remaining}g left`}
@@ -59,12 +76,24 @@ export function CaloriesMacroSummary({ rows, accentColor, onEditTargets }: Props
               </View>
             </View>
             <View
-              className="h-2 w-full overflow-hidden rounded-full"
-              style={{ backgroundColor: tokens.surfaceSunken }}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              style={{
+                height: CALORIES_MINI_BAR_HEIGHT,
+                borderRadius: radius.full,
+                backgroundColor: tokens.surfaceSunken,
+                overflow: 'hidden',
+              }}
             >
               <View
-                className="h-full rounded-full"
-                style={{ width: `${row.percent}%`, backgroundColor: accentColor }}
+                style={{
+                  // Berry is used at 100% width for an over-target row so the
+                  // mark never disappears; the numeric caption states the excess.
+                  width: `${Math.min(100, Math.max(0, row.percent))}%`,
+                  height: '100%',
+                  borderRadius: radius.full,
+                  backgroundColor: barFill,
+                }}
               />
             </View>
           </View>
