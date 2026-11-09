@@ -95,7 +95,7 @@ export function Chip({ label, accessibilityLabel, active, color, onPress, icon }
             {icon}
           </Text>
         ) : null}
-        <Text variant="label" style={{ color: active ? activeInk : tokens.text }}>
+        <Text variant="label" style={{ color: active ? activeInk : tokens.text, flexShrink: 1 }}>
           {label}
         </Text>
       </Pressable>
