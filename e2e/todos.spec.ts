@@ -368,6 +368,12 @@ test.describe('Todos', () => {
       .getByRole('checkbox', { name: 'Mark incomplete: Daily review' })
       .first()
       .click({ force: true });
+    // "1 open" alone is true both BEFORE the reopen lands (the spawned copy is
+    // the one open task) and after it (the reopened row, spawn retracted), so it
+    // cannot prove the write finished. The completed count disappearing is the
+    // observable that only the reopen produces; without it the row oracle below
+    // races the reopen transaction on a slow machine.
+    await expect(page.getByText('1 completed', { exact: true })).toBeHidden();
     await expect(page.getByText('1 open', { exact: true })).toBeVisible();
 
     // Row oracle (kept last: the harness navigates away from the app). One live

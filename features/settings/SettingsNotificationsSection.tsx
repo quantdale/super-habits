@@ -22,12 +22,17 @@ import {
   type WorkoutPreferences,
 } from '@/features/workout/workout.data';
 import type { WorkoutEffortScale } from '@/core/db/types';
-import { Card } from '@/core/ui/Card';
+import {
+  SettingsGroup,
+  SettingsRow,
+  SettingsSectionHeading,
+  SettingsStatusPill,
+} from './SettingsSharedUi';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { POMODORO_SECTION_KEY, SECTION_COLORS } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { SettingsRow, SettingsSectionHeading, SettingsStatusPill } from './SettingsSharedUi';
+
 import { enqueueBackupSettingsRecord } from '@/core/sync/syncedMutation';
 import { readableAccent, tintOver } from '@/core/theme/contrast';
 
@@ -396,7 +401,7 @@ export function SettingsNotificationsSection() {
         title="Reminders"
         accentColor={ACCENT}
       />
-      <Card accentColor={ACCENT} className="mb-0">
+      <SettingsGroup accentColor={ACCENT}>
         {/* W13 (D13.2/D13.5): the OS permission state and the desired schedule
             are different facts. This row reports the OS status only; the switch
             below owns the user's preference, so a denied permission can never
@@ -413,10 +418,10 @@ export function SettingsNotificationsSection() {
 
         <View className="flex-row items-center justify-between pt-3">
           <View className="min-w-0 flex-1 pr-3">
-            <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+            <Text variant="bodyMd" className="font-bold">
               Todo due-date reminders
             </Text>
-            <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+            <Text variant="caption" tone="muted">
               Notify when a todo with a due date comes due. Completing or deleting a todo cancels
               its reminder.
             </Text>
@@ -431,14 +436,14 @@ export function SettingsNotificationsSection() {
         </View>
 
         <View className="border-t pt-3" style={{ borderColor: tokens.border }}>
-          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+          <Text variant="bodyMd" className="font-bold">
             Daily plan reminder time
           </Text>
-          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+          <Text variant="caption" tone="muted">
             A daily nudge to review your plan. Uses 24-hour HH:mm.
           </Text>
           {!todoRemindersEnabled ? (
-            <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+            <Text variant="caption" tone="muted">
               Follows the todo due-date reminders toggle — turn it on to schedule this nudge.
             </Text>
           ) : null}
@@ -470,7 +475,7 @@ export function SettingsNotificationsSection() {
               disabled={loading || saving || !todoRemindersEnabled}
               onPress={() => void handleSaveDailyPlanTime()}
             >
-              <Text className="text-sm font-semibold" style={{ color: accentText }}>
+              <Text variant="bodyMd" className="font-bold" style={{ color: accentText }}>
                 {saving ? 'Saving…' : 'Save'}
               </Text>
             </Pressable>
@@ -479,19 +484,22 @@ export function SettingsNotificationsSection() {
         </View>
 
         <View className="border-t pt-3" style={{ borderColor: tokens.border }}>
-          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+          <Text variant="bodyMd" className="font-bold">
             Weekly review reminder
           </Text>
-          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+          <Text variant="caption" tone="muted">
             A weekly nudge to close out your week and plan the next one. Opening it goes straight to
             the review.
           </Text>
-          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+          <Text variant="caption" tone="muted">
             {Platform.OS === 'web'
               ? 'Saved on this device. Native notification delivery is unavailable on web.'
               : 'Native apps schedule this reminder; notification access is controlled by the system.'}
           </Text>
-          <View className="mt-2 flex-row items-center justify-between">
+          {/* The toggle owns its own line: sharing one row with the seven
+              weekday chips clipped the last chip at 360/390 (no horizontal
+              scroll is allowed inside the sheet). */}
+          <View className="mt-2 flex-row items-center gap-2">
             <Switch
               accessibilityLabel="Weekly review reminder"
               value={weeklyEnabled}
@@ -499,36 +507,38 @@ export function SettingsNotificationsSection() {
               onValueChange={(value) => void handleToggleWeeklyReminder(value)}
               trackColor={{ true: ACCENT, false: tokens.surfaceElevated }}
             />
-            <View className="flex-row gap-1">
-              {WEEKDAYS.map((day) => {
-                const active = weeklyWeekday === day;
-                return (
-                  <Pressable
-                    key={day}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Weekly review on ${WEEKDAY_LABELS[day]}`}
-                    accessibilityState={{ selected: active }}
-                    onPress={() => {
-                      setError(null);
-                      setSavedNote(null);
-                      setWeeklyWeekday(day);
-                    }}
-                    className="rounded-lg border px-2 py-1"
-                    style={{
-                      borderColor: active ? ACCENT : tokens.border,
-                      backgroundColor: active ? `${ACCENT}18` : tokens.surfaceElevated,
-                    }}
-                  >
-                    <Text
-                      className="text-xs font-medium"
-                      style={{ color: active ? accentText : tokens.textMuted }}
-                    >
-                      {WEEKDAY_LABELS[day]}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <SettingsStatusPill
+              label={weeklyEnabled ? 'On' : 'Off'}
+              tone={weeklyEnabled ? 'accent' : 'neutral'}
+              accentColor={ACCENT}
+            />
+          </View>
+          <View className="mt-2 flex-row flex-wrap gap-1">
+            {WEEKDAYS.map((day) => {
+              const active = weeklyWeekday === day;
+              return (
+                <Pressable
+                  key={day}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Weekly review on ${WEEKDAY_LABELS[day]}`}
+                  accessibilityState={{ selected: active }}
+                  onPress={() => {
+                    setError(null);
+                    setSavedNote(null);
+                    setWeeklyWeekday(day);
+                  }}
+                  className="rounded-lg border px-2 py-1"
+                  style={{
+                    borderColor: active ? ACCENT : tokens.border,
+                    backgroundColor: active ? `${ACCENT}18` : tokens.surfaceElevated,
+                  }}
+                >
+                  <Text variant="caption" style={{ color: active ? accentText : tokens.textMuted }}>
+                    {WEEKDAY_LABELS[day]}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
           <View className="mt-2 flex-row items-center gap-2">
             <TextInput
@@ -558,7 +568,7 @@ export function SettingsNotificationsSection() {
               disabled={loading || saving}
               onPress={() => void handleSaveWeeklyTime()}
             >
-              <Text className="text-sm font-semibold" style={{ color: accentText }}>
+              <Text variant="bodyMd" className="font-bold" style={{ color: accentText }}>
                 {saving ? 'Saving…' : 'Save'}
               </Text>
             </Pressable>
@@ -567,14 +577,14 @@ export function SettingsNotificationsSection() {
         </View>
 
         <View className="border-t pt-3" style={{ borderColor: tokens.border }}>
-          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+          <Text variant="bodyMd" className="font-bold">
             Workout-day reminder
           </Text>
-          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+          <Text variant="caption" tone="muted">
             Optional reminders follow your weekly plan and date overrides. Rest days never schedule
             a reminder.
           </Text>
-          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+          <Text variant="caption" tone="muted">
             {Platform.OS === 'web'
               ? 'Saved locally, but browser notification delivery is unavailable here.'
               : 'Native apps schedule upcoming training days; notification access is controlled by the system.'}
@@ -621,7 +631,7 @@ export function SettingsNotificationsSection() {
               disabled={loading || saving || workoutPreferences === null}
               onPress={() => void handleSaveWorkoutReminderTime()}
             >
-              <Text className="text-sm font-semibold" style={{ color: accentText }}>
+              <Text variant="bodyMd" className="font-bold" style={{ color: accentText }}>
                 {saving ? 'Saving…' : 'Save'}
               </Text>
             </Pressable>
@@ -629,10 +639,10 @@ export function SettingsNotificationsSection() {
         </View>
 
         <View className="border-t pt-3" style={{ borderColor: tokens.border }}>
-          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+          <Text variant="bodyMd" className="font-bold">
             Set effort scale
           </Text>
-          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
+          <Text variant="caption" tone="muted">
             Choose an optional scale to record with each guided set. Historical entries keep their
             scale.
           </Text>
@@ -654,7 +664,8 @@ export function SettingsNotificationsSection() {
                   }}
                 >
                   <Text
-                    className="text-sm font-semibold"
+                    variant="bodyMd"
+                    className="font-bold"
                     style={{ color: active ? accentText : tokens.textMuted }}
                   >
                     {scale === 'off' ? 'Off' : scale.toUpperCase()}
@@ -671,7 +682,7 @@ export function SettingsNotificationsSection() {
             {savedNote}
           </Text>
         ) : null}
-      </Card>
+      </SettingsGroup>
     </ScreenSection>
   );
 }
