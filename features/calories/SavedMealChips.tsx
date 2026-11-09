@@ -1,7 +1,9 @@
-import { View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { PillChip } from '@/core/ui/PillChip';
 import { SectionLabel } from '@/core/ui/SectionLabel';
+import { CHIP_WRAP_MAX_LINES } from './chipWrap';
 import { useChipWrapClamp } from './useChipWrapClamp';
 import type { FrequentFood } from './calories.domain';
 import type { SavedMeal } from './types';
@@ -20,13 +22,15 @@ type Props = {
  * The clamp is measured, not guessed (`useChipWrapClamp`): each chip reports
  * its laid-out row, and only rows past the first two are dropped. The full
  * catalog stays reachable through the quick-log card's existing "Browse saved
- * meals" control, so nothing becomes unreachable.
+ * meals" control, so nothing becomes unreachable. Wrap-container width changes
+ * invalidate geometry so hidden chips can remasure into the two-line window.
  */
 export function SavedMealChips({ meals, onSelect, color }: Props) {
   const { sectionAccents } = useAppTheme();
   const accent = color ?? sectionAccents.calories.fill;
   const ids = meals.map((meal) => meal.id);
-  const { visibleIds, hiddenCount, onChipLayout } = useChipWrapClamp(ids);
+  const { visibleIds, hiddenCount, onChipLayout, onWrapLayout, layoutGeneration } =
+    useChipWrapClamp(ids);
 
   if (meals.length === 0) return null;
 
@@ -35,10 +39,13 @@ export function SavedMealChips({ meals, onSelect, color }: Props) {
   return (
     <View className="mb-3">
       <SectionLabel>Recent foods</SectionLabel>
-      <View className="flex-row flex-wrap">
+      <View
+        className="flex-row flex-wrap"
+        onLayout={(event) => onWrapLayout(event.nativeEvent.layout.width)}
+      >
         {rendered.map((meal) => (
           <View
-            key={meal.id}
+            key={`${meal.id}:${layoutGeneration}`}
             style={{ maxWidth: '100%' }}
             onLayout={(event) => onChipLayout(meal.id, event.nativeEvent.layout.y)}
           >
@@ -68,13 +75,17 @@ type FrequentProps = {
 /**
  * "Frequent" chips: most-logged foods of the last ~30 days. Tapping reuses the
  * exact recent-chip prefill/add path via `onSelect`. Two-line clamp, same
- * measurement contract as the recent chips (P17).
+ * measurement contract as the recent chips (P17). Overflow is expandable —
+ * frequent foods come from entry history, not the saved-meal catalog, so the
+ * quiet "more" hint must surface the hidden shortcuts itself.
  */
 export function FrequentFoodChips({ foods, onSelect, color }: FrequentProps) {
   const { sectionAccents } = useAppTheme();
   const accent = color ?? sectionAccents.calories.fill;
+  const [expanded, setExpanded] = useState(false);
   const ids = foods.map((food) => food.foodName.toLowerCase());
-  const { visibleIds, hiddenCount, onChipLayout } = useChipWrapClamp(ids);
+  const { visibleIds, hiddenCount, onChipLayout, onWrapLayout, layoutGeneration } =
+    useChipWrapClamp(ids, expanded ? Number.POSITIVE_INFINITY : CHIP_WRAP_MAX_LINES);
 
   if (foods.length === 0) return null;
 
@@ -85,27 +96,37 @@ export function FrequentFoodChips({ foods, onSelect, color }: FrequentProps) {
   return (
     <View className="mb-3">
       <SectionLabel>Frequent foods</SectionLabel>
-      <View className="flex-row flex-wrap">
-        {rendered.map((food) => (
-          <View
-            key={food.foodName.toLowerCase()}
-            style={{ maxWidth: '100%' }}
-            onLayout={(event) =>
-              onChipLayout(food.foodName.toLowerCase(), event.nativeEvent.layout.y)
-            }
-          >
-            <PillChip
-              label={`${food.foodName} · ${food.logCount}×`}
-              accessibilityLabel={`Log ${food.foodName}, logged ${food.logCount} times recently`}
-              active={false}
-              color={accent}
-              onPress={() => onSelect(food)}
-            />
-          </View>
-        ))}
+      <View
+        className="flex-row flex-wrap"
+        onLayout={(event) => onWrapLayout(event.nativeEvent.layout.width)}
+      >
+        {rendered.map((food) => {
+          const id = food.foodName.toLowerCase();
+          return (
+            <View
+              key={`${id}:${layoutGeneration}`}
+              style={{ maxWidth: '100%' }}
+              onLayout={(event) => onChipLayout(id, event.nativeEvent.layout.y)}
+            >
+              <PillChip
+                label={`${food.foodName} · ${food.logCount}×`}
+                accessibilityLabel={`Log ${food.foodName}, logged ${food.logCount} times recently`}
+                active={false}
+                color={accent}
+                onPress={() => onSelect(food)}
+              />
+            </View>
+          );
+        })}
       </View>
-      {hiddenCount > 0 ? (
-        <SectionLabel className="mb-0">{`${hiddenCount} more in frequent foods`}</SectionLabel>
+      {hiddenCount > 0 && !expanded ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Show ${hiddenCount} more frequent foods`}
+          onPress={() => setExpanded(true)}
+        >
+          <SectionLabel className="mb-0">{`${hiddenCount} more in frequent foods`}</SectionLabel>
+        </Pressable>
       ) : null}
     </View>
   );

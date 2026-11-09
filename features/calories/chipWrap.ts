@@ -78,3 +78,32 @@ export function clampChipWrap(
 export function chipWrapWasClamped(clamp: ChipWrapClamp): boolean {
   return clamp.hiddenCount > 0;
 }
+
+/**
+ * Keep laid-out tops for chip ids that are still in the list. Used when the
+ * catalog refreshes so retained chips do not wait for a layout event they may
+ * never re-emit (React preserves them by key).
+ */
+export function retainChipTops(
+  previousTops: Readonly<Record<string, number>>,
+  ids: readonly string[],
+): Record<string, number> {
+  const next: Record<string, number> = {};
+  for (const id of ids) {
+    if (previousTops[id] !== undefined) next[id] = previousTops[id];
+  }
+  return next;
+}
+
+/**
+ * Decide whether a wrap-container width report should drop every chip top so
+ * the list remasures. Equal widths are a no-op; the first report only records
+ * the width (nothing to invalidate yet).
+ */
+export function wrapWidthRequiresRemeasure(
+  previousWidth: number | null,
+  nextWidth: number,
+): boolean {
+  if (previousWidth === null) return false;
+  return previousWidth !== nextWidth;
+}

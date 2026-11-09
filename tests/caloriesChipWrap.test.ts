@@ -3,6 +3,8 @@ import {
   chipWrapWasClamped,
   clampChipWrap,
   CHIP_WRAP_MAX_LINES,
+  retainChipTops,
+  wrapWidthRequiresRemeasure,
 } from '@/features/calories/chipWrap';
 
 /**
@@ -94,5 +96,27 @@ describe('Calories chip wrap clamp (P17: ≤ 2 lines)', () => {
     expect(clampChipWrap(boxes, 1)).toEqual({ visibleIds: ['a'], hiddenCount: 2 });
     expect(clampChipWrap(boxes, 0)).toEqual({ visibleIds: [], hiddenCount: 3 });
     expect(CHIP_WRAP_MAX_LINES).toBe(2);
+  });
+});
+
+describe('Calories chip wrap remasure helpers (Codex P17)', () => {
+  it('retains tops only for ids that are still in the list', () => {
+    expect(retainChipTops({ a: 0, b: 48, c: 96 }, ['b', 'c', 'd'])).toEqual({
+      b: 48,
+      c: 96,
+    });
+  });
+
+  it('returns an empty map when nothing overlaps', () => {
+    expect(retainChipTops({ a: 0 }, ['z'])).toEqual({});
+  });
+
+  it('does not remasure on the first width report', () => {
+    expect(wrapWidthRequiresRemeasure(null, 360)).toBe(false);
+  });
+
+  it('remasures when the wrap container width changes', () => {
+    expect(wrapWidthRequiresRemeasure(360, 390)).toBe(true);
+    expect(wrapWidthRequiresRemeasure(390, 390)).toBe(false);
   });
 });
