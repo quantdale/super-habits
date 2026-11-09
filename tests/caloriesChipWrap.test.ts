@@ -5,6 +5,7 @@ import {
   CHIP_WRAP_MAX_LINES,
   retainChipTops,
   wrapWidthRequiresRemeasure,
+  chipWrapMeasurementKey,
 } from '@/features/calories/chipWrap';
 
 /**
@@ -118,5 +119,19 @@ describe('Calories chip wrap remasure helpers (Codex P17)', () => {
   it('remasures when the wrap container width changes', () => {
     expect(wrapWidthRequiresRemeasure(360, 390)).toBe(true);
     expect(wrapWidthRequiresRemeasure(390, 390)).toBe(false);
+  });
+});
+
+describe('chipWrapMeasurementKey (label-aware identity)', () => {
+  it('changes when displayed labels change even if ids stay the same', () => {
+    const ids = ['oatmeal', 'eggs'];
+    const before = chipWrapMeasurementKey(ids, 'Oatmeal·9');
+    const after = chipWrapMeasurementKey(ids, 'Oatmeal·10');
+    expect(before).not.toEqual(after);
+  });
+
+  it('stays stable when ids and labels are unchanged', () => {
+    const ids = ['a', 'b'];
+    expect(chipWrapMeasurementKey(ids, 'A·1')).toEqual(chipWrapMeasurementKey(ids, 'A·1'));
   });
 });

@@ -107,3 +107,16 @@ export function wrapWidthRequiresRemeasure(
   if (previousWidth === null) return false;
   return previousWidth !== nextWidth;
 }
+
+/**
+ * Identity for chip-wrap geometry. Ids alone miss label edits that change chip
+ * width without changing identity (e.g. frequent-food count `9×` → `10×`); RN-web
+ * size observers then skip row-only moves and leave stale clamps. Fold the
+ * displayed labels into the key so those edits force a full remasure.
+ */
+export function chipWrapMeasurementKey(
+  ids: readonly string[],
+  labelSignature: string = '',
+): string {
+  return ids.join('\u0001') + '\u0002' + labelSignature;
+}

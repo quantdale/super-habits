@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import {
   clampChipWrap,
   CHIP_WRAP_MAX_LINES,
+  chipWrapMeasurementKey,
   wrapWidthRequiresRemeasure,
   type ChipBox,
 } from './chipWrap';
@@ -30,13 +31,18 @@ type Measurement = {
  * chip has reported, `visibleIds` is `null` and the caller renders all of them
  * (a first paint must never hide content it has not measured).
  *
- * Width changes and id-list refreshes both clear every top and bump
- * `generation` so chips remount, remasure, and can re-enter the two-line
- * window. Retaining tops across list mutations is unsafe on RN-web: size
- * observers skip row-only moves, so cached `y` values drift from reality.
+ * Width changes, id-list refreshes, and displayed-label changes all clear
+ * every top and bump `generation` so chips remount and remasure. Label text is
+ * part of the measurement key because a count like `9×` → `10×` can widen a
+ * chip and reflow rows without changing ids; RN-web size observers then skip
+ * row-only moves and would leave a stale clamp.
  */
-export function useChipWrapClamp(ids: readonly string[], maxLines = CHIP_WRAP_MAX_LINES) {
-  const key = ids.join('\u0001');
+export function useChipWrapClamp(
+  ids: readonly string[],
+  maxLines = CHIP_WRAP_MAX_LINES,
+  labelSignature = '',
+) {
+  const key = chipWrapMeasurementKey(ids, labelSignature);
   const [measurement, setMeasurement] = useState<Measurement>({
     key,
     tops: {},
@@ -47,8 +53,8 @@ export function useChipWrapClamp(ids: readonly string[], maxLines = CHIP_WRAP_MA
   const onChipLayout = useCallback(
     (id: string, top: number) => {
       setMeasurement((previous) => {
-        // Id-list change: drop every top and bump generation so retained chips
-        // remount and re-emit layout (RN-web size observers skip row-only moves).
+        // Key change (ids or labels): drop tops and bump generation so retained
+        // chips remount and re-emit layout.
         if (previous.key !== key) {
           return {
             key,
@@ -74,8 +80,6 @@ export function useChipWrapClamp(ids: readonly string[], maxLines = CHIP_WRAP_MA
       setMeasurement((previous) => {
         if (!wrapWidthRequiresRemeasure(previous.width, width)) {
           if (previous.width === width && previous.key === key) return previous;
-          // First width report, or key drift without a width change: record
-          // width; key drift still invalidates tops so row geometry is not reused.
           if (previous.key !== key) {
             return {
               key,
@@ -91,7 +95,6 @@ export function useChipWrapClamp(ids: readonly string[], maxLines = CHIP_WRAP_MA
             generation: previous.generation,
           };
         }
-        // Width changed: drop geometry and remount chips for a full remasure.
         return { key, tops: {}, width, generation: previous.generation + 1 };
       });
     },
@@ -99,7 +102,6 @@ export function useChipWrapClamp(ids: readonly string[], maxLines = CHIP_WRAP_MA
   );
 
   const tops = useMemo(() => {
-    // Stale key ⇒ treat as unmeasured so every chip remounts/remasures.
     if (measurement.key !== key) return {};
     return measurement.tops;
   }, [measurement, key]);
@@ -118,7 +120,6 @@ export function useChipWrapClamp(ids: readonly string[], maxLines = CHIP_WRAP_MA
     hiddenCount,
     onChipLayout,
     onWrapLayout,
-    /** Include in chip keys so a geometry invalidation remounts every chip. */
     layoutGeneration: measurement.generation,
   };
 }

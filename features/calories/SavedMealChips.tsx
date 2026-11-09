@@ -29,8 +29,9 @@ export function SavedMealChips({ meals, onSelect, color }: Props) {
   const { sectionAccents } = useAppTheme();
   const accent = color ?? sectionAccents.calories.fill;
   const ids = meals.map((meal) => meal.id);
+  const labelSignature = meals.map((meal) => `${meal.food_name}·${meal.calories}`).join('\u0001');
   const { visibleIds, hiddenCount, onChipLayout, onWrapLayout, layoutGeneration } =
-    useChipWrapClamp(ids);
+    useChipWrapClamp(ids, undefined, labelSignature);
 
   if (meals.length === 0) return null;
 
@@ -84,8 +85,13 @@ export function FrequentFoodChips({ foods, onSelect, color }: FrequentProps) {
   const accent = color ?? sectionAccents.calories.fill;
   const [expanded, setExpanded] = useState(false);
   const ids = foods.map((food) => food.foodName.toLowerCase());
+  const labelSignature = foods.map((food) => `${food.foodName}·${food.logCount}`).join('\u0001');
   const { visibleIds, hiddenCount, onChipLayout, onWrapLayout, layoutGeneration } =
-    useChipWrapClamp(ids, expanded ? Number.POSITIVE_INFINITY : CHIP_WRAP_MAX_LINES);
+    useChipWrapClamp(
+      ids,
+      expanded ? Number.POSITIVE_INFINITY : CHIP_WRAP_MAX_LINES,
+      labelSignature,
+    );
 
   if (foods.length === 0) return null;
 
