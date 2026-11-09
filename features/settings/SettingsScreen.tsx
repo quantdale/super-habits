@@ -379,7 +379,7 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
           onPress={onRequestClose}
         >
           <MaterialIcons name="arrow-back" size={18} color={tokens.textMuted} />
-          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+          <Text variant="bodyMd" className="font-bold">
             Back
           </Text>
         </Pressable>

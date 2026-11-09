@@ -2,10 +2,9 @@ import { Text } from '@/core/ui/Text';
 import { View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
-import { Card } from '@/core/ui/Card';
+import { SettingsGroup, SettingsRow, SettingsSectionHeading } from './SettingsSharedUi';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { ValidationError } from '@/core/ui/ValidationError';
-import { SettingsRow, SettingsSectionHeading } from './SettingsSharedUi';
 
 const INTERNAL_ACCENT = '#7c2d12';
 
@@ -33,7 +32,7 @@ export function SettingsDeveloperSection({
         title="Rollout and diagnostics"
         accentColor={INTERNAL_ACCENT}
       />
-      <Card accentColor={INTERNAL_ACCENT} className="mb-0">
+      <SettingsGroup accentColor={INTERNAL_ACCENT}>
         <View
           className="rounded-2xl border px-4 py-3"
           style={{
@@ -41,15 +40,8 @@ export function SettingsDeveloperSection({
             backgroundColor: tokens.dangerBackground,
           }}
         >
-          <Text
-            className="text-[11px] font-semibold uppercase tracking-[1.1px]"
-            style={{ color: tokens.dangerText }}
-          >
-            Internal only
-          </Text>
-          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-            These controls and notes are for rollout testing and product diagnostics, not everyday
-            setup.
+          <Text variant="label" style={{ color: tokens.dangerText }}>
+            Internal only — rollout testing and diagnostics, not everyday setup.
           </Text>
         </View>
 
@@ -120,7 +112,7 @@ export function SettingsDeveloperSection({
             />
           </View>
         ) : null}
-      </Card>
+      </SettingsGroup>
     </ScreenSection>
   );
 }

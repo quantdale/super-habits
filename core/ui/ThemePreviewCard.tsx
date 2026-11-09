@@ -1,76 +1,136 @@
-import { Text } from '@/core/ui/Text';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+
 import { useAppTheme } from '@/core/providers/themeContext';
 import type { ThemeDefinition } from '@/core/theme';
+import { radius, spacing } from '@/core/theme/designTokens';
 
+/**
+ * Live theme mini-preview (Playful Momentum §7 Settings: "Theme picker =
+ * OptionRows with live mini-previews").
+ *
+ * The old card was a 104px tile in a wrapping grid: two per row at best, a
+ * separate selection ring, and its own name/appearance caption repeated beside
+ * the OptionRow that now carries the label. This renders the *preview only* —
+ * a self-contained swatch painted entirely from the **previewed theme's own
+ * tokens** (`theme.tokens`), so the picker previews a theme without switching
+ * to it:
+ *
+ * - the canvas (`background`) with a 2px `border` ring;
+ * - a small `surface` card outlined by the previewed `border`;
+ * - two text bars in `text` / `textMuted`;
+ * - a `primary` dot (the theme's brand mark);
+ * - a `button` + `buttonText` mini button, which is the one part a user is
+ *   most likely to judge ("is this button readable here?") and it carries the
+ *   theme's own contrast promise (§5.4 `buttonText` on `button` ≥ 4.5).
+ *
+ * Because every fill comes from the previewed theme, the swatch is decorative:
+ * it is hidden from assistive tech (`accessibilityElementsHidden` /
+ * `aria-hidden`) and the surrounding `OptionRow` supplies the accessible name,
+ * so no new string is introduced and the name asserted by `theming.spec.ts`
+ * (`<Theme>, <light|dark> theme`) is unchanged.
+ */
 type ThemePreviewCardProps = {
   theme: ThemeDefinition;
-  selected: boolean;
-  onPress: () => void;
+  /** Selection is owned by the surrounding OptionRow; kept for API parity. */
+  selected?: boolean;
+  /** The preview is presentational; pressing is handled by the row. */
+  onPress?: () => void;
+  /** Compact swatch used inline in list rows. */
+  size?: 'row';
 };
 
-/** A ~72x56 swatch rendered from the theme's own tokens, plus name + appearance badge. */
-export function ThemePreviewCard({ theme, selected, onPress }: ThemePreviewCardProps) {
+const SWATCH_WIDTH = 64;
+const SWATCH_HEIGHT = 40;
+
+export function ThemePreviewCard({ theme, selected = false }: ThemePreviewCardProps) {
   const { tokens: activeTokens } = useAppTheme();
   const t = theme.tokens;
 
   return (
-    <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-      accessibilityLabel={`${theme.name}, ${theme.appearance} theme`}
-      onPress={onPress}
-      className="w-[104px] items-center gap-2 rounded-2xl p-2"
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no"
+      aria-hidden
       style={{
-        borderWidth: selected ? 2 : 1,
+        width: SWATCH_WIDTH,
+        height: SWATCH_HEIGHT,
+        borderRadius: radius.sm,
+        borderWidth: 2,
+        // The active theme's border keeps the swatch legible even when the
+        // previewed theme's own border is nearly the same tone as its canvas.
         borderColor: selected ? activeTokens.primary : activeTokens.border,
-        backgroundColor: activeTokens.surface,
+        backgroundColor: t.background,
+        overflow: 'hidden',
+        padding: spacing.xs,
+        justifyContent: 'space-between',
       }}
     >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+        <View
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: radius.full,
+            backgroundColor: t.primary,
+          }}
+        />
+        <View style={{ flex: 1, gap: 3 }}>
+          <View
+            style={{
+              height: 4,
+              borderRadius: radius.full,
+              backgroundColor: t.text,
+              width: '80%',
+            }}
+          />
+          <View
+            style={{
+              height: 3,
+              borderRadius: radius.full,
+              backgroundColor: t.textMuted,
+              width: '55%',
+            }}
+          />
+        </View>
+      </View>
+
       <View
-        className="h-14 w-[72px] overflow-hidden rounded-xl"
-        style={{ backgroundColor: t.background }}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: spacing.xs,
+        }}
       >
         <View
-          className="absolute bottom-1.5 left-1.5 right-1.5 rounded-lg p-1.5"
-          style={{ backgroundColor: t.surface, borderColor: t.border, borderWidth: 1 }}
-        >
-          <View className="h-1 w-7 rounded-full" style={{ backgroundColor: t.text }} />
-          <View className="mt-1 h-1 w-5 rounded-full" style={{ backgroundColor: t.textMuted }} />
-        </View>
-        <View
-          className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full"
-          style={{ backgroundColor: t.primary }}
-        />
-        {selected ? (
-          <View
-            className="absolute left-1.5 top-1.5 h-4 w-4 items-center justify-center rounded-full"
-            style={{ backgroundColor: activeTokens.primary }}
-          >
-            <MaterialIcons name="check" size={12} color={t.buttonText} />
-          </View>
-        ) : null}
-      </View>
-      <View className="items-center">
-        <Text variant="label" numberOfLines={1} style={{ color: activeTokens.text }}>
-          {theme.name}
-        </Text>
-        {/* Appearance badge: the one upright-case exception in this card, and a
-            pure CSS transform — the accessible name comes from the radio label
-            above, so asserted copy is unchanged. */}
-        <Text
-          variant="caption"
-          numberOfLines={1}
           style={{
-            color: activeTokens.textMuted,
-            textTransform: 'uppercase',
-            letterSpacing: 0.5,
+            flex: 1,
+            height: 12,
+            borderRadius: radius.xs,
+            backgroundColor: t.surface,
+            borderWidth: 1,
+            borderColor: t.border,
+          }}
+        />
+        <View
+          style={{
+            width: 26,
+            height: 12,
+            borderRadius: radius.xs,
+            backgroundColor: t.button,
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          {theme.appearance}
-        </Text>
+          <MaterialIcons
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            name="check"
+            size={9}
+            color={t.buttonText}
+          />
+        </View>
       </View>
-    </Pressable>
+    </View>
   );
 }

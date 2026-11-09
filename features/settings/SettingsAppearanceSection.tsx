@@ -1,33 +1,35 @@
-import { Text } from '@/core/ui/Text';
 import { View } from 'react-native';
 import type { ResolvedTheme, ThemeMode } from '@/core/providers/themeContext';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { DARK_THEME_IDS, LIGHT_THEME_IDS, THEME_REGISTRY, type ThemeId } from '@/core/theme';
-import { Card } from '@/core/ui/Card';
+import { OptionRow } from '@/core/ui/OptionRow';
 import { PillChip } from '@/core/ui/PillChip';
 import { ScreenSection } from '@/core/ui/ScreenSection';
+import { Text } from '@/core/ui/Text';
 import { ThemePreviewCard } from '@/core/ui/ThemePreviewCard';
-import { SettingsRow, SettingsSectionHeading } from './SettingsSharedUi';
+import { spacing } from '@/core/theme/designTokens';
+import { SettingsGroup, SettingsRow, SettingsSectionHeading } from './SettingsSharedUi';
 
 const THEME_OPTIONS: {
   mode: ThemeMode;
   label: string;
+  /** Reachable detail; the visible surface shows only the state. */
   description: string;
 }[] = [
   {
     mode: 'system',
     label: 'System',
-    description: 'Follow your device setting automatically.',
+    description: 'Follow your device appearance setting automatically.',
   },
   {
     mode: 'light',
     label: 'Light',
-    description: 'Always use the light theme.',
+    description: 'Always use the light theme, even when the device is in dark mode.',
   },
   {
     mode: 'dark',
     label: 'Dark',
-    description: 'Always use the dark theme.',
+    description: 'Always use the dark theme, even when the device is in light mode.',
   },
 ];
 
@@ -53,6 +55,18 @@ type SettingsAppearanceSectionProps = {
   onSelectTheme: (themeId: ThemeId) => void;
 };
 
+/**
+ * Settings → Appearance (Playful Momentum §7: bold group titles, rows in
+ * `depth.flat` groups, theme picker = OptionRows with live mini-previews, no
+ * narration paragraphs).
+ *
+ * The mode control deliberately stays a `Chip` row: it is a two/three-way
+ * toggle the existing specs address as `button` + `aria-pressed`
+ * (`getByRole('button', { name: 'Dark', exact: true })`), and turning a toggle
+ * into a radio group would change that accessible contract. The theme pickers
+ * are `OptionRow`s — a genuine one-of-N choice — with the theme's own colours
+ * as the trailing live preview.
+ */
 export function SettingsAppearanceSection({
   mode,
   resolvedTheme,
@@ -71,18 +85,19 @@ export function SettingsAppearanceSection({
         title="Theme and display"
         accentColor={tokens.textMuted}
       />
-      <Card accentColor={tokens.textMuted} className="mb-0">
-        <View className="gap-4">
-          <View>
-            <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-              Theme mode
-            </Text>
-            <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-              Choose how super-habits should look on this device.
-            </Text>
-          </View>
 
-          <View className="flex-row flex-wrap">
+      <SettingsGroup>
+        <View
+          style={{
+            paddingBottom: spacing.md,
+            borderBottomWidth: 1,
+            borderBottomColor: tokens.border,
+          }}
+        >
+          <Text variant="bodyMd" className="font-bold">
+            Theme mode
+          </Text>
+          <View className="mt-2 flex-row flex-wrap">
             {THEME_OPTIONS.map((option) => (
               <PillChip
                 key={option.mode}
@@ -93,68 +108,67 @@ export function SettingsAppearanceSection({
               />
             ))}
           </View>
-
-          {/* W13 (SUR-08): the theme value is stated by the pills' selected
-              state and this single line. The old `Current selection` and
-              `Current behavior` rows restated the same value twice more. */}
-          <SettingsRow
-            first
-            label="Current appearance"
-            value={`${appearanceCopy.summary} Active theme: ${THEME_REGISTRY[themeId]?.name ?? themeId}.`}
-            explanation={themeModeDescription}
-            statusLabel={mode}
-            statusTone="accent"
-            accentColor={tokens.textMuted}
-            last
-          />
         </View>
-      </Card>
 
-      <Card accentColor={tokens.textMuted} className="mb-0">
-        <View className="gap-4">
-          <View>
-            <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-              Day theme
-            </Text>
-            <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-              Used whenever the resolved appearance is light.
-            </Text>
-          </View>
-          <View className="flex-row flex-wrap gap-2">
-            {LIGHT_THEME_IDS.map((id) => (
-              <ThemePreviewCard
+        {/* SUR-08: the theme value is stated by the chips' selected state and
+            this single row — not restated by `Current selection` +
+            `Current behavior` rows. */}
+        <SettingsRow
+          label="Current appearance"
+          value={`${appearanceCopy.summary} Active theme: ${THEME_REGISTRY[themeId]?.name ?? themeId}.`}
+          explanation={themeModeDescription}
+          statusLabel={mode}
+          statusTone="accent"
+          accentColor={tokens.textMuted}
+          last
+        />
+      </SettingsGroup>
+
+      <View className="mt-6">
+        <Text variant="bodyMd" className="font-bold">
+          Day theme
+        </Text>
+        <View className="mt-2" style={{ gap: spacing.sm }}>
+          {LIGHT_THEME_IDS.map((id) => {
+            const theme = THEME_REGISTRY[id];
+            return (
+              <OptionRow
                 key={id}
-                theme={THEME_REGISTRY[id]}
+                label={theme.name}
                 selected={themeId === id}
                 onPress={() => onSelectTheme(id)}
-              />
-            ))}
-          </View>
+                accentColor={tokens.accent}
+                accessibilityLabel={`${theme.name}, ${theme.appearance} theme`}
+              >
+                <ThemePreviewCard theme={theme} selected={themeId === id} />
+              </OptionRow>
+            );
+          })}
         </View>
-      </Card>
+      </View>
 
-      <Card accentColor={tokens.textMuted} className="mb-0">
-        <View className="gap-4">
-          <View>
-            <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-              Night theme
-            </Text>
-            <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-              Used whenever the resolved appearance is dark.
-            </Text>
-          </View>
-          <View className="flex-row flex-wrap gap-2">
-            {DARK_THEME_IDS.map((id) => (
-              <ThemePreviewCard
+      <View className="mt-6">
+        <Text variant="bodyMd" className="font-bold">
+          Night theme
+        </Text>
+        <View className="mt-2" style={{ gap: spacing.sm }}>
+          {DARK_THEME_IDS.map((id) => {
+            const theme = THEME_REGISTRY[id];
+            return (
+              <OptionRow
                 key={id}
-                theme={THEME_REGISTRY[id]}
+                label={theme.name}
                 selected={themeId === id}
                 onPress={() => onSelectTheme(id)}
-              />
-            ))}
-          </View>
+                accentColor={tokens.accent}
+                accessibilityLabel={`${theme.name}, ${theme.appearance} theme`}
+              >
+                <ThemePreviewCard theme={theme} selected={themeId === id} />
+              </OptionRow>
+            );
+          })}
         </View>
-      </Card>
+      </View>
     </ScreenSection>
   );
 }
