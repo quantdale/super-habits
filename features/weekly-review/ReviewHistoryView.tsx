@@ -1,26 +1,35 @@
 import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
+import { Button } from '@/core/ui/Button';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { ValidationError } from '@/core/ui/ValidationError';
+import { radius, spacing } from '@/core/theme/designTokens';
 import { deleteWeeklyReview, listWeeklyReviews } from '@/features/weekly-review/weeklyReview.data';
 import type { WeeklyReview } from '@/features/weekly-review/weeklyReview.types';
 import {
   parseSummaryPayload,
   parsePlanPayload,
 } from '@/features/weekly-review/weeklyReview.domain';
+import { planningRowVisual } from '@/features/planning-hub/planningHub.visual';
 
 /**
  * Browsing past weekly reviews. Expanding an entry shows the saved summary
  * insights and plan payload; a confirmed delete removes an erroneous review
  * from history and rollups (soft delete + durable delete intent — the logged
  * entities themselves are never touched).
+ *
+ * v2 P21 part A: each entry is one `depth.card` surface (2px ring + 4px
+ * `borderStrong` lip) whose whole header is the expand target; the expanded
+ * body sits on the same face with a hairline divider so no card nests inside a
+ * card. The `Week of … review` accessible name and the expanded `Delete review
+ * for week …` control are unchanged.
  */
 export function ReviewHistoryView() {
-  const { tokens } = useAppTheme();
+  const { tokens, resolvedTheme } = useAppTheme();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [reviews, setReviews] = useState<WeeklyReview[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,7 +89,7 @@ export function ReviewHistoryView() {
 
   if (loading) {
     return (
-      <Text className="py-4 text-sm" style={{ color: tokens.textMuted }}>
+      <Text variant="bodyMd" tone="muted" style={{ paddingVertical: spacing.lg }}>
         Loading past reviews…
       </Text>
     );
@@ -89,15 +98,30 @@ export function ReviewHistoryView() {
   if (reviews.length === 0) {
     return (
       <Card>
-        <Text className="py-3 text-center text-sm" style={{ color: tokens.textMuted }}>
+        <Text
+          variant="bodyMd"
+          tone="muted"
+          style={{ textAlign: 'center', paddingVertical: spacing.md }}
+        >
           No past reviews yet. Complete this week&apos;s review to start your history.
         </Text>
       </Card>
     );
   }
 
+  const row = planningRowVisual({
+    tone: 'sky',
+    selected: false,
+    appearance: resolvedTheme,
+    surface: tokens.surface,
+    border: tokens.border,
+    borderStrong: tokens.borderStrong,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+  });
+
   return (
-    <View className="gap-2">
+    <View style={{ gap: spacing.sm }}>
       {deleteError ? <ValidationError message={deleteError} /> : null}
       {reviews.map((review) => {
         const expanded = expandedId === review.id;
@@ -106,56 +130,91 @@ export function ReviewHistoryView() {
         return (
           <View
             key={review.id}
-            className="rounded-xl border"
             style={{
-              borderColor: tokens.border,
-              backgroundColor: expanded ? tokens.surfaceElevated : 'transparent',
+              borderRadius: radius.lg,
+              backgroundColor: row.face,
+              borderWidth: 2,
+              borderColor: row.border,
+              borderBottomWidth: 4,
+              borderBottomColor: row.lip,
+              overflow: 'hidden',
             }}
           >
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Week of ${review.week_start_date} review`}
               accessibilityState={{ expanded }}
-              className="p-3"
+              aria-expanded={expanded}
               onPress={() => setExpandedId(expanded ? null : review.id)}
+              style={{ minHeight: 52, padding: spacing.md, gap: spacing.xs }}
             >
-              <View className="flex-row items-center justify-between">
-                <Text className="font-medium" style={{ color: tokens.text }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                <MaterialIcons
+                  name={expanded ? 'expand-less' : 'expand-more'}
+                  size={20}
+                  color={row.mark}
+                />
+                <Text
+                  variant="bodyMd"
+                  style={{ color: row.ink, fontWeight: '700', flex: 1 }}
+                  numberOfLines={1}
+                >
                   {review.week_start_date} – {review.week_end_date}
                 </Text>
-                <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                <Text
+                  variant="label"
+                  style={{ color: review.status === 'completed' ? row.ink : tokens.textMuted }}
+                >
                   {review.status === 'completed' ? 'Completed' : 'Draft'}
                 </Text>
               </View>
               {expanded && (
-                <View className="mt-2 gap-1">
+                <View
+                  style={{
+                    marginTop: spacing.sm,
+                    paddingTop: spacing.sm,
+                    borderTopWidth: 1,
+                    borderTopColor: tokens.border,
+                    gap: spacing.xs,
+                  }}
+                >
                   {summary ? (
                     <>
-                      <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                      <Text variant="caption" tone="muted">
                         Todos: {summary.todos.completedCount} completed ·{' '}
                         {summary.todos.overdueCount} overdue
                       </Text>
-                      <Text className="text-sm" style={{ color: tokens.textMuted }}>
+                      <Text variant="caption" tone="muted">
                         Focus: {summary.focus.minutes} min in {summary.focus.sessions} sessions
                       </Text>
                       {summary.wins.slice(0, 3).map((w, i) => (
-                        <Text key={`w-${i}`} className="text-sm" style={{ color: tokens.text }}>
-                          ✓ {w.message}
-                        </Text>
+                        <View
+                          key={`w-${i}`}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}
+                        >
+                          <MaterialIcons name="check" size={14} color={tokens.successText} />
+                          <Text variant="bodyMd" style={{ color: tokens.text, flex: 1 }}>
+                            {w.message}
+                          </Text>
+                        </View>
                       ))}
                     </>
                   ) : null}
                   {plan && plan.priorities.length > 0 ? (
-                    <View className="mt-1">
+                    <View style={{ marginTop: spacing.xs, gap: 2 }}>
                       {plan.priorities.map((p, i) => (
-                        <Text key={p.id} className="text-sm" style={{ color: tokens.text }}>
+                        <Text key={p.id} variant="bodyMd" style={{ color: tokens.text }}>
                           {i + 1}. {p.text}
                         </Text>
                       ))}
                     </View>
                   ) : null}
                   {review.reflection ? (
-                    <Text className="mt-1 text-sm italic" style={{ color: tokens.textMuted }}>
+                    <Text
+                      variant="bodyMd"
+                      tone="muted"
+                      style={{ marginTop: spacing.xs, fontStyle: 'italic' }}
+                    >
                       {review.reflection}
                     </Text>
                   ) : null}
@@ -163,11 +222,12 @@ export function ReviewHistoryView() {
               )}
             </Pressable>
             {expanded ? (
-              <View className="px-3 pb-3">
+              <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.md }}>
                 <Button
                   label={deletingId === review.id ? 'Deleting…' : 'Delete review'}
                   accessibilityLabel={`Delete review for week ${review.week_start_date}`}
                   variant="danger"
+                  icon="delete-outline"
                   disabled={deletingId !== null}
                   onPress={() => void handleDelete(review)}
                 />

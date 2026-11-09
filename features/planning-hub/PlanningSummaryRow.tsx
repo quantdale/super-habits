@@ -2,6 +2,9 @@ import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Text } from '@/core/ui/Text';
+import { ProgressBar } from '@/core/ui/ProgressBar';
+import { radius, spacing } from '@/core/theme/designTokens';
+import { planningRowVisual } from '@/features/planning-hub/planningHub.visual';
 
 /** W11: one objective / status / context / progress grammar for planning.
  * Visual layout is shared; goal and project persistence stays in its owner. */
@@ -17,6 +20,18 @@ type Props = {
   actions?: ReactNode;
 };
 
+/**
+ * Shared objective row (projects + goals). v2 P21 part A brings it onto the
+ * v2 tokens: the whole non-action surface is ONE press target (`depth.card`
+ * recipe — 2px ring + a 4px `borderStrong` bottom lip), the progress line rides
+ * the shared `ProgressBar` (sunken track + section bright fill; slimmed to 8px
+ * so the row keeps its 52pt rhythm), and the percentage sits on the row's own
+ * ink tier instead of a second color system.
+ *
+ * Accessibility is unchanged: the press target keeps its long
+ * "name, status, N percent progress" label, and the reorder actions stay
+ * independent siblings (W11.5 pins that pressing them never opens the detail).
+ */
 export function PlanningSummaryRow({
   title,
   status,
@@ -28,62 +43,89 @@ export function PlanningSummaryRow({
   onPress,
   actions,
 }: Props) {
-  const { tokens } = useAppTheme();
+  const { tokens, resolvedTheme } = useAppTheme();
   const percent = Math.max(
     0,
     Math.min(100, Number.isFinite(progressPercent) ? progressPercent : 0),
   );
+  // The row is a surface card, not a selected option: `planningRowVisual` with
+  // `selected: false` yields (surface face, floored outline, `borderStrong`
+  // lip, theme ink) — the exact `depth.card` colors, hue-independent so a
+  // project's own color never becomes text.
+  const row = planningRowVisual({
+    tone: 'sky',
+    selected: false,
+    appearance: resolvedTheme,
+    surface: tokens.surface,
+    border: tokens.border,
+    borderStrong: tokens.borderStrong,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+  });
 
   return (
     <View
-      className="rounded-2xl border px-3 py-2"
-      style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+      style={{
+        borderRadius: radius.lg,
+        backgroundColor: row.face,
+        borderWidth: 2,
+        borderColor: row.border,
+        borderBottomWidth: 4,
+        borderBottomColor: row.lip,
+        overflow: 'hidden',
+      }}
     >
-      <View className="flex-row items-center gap-2">
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={accessibilityLabel}
-          className="min-h-12 min-w-0 flex-1 justify-center py-1"
           onPress={onPress}
+          style={{
+            minHeight: 52,
+            minWidth: 0,
+            flex: 1,
+            justifyContent: 'center',
+            paddingVertical: spacing.md,
+            paddingLeft: spacing.lg,
+            paddingRight: spacing.sm,
+            gap: spacing.xs,
+          }}
         >
-          <View className="flex-row items-center gap-2">
-            <View className="min-w-0 flex-1">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <View style={{ minWidth: 0, flex: 1 }}>
               <Text
-                className="text-base font-semibold"
-                style={{ color: tokens.text }}
+                variant="bodyMd"
+                style={{ color: row.ink, fontWeight: '700' }}
                 numberOfLines={2}
               >
                 {title}
               </Text>
-              <Text
-                className="mt-0.5 text-xs"
-                style={{ color: tokens.textMuted }}
-                numberOfLines={2}
-              >
+              <Text variant="caption" tone="muted" style={{ marginTop: 2 }} numberOfLines={2}>
                 {status}
                 {context ? ` · ${context}` : ''}
                 {targetDate ? ` · Due ${targetDate}` : ''}
               </Text>
             </View>
             <Text
-              className="text-sm font-semibold"
-              style={{ color: tokens.text }}
+              variant="label"
+              style={{ color: row.ink }}
               accessibilityLabel={`${percent} percent progress`}
             >
               {percent}%
             </Text>
           </View>
-          <View
-            className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full"
-            style={{ backgroundColor: tokens.surfaceSunken }}
-          >
-            <View
-              className="h-1.5 rounded-full"
-              style={{ width: `${percent}%`, backgroundColor: accentColor }}
-            />
-          </View>
+          <ProgressBar
+            progress={percent / 100}
+            accentColor={accentColor}
+            height={8}
+            style={{ marginTop: spacing.xs }}
+          />
         </Pressable>
-        {actions}
+        {actions ? (
+          <View style={{ paddingRight: spacing.sm, flexDirection: 'row', gap: spacing.xs }}>
+            {actions}
+          </View>
+        ) : null}
       </View>
     </View>
   );
