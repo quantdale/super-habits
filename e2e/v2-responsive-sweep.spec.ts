@@ -814,6 +814,64 @@ test.describe('V2 responsive sweep', () => {
     ).toEqual([]);
   });
 
+  // CG-12 first released slice: the Focus (pomodoro) surface now carries its
+  // own ACTIVE audit instead of waiting for the whole-app case above, which
+  // stays quarantined for the surfaces that are still open. Same helpers
+  // (`measure`, `waitForSettledGeometry`, `panelScope`), same <44 predicate
+  // (43.5 with sub-pixel tolerance), same phone widths and both themes — only
+  // the audited surface set is narrowed, so a Focus regression fails here
+  // while the remaining surfaces keep their original gate.
+  test('the Focus (pomodoro) section reaches a 44px CSS hit area at phone widths', async ({
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    await prepare(page);
+
+    const offenders: string[] = [];
+    for (const theme of ['light', 'dark'] as const) {
+      await setTheme(page, theme);
+      for (const width of PHONE_WIDTHS) {
+        await page.setViewportSize({ width, height: 844 });
+        await showSection(page, TAB_LABELS.pomodoro);
+        await waitForSettledGeometry(page, panelScope('pomodoro'));
+
+        // The mode tabs are the controls CG-12 measured on this surface, so
+        // they are asserted by name as well as through the generic sweep: a
+        // failure names the tab and its real CSS-px box. The generic sweep
+        // below covers the same nodes, so they are de-duplicated by name.
+        const modeTabs = page.getByRole('tablist', { name: 'Focus timer mode' }).getByRole('tab');
+        await expect(modeTabs, `${theme} ${width}: the three mode tabs render`).toHaveCount(3);
+        const modeTabNames = new Set<string>();
+        for (const tab of await modeTabs.all()) {
+          const name = (await tab.getAttribute('aria-label')) ?? (await tab.innerText()).trim();
+          modeTabNames.add(name);
+          const box = await tab.boundingBox();
+          expect(box, `${theme} ${width}: "${name}" has a laid-out box`).not.toBeNull();
+          if (box!.width < 43.5 || box!.height < 43.5) {
+            offenders.push(
+              `${theme} ${width} › "${name}" measured ${
+                Math.round(box!.width * 10) / 10
+              }x${Math.round(box!.height * 10) / 10} px`,
+            );
+          }
+        }
+
+        // Everything else the sweep reports under the pomodoro key: the same
+        // measurement and threshold the quarantined case uses, narrowed to
+        // this one panel (presets, duration steppers, history controls, …).
+        const instrument = await measure(page, panelScope('pomodoro'));
+        for (const target of instrument.undersizedTargets) {
+          if (modeTabNames.has(target.name)) continue;
+          offenders.push(
+            `${theme} ${width} › "${target.name}" measured ${target.width}x${target.height} px`,
+          );
+        }
+      }
+    }
+
+    expect(offenders, 'every Focus (pomodoro) control reaches a 44x44 CSS px hit area').toEqual([]);
+  });
+
   // CG-12 slice 2, Command Center: the same predicate, thresholds and helpers
   // as the gated case above, auditing ONLY the command overlay scope. The
   // overlay is opened through the shipped Add -> Describe it path, the example

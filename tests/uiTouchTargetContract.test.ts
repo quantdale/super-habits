@@ -65,9 +65,17 @@ describe('V3 compact control touch targets', () => {
     expect(source).toMatch(/hitSlop=\{\{\s*top:\s*2,\s*bottom:\s*2\s*\}\}/);
   });
 
-  it('SegmentedControl segments stay 36 with vertical-only hitSlop reaching 44', () => {
+  it('SegmentedControl segments stay 36 by default with vertical-only hitSlop reaching 44', () => {
     const source = read('SegmentedControl.tsx');
-    expect(source).toMatch(/minHeight: 36/);
+    // CG-12: the face height is no longer a literal — it is the model's
+    // DEFAULT (36, so the tray stays the 40pt V3 §6 tray) unless a caller
+    // explicitly opts up. Both halves are pinned, so the default cannot drift
+    // and the opt-in cannot bypass the clamp.
+    expect(readFileSync(join(CORE_UI, 'segmentedControl.model.ts'), 'utf8')).toMatch(
+      /DEFAULT_SEGMENT_MIN_HEIGHT\s*=\s*36/,
+    );
+    expect(source).toMatch(/minHeight:\s*segmentMinHeight/);
+    expect(source).toMatch(/resolveSegmentMinHeight\(\{\s*minSegmentHeight,\s*isWeb:/);
     expect(source).toMatch(/hitSlop=\{\{\s*top:\s*4,\s*bottom:\s*4\s*\}\}/);
     // Vertical-only: no horizontal slop between adjacent segments.
     expect(source).not.toMatch(/hitSlop=\{\{[^}]*left/);
