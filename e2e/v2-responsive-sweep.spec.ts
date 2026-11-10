@@ -20,7 +20,11 @@ import { layout } from '@/core/theme/designTokens';
  *     dark. A control parked outside the viewport by a *clipping* ancestor (To
  *     Do's swipe-revealed row actions sit at `left: -9820` until swiped) is not
  *     overflow: the clip box is what a user can see, so the ancestor is
- *     measured instead.
+ *     measured instead. That exemption is scoped to parked controls only: a
+ *     horizontal SCRUBBER is additionally held to its own clipping ancestor's
+ *     bounds, so an oversized scroller inside a clipping panel (a Modal's
+ *     `overflow: hidden` body) is still reported even though the panel itself
+ *     fits.
  *  2. **Effective touch targets >= 44x44 CSS px** at phone widths — measured as
  *     the real DOM box of the interactive element (the node that carries the
  *     `role`/`button` semantics and the press handler). No `hitSlop` inflation
@@ -37,12 +41,18 @@ import { layout } from '@/core/theme/designTokens';
  *     below stay ordinary active cases, so a NEW overflow, layout or motion
  *     defect still fails this lane.
  *  3. **Wide layout** — >= 900 shows the side rail (80px, widening to the
- *     248px labelled sidebar at >= 1280), the content column honours its
- *     declared cap (`layout.contentMaxWidth` 640, with the documented Today
- *     dashboard exception `layout.dashboardMaxWidth` 1040,
+ *     248px labelled sidebar at >= 1280), the content column honours its cap
+ *     (`layout.contentMaxWidth` 640, with the documented Today dashboard
+ *     exception `layout.dashboardMaxWidth` 1040,
  *     `docs/ui-ux/16-playful-momentum.md` §5.6) and is horizontally centred in
  *     the remaining content area; <= 899 keeps the floating bottom bar and no
- *     sidebar.
+ *     sidebar. The column is located STRUCTURALLY (the centred content wrapper
+ *     — `alignSelf: center` or auto side margins), never by looking for a
+ *     `max-width` declaration, and the cap it is measured against is
+ *     `layout.contentMaxWidth` / `layout.dashboardMaxWidth` from the tokens
+ *     themselves. Deleting the `maxWidth` from `core/ui/Screen.tsx` therefore
+ *     widens the measured column past the contract and fails, instead of
+ *     emptying the candidate list and passing vacuously.
  *  4. **Reduced motion** — with `prefers-reduced-motion: reduce` emulated, no
  *     animation is left *running* and no CSS animation is declared on the
  *     content (§5.8 allows one 120ms opacity cross-fade and forbids
@@ -51,9 +61,13 @@ import { layout } from '@/core/theme/designTokens';
  * Determinism: nothing is gated on `waitForTimeout`. Layout is awaited by
  * polling a rounded geometry signature until it repeats (so a drawer's entrance
  * spring is never measured mid-slide), and every interaction asserts its
- * resulting state (`aria-selected`, dialog visibility). Data comes from the
- * shared `TYPICAL` fixture, so the same populated state is measured in light and
- * dark.
+ * resulting state (`aria-selected`, dialog visibility). A MISSING measurement
+ * scope is a hard failure everywhere — `waitForSettledGeometry` refuses a
+ * `missing` signature and `measure` throws instead of falling back to
+ * `document.body` — so an overlay that never opened, or a Health deep link that
+ * landed on the loading shell, can never be read as a clean pass. Data comes
+ * from the shared `TYPICAL` fixture, so the same populated state is measured in
+ * light and dark.
  */
 
 const PHONE_WIDTHS = [360, 375, 390] as const;
@@ -140,7 +154,12 @@ async function measure(page: Page, scopeSelector: string): Promise<Measurement> 
       const outsideViewport = (box: { left: number; right: number }): boolean =>
         box.left < -1 || box.right > window.innerWidth + 1;
 
-      const root = document.querySelector(scope) ?? document.body;
+      const root = document.querySelector(scope);
+      // A missing scope must never silently degrade to `document.body`: measuring
+      // the whole page reports a clean surface for a surface that is not there,
+      // which is exactly the false-green a Health deep link still on the loading
+      // shell (or an overlay that failed to open) produces.
+      if (!root) throw new Error(`v2-responsive-sweep: measurement scope not found: ${scope}`);
       const undersizedTargets: Target[] = [];
       const horizontalEscapes: string[] = [];
 
@@ -169,9 +188,13 @@ async function measure(page: Page, scopeSelector: string): Promise<Measurement> 
         if (width < 43.5 || height < 43.5) undersizedTargets.push({ name, width, height });
       }
 
-      // A horizontal scroller may scroll its own content, but it must itself
-      // fit the viewport — a scroller wider than the page is a clipped surface
-      // (the failure `command.p19` and `gamification-surfaces` pin).
+      // A horizontal scroller may scroll its own content, but its own BOX must
+      // fit the viewport AND its clipping ancestor's box. The second check is
+      // deliberately NOT covered by the parked-control exemption above: a Modal
+      // panel clips with `overflow: hidden`, so a scroller wider than the panel
+      // is invisible-by-clipping — a genuinely clipped surface — even though the
+      // panel itself fits the viewport. Content wider than the scroller's own
+      // frame stays legitimate (that is what a scroller is for).
       const unfittedScrollers: string[] = [];
       for (const element of Array.from(root.querySelectorAll<HTMLElement>('*'))) {
         if (!isRendered(element)) continue;
@@ -179,10 +202,15 @@ async function measure(page: Page, scopeSelector: string): Promise<Measurement> 
         if (!/auto|scroll/.test(style.overflowX)) continue;
         const box = element.getBoundingClientRect();
         if (box.width === 0) continue;
+        const bounds = `${element.tagName}:${Math.round(box.left)}-${Math.round(box.right)}`;
+        if (outsideViewport(box)) {
+          unfittedScrollers.push(bounds);
+          continue;
+        }
         const clip = clippingBox(element);
-        if (outsideViewport(box) && !(clip && !outsideViewport(clip))) {
+        if (clip && (box.left < clip.left - 1 || box.right > clip.right + 1)) {
           unfittedScrollers.push(
-            `${element.tagName}:${Math.round(box.left)}-${Math.round(box.right)}`,
+            `${bounds} clipped-by:${Math.round(clip.left)}-${Math.round(clip.right)}`,
           );
         }
       }
@@ -209,23 +237,54 @@ async function measure(page: Page, scopeSelector: string): Promise<Measurement> 
  * Modal's entrance spring (drawer slide + scale) is never measured mid-flight.
  * Under the reduced motion this spec installs those springs are skipped
  * entirely; this poll keeps the measurement honest without a sleep.
+ *
+ * A `missing` scope is rejected twice over: the poll's predicate treats it as
+ * NOT settled (so two consecutive `missing` samples can never satisfy the wait)
+ * and the poll message names the selector, so an overlay that failed to open or
+ * a section that has not mounted fails with the scope named instead of
+ * silently measuring `document.body` later.
  */
-async function waitForSettledGeometry(page: Page, scopeSelector: string): Promise<void> {
+async function waitForSettledGeometry(
+  page: Page,
+  scopeSelector: string,
+  { requireActive = false }: { requireActive?: boolean } = {},
+): Promise<void> {
   let previous: string | null = null;
   await expect
     .poll(
       async () => {
-        const signature = await page.evaluate((scope) => {
-          const root = document.querySelector(scope);
-          if (!root) return 'missing';
-          const box = root.getBoundingClientRect();
-          return [box.x, box.y, box.width, box.height].map((value) => Math.round(value)).join(':');
-        }, scopeSelector);
+        const signature = await page.evaluate(
+          ({ scope, active }) => {
+            const root = document.querySelector(scope);
+            // 'absent' is a distinct, never-settled state: an unwritten
+            // selector must not look like a stable geometry.
+            if (!root) return 'absent';
+            if (active && root.getAttribute('aria-hidden') === 'true') return 'inactive';
+            const box = root.getBoundingClientRect();
+            if (box.width === 0 || box.height === 0) return `collapsed:${scope}`;
+            return [box.x, box.y, box.width, box.height]
+              .map((value) => Math.round(value))
+              .join(':');
+          },
+          { scope: scopeSelector, active: requireActive },
+        );
+        if (signature === 'absent') {
+          previous = null;
+          return false;
+        }
+        if (signature === 'inactive' || signature.startsWith('collapsed:')) {
+          previous = null;
+          return false;
+        }
         const stable = signature === previous;
         previous = signature;
         return stable;
       },
-      { timeout: 15_000, intervals: [80, 120, 160] },
+      {
+        timeout: 20_000,
+        intervals: [80, 120, 160],
+        message: `"${scopeSelector}" must exist, be active, be laid out, and hold still`,
+      },
     )
     .toBe(true);
 }
@@ -281,14 +340,27 @@ type Overlay = 'settings' | 'command' | 'hub' | 'weekly-review' | 'health';
  * via the documented `#health` deep link (it has no rail destination in the
  * six-tab model).
  */
+/**
+ * Scopes are named, not generic: `[role="dialog"]` alone can match whichever
+ * modal happens to be mounted (the quick-capture sheet lingers a few hundred ms
+ * after closing), so each overlay returns the selector of ITS OWN dialog, which
+ * `waitForSettledGeometry` then requires to exist and hold still.
+ */
+const DIALOG_SCOPE = {
+  settings: '[role="dialog"][aria-label="Settings"]',
+  command: '[role="dialog"][aria-label="Command center"]',
+  hub: '[role="dialog"][aria-label="Plan"]',
+  'weekly-review': '[role="dialog"][aria-label="Weekly Review"]',
+} as const;
+
 async function openOverlay(page: Page, overlay: Overlay): Promise<string> {
   switch (overlay) {
     case 'settings': {
       await showSection(page, TAB_LABELS.overview);
       await openSettingsScreen(page);
       await expect(page.getByRole('dialog', { name: 'Settings' })).toBeVisible({ timeout: 20_000 });
-      await waitForSettledGeometry(page, '[role="dialog"]');
-      return '[role="dialog"]';
+      await waitForSettledGeometry(page, DIALOG_SCOPE.settings);
+      return DIALOG_SCOPE.settings;
     }
     case 'command': {
       await showSection(page, TAB_LABELS.overview);
@@ -296,40 +368,58 @@ async function openOverlay(page: Page, overlay: Overlay): Promise<string> {
       await expect(page.getByText('Command center', { exact: true })).toBeVisible({
         timeout: 20_000,
       });
-      await waitForSettledGeometry(page, '[role="dialog"]');
-      return '[role="dialog"]';
+      await waitForSettledGeometry(page, DIALOG_SCOPE.command);
+      return DIALOG_SCOPE.command;
     }
     case 'hub': {
       await showSection(page, TAB_LABELS.overview);
       await page.getByRole('button', { name: 'Plan today' }).click();
       await expect(planningHubTab(page, 'Projects')).toBeVisible({ timeout: 20_000 });
-      await waitForSettledGeometry(page, '[role="dialog"]');
-      return '[role="dialog"]';
+      await waitForSettledGeometry(page, DIALOG_SCOPE.hub);
+      return DIALOG_SCOPE.hub;
     }
     case 'weekly-review': {
       await showSection(page, TAB_LABELS.overview);
       await page.getByRole('button', { name: 'Plan today' }).click();
       await expect(planningHubTab(page, 'Progress')).toBeVisible({ timeout: 20_000 });
       await planningHubTab(page, 'Progress').click();
-      await page.getByRole('dialog').getByRole('button', { name: 'Open weekly review' }).click();
-      await expect(page.getByRole('dialog').getByText(/^Step 1 of 5/)).toBeVisible({
-        timeout: 20_000,
-      });
-      await waitForSettledGeometry(page, '[role="dialog"]');
-      return '[role="dialog"]';
+      await page
+        .getByRole('dialog', { name: 'Plan' })
+        .getByRole('button', { name: 'Open weekly review' })
+        .click();
+      await expect(
+        page.getByRole('dialog', { name: 'Weekly Review' }).getByText(/^Step 1 of 5/),
+      ).toBeVisible({ timeout: 20_000 });
+      await waitForSettledGeometry(page, DIALOG_SCOPE['weekly-review']);
+      return DIALOG_SCOPE['weekly-review'];
     }
     case 'health': {
       await page.goto('/#health', { waitUntil: 'domcontentloaded' });
+      // The Health section has no rail destination (six-tab model), so its
+      // panel is the only oracle: it must EXIST and be active. A missing panel
+      // once satisfied a `undefined !== 'true'` poll, let the settle check
+      // accept two `missing` samples, and let `measure` fall back to
+      // `document.body` — a clean report for the loading shell. Both the poll
+      // and the settle helper now require existence plus an active panel.
       await expect
-        .poll(() =>
-          page.evaluate(
-            () =>
-              document.querySelector('#sh-section-panel-health')?.getAttribute('aria-hidden') !==
-              'true',
-          ),
+        .poll(
+          () =>
+            page.evaluate(() => {
+              const panel = document.querySelector('#sh-section-panel-health');
+              if (!panel) return 'absent';
+              if (panel.getAttribute('aria-hidden') === 'true') return 'inactive';
+              const box = panel.getBoundingClientRect();
+              if (box.width === 0 || box.height === 0) return 'collapsed';
+              return 'active';
+            }),
+          {
+            timeout: 30_000,
+            intervals: [150, 250, 400],
+            message: 'the Health section panel must exist and be active',
+          },
         )
-        .toBe(true);
-      await waitForSettledGeometry(page, panelScope('health'));
+        .toBe('active');
+      await waitForSettledGeometry(page, panelScope('health'), { requireActive: true });
       return panelScope('health');
     }
   }
@@ -362,6 +452,148 @@ function expectNoOverflow(result: Measurement, label: string): void {
   expect(result.pageOverflow, `${label}: the page never scrolls sideways`).toBeLessThanOrEqual(1);
   expect(result.horizontalEscapes, `${label}: no control escapes the viewport`).toEqual([]);
   expect(result.unfittedScrollers, `${label}: horizontal scrollers fit the viewport`).toEqual([]);
+}
+
+type PayloadColumn = {
+  /** Interactive controls measured (non-vacuity: a section must have some). */
+  controls: number;
+  /** Text leaves measured (non-vacuity: a section must have some). */
+  textLeaves: number;
+  /** Widest horizontal span the section's own content occupies, in CSS px. */
+  width: number;
+  /** Horizontal centre of that span, in CSS px. */
+  centre: number;
+};
+
+/**
+ * Measure the width the surface's own CONTENT occupies, without looking for a
+ * `max-width` declaration.
+ *
+ * Why: the previous version collected only elements that DECLARED a
+ * `maxWidth`, so deleting the cap (or a component that stopped setting it) left
+ * the candidate list empty and the cap assertion reduced over nothing — a green
+ * run for an uncapped page. This measures the payload instead: every
+ * interactive control plus every text leaf, minus what is legitimately outside
+ * the flow (fixed overlays, controls parked behind a clipping container such
+ * as To Do's swipe actions, and children of horizontal scrollers, whose content
+ * is *meant* to overflow its frame). What remains is the box the user reads, so
+ * a removed cap widens it past the contract and fails.
+ */
+async function measurePayloadColumn(page: Page, scopeSelector: string): Promise<PayloadColumn> {
+  return page.evaluate(
+    ({ interactiveSelector, scopeSelector: scope }) => {
+      const root = document.querySelector(scope);
+      if (!root) throw new Error(`v2-responsive-sweep: payload scope not found: ${scope}`);
+
+      const isRendered = (node: HTMLElement): boolean => {
+        let current: HTMLElement | null = node;
+        while (current && current !== document.body) {
+          if (current.getAttribute('aria-hidden') === 'true') return false;
+          if (current.hasAttribute('inert')) return false;
+          const style = getComputedStyle(current);
+          if (style.display === 'none' || style.visibility === 'hidden') return false;
+          if (Number.parseFloat(style.opacity) < 0.05) return false;
+          current = current.parentElement;
+        }
+        return true;
+      };
+
+      const clippingBox = (node: HTMLElement): DOMRect | null => {
+        let current = node.parentElement;
+        while (current && current !== document.body) {
+          const style = getComputedStyle(current);
+          if (/hidden|clip/.test(style.overflowX) || /hidden|clip/.test(style.overflowY)) {
+            return current.getBoundingClientRect();
+          }
+          current = current.parentElement;
+        }
+        return null;
+      };
+
+      /** A horizontal scroller ancestor means the node is scroll content. */
+      const insideHorizontalScroller = (node: HTMLElement): boolean => {
+        let current = node.parentElement;
+        while (current && current !== document.body) {
+          const style = getComputedStyle(current);
+          if (/auto|scroll/.test(style.overflowX)) return true;
+          current = current.parentElement;
+        }
+        return false;
+      };
+
+      let left = Number.POSITIVE_INFINITY;
+      let right = Number.NEGATIVE_INFINITY;
+      let controls = 0;
+      let textLeaves = 0;
+
+      const include = (node: HTMLElement): void => {
+        if (!isRendered(node)) return;
+        if (insideHorizontalScroller(node)) return;
+        if (getComputedStyle(node).position === 'fixed') return;
+        const box = node.getBoundingClientRect();
+        if (box.width === 0 || box.height === 0) return;
+        const clip = clippingBox(node);
+        const parked =
+          (box.left < -1 || box.right > window.innerWidth + 1) &&
+          clip !== null &&
+          clip.left >= -1 &&
+          clip.right <= window.innerWidth + 1;
+        if (parked) return;
+        left = Math.min(left, box.left);
+        right = Math.max(right, box.right);
+      };
+
+      for (const candidate of Array.from(root.querySelectorAll(interactiveSelector))) {
+        controls += 1;
+        include(candidate as HTMLElement);
+      }
+      for (const element of Array.from(root.querySelectorAll<HTMLElement>('*'))) {
+        if (element.children.length > 0) continue;
+        if (!(element.textContent ?? '').trim()) continue;
+        textLeaves += 1;
+        include(element);
+      }
+
+      return {
+        controls,
+        textLeaves,
+        width: Number.isFinite(left) ? Math.round((right - left) * 10) / 10 : 0,
+        centre: Number.isFinite(left) ? Math.round((left + right) * 5) / 10 : 0,
+      };
+    },
+    { interactiveSelector: INTERACTIVE_SELECTOR, scopeSelector },
+  );
+}
+
+/** The nav shell's own geometry (rail or bottom bar) plus the content field. */
+type ShellGeometry = {
+  rail: { width: number; top: number; height: number } | null;
+  /** Viewport width minus a vertical side rail: the space content may use. */
+  fieldWidth: number;
+  /** Horizontal centre of that space. */
+  fieldCentre: number;
+};
+
+/** Measure the shell (rail / bottom bar) without touching the content. */
+async function measureShell(page: Page): Promise<ShellGeometry> {
+  return page.evaluate(() => {
+    const rail = document.querySelector('[aria-label="Section tabs"]');
+    const railBox = rail ? rail.getBoundingClientRect() : null;
+    const railWidth = railBox ? Math.round(railBox.width * 10) / 10 : 0;
+    const isSideRail = Boolean(railBox && Math.round(railBox.y * 10) / 10 === 0);
+    const fieldWidth = window.innerWidth - (isSideRail ? railWidth : 0);
+    return {
+      rail: railBox
+        ? {
+            width: railWidth,
+            top: Math.round(railBox.y * 10) / 10,
+            height: Math.round(railBox.height * 10) / 10,
+          }
+        : null,
+      fieldWidth,
+      fieldCentre: Math.round((window.innerWidth - fieldWidth / 2) * 10) / 10,
+    };
+  });
 }
 
 type Inventory = Map<string, { surface: string; name: string; sizes: Set<string> }>;
@@ -410,8 +642,8 @@ async function collectSub44Inventory(page: Page): Promise<Inventory> {
   await expect(planningHubTab(page, 'Projects')).toBeVisible({ timeout: 20_000 });
   for (const view of HUB_VIEWS) {
     await planningHubTab(page, view).click();
-    await waitForSettledGeometry(page, '[role="dialog"]');
-    await audit(`hub-${view.toLowerCase()}`, '[role="dialog"]');
+    await waitForSettledGeometry(page, DIALOG_SCOPE.hub);
+    await audit(`hub-${view.toLowerCase()}`, DIALOG_SCOPE.hub);
   }
 
   return inventory;
@@ -471,8 +703,8 @@ test.describe('V2 responsive sweep', () => {
     await expect(planningHubTab(page, 'Projects')).toBeVisible({ timeout: 20_000 });
     for (const view of HUB_VIEWS) {
       await planningHubTab(page, view).click();
-      await waitForSettledGeometry(page, '[role="dialog"]');
-      expectNoOverflow(await measure(page, '[role="dialog"]'), `hub ${view}`);
+      await waitForSettledGeometry(page, DIALOG_SCOPE.hub);
+      expectNoOverflow(await measure(page, DIALOG_SCOPE.hub), `hub ${view}`);
     }
   });
 
@@ -505,85 +737,65 @@ test.describe('V2 responsive sweep', () => {
         await showSection(page, section.label);
         await waitForSettledGeometry(page, panelScope(section.key));
 
-        const shell = await page.evaluate((scope) => {
-          const rail = document.querySelector('[aria-label="Section tabs"]');
-          const railBox = rail ? rail.getBoundingClientRect() : null;
-          const panel = document.querySelector(scope);
-          if (!panel) return null;
-          // Content columns declare their cap in CSS (`maxWidth`): measure
-          // every declared column in the panel and prove the cap holds.
-          const columns: { declared: number; width: number; centre: number }[] = [];
-          for (const element of Array.from(panel.querySelectorAll<HTMLElement>('*'))) {
-            const style = getComputedStyle(element);
-            if (style.maxWidth === 'none') continue;
-            const declared = Number.parseFloat(style.maxWidth);
-            if (!Number.isFinite(declared) || declared < 400) continue;
-            const box = element.getBoundingClientRect();
-            if (box.width < 300) continue;
-            columns.push({
-              declared,
-              width: Math.round(box.width * 10) / 10,
-              centre: Math.round((box.x + box.width / 2) * 10) / 10,
-            });
-          }
-          return {
-            rail: railBox
-              ? {
-                  width: Math.round(railBox.width * 10) / 10,
-                  top: Math.round(railBox.y * 10) / 10,
-                  height: Math.round(railBox.height * 10) / 10,
-                }
-              : null,
-            columns,
-          };
-        }, panelScope(section.key));
-        expect(shell, `${width} ${section.key}: the section panel renders`).not.toBeNull();
-
+        const shell = await measureShell(page);
+        // The section's own CONTENT box, located structurally: every interactive
+        // control and every text leaf the user can actually reach. It is
+        // measured WITHOUT looking for a `maxWidth` declaration, so a removed
+        // cap widens it past the contract instead of emptying a candidate list.
+        const payload = await measurePayloadColumn(page, panelScope(section.key));
+        // Non-vacuity: a real section always renders controls and text. A zero
+        // here means the measurement scope is wrong (wrong panel, unmounted
+        // section, or a hidden subtree), not a passing section.
+        expect(
+          payload.controls,
+          `${width} ${section.key}: the section renders interactive controls to measure`,
+        ).toBeGreaterThan(1);
+        expect(
+          payload.textLeaves,
+          `${width} ${section.key}: the section renders text to measure`,
+        ).toBeGreaterThan(1);
         // The content area is the viewport minus a *vertical* side rail; the
         // phone bar is a horizontal overlay on top of the content, so it does
         // not narrow the column.
-        const isVerticalRail = shell!.rail !== null && shell!.rail.top === 0;
-        const railWidth = isVerticalRail ? shell!.rail!.width : 0;
-        const expectedCentre = (width + railWidth) / 2;
-        for (const column of shell!.columns) {
-          expect(
-            column.width,
-            `${width} ${section.key}: column honours its ${column.declared}px cap`,
-          ).toBeLessThanOrEqual(column.declared + 1);
-          expect(
-            Math.abs(column.centre - expectedCentre),
-            `${width} ${section.key}: column is centred in the ${width - railWidth}px content area`,
-          ).toBeLessThanOrEqual(1.5);
-        }
-        // The outermost column never exceeds the documented cap for the
-        // section: the Today dashboard may use `dashboardMaxWidth` (1040, §5.6),
-        // every other section is the 640 phone-like column.
-        const widest = shell!.columns.reduce((max, column) => Math.max(max, column.width), 0);
+        expect(
+          shell.fieldWidth,
+          `${width} ${section.key}: the content area is the viewport minus the side rail`,
+        ).toBe(width - (shell.rail && shell.rail.top === 0 ? shell.rail.width : 0));
+
+        // The whole promise: the content the user reads stays inside the
+        // documented cap (640 phone-like column, 1040 for the composed Today
+        // dashboard — docs/ui-ux/16-playful-momentum.md §5.6) and is centred in
+        // the content area. Both numbers come from the design tokens, never from
+        // what the DOM happens to declare, so dropping the cap fails here.
         const cap = section.key === 'overview' ? layout.dashboardMaxWidth : layout.contentMaxWidth;
         expect(
-          widest,
-          `${width} ${section.key}: content column stays within ${cap}px`,
+          payload.width,
+          `${width} ${section.key}: content is no wider than ${cap}px`,
         ).toBeLessThanOrEqual(cap + 1);
+        expect(
+          Math.abs(payload.centre - shell.fieldCentre),
+          `${width} ${section.key}: content is centred in the ${shell.fieldWidth}px content area`,
+        ).toBeLessThanOrEqual(1.5);
 
         // Nav shell swap: >= 900 is the side rail (80px, widening to the 248px
         // labelled sidebar at >= 1280); below 900 the bottom bar owns the
         // bottom edge and there is no sidebar.
         if (width >= 900) {
-          expect(shell!.rail, `${width} ${section.key}: the side rail renders`).not.toBeNull();
-          expect(shell!.rail!.width, `${width} ${section.key}: side rail width`).toBe(
+          expect(shell.rail, `${width} ${section.key}: the side rail renders`).not.toBeNull();
+          expect(shell.rail!.width, `${width} ${section.key}: side rail width`).toBe(
             width >= 1280 ? 248 : 80,
           );
-          expect(shell!.rail!.top, `${width} ${section.key}: the rail starts at the top edge`).toBe(
+          expect(shell.rail!.top, `${width} ${section.key}: the rail starts at the top edge`).toBe(
             0,
           );
           expect(
-            shell!.rail!.height,
+            shell.rail!.height,
             `${width} ${section.key}: the rail is full height`,
           ).toBeGreaterThan(600);
         } else {
-          expect(shell!.rail, `${width} ${section.key}: the bottom bar renders`).not.toBeNull();
+          expect(shell.rail, `${width} ${section.key}: the bottom bar renders`).not.toBeNull();
           expect(
-            shell!.rail!.top,
+            shell.rail!.top,
             `${width} ${section.key}: the bar floats at the bottom`,
           ).toBeGreaterThan(600);
         }
@@ -616,7 +828,11 @@ test.describe('V2 responsive sweep', () => {
     /** Declared CSS animations in a surface (loop-capable, so never allowed). */
     const declaredAnimations = (scope: string) =>
       page.evaluate((scopeSelector) => {
-        const root = document.querySelector(scopeSelector) ?? document.body;
+        const root = document.querySelector(scopeSelector);
+        // Same rule as `measure`: a missing scope is a hard failure, never a
+        // silent fall-back to `document.body` (which would report a clean,
+        // animation-free page for a surface that is not rendered).
+        if (!root) throw new Error(`v2-responsive-sweep: motion scope not found: ${scopeSelector}`);
         const offenders: string[] = [];
         for (const element of Array.from(root.querySelectorAll<HTMLElement>('*'))) {
           const style = getComputedStyle(element);
