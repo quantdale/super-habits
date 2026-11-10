@@ -679,26 +679,59 @@ test.fixme('Space activates tab-shaped and picker controls like a click', async 
 // keyboard-only loss of the primary To Do action (and an unexpected modal).
 // The keyboard path for the *row* is Enter on the row; the checkbox itself must
 // own Enter/Space. The body below is the release assertion.
-test.fixme('Enter and Space complete a To Do task from its completion checkbox', async ({
-  page,
-}) => {
+//
+// Each key owns a DISTINCT, initially-incomplete seeded task (`Task 4` for
+// Enter, `Task 5` for Space) so neither iteration consumes the other's control:
+// completing a row removes it from the pending list and flips its accessible
+// name to `Mark incomplete: …`, so a shared target would leave the second
+// iteration with nothing to press and fail even when both keys work. Completed
+// rows also have to stay observable, hence the completed section is expanded
+// before the walk. The SQLite oracle runs ONCE after the loop because
+// `queryRows` navigates the page into the DB-harness document and would
+// otherwise destroy the app state the second iteration needs.
+test.fixme('Enter and Space complete a to-do from its completion checkbox', async ({ page }) => {
   test.setTimeout(300_000);
   await prepare(page);
   await showSection(page, 'todos');
 
-  for (const key of ['Enter', 'Space'] as const) {
-    const checkbox = page.getByRole('checkbox', { name: /^Mark complete: Task 4$/ });
-    await expect(checkbox).toBeVisible({ timeout: 20_000 });
-    await focusAsKeyboardUser(page, checkbox);
+  // Keep completed rows mounted so the flipped control is observable without
+  // leaving the list (the same trick `e2e/todos.spec.ts` uses).
+  await page.getByRole('button', { name: 'Show completed tasks' }).click();
+  await expect(page.getByRole('button', { name: 'Hide completed tasks' })).toBeVisible();
+
+  const cases = [
+    { key: 'Enter', title: 'Task 4' },
+    { key: 'Space', title: 'Task 5' },
+  ] as const;
+
+  for (const { key, title } of cases) {
+    const pending = page.getByRole('checkbox', {
+      name: `Mark complete: ${title}`,
+      exact: true,
+    });
+    await expect(pending, `${title} starts pending before ${key}`).toHaveCount(1, {
+      timeout: 20_000,
+    });
+    await focusAsKeyboardUser(page, pending);
     await page.keyboard.press(key);
     await expect(
       page.getByRole('dialog'),
       `${key} on the completion checkbox never opens another surface`,
     ).toHaveCount(0);
-    const rows = await queryRows(
-      page,
-      `SELECT completed FROM todos WHERE deleted_at IS NULL AND title = 'Task 4'`,
-    );
-    expect(rows, `${key} completes the task like a click`).toEqual([{ completed: 1 }]);
+    // The product's own completion contract: the control flips to the
+    // completed state (its name becomes `Mark incomplete: …`).
+    await expect(
+      page.getByRole('checkbox', { name: `Mark incomplete: ${title}`, exact: true }),
+      `${key} completes ${title} like a click`,
+    ).toHaveCount(1, { timeout: 15_000 });
   }
+
+  const rows = await queryRows(
+    page,
+    `SELECT title, completed FROM todos WHERE deleted_at IS NULL AND title IN ('Task 4', 'Task 5') ORDER BY title ASC`,
+  );
+  expect(rows, 'both keys persisted the completion a click would write').toEqual([
+    { title: 'Task 4', completed: 1 },
+    { title: 'Task 5', completed: 1 },
+  ]);
 });
