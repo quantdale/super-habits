@@ -1369,6 +1369,11 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                   label: getModeLabel(mode),
                 }))}
                 value={currentMode}
+                // CG-12 (`docs/testing/known-gaps.md`): the mode tabs are the
+                // Focus surface's primary control, and a 36pt face is a 36px
+                // DOM box on web (`hitSlop` never reaches the DOM). Ask the
+                // shared control for a real 44pt face — layout, not slop.
+                minSegmentHeight={44}
                 onChange={(mode) => {
                   // The guard is synchronous and reads the live claims, so it
                   // holds for a stale render, a queued press, a keyboard arrow,
