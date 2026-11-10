@@ -8,14 +8,19 @@ import { Button } from '@/core/ui/Button';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { PillChip } from '@/core/ui/PillChip';
 import { SectionLabel } from '@/core/ui/SectionLabel';
+import { ListGroup } from '@/core/ui/ListGroup';
+import { ProgressBar } from '@/core/ui/ProgressBar';
 import { SECTION_COLORS } from '@/constants/sectionColors';
-import { spacing } from '@/core/theme/designTokens';
+import { radius, spacing, typography } from '@/core/theme/designTokens';
 import { useForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { buildProgressSummary } from '@/features/progress/progress.summary';
 import { PROGRESS_WINDOW_OPTIONS } from '@/features/progress/progress.domain';
 import { buildProgressNarrative } from '@/features/progress/progress.narrative';
+import { comparisonPercent, progressBarVisual } from '@/features/progress/progress.visual';
 import type { ProgressPeriodStat, ProgressSummary } from '@/features/progress/progress.types';
+
+const COLOR = SECTION_COLORS.todos;
 
 type MetricRow = {
   key: string;
@@ -51,6 +56,21 @@ const NARRATIVE_METRIC_ORDER: { match: RegExp; key: string }[] = [
   { match: /workouts/i, key: 'workouts' },
   { match: /completed .* tasks/i, key: 'todos' },
 ];
+
+/**
+ * The prior-window comparison in words. A zero prior window says "new this
+ * period" instead of fabricating a percentage, and a decrease is stated
+ * numerically — never painted as failure (design D12.4).
+ */
+function comparisonLabel(stat: ProgressPeriodStat, unit?: string): string {
+  const suffix = unit ? ` ${unit}` : '';
+  if (stat.previous === 0) {
+    return stat.current === 0 ? 'nothing in the prior period' : 'new this period';
+  }
+  if (stat.current > stat.previous) return `up from ${stat.previous}${suffix}`;
+  if (stat.current < stat.previous) return `down from ${stat.previous}${suffix}`;
+  return `level with ${stat.previous}${suffix}`;
+}
 
 export function ProgressInsightsView() {
   const { tokens } = useAppTheme();
@@ -123,21 +143,23 @@ export function ProgressInsightsView() {
   const headlineKeys = new Set(headlineRows.map((r) => r.key));
   const detailRows = rows.filter((r) => !headlineKeys.has(r.key));
 
+  const bar = progressBarVisual({ surfaceSunken: tokens.surfaceSunken });
+
   if (loadError && !isLoading && !summary) {
     return (
       <View className="gap-3">
-        <Text className="text-lg font-bold" style={{ color: tokens.text }}>
+        <Text variant="titleLg" style={{ color: tokens.text }}>
           Progress
         </Text>
-        <Card
-          variant="header"
-          accentColor={tokens.textMuted}
-          headerTitle="Progress is temporarily unavailable"
-          headerSubtitle="Nothing was saved or changed."
-          className="mb-0"
-        >
+        <Card innerClassName="p-4">
           <View className="gap-3">
-            <Text className="text-sm" style={{ color: tokens.textMuted }}>
+            <Text variant="titleMd" style={{ color: tokens.text }}>
+              Progress is temporarily unavailable
+            </Text>
+            <Text variant="caption" tone="muted">
+              Nothing was saved or changed.
+            </Text>
+            <Text variant="bodyMd" tone="muted">
               {loadError}
             </Text>
             <Button
@@ -156,7 +178,7 @@ export function ProgressInsightsView() {
   if (!isLoading && !summary) {
     return (
       <EmptyStateCard
-        accentColor={SECTION_COLORS.todos}
+        accentColor={COLOR}
         title="No progress data yet"
         description="Complete tasks, habits, and sessions to start seeing weekly comparisons."
       />
@@ -164,88 +186,73 @@ export function ProgressInsightsView() {
   }
 
   return (
-    <View className="gap-3">
-      <Text className="text-lg font-bold" style={{ color: tokens.text }}>
-        Progress
-      </Text>
-      <View className="flex-row flex-wrap">
-        {PROGRESS_WINDOW_OPTIONS.map((days) => (
-          <PillChip
-            key={days}
-            label={`${days}d`}
-            accessibilityLabel={`Show the last ${days} days`}
-            active={windowDays === days}
-            color={SECTION_COLORS.todos}
-            onPress={() => setWindowDays(days)}
-          />
-        ))}
-      </View>
-
-      {summary ? (
-        <Text className="text-xs" style={{ color: tokens.textMuted }}>
-          Last {summary.windowDays} days ({summary.range.currentStart} → {summary.range.currentEnd}
-          ), compared with {summary.range.previousStart} → {summary.range.previousEnd}
+    <View style={{ gap: spacing.xl }}>
+      {/* Header group: the surface name, the window control, and one caption
+          that states both comparison windows. Progress rides Sky because it
+          lives inside the Planning Hub drawer — one hue for the whole surface,
+          never a rainbow of per-metric colors (§5.1). */}
+      <View style={{ gap: spacing.md }}>
+        <Text variant="titleLg" style={{ color: tokens.text }}>
+          Progress
         </Text>
-      ) : null}
-
-      {narrative.length > 0 ? (
-        <View className="gap-1.5">
-          {narrative.map((line, i) => (
-            <Text key={`${i}-${line}`} className="text-sm" style={{ color: tokens.text }}>
-              {line}
-            </Text>
+        <View className="flex-row flex-wrap">
+          {PROGRESS_WINDOW_OPTIONS.map((days) => (
+            <PillChip
+              key={days}
+              label={`${days}d`}
+              accessibilityLabel={`Show the last ${days} days`}
+              active={windowDays === days}
+              color={COLOR}
+              onPress={() => setWindowDays(days)}
+            />
           ))}
         </View>
-      ) : null}
 
+        {summary ? (
+          <Text variant="caption" tone="muted" style={{ fontVariant: ['tabular-nums'] }}>
+            Last {summary.windowDays} days ({summary.range.currentStart} →{' '}
+            {summary.range.currentEnd}
+            ), compared with {summary.range.previousStart} → {summary.range.previousEnd}
+          </Text>
+        ) : null}
+      </View>
+
+      {/* Highlights: the narrative-backed comparisons, one flat group. The
+          former paragraph wall repeated these same numbers a third time; the
+          story survives as row order + comparison caption (§"no narration
+          walls"), and the rows keep their units and the no-invented-percentage
+          rule (openspec `reflection-insights`). */}
       {headlineRows.length > 0 ? (
-        <View className="gap-2">
+        <View style={{ gap: spacing.md }}>
           <SectionLabel>Highlights</SectionLabel>
-          <Card innerClassName="p-0">
-            {headlineRows.map((row, index) => (
-              <MetricRowView
-                key={row.key}
-                row={row}
-                isFirst={index === 0}
-                borderColor={tokens.border}
-              />
+          <ListGroup>
+            {headlineRows.map((row) => (
+              <HighlightRow key={row.key} row={row} barFill={bar.fill} track={bar.track} />
             ))}
-          </Card>
+          </ListGroup>
         </View>
       ) : null}
 
       {/* One accessible disclosure for the remaining metrics and planning. The
           brief allows only this — not an inscrutable icon hiding everything. */}
-      <Pressable
-        accessibilityRole="button"
+      <DisclosureChip
+        label={`More details ${showDetails ? '−' : '+'}`}
         accessibilityLabel={showDetails ? 'Hide metric details' : 'Show metric details'}
-        accessibilityState={{ expanded: showDetails }}
-        aria-expanded={showDetails}
-        className="min-h-11 self-start justify-center rounded-xl border px-3"
-        style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+        expanded={showDetails}
         onPress={() => setShowDetails((open) => !open)}
-      >
-        <Text className="text-sm" style={{ color: tokens.text }}>
-          More details {showDetails ? '−' : '+'}
-        </Text>
-      </Pressable>
+      />
 
       {showDetails ? (
-        <View className="gap-3">
-          <Card innerClassName="p-0">
-            {detailRows.map((row, index) => (
-              <MetricRowView
-                key={row.key}
-                row={row}
-                isFirst={index === 0}
-                borderColor={tokens.border}
-              />
+        <View style={{ gap: spacing.xl }}>
+          <ListGroup>
+            {detailRows.map((row) => (
+              <DetailMetricRow key={row.key} row={row} />
             ))}
-          </Card>
+          </ListGroup>
           {summary ? (
-            <View className="gap-1">
+            <View style={{ gap: spacing.md }}>
               <SectionLabel>Planning</SectionLabel>
-              <Card innerClassName="p-0">
+              <ListGroup>
                 <DetailRow label="Active projects" value={String(summary.activeProjects)} />
                 <DetailRow label="Active goals" value={String(summary.activeGoals)} />
                 <DetailRow
@@ -253,7 +260,7 @@ export function ProgressInsightsView() {
                   value={`${summary.goalsAverageProgress}%`}
                 />
                 <DetailRow label="Calorie goal" value={`${summary.calorieGoal} kcal`} />
-              </Card>
+              </ListGroup>
             </View>
           ) : null}
         </View>
@@ -263,61 +270,93 @@ export function ProgressInsightsView() {
 }
 
 /**
- * One metric row: label, current value with unit, and the prior-window
- * comparison. A zero prior window renders `new this period` rather than a
- * fabricated percentage, and a decrease is stated numerically — never painted
- * as failure (design D12.4).
+ * One headline comparison: label, prior anchor, the current value as a
+ * `metric`-role number (800 + tabular figures, stepped to `titleLg` so three
+ * rows never crowd a phone), and the §6 ProgressBar whose length is this
+ * window's share of the larger of the two windows. The bar is proportion, not
+ * text: the number beside it carries the value, so no label is ever painted on
+ * the hue fill (§5.1 "never put white text on bright").
  */
-function MetricRowView({
-  row,
-  isFirst,
-  borderColor,
-}: {
-  row: MetricRow;
-  isFirst: boolean;
-  borderColor: string;
-}) {
+function HighlightRow({ row, barFill, track }: { row: MetricRow; barFill: string; track: string }) {
   const { tokens } = useAppTheme();
-  // The narrative above already states the percentage change, so the row
-  // carries the numeric anchor in words instead of repeating the same
-  // percentage string twice within one viewport (W12 density goal).
-  const comparison =
-    row.stat.previous === 0
-      ? row.stat.current === 0
-        ? 'nothing in the prior period'
-        : 'new this period'
-      : row.stat.current > row.stat.previous
-        ? `up from ${row.stat.previous}`
-        : row.stat.current < row.stat.previous
-          ? `down from ${row.stat.previous}`
-          : `level with ${row.stat.previous}`;
+  const percent = comparisonPercent(row.stat.current, row.stat.previous);
+  const unitSuffix = row.unit ? ` ${row.unit}` : '';
   return (
-    <View
-      style={
-        isFirst
-          ? undefined
-          : { borderTopWidth: 1, borderTopColor: borderColor, marginHorizontal: spacing.lg }
-      }
-    >
-      <View className="flex-row items-center justify-between px-4 py-3" style={{ minHeight: 56 }}>
+    <View style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.sm }}>
+      <View className="min-w-0 flex-row items-end justify-between" style={{ gap: spacing.md }}>
         <View className="min-w-0 flex-1">
-          <Text className="text-sm" style={{ color: tokens.text }}>
+          <Text variant="bodyMd" className="font-bold" numberOfLines={2}>
             {row.label}
           </Text>
-          <Text className="text-xs" style={{ color: tokens.textMuted }}>
+          <Text variant="caption" tone="muted" style={{ fontVariant: ['tabular-nums'] }}>
             Prior: {row.stat.previous}
-            {row.unit ? ` ${row.unit}` : ''}
+            {unitSuffix}
           </Text>
         </View>
-        <View className="items-end">
-          <Text className="text-base font-bold tabular-nums" style={{ color: tokens.text }}>
-            {row.stat.current}
-            {row.unit ? ` ${row.unit}` : ''}
-          </Text>
-          <Text className="text-xs" style={{ color: tokens.textMuted }}>
-            {comparison}
-          </Text>
-        </View>
+        <Text
+          variant="metric"
+          style={{
+            color: tokens.text,
+            // The role's 800 weight and tabular figures, stepped down to the
+            // title scale so a three-row group never crowds a 360pt phone.
+            fontSize: typography.titleLg.fontSize,
+            lineHeight: typography.titleLg.lineHeight,
+          }}
+        >
+          {row.stat.current}
+          {unitSuffix}
+        </Text>
+      </View>
+      {/* §6 ProgressBar: the component's own 14px face (no height override),
+          Sky bright fill on the theme's sunken rail, one 300ms sweep. */}
+      <ProgressBar
+        progress={percent / 100}
+        accentColor={barFill}
+        style={{ backgroundColor: track }}
+        accessibilityLabel={`${row.label}: ${row.stat.current}${unitSuffix} this window, ${row.stat.previous}${unitSuffix} prior`}
+      />
+      <Text variant="caption" tone="muted">
+        {comparisonLabel(row.stat, row.unit)}
+      </Text>
+    </View>
+  );
+}
+
+/** One remaining metric behind the disclosure: label, current value, and the
+ * prior-window comparison in words (units carried separately). */
+function DetailMetricRow({ row }: { row: MetricRow }) {
+  const { tokens } = useAppTheme();
+  const unitSuffix = row.unit ? ` ${row.unit}` : '';
+  return (
+    <View
+      className="flex-row items-center justify-between"
+      style={{
+        minHeight: 56,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm,
+        gap: spacing.md,
+      }}
+    >
+      <View className="min-w-0 flex-1">
+        <Text variant="bodyMd" style={{ color: tokens.text }}>
+          {row.label}
+        </Text>
+        <Text variant="caption" tone="muted" style={{ fontVariant: ['tabular-nums'] }}>
+          Prior: {row.stat.previous}
+          {unitSuffix}
+        </Text>
+      </View>
+      <View className="items-end">
+        <Text
+          variant="bodyMd"
+          style={{ color: tokens.text, fontWeight: '700', fontVariant: ['tabular-nums'] }}
+        >
+          {row.stat.current}
+          {unitSuffix}
+        </Text>
+        <Text variant="caption" tone="muted">
+          {comparisonLabel(row.stat, row.unit)}
+        </Text>
       </View>
     </View>
   );
@@ -326,13 +365,77 @@ function MetricRowView({
 function DetailRow({ label, value }: { label: string; value: string }) {
   const { tokens } = useAppTheme();
   return (
-    <View className="flex-row items-center justify-between px-4 py-3" style={{ minHeight: 48 }}>
-      <Text className="text-sm" style={{ color: tokens.textMuted }}>
+    <View
+      className="flex-row items-center justify-between"
+      style={{ minHeight: 48, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}
+    >
+      <Text variant="bodyMd" tone="muted">
         {label}
       </Text>
-      <Text className="text-sm font-medium tabular-nums" style={{ color: tokens.text }}>
+      <Text
+        variant="bodyMd"
+        style={{ color: tokens.text, fontWeight: '700', fontVariant: ['tabular-nums'] }}
+      >
         {value}
       </Text>
+    </View>
+  );
+}
+
+/**
+ * The one disclosure control (a `depth.lip.sm` toggle chip).
+ *
+ * It is a plain `Pressable` rather than `Pressable3D` for one reason: this
+ * react-native-web version does not map `accessibilityState.expanded`, and the
+ * W12 contract asserts `aria-expanded` on the *button element itself*
+ * (`e2e/planning-w12.spec.ts`). The lip is therefore composed by hand — a
+ * `borderStrong` slab behind a 2px-bordered face — so the control still reads
+ * as the same pressable family as every other chip on the surface.
+ */
+function DisclosureChip({
+  label,
+  accessibilityLabel,
+  expanded,
+  onPress,
+}: {
+  label: string;
+  accessibilityLabel: string;
+  expanded: boolean;
+  onPress: () => void;
+}) {
+  const { tokens, sectionAccents } = useAppTheme();
+  return (
+    <View
+      style={{
+        alignSelf: 'flex-start',
+        backgroundColor: tokens.borderStrong,
+        borderRadius: radius.md,
+      }}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ expanded }}
+        aria-expanded={expanded}
+        onPress={onPress}
+        className="flex-row items-center justify-center"
+        style={{
+          minHeight: 44,
+          paddingHorizontal: spacing.lg,
+          marginBottom: 2,
+          borderRadius: radius.md,
+          borderWidth: 2,
+          borderColor: tokens.border,
+          backgroundColor: tokens.surface,
+        }}
+      >
+        {/* §5.1 appearance-resolved colored-text tier: the Sky `solid`
+            (#1769D8) is 3.18:1 on a dark surface, while the accent's `text`
+            tier is the same Sky in light mode and the readable bright in dark. */}
+        <Text variant="bodyMd" style={{ color: sectionAccents.todos.text, fontWeight: '700' }}>
+          {label}
+        </Text>
+      </Pressable>
     </View>
   );
 }
