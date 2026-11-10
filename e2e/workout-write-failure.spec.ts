@@ -130,6 +130,69 @@ async function settleRewards(page: Page): Promise<void> {
     .toBeGreaterThan(0);
 }
 
+/**
+ * Wall-clock window for the transient-failure injection (milliseconds).
+ *
+ * The setup between injecting a trigger and the click that must fail is NOT
+ * short on a hosted runner: `returnToApp` (a reload), `goToTab` (which also
+ * waits for React hydration), the swipe gesture and the confirm tap routinely
+ * total several seconds there. A window anchored at injection-time must
+ * therefore be generous enough to absorb that setup and still be OPEN when the
+ * first attempt runs. 45 s is ~10x the observed local setup and still comfortably
+ * inside a runner's worst case.
+ */
+const TRANSIENT_WINDOW_MS = 45_000;
+
+/**
+ * Inject a TRANSIENT `RAISE(ABORT)` on `triggerName`, expire it after
+ * `TRANSIENT_WINDOW_MS`, and hand back a waiter.
+ *
+ * WHY TRANSIENT AT ALL: a permanent trigger can only be removed through the DB
+ * harness, and every harness round trip navigates to the harness document,
+ * which tears down React state and forces a reload before the retry. That
+ * reload is exactly what hid the stale-alert defects these tests pin (after a
+ * remount the error state starts null). The failure therefore has to expire on
+ * its own so the retry can happen inside the same page.
+ *
+ * WHY A TIME WINDOW AND NOT AN ATTEMPT COUNTER (option A in the review): a
+ * counter-trigger cannot work here. The app's data layer runs every mutation
+ * through `withSQLiteTransaction` → expo-sqlite `withTransactionAsync`, which is
+ * `BEGIN` / task / `COMMIT` and, on ANY throw, `ROLLBACK` then rethrow. A
+ * trigger that records its attempt in a helper row and then `RAISE(FAIL)`s has
+ * that bookkeeping rolled back with the rest of the statement, so the counter
+ * never advances and EVERY attempt fails forever. Proven against the real
+ * engine (better-sqlite3, the same SQLite the harness runs): attempt 1 rejected,
+ * helper row still 0, attempt 2 also rejected. Option A is therefore
+ * unreliable by construction, not by accident.
+ *
+ * The deadline is computed as LATE as possible (immediately before the caller
+ * reloads), so the window is anchored at injection rather than before setup.
+ */
+async function injectTransientAbort(page: Page, sql: string): Promise<() => Promise<void>> {
+  // INTEGER-aligned on BOTH sides. The trigger predicate floors SQLite's `now`
+  // to whole seconds via CAST(strftime('%s','now') AS INTEGER), so a fractional
+  // deadline left the trigger armed for up to ~1s AFTER the page clock passed
+  // it — enough for the immediate retry to be rejected a second time (observed:
+  // the retry only succeeded once an extra settle was added).
+  const deadlineSeconds = await page.evaluate(
+    (windowMs) => Math.floor(Date.now() / 1000 + windowMs / 1000),
+    TRANSIENT_WINDOW_MS,
+  );
+  await seedSql(page, sql.replace('__DEADLINE__', String(deadlineSeconds)));
+  // Closing the window is waited out on the APP page's own clock: no
+  // navigation, so React state (and any stale error) survives. The `+1` mirrors
+  // the same floor: expiry is only guaranteed once the floored clock has PASSED
+  // the deadline, not merely reached it.
+  return () =>
+    page
+      .waitForFunction(
+        (deadline) => Math.floor(Date.now() / 1000) >= deadline + 1,
+        deadlineSeconds,
+        { timeout: TRANSIENT_WINDOW_MS + 30_000 },
+      )
+      .then(() => undefined);
+}
+
 test.describe('Workout write-failure honesty', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -205,6 +268,9 @@ test.describe('Workout write-failure honesty', () => {
   test('a rejected routine delete keeps the routine listed and live, and an in-app retry clears the alert', async ({
     page,
   }) => {
+    // The transient window is waited out in real time, so the budget must be
+    // >= 3x the window (see `TRANSIENT_WINDOW_MS`).
+    test.setTimeout(180_000);
     await createRoutine(page, 'Doomed routine');
     // A second routine that is never deleted: it lets the FINAL single DB read
     // prove the failed attempt minted no intent, without an intermediate read
@@ -212,24 +278,14 @@ test.describe('Workout write-failure honesty', () => {
     // exactly what the transient-failure path below must not do).
     await createRoutine(page, 'Survivor routine');
 
-    // TRANSIENT failure, injected so the retry can happen INSIDE the app.
-    //
-    // A permanent `RAISE(ABORT)` trigger can only be removed through the DB
-    // harness, and every harness round trip navigates the page to the harness
-    // document — which tears down React state and forces a reload before the
-    // retry. That reload is what hid this defect: after a remount `actionError`
-    // starts null, so the stale-alert bug could not be observed.
-    //
-    // This trigger aborts only until a wall-clock deadline, so the SAME page
-    // (same React state, same `actionError`) survives the failure and issues the
-    // retry. The window is the modelled transient condition, not app readiness.
-    const deadlineSeconds = await page.evaluate(() => Math.floor(Date.now() / 1000) + 6);
-    await seedSql(
+    // Transient failure so the retry can happen INSIDE the app (see
+    // `injectTransientAbort` for why a counter-trigger cannot be used).
+    const waitForWindowToClose = await injectTransientAbort(
       page,
       `CREATE TRIGGER ${ROUTINE_DELETE}
          BEFORE UPDATE ON workout_routines
          WHEN NEW.deleted_at IS NOT NULL
-           AND CAST(strftime('%s', 'now') AS INTEGER) < ${deadlineSeconds}
+           AND CAST(strftime('%s', 'now') AS INTEGER) < __DEADLINE__
          BEGIN SELECT RAISE(ABORT, 'routine-delete-blocked'); END;`,
     );
     await returnToApp(page);
@@ -250,9 +306,7 @@ test.describe('Workout write-failure honesty', () => {
 
     // Let the injected window close, WITHOUT navigating: the app page's own
     // clock is the signal, so React state (and the stale error, if any) stays.
-    await page.waitForFunction((deadline) => Date.now() / 1000 > deadline, deadlineSeconds, {
-      timeout: 30_000,
-    });
+    await waitForWindowToClose();
 
     // (c) Retry IN APP. The delete now succeeds and the row disappears…
     await swipeLeftRevealWorkoutRoutineRow(page);
@@ -549,16 +603,18 @@ test.describe('Workout write-failure honesty', () => {
   test('a rejected library add reports inside the picker, and an in-app retry clears the alert', async ({
     page,
   }) => {
+    // The transient window is waited out in real time, so the budget must be
+    // >= 3x the window (see `TRANSIENT_WINDOW_MS`).
+    test.setTimeout(180_000);
     await createRoutine(page, 'Library blocked');
-    // TRANSIENT window, so the retry happens INSIDE the app: the picker stays
+    // Transient failure so the retry happens INSIDE the app: the picker stays
     // mounted across it, which is what exposes a stale alert (the same technique
     // the routine-delete case documents in full).
-    const deadlineSeconds = await page.evaluate(() => Math.floor(Date.now() / 1000) + 6);
-    await seedSql(
+    const waitForWindowToClose = await injectTransientAbort(
       page,
       `CREATE TRIGGER ${EXERCISE_INSERT}
          BEFORE INSERT ON routine_exercises
-         WHEN CAST(strftime('%s', 'now') AS INTEGER) < ${deadlineSeconds}
+         WHEN CAST(strftime('%s', 'now') AS INTEGER) < __DEADLINE__
          BEGIN SELECT RAISE(ABORT, 'exercise-add-blocked'); END;`,
     );
     await returnToApp(page);
@@ -573,9 +629,7 @@ test.describe('Workout write-failure honesty', () => {
     await expect(picker.getByRole('alert')).toContainText(COPY.exerciseAdd);
 
     // Let the window close without leaving the page (no harness round trip).
-    await page.waitForFunction((deadline) => Date.now() / 1000 > deadline, deadlineSeconds, {
-      timeout: 30_000,
-    });
+    await waitForWindowToClose();
 
     // (c) Retry IN APP: the add lands, and the picker must not keep claiming it
     // failed while the exercise is already on the routine.
