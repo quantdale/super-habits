@@ -5,6 +5,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { IconButton } from '@/core/ui/IconButton';
 import { TextField } from '@/core/ui/TextField';
+import { ValidationError } from '@/core/ui/ValidationError';
 import { SECTION_COLORS, SECTION_ON_BRIGHT_INK } from '@/constants/sectionColors';
 import {
   getDailyPlan,
@@ -236,16 +237,8 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
         </Text>
       ) : null}
 
-      {carryForwardError ? (
-        <Text className="text-sm" style={{ color: tokens.dangerText }}>
-          {carryForwardError}
-        </Text>
-      ) : null}
-      {saveError ? (
-        <Text className="text-sm" style={{ color: tokens.dangerText }}>
-          {saveError}
-        </Text>
-      ) : null}
+      {carryForwardError ? <ValidationError message={carryForwardError} /> : null}
+      {saveError ? <ValidationError message={saveError} /> : null}
 
       {!isCompleted ? (
         <Pressable

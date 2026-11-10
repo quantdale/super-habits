@@ -60,6 +60,7 @@ import {
   computeResumeDeadlineIso,
   resolveRunningDeadlineMs,
   resolveActivePreset,
+  shouldRestoreGoverningPreset,
   timerEndNotificationCopy,
   type CompletedFocusLogPlan,
   type PomodoroMode,
@@ -154,6 +155,12 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
   const [notificationScheduleFailed, setNotificationScheduleFailed] = useState(false);
   /** Startup was rejected: the timer never started and nothing was recorded. */
   const [startFailedNotice, setStartFailedNotice] = useState(false);
+  /**
+   * A preset selection did not reach SQLite, so the timer was reconciled back
+   * to the stored durations instead of showing a selection the database never
+   * accepted. `null` when the surface has nothing to say.
+   */
+  const [presetApplyError, setPresetApplyError] = useState<string | null>(null);
   /** Secondary disclosure for history, garden, heatmap, and detailed stats. */
   const [showHistory, setShowHistory] = useState(false);
   /** Polite status line: updated on phase changes only, never per second. */
@@ -709,6 +716,9 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       // clock of the running session is untouched, and so is the preset that
       // governs its auto-start, which is frozen with it at claim time.
       const sessionActive = isSessionActive(sessionClaims());
+      const previousStoredPresetId = storedActivePresetId;
+      const previousGoverningPreset = activePresetRef.current;
+      setPresetApplyError(null);
       if (!sessionActive) {
         // Apply to the timer synchronously: the selection is a local
         // interaction, so the next Start must read the new durations even
@@ -717,30 +727,49 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       }
       setStoredActivePresetIdState(preset.id);
       setCompletionSummary(null);
-      void setActivePresetId(preset.id).catch(() => undefined);
       const nextSettings = {
         focusMinutes: preset.focusMinutes,
         shortBreakMinutes: preset.shortBreakMinutes,
         longBreakMinutes: preset.longBreakMinutes,
         sessionsBeforeLongBreak: preset.sessionsBeforeLongBreak,
       };
-      if (sessionActive) return;
-      settingsRef.current = { ...settingsRef.current, ...nextSettings };
-      setSettings((prev) => ({ ...prev, ...nextSettings }));
-      const duration = getModeDuration(currentModeRef.current, nextSettings);
-      setTotalSeconds(duration);
-      totalSecondsRef.current = duration;
-      applyRemaining(duration);
-      lastTickTime.current = null;
+      if (!sessionActive) {
+        settingsRef.current = { ...settingsRef.current, ...nextSettings };
+        setSettings((prev) => ({ ...prev, ...nextSettings }));
+        const duration = getModeDuration(currentModeRef.current, nextSettings);
+        setTotalSeconds(duration);
+        totalSecondsRef.current = duration;
+        applyRemaining(duration);
+        lastTickTime.current = null;
+      }
       try {
-        await savePomodoroSettings(nextSettings);
+        // Write the durations the timer will actually run FIRST: if that is
+        // rejected nothing at all is persisted and the revert below is the
+        // database's own state. The selection is written after, so a selection
+        // failure leaves the highlight resolving from the saved durations
+        // instead of claiming a rhythm the timer never adopted.
+        if (!sessionActive) await savePomodoroSettings(nextSettings);
+        await setActivePresetId(preset.id);
       } catch {
-        // The durable write failed: reconcile the timer back to the stored
-        // settings on the next load instead of showing an unsaved preset.
+        // The write did not land. Reconcile the highlight and the idle timer
+        // back to what SQLite actually holds, and say so instead of leaving an
+        // unsaved selection on screen.
+        setPresetApplyError('Could not save that preset. Try again.');
+        setStoredActivePresetIdState(previousStoredPresetId);
+        // The governing preset is frozen with an accepted session. A rejection
+        // that lands AFTER Start must not revert it: `planSessionCompletion`
+        // reads it for the next mode's auto-start, and the re-sync effect
+        // refuses to repair it while a session owns the clock — so reverting
+        // here would silently strip the running session's Sprint behaviour.
+        // Idle timers still revert (nothing is running to protect).
+        if (shouldRestoreGoverningPreset(isSessionActive(sessionClaims()))) {
+          activePresetRef.current = previousGoverningPreset;
+        }
+        void loadPresets();
         void loadSettings();
       }
     },
-    [applyRemaining, loadSettings, sessionClaims],
+    [applyRemaining, loadPresets, loadSettings, sessionClaims, storedActivePresetId],
   );
 
   useEffect(
@@ -991,6 +1020,20 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
       </ScreenSection>
 
       <BackgroundWarning visible={showWarning} onDismiss={() => setShowWarning(false)} />
+
+      {presetApplyError && !showConfiguration ? (
+        <ScreenSection>
+          {/* The preset surfaces are withdrawn while a session owns the clock,
+              so a rejection that lands AFTER Start has none of them left to
+              report on. This makes the failure visible without ever touching
+              the running session (the governing preset is deliberately kept).
+              Mutually exclusive with the inline copy beside the selector, so
+              the failure is never reported twice. */}
+          <Text accessibilityRole="alert" variant="bodyMd" style={{ color: tokens.dangerText }}>
+            {presetApplyError}
+          </Text>
+        </ScreenSection>
+      ) : null}
 
       {interruptedNotice ||
       recoveredNotice ||
@@ -1358,6 +1401,16 @@ export function PomodoroScreen({ isActive }: { isActive: boolean }) {
                 activePresetId={highlightedPresetId}
                 onSelect={(p) => void handleSelectPreset(p)}
               />
+              {presetApplyError ? (
+                <Text
+                  accessibilityRole="alert"
+                  variant="bodyMd"
+                  style={{ color: tokens.dangerText }}
+                  className="mt-2"
+                >
+                  {presetApplyError}
+                </Text>
+              ) : null}
             </View>
             <View className="mt-3 flex-row flex-wrap gap-2">
               <Button

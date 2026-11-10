@@ -4,6 +4,7 @@ import {
   DEFAULT_SETTINGS,
   planSessionCompletion,
   planActiveTimerReconcile,
+  shouldRestoreGoverningPreset,
   timerEndNotificationCopy,
   type ActiveTimerIntent,
   type PomodoroMode,
@@ -50,6 +51,10 @@ type HarnessState = {
   isPaused: boolean;
   /** Preset governing auto-start; frozen for the duration of a session. */
   governingPreset: PomodoroPreset;
+  /** Stored preset selection (highlight source); reconciled on a rejected write. */
+  storedPresetId: string | null;
+  /** Last surfaced preset-selection failure, if any. */
+  error: string | null;
   /** Durable active-timer intent, exactly as persisted. */
   intent: ActiveTimerIntent | null;
   warning: 'notification' | null;
@@ -71,6 +76,8 @@ function makeTimerHarness(options?: { platform?: 'web' | 'native' }) {
     isRunning: false,
     isPaused: false,
     governingPreset: BUILT_IN_PRESETS[0],
+    storedPresetId: null,
+    error: null,
     intent: null,
     warning: null,
     recovered: null,
@@ -112,6 +119,53 @@ function makeTimerHarness(options?: { platform?: 'web' | 'native' }) {
       applyRemaining(duration);
     }
     return { applied: !sessionActive, governingPreset: state.governingPreset };
+  };
+
+  /**
+   * Mirror of the screen's `handleSelectPreset` DURABLE-WRITE path, including
+   * its failure reconciliation. `write` stands in for
+   * `savePomodoroSettings` + `setActivePresetId` — the real sequence, whose
+   * rejection is what the catch block handles. The catch is the shipped rule
+   * (`shouldRestoreGoverningPreset`), so this exercises production code rather
+   * than a test-only copy of it.
+   */
+  const selectPresetWithWrite = async (
+    preset: PomodoroPreset,
+    write: () => Promise<void>,
+  ): Promise<{ applied: boolean; error: string | null }> => {
+    const sessionActive = isSessionActive(claims());
+    const previousStoredPresetId = state.storedPresetId;
+    const previousGoverningPreset = state.governingPreset;
+    const previousSettings = { ...state.settings };
+    state.error = null;
+    if (!sessionActive) state.governingPreset = preset;
+    state.storedPresetId = preset.id;
+    const nextSettings = { ...state.settings, ...preset };
+    if (!sessionActive) {
+      state.settings = nextSettings;
+      const duration = modeDuration(state.mode, nextSettings);
+      state.totalSeconds = duration;
+      applyRemaining(duration);
+    }
+    try {
+      await write();
+    } catch {
+      const error = 'Could not save that preset. Try again.';
+      state.error = error;
+      state.storedPresetId = previousStoredPresetId;
+      if (shouldRestoreGoverningPreset(isSessionActive(claims()))) {
+        state.governingPreset = previousGoverningPreset;
+        // The screen reconciles the idle clock through `loadSettings()`, which
+        // re-reads the durable defaults; the harness has no database, so it
+        // restores the captured snapshot under the same idle guard.
+        state.settings = previousSettings;
+        const duration = modeDuration(state.mode, previousSettings);
+        state.totalSeconds = duration;
+        applyRemaining(duration);
+      }
+      return { applied: false, error };
+    }
+    return { applied: !sessionActive, error: null };
   };
 
   /** Mirror of the screen's inline duration save. */
@@ -230,6 +284,7 @@ function makeTimerHarness(options?: { platform?: 'web' | 'native' }) {
     scheduleCalls,
     selectMode,
     selectPreset,
+    selectPresetWithWrite,
     saveSettings,
     start,
     completeNaturally,
@@ -569,6 +624,69 @@ describe('timer-start race against in-flight configuration', () => {
     expect(harness.state.mode).toBe('focus');
     expect(harness.state.totalSeconds).toBe(45 * 60);
     expect(harness.state.intent).toMatchObject({ mode: 'focus', totalSeconds: 45 * 60 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A rejected preset write that lands AFTER Start must never touch the session
+
+describe('preset-selection rejection reconciliation', () => {
+  const sprint = BUILT_IN_PRESETS.find((preset) => preset.id === 'sprint')!;
+
+  it('keeps the governing preset of a session started before the rejection', async () => {
+    const gate = deferred<string | null>();
+    const harness = makeTimerHarness();
+
+    // The durable write is still in flight when Start is pressed…
+    const write = harness.selectPresetWithWrite(sprint, async () => {
+      await gate.promise;
+    });
+    expect(harness.state.governingPreset.id).toBe('sprint');
+    // …so the session claims Sprint's clock and Sprint's behaviour.
+    const startPromise = harness.start(undefined, async () => 'notif_preset');
+    await startPromise;
+    expect(harness.state.totalSeconds).toBe(sprint.focusMinutes * 60);
+
+    // The write then rejects, after the session already owns the clock.
+    gate.reject(new Error('settings-write-blocked'));
+    const outcome = await write;
+    expect(outcome.error).toBe('Could not save that preset. Try again.');
+
+    // The running session keeps governing Sprint: restoring the previous preset
+    // here would silently strip its auto-start (the Codex P2 finding).
+    expect(harness.state.governingPreset.id).toBe('sprint');
+    const completion = harness.completeNaturally();
+    expect(completion.autoStartNext).toBe(true);
+
+    // The highlight and the NEXT timer's configuration are still reconciled
+    // away from an unsaved selection.
+    expect(harness.state.storedPresetId).toBeNull();
+  });
+
+  it('reverts the governing preset for an idle timer, where nothing runs to protect', async () => {
+    const harness = makeTimerHarness();
+    const previous = harness.state.governingPreset;
+
+    const outcome = await harness.selectPresetWithWrite(sprint, async () => {
+      throw new Error('settings-write-blocked');
+    });
+
+    expect(outcome.error).toBe('Could not save that preset. Try again.');
+    expect(harness.state.governingPreset.id).toBe(previous.id);
+    expect(harness.state.storedPresetId).toBeNull();
+    // The idle clock is reconciled back to the stored durations too.
+    expect(harness.state.totalSeconds).toBe(DEFAULT_SETTINGS.focusMinutes * 60);
+    expect(harness.state.remaining).toBe(DEFAULT_SETTINGS.focusMinutes * 60);
+  });
+
+  it('applies the selection normally when the durable write succeeds', async () => {
+    const harness = makeTimerHarness();
+    const outcome = await harness.selectPresetWithWrite(sprint, async () => undefined);
+
+    expect(outcome).toEqual({ applied: true, error: null });
+    expect(harness.state.governingPreset.id).toBe('sprint');
+    expect(harness.state.storedPresetId).toBe('sprint');
+    expect(harness.state.totalSeconds).toBe(sprint.focusMinutes * 60);
   });
 });
 
