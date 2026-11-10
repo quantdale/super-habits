@@ -379,6 +379,22 @@ export function matchPresetBySettings(
 }
 
 /**
+ * Whether a rejected preset selection may hand the timer back to the preset
+ * that governed it before the press.
+ *
+ * The governing preset is frozen with an accepted session: `planSessionCompletion`
+ * reads it to decide whether the next mode auto-starts, and the re-sync effect
+ * deliberately refuses to repair it while a session owns the clock. So a
+ * rejection that lands AFTER Start must leave the governing preset alone —
+ * restoring it would silently strip the running session's auto-start
+ * (Sprint -> break auto-start, for example) and hand the user a rhythm they
+ * never chose. Only an idle timer may be reverted.
+ */
+export function shouldRestoreGoverningPreset(sessionActive: boolean): boolean {
+  return !sessionActive;
+}
+
+/**
  * Resolve the preset that drives timer BEHAVIOR (auto-start flags): the stored
  * selection when valid, else the preset whose durations match the current
  * settings, else Classic. The duration-match fallback fixes the silent-Classic

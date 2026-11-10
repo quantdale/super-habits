@@ -326,4 +326,116 @@ test.describe('Focus write-failure honesty', () => {
     });
     await returnToApp(page);
   });
+
+  test('a rejection landing AFTER Start never strips the running session of its preset (auto-start survives)', async ({
+    page,
+  }) => {
+    // Codex P2 on PR #206: the catch block used to restore the previous
+    // governing preset unconditionally. When the selection write survived the
+    // Start press and only then rejected, that revert silently removed Sprint
+    // from the RUNNING session (`planSessionCompletion` reads the governing
+    // preset for `autoStartBreaks`), so the break never auto-started.
+    //
+    // Deterministic ordering with no sleeps: the durable `pomodoro_settings`
+    // WRITE is held at the worker boundary (the established W7 harness
+    // technique) so Start is pressed while it is still in flight; releasing it
+    // afterwards lets the real `RAISE(ABORT)` trigger reject it AFTER the
+    // session owns the clock.
+    await page.addInitScript(() => {
+      const hold = { armed: false, queued: [] as (() => void)[] };
+      const control = window as unknown as {
+        __holdPresetWrite(on: boolean): void;
+        __releasePresetWrite(): void;
+      };
+      control.__holdPresetWrite = (on: boolean) => {
+        hold.armed = on;
+      };
+      control.__releasePresetWrite = () => {
+        hold.armed = false;
+        for (const send of hold.queued.splice(0)) send();
+      };
+      const original = Worker.prototype.postMessage;
+      Worker.prototype.postMessage = function (
+        this: Worker,
+        message: unknown,
+        transferOrOptions?: Transferable[] | StructuredSerializeOptions,
+      ) {
+        const payload = JSON.stringify(message);
+        // Only the settings WRITE carries the preset's durations.
+        if (hold.armed && payload.includes('"pomodoro_settings","1"')) {
+          // SAFETY: the hold/release path forwards the caller's own arguments
+          // verbatim, exactly as an unmodified `postMessage` would.
+          const forward = () =>
+            original.call(
+              this,
+              message,
+              transferOrOptions as Transferable[] & StructuredSerializeOptions,
+            );
+          hold.queued.push(forward);
+          return;
+        }
+        original.call(
+          this,
+          message,
+          transferOrOptions as Transferable[] & StructuredSerializeOptions,
+        );
+      };
+    });
+
+    await seedSql(
+      page,
+      `CREATE TRIGGER ${SETTINGS_TRIGGER}
+         BEFORE INSERT ON app_meta
+         WHEN NEW.key = 'pomodoro_settings'
+         BEGIN SELECT RAISE(ABORT, 'settings-write-blocked'); END;`,
+    );
+    await returnToApp(page);
+    await goToTab(page, 'pomodoro');
+    await installClock(page);
+    await expect(page.getByText('25:00')).toBeVisible();
+
+    // Select Sprint while its durable write is held, then Start.
+    await page.evaluate(() =>
+      (window as unknown as { __holdPresetWrite(on: boolean): void }).__holdPresetWrite(true),
+    );
+    await page.getByRole('button', { name: 'Choose preset' }).click();
+    await page.getByRole('radio', { name: /^Sprint · / }).click();
+    await page.getByText('Start focus', { exact: true }).click();
+    await expect(page.getByText('Pause', { exact: true })).toBeEnabled({ timeout: 3_000 });
+    // The accepted session claimed Sprint's 15-minute focus.
+    await expect(page.getByText('15:00')).toBeVisible();
+
+    // Release: the queued write now reaches SQLite and is rejected.
+    await page.evaluate(() =>
+      (window as unknown as { __releasePresetWrite(): void }).__releasePresetWrite(),
+    );
+
+    // (a) the late failure is still surfaced — exactly once — even though the
+    // preset surfaces are withdrawn for the running session.
+    await expect(page.getByRole('alert')).toHaveCount(1);
+    await expect(page.getByRole('alert')).toHaveText('Could not save that preset. Try again.');
+    // The running clock is untouched by the reconciliation.
+    await expect(page.getByText('15:00')).toBeVisible();
+    await expect(page.getByText('Focus started — 15 minutes')).toBeVisible();
+
+    // (b) the session still completes with SPRINT's behaviour: the short break
+    // auto-starts. On the pre-fix code the governing preset reverted to Classic
+    // (`autoStartBreaks: false`), so this wait is the regression assertion.
+    await page.clock.fastForward(15 * 60 * 1000);
+    await expect(page.getByLabel(/^Short Break running, \d{2}:\d{2} remaining$/)).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByText('Pause', { exact: true })).toBeVisible();
+
+    // Durable truth: nothing was stored for the rejected selection, and only
+    // the completed focus session was logged once (breaks never log).
+    await returnToApp(page);
+    expect(await settingsValue(page)).toEqual([]);
+    const sessions = await queryRows(
+      page,
+      'SELECT COUNT(*) AS n, SUM(duration_seconds) AS total FROM pomodoro_sessions',
+    );
+    expect(Number(sessions[0]?.n ?? 0)).toBe(1);
+    expect(Number(sessions[0]?.total ?? 0)).toBe(15 * 60);
+  });
 });
