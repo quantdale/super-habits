@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
+import { Card } from '@/core/ui/Card';
 import { IconButton } from '@/core/ui/IconButton';
 import { TextField } from '@/core/ui/TextField';
 import { ValidationError } from '@/core/ui/ValidationError';
@@ -43,6 +44,9 @@ type AdherenceSummary = {
   completedStreak: number;
 };
 
+/** Curated read-failure copy (never the raw engine message). */
+const PLAN_LOAD_ERROR = 'Could not load your plan. Try again.';
+
 export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
   const { tokens, sectionAccents } = useAppTheme();
   const today = dateKey ?? toDateKey();
@@ -65,6 +69,13 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
   const [showPriorityPicker, setShowPriorityPicker] = useState(false);
   const [showPlanningOptions, setShowPlanningOptions] = useState(false);
   const [showReflection, setShowReflection] = useState(false);
+  // A rejected READ is its own state. Before the first successful load it
+  // replaces the editor (an editor over an unread plan invites a blind
+  // overwrite that would erase the real one); after it, a failed refresh only
+  // adds a notice and keeps the loaded plan on screen.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [retryingLoad, setRetryingLoad] = useState(false);
 
   const loadPlanData = useCallback(
     () =>
@@ -120,21 +131,35 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
 
   const refresh = useCallback(async () => {
     const isCurrent = begin();
-    const data = await loadPlanData();
-    applyLoadedPlan(isCurrent, data);
+    try {
+      const data = await loadPlanData();
+      if (!isCurrent()) return;
+      applyLoadedPlan(isCurrent, data);
+      setLoadError(null);
+      setHasLoaded(true);
+    } catch {
+      // Surface the rejected read instead of leaking an unhandled rejection.
+      // Nothing is applied, so a failed REFRESH can never blank the plan that
+      // is already on screen.
+      if (isCurrent()) setLoadError(PLAN_LOAD_ERROR);
+    }
   }, [begin, loadPlanData, applyLoadedPlan]);
 
   useEffect(() => {
-    const isCurrent = begin();
-    let active = true;
-    void (async () => {
-      const data = await loadPlanData();
-      if (active) applyLoadedPlan(isCurrent, data);
-    })();
-    return () => {
-      active = false;
-    };
-  }, [begin, loadPlanData, applyLoadedPlan]);
+    // The initial read is asynchronous; scheduling it on a microtask keeps the
+    // effect free of a synchronous setState cascade (same pattern as the
+    // activity timeline's initial load).
+    queueMicrotask(() => void refresh());
+  }, [refresh]);
+
+  const handleRetryLoad = useCallback(async () => {
+    setRetryingLoad(true);
+    try {
+      await refresh();
+    } finally {
+      setRetryingLoad(false);
+    }
+  }, [refresh]);
 
   const toggleTodo = useCallback(
     (todoId: string) => {
@@ -216,6 +241,34 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
     .filter((t) => !topTodoIds.includes(t.id))
     .filter((t) => normalizedQuery.length === 0 || t.title.toLowerCase().includes(normalizedQuery));
 
+  // Nothing has ever been read successfully: render the failure INSTEAD of the
+  // editor. Showing an empty editor here would read as "today is unsaved" and
+  // a Save from it would overwrite the plan that actually exists. `retryingLoad`
+  // keeps this branch mounted for the whole retry, so a pending read can never
+  // fall through to an apparently-empty editor.
+  if ((loadError || retryingLoad) && !hasLoaded) {
+    return (
+      <View className="gap-3">
+        <View className="gap-1">
+          <Text className="text-lg font-bold" style={{ color: tokens.text }}>
+            Plan for {today}
+          </Text>
+        </View>
+        <Card>
+          <View className="gap-2 py-1">
+            {loadError ? <ValidationError message={loadError} /> : null}
+            <Button
+              label="Retry loading the plan"
+              variant="ghost"
+              loading={retryingLoad}
+              onPress={() => void handleRetryLoad()}
+            />
+          </View>
+        </Card>
+      </View>
+    );
+  }
+
   return (
     <View className="gap-3">
       <View className="gap-1">
@@ -239,6 +292,20 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
 
       {carryForwardError ? <ValidationError message={carryForwardError} /> : null}
       {saveError ? <ValidationError message={saveError} /> : null}
+      {/* A failed REFRESH (post-delete, post-action, foreground) keeps the plan
+          already on screen and adds only the notice + retry, so a rejected
+          re-read can never blank the editor. */}
+      {loadError && hasLoaded ? (
+        <View className="gap-2">
+          <ValidationError message={loadError} />
+          <Button
+            label="Retry loading the plan"
+            variant="ghost"
+            loading={retryingLoad}
+            onPress={() => void handleRetryLoad()}
+          />
+        </View>
+      ) : null}
 
       {!isCompleted ? (
         <Pressable
