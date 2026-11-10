@@ -2,15 +2,22 @@ import { Text } from '@/core/ui/Text';
 import { Pressable } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { readableSurface } from '@/core/theme/contrast';
-import { Card } from '@/core/ui/Card';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { COMMAND_EXPERIMENT_ENABLED } from '@/features/command/types';
-import { SettingsRow, SettingsSectionHeading } from './SettingsSharedUi';
+import { SettingsGroup, SettingsRow, SettingsSectionHeading } from './SettingsSharedUi';
 
 type SettingsCommandSectionProps = {
   onOpenCommandCenter: () => void;
 };
 
+/**
+ * Settings → Capture (Playful Momentum §7: bold group title, rows in a
+ * `depth.flat` group, no narration paragraphs).
+ *
+ * The two rows state what "Describe it" is and which capture path is the
+ * default; the supporting sentences live in Details instead of standing in
+ * front of the control.
+ */
 export function SettingsCommandSection({ onOpenCommandCenter }: SettingsCommandSectionProps) {
   const { tokens } = useAppTheme();
 
@@ -21,9 +28,8 @@ export function SettingsCommandSection({ onOpenCommandCenter }: SettingsCommandS
         title="Advanced capture"
         accentColor={tokens.textMuted}
       />
-      <Card accentColor={tokens.textMuted} className="mb-0">
+      <SettingsGroup>
         <SettingsRow
-          first
           label="Describe it"
           value="Write a task, habit, meal, workout, or focus action naturally."
           explanation="super-habits prepares a draft and waits for your review before anything is saved."
@@ -43,30 +49,25 @@ export function SettingsCommandSection({ onOpenCommandCenter }: SettingsCommandS
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Open advanced capture from settings"
-            className="mt-4 rounded-2xl px-4 py-3"
+            className="mt-4 items-center justify-center"
             style={{
               // textMuted is a text-role token: in dark themes it lightens past
-              // AA against fixed light label text (dark #A9A4C9 measured
-              // 2.38:1). Deepen the fill until textOnAccent clears 4.5 while
-              // keeping the hue; no-op where it already passes (light).
+              // AA against fixed light label text. Deepen the fill until
+              // textOnAccent clears 4.5 while keeping the hue; no-op where it
+              // already passes (light).
               backgroundColor: readableSurface(tokens.textMuted, tokens.textOnAccent),
-              shadowColor: tokens.shadowColor,
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.08,
-              shadowRadius: 12,
-              elevation: 1,
+              borderRadius: 16,
+              minHeight: 44,
+              paddingHorizontal: 16,
             }}
             onPress={onOpenCommandCenter}
           >
-            <Text
-              className="text-center text-sm font-semibold"
-              style={{ color: tokens.textOnAccent }}
-            >
+            <Text variant="button" style={{ color: tokens.textOnAccent }}>
               Open advanced capture
             </Text>
           </Pressable>
         ) : null}
-      </Card>
+      </SettingsGroup>
     </ScreenSection>
   );
 }

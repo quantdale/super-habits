@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useAppBootstrapState } from '@/core/providers/appBootstrapContext';
-import { Card } from '@/core/ui/Card';
+
 import { Button } from '@/core/ui/Button';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { exportPortableBackup } from '@/core/portable/portableExport';
@@ -22,6 +22,8 @@ import {
 import type { PortableBackupFile, PortableImportPreview } from '@/core/portable/portable.types';
 import { inspectLocalAccountDataState } from '@/core/auth/account.data';
 import { isDeviceEmptyForRestore } from '@/core/backup/backupRestore';
+import { ScreenSection } from '@/core/ui/ScreenSection';
+import { SettingsGroup, SettingsRow, SettingsSectionHeading } from './SettingsSharedUi';
 
 const PORTABLE_ACCENT = '#0f766e';
 
@@ -210,168 +212,161 @@ export function SettingsPortableSection() {
   }, [preview, pendingFile, importing, refreshAccountState]);
 
   return (
-    <Card accentColor={PORTABLE_ACCENT} className="mb-0">
-      <View className="flex-row items-start justify-between gap-3">
-        <View className="min-w-0 flex-1">
-          <Text className="text-base font-semibold" style={{ color: tokens.text }}>
-            Portable data
-          </Text>
-          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-            Create a portable copy of your Super Habits data, or import one on an empty device.
-            Portable backup works without an account and does not touch cloud backup.
-          </Text>
-        </View>
-      </View>
-
-      <View
-        className="mt-3 rounded-2xl border px-4 py-3"
-        style={{ borderColor: tokens.warningBorder, backgroundColor: tokens.warningBackground }}
-      >
-        <Text className="text-sm font-semibold" style={{ color: tokens.warningText }}>
-          Before you export
-        </Text>
-        <Text className="mt-1 text-sm leading-6" style={{ color: tokens.warningText }}>
-          This file contains your Super Habits data. Store it somewhere you trust. The exported file
-          is not encrypted — anyone with the file can read its contents.
-        </Text>
-      </View>
-
-      <ValidationError message={error} />
-      {message ? (
-        <View className="mt-2">
-          <Text
-            className="text-sm leading-6"
-            accessibilityRole="alert"
-            style={{ color: tokens.accent }}
-          >
-            {message}
-          </Text>
-        </View>
-      ) : null}
-
-      <View className="mt-4 gap-2">
-        <Button
-          label={exporting ? 'Exporting...' : 'Export data'}
-          onPress={() => void handleExport()}
-          disabled={exporting}
-          color={PORTABLE_ACCENT}
+    <ScreenSection>
+      <SettingsSectionHeading
+        eyebrow="Portable data"
+        title="Move a copy between devices"
+        accentColor={PORTABLE_ACCENT}
+      />
+      <SettingsGroup accentColor={PORTABLE_ACCENT}>
+        <SettingsRow
+          first
+          label="Portable data"
+          value="Create a copy of your data, or import one on an empty device."
+          explanation="Portable backup works without an account and does not touch cloud backup. Import replaces an empty device only; it never merges into local data."
+          statusLabel="Offline"
+          accentColor={PORTABLE_ACCENT}
         />
-        <Button
-          label={validating ? 'Reading file...' : importing ? 'Importing...' : 'Import data'}
-          onPress={() => {
-            if (Platform.OS === 'web') {
-              webFileInputRef.current?.click();
-            } else {
-              void handlePickNative();
-            }
-          }}
-          disabled={importDisabled}
-          variant="ghost"
-        />
-        {!deviceEmpty ? (
-          <Text className="text-sm leading-6" style={{ color: tokens.textMuted }}>
-            Import is available only on an empty device. This device contains local data, so
-            portable import is paused here.
-          </Text>
-        ) : null}
-      </View>
 
-      {Platform.OS === 'web' ? (
-        <input
-          ref={webFileInputRef}
-          type="file"
-          accept="application/json,.json"
-          className="hidden"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) void handlePickWeb(file);
-            event.target.value = '';
-          }}
-        />
-      ) : null}
-
-      {preview ? (
         <View
-          className="mt-4 rounded-2xl border px-4 py-3"
-          style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+          className="mt-3 rounded-2xl border px-4 py-3"
+          style={{ borderColor: tokens.warningBorder, backgroundColor: tokens.warningBackground }}
         >
-          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-            Portable Super Habits backup
+          <Text variant="bodyMd" className="font-bold" style={{ color: tokens.warningText }}>
+            Before you export
           </Text>
-          <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-            {selectedFileName ?? 'Selected file'}
+          <Text variant="caption" className="mt-1" style={{ color: tokens.warningText }}>
+            This file contains your Super Habits data. Store it somewhere you trust. The exported
+            file is not encrypted — anyone with the file can read its contents.
           </Text>
-          {preview.exportedAt ? (
-            <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-              Created: {new Date(preview.exportedAt).toLocaleString()}
+        </View>
+
+        <ValidationError message={error} />
+        {message ? (
+          <View className="mt-2">
+            <Text variant="caption" accessibilityRole="alert" style={{ color: tokens.accent }}>
+              {message}
+            </Text>
+          </View>
+        ) : null}
+
+        <View className="mt-4 gap-2">
+          <Button
+            label={exporting ? 'Exporting...' : 'Export data'}
+            onPress={() => void handleExport()}
+            disabled={exporting}
+            color={PORTABLE_ACCENT}
+          />
+          <Button
+            label={validating ? 'Reading file...' : importing ? 'Importing...' : 'Import data'}
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                webFileInputRef.current?.click();
+              } else {
+                void handlePickNative();
+              }
+            }}
+            disabled={importDisabled}
+            variant="ghost"
+          />
+          {!deviceEmpty ? (
+            <Text variant="caption" tone="muted">
+              Import is available only on an empty device. This device contains local data, so
+              portable import is paused here.
             </Text>
           ) : null}
-
-          <View className="mt-3">
-            <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-              Contains
-            </Text>
-            {describePortableCounts(preview.counts).map(({ label, count }) => (
-              <Text
-                key={label}
-                className="mt-1 text-sm leading-6"
-                style={{ color: tokens.textMuted }}
-              >
-                {label}: {count.toLocaleString()}
-              </Text>
-            ))}
-            <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-              Settings: {preview.settingsIncluded ? 'included' : 'not included'}
-            </Text>
-            <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-              Integrity: {preview.integrityVerified ? 'Verified' : 'Failed'}
-            </Text>
-          </View>
-
-          <View className="mt-3">
-            <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-              Account compatibility
-            </Text>
-            <Text className="mt-1 text-sm leading-6" style={{ color: tokens.textMuted }}>
-              {preview.ownerMessage}
-            </Text>
-            {preview.disclosures.map((disclosure) => (
-              <Text
-                key={disclosure}
-                className="mt-1 text-sm leading-6"
-                style={{ color: tokens.textMuted }}
-              >
-                {disclosure}
-              </Text>
-            ))}
-          </View>
-
-          {preview.warnings.map((warning) => (
-            <Text
-              key={warning}
-              className="mt-2 text-sm leading-6"
-              style={{ color: tokens.warningText }}
-            >
-              {warning}
-            </Text>
-          ))}
-
-          <View className="mt-4 gap-2">
-            <Button
-              label={importing ? 'Importing...' : 'Import'}
-              onPress={() => void handleConfirmImport()}
-              disabled={importing}
-              color={PORTABLE_ACCENT}
-            />
-            <Button
-              label="Cancel"
-              onPress={handleCancelImport}
-              disabled={importing}
-              variant="ghost"
-            />
-          </View>
         </View>
-      ) : null}
-    </Card>
+
+        {Platform.OS === 'web' ? (
+          <input
+            ref={webFileInputRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void handlePickWeb(file);
+              event.target.value = '';
+            }}
+          />
+        ) : null}
+
+        {preview ? (
+          <View
+            className="mt-4 rounded-2xl border px-4 py-3"
+            style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+          >
+            <Text variant="bodyMd" className="font-bold">
+              Portable Super Habits backup
+            </Text>
+            <Text variant="caption" tone="muted" className="mt-1">
+              {selectedFileName ?? 'Selected file'}
+            </Text>
+            {preview.exportedAt ? (
+              <Text variant="caption" tone="muted" className="mt-1">
+                Created: {new Date(preview.exportedAt).toLocaleString()}
+              </Text>
+            ) : null}
+
+            <View className="mt-3">
+              <Text variant="bodyMd" className="font-bold">
+                Contains
+              </Text>
+              {describePortableCounts(preview.counts).map(({ label, count }) => (
+                <Text key={label} variant="caption" tone="muted" className="mt-1">
+                  {label}: {count.toLocaleString()}
+                </Text>
+              ))}
+              <Text variant="caption" tone="muted" className="mt-1">
+                Settings: {preview.settingsIncluded ? 'included' : 'not included'}
+              </Text>
+              <Text variant="caption" tone="muted" className="mt-1">
+                Integrity: {preview.integrityVerified ? 'Verified' : 'Failed'}
+              </Text>
+            </View>
+
+            <View className="mt-3">
+              <Text variant="bodyMd" className="font-bold">
+                Account compatibility
+              </Text>
+              <Text variant="caption" tone="muted" className="mt-1">
+                {preview.ownerMessage}
+              </Text>
+              {preview.disclosures.map((disclosure) => (
+                <Text key={disclosure} variant="caption" tone="muted" className="mt-1">
+                  {disclosure}
+                </Text>
+              ))}
+            </View>
+
+            {preview.warnings.map((warning) => (
+              <Text
+                key={warning}
+                variant="caption"
+                className="mt-2"
+                style={{ color: tokens.warningText }}
+              >
+                {warning}
+              </Text>
+            ))}
+
+            <View className="mt-4 gap-2">
+              <Button
+                label={importing ? 'Importing...' : 'Import'}
+                onPress={() => void handleConfirmImport()}
+                disabled={importing}
+                color={PORTABLE_ACCENT}
+              />
+              <Button
+                label="Cancel"
+                onPress={handleCancelImport}
+                disabled={importing}
+                variant="ghost"
+              />
+            </View>
+          </View>
+        ) : null}
+      </SettingsGroup>
+    </ScreenSection>
   );
 }
