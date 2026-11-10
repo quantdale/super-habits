@@ -113,6 +113,7 @@ import { validateRoutineName } from '@/lib/validation';
 import { createSubmitGuard } from '@/lib/submitGuard';
 import { BodyWeightCard, WorkoutProgressCard, WorkoutTotalsCard } from './WorkoutGymPanels';
 import { BUILT_IN_EXERCISES } from './exerciseCatalog';
+import { workoutWriteFailureCopy } from './workoutWriteFailure';
 
 const COLOR = SECTION_COLORS.workout;
 
@@ -476,6 +477,11 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const [currentView, setCurrentView] = useState<ViewState>({ type: 'list' });
   const [routineModal, setRoutineModal] = useState<RoutineModalState | null>(null);
   const [workoutError, setWorkoutError] = useState<string | null>(null);
+  // Failure copy for the surfaces whose rejection cannot land in the landing
+  // form (route deletes, quick logs, weight-row deletes). The landing's own
+  // `workoutError` sits inside the New routine card, so it is invisible from
+  // those surfaces; each of them names its own failure here instead.
+  const [actionError, setActionError] = useState<string | null>(null);
   // Synchronous re-entry guards for the async write paths: React state
   // updates are async, so two taps in the same tick would both pass a state
   // check and persist twice (CG-3 defect class). tryStart() is synchronous
@@ -499,6 +505,21 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   const [customExercises, setCustomExercises] = useState<CustomExercise[]>([]);
   const [selectedProgressExercise, setSelectedProgressExercise] = useState<string | null>(null);
   const [weekEditorVisible, setWeekEditorVisible] = useState(false);
+  // The recurring-template chips write straight from the "Plan your week"
+  // sheet, whose rejections must be reported INSIDE that sheet (the landing
+  // form's `workoutError` is behind the scrim and unreachable).
+  const [weekError, setWeekError] = useState<string | null>(null);
+  // Row actions inside the History & insights disclosure (body-weight delete)
+  // report beside the card that owns the row, so the message is where the user
+  // is looking instead of at the top of a long page.
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  // The per-day assignment sheet owns its own failure copy: reusing the form's
+  // `workoutError` would print the same sentence twice on screen (the form is
+  // just behind the scrim), and the message belongs where the user acted.
+  const [daySheetError, setDaySheetError] = useState<string | null>(null);
+  // The move dialog owns its own alert too: a rejection there must be readable
+  // while the dialog is the only interactive surface.
+  const [rescheduleError, setRescheduleError] = useState<string | null>(null);
   // W9.1: the focused per-day assignment sheet replaces the old "Change
   // today" modal. `scope` is explicit so a one-day override can never be
   // confused with the recurring weekly template.
@@ -616,7 +637,15 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         return;
       }
       setWorkoutError(null);
-      await addRoutine(name.trim(), description.trim());
+
+      try {
+        await addRoutine(name.trim(), description.trim());
+      } catch (error) {
+        // A rejected create must not vanish: keep the typed name/description
+        // (so a retry needs no re-typing) and say so on the form that owns it.
+        setWorkoutError(workoutWriteFailureCopy(error, 'Could not add the routine. Try again.'));
+        return;
+      }
       setName('');
       setDescription('');
       void refresh();
@@ -639,7 +668,18 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       });
       if (!confirmed) return;
 
-      await deleteRoutine(routine.id);
+      try {
+        await deleteRoutine(routine.id);
+      } catch (error) {
+        // The routine is still live; report it on the landing that owns the
+        // row instead of closing the flow as if it had been removed.
+        setActionError(workoutWriteFailureCopy(error, 'Could not remove the routine. Try again.'));
+        return;
+      }
+      // Clear the previous failure only once the write landed: a retry that
+      // succeeds must not leave "Could not remove the routine" on a landing
+      // whose row is already gone.
+      setActionError(null);
       if (routineModal?.routineId === routine.id) {
         setRoutineModal(null);
       }
@@ -860,7 +900,20 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       confirmVariant: 'danger',
     });
     if (!confirmed) return;
-    if (pendingSave) await clearWorkoutPendingSave(pendingSave);
+    if (pendingSave) {
+      try {
+        await clearWorkoutPendingSave(pendingSave);
+      } catch (error) {
+        // The recovery record is still durable: dropping the React copy here
+        // would hide a session that a remount would resurrect, so keep it and
+        // report the failed discard instead.
+        setActionError(
+          workoutWriteFailureCopy(error, 'Could not discard that workout. Try again.'),
+        );
+        return;
+      }
+    }
+    setActionError(null);
     setPendingSave(null);
   }, [confirm, pendingSave]);
 
@@ -872,7 +925,19 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       confirmVariant: 'danger',
     });
     if (!confirmed) return;
-    if (draft) await clearWorkoutSessionDraft(draft);
+    if (draft) {
+      try {
+        await clearWorkoutSessionDraft(draft);
+      } catch (error) {
+        // Same rule as the finished-workout discard: never hide a draft the
+        // database still holds.
+        setActionError(
+          workoutWriteFailureCopy(error, 'Could not discard that workout. Try again.'),
+        );
+        return;
+      }
+    }
+    setActionError(null);
     setDraft(null);
   }, [confirm, draft]);
 
@@ -1038,13 +1103,34 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       } catch (error) {
         // Keep the assignment sheet open with the reason instead of closing as
         // if the day was assigned.
-        setWorkoutError(error instanceof Error ? error.message : 'Could not assign the day.');
+        setDaySheetError(workoutWriteFailureCopy(error, 'Could not save that day. Try again.'));
         return;
       }
+      setDaySheetError(null);
       setDaySheet(null);
       await refresh();
     },
     [refresh, todayKey],
+  );
+
+  /**
+   * Recurring-template chip write from the "Plan your week" sheet. The chip
+   * paints its selected state from the reloaded plan, so a rejected write
+   * leaves the stored assignment untouched — it only needs to be announced
+   * inside the sheet that owns the control.
+   */
+  const saveWeeklyPlanChip = useCallback(
+    async (write: () => Promise<void>): Promise<void> => {
+      try {
+        await write();
+      } catch (error) {
+        setWeekError(workoutWriteFailureCopy(error, 'Could not save that day. Try again.'));
+        return;
+      }
+      setWeekError(null);
+      await refresh();
+    },
+    [refresh],
   );
 
   /** The landing's single dominant training action. */
@@ -1096,7 +1182,14 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       confirmVariant: 'danger',
     });
     if (!confirmed) return;
-    await deleteBodyWeightEntry(entry.id);
+    try {
+      await deleteBodyWeightEntry(entry.id);
+    } catch (error) {
+      // The measurement is still stored and still on the card.
+      setHistoryError(workoutWriteFailureCopy(error, 'Could not delete that entry. Try again.'));
+      return;
+    }
+    setHistoryError(null);
     await refresh();
   };
 
@@ -1191,6 +1284,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         onSelectExercise={setSelectedProgressExercise}
         weightUnit={displayWeightUnit}
       />
+      <ValidationError message={historyError} />
       <BodyWeightCard
         entries={bodyWeightEntries}
         goalWeight={workoutPreferences?.goalWeight ?? null}
@@ -1271,6 +1365,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
           This recurring template uses Monday–Sunday local calendar days. A date override never
           edits these rows.
         </Text>
+        <ValidationError message={weekError} />
         <View className="gap-4">
           {Array.from({ length: 7 }, (_, index) => index + 1).map((weekday) => (
             <View key={weekday}>
@@ -1290,8 +1385,8 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                   }
                   color={COLOR}
                   onPress={() =>
-                    void upsertWeeklyPlanEntry({ weekday, planKind: 'rest', routineId: null }).then(
-                      refresh,
+                    void saveWeeklyPlanChip(() =>
+                      upsertWeeklyPlanEntry({ weekday, planKind: 'rest', routineId: null }),
                     )
                   }
                 />
@@ -1306,11 +1401,13 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                     }
                     color={COLOR}
                     onPress={() =>
-                      void upsertWeeklyPlanEntry({
-                        weekday,
-                        planKind: 'workout',
-                        routineId: routine.id,
-                      }).then(refresh)
+                      void saveWeeklyPlanChip(() =>
+                        upsertWeeklyPlanEntry({
+                          weekday,
+                          planKind: 'workout',
+                          routineId: routine.id,
+                        }),
+                      )
                     }
                   />
                 ))}
@@ -1333,6 +1430,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       >
         {daySheet !== null ? (
           <>
+            <ValidationError message={daySheetError} />
             {daySheet.weekday === todayWeekdayNum ? (
               <View className="mb-3 flex-row gap-2">
                 <PillChip
@@ -1405,6 +1503,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
           onChangeText={setRescheduleDateInput}
           placeholder="YYYY-MM-DD"
         />
+        <ValidationError message={rescheduleError} />
         <Button
           label="Move workout"
           color={COLOR}
@@ -1421,6 +1520,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
               routineId,
             }).then(
               () => {
+                setRescheduleError(null);
                 setRescheduleVisible(false);
                 void refresh();
               },
@@ -1429,8 +1529,8 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                 // dialog open with the reason instead of vanishing silently.
                 // The second-argument form keeps a later refresh failure from
                 // being mislabeled as a failed move.
-                setWorkoutError(
-                  error instanceof Error ? error.message : 'Could not move the workout.',
+                setRescheduleError(
+                  workoutWriteFailureCopy(error, 'Could not move the workout. Try again.'),
                 );
               },
             );
@@ -1618,6 +1718,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
       <Screen scroll>
         <ScreenSection>
           <PageHeader title="Workout" />
+          <ValidationError message={actionError} />
           <View className="mt-1 flex-row items-center gap-2">
             <MaterialIcons name="today" size={14} color={tokens.textMuted} />
             <Text className="min-w-0 flex-1 text-sm" style={{ color: tokens.textMuted }}>
@@ -1700,7 +1801,10 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                     variant="ghost"
                     size="sm"
                     onColor={COLOR}
-                    onPress={() => setDaySheet({ weekday: todayWeekdayNum, scope: 'today' })}
+                    onPress={() => {
+                      setDaySheetError(null);
+                      setDaySheet({ weekday: todayWeekdayNum, scope: 'today' });
+                    }}
                   />
                 </View>
                 {trainingState.kind === 'scheduled' ? (
@@ -1714,6 +1818,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                         const next = new Date();
                         next.setDate(next.getDate() + 1);
                         setRescheduleDateInput(toDateKey(next));
+                        setRescheduleError(null);
                         setRescheduleVisible(true);
                       }}
                     />
@@ -1725,7 +1830,10 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                       variant="ghost"
                       size="sm"
                       onColor={COLOR}
-                      onPress={() => setWeekEditorVisible(true)}
+                      onPress={() => {
+                        setWeekError(null);
+                        setWeekEditorVisible(true);
+                      }}
                     />
                   </View>
                 )}
@@ -1762,7 +1870,16 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                       if (result.status === 'applied' && result.logId) {
                         recordAction('workout', result.logId);
                       }
+                      setActionError(null);
                       void refresh();
+                    } catch (error) {
+                      // A rejected quick log must not look like a logged
+                      // session: no reward was attributed and nothing is in
+                      // history, so say it on the landing that owns the action
+                      // and keep the ring free for a retry.
+                      setActionError(
+                        workoutWriteFailureCopy(error, 'Could not log the workout. Try again.'),
+                      );
                     } finally {
                       quickCompleteGuardRef.current.finish();
                     }
@@ -1785,19 +1902,23 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
               variant="ghost"
               size="sm"
               accessibilityLabel="Edit weekly plan"
-              onPress={() => setWeekEditorVisible(true)}
+              onPress={() => {
+                setWeekError(null);
+                setWeekEditorVisible(true);
+              }}
             />
           </View>
           <Card accentColor={COLOR} className="mb-0">
             <View className="pb-2">
               <WeekDayNodesRow
                 cells={weekStrip}
-                onOpenDay={(cell) =>
+                onOpenDay={(cell) => {
+                  setDaySheetError(null);
                   setDaySheet({
                     weekday: cell.weekday,
                     scope: cell.isToday ? 'today' : 'weekly',
-                  })
-                }
+                  });
+                }}
               />
             </View>
             {weekStrip.map((cell) => (
@@ -1807,9 +1928,13 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                 onRest={() =>
                   void assignWeekday(cell.weekday, null, cell.isToday ? 'today' : 'weekly')
                 }
-                onAssign={() =>
-                  setDaySheet({ weekday: cell.weekday, scope: cell.isToday ? 'today' : 'weekly' })
-                }
+                onAssign={() => {
+                  setDaySheetError(null);
+                  setDaySheet({
+                    weekday: cell.weekday,
+                    scope: cell.isToday ? 'today' : 'weekly',
+                  });
+                }}
               />
             ))}
           </Card>
