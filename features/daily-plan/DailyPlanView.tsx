@@ -243,8 +243,10 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
 
   // Nothing has ever been read successfully: render the failure INSTEAD of the
   // editor. Showing an empty editor here would read as "today is unsaved" and
-  // a Save from it would overwrite the plan that actually exists.
-  if (loadError && !hasLoaded) {
+  // a Save from it would overwrite the plan that actually exists. `retryingLoad`
+  // keeps this branch mounted for the whole retry, so a pending read can never
+  // fall through to an apparently-empty editor.
+  if ((loadError || retryingLoad) && !hasLoaded) {
     return (
       <View className="gap-3">
         <View className="gap-1">
@@ -254,7 +256,7 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
         </View>
         <Card>
           <View className="gap-2 py-1">
-            <ValidationError message={loadError} />
+            {loadError ? <ValidationError message={loadError} /> : null}
             <Button
               label="Retry loading the plan"
               variant="ghost"

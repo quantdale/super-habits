@@ -73,9 +73,13 @@ export function ReviewHistoryView() {
 
   const handleRetryLoad = useCallback(async () => {
     setRetrying(true);
-    setLoadError(null);
+    // The failure surface stays mounted for the whole retry: clearing the error
+    // here would leave an empty `reviews` list with no error, which renders as
+    // the false claim "No past reviews yet" until the read settles.
     try {
-      setReviews(await listWeeklyReviews(26));
+      const next = await listWeeklyReviews(26);
+      setReviews(next);
+      setLoadError(null);
     } catch {
       setLoadError(HISTORY_LOAD_ERROR);
     } finally {
@@ -132,12 +136,13 @@ export function ReviewHistoryView() {
   }
 
   // The failure surface REPLACES the empty state: rendering both would claim
-  // the user has no reviews at the same moment the read failed.
-  if (loadError && reviews.length === 0) {
+  // the user has no reviews at the same moment the read failed (or while its
+  // retry is still in flight). Only a SUCCESSFUL read clears the notice.
+  if ((loadError || retrying) && reviews.length === 0) {
     return (
       <Card>
         <View style={{ gap: spacing.sm, paddingVertical: spacing.xs }}>
-          <ValidationError message={loadError} />
+          {loadError ? <ValidationError message={loadError} /> : null}
           <Button
             label="Retry loading past reviews"
             variant="ghost"

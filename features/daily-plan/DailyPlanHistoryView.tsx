@@ -81,9 +81,13 @@ export function DailyPlanHistoryView({ onPlanDeleted }: { onPlanDeleted?: () => 
 
   const handleRetryLoad = useCallback(async () => {
     setRetrying(true);
-    setLoadError(null);
+    // The failure surface stays mounted for the whole retry: clearing the error
+    // here would leave an empty `entries` list with no error, which renders as
+    // the false claim "No past plans yet" until the read settles.
     try {
-      setEntries(await buildEntries());
+      const next = await buildEntries();
+      setEntries(next);
+      setLoadError(null);
     } catch {
       setLoadError(HISTORY_LOAD_ERROR);
     } finally {
@@ -141,12 +145,13 @@ export function DailyPlanHistoryView({ onPlanDeleted }: { onPlanDeleted?: () => 
   }
 
   // The failure surface REPLACES the empty state: rendering both would claim
-  // the user has no history at the same moment the read failed.
-  if (loadError && entries.length === 0) {
+  // the user has no history at the same moment the read failed (or while its
+  // retry is still in flight). Only a SUCCESSFUL read clears the notice.
+  if ((loadError || retrying) && entries.length === 0) {
     return (
       <Card>
         <View className="gap-2 py-1">
-          <ValidationError message={loadError} />
+          {loadError ? <ValidationError message={loadError} /> : null}
           <Button
             label="Retry loading plan history"
             variant="ghost"

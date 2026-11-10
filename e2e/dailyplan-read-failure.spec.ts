@@ -42,7 +42,17 @@ import { browserLocalDateKeyOffset } from './helpers/browserDate';
  */
 
 /** Rules are matched against the SQL text of `prepare` worker messages. */
-type ReadFailureRule = { include: string[]; exclude?: string[] };
+type ReadFailureRule = {
+  include: string[];
+  exclude?: string[];
+  /**
+   * `fail` (default) rewrites the matched statement so it cannot prepare, so
+   * the read REJECTS immediately. `hold` instead queues the worker message and
+   * sends nothing, so the read stays PENDING until `releaseHeldReads()` — the
+   * shape of a slow/blocked read against the still-visible failure surface.
+   */
+  mode?: 'fail' | 'hold';
+};
 
 /** Survives reloads (read by the init script) — cleared per test. */
 const RULE_STORAGE_KEY = 'e2e.dailyplan-read-failure';
@@ -55,31 +65,53 @@ const LIST_WEEKLY_REVIEWS = 'FROM weekly_reviews WHERE deleted_at IS NULL ORDER 
 /** Install the worker-channel read-failure injector once per page. */
 async function installReadFailureInjection(page: Page): Promise<void> {
   await page.addInitScript((storageKey: string) => {
-    const win = window as unknown as { __shReadFailure?: ReadFailureRule | null };
+    const win = window as unknown as {
+      __shReadFailure?: ReadFailureRule | null;
+      __shHeldReadPosts?: (() => void)[];
+      __shReleaseHeldReads?: () => void;
+    };
     const stored = window.localStorage.getItem(storageKey);
     win.__shReadFailure = stored ? (JSON.parse(stored) as ReadFailureRule) : null;
+    const held: (() => void)[] = [];
+    win.__shHeldReadPosts = held;
+    /** Send every held worker message, and disarm so the read can settle. */
+    win.__shReleaseHeldReads = () => {
+      win.__shReadFailure = null;
+      window.localStorage.removeItem(storageKey);
+      for (const send of held.splice(0, held.length)) send();
+    };
     const originalPostMessage = Worker.prototype.postMessage;
     Worker.prototype.postMessage = function patchedPostMessage(
       this: Worker,
       message: { type?: string; data?: { source?: unknown } },
       ...rest: unknown[]
     ) {
-      let next = message;
       try {
         const rule = win.__shReadFailure;
-        if (rule && next && next.type === 'prepare' && next.data) {
-          const source = String(next.data.source ?? '');
+        if (rule && message && message.type === 'prepare' && message.data) {
+          const source = String(message.data.source ?? '');
           const matched =
             rule.include.every((needle) => source.includes(needle)) &&
             (rule.exclude ?? []).every((needle) => !source.includes(needle));
           if (matched) {
-            next = { ...next, data: { ...next.data, source: 'SELECT * FROM __sh_read_failure__' } };
+            if (rule.mode === 'hold') {
+              // Queue instead of sending: the read never reaches the worker,
+              // so its promise stays pending exactly like a blocked read.
+              held.push(() => {
+                originalPostMessage.call(this, message, ...(rest as []));
+              });
+              return undefined;
+            }
+            message = {
+              ...message,
+              data: { ...message.data, source: 'SELECT * FROM __sh_read_failure__' },
+            };
           }
         }
       } catch {
         // The injector must never break the worker channel itself.
       }
-      return originalPostMessage.call(this, next, ...(rest as []));
+      return originalPostMessage.call(this, message, ...(rest as []));
     };
   }, RULE_STORAGE_KEY);
 }
@@ -103,6 +135,34 @@ async function clearReadFailure(page: Page): Promise<void> {
     window.localStorage.removeItem(storageKey);
     (window as unknown as { __shReadFailure?: unknown }).__shReadFailure = null;
   }, RULE_STORAGE_KEY);
+}
+
+/**
+ * Arm a HOLDING rule: matched reads are queued at the worker boundary and stay
+ * pending until `releaseHeldReads()`.
+ */
+async function armHeldReadFailure(page: Page, rule: ReadFailureRule): Promise<void> {
+  await armReadFailure(page, { ...rule, mode: 'hold' });
+}
+
+/**
+ * Block until the app has actually issued a held read, so the "while pending"
+ * assertions below are deterministic instead of racing the click.
+ */
+async function expectHeldReadInFlight(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () =>
+      ((window as unknown as { __shHeldReadPosts?: unknown[] }).__shHeldReadPosts?.length ?? 0) > 0,
+    null,
+    { timeout: 20_000 },
+  );
+}
+
+/** Release every held worker message and disarm, so the read can settle. */
+async function releaseHeldReads(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    (window as unknown as { __shReleaseHeldReads?: () => void }).__shReleaseHeldReads?.();
+  });
 }
 
 /** The announced failure surface (role=alert) carrying `text`. */
@@ -355,6 +415,114 @@ test.describe('Planning history reads are honest under failure', () => {
     });
     await expect(errorSurface(page, 'Could not load past reviews.')).toHaveCount(0);
     await expect(page.getByText(/No past reviews yet/)).toHaveCount(0);
+  });
+
+  test('the plan-history retry never exposes the empty state while its read is still pending', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+
+    await installReadFailureInjection(page);
+
+    // Real history exists, so "No past plans yet" is never a true statement here.
+    const yesterday = await browserLocalDateKeyOffset(page, -1);
+    const now = new Date().toISOString();
+    await runSql(
+      page,
+      `INSERT INTO daily_plans (id, date_key, intention, status, created_at, updated_at)
+       VALUES ('dplan_rf_hold', '${yesterday}', 'Held retry plan', 'committed', '${now}', '${now}')`,
+    );
+    await returnToApp(page);
+    await goToTab(page, 'overview');
+    await openPlanHub(page);
+
+    await armReadFailure(page, { include: [LIST_RECENT_DAILY_PLANS] });
+    await page.getByRole('button', { name: 'Plan history' }).click();
+    const errorText = 'Could not load your plan history. Try again.';
+    await expect(errorSurface(page, errorText)).toBeVisible({ timeout: 20_000 });
+
+    // The retry's own read is now HELD: it stays pending indefinitely.
+    await armHeldReadFailure(page, { include: [LIST_RECENT_DAILY_PLANS] });
+    const retry = page.getByRole('button', { name: 'Retry loading plan history' });
+    await retry.click();
+    await expectHeldReadInFlight(page);
+
+    // While the retry is pending: no false empty claim, and the failure
+    // surface stays mounted so the user can see the read is still in flight.
+    await expect(page.getByText(/No past plans yet/)).toHaveCount(0);
+    await expect(errorSurface(page, errorText)).toBeVisible();
+    await expect(retry).toBeVisible();
+    await expect(retry).toBeDisabled();
+    // Exactly one failure surface: the retry never double-reports.
+    await expect(errorSurface(page, errorText)).toHaveCount(1);
+    expect(unhandledReadRejections(pageErrors)).toEqual([]);
+
+    // Released: the real read settles and the honest history renders.
+    await releaseHeldReads(page);
+    await expect(
+      page.getByRole('button', { name: `Plan for ${yesterday}, Committed` }),
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(errorSurface(page, errorText)).toHaveCount(0);
+    await expect(page.getByText(/No past plans yet/)).toHaveCount(0);
+    expect(unhandledReadRejections(pageErrors)).toEqual([]);
+  });
+
+  test('the past-review retry never exposes the empty state while its read is still pending', async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+
+    await installReadFailureInjection(page);
+
+    await runSql(
+      page,
+      `INSERT INTO weekly_reviews
+         (id, week_key, week_start_date, week_end_date, next_week_start_date,
+          completed_at, status, summary_payload, plan_payload, reflection,
+          created_at, updated_at, deleted_at)
+       VALUES ('wrev_rf_hold', '2026-10-19', '2026-10-19', '2026-10-25', '2026-10-26',
+               '2026-10-25T09:00:00.000Z', 'completed', '{}',
+               '{"priorities":[],"todoDecisions":[],"newCommitments":[]}',
+               'Held retry review', '2026-10-25T09:00:00.000Z', '2026-10-25T09:00:00.000Z', NULL)`,
+    );
+    await returnToApp(page);
+    await goToTab(page, 'overview');
+    await page.getByRole('button', { name: 'View Momentum Garden' }).click();
+    const openReview = page.getByRole('dialog').getByRole('button', { name: 'Open weekly review' });
+    await expect(openReview).toBeVisible({ timeout: 20_000 });
+    await openReview.click();
+    const modal = page.getByRole('dialog');
+    await expect(modal.getByText(/^Step 1 of 5/)).toBeVisible({ timeout: 20_000 });
+
+    await armReadFailure(page, { include: [LIST_WEEKLY_REVIEWS] });
+    await modal.getByRole('button', { name: 'Show past reviews' }).click();
+    const errorText = 'Could not load past reviews. Try again.';
+    await expect(errorSurface(page, errorText)).toBeVisible({ timeout: 20_000 });
+
+    await armHeldReadFailure(page, { include: [LIST_WEEKLY_REVIEWS] });
+    const retry = modal.getByRole('button', { name: 'Retry loading past reviews' });
+    await retry.click();
+    await expectHeldReadInFlight(page);
+
+    // While the retry is pending: no false empty claim, failure surface intact.
+    await expect(page.getByText(/No past reviews yet/)).toHaveCount(0);
+    await expect(errorSurface(page, errorText)).toBeVisible();
+    await expect(retry).toBeVisible();
+    await expect(retry).toBeDisabled();
+    await expect(errorSurface(page, errorText)).toHaveCount(1);
+    expect(unhandledReadRejections(pageErrors)).toEqual([]);
+
+    await releaseHeldReads(page);
+    await expect(modal.getByRole('button', { name: 'Week of 2026-10-19 review' })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(errorSurface(page, errorText)).toHaveCount(0);
+    await expect(page.getByText(/No past reviews yet/)).toHaveCount(0);
+    expect(unhandledReadRejections(pageErrors)).toEqual([]);
   });
 
   test('the read-failure surfaces fit the three supported narrow widths without overflow', async ({
