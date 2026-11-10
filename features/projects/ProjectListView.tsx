@@ -21,6 +21,7 @@ import {
   type ProjectStatusFilter,
 } from '@/features/projects/projects.domain';
 import { PROJECT_STATUS_LABELS, PROJECT_STATUS_VALUES } from '@/features/projects/projects.types';
+import { describePlanningWriteError } from '@/features/planning-hub/planningWriteError';
 
 type ProjectListViewProps = {
   onOpenProject: (id: string | null) => void;
@@ -48,6 +49,9 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
   const [statusFilter, setStatusFilter] = useState<ProjectStatusFilter>('all');
   const [sortKey, setSortKey] = useState<ProjectSortKey>('manual');
   const [showFilters, setShowFilters] = useState(false);
+  // Tier-2 honesty: a rejected reorder write used to be dropped on the floor
+  // (no catch, no feedback, optimistic order left on screen).
+  const [reorderError, setReorderError] = useState<string | null>(null);
 
   const loadSeq = useRef(0);
   const loadProjects = useCallback(async () => {
@@ -88,7 +92,17 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
       // last no matter what sort_order says.
       const next = manualProjectMoveOrder(rows, index, direction);
       if (!next) return;
-      await reorderProjects(next);
+      setReorderError(null);
+      try {
+        await reorderProjects(next);
+      } catch (e) {
+        setReorderError(
+          describePlanningWriteError(e, 'Could not save the new order. Please try again.'),
+        );
+      }
+      // Re-read either way: a rejected write leaves SQLite at the original
+      // order, so the list snaps back to the truth instead of keeping the
+      // optimistic swap.
       void loadProjects();
     },
     [rows, loadProjects],
@@ -193,6 +207,12 @@ export function ProjectListView({ onOpenProject }: ProjectListViewProps) {
             </View>
           ) : null}
         </View>
+      ) : null}
+
+      {reorderError ? (
+        <Text accessibilityRole="alert" className="text-sm" style={{ color: tokens.dangerText }}>
+          {reorderError}
+        </Text>
       ) : null}
 
       {!isLoading && rows.length === 0 ? (

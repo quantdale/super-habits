@@ -423,12 +423,43 @@ function AssociationSection({
   onChanged: () => void | Promise<void>;
 }) {
   const { tokens } = useAppTheme();
-  if (linked.length === 0 && candidates.length === 0) return null;
+  // Tier-2 honesty: a rejected association write used to be swallowed by an
+  // empty `catch` (the refresh simply left the row where it was), so the tap
+  // looked like it silently did nothing. Persist first, then refresh, and
+  // report the failure next to the control that caused it.
+  const [linkError, setLinkError] = useState<string | null>(null);
+
+  const runAssociationWrite = async (write: () => void | Promise<void>): Promise<void> => {
+    setLinkError(null);
+    try {
+      await write();
+    } catch (e) {
+      setLinkError(describePlanningWriteError(e, 'Could not update that link. Please try again.'));
+    } finally {
+      try {
+        await onChanged();
+      } catch {
+        // A refresh that fails after the write settled only leaves the list
+        // stale; the write's own outcome above is what the user is told.
+      }
+    }
+  };
+
+  if (linked.length === 0 && candidates.length === 0 && !linkError) return null;
   return (
     <View className="mt-2">
       <Text className="mb-2 text-sm font-semibold" style={{ color: tokens.text }}>
         {title}
       </Text>
+      {linkError ? (
+        <Text
+          accessibilityRole="alert"
+          className="mb-2 text-sm"
+          style={{ color: tokens.dangerText }}
+        >
+          {linkError}
+        </Text>
+      ) : null}
       {linked.map((item) => (
         <View
           key={item.id}
@@ -440,16 +471,7 @@ function AssociationSection({
           </Text>
           <IconButton
             icon="link-off"
-            onPress={async () => {
-              try {
-                await onUnlink(item.id);
-              } catch {
-                // Stale row (e.g. a goal soft-deleted elsewhere): the refresh
-                // below drops it; never leave an unhandled rejection.
-              } finally {
-                await onChanged();
-              }
-            }}
+            onPress={() => void runAssociationWrite(() => onUnlink(item.id))}
             accessibilityLabel={`Unlink ${labelOf(item)}`}
           />
         </View>
@@ -460,16 +482,7 @@ function AssociationSection({
           accessibilityRole="button"
           className="mb-2 flex-row items-center gap-2 rounded-xl border p-2"
           style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-          onPress={async () => {
-            try {
-              await onLink(item.id);
-            } catch {
-              // Stale row (e.g. a goal soft-deleted elsewhere): the refresh
-              // below drops it; never leave an unhandled rejection.
-            } finally {
-              await onChanged();
-            }
-          }}
+          onPress={() => void runAssociationWrite(() => onLink(item.id))}
         >
           <Text style={{ fontSize: 18 }}>•</Text>
           <Text className="flex-1 text-sm" style={{ color: tokens.textMuted }} numberOfLines={1}>
