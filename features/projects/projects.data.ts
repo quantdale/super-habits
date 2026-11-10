@@ -91,8 +91,17 @@ export async function updateProject(id: string, updates: ProjectUpdate): Promise
         `SELECT status, completed_at FROM projects WHERE id = ? AND deleted_at IS NULL`,
         [id],
       );
+      // Write contract (mirrors the Goal path, 498fcd09): a missing or
+      // soft-deleted project must REJECT, not silently no-op. `ProjectDetailView`
+      // loads its row once on mount, so a project tombstoned between that load
+      // and the save reaches this UPDATE with zero matching rows; without this
+      // guard the caller's `onBack()` closes the editor exactly as if the edit
+      // had saved, and the user's rename/objective edit is silently discarded.
+      if (!existing) {
+        throw new Error('Project not found.');
+      }
       const nextStatus =
-        updates.status !== undefined ? normalizeProjectStatus(updates.status) : existing?.status;
+        updates.status !== undefined ? normalizeProjectStatus(updates.status) : existing.status;
 
       const fields: string[] = ['updated_at = ?'];
       const values: (string | null)[] = [now];
@@ -110,10 +119,10 @@ export async function updateProject(id: string, updates: ProjectUpdate): Promise
       }
       if (updates.status !== undefined) {
         fields.push('status = ?');
-        values.push(nextStatus!);
+        values.push(nextStatus);
         // Stable completion fact: set on entering completed, clear on leaving,
         // preserve otherwise.
-        const wasCompleted = existing?.status === 'completed';
+        const wasCompleted = existing.status === 'completed';
         const willBeCompleted = nextStatus === 'completed';
         if (!wasCompleted && willBeCompleted) {
           fields.push('completed_at = ?');

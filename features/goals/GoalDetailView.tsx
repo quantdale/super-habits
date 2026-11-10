@@ -59,6 +59,8 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
   const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [showLinkedTasks, setShowLinkedTasks] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  /** Tier-2 honesty: rejected todo link/unlink writes used to vanish silently. */
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   const [linkedTodos, setLinkedTodos] = useState<{ id: string; title: string; completed: 0 | 1 }[]>(
     [],
@@ -181,6 +183,27 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
       setDeleteError(describePlanningWriteError(e, 'Could not delete the goal. Please try again.'));
     }
   }, [isCreate, goalId, onBack]);
+
+  const applyGoalTodoLink = useCallback(
+    async (write: () => Promise<void>): Promise<void> => {
+      setLinkError(null);
+      try {
+        await write();
+      } catch (e) {
+        setLinkError(
+          describePlanningWriteError(e, 'Could not update that link. Please try again.'),
+        );
+      } finally {
+        try {
+          await reloadLinks();
+        } catch {
+          // A refresh that fails after the write settled only leaves the list
+          // stale; the write's own outcome above is what the user is told.
+        }
+      }
+    },
+    [reloadLinks],
+  );
 
   const applyProgressText = useCallback(() => {
     const result = parseGoalProgressText(progressText);
@@ -384,8 +407,7 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
               style={{ borderColor: tokens.border }}
               onPress={async () => {
                 if (!goalId) return;
-                await setTodoProjectGoal(t.id, { goalId });
-                await reloadLinks();
+                await applyGoalTodoLink(() => setTodoProjectGoal(t.id, { goalId }));
               }}
             >
               <MaterialIcons name="add" size={18} color={tokens.iconMuted} />
@@ -462,6 +484,12 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
         </Text>
       ) : null}
 
+      {linkError ? (
+        <Text accessibilityRole="alert" className="text-sm" style={{ color: tokens.dangerText }}>
+          {linkError}
+        </Text>
+      ) : null}
+
       <Button
         label={isCreate ? 'Create Goal' : 'Save Goal'}
         onPress={handleSave}
@@ -502,10 +530,9 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
                   </Text>
                   <IconButton
                     icon="link-off"
-                    onPress={async () => {
-                      await setTodoProjectGoal(t.id, { goalId: null });
-                      await reloadLinks();
-                    }}
+                    onPress={() =>
+                      void applyGoalTodoLink(() => setTodoProjectGoal(t.id, { goalId: null }))
+                    }
                     accessibilityLabel={`Unlink ${t.title}`}
                   />
                 </View>
@@ -516,10 +543,7 @@ export function GoalDetailView({ goalId, onBack, onOpenProject }: GoalDetailView
                   accessibilityRole="button"
                   className="mb-2 flex-row items-center gap-2 rounded-xl border p-2"
                   style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
-                  onPress={async () => {
-                    await setTodoProjectGoal(t.id, { goalId });
-                    await reloadLinks();
-                  }}
+                  onPress={() => void applyGoalTodoLink(() => setTodoProjectGoal(t.id, { goalId }))}
                 >
                   <MaterialIcons name="add" size={18} color={tokens.iconMuted} />
                   <Text
