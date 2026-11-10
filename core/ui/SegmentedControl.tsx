@@ -5,10 +5,14 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { useReducedMotion } from '@/core/theme/motion';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 import { radius } from '@/core/theme/designTokens';
-import { nextSegmentValue } from '@/core/ui/segmentedControl.model';
+import {
+  nextSegmentValue,
+  resolveSegmentMinHeight,
+  SEGMENT_TRACK_PADDING,
+} from '@/core/ui/segmentedControl.model';
 
 /** 40px track (§6): 36pt segment faces + 2pt padding. */
-const TRACK_PADDING = 2;
+const TRACK_PADDING = SEGMENT_TRACK_PADDING;
 /** Thumb lip under the white face (§6 "white Pressable3D (2px lip)"). */
 const THUMB_LIP = 2;
 
@@ -25,6 +29,8 @@ type SegmentOptionProps<T extends string> = {
   active: boolean;
   /** Accent used for the keyboard focus ring. */
   ringColor: string;
+  /** Resolved face height; 36 (the V3 default) unless a caller opted up. */
+  segmentMinHeight: number;
   onSelect: (value: T) => void;
 };
 
@@ -37,6 +43,7 @@ function SegmentOptionButton<T extends string>({
   option,
   active,
   ringColor,
+  segmentMinHeight,
   onSelect,
 }: SegmentOptionProps<T>) {
   const { tokens } = useAppTheme();
@@ -54,13 +61,15 @@ function SegmentOptionButton<T extends string>({
       onFocus={ring.onFocus}
       onBlur={ring.onBlur}
       // Vertical-only slop lifts the 36pt segment face to the 44pt touch
-      // contract without overlapping horizontally adjacent segments.
+      // contract without overlapping horizontally adjacent segments. It is
+      // deliberately NOT the mechanism that satisfies CG-12 on web (see
+      // `minSegmentHeight`): react-native-web drops it entirely.
       hitSlop={{ top: 4, bottom: 4 }}
       style={[
         {
           flex: 1,
           minWidth: 0,
-          minHeight: 36,
+          minHeight: segmentMinHeight,
           justifyContent: 'center',
           alignItems: 'center',
           borderRadius: radius.full,
@@ -88,6 +97,14 @@ type SegmentedControlProps<T extends string> = {
   /** Accent color for the selected segment; defaults to the theme accent. */
   accentColor?: string;
   accessibilityLabel?: string;
+  /**
+   * Opt up to a taller segment FACE, so the real DOM hit area (not `hitSlop`,
+   * which react-native-web never applies — `docs/testing/known-gaps.md` CG-12)
+   * reaches >= 44 CSS px on web. Omitted (every caller but Focus today) → 36pt
+   * faces in a 40pt tray, pixel-identical to V3 §6. Clamped to 52 and ignored
+   * off-web by `resolveSegmentMinHeight`; values <= 36 are the default.
+   */
+  minSegmentHeight?: number;
 };
 
 /**
@@ -108,10 +125,17 @@ export function SegmentedControl<T extends string>({
   onChange,
   accentColor,
   accessibilityLabel,
+  minSegmentHeight,
 }: SegmentedControlProps<T>) {
   const { tokens } = useAppTheme();
   const reducedMotion = useReducedMotion();
   const resolvedAccent = accentColor ?? tokens.primary;
+  // Web-only layout tier: off-web (and for every default caller) this is the
+  // untouched 36pt V3 face.
+  const segmentMinHeight = resolveSegmentMinHeight({
+    minSegmentHeight,
+    isWeb: Platform.OS === 'web',
+  });
   const containerRef = useRef<View>(null);
   const [trackWidth, setTrackWidth] = useState(0);
   const [indicator] = useState(() => new Animated.Value(0));
@@ -209,6 +233,7 @@ export function SegmentedControl<T extends string>({
           option={option}
           active={option.value === value}
           ringColor={resolvedAccent}
+          segmentMinHeight={segmentMinHeight}
           onSelect={onChange}
         />
       ))}

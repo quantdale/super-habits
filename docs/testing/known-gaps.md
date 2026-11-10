@@ -164,7 +164,6 @@ per width where a width changes the measurement):
 | `features/settings`                                                   | notification `<input type=checkbox>` ×3, `<input type=time>` ×3, inline `Save <reminder> time` ×3, `Weekly review on <day>` ×7, `Set effort scale OFF/RIR/RPE`, the eight pomodoro/macro stepper ± keys, day/night/motion chips   | 40x20; 96x38; 66x38; 32-43x26; 50/50/55 x40; 40x24; 55.4-85.7x40                                |
 | `features/planning-hub` + `features/daily-plan` + `features/progress` | the hub's five view tabs, `Carry forward unfinished priorities from yesterday`, `Show plan history`, `Show the last 7/30/90 days`, `7 days`/`28 days`                                                                             | 61.2x36; 216x34; 102x34; 48.2/56.3 x40; 72.6/80.7 x40                                           |
 | `features/overview`                                                   | Streak chip, XP chip, `View Momentum Garden`                                                                                                                                                                                      | 48.1x32; 64.3x32; 128.1x36                                                                      |
-| `features/pomodoro`                                                   | `Focus`/`Short Break`/`Long Break` mode tabs                                                                                                                                                                                      | 95.3/100.3/105.3 x36                                                                            |
 | `features/command`                                                    | the two `Use example:` chips                                                                                                                                                                                                      | 235.1x40; 284/299.3/299 x40                                                                     |
 
 The three surfaces with **no** finding (`Habits`, `hub-goals`, `hub-projects` returned
@@ -184,6 +183,11 @@ surface set, all widths), so un-fixme-ing it is the fix's own proof. The other
 three promises in the same spec (no horizontal overflow, wide-viewport cap +
 centre + shell swap, reduced-motion quiet) stay ordinary active cases, so a new
 overflow, layout or motion defect still fails the lane.
+
+The `features/pomodoro` slice is **released**: its mode tabs get a real 44pt
+segment face via `core/ui/SegmentedControl.tsx`'s opt-in `minSegmentHeight` (web
+layout, not `hitSlop`), guarded by the active case "the Focus (pomodoro)
+section reaches a 44px CSS hit area at phone widths" in this spec.
 
 **Owning lane:** the per-surface feature folders above (the shared primitives
 that make slop-only sizing possible are `core/ui/Button.tsx` (`size=sm` 36pt),
