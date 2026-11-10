@@ -1,15 +1,16 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { REWARD_COLORS } from '@/constants/sectionColors';
+import { REWARD_COLORS, REWARD_HUES } from '@/constants/sectionColors';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { radius, spacing, typography } from '@/core/theme/designTokens';
 import { Card } from '@/core/ui/Card';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
+import { ProgressBar } from '@/core/ui/ProgressBar';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { SkeletonBlock } from '@/core/ui/SkeletonBlock';
 import { StatBlock } from '@/core/ui/StatBlock';
-import { BadgeGrid } from './BadgeGrid';
+import { BadgeFamilyTile, BadgeGrid } from './BadgeGrid';
 import { earnedMilestones } from './gamification.domain';
 import { LevelHero } from './LevelHero';
 import { QuestRow } from './QuestRow';
@@ -55,9 +56,16 @@ function tierLabel(badge: BadgeState): string {
  * believable next target follows, and earned tiers render inline while locked
  * tiers move behind one disclosure. The ledger, thresholds and award
  * idempotency are untouched — this reads the same shared snapshot only.
+ *
+ * P20 (`docs/ui-ux/16-playful-momentum.md` §7 "Gamification surfaces"): the
+ * milestone and next-target cards lead with the badge-family tile on its Gold
+ * wash, the next-target bar is the chunky Gold §6 bar, the week strip is
+ * Flame/Ice nodes, and quest rows are lipped Gold-bar cards. Every heading,
+ * string, control name and the `All badges` disclosure (with its reported
+ * expanded state) are unchanged.
  */
 export function AchievementsScreen() {
-  const { tokens } = useAppTheme();
+  const { tokens, rewardAccents } = useAppTheme();
   const { snapshot, isLoading } = useGamification();
   const [showAllBadges, setShowAllBadges] = useState(false);
 
@@ -104,28 +112,18 @@ export function AchievementsScreen() {
         <SectionHeading title="Latest milestone" />
         {topMilestone ? (
           <Card
-            accentColor={REWARD_COLORS.badge}
             innerClassName="p-3"
             className="mb-0"
-            style={{ borderColor: REWARD_COLORS.badge }}
+            style={{
+              borderColor: REWARD_HUES.badge.bright,
+              borderBottomColor: REWARD_COLORS.badge,
+            }}
           >
             <View className="flex-row items-center" style={{ gap: spacing.md }}>
-              <View
-                style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: radius.lg,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: `${REWARD_COLORS.badge}22`,
-                }}
-              >
-                <MaterialIcons
-                  name={topMilestone.icon as keyof typeof MaterialIcons.glyphMap}
-                  size={26}
-                  color={REWARD_COLORS.badge}
-                />
-              </View>
+              <BadgeFamilyTile
+                icon={topMilestone.icon as keyof typeof MaterialIcons.glyphMap}
+                size={52}
+              />
               <View className="min-w-0 flex-1">
                 <Text style={{ ...typography.titleMd, color: tokens.text }}>
                   {topMilestone.label}
@@ -134,7 +132,7 @@ export function AchievementsScreen() {
                   {tierLabel(topMilestone)} tier earned · {topMilestone.description}
                 </Text>
               </View>
-              <Text style={{ ...typography.caption, color: REWARD_COLORS.badge }}>Earned</Text>
+              <Text style={{ ...typography.label, color: rewardAccents.badge.text }}>Earned</Text>
             </View>
             {earnedBadgeCount > 1 ? (
               <Text
@@ -146,9 +144,12 @@ export function AchievementsScreen() {
           </Card>
         ) : (
           <Card innerClassName="p-3" className="mb-0">
-            <Text style={{ ...typography.bodyMd, color: tokens.text }}>
-              No badges earned yet — the first one is one completed day away.
-            </Text>
+            <View className="flex-row items-center" style={{ gap: spacing.md }}>
+              <BadgeFamilyTile icon="emoji-events" size={44} subdued />
+              <Text style={{ ...typography.bodyMd, color: tokens.text, flex: 1 }}>
+                No badges earned yet — the first one is one completed day away.
+              </Text>
+            </View>
           </Card>
         )}
       </ScreenSection>
@@ -158,7 +159,12 @@ export function AchievementsScreen() {
         <ScreenSection>
           <SectionHeading title="Next target" />
           <Card innerClassName="p-3" className="mb-0">
-            <View className="flex-row items-center justify-between" style={{ gap: spacing.md }}>
+            <View className="flex-row items-center" style={{ gap: spacing.md }}>
+              <BadgeFamilyTile
+                icon={next.icon as keyof typeof MaterialIcons.glyphMap}
+                size={44}
+                subdued
+              />
               <View className="min-w-0 flex-1">
                 <Text style={{ ...typography.bodyMd, color: tokens.text }}>{next.label}</Text>
                 <Text style={{ ...typography.caption, color: tokens.textMuted, marginTop: 2 }}>
@@ -166,26 +172,22 @@ export function AchievementsScreen() {
                 </Text>
               </View>
               <Text
-                style={{ ...typography.label, color: tokens.text, fontVariant: ['tabular-nums'] }}
+                style={{
+                  ...typography.label,
+                  color: tokens.text,
+                  fontVariant: ['tabular-nums'],
+                }}
               >
                 {Math.min(next.progress, next.threshold)}/{next.threshold}
               </Text>
             </View>
-            <View
-              style={{
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: tokens.surfaceSunken,
-                marginTop: spacing.sm,
-                overflow: 'hidden',
-              }}
-            >
-              <View
-                style={{
-                  width: `${Math.round(Math.min(1, next.ratio) * 100)}%`,
-                  height: '100%',
-                  backgroundColor: REWARD_COLORS.badge,
-                }}
+            <View style={{ marginTop: spacing.sm }}>
+              {/* §7: the badge/quest progress object is the Gold §6 bar. */}
+              <ProgressBar
+                progress={next.ratio}
+                accentColor={REWARD_COLORS.badge}
+                height={10}
+                accessibilityLabel={`${next.label} progress`}
               />
             </View>
           </Card>
@@ -219,25 +221,18 @@ export function AchievementsScreen() {
               : 'A day counts once any habit, task, focus session, workout, or meal is logged.'
           }
         />
-        <WeekStrip
-          week={snapshot.week}
-          todayKey={snapshot.todayKey}
-          accent={REWARD_COLORS.accent}
-        />
+        <Card innerClassName="p-3" className="mb-0">
+          <WeekStrip
+            week={snapshot.week}
+            todayKey={snapshot.todayKey}
+            accent={REWARD_COLORS.accent}
+          />
+        </Card>
       </ScreenSection>
 
       <ScreenSection>
         <SectionHeading title="Today's quests" hint="Three new quests rotate in every day." />
-        <View
-          style={{
-            gap: spacing.md,
-            padding: spacing.lg,
-            borderRadius: radius.lg,
-            backgroundColor: tokens.surface,
-            borderWidth: 1,
-            borderColor: tokens.border,
-          }}
-        >
+        <View style={{ gap: spacing.md }}>
           {snapshot.quests.map((quest) => (
             <QuestRow key={quest.id} quest={quest} accent={REWARD_COLORS.quest} />
           ))}
@@ -262,8 +257,14 @@ export function AchievementsScreen() {
           accessibilityLabel={showAllBadges ? 'Hide all badges' : 'Show all badges'}
           accessibilityState={{ expanded: showAllBadges }}
           aria-expanded={showAllBadges}
-          className="min-h-11 self-start justify-center rounded-xl border px-3"
-          style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+          className="min-h-11 self-start justify-center rounded-xl px-3"
+          style={{
+            borderWidth: 2,
+            borderColor: tokens.border,
+            borderBottomWidth: 4,
+            borderBottomColor: tokens.borderStrong,
+            backgroundColor: tokens.surface,
+          }}
           onPress={() => setShowAllBadges((open) => !open)}
         >
           <Text style={{ ...typography.bodyMd, color: tokens.text }}>
@@ -279,32 +280,41 @@ export function AchievementsScreen() {
 
       <ScreenSection className="mb-0">
         <SectionHeading title="Streak protection" />
-        <View
-          style={{
-            gap: spacing.sm,
-            padding: spacing.lg,
-            borderRadius: radius.lg,
-            backgroundColor: tokens.surface,
-            borderWidth: 1,
-            borderColor: tokens.border,
-          }}
-        >
-          <Text style={{ ...typography.bodyMd, color: tokens.text }}>
-            {snapshot.freezes.banked} of {snapshot.freezes.earned} earned streak freezes available
-          </Text>
+        <Card innerClassName="p-3" className="mb-0">
+          <View
+            className="flex-row items-center"
+            style={{ gap: spacing.sm, marginBottom: spacing.sm }}
+          >
+            {/* Ice-shield hero icon: a freeze is a gift, never a loss. */}
+            <View
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: radius.sm,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: tokens.surfaceSunken,
+              }}
+            >
+              <MaterialIcons name="ac-unit" size={18} color={REWARD_HUES.frozen.lip} />
+            </View>
+            <Text style={{ ...typography.bodyMd, color: tokens.text, flex: 1 }}>
+              {snapshot.freezes.banked} of {snapshot.freezes.earned} earned streak freezes available
+            </Text>
+          </View>
           <Text style={{ ...typography.caption, color: tokens.textMuted }}>
             Reward streak: {snapshot.streak.current} day
             {snapshot.streak.current === 1 ? '' : 's'} · best: {snapshot.streak.longest} day
             {snapshot.streak.longest === 1 ? '' : 's'}.
           </Text>
-          <Text style={{ ...typography.caption, color: tokens.textMuted }}>
+          <Text style={{ ...typography.caption, color: tokens.textMuted, marginTop: spacing.xs }}>
             A freeze is earned at 7, 30, 100, and 365 day reward streaks and spends itself
             automatically on the first missed day, so one off day never wipes a long run. Today is
             always grace: the streak only breaks once a full day has passed with no activity. The
             Habits tab shows a separate per-habit streak, which counts that habit&apos;s scheduled
             occurrences only.
           </Text>
-        </View>
+        </Card>
       </ScreenSection>
     </View>
   );

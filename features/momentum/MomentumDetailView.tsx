@@ -9,6 +9,7 @@ import { Card } from '@/core/ui/Card';
 import { Button } from '@/core/ui/Button';
 import { PillChip } from '@/core/ui/PillChip';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
+import { GARDEN_SUN, GARDEN_SPECIES } from './momentumGarden.visual';
 import { getMomentumGarden } from './momentum.data';
 import {
   buildMomentumSourceExplanations,
@@ -17,72 +18,153 @@ import {
 } from './momentum.domain';
 import { MomentumGardenArt } from './MomentumGardenArt';
 import type { MomentumGardenModel, MomentumSource } from './momentum.types';
+import { radius, spacing } from '@/core/theme/designTokens';
 
 type MomentumDetailViewProps = {
   initialDays?: 7 | 28;
 };
 
+/**
+ * The area's own text tone (never the `bright` fill): a bright section hue
+ * painted as 11–15px text measures ~2:1 on a white card, while the resolved
+ * accent text clears the floor in both appearances. Planning uses the
+ * appearance-resolved Gold text tone (`rewardAccents.badge.text`, bronze in
+ * light) — never the decorative sun fill, which is 1.55:1 on a white card.
+ */
 function sourceColor(
   source: MomentumSource,
   sectionAccents: ReturnType<typeof useAppTheme>['sectionAccents'],
-  tokens: ReturnType<typeof useAppTheme>['tokens'],
+  rewardAccents: ReturnType<typeof useAppTheme>['rewardAccents'],
 ): string {
-  switch (source) {
-    case 'tasks':
-      return sectionAccents.todos.text;
-    case 'habits':
-      return sectionAccents.habits.text;
-    case 'focus':
-      return sectionAccents.focus.text;
-    case 'workout':
-      return sectionAccents.workout.text;
-    case 'nutrition':
-      return sectionAccents.calories.text;
-    case 'planning':
-      return tokens.accent;
-    case 'review':
-      return sectionAccents.focus.text;
-  }
+  const hue = GARDEN_SPECIES[source].hue;
+  if (hue === 'gold') return rewardAccents.badge.text;
+  return sectionAccents[hue].text;
+}
+
+/** Section accent key a garden species paints with (Gold maps to the Focus slot). */
+function accentKeyFor(
+  source: MomentumSource,
+): keyof ReturnType<typeof useAppTheme>['sectionAccents'] {
+  const hue = GARDEN_SPECIES[source].hue;
+  return hue === 'gold' ? 'focus' : hue;
+}
+
+/** A small plant pictogram matching the garden's species for that area. */
+function SourceMarker({
+  source,
+  tint,
+  ink,
+}: {
+  source: MomentumSource;
+  tint: string;
+  ink: string;
+}) {
+  return (
+    <View
+      style={{
+        width: 22,
+        height: 22,
+        borderRadius: radius.full,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: tint,
+      }}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <View
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: GARDEN_SPECIES[source].species === 'cactus' ? 2 : radius.full,
+          backgroundColor: ink,
+        }}
+      />
+    </View>
+  );
 }
 
 function MomentumDayRow({ model, dateKey }: { model: MomentumGardenModel; dateKey: string }) {
-  const { tokens, sectionAccents } = useAppTheme();
+  const { tokens, sectionAccents, rewardAccents } = useAppTheme();
   const day = model.days.find((candidate) => candidate.dateKey === dateKey);
   if (!day) return null;
   return (
     <View
-      className="flex-row items-center gap-3 rounded-2xl border px-3 py-2.5"
-      style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
+        borderRadius: radius.sm,
+        borderWidth: 2,
+        borderColor: tokens.border,
+        borderBottomWidth: 4,
+        borderBottomColor: tokens.borderStrong,
+        backgroundColor: tokens.surface,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+      }}
       accessible
       accessibilityRole="text"
       accessibilityLabel={day.accessibilityLabel}
     >
-      <View className="w-[72px]">
-        <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+      <View style={{ width: 84 }}>
+        <Text variant="bodyMd" style={{ color: tokens.text }} numberOfLines={1}>
           {formatMomentumDateLabel(day.dateKey, model.todayKey)}
         </Text>
-        <Text className="text-[11px]" style={{ color: tokens.textMuted }}>
+        <Text variant="caption" tone="muted" numberOfLines={1}>
           {day.dateKey}
         </Text>
       </View>
-      <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-1.5">
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: spacing.xs,
+          flex: 1,
+          minWidth: 0,
+        }}
+      >
         {day.activeSources.length > 0 ? (
-          day.activeSources.map((source) => (
-            <View
-              key={source}
-              className="rounded-full px-2 py-1"
-              style={{ backgroundColor: `${sourceColor(source, sectionAccents, tokens)}1f` }}
-            >
-              <Text
-                className="text-[11px] font-semibold"
-                style={{ color: sourceColor(source, sectionAccents, tokens) }}
+          day.activeSources.map((source) => {
+            const ink = sourceColor(source, sectionAccents, rewardAccents);
+            return (
+              <View
+                key={source}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  borderRadius: radius.full,
+                  paddingHorizontal: spacing.sm,
+                  paddingVertical: 3,
+                  backgroundColor:
+                    sectionAccents[
+                      GARDEN_SPECIES[source].hue === 'gold' ? 'focus' : GARDEN_SPECIES[source].hue
+                    ].tint,
+                }}
               >
-                {day.contributions[source].label}
-              </Text>
-            </View>
-          ))
+                <SourceMarker
+                  source={source}
+                  tint={`${
+                    sectionAccents[
+                      GARDEN_SPECIES[source].hue === 'gold' ? 'focus' : GARDEN_SPECIES[source].hue
+                    ].fill
+                  }22`}
+                  ink={
+                    sectionAccents[
+                      GARDEN_SPECIES[source].hue === 'gold' ? 'focus' : GARDEN_SPECIES[source].hue
+                    ].fill
+                  }
+                />
+                <Text variant="caption" style={{ color: ink }}>
+                  {day.contributions[source].label}
+                </Text>
+              </View>
+            );
+          })
         ) : (
-          <Text className="text-xs" style={{ color: tokens.textMuted }}>
+          <Text variant="caption" tone="muted">
             Ready for new growth
           </Text>
         )}
@@ -91,8 +173,20 @@ function MomentumDayRow({ model, dateKey }: { model: MomentumGardenModel; dateKe
   );
 }
 
+/**
+ * The deeper Momentum Garden view (Plan hub → Progress, and the Today card's
+ * "View garden" destination).
+ *
+ * P20 (`docs/ui-ux/16-playful-momentum.md` §7 "Momentum Garden"): the scene is
+ * a flat illustrated garden on a soft sky band, the "Why each area grows"
+ * explanation text is kept verbatim (it is the read-only contract), and every
+ * state stays neutral — an empty bed reads "Ready for new growth", never a
+ * withering or a loss. Behaviour is untouched: same `getMomentumGarden` read,
+ * same day-rollover/foreground refresh, same 7/28-day window, same milestone
+ * list.
+ */
 export function MomentumDetailView({ initialDays = 7 }: MomentumDetailViewProps) {
-  const { tokens, sectionAccents } = useAppTheme();
+  const { tokens, sectionAccents, rewardAccents } = useAppTheme();
   const gardenAccent = sectionAccents.habits;
   const dayGeneration = useDayRolloverGeneration();
   const [windowDays, setWindowDays] = useState<7 | 28>(initialDays);
@@ -142,18 +236,16 @@ export function MomentumDetailView({ initialDays = 7 }: MomentumDetailViewProps)
 
   if (loadError && !isLoading && !model) {
     return (
-      <View className="gap-3">
-        <Text className="text-lg font-bold" style={{ color: tokens.text }}>
-          Momentum Garden
-        </Text>
+      <View style={{ gap: spacing.md }}>
+        <Text variant="titleMd">Momentum Garden</Text>
         <Card
           variant="header"
           accentColor={gardenAccent.fill}
           headerTitle="Your garden is temporarily unavailable"
           headerSubtitle="Nothing was saved or changed."
         >
-          <View className="gap-3">
-            <Text className="text-sm" style={{ color: tokens.textMuted }}>
+          <View style={{ gap: spacing.md }}>
+            <Text variant="bodyMd" tone="muted">
               {loadError}
             </Text>
             <Button
@@ -169,9 +261,16 @@ export function MomentumDetailView({ initialDays = 7 }: MomentumDetailViewProps)
 
   if (isLoading && !model) {
     return (
-      <View className="min-h-[180px] items-center justify-center">
+      <View
+        style={{
+          minHeight: 180,
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: spacing.md,
+        }}
+      >
         <ActivityIndicator size="large" color={gardenAccent.text} />
-        <Text className="mt-3 text-sm" style={{ color: tokens.textMuted }}>
+        <Text variant="bodyMd" tone="muted">
           Looking across your recent work…
         </Text>
       </View>
@@ -195,87 +294,104 @@ export function MomentumDetailView({ initialDays = 7 }: MomentumDetailViewProps)
       : null;
 
   return (
-    <View className="gap-3">
+    <View style={{ gap: spacing.md }}>
       <View>
-        <Text className="text-lg font-bold" style={{ color: tokens.text }}>
-          Momentum Garden
-        </Text>
-        <Text className="mt-1 text-sm" style={{ color: tokens.textMuted }}>
+        <Text variant="titleMd">Momentum Garden</Text>
+        <Text variant="caption" tone="muted" style={{ marginTop: spacing.xs }}>
           Each area grows from real work. Missing activity leaves the garden neutral, never worse.
         </Text>
       </View>
 
-      <View className="flex-row flex-wrap">
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         <PillChip
           label="7 days"
           active={windowDays === 7}
-          color={gardenAccent.text}
+          color={gardenAccent.fill}
           onPress={() => setWindowDays(7)}
         />
         <PillChip
           label="28 days"
           active={windowDays === 28}
-          color={gardenAccent.text}
+          color={gardenAccent.fill}
           onPress={() => setWindowDays(28)}
         />
       </View>
 
-      <Card accentColor={gardenAccent.fill} innerClassName="p-3">
-        <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+      <Card innerClassName="p-3" accentColor={gardenAccent.fill}>
+        <Text variant="bodyMd" style={{ color: tokens.text }}>
           Today
         </Text>
         <MomentumGardenArt day={model.today} height={164} />
-        <Text className="mt-1 text-sm" style={{ color: tokens.text }}>
+        <Text variant="bodyMd" style={{ color: tokens.text, marginTop: spacing.xs }}>
           {formatMomentumTodaySummary(model)}
         </Text>
-        <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+        <Text variant="caption" tone="muted" style={{ marginTop: spacing.xs }}>
           {model.today.accessibilityLabel}
         </Text>
         {returningCopy ? (
-          <Text
-            className="mt-2 rounded-xl px-3 py-2 text-sm"
-            style={{ color: tokens.text, backgroundColor: tokens.surfaceElevated }}
+          <View
+            style={{
+              marginTop: spacing.sm,
+              borderRadius: radius.sm,
+              paddingHorizontal: spacing.md,
+              paddingVertical: spacing.sm,
+              backgroundColor: tokens.surfaceElevated,
+            }}
           >
-            {returningCopy}
-          </Text>
+            <Text variant="bodyMd" style={{ color: tokens.text }}>
+              {returningCopy}
+            </Text>
+          </View>
         ) : null}
       </Card>
 
       <Card accentColor={sectionAccents.todos.fill} innerClassName="p-3">
-        <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+        <Text variant="bodyMd" style={{ color: tokens.text }}>
           Why each area grows
         </Text>
-        <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+        <Text variant="caption" tone="muted" style={{ marginTop: spacing.xs }}>
           These are separate signals, not a combined rating.
         </Text>
-        <View className="mt-3 gap-2">
-          {explanations.map((explanation) => (
-            <View key={explanation.source} className="flex-row items-start gap-2">
+        <View style={{ marginTop: spacing.md, gap: spacing.md }}>
+          {explanations.map((explanation) => {
+            const accent = accentKeyFor(explanation.source);
+            return (
               <View
-                className="mt-1.5 h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: sourceColor(explanation.source, sectionAccents, tokens) }}
-              />
-              <View className="min-w-0 flex-1">
-                <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-                  {explanation.label}
-                </Text>
-                <Text className="text-xs" style={{ color: tokens.textMuted }}>
-                  {explanation.explanation}
-                </Text>
+                key={explanation.source}
+                style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}
+              >
+                <SourceMarker
+                  source={explanation.source}
+                  tint={sectionAccents[accent].tint}
+                  ink={sectionAccents[accent].fill}
+                />
+                <View style={{ minWidth: 0, flex: 1 }}>
+                  <Text
+                    variant="bodyMd"
+                    style={{
+                      color: sourceColor(explanation.source, sectionAccents, rewardAccents),
+                    }}
+                  >
+                    {explanation.label}
+                  </Text>
+                  <Text variant="caption" tone="muted">
+                    {explanation.explanation}
+                  </Text>
+                </View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       </Card>
 
       <Card accentColor={sectionAccents.focus.fill} innerClassName="p-3">
-        <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+        <Text variant="bodyMd" style={{ color: tokens.text }}>
           Recent growth
         </Text>
-        <Text className="mt-1 text-xs" style={{ color: tokens.textMuted }}>
+        <Text variant="caption" tone="muted" style={{ marginTop: spacing.xs }}>
           {model.accessibilityLabel}
         </Text>
-        <View className="mt-3 gap-2">
+        <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
           {historyDays.map((day) => (
             <MomentumDayRow key={day.dateKey} model={model} dateKey={day.dateKey} />
           ))}
@@ -283,13 +399,13 @@ export function MomentumDetailView({ initialDays = 7 }: MomentumDetailViewProps)
       </Card>
 
       {model.milestones.length > 0 ? (
-        <Card accentColor={tokens.accent} innerClassName="p-3">
-          <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
+        <Card accentColor={GARDEN_SUN.fill} innerClassName="p-3">
+          <Text variant="bodyMd" style={{ color: tokens.text }}>
             Milestones from real progress
           </Text>
-          <View className="mt-2 gap-1.5">
+          <View style={{ marginTop: spacing.sm, gap: spacing.xs }}>
             {model.milestones.map((milestone) => (
-              <Text key={milestone.id} className="text-sm" style={{ color: tokens.text }}>
+              <Text key={milestone.id} variant="bodyMd" style={{ color: tokens.text }}>
                 • {milestone.label} · {milestone.dateKey}
               </Text>
             ))}

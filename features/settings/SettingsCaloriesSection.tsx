@@ -1,13 +1,12 @@
 import { View } from 'react-native';
 import { Button } from '@/core/ui/Button';
-import { Card } from '@/core/ui/Card';
+import { SettingsGroup, SettingsRow, SettingsSectionHeading } from './SettingsSharedUi';
 import { NumberStepperField } from '@/core/ui/NumberStepperField';
 import { ScreenSection } from '@/core/ui/ScreenSection';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import type { CalorieGoal } from '@/features/calories/types';
 import { formatCalorieGoalSummary, type CalorieGoalFormState } from './settingsShared';
-import { SettingsRow, SettingsSectionHeading } from './SettingsSharedUi';
 
 type SettingsCaloriesSectionProps = {
   calorieGoal: CalorieGoal;
@@ -37,7 +36,7 @@ export function SettingsCaloriesSection({
         title="Daily calorie and macro goals"
         accentColor={SECTION_COLORS.calories}
       />
-      <Card accentColor={SECTION_COLORS.calories} className="mb-0">
+      <SettingsGroup accentColor={SECTION_COLORS.calories}>
         <SettingsRow
           first
           label="Saved goal"
@@ -99,25 +98,25 @@ export function SettingsCaloriesSection({
 
         <ValidationError message={calorieGoalError} />
 
-        <View className="mt-2 flex-row gap-2">
-          <View className="flex-1">
-            <Button
-              label={calorieGoalSaving ? 'Saving...' : 'Save nutrition defaults'}
-              onPress={onSave}
-              disabled={calorieGoalLoading || calorieGoalSaving}
-              color={SECTION_COLORS.calories}
-            />
-          </View>
-          <View className="flex-1">
-            <Button
-              label="Revert"
-              variant="ghost"
-              onPress={onRevert}
-              disabled={calorieGoalLoading || calorieGoalSaving}
-            />
-          </View>
+        {/* One primary action per state (§4.5), full width; Revert is a quiet
+            ghost below so no label clips at 360/390. */}
+        <View className="mt-2 gap-2">
+          <Button
+            label={calorieGoalSaving ? 'Saving...' : 'Save nutrition defaults'}
+            onPress={onSave}
+            disabled={calorieGoalLoading || calorieGoalSaving}
+            color={SECTION_COLORS.calories}
+            fullWidth
+          />
+          <Button
+            label="Revert"
+            variant="ghost"
+            onPress={onRevert}
+            disabled={calorieGoalLoading || calorieGoalSaving}
+            fullWidth
+          />
         </View>
-      </Card>
+      </SettingsGroup>
     </ScreenSection>
   );
 }
