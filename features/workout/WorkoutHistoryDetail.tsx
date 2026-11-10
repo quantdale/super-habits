@@ -9,6 +9,7 @@ import { Button } from '@/core/ui/Button';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
+import { ValidationError } from '@/core/ui/ValidationError';
 import {
   computePersonalRecords,
   computeSessionTotalSets,
@@ -19,6 +20,7 @@ import {
 } from './workout.domain';
 import { QuickLogBadge } from './QuickLogBadge';
 import { deleteWorkoutLog, getWorkoutLogDetail, type WorkoutLogDetail } from './workout.data';
+import { workoutWriteFailureCopy } from './workoutWriteFailure';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import type { WorkoutModality, WorkoutSessionSet, WorkoutWeightUnit } from '@/core/db/types';
 
@@ -108,6 +110,9 @@ export function WorkoutHistoryDetailModal({
   const [detail, setDetail] = useState<WorkoutLogDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // A rejected delete must be reported inside this dialog: the log stays in
+  // history, so closing as if it were removed would be a silent divergence.
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!logId) return;
@@ -187,7 +192,12 @@ export function WorkoutHistoryDetailModal({
     setDeleting(true);
     try {
       await deleteWorkoutLog(logId);
+      setDeleteError(null);
       onDeleted();
+    } catch (error) {
+      // The session is still stored (and still in the history list behind this
+      // dialog), so the dialog stays open and offers the retry.
+      setDeleteError(workoutWriteFailureCopy(error, 'Could not delete that session. Try again.'));
     } finally {
       setDeleting(false);
     }
@@ -208,6 +218,7 @@ export function WorkoutHistoryDetailModal({
         />
       ) : (
         <>
+          <ValidationError message={deleteError} />
           <View className="mb-4">
             <Text className="text-base font-semibold" style={{ color: tokens.text }}>
               {detail.routineName ?? 'Workout'}

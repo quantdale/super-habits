@@ -9,6 +9,7 @@ import { Card } from '@/core/ui/Card';
 import { PillChip } from '@/core/ui/PillChip';
 import { TextField } from '@/core/ui/TextField';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
+import { ValidationError } from '@/core/ui/ValidationError';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
 import { SECTION_COLORS } from '@/constants/sectionColors';
@@ -19,6 +20,7 @@ import {
   restoreCustomExercise,
   updateCustomExercise,
 } from './workout.data';
+import { workoutWriteFailureCopy } from './workoutWriteFailure';
 
 const COLOR = SECTION_COLORS.workout;
 
@@ -87,6 +89,10 @@ export function CustomExerciseManagerModal({ visible, onClose, onDismiss, onChan
   const [exercises, setExercises] = useState<CustomExercise[]>([]);
   const [showArchived, setShowArchived] = useState(true);
   const [editing, setEditing] = useState<EditState | null>(null);
+  // Rejected rename/archive/restore writes were discarded by `await` with no
+  // surface, so the card looked unchanged and the manager looked idle. One
+  // alert at the top of the modal names what did not save.
+  const [writeError, setWriteError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     // Refresh unit (audit C §12): a close/reopen or a post-archive reload
@@ -115,19 +121,27 @@ export function CustomExerciseManagerModal({ visible, onClose, onDismiss, onChan
     // the editor open so the user can fix it; the data-layer assert is the
     // backstop that rejects over-long names with the canonical message.
     if (!trimmed || trimmed.length > 100) return;
-    await updateCustomExercise(editing.id, {
-      name: trimmed,
-      primaryArea: editing.area.trim() || undefined,
-      equipment: editing.equipment.trim(),
-      aliases: editing.aliases
-        .split(',')
-        .map((alias) => alias.trim())
-        .filter(Boolean),
-      instructions: editing.instructions.trim(),
-      modality: editing.modality,
-      unilateral: editing.unilateral,
-      supportsExternalLoad: editing.supportsExternalLoad,
-    });
+    try {
+      await updateCustomExercise(editing.id, {
+        name: trimmed,
+        primaryArea: editing.area.trim() || undefined,
+        equipment: editing.equipment.trim(),
+        aliases: editing.aliases
+          .split(',')
+          .map((alias) => alias.trim())
+          .filter(Boolean),
+        instructions: editing.instructions.trim(),
+        modality: editing.modality,
+        unilateral: editing.unilateral,
+        supportsExternalLoad: editing.supportsExternalLoad,
+      });
+    } catch (error) {
+      // Keep the editor (and the typed draft) open so the retry needs no
+      // re-typing, and say which write did not land.
+      setWriteError(workoutWriteFailureCopy(error, 'Could not save that exercise. Try again.'));
+      return;
+    }
+    setWriteError(null);
     setEditing(null);
     notifyChanged();
   }, [editing, notifyChanged]);
@@ -141,7 +155,15 @@ export function CustomExerciseManagerModal({ visible, onClose, onDismiss, onChan
         confirmVariant: 'danger',
       });
       if (!confirmed) return;
-      await archiveCustomExercise(exercise.id);
+      try {
+        await archiveCustomExercise(exercise.id);
+      } catch (error) {
+        setWriteError(
+          workoutWriteFailureCopy(error, 'Could not archive that exercise. Try again.'),
+        );
+        return;
+      }
+      setWriteError(null);
       if (editing?.id === exercise.id) setEditing(null);
       notifyChanged();
     },
@@ -150,7 +172,15 @@ export function CustomExerciseManagerModal({ visible, onClose, onDismiss, onChan
 
   const handleRestore = useCallback(
     async (exercise: CustomExercise) => {
-      await restoreCustomExercise(exercise.id);
+      try {
+        await restoreCustomExercise(exercise.id);
+      } catch (error) {
+        setWriteError(
+          workoutWriteFailureCopy(error, 'Could not restore that exercise. Try again.'),
+        );
+        return;
+      }
+      setWriteError(null);
       notifyChanged();
     },
     [notifyChanged],
@@ -170,6 +200,7 @@ export function CustomExerciseManagerModal({ visible, onClose, onDismiss, onChan
         Renames and metadata changes apply to future routine editing only — completed sessions keep
         the exercise snapshot recorded at completion.
       </Text>
+      <ValidationError message={writeError} />
       <View className="mb-3 flex-row flex-wrap">
         <PillChip
           label={showArchived ? 'Showing archived' : 'Hiding archived'}
