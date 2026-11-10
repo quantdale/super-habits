@@ -15,6 +15,7 @@ import {
   parsePlanPayload,
 } from '@/features/weekly-review/weeklyReview.domain';
 import { planningRowVisual } from '@/features/planning-hub/planningHub.visual';
+import { describePlanningWriteError } from '@/features/planning-hub/planningWriteError';
 
 /**
  * Browsing past weekly reviews. Expanding an entry shows the saved summary
@@ -70,18 +71,28 @@ export function ReviewHistoryView() {
       setDeleteError(null);
       try {
         await deleteWeeklyReview(review.id);
-        setExpandedId(null);
-        await loadReviews();
       } catch (e) {
-        // A rejected delete keeps the history row and the retriable button;
-        // the failure surfaces with the review's own message when present.
+        // A rejected delete keeps the history row and the retriable button.
+        // The copy goes through the shared planning helper so a storage/engine
+        // failure ('Error finalizing statement') is reported in a sentence the
+        // user can act on instead of leaking raw SQLite noise.
         setDeleteError(
-          e instanceof Error && e.message
-            ? e.message
-            : 'Could not delete the review. Please try again.',
+          describePlanningWriteError(e, 'Could not delete the review. Please try again.'),
         );
+        return;
       } finally {
         setDeletingId(null);
+      }
+
+      // The delete committed: drop the row locally so the list can never show a
+      // review the database no longer has, then re-read for the rest.
+      setExpandedId(null);
+      setReviews((current) => current.filter((item) => item.id !== review.id));
+      try {
+        await loadReviews();
+      } catch {
+        // The local removal above already matches the committed state, so a
+        // failed re-read must never be reported as a failed delete.
       }
     },
     [confirm, loadReviews],

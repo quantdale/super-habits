@@ -7,6 +7,7 @@ import { Card } from '@/core/ui/Card';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { ValidationError } from '@/core/ui/ValidationError';
 import { listRecentDailyPlans, softDeleteDailyPlan } from '@/features/daily-plan/dailyPlan.data';
+import { describePlanningWriteError } from '@/features/planning-hub/planningWriteError';
 import { parseTopTodoIds, parseTopTodoTitles } from '@/features/daily-plan/dailyPlan.domain';
 import { DAILY_PLAN_STATUS_LABELS } from '@/features/daily-plan/dailyPlan.types';
 import { listPendingTodos } from '@/features/todos/todos.data';
@@ -78,20 +79,30 @@ export function DailyPlanHistoryView({ onPlanDeleted }: { onPlanDeleted?: () => 
       setDeleteError(null);
       try {
         await softDeleteDailyPlan(entry.id);
-        setExpandedId(null);
-        await loadEntries();
-        onPlanDeleted?.();
       } catch (e) {
-        // A rejected delete keeps the history row and the retriable button;
-        // the failure surfaces with the review's own message when present.
+        // A rejected delete keeps the history row and the retriable button.
+        // The copy goes through the shared planning helper so a storage/engine
+        // failure ('Error finalizing statement') is reported in a sentence the
+        // user can act on instead of leaking raw SQLite noise.
         setDeleteError(
-          e instanceof Error && e.message
-            ? e.message
-            : 'Could not delete the plan. Please try again.',
+          describePlanningWriteError(e, 'Could not delete the plan. Please try again.'),
         );
+        return;
       } finally {
         setDeletingId(null);
       }
+
+      // The delete committed: drop the row locally so the panel can never show a
+      // plan the database no longer has, then re-read for the rest of the panel.
+      setExpandedId(null);
+      setEntries((current) => current.filter((row) => row.id !== entry.id));
+      try {
+        await loadEntries();
+      } catch {
+        // The local removal above already matches the committed state, so a
+        // failed re-read must never be reported as a failed delete.
+      }
+      onPlanDeleted?.();
     },
     [confirm, loadEntries, onPlanDeleted],
   );
