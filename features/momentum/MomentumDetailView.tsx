@@ -27,16 +27,17 @@ type MomentumDetailViewProps = {
 /**
  * The area's own text tone (never the `bright` fill): a bright section hue
  * painted as 11–15px text measures ~2:1 on a white card, while the resolved
- * accent text clears the floor in both appearances. Planning keeps the Gold
- * reward tone because it is the garden's reward bed.
+ * accent text clears the floor in both appearances. Planning uses the
+ * appearance-resolved Gold text tone (`rewardAccents.badge.text`, bronze in
+ * light) — never the decorative sun fill, which is 1.55:1 on a white card.
  */
 function sourceColor(
   source: MomentumSource,
   sectionAccents: ReturnType<typeof useAppTheme>['sectionAccents'],
-  tokens: ReturnType<typeof useAppTheme>['tokens'],
+  rewardAccents: ReturnType<typeof useAppTheme>['rewardAccents'],
 ): string {
   const hue = GARDEN_SPECIES[source].hue;
-  if (hue === 'gold') return GARDEN_SUN.fill;
+  if (hue === 'gold') return rewardAccents.badge.text;
   return sectionAccents[hue].text;
 }
 
@@ -84,7 +85,7 @@ function SourceMarker({
 }
 
 function MomentumDayRow({ model, dateKey }: { model: MomentumGardenModel; dateKey: string }) {
-  const { tokens, sectionAccents } = useAppTheme();
+  const { tokens, sectionAccents, rewardAccents } = useAppTheme();
   const day = model.days.find((candidate) => candidate.dateKey === dateKey);
   if (!day) return null;
   return (
@@ -126,7 +127,7 @@ function MomentumDayRow({ model, dateKey }: { model: MomentumGardenModel; dateKe
       >
         {day.activeSources.length > 0 ? (
           day.activeSources.map((source) => {
-            const ink = sourceColor(source, sectionAccents, tokens);
+            const ink = sourceColor(source, sectionAccents, rewardAccents);
             return (
               <View
                 key={source}
@@ -185,7 +186,7 @@ function MomentumDayRow({ model, dateKey }: { model: MomentumGardenModel; dateKe
  * list.
  */
 export function MomentumDetailView({ initialDays = 7 }: MomentumDetailViewProps) {
-  const { tokens, sectionAccents } = useAppTheme();
+  const { tokens, sectionAccents, rewardAccents } = useAppTheme();
   const gardenAccent = sectionAccents.habits;
   const dayGeneration = useDayRolloverGeneration();
   const [windowDays, setWindowDays] = useState<7 | 28>(initialDays);
@@ -368,7 +369,7 @@ export function MomentumDetailView({ initialDays = 7 }: MomentumDetailViewProps)
                   <Text
                     variant="bodyMd"
                     style={{
-                      color: sourceColor(explanation.source, sectionAccents, tokens),
+                      color: sourceColor(explanation.source, sectionAccents, rewardAccents),
                     }}
                   >
                     {explanation.label}
