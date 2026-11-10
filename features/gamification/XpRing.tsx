@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import { REWARD_HUES } from '@/constants/sectionColors';
 import { useReducedMotion } from '@/core/theme/motion';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -18,12 +19,12 @@ export type XpRingProps = {
 };
 
 /**
- * Animated SVG progress ring (Refero: Brilliant level badge, Imprint unit
- * wheel). The offset animates from the previous value to the new one, so a
- * level-up reads as growth instead of a redraw.
- *
- * Reduced motion collapses the duration to 0 — the ring still shows the final
- * value, it just does not sweep.
+ * Animated SVG progress ring (docs/ui-ux/16-playful-momentum.md §6
+ * ProgressRing, §7 "LevelHero / XpRing polish per tokens"). The Gold arc sits
+ * on a Gold-lip depth ring two pixels wider, so the ring reads as a solid slab
+ * with an edge instead of a hairline stroke. The offset animates from the
+ * previous value to the new one, so a level-up reads as growth; reduced motion
+ * collapses the duration to 0 and the ring simply shows the final value.
  */
 export function XpRing({
   size,
@@ -64,6 +65,13 @@ export function XpRing({
     return () => animation.stop();
   }, [animatedOffset, durationMs, offset, reducedMotion]);
 
+  // The lip band is the reward hue's darker tier painted directly under the arc
+  // (2px wider, same dash geometry) so the filled segment owns a visible edge
+  // while the empty track stays flat.
+  const lipWidth = strokeWidth + 2;
+  const lipRadius = size / 2 - lipWidth / 2;
+  const lipCircumference = 2 * Math.PI * lipRadius;
+
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <Svg
@@ -71,6 +79,21 @@ export function XpRing({
         height={size}
         style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}
       >
+        <AnimatedCircle
+          cx={size / 2}
+          cy={size / 2}
+          r={lipRadius}
+          fill="none"
+          stroke={REWARD_HUES.accent.lip}
+          strokeWidth={lipWidth}
+          strokeLinecap="round"
+          strokeDasharray={`${lipCircumference} ${lipCircumference}`}
+          strokeDashoffset={animatedOffset.interpolate({
+            inputRange: [0, circumference],
+            outputRange: [0, lipCircumference],
+            extrapolate: 'clamp',
+          })}
+        />
         <Circle
           cx={size / 2}
           cy={size / 2}
