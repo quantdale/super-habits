@@ -19,10 +19,16 @@ type MomentumCardProps = {
 /**
  * Momentum Garden on Today.
  *
- * Pop treatment: the art sits in its own tinted, inset panel so the middle of
- * the card is a *scene* rather than empty space, and today's contributing
- * sources are listed as chips underneath — the same information the art
- * encodes, spelled out for anyone who does not read the garden yet.
+ * P20 (`docs/ui-ux/16-playful-momentum.md` §7 "Momentum Garden"): the art sits
+ * in a soft sky-band panel so the middle of the card is a *scene* — a flat
+ * illustrated garden with one plant species per contributing area — rather than
+ * empty space. Today's contributing sources are listed as chips underneath: the
+ * same information the art encodes, spelled out for anyone who does not read
+ * the garden yet. Nothing wilts and no state is punitive: an empty day reads
+ * "ready", and returning after a gap keeps every prior plant.
+ *
+ * Presentation only — the model, the summary line and the accessible label all
+ * come from `momentum.domain.ts` unchanged.
  */
 export function MomentumCard({ model, onViewGarden }: MomentumCardProps) {
   const { tokens, sectionAccents } = useAppTheme();
@@ -47,12 +53,14 @@ export function MomentumCard({ model, onViewGarden }: MomentumCardProps) {
               borderRadius: radius.md,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: `${accent.fill}22`,
-              borderWidth: 1.5,
+              backgroundColor: accent.tint,
+              borderWidth: 2,
               borderColor: `${accent.fill}33`,
+              borderBottomWidth: 4,
+              borderBottomColor: `${accent.fill}55`,
             }}
           >
-            <GardenIcon size={26} bright={accent.text} lip={accent.fill} />
+            <GardenIcon size={26} bright={accent.fill} lip={accent.fill} />
           </View>
           <View style={{ flexGrow: 1, flexBasis: 200, minWidth: 0 }}>
             <Text variant="titleMd">Momentum Garden</Text>
@@ -100,11 +108,13 @@ export function MomentumCard({ model, onViewGarden }: MomentumCardProps) {
                   paddingVertical: 4,
                   paddingHorizontal: spacing.sm,
                   borderRadius: radius.full,
-                  backgroundColor: `${accent.fill}18`,
+                  backgroundColor: accent.tint,
                 }}
               >
-                <MaterialIcons name="eco" size={13} color={accent.fill} />
-                <Text variant="caption" style={{ color: accent.fill, fontSize: 11 }}>
+                {/* Chip ink is the resolved accent TEXT tier: the bright fill
+                    as 13px text on its own wash measures ~2:1. */}
+                <MaterialIcons name="eco" size={13} color={accent.text} />
+                <Text variant="caption" style={{ color: accent.text }}>
                   {MOMENTUM_SOURCE_LABELS[source]}
                 </Text>
               </View>
