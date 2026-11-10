@@ -75,9 +75,13 @@ Last successful validation:
 
 Current failures: none.
 
+Relevant quarantines: none.
+
+Blockers: None.
+
 Exact next action: none — parent runs the full gates, commits and opens the draft PR.
 
-Remaining definition of done: met (see Validation Ledger).
+Remaining definition of done: Complete — all seven journeys pass with `--repeat-each=3`, the full gates are green (see Validation Ledger), and @codex review is the only step left to the parent.
 
 ## Progress
 
@@ -153,7 +157,7 @@ No product files changed: no product bug was found in `features/projects/*` or
 Delivered the first end-to-end lifecycle coverage for Projects and Goals: seven
 tests that each assert rendered state plus the persisted row/intent evidence, with
 no fixed sleeps and no product change. The journeys cover validation, editing,
-every reachable status transition and reversal, todo/goal↔project association with
+every reachable status transition and reversal, task/goal↔project association with
 progress recomputation, tombstone deletion that keeps children alive, the
 failure/retry path for a rejected delete, cold-reload persistence, and keyboard +
 rendered a11y at 390px. Two UX gaps (unconfirmed destructive delete, no un-archive
