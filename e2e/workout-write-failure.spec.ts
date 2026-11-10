@@ -900,6 +900,81 @@ test.describe('Workout write-failure honesty', () => {
     await returnToApp(page);
   });
 
+  test('a rejected session delete does not leak its error onto a different session', async ({
+    page,
+  }) => {
+    // TWO sessions, so the dialog can be retargeted at an untouched log. They
+    // are seeded directly (rather than quick-logged twice) so each has a stable,
+    // distinguishable identity and no reward/xp side effects are in play.
+    const sessionA = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+    const sessionB = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    await seedSql(
+      page,
+      `INSERT INTO workout_routines (id, name, description, created_at, updated_at, deleted_at)
+       VALUES ('wrk_wf_leak', 'Leak probe', NULL, '${sessionA}', '${sessionA}', NULL);
+       INSERT INTO workout_logs (id, routine_id, notes, completed_at, created_at, routine_name)
+       VALUES ('wrk_wf_log_a', 'wrk_wf_leak', NULL, '${sessionA}', '${sessionA}', 'Session A'),
+              ('wrk_wf_log_b', 'wrk_wf_leak', NULL, '${sessionB}', '${sessionB}', 'Session B');`,
+    );
+    // A TRANSIENT abort (see `injectTransientAbort`): the delete of A must fail
+    // while the dialog is retargeted and then succeed on the in-app retry, all
+    // without a reload — a remount would reset the very state under test.
+    const waitForWindowToClose = await injectTransientAbort(
+      page,
+      `CREATE TRIGGER ${LOG_DELETE}
+         BEFORE DELETE ON workout_logs
+         WHEN CAST(strftime('%s', 'now') AS INTEGER) < __DEADLINE__
+         BEGIN SELECT RAISE(ABORT, 'session-delete-blocked'); END;`,
+    );
+    await returnToApp(page);
+    await goToTab(page, 'workout');
+    await openHistory(page);
+    const rows = page.getByLabel(/^Open session from /);
+    await expect(rows).toHaveCount(2);
+
+    // Row 0 is the newest session (B); row 1 is A. Delete A first so it fails.
+    await rows.nth(1).click();
+    const detail = page.getByRole('dialog', { name: 'Session detail' });
+    await expect(detail.getByText('Session A', { exact: true })).toBeVisible();
+    await detail.getByRole('button', { name: 'Delete logged session' }).click();
+    await page.getByText('Delete session', { exact: true }).last().click({ force: true });
+
+    // (a) A's failure is reported on A.
+    await expect(detail.getByRole('alert')).toContainText(COPY.sessionDelete);
+
+    // (b) A's error must SURVIVE an in-place retry attempt on A: re-opening the
+    // confirm sheet and cancelling is not a new target, so the copy stays.
+    await detail.getByRole('button', { name: 'Delete logged session' }).click();
+    const confirmSheet = page.getByRole('dialog', { name: 'Delete logged session' });
+    await expect(confirmSheet).toBeVisible();
+    await confirmSheet.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(detail.getByRole('alert')).toContainText(COPY.sessionDelete);
+
+    // (c) Dismissing and opening the OTHER session must show a CLEAN dialog:
+    // nothing was ever attempted against B, so B must not inherit A's error.
+    await detail.getByLabel('Close').click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await rows.nth(0).click();
+    const other = page.getByRole('dialog', { name: 'Session detail' });
+    await expect(other.getByText('Session B', { exact: true })).toBeVisible();
+    await expect(other.getByRole('alert')).toHaveCount(0);
+    await expect(page.getByText(COPY.sessionDelete, { exact: true })).toHaveCount(0);
+
+    // (d) Once the injected window closes, B deletes cleanly — and the delete is
+    // B's, not a leftover of A's attempt.
+    await waitForWindowToClose();
+    await other.getByRole('button', { name: 'Delete logged session' }).click();
+    await page.getByText('Delete session', { exact: true }).last().click({ force: true });
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    const remaining = await queryRows(
+      page,
+      `SELECT routine_name FROM workout_logs ORDER BY completed_at`,
+    );
+    expect(remaining).toEqual([{ routine_name: 'Session A' }]);
+    await returnToApp(page);
+  });
+
   test('a rejected custom-exercise rename keeps the editor open with the draft, then saves on retry', async ({
     page,
   }) => {
@@ -940,6 +1015,25 @@ test.describe('Workout write-failure honesty', () => {
     await expect(failing.getByRole('textbox', { name: 'Edit custom exercise name' })).toHaveValue(
       'Pec Deck',
     );
+    // The failed editor keeps the draft in place across an in-place retry: the
+    // error belongs to THIS exercise until the write succeeds or the target
+    // changes, so re-opening the editor for the same exercise keeps it.
+    await failing.getByRole('button', { name: 'Save custom exercise changes' }).click();
+    await expect(failing.getByRole('alert')).toContainText(COPY.customEdit);
+    await expect(failing.getByRole('textbox', { name: 'Edit custom exercise name' })).toHaveValue(
+      'Pec Deck',
+    );
+    // Dismissing and reopening the manager must show a clean surface: nothing
+    // was attempted on this fresh visit. The manager stays mounted across a
+    // close/reopen, so a leaked message would otherwise resurface here.
+    await failing.getByLabel('Close').first().click();
+    await expect(page.getByRole('dialog', { name: 'Custom exercises' })).toHaveCount(0);
+    await builderFailing.getByRole('button', { name: 'Manage custom exercises' }).click();
+    const reopened = page.getByRole('dialog', { name: 'Custom exercises' });
+    await expect(reopened.getByText('Cable Fly')).toBeVisible();
+    await expect(reopened.getByRole('alert')).toHaveCount(0);
+    await expect(reopened.getByText(COPY.customEdit, { exact: true })).toHaveCount(0);
+
     const afterFailure = await queryRows(
       page,
       `SELECT name FROM custom_exercises WHERE id = 'cex_wfail_manager'`,

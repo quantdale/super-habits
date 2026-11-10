@@ -113,6 +113,23 @@ export function WorkoutHistoryDetailModal({
   // A rejected delete must be reported inside this dialog: the log stays in
   // history, so closing as if it were removed would be a silent divergence.
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // This dialog stays MOUNTED while `visible`/`logId` change (WorkoutScreen
+  // renders it with `visible={detailLogId !== null}` and passes the id), so a
+  // failure raised for one session would otherwise be shown over the next one.
+  // Retire it whenever the TARGET changes or the dialog closes; keep it across
+  // an in-place retry of the same log, which is exactly when the user needs it.
+  // Render-time adjustment, not an effect (the documented pattern — remounting
+  // is not an option because the close animation, the refresh unit and
+  // `useGuardedAsyncRefresh` all rely on a stable instance):
+  // https://react.dev/reference/react/useState#storing-information-from-previous-renders
+  const [lastTarget, setLastTarget] = useState<{ visible: boolean; logId: string | null }>({
+    visible,
+    logId,
+  });
+  if (lastTarget.visible !== visible || lastTarget.logId !== logId) {
+    setLastTarget({ visible, logId });
+    setDeleteError(null);
+  }
 
   const refresh = useCallback(async () => {
     if (!logId) return;
@@ -196,7 +213,9 @@ export function WorkoutHistoryDetailModal({
       onDeleted();
     } catch (error) {
       // The session is still stored (and still in the history list behind this
-      // dialog), so the dialog stays open and offers the retry.
+      // dialog), so the dialog stays open and offers the retry. The message
+      // outlives an in-place retry of THIS log and is retired by the target
+      // reset above once the dialog closes or another session is opened.
       setDeleteError(workoutWriteFailureCopy(error, 'Could not delete that session. Try again.'));
     } finally {
       setDeleting(false);

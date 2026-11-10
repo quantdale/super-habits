@@ -93,6 +93,20 @@ export function CustomExerciseManagerModal({ visible, onClose, onDismiss, onChan
   // surface, so the card looked unchanged and the manager looked idle. One
   // alert at the top of the modal names what did not save.
   const [writeError, setWriteError] = useState<string | null>(null);
+  // This modal also stays MOUNTED across a close/reopen, and its editor is
+  // retargeted between exercises, so a failure must not outlive either. It is
+  // retired when the manager opens/closes or the edited exercise changes, and
+  // kept across an in-place retry of the same exercise (render-time adjustment,
+  // the same pattern as the session-detail dialog).
+  const [errorScope, setErrorScope] = useState<{ visible: boolean; editingId: string | null }>({
+    visible,
+    editingId: null,
+  });
+  const editingId = editing?.id ?? null;
+  if (errorScope.visible !== visible || errorScope.editingId !== editingId) {
+    setErrorScope({ visible, editingId });
+    setWriteError(null);
+  }
 
   const refresh = useCallback(async () => {
     // Refresh unit (audit C §12): a close/reopen or a post-archive reload
