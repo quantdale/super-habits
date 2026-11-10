@@ -23,6 +23,8 @@ import { applyNextWeekPlanSuggestions } from './weeklyReview.applyNextWeek';
 import { getWeeklyReviewByWeekKey } from './weeklyReview.data';
 import { ReviewHistoryView } from './ReviewHistoryView';
 import { weekHasAnyScheduledOrRecordedActivity } from './weeklyReviewScreenGuards';
+import { ValidationError } from '@/core/ui/ValidationError';
+import { describePlanningWriteError } from '@/features/planning-hub/planningWriteError';
 import {
   planningPrimaryFace,
   planningRowVisual,
@@ -310,8 +312,18 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
       }
       setApplyMessage(parts.join(' '));
     } catch (e) {
+      // A rejected next-week write must keep its failure visible (and announced)
+      // instead of rendering an engine message in the success block. The copy
+      // goes through the shared planning helper, and the action stays retriable:
+      // `applyStatus` stays 'error' (never 'applied'), so the button below
+      // remains available for the retry.
       setApplyStatus('error');
-      setApplyMessage(e instanceof Error ? e.message : 'Failed to apply suggestions');
+      setApplyMessage(
+        describePlanningWriteError(
+          e,
+          'Could not add the priorities to next week. Please try again.',
+        ),
+      );
     }
   }, [nextWeekSuggestions, carryForwardTodoIds.length]);
 
@@ -507,18 +519,21 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
                 />
               </View>
             ) : null}
-            {applyMessage ? (
+            {applyMessage && applyStatus === 'error' ? (
+              <View style={{ marginTop: spacing.md, width: '100%' }}>
+                {/* The done step's own error surface: announced to assistive
+                    technology (role=alert), themed by the shared danger tokens
+                    instead of inheriting the success block's muted ink. */}
+                <ValidationError message={applyMessage} />
+              </View>
+            ) : null}
+            {applyMessage && applyStatus !== 'error' ? (
               <Text
                 variant="bodyMd"
                 style={{
                   marginTop: spacing.md,
                   textAlign: 'center',
-                  color:
-                    applyStatus === 'error'
-                      ? danger.mutedInk
-                      : failedCommitmentCount > 0
-                        ? warning.mutedInk
-                        : success.mutedInk,
+                  color: failedCommitmentCount > 0 ? warning.mutedInk : success.mutedInk,
                 }}
               >
                 {applyMessage}

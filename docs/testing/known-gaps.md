@@ -98,6 +98,51 @@ Every entry below is either a contract gap or a capability gap. If a new uncover
 - **Reason (observed 2026-10-30, UI v2 P6/P7):** `e2e/visual-regression.spec.ts:424` (`todos-390-dark`) failed on PR #168 run `40938811411` attempts 1 and 2 (5,613 px) and on PR #173 run `40940542299` (4,915 px), but passed on PR #168 run `40932996057` and PR #173 run `40947289113` with the same golden and no change to To Do code between them. The diffs are small, sub-threshold antialiasing deltas confined to the tab-bar edge and its icons (max channel delta 95), not a layout change, so the capture is nondeterministic on the hosted runner.
 - **Handling:** treated as a known flake for merge decisions (alongside the five W15 cases already failing on main). The flaky capture is **not** adopted as a golden (adopting it would only flip which state fails), the assertion is not loosened, and no mask is added. Close this entry once the tab-bar edge capture is made deterministic (for example by settling the tab-bar cross-fade before capture) and the test passes on consecutive hosted runs.
 
+### CG-11 — v2 secondary surfaces: dark colour tiers are not AA on a third (mid-tone) canvas — OPEN (quarantined `test.fixme`)
+
+**Gate site:** `e2e/v2-surfaces-aa.spec.ts`
+
+**Decided contract (§5.1 + WCAG AA):** every rendered text node on a v2
+surface clears 4.5:1 (or 3:1 at large/bold sizes) against its composited
+ancestor background, in every theme the picker offers — not only `light`,
+`dark`, and the one theme with `sectionOverrides`.
+
+**Reason (measured 2026-11-10, `e2e/v2-surfaces-aa.spec.ts`):** the
+dark-appearance coloured-text tiers (`SECTION_TEXT_COLORS_DARK`, the §5.1
+`bright` hues) and the derived `chipBackground` wash are resolved from the
+APPEARANCE (and from a theme's own `primary` + `surface`), then painted without
+being validated against the ACTIVE theme's surface. On the default dark canvas
+(`#1A1F2B`) they clear the floor; on Nord Arctic's mid-tone slate they do not:
+
+| Surface (file)                                                                  | Node               | Ink                      | Measured on `#3B4252`                            |
+| ------------------------------------------------------------------------------- | ------------------ | ------------------------ | ------------------------------------------------ |
+| `features/progress/ProgressInsightsView.tsx` `DisclosureChip`                   | `More details −/+` | Sky bright `#2FA8F7`     | **3.86:1** at 15px                               |
+| `features/activity/ActivityTimelineView.tsx` `DisclosureChip`                   | `Filters −/+`      | Sky bright `#2FA8F7`     | **3.86:1** at 15px                               |
+| `features/momentum/MomentumDetailView.tsx` `sourceColor` (garden source labels) | `Tasks`            | Sky bright `#2FA8F7`     | **3.86:1** at 15px                               |
+| same                                                                            | `Workout`          | Coral bright `#FF6A4D`   | **3.56:1** at 15px                               |
+| same                                                                            | `Nutrition`        | Berry bright `#FF6FAE`   | **3.90:1** at 15px                               |
+| same                                                                            | `Focus`            | lifted Grape `#B49BFF`   | **4.35:1** at 15px                               |
+| `features/overview/OverviewScreen.tsx` `Plan today` chip                        | `Plan today`       | Nord `primary` `#88C0D0` | **3.50:1** at 14px on `chipBackground` `#4A5B6B` |
+
+The four `test.fixme` cases in `e2e/v2-surfaces-aa.spec.ts` (three Nord
+surfaces plus Today's header chip, whose `Plan today` label sits on the chip's
+own derived wash) hold the measurement and the exact selector in their notes;
+their bodies are the release assertion (same helper, same thresholds), so
+un-fixme-ing a case is the fix's own proof. The same spec asserts every
+non-affected surface on Nord — and every surface in light, dark and
+cyberpunk-neon — unsuppressed, so a new defect anywhere still fails the lane.
+No threshold was lowered and no node was excluded.
+
+**Owning lane:** theme token resolution (accent text must be resolved against
+the ACTUAL active surface — the `readableAccent` contract Settings already
+uses), or `core/theme` (§5.1 `SECTION_TEXT_COLORS_DARK` and `chipBackground`
+becoming surface-aware).
+
+**Exit criteria:** all four gated cases un-fixme and pass on Nord Arctic
+without loosening the threshold, then remove this entry (the
+reverse-direction check in `scripts/quarantine-register-parity.mjs` fails on a
+register entry that outlives its gate).
+
 ---
 
 ## Capability gaps
