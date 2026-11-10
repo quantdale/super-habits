@@ -259,6 +259,60 @@ shrinking the sampled section set — then delete this entry (the
 reverse-direction check in `scripts/quarantine-register-parity.mjs` fails on a
 register entry that outlives its gate).
 
+### CG-13 — v2 keyboard sweep: four keyboard-only focus/activation defects at phone width — OPEN (quarantined `test.fixme`)
+
+**Gate site:** `e2e/v2-keyboard-focus.spec.ts`
+
+**Decided contract (§5.7 + Design DNA §15 + WCAG 2.4.7 / 3.2.5):** a keyboard-only
+user gets the same product a pointer user gets. Every control a `Tab` pass
+reaches paints a visible focus indicator, `Tab` never lands on a control the
+user cannot see, every overlay traps focus while open, closes on `Escape`, and
+returns focus to the control that opened it, and `Enter`/`Space` activate
+buttons, tabs, checkboxes and chips exactly like a click.
+
+**Reason (measured 2026-11-10, `e2e/v2-keyboard-focus.spec.ts`, 390x844 light
+and dark, `TYPICAL` fixture):** four defects break that contract on the web
+build. All four cases were reproduced by the spec's own walk (`Tab` from a
+neutral start, `body` hops skipped, cycle ends at the first repeated stop) and
+its own DB oracle; the values below are the spec's measurements:
+
+| Case                         | Control / path                                                                                                                  | Measured                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Offscreen tab stops          | `Edit item` / `Delete item` on every swipe row (`core/ui/SwipeRightActions.tsx` via `react-native-gesture-handler` `Swipeable`) | To Do: 14 stops at `left -9790`/`-9706` (`Swipeable` parks the actions panel outside the viewport until a swipe); Workout: 2 stops at `-9792`/`-9708`. All inside `overflow: hidden` rows, so focus lands where nothing is painted                                                                                                                                       |
+| Weekly Review focus return   | hub Progress → `Open weekly review` → `Escape`                                                                                  | `document.activeElement === BODY`; the invoking control was unmounted by `openWeeklyReview` (`core/providers/NavigationProvider.tsx`), so RN-Web's restore finds nothing. The wide-layout (>=1280) Overview opener _does_ return focus, which scopes the defect to the hub-opened chain                                                                                  |
+| Space on tab-shaped controls | section rail `Habits` tab, `SegmentedControl` (`Diary view`), `OptionRow` preset row (`Presets`)                                | Space leaves `aria-selected` `false` / the preset sheet open (`dialogs=1`). RN-Web's `PressResponder` (`isValidKeyPress`) accepts Space only for button-shaped roles and no component binds it — unlike `features/habits/useHabitCheckboxKeyboard.ts` and `core/ui/Switch.tsx`, which exist for this gap. Enter works on all three                                       |
+| To Do completion checkbox    | `Mark complete: Task 4` / `Task 5`, Enter and Space                                                                             | opens `<dialog aria-label="Edit task">` and `todos.completed` stays `0`, because the nested `checkbox` sits inside the row's own `Pressable` (`features/todos/TodoItem.tsx`, `Edit task: …`), which receives the key press. A pointer click on the same control completes the task, so this is a keyboard-only loss of the primary To Do action plus an unexpected modal |
+
+The four `test.fixme` cases in `e2e/v2-keyboard-focus.spec.ts` hold the exact
+selector and the measurement in their notes; their bodies are the release
+assertion (same walk, same thresholds, same fixture), so un-fixme-ing a case is
+the fix's own proof. The rest of that spec stays ordinary active coverage —
+every `Tab` stop paints a visible indicator (light and dark, six sections),
+no `Tab` stop is inside `aria-hidden`/`inert`/CSS-hidden content, all five
+overlays trap focus and close on `Escape`, Settings/Command Center/quick
+capture/Planning Hub return focus to their opener, a habit check-in and a
+quick-kcal chip activate on both keys, and the rail/segmented tabs activate on
+Enter — so a NEW focus, overlay or key defect still fails the lane. No
+threshold was lowered and no control was excluded (the offscreen case reports
+`clippedAway` as the diagnostic rather than exempting it).
+
+**Owning lane:** `core/ui/SwipeableCard.tsx` / `core/ui/SwipeRightActions.tsx`
+(keep the revealed actions out of the tab order until the row is swiped, or
+convert `Swipeable`'s actions panel to `tabIndex={-1}` + `aria-hidden`),
+`core/providers/NavigationProvider.tsx` (`openWeeklyReview` must record the
+control that opened the chain so the review can return focus to `Plan today`),
+`app/index.tsx` (`TabButton`), `core/ui/SegmentedControl.tsx`
+(`SegmentOptionButton`) and `core/ui/OptionRow.tsx` (bind Space for non-button
+roles, same contract as the habit hook and `core/ui/Switch.tsx`), and
+`features/todos/TodoItem.tsx` (the completion checkbox must own Enter/Space
+instead of the wrapping row `Pressable`).
+
+**Exit criteria:** all four gated cases un-fixme and pass at 390x844 in light
+and dark without loosening any threshold, shrinking the surface set or excluding
+a control — then remove this entry (the reverse-direction check in
+`scripts/quarantine-register-parity.mjs` fails on a register entry that outlives
+its gate).
+
 ---
 
 ## Capability gaps
