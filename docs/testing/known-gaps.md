@@ -138,6 +138,123 @@ ancestor background, in every theme the picker offers — not only `light`,
   and `scripts/quarantine-register-parity.mjs` reports no unregistered gate and
   no stale entry after this block was closed.
 
+### CG-12 — v2 mobile surfaces: interactive controls under a 44x44 CSS hit area on web — OPEN (quarantined `test.fixme`)
+
+**Gate site:** `e2e/v2-responsive-sweep.spec.ts`
+
+**Decided contract (§5.6 + WCAG 2.5.5 / HIG):** every interactive control on a
+v2 surface exposes a **>= 44x44 CSS px hit area on the web build** at phone
+widths (360/375/390). The hit area is the real DOM box of the element that
+carries the `role`/`button` semantics and the press handler — not the visual face
+and not a `hitSlop`-inflated number, because react-native-web never applies
+`hitSlop` to the DOM box and never forwards it as an attribute (documented in
+`core/ui/PillChip.tsx`, which is why `Chip` keeps a 40pt face).
+
+**Reason (measured 2026-11-10, `e2e/v2-responsive-sweep.spec.ts`):** 114
+controls measure under 44 in at least one dimension at 360/375/390 across the
+six sections and the Settings / Command Center / Planning Hub / Weekly Review /
+Health surfaces. All values below are the sweep's own measurements (sizes listed
+per width where a width changes the measurement):
+
+| Surface (owner folder)                                                | Controls                                                                                                                                                                                                                          | Measured                                                                                        |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `features/todos`                                                      | `Add task` (52pt slab, but only the 28x28 glyph is the press node), `Search tasks`, `Show completed tasks`                                                                                                                        | 28x28; 220/235/250 x40; 134.4x40                                                                |
+| `features/workout`                                                    | `Complete workout <routine>` (`sm` Button + its 4pt slop), the seven `This week` day nodes at 360, `Change today`, `Plan week`, `Start Routine`, `Edit weekly plan`                                                               | 106x28; 41.7x64 each; 110.2x36; 87.9x36; 54.5x36; 79.9x36                                       |
+| `features/calories`                                                   | `Edit daily calorie goal`, `Edit daily macro targets`, `Form view`/`Diary view`, the four meal-type chips, the four frequent-food log chips, the four quick-kcal presets, `Add quick-calorie entry`, `Show N more frequent foods` | 80.9x32; 96.2x36; 161/168.5/176 x36; 68.5-90.9x40; 92-150.9x40; 56x36; 50.3x36; 292/307/322 x24 |
+| `features/settings`                                                   | notification `<input type=checkbox>` ×3, `<input type=time>` ×3, inline `Save <reminder> time` ×3, `Weekly review on <day>` ×7, `Set effort scale OFF/RIR/RPE`, the eight pomodoro/macro stepper ± keys, day/night/motion chips   | 40x20; 96x38; 66x38; 32-43x26; 50/50/55 x40; 40x24; 55.4-85.7x40                                |
+| `features/planning-hub` + `features/daily-plan` + `features/progress` | the hub's five view tabs, `Carry forward unfinished priorities from yesterday`, `Show plan history`, `Show the last 7/30/90 days`, `7 days`/`28 days`                                                                             | 61.2x36; 216x34; 102x34; 48.2/56.3 x40; 72.6/80.7 x40                                           |
+| `features/overview`                                                   | Streak chip, XP chip, `View Momentum Garden`                                                                                                                                                                                      | 48.1x32; 64.3x32; 128.1x36                                                                      |
+| `features/pomodoro`                                                   | `Focus`/`Short Break`/`Long Break` mode tabs                                                                                                                                                                                      | 95.3/100.3/105.3 x36                                                                            |
+| `features/command`                                                    | the two `Use example:` chips                                                                                                                                                                                                      | 235.1x40; 284/299.3/299 x40                                                                     |
+
+The three surfaces with **no** finding (`Habits`, `hub-goals`, `hub-projects` returned
+zero entries; `hub-timeline` and `hub-progress` only carry the shared hub tabs
+and its range chips) prove the sweep is not blanket-red: it discriminates per
+control, in both light and dark, and per width.
+
+Most entries are web-only (`hitSlop` applies on native RN), but the DOM is the
+surface a PWA user actually gets. The two that are **not** slop artefacts are
+`Add task` (the 52pt slab is a decorative ancestor, so the real press node is the
+28pt glyph) and Workout's `This week` strip (seven 44pt nodes plus gaps cannot
+fit 328px of inner width at 360, so the layout squeezes them to 41.7).
+
+**Handling:** quarantined per the standing protocol, not excluded. The gated
+case's body is the full release assertion (same helper, same thresholds, same
+surface set, all widths), so un-fixme-ing it is the fix's own proof. The other
+three promises in the same spec (no horizontal overflow, wide-viewport cap +
+centre + shell swap, reduced-motion quiet) stay ordinary active cases, so a new
+overflow, layout or motion defect still fails the lane.
+
+**Owning lane:** the per-surface feature folders above (the shared primitives
+that make slop-only sizing possible are `core/ui/Button.tsx` (`size=sm` 36pt),
+`core/ui/PillChip.tsx`/`Chip` 40pt, `core/ui/SegmentedControl.tsx` 36pt
+segments, `core/ui/NumberStepperField.tsx` 24pt keys, and
+`features/todos/TodoQuickCapture.tsx`'s slab-vs-press-node shape). A durable fix
+is one of: raise the web face itself to 44 (Chip/segmented/stepper already have
+the geometry room), make the press wrapper of `Pressable3D` content-sized rather
+than glyph-sized, reflow Workout's week strip at <= 375, and replace the web
+`<input type=checkbox>` notification toggles with the 44pt `core/ui.Switch` the
+Settings parity spec already pins.
+
+**Exit criteria:** the gated case is un-fixme-ed and passes with **zero**
+sub-44 entries at 360/375/390 in both themes, without loosening the threshold,
+shrinking the surface set, or excluding a control — then delete this entry (the
+reverse-direction check in `scripts/quarantine-register-parity.mjs` fails on a
+register entry that outlives its gate).
+
+### CG-14 — v2 shell: JS-driven section transition ignores reduced motion — OPEN (quarantined `test.fixme`)
+
+**Gate site:** `e2e/v2-responsive-sweep.spec.ts`
+
+**Decided contract (§5.8 reduced motion):** with `prefers-reduced-motion:
+reduce`, the app performs "no translate, scale or confetti" and an "opacity
+cross-fade of 120ms only" (`docs/ui-ux/16-playful-momentum.md` §5.8).
+
+**Reason (measured 2026-11-10, `e2e/v2-responsive-sweep.spec.ts`):**
+`SectionContainer` (`app/index.tsx`, the shell's section cross-fade) starts an
+`Animated.parallel` of a **200ms opacity timing and a 240ms translate timing**
+unconditionally — it never consults `useReducedMotion()`. On the web build those
+timings run through react-native-web's own `requestAnimationFrame` driver and
+write inline styles, so they produce **neither** a Web Animation object
+(`document.getAnimations()` reports **0 running animations**) **nor** an
+`@keyframes` rule (`animationName` is `none`) — the two checks the sweep already
+had are structurally blind to this class of motion. A frame-by-frame sampler of
+the incoming panel's computed style, armed before the click, measures each
+section switch at 390px and 1280px:
+
+| Observation                        | Measured                                               | §5.8 budget          |
+| ---------------------------------- | ------------------------------------------------------ | -------------------- |
+| Opacity ramp `0.000 → 1.000`       | 12–16 distinct frames, still changing at **298–326ms** | one 120ms cross-fade |
+| `translateY` travel                | `12px → 0` across **15–18** distinct transform values  | **no translate**     |
+| `document.getAnimations()` running | **0**                                                  | —                    |
+| Declared CSS `animationName`       | **none**                                               | —                    |
+
+Representative failure evidence: `390 todos: opacity 0.000 -> 0.021 -> 0.037 ->
+0.054 -> 0.122 -> 0.203 -> 0.304 -> 0.935 -> 0.974 -> 1.000 over 298ms;
+transforms ["matrix(1, 0, 0, 1, 0, 12)", "matrix(1, 0, 0, 1, 0, 11.8028)", …]`.
+
+**Handling:** quarantined per the standing protocol, not excluded. The gated
+case's body is the full release assertion (same `sampleMotion`
+/
+`summariseMotion` helpers, same thresholds, same sections, both widths), so
+un-fixme-ing it is the fix's own proof. The sampler is itself proven
+non-vacuous: an injected plain-`div` `requestAnimationFrame` animation is
+detected as 43 translated frames with a 649ms opacity ramp.
+
+**Owning lane:** the shell (`app/index.tsx` `SectionContainer`) — it must call
+`useReducedMotion()` (`core/theme/motion.ts`) and, when true, set the opacity
+value directly with no translate at all and at most a 120ms
+(`MOTION_V2_DURATION.reducedFade`) cross-fade, matching every other v2 surface
+(`core/ui/Modal.tsx`, `core/ui/Switch.tsx`, `SegmentedControl`,
+`RewardCelebrationOverlay` already do).
+
+**Exit criteria:** the gated case is un-fixme-ed and passes with **zero**
+translated transform values and an opacity ramp `<= 136ms` (120ms + one 16ms
+frame quantum) at 390px and 1280px, without loosening the threshold or
+shrinking the sampled section set — then delete this entry (the
+reverse-direction check in `scripts/quarantine-register-parity.mjs` fails on a
+register entry that outlives its gate).
+
 ---
 
 ## Capability gaps
