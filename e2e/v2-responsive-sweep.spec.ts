@@ -968,24 +968,15 @@ test.describe('V2 responsive sweep', () => {
     }
   });
 
-  // Quarantined defect (CG-14 in `docs/testing/known-gaps.md`), quarantined per
-  // the standing protocol rather than excluded: the body below IS the release
-  // assertion (same sampler, same thresholds, same surface set), so un-fixme-ing
-  // this case is the fix's own proof.
-  //
   // The case above proves no CSS/Web-Animation motion runs under reduced motion.
   // That is NOT the whole contract: React Native's `Animated` timings on web are
   // driven by react-native-web's requestAnimationFrame loop writing inline
   // styles, so they produce neither a Web Animation object nor an @keyframes
-  // rule. `SectionContainer` (app/index.tsx) runs a 200ms opacity timing and a
-  // 240ms translate timing unconditionally, which §5.8 forbids ("no translate,
-  // scale or confetti; opacity cross-fade of 120ms only"). Measured 2026-11-10
-  // at 390px: opacity ramps 0.000 -> 1.000 over 12-16 frames and is still
-  // changing at 300-326ms, while translateY travels 12px -> 0 across 15-18
-  // distinct transform values — with `document.getAnimations()` reporting 0.
-  test.fixme('reduced motion forbids JS-driven translation and long opacity ramps (known SectionContainer gap)', async ({
-    page,
-  }) => {
+  // rule — a JS-driven transition would slip past that check. This case samples
+  // the incoming panel frame by frame instead, so `SectionContainer`
+  // (app/index.tsx) is held to §5.8 ("no translate, scale or confetti; opacity
+  // cross-fade of 120ms only") directly.
+  test('reduced motion forbids JS-driven translation and long opacity ramps', async ({ page }) => {
     test.setTimeout(420_000);
     await prepare(page);
 

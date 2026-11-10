@@ -32,6 +32,7 @@ import {
 } from '@/core/ui/illustrations/icons';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 import { elevation, layout, radius, size, spacing } from '@/core/theme/designTokens';
+import { useReducedMotion } from '@/core/theme/motion';
 import { OverviewScreen } from '@/features/overview/OverviewScreen';
 import { TodosScreen } from '@/features/todos/TodosScreen';
 import { HabitsScreen } from '@/features/habits/HabitsScreen';
@@ -344,11 +345,25 @@ function SectionContainer({
   section,
   ...rest
 }: { isActive: boolean; children: React.ReactNode; section: AppSection } & ViewProps) {
+  const reducedMotion = useReducedMotion();
   const [opacity] = useState(() => new Animated.Value(isActive ? 1 : 0));
   const [translate] = useState(() => new Animated.Value(isActive ? 0 : 12));
   const containerRef = useRef<View>(null);
 
   useEffect(() => {
+    // §5.8 reduced motion: no translate at all and an opacity cross-fade of at
+    // most 120ms — same branch shape as core/ui/Modal.tsx, Switch.tsx and
+    // SegmentedControl.tsx, which snap their values under reduced motion. A
+    // timed ramp cannot honour that budget here: a section's first mount costs
+    // tens of ms of render between the press and the effect (measured 40-60ms),
+    // so a timed 120ms fade lands well past the 120ms + one-frame contract and
+    // reads as a slow dissolve rather than a reduced-motion state change.
+    if (reducedMotion) {
+      opacity.setValue(isActive ? 1 : 0);
+      translate.setValue(0);
+      return;
+    }
+
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: isActive ? 1 : 0,
@@ -361,7 +376,7 @@ function SectionContainer({
         useNativeDriver: true,
       }),
     ]).start();
-  }, [isActive, opacity, translate]);
+  }, [isActive, opacity, reducedMotion, translate]);
 
   // Mounted-but-inactive sections keep their state for the cross-fade and are
   // aria-hidden, but that alone leaves their controls in the keyboard tab
