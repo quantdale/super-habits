@@ -202,16 +202,34 @@ test.describe('Workout write-failure honesty', () => {
     await returnToApp(page);
   });
 
-  test('a rejected routine delete keeps the routine listed and live, then tombstones once on retry', async ({
+  test('a rejected routine delete keeps the routine listed and live, and an in-app retry clears the alert', async ({
     page,
   }) => {
     await createRoutine(page, 'Doomed routine');
+    // A second routine that is never deleted: it lets the FINAL single DB read
+    // prove the failed attempt minted no intent, without an intermediate read
+    // (which would navigate to the harness document and destroy app state —
+    // exactly what the transient-failure path below must not do).
+    await createRoutine(page, 'Survivor routine');
 
+    // TRANSIENT failure, injected so the retry can happen INSIDE the app.
+    //
+    // A permanent `RAISE(ABORT)` trigger can only be removed through the DB
+    // harness, and every harness round trip navigates the page to the harness
+    // document — which tears down React state and forces a reload before the
+    // retry. That reload is what hid this defect: after a remount `actionError`
+    // starts null, so the stale-alert bug could not be observed.
+    //
+    // This trigger aborts only until a wall-clock deadline, so the SAME page
+    // (same React state, same `actionError`) survives the failure and issues the
+    // retry. The window is the modelled transient condition, not app readiness.
+    const deadlineSeconds = await page.evaluate(() => Math.floor(Date.now() / 1000) + 6);
     await seedSql(
       page,
       `CREATE TRIGGER ${ROUTINE_DELETE}
          BEFORE UPDATE ON workout_routines
          WHEN NEW.deleted_at IS NOT NULL
+           AND CAST(strftime('%s', 'now') AS INTEGER) < ${deadlineSeconds}
          BEGIN SELECT RAISE(ABORT, 'routine-delete-blocked'); END;`,
     );
     await returnToApp(page);
@@ -229,39 +247,59 @@ test.describe('Workout write-failure honesty', () => {
     await expect(
       page.getByRole('button', { name: 'Open Doomed routine routine', exact: true }),
     ).toBeVisible();
-    const afterFailure = await queryRows(
-      page,
-      `SELECT deleted_at FROM workout_routines WHERE name = 'Doomed routine'`,
-    );
-    expect(afterFailure).toEqual([{ deleted_at: null }]);
-    const deleteIntentsAfterFailure = await queryRows(
-      page,
-      `SELECT COUNT(*) AS n FROM sync_outbox WHERE entity = 'workout_routines' AND operation = 'delete'`,
-    );
-    expect(Number(deleteIntentsAfterFailure[0]?.n ?? -1)).toBe(0);
 
-    // (c) Retry after the failure is cleared tombstones exactly that row.
-    await seedSql(page, `DROP TRIGGER ${ROUTINE_DELETE};`);
-    await returnToApp(page);
-    await goToTab(page, 'workout');
+    // Let the injected window close, WITHOUT navigating: the app page's own
+    // clock is the signal, so React state (and the stale error, if any) stays.
+    await page.waitForFunction((deadline) => Date.now() / 1000 > deadline, deadlineSeconds, {
+      timeout: 30_000,
+    });
+
+    // (c) Retry IN APP. The delete now succeeds and the row disappears…
     await swipeLeftRevealWorkoutRoutineRow(page);
     await clickSwipeDeleteAction(page, 'Doomed routine');
     await page.getByText('Delete routine', { exact: true }).click({ force: true });
     await expect(
       page.getByRole('button', { name: 'Open Doomed routine routine', exact: true }),
     ).toHaveCount(0);
+    // …so the landing must stop claiming the deletion failed. A success that
+    // leaves the previous failure copy on screen is the divergence this pins:
+    // the routine is gone while the UI still reports "Could not remove the
+    // routine. Try again.".
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await expect(page.getByText(COPY.routineDelete, { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Open Survivor routine routine', exact: true }),
+    ).toBeVisible();
 
-    const afterRetry = await queryRows(
+    // One read at the end: exactly one tombstone (the retried routine) and
+    // exactly one delete intent total, which is also the proof the failed
+    // attempt minted none.
+    const routines = await queryRows(
       page,
-      `SELECT deleted_at FROM workout_routines WHERE name = 'Doomed routine'`,
+      `SELECT name, deleted_at FROM workout_routines ORDER BY name`,
     );
-    expect(afterRetry).toHaveLength(1);
-    expect(afterRetry[0]?.deleted_at).not.toBeNull();
+    expect(routines).toEqual([
+      { name: 'Doomed routine', deleted_at: expect.any(String) },
+      { name: 'Survivor routine', deleted_at: null },
+    ]);
+    // Exactly one DELETE intent, and it names the retried routine — i.e. the
+    // failed attempt minted none. (Asserted per entity id rather than by intent
+    // counts: the outbox coalesces one row per entity, so the doomed routine's
+    // original `create` intent is superseded by this `delete`.)
     const intentsAfterRetry = await queryRows(
       page,
-      `SELECT operation FROM sync_outbox WHERE entity = 'workout_routines'`,
+      `SELECT o.operation FROM sync_outbox o
+         JOIN workout_routines r ON r.id = o.id
+        WHERE o.entity = 'workout_routines' AND r.name = 'Doomed routine'`,
     );
     expect(intentsAfterRetry).toEqual([{ operation: 'delete' }]);
+    expect(
+      await queryRows(
+        page,
+        `SELECT COUNT(*) AS n FROM sync_outbox
+          WHERE entity = 'workout_routines' AND operation = 'delete'`,
+      ),
+    ).toEqual([{ n: 1 }]);
     await returnToApp(page);
   });
 
@@ -508,44 +546,45 @@ test.describe('Workout write-failure honesty', () => {
     await returnToApp(page);
   });
 
-  test('a rejected library add reports inside the picker and adds once on retry', async ({
+  test('a rejected library add reports inside the picker, and an in-app retry clears the alert', async ({
     page,
   }) => {
     await createRoutine(page, 'Library blocked');
+    // TRANSIENT window, so the retry happens INSIDE the app: the picker stays
+    // mounted across it, which is what exposes a stale alert (the same technique
+    // the routine-delete case documents in full).
+    const deadlineSeconds = await page.evaluate(() => Math.floor(Date.now() / 1000) + 6);
     await seedSql(
       page,
       `CREATE TRIGGER ${EXERCISE_INSERT}
          BEFORE INSERT ON routine_exercises
+         WHEN CAST(strftime('%s', 'now') AS INTEGER) < ${deadlineSeconds}
          BEGIN SELECT RAISE(ABORT, 'exercise-add-blocked'); END;`,
     );
     await returnToApp(page);
     await goToTab(page, 'workout');
     await page.getByRole('button', { name: 'Open Library blocked routine', exact: true }).click();
-    const failingBuilder = page.getByRole('dialog', { name: 'Library blocked' });
-    await failingBuilder.getByText('Choose from exercise library', { exact: true }).click();
+    const builder = page.getByRole('dialog', { name: 'Library blocked' });
+    await builder.getByText('Choose from exercise library', { exact: true }).click();
     const picker = page.getByRole('dialog', { name: 'Exercise library' });
     await picker.getByRole('button', { name: 'Add Barbell Bench Press', exact: true }).click();
 
-    // (a) The picker is the topmost surface, so it must own the alert…
+    // (a) The picker is the topmost surface, so it must own the alert.
     await expect(picker.getByRole('alert')).toContainText(COPY.exerciseAdd);
-    // (b) …and nothing was added to the routine.
-    expect(
-      await queryRows(page, `SELECT COUNT(*) AS n FROM routine_exercises WHERE deleted_at IS NULL`),
-    ).toEqual([{ n: 0 }]);
 
-    // (c) Retry adds exactly one exercise with its default set.
-    await seedSql(page, `DROP TRIGGER ${EXERCISE_INSERT};`);
-    await returnToApp(page);
-    await goToTab(page, 'workout');
-    await page.getByRole('button', { name: 'Open Library blocked routine', exact: true }).click();
-    const retriedBuilder = page.getByRole('dialog', { name: 'Library blocked' });
-    await retriedBuilder.getByText('Choose from exercise library', { exact: true }).click();
-    const retriedPicker = page.getByRole('dialog', { name: 'Exercise library' });
-    await retriedPicker
-      .getByRole('button', { name: 'Add Barbell Bench Press', exact: true })
-      .click();
-    await expect(retriedBuilder.getByText('Barbell Bench Press', { exact: true })).toBeVisible();
+    // Let the window close without leaving the page (no harness round trip).
+    await page.waitForFunction((deadline) => Date.now() / 1000 > deadline, deadlineSeconds, {
+      timeout: 30_000,
+    });
 
+    // (c) Retry IN APP: the add lands, and the picker must not keep claiming it
+    // failed while the exercise is already on the routine.
+    await picker.getByRole('button', { name: 'Add Barbell Bench Press', exact: true }).click();
+    await expect(builder.getByText('Barbell Bench Press', { exact: true })).toBeVisible();
+    await expect(picker.getByRole('alert')).toHaveCount(0);
+
+    // One read at the end proves the failed attempt wrote nothing: exactly one
+    // exercise and one default set exist.
     expect(
       await queryRows(page, `SELECT COUNT(*) AS n FROM routine_exercises WHERE deleted_at IS NULL`),
     ).toEqual([{ n: 1 }]);

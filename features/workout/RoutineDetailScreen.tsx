@@ -327,6 +327,10 @@ export function RoutineDetailModal({
         sortOrder: exercises.length + 1,
       });
       await queuedAddDefaultSet(exId);
+      // Clear the previous failure only once the write landed: this picker stays
+      // mounted, so a stale alert would reappear over a routine that already has
+      // the exercise.
+      setSheetError(null);
       closePicker();
       await refresh();
       setExpandedId(exId);
@@ -373,6 +377,9 @@ export function RoutineDetailModal({
       setCustomUnilateral(false);
       setCustomSupportsExternalLoad(customModality === 'weighted_strength');
       setWorkoutError(null);
+      // The create landed: drop its own failure copy too, or it would render
+      // over the next time this sheet opens.
+      setSheetError(null);
     } catch (error) {
       setSheetError(workoutWriteFailureCopy(error, 'Could not create exercise. Try again.'));
     }

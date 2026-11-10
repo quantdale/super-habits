@@ -676,6 +676,10 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         setActionError(workoutWriteFailureCopy(error, 'Could not remove the routine. Try again.'));
         return;
       }
+      // Clear the previous failure only once the write landed: a retry that
+      // succeeds must not leave "Could not remove the routine" on a landing
+      // whose row is already gone.
+      setActionError(null);
       if (routineModal?.routineId === routine.id) {
         setRoutineModal(null);
       }
@@ -1826,7 +1830,10 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
                       variant="ghost"
                       size="sm"
                       onColor={COLOR}
-                      onPress={() => setWeekEditorVisible(true)}
+                      onPress={() => {
+                        setWeekError(null);
+                        setWeekEditorVisible(true);
+                      }}
                     />
                   </View>
                 )}
@@ -1895,7 +1902,10 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
               variant="ghost"
               size="sm"
               accessibilityLabel="Edit weekly plan"
-              onPress={() => setWeekEditorVisible(true)}
+              onPress={() => {
+                setWeekError(null);
+                setWeekEditorVisible(true);
+              }}
             />
           </View>
           <Card accentColor={COLOR} className="mb-0">
