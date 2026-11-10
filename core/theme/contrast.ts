@@ -98,6 +98,43 @@ export function inkOnFill(
 }
 
 /**
+ * Nudge a coloured-*text* tier until it clears `min` on EVERY background in
+ * `backgrounds` — the neutral faces that tier is actually painted on.
+ *
+ * Contract (Playful Momentum §5.1 + WCAG AA): the shipped hue is returned
+ * unchanged whenever it already clears the floor on all of them, so a theme
+ * whose faces are dark (or light) enough keeps the spec value byte-for-byte;
+ * otherwise only its lightness moves — `lighten`/`darken` shift the tone toward
+ * white/black and preserve the hue.
+ *
+ * This is the surface-aware half of the `readableAccent` contract: a section's
+ * `bright` tier is validated against the canvas the §5.1 table was measured on
+ * (`#1A1F2B`), so painting it on a third, mid-tone canvas (Nord Arctic's
+ * `#3B4252`) without re-resolving is what misses the floor.
+ */
+export function readableAccentOnFaces(
+  text: string,
+  backgrounds: readonly string[],
+  min = WCAG_AA_TEXT,
+): string {
+  const faces = backgrounds.filter(isHex);
+  if (!isHex(text) || faces.length === 0) return text;
+  let out = text;
+  for (let i = 0; i < 16; i++) {
+    // The hardest face (lowest ratio) decides both the exit condition and the
+    // direction: neutral ladders keep every face on one side of the text tone,
+    // so lifting away from the closest face lifts away from all of them.
+    let hardest = faces[0];
+    for (const face of faces) {
+      if (contrastRatio(out, face) < contrastRatio(out, hardest)) hardest = face;
+    }
+    if (contrastRatio(out, hardest) >= min) return out;
+    out = luminance(hardest) > luminance(out) ? darken(out, 0.12) : lighten(out, 0.12);
+  }
+  return out;
+}
+
+/**
  * Nudge `accent` toward a readable *text* colour against `background`. Used
  * where an accent must be painted as text (metric values, links) on a tinted
  * or neutral surface.

@@ -16,6 +16,11 @@
  * - "focus" remains the user-facing section label and accent namespace
  */
 
+// The surface-aware half of the §5.1 text resolver: a coloured-text tier is
+// floored against the ACTIVE theme's own neutral faces (no-op wherever the
+// shipped hue already clears them).
+import { readableAccentOnFaces } from '@/core/theme/contrast';
+
 export type SectionHue = {
   bright: string;
   solid: string;
@@ -146,6 +151,14 @@ export const SECTION_TEXT_COLORS_DARK = {
 export type SectionAccent = { fill: string; text: string; tint: string };
 
 /**
+ * The neutral faces a section's coloured TEXT tier is painted on. Consumers
+ * read `sectionAccents.*.text` as ink on the card face, raised surfaces and
+ * recessed trays, so all of them are validated together (the hardest one
+ * decides).
+ */
+export type SectionTextSurfaces = readonly string[];
+
+/**
  * Reward-layer accents (gamification). These are semantic, not section
  * identities: XP/level, streak, badges, and streak-freeze each keep one color
  * everywhere — dashboard card, achievements screen, and celebration overlay —
@@ -247,24 +260,44 @@ export function getRewardAccents(appearance: 'light' | 'dark'): Record<RewardKey
  * wash; dark mode paints the `bright` tier over `tintDark` (the §5.1 table's
  * "bright on surface D" column). `overrides` lets a theme replace the whole
  * set for cases where even the fill clashes (e.g. Cyberpunk Neon).
+ *
+ * SURFACE AWARENESS (`surfaces`): the §5.1 text tiers above are resolved from
+ * the APPEARANCE — the table's `bright`-on-`surface D` column is measured on
+ * `#1A1F2B` — so painting them on a theme whose canvas is a different tone
+ * (Nord Arctic's mid-tone `#3B4252` slate) misses the 4.5:1 text floor without
+ * this. When the caller passes the theme's own neutral faces, each `text` tier
+ * is re-resolved against them: the §5.1 hue is returned BYTE-IDENTICAL wherever
+ * it already clears the floor on every one of them (so light, dark, `light`-
+ * and `dark`-shade themes and every rendered golden are unchanged), and only
+ * its lightness is lifted — hue preserved — where it does not.
+ *
+ * `tint` (the wash that tier is painted on inside selected chips/rows) and
+ * `fill` (shapes/nodes only, never a text colour) are not touched.
  */
 export function getSectionAccents(
   appearance: 'light' | 'dark',
   overrides?: Partial<Record<SectionKey, SectionAccent>>,
+  surfaces?: SectionTextSurfaces,
 ): Record<SectionKey, SectionAccent> {
   const keys = Object.keys(SECTION_COLORS) as SectionKey[];
   const result = {} as Record<SectionKey, SectionAccent>;
   for (const key of keys) {
-    const override = overrides?.[key];
-    if (override) {
-      result[key] = override;
-      continue;
-    }
     const hue = SECTION_HUES[key];
-    result[key] =
-      appearance === 'dark'
-        ? { fill: hue.bright, text: SECTION_TEXT_COLORS_DARK[key], tint: hue.tintDark }
-        : { fill: hue.bright, text: hue.solid, tint: hue.tintLight };
+    const tint = appearance === 'dark' ? hue.tintDark : hue.tintLight;
+    const override = overrides?.[key];
+    // A theme override replaces the `bright` fill (Cyberpunk Neon's neon-grade
+    // hues), so its OWN text tier is what needs the same floor.
+    const shipped =
+      override?.text ?? (appearance === 'dark' ? SECTION_TEXT_COLORS_DARK[key] : hue.solid);
+    // The wash a selected chip/row paints this tier on is a face too; an
+    // 8-digit (alpha-carrying) override tint is an overlay, not a fill, and is
+    // skipped by `readableAccentOnFaces` (consumers composite it first).
+    const faces = surfaces ? [...surfaces, override?.tint ?? tint] : undefined;
+    result[key] = {
+      fill: override?.fill ?? hue.bright,
+      text: faces ? readableAccentOnFaces(shipped, faces) : shipped,
+      tint: override?.tint ?? tint,
+    };
   }
   return result;
 }
