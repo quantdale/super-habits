@@ -291,6 +291,95 @@ async function waitForSettledGeometry(
 
 const panelScope = (section: string) => `#sh-section-panel-${section}`;
 
+/**
+ * Frame-by-frame motion of one element, sampled through `requestAnimationFrame`.
+ *
+ * Why this exists next to `document.getAnimations()`: on the web build React
+ * Native's `Animated` timings/springs are driven by react-native-web's own
+ * requestAnimationFrame loop, which writes inline `style` values directly. They
+ * are therefore invisible BOTH to `document.getAnimations()` (no Web Animation
+ * object is ever created) and to the CSS `animationName` scan (no @keyframes is
+ * declared). Only sampling the computed style catches them.
+ *
+ * A section switch runs a 200ms opacity timing and a 240ms translate timing in
+ * `SectionContainer` (app/index.tsx), so the sampler has to be armed BEFORE the
+ * click that starts the transition; it then records every frame for `windowMs`.
+ */
+type MotionSample = { t: number; opacity: number; transform: string };
+
+async function sampleMotion(
+  page: Page,
+  elementId: string,
+  action: () => Promise<void>,
+  windowMs = 700,
+): Promise<MotionSample[]> {
+  await page.evaluate((id) => {
+    const host = window as unknown as {
+      __v2MotionProbe?: { stop: () => void; read: () => MotionSample[] };
+    };
+    const node = document.getElementById(id);
+    if (!node) throw new Error(`v2-responsive-sweep: motion probe target not found: #${id}`);
+    const samples: MotionSample[] = [];
+    const started = performance.now();
+    let running = true;
+    const tick = () => {
+      if (!running) return;
+      const style = getComputedStyle(node);
+      samples.push({
+        t: Math.round(performance.now() - started),
+        opacity: Number.parseFloat(style.opacity),
+        transform: style.transform,
+      });
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    host.__v2MotionProbe = {
+      stop: () => {
+        running = false;
+      },
+      read: () => samples,
+    };
+  }, elementId);
+
+  await action();
+  await page.waitForTimeout(windowMs);
+  const samples = await page.evaluate(() => {
+    const host = window as unknown as {
+      __v2MotionProbe?: { stop: () => void; read: () => MotionSample[] };
+    };
+    host.__v2MotionProbe?.stop();
+    return host.__v2MotionProbe?.read() ?? [];
+  });
+  await page.evaluate(() => {
+    delete (window as unknown as { __v2MotionProbe?: unknown }).__v2MotionProbe;
+  });
+  return samples;
+}
+
+/** Summarise a sample series into the facts the reduced-motion contract needs. */
+function summariseMotion(samples: MotionSample[]) {
+  const opacities = Array.from(new Set(samples.map((sample) => sample.opacity.toFixed(3))));
+  const transforms = Array.from(new Set(samples.map((sample) => sample.transform)));
+  // Last frame at which opacity still differed from the previous frame.
+  let opacitySettledAtMs = 0;
+  for (let index = 1; index < samples.length; index += 1) {
+    if (samples[index].opacity.toFixed(3) !== samples[index - 1].opacity.toFixed(3)) {
+      opacitySettledAtMs = samples[index].t;
+    }
+  }
+  // Translation: any matrix with a non-zero x/y component. `none` and identity
+  // matrices are "no translation".
+  const translated = transforms.filter((transform) => {
+    if (transform === 'none') return false;
+    const matched = /matrix\(([^)]+)\)/.exec(transform);
+    if (!matched) return true; // an unexpected transform function is motion
+    const parts = matched[1].split(',').map((part) => Number.parseFloat(part.trim()));
+    const [x = 0, y = 0] = [parts[4] ?? 0, parts[5] ?? 0];
+    return Math.abs(x) > 0.01 || Math.abs(y) > 0.01;
+  });
+  return { opacities, transforms, translated, opacitySettledAtMs };
+}
+
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
   await page.evaluate((mode) => window.localStorage.setItem('superhabits.theme.mode', mode), theme);
   await page.reload({ waitUntil: 'domcontentloaded' });
@@ -876,6 +965,68 @@ test.describe('V2 responsive sweep', () => {
         `390 ${entry.surface}: reduced motion declares no CSS animation`,
       ).toEqual([]);
       await dismissOverlay(page, entry.overlay);
+    }
+  });
+
+  // Quarantined defect (CG-14 in `docs/testing/known-gaps.md`), quarantined per
+  // the standing protocol rather than excluded: the body below IS the release
+  // assertion (same sampler, same thresholds, same surface set), so un-fixme-ing
+  // this case is the fix's own proof.
+  //
+  // The case above proves no CSS/Web-Animation motion runs under reduced motion.
+  // That is NOT the whole contract: React Native's `Animated` timings on web are
+  // driven by react-native-web's requestAnimationFrame loop writing inline
+  // styles, so they produce neither a Web Animation object nor an @keyframes
+  // rule. `SectionContainer` (app/index.tsx) runs a 200ms opacity timing and a
+  // 240ms translate timing unconditionally, which §5.8 forbids ("no translate,
+  // scale or confetti; opacity cross-fade of 120ms only"). Measured 2026-11-10
+  // at 390px: opacity ramps 0.000 -> 1.000 over 12-16 frames and is still
+  // changing at 300-326ms, while translateY travels 12px -> 0 across 15-18
+  // distinct transform values — with `document.getAnimations()` reporting 0.
+  test.fixme('reduced motion forbids JS-driven translation and long opacity ramps (known SectionContainer gap)', async ({
+    page,
+  }) => {
+    test.setTimeout(420_000);
+    await prepare(page);
+
+    // The sampler must be armed BEFORE the click that starts the transition,
+    // so the shortlisted cases below each watch the INCOMING panel.
+    const cases = ['todos', 'habits', 'pomodoro', 'calories'] as const;
+    for (const width of [390, 1280] as const) {
+      await page.setViewportSize({ width, height: width >= 768 ? 900 : 844 });
+      for (const key of cases) {
+        // Settle on Today first, so the switch below is a real transition.
+        await showSection(page, TAB_LABELS.overview);
+        await waitForSettledGeometry(page, panelScope('overview'));
+
+        const samples = await sampleMotion(page, `sh-section-panel-${key}`, async () => {
+          await sectionTab(page, TAB_LABELS[key]).click();
+        });
+        await expect(sectionTab(page, TAB_LABELS[key])).toHaveAttribute('aria-selected', 'true');
+
+        // Non-vacuity: the sampler really observed the transition.
+        expect(
+          samples.length,
+          `${width} ${key}: the frame sampler captured the transition`,
+        ).toBeGreaterThan(4);
+
+        const motion = summariseMotion(samples);
+        const evidence = `${width} ${key}: opacity ${motion.opacities.join(
+          ' -> ',
+        )} over ${motion.opacitySettledAtMs}ms; transforms ${JSON.stringify(
+          motion.transforms.slice(0, 6),
+        )}`;
+
+        // §5.8: "no translate, scale or confetti".
+        expect(motion.translated, `reduced motion must not translate — ${evidence}`).toEqual([]);
+
+        // §5.8: "Opacity cross-fade of 120ms only". One frame of slack
+        // absorbs the sampling granularity (a 16ms frame quantum).
+        expect(
+          motion.opacitySettledAtMs,
+          `reduced-motion opacity may not ramp beyond 120ms — ${evidence}`,
+        ).toBeLessThanOrEqual(120 + 16);
+      }
     }
   });
 });

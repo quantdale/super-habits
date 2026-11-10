@@ -205,6 +205,59 @@ shrinking the surface set, or excluding a control — then delete this entry (th
 reverse-direction check in `scripts/quarantine-register-parity.mjs` fails on a
 register entry that outlives its gate).
 
+### CG-14 — v2 shell: JS-driven section transition ignores reduced motion — OPEN (quarantined `test.fixme`)
+
+**Gate site:** `e2e/v2-responsive-sweep.spec.ts`
+
+**Decided contract (§5.8 reduced motion):** with `prefers-reduced-motion:
+reduce`, the app performs "no translate, scale or confetti" and an "opacity
+cross-fade of 120ms only" (`docs/ui-ux/16-playful-momentum.md` §5.8).
+
+**Reason (measured 2026-11-10, `e2e/v2-responsive-sweep.spec.ts`):**
+`SectionContainer` (`app/index.tsx`, the shell's section cross-fade) starts an
+`Animated.parallel` of a **200ms opacity timing and a 240ms translate timing**
+unconditionally — it never consults `useReducedMotion()`. On the web build those
+timings run through react-native-web's own `requestAnimationFrame` driver and
+write inline styles, so they produce **neither** a Web Animation object
+(`document.getAnimations()` reports **0 running animations**) **nor** an
+`@keyframes` rule (`animationName` is `none`) — the two checks the sweep already
+had are structurally blind to this class of motion. A frame-by-frame sampler of
+the incoming panel's computed style, armed before the click, measures each
+section switch at 390px and 1280px:
+
+| Observation                        | Measured                                               | §5.8 budget          |
+| ---------------------------------- | ------------------------------------------------------ | -------------------- |
+| Opacity ramp `0.000 → 1.000`       | 12–16 distinct frames, still changing at **298–326ms** | one 120ms cross-fade |
+| `translateY` travel                | `12px → 0` across **15–18** distinct transform values  | **no translate**     |
+| `document.getAnimations()` running | **0**                                                  | —                    |
+| Declared CSS `animationName`       | **none**                                               | —                    |
+
+Representative failure evidence: `390 todos: opacity 0.000 -> 0.021 -> 0.037 ->
+0.054 -> 0.122 -> 0.203 -> 0.304 -> 0.935 -> 0.974 -> 1.000 over 298ms;
+transforms ["matrix(1, 0, 0, 1, 0, 12)", "matrix(1, 0, 0, 1, 0, 11.8028)", …]`.
+
+**Handling:** quarantined per the standing protocol, not excluded. The gated
+case's body is the full release assertion (same `sampleMotion`
+/
+`summariseMotion` helpers, same thresholds, same sections, both widths), so
+un-fixme-ing it is the fix's own proof. The sampler is itself proven
+non-vacuous: an injected plain-`div` `requestAnimationFrame` animation is
+detected as 43 translated frames with a 649ms opacity ramp.
+
+**Owning lane:** the shell (`app/index.tsx` `SectionContainer`) — it must call
+`useReducedMotion()` (`core/theme/motion.ts`) and, when true, set the opacity
+value directly with no translate at all and at most a 120ms
+(`MOTION_V2_DURATION.reducedFade`) cross-fade, matching every other v2 surface
+(`core/ui/Modal.tsx`, `core/ui/Switch.tsx`, `SegmentedControl`,
+`RewardCelebrationOverlay` already do).
+
+**Exit criteria:** the gated case is un-fixme-ed and passes with **zero**
+translated transform values and an opacity ramp `<= 136ms` (120ms + one 16ms
+frame quantum) at 390px and 1280px, without loosening the threshold or
+shrinking the sampled section set — then delete this entry (the
+reverse-direction check in `scripts/quarantine-register-parity.mjs` fails on a
+register entry that outlives its gate).
+
 ---
 
 ## Capability gaps
