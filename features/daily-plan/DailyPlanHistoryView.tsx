@@ -15,6 +15,9 @@ import type { DailyPlan } from '@/core/db/types';
 
 type PlanHistoryEntry = DailyPlan & { todoTitles: string[] };
 
+/** Curated read-failure copy (never the raw engine message). */
+const HISTORY_LOAD_ERROR = 'Could not load your plan history. Try again.';
+
 /**
  * Browsing of previous days' plans plus a simple adherence streak summary.
  * Selecting an entry expands its detail inline; a confirmed danger delete
@@ -30,6 +33,10 @@ export function DailyPlanHistoryView({ onPlanDeleted }: { onPlanDeleted?: () => 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // A rejected READ is its own state: it must never fall through to the empty
+  // state, which would tell the user their history is gone.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   const buildEntries = useCallback(async (): Promise<PlanHistoryEntry[]> => {
     const [plans, todos] = await Promise.all([listRecentDailyPlans(30), listPendingTodos()]);
@@ -49,6 +56,8 @@ export function DailyPlanHistoryView({ onPlanDeleted }: { onPlanDeleted?: () => 
 
   const loadEntries = useCallback(async () => {
     setEntries(await buildEntries());
+    // A successful read invalidates any read-failure notice still on screen.
+    setLoadError(null);
   }, [buildEntries]);
 
   useEffect(() => {
@@ -57,6 +66,10 @@ export function DailyPlanHistoryView({ onPlanDeleted }: { onPlanDeleted?: () => 
       try {
         const next = await buildEntries();
         if (active) setEntries(next);
+      } catch {
+        // A rejected initial read stays visible and retriable instead of
+        // becoming an unhandled rejection behind a false "no plans" state.
+        if (active) setLoadError(HISTORY_LOAD_ERROR);
       } finally {
         if (active) setLoading(false);
       }
@@ -64,6 +77,18 @@ export function DailyPlanHistoryView({ onPlanDeleted }: { onPlanDeleted?: () => 
     return () => {
       active = false;
     };
+  }, [buildEntries]);
+
+  const handleRetryLoad = useCallback(async () => {
+    setRetrying(true);
+    setLoadError(null);
+    try {
+      setEntries(await buildEntries());
+    } catch {
+      setLoadError(HISTORY_LOAD_ERROR);
+    } finally {
+      setRetrying(false);
+    }
   }, [buildEntries]);
 
   const handleDelete = useCallback(
@@ -115,6 +140,24 @@ export function DailyPlanHistoryView({ onPlanDeleted }: { onPlanDeleted?: () => 
     );
   }
 
+  // The failure surface REPLACES the empty state: rendering both would claim
+  // the user has no history at the same moment the read failed.
+  if (loadError && entries.length === 0) {
+    return (
+      <Card>
+        <View className="gap-2 py-1">
+          <ValidationError message={loadError} />
+          <Button
+            label="Retry loading plan history"
+            variant="ghost"
+            loading={retrying}
+            onPress={() => void handleRetryLoad()}
+          />
+        </View>
+      </Card>
+    );
+  }
+
   if (entries.length === 0) {
     return (
       <Card>
@@ -132,6 +175,19 @@ export function DailyPlanHistoryView({ onPlanDeleted }: { onPlanDeleted?: () => 
 
   return (
     <View className="gap-2">
+      {/* A failed refresh keeps every row already on screen; only the error
+          is added, so a rejected re-read can never blank the list. */}
+      {loadError ? (
+        <View className="gap-2">
+          <ValidationError message={loadError} />
+          <Button
+            label="Retry loading plan history"
+            variant="ghost"
+            loading={retrying}
+            onPress={() => void handleRetryLoad()}
+          />
+        </View>
+      ) : null}
       {deleteError ? <ValidationError message={deleteError} /> : null}
       <View className="flex-row gap-2">
         <Card className="flex-1">
