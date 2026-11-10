@@ -509,9 +509,7 @@ test('Settings, Command Center, quick capture and the Planning Hub return focus 
 // to the hub-opened variant.) The body below is the release assertion: focus
 // must land somewhere a keyboard user can continue from, i.e. the `Plan today`
 // control that opened the chain.
-test.fixme('the Weekly Review returns focus to a control when it is dismissed', async ({
-  page,
-}) => {
+test('the Weekly Review returns focus to a control when it is dismissed', async ({ page }) => {
   test.setTimeout(420_000);
   await prepare(page);
 
