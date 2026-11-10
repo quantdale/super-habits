@@ -6,6 +6,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { PillChip } from '@/core/ui/PillChip';
 import { SECTION_COLORS, SECTION_ON_BRIGHT_INK } from '@/constants/sectionColors';
+import { CaptureTypePicker } from './CaptureTypePicker';
 import { useCommandCenter } from '@/features/command/commandCenterContext';
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { addTodo, removeTodo } from '@/features/todos/todos.data';
@@ -44,18 +45,12 @@ const MODES: { key: CaptureMode; label: string }[] = [
 ];
 
 /**
- * Destination identity (campaign SUR-10): the selected type chip and the
- * primary action carry that destination's section hue — one hue visible at a
- * time, never a rainbow sheet. Planning destinations (Project/Goal) use the
- * theme accent because they have no section of their own.
+ * Campaign SUR-10 (one destination hue at a time) now lives entirely on the
+ * selected type tile: the picker paints the destination's section hue, and the
+ * sheet's primary "Capture" action uses the app's brand primary (§7). The mode
+ * → section translation moved beside the picker in `captureType.mode.ts`, so
+ * the tiles, the CTA and the contrast tests read one table.
  */
-const MODE_ACCENT: Partial<Record<CaptureMode, string>> = {
-  todo: SECTION_COLORS.todos,
-  habit: SECTION_COLORS.habits,
-  calorie: SECTION_COLORS.calories,
-  focus: SECTION_COLORS.focus,
-};
-
 const PRIORITIES: TodoPriority[] = ['urgent', 'normal', 'low'];
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
 
@@ -311,8 +306,6 @@ export function QuickCaptureOverlay() {
     pushRecent,
   ]);
 
-  const accent = MODE_ACCENT[mode] ?? tokens.accent;
-
   return (
     <View className="gap-3">
       <Text variant="titleMd" style={{ color: tokens.text }}>
@@ -333,17 +326,11 @@ export function QuickCaptureOverlay() {
         />
       ) : null}
 
-      <View className="flex-row flex-wrap">
-        {MODES.map((m) => (
-          <PillChip
-            key={m.key}
-            label={m.label}
-            active={mode === m.key}
-            color={MODE_ACCENT[m.key] ?? tokens.accent}
-            onPress={() => switchMode(m.key)}
-          />
-        ))}
-      </View>
+      {/* P19: the destination picker is a row of OptionRow-style tiles that
+          take their section hue when selected (§7 “type picker = a row of 6
+          OptionRow-style tiles with hero icons”). Same six labels, same `button`
+          role, same selection path. */}
+      <CaptureTypePicker modes={MODES} selected={mode} onSelect={switchMode} />
 
       {mode === 'focus' ? (
         <View className="items-center gap-3 py-4">
@@ -490,10 +477,15 @@ export function QuickCaptureOverlay() {
             </Text>
           ) : null}
 
+          {/* P19: the sheet is a global action, so its one primary uses the
+              app's brand primary (§7 "Sprout primary 'Capture'"), exactly like
+              the shell's Add affordance — the destination hue lives on the
+              selected type tile above, so only one hue is loud at a time. */}
           <Button
             label={submitting ? 'Capturing…' : 'Capture'}
             onPress={handleSubmit}
-            color={accent}
+            size="lg"
+            fullWidth
           />
           <Button
             label="Describe it"

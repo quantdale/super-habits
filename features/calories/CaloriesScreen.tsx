@@ -67,6 +67,7 @@ import { CalorieGoalModal } from './CalorieGoalModal';
 import { loadMacroTargets, saveMacroTargets } from './caloriesTargets';
 import { MacroTargetsModal } from './MacroTargetsModal';
 import { CaloriesDailyHero } from './CaloriesDailyHero';
+import { caloriesHeroVisual } from './caloriesHero.visual';
 import { CaloriesDiaryView } from './CaloriesDiaryView';
 import { CaloriesEntryFields } from './CaloriesEntryFields';
 import { CaloriesFormView } from './CaloriesFormView';
@@ -104,9 +105,12 @@ const VIEW_MODE_OPTIONS: readonly { value: CaloriesViewMode; label: string }[] =
 function ViewModeSwitch({
   value,
   onChange,
+  accentColor,
 }: {
   value: CaloriesViewMode;
   onChange: (nextValue: CaloriesViewMode) => void;
+  /** Section accent for the selected segment (§6 SegmentedControl). */
+  accentColor: string;
 }) {
   // The control stretches to the hero width so both segment labels get an
   // equal half and the sliding pill always lands exactly on its label.
@@ -119,7 +123,7 @@ function ViewModeSwitch({
       }))}
       value={value}
       onChange={onChange}
-      accentColor={COLOR}
+      accentColor={accentColor}
       accessibilityLabel="Calories view"
     />
   );
@@ -141,7 +145,7 @@ function ViewModeSwitch({
  * goal/target persistence, and day-correction contract.
  */
 export function CaloriesScreen({ isActive }: { isActive: boolean }) {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents, resolvedTheme } = useAppTheme();
   const { recordAction } = useGamification();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const dayGeneration = useDayRolloverGeneration();
@@ -740,6 +744,20 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   );
 
   const overBy = goalProgress.over ? consumedKcal - goal.calories : 0;
+  // P17 §7 Calories: one hue. The card is a flat theme surface, so the Berry
+  // tier is chosen against THAT fill in the current appearance (`solid` Berry
+  // is 5.60:1 on a white card while `bright` Berry is 2.58:1 there; the tiers
+  // swap in dark). Every berry-shaped mark on the surface — daily bar, macro
+  // mini bars, metric and caption inks — reads from this one resolved pair.
+  const heroVisual = caloriesHeroVisual({
+    appearance: resolvedTheme,
+    accentFill: sectionAccents.calories.fill,
+    accentText: sectionAccents.calories.text,
+    surface: tokens.surface,
+    surfaceSunken: tokens.surfaceSunken,
+    text: tokens.text,
+    textMuted: tokens.textMuted,
+  });
   const remainingLabel = goalProgress.over
     ? `${formatKcal(overBy)} kcal over`
     : `${formatKcal(goalProgress.remaining)} kcal left`;
@@ -749,9 +767,20 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       scroll
       hero={
         <View>
-          <PageHeader eyebrow="Calories" title={remainingLabel} />
+          {/* §6 PageHeader: titleLg section name, no doc-copy subtitle and no
+              second overline repeating it. The remaining-kcal number is the
+              hero card's `metric` headline right below, so the daily fact still
+              renders exactly once (W10 duplicate-UI contract). */}
+          <PageHeader title="Calories" />
           <View className="mt-4">
-            <ViewModeSwitch value={viewMode} onChange={setAndPersistViewMode} />
+            <ViewModeSwitch
+              value={viewMode}
+              onChange={setAndPersistViewMode}
+              // §6 SegmentedControl: the selected label sits on the WHITE thumb,
+              // so the accent must be the text-safe tier (bright Berry is
+              // 2.58:1 on white; solid Berry is 5.60:1).
+              accentColor={heroVisual.segmentedAccent}
+            />
           </View>
         </View>
       }
@@ -762,13 +791,16 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       <View className="mb-6 flex-row flex-wrap" style={{ gap: 16 }}>
         <View className="min-w-[280px] flex-1">
           <CaloriesDailyHero
+            label={remainingLabel}
             consumed={consumedKcal}
             goal={goal.calories}
             over={goalProgress.over}
             overBy={overBy}
             percent={goalProgress.percent}
             dateKey={selectedDateKey}
-            accentColor={COLOR}
+            barFill={heroVisual.barFill}
+            mutedInk={heroVisual.mutedInk}
+            metricInk={heroVisual.metricInk}
             onEditGoal={() => setGoalSheetVisible(true)}
           />
         </View>
@@ -783,7 +815,8 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
               remaining: progress.remaining,
               over: progress.over,
             }))}
-            accentColor={COLOR}
+            barFill={heroVisual.barFill}
+            mutedInk={heroVisual.mutedInk}
             onEditTargets={() => setTargetsSheetVisible(true)}
           />
           {macroSaveNote ? (
@@ -797,6 +830,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       {viewMode === 'form' ? (
         <CaloriesFormView
           accentColor={COLOR}
+          primaryActionColor={heroVisual.ctaFace}
           recentMeals={recentMeals}
           frequentFoods={frequentFoods}
           savedMealCount={allSavedMeals.length}
