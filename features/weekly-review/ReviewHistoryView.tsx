@@ -17,6 +17,9 @@ import {
 import { planningRowVisual } from '@/features/planning-hub/planningHub.visual';
 import { describePlanningWriteError } from '@/features/planning-hub/planningWriteError';
 
+/** Curated read-failure copy (never the raw engine message). */
+const HISTORY_LOAD_ERROR = 'Could not load past reviews. Try again.';
+
 /**
  * Browsing past weekly reviews. Expanding an entry shows the saved summary
  * insights and plan payload; a confirmed delete removes an erroneous review
@@ -37,10 +40,16 @@ export function ReviewHistoryView() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // A rejected READ is its own state: it must never fall through to the empty
+  // state, which would tell the user their review history is gone.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   const loadReviews = useCallback(async () => {
     const next = await listWeeklyReviews(26);
     setReviews(next);
+    // A successful read invalidates any read-failure notice still on screen.
+    setLoadError(null);
   }, []);
 
   useEffect(() => {
@@ -49,6 +58,10 @@ export function ReviewHistoryView() {
       try {
         const reviews = await listWeeklyReviews(26);
         if (active) setReviews(reviews);
+      } catch {
+        // A rejected initial read stays visible and retriable instead of
+        // becoming an unhandled rejection behind a false "no reviews" state.
+        if (active) setLoadError(HISTORY_LOAD_ERROR);
       } finally {
         if (active) setLoading(false);
       }
@@ -56,6 +69,22 @@ export function ReviewHistoryView() {
     return () => {
       active = false;
     };
+  }, []);
+
+  const handleRetryLoad = useCallback(async () => {
+    setRetrying(true);
+    // The failure surface stays mounted for the whole retry: clearing the error
+    // here would leave an empty `reviews` list with no error, which renders as
+    // the false claim "No past reviews yet" until the read settles.
+    try {
+      const next = await listWeeklyReviews(26);
+      setReviews(next);
+      setLoadError(null);
+    } catch {
+      setLoadError(HISTORY_LOAD_ERROR);
+    } finally {
+      setRetrying(false);
+    }
   }, []);
 
   const handleDelete = useCallback(
@@ -106,6 +135,25 @@ export function ReviewHistoryView() {
     );
   }
 
+  // The failure surface REPLACES the empty state: rendering both would claim
+  // the user has no reviews at the same moment the read failed (or while its
+  // retry is still in flight). Only a SUCCESSFUL read clears the notice.
+  if ((loadError || retrying) && reviews.length === 0) {
+    return (
+      <Card>
+        <View style={{ gap: spacing.sm, paddingVertical: spacing.xs }}>
+          {loadError ? <ValidationError message={loadError} /> : null}
+          <Button
+            label="Retry loading past reviews"
+            variant="ghost"
+            loading={retrying}
+            onPress={() => void handleRetryLoad()}
+          />
+        </View>
+      </Card>
+    );
+  }
+
   if (reviews.length === 0) {
     return (
       <Card>
@@ -133,6 +181,19 @@ export function ReviewHistoryView() {
 
   return (
     <View style={{ gap: spacing.sm }}>
+      {/* A failed refresh keeps every review already on screen; only the error
+          is added, so a rejected re-read can never blank the list. */}
+      {loadError ? (
+        <View style={{ gap: spacing.sm }}>
+          <ValidationError message={loadError} />
+          <Button
+            label="Retry loading past reviews"
+            variant="ghost"
+            loading={retrying}
+            onPress={() => void handleRetryLoad()}
+          />
+        </View>
+      ) : null}
       {deleteError ? <ValidationError message={deleteError} /> : null}
       {reviews.map((review) => {
         const expanded = expandedId === review.id;
