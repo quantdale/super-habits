@@ -1,14 +1,17 @@
 import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { PillChip } from '@/core/ui/PillChip';
 import { Card } from '@/core/ui/Card';
 import { Button } from '@/core/ui/Button';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
+import { ListGroup } from '@/core/ui/ListGroup';
+import { SectionLabel } from '@/core/ui/SectionLabel';
 import { SECTION_COLORS } from '@/constants/sectionColors';
-import { spacing } from '@/core/theme/designTokens';
+import { radius, spacing } from '@/core/theme/designTokens';
 import { toDateKey } from '@/lib/time';
 import { useForegroundRefresh } from '@/lib/useForegroundRefresh';
 import { useGuardedAsyncRefresh } from '@/lib/useGuardedAsyncRefresh';
@@ -25,11 +28,17 @@ import {
   groupTimelineByDay,
   hasClockTime,
 } from '@/features/activity/activityTimeline.domain';
+import {
+  activityItemTileVisual,
+  type ActivitySourceTileVisual,
+} from '@/features/activity/activityTimeline.visual';
 import type {
   ActivityTimelineItem,
   ActivityTimelineRangeFilter,
   ActivityTimelineSourceFilter,
 } from '@/features/activity/activityTimeline.types';
+
+const COLOR = SECTION_COLORS.todos;
 
 const SOURCE_FILTERS: { key: ActivityTimelineSourceFilter; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -86,7 +95,7 @@ function formatTime(occurredAt: string): string | null {
 }
 
 export function ActivityTimelineView() {
-  const { tokens } = useAppTheme();
+  const { tokens, sectionAccents } = useAppTheme();
   const [items, setItems] = useState<ActivityTimelineItem[]>([]);
   // Cursor for the next page: the last loaded item identifies the resume point,
   // so a page appended after a refresh can never skip or duplicate rows the way
@@ -221,19 +230,19 @@ export function ActivityTimelineView() {
 
   if (loadError && !isLoading && items.length === 0) {
     return (
-      <View className="gap-3">
-        <Text className="text-lg font-bold" style={{ color: tokens.text }}>
+      <View style={{ gap: spacing.xl }}>
+        <Text variant="titleLg" style={{ color: tokens.text }}>
           Timeline
         </Text>
-        <Card
-          variant="header"
-          accentColor={tokens.textMuted}
-          headerTitle="Timeline is temporarily unavailable"
-          headerSubtitle="Nothing was saved or changed."
-          className="mb-0"
-        >
-          <View className="gap-3">
-            <Text className="text-sm" style={{ color: tokens.textMuted }}>
+        <Card innerClassName="p-4">
+          <View style={{ gap: spacing.md }}>
+            <Text variant="titleMd" style={{ color: tokens.text }}>
+              Timeline is temporarily unavailable
+            </Text>
+            <Text variant="caption" tone="muted">
+              Nothing was saved or changed.
+            </Text>
+            <Text variant="bodyMd" tone="muted">
               {loadError}
             </Text>
             <Button
@@ -253,206 +262,274 @@ export function ActivityTimelineView() {
   const hasAnyActivity = items.length > 0;
 
   return (
-    <View className="gap-3">
-      <View className="flex-row items-center justify-between">
-        <Text className="text-lg font-bold" style={{ color: tokens.text }}>
-          Timeline
-        </Text>
-        {!isLoading ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={
-              activeFilterCount > 0
-                ? `Timeline filters, ${activeFilterCount} active`
-                : 'Timeline filters'
-            }
-            accessibilityState={{ expanded: showFilters }}
-            aria-expanded={showFilters}
-            className="min-h-11 justify-center rounded-xl border px-3"
-            style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-            onPress={() => setShowFilters((open) => !open)}
-          >
-            <Text className="text-sm" style={{ color: tokens.text }}>
-              Filters{activeFilterCount > 0 ? ` · ${activeFilterCount} active` : ''}{' '}
-              {showFilters ? '−' : '+'}
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
+    <View style={{ gap: spacing.xl }}>
+      {/* Header group: surface name + the one collapsed disclosure. Events
+          render before this chrome once any activity exists (§"Activity shows
+          events before filter chrome"). */}
+      <View style={{ gap: spacing.sm }}>
+        <View className="flex-row items-center justify-between" style={{ gap: spacing.md }}>
+          <Text variant="titleLg" style={{ color: tokens.text }}>
+            Timeline
+          </Text>
+          {!isLoading ? (
+            <DisclosureChip
+              label={`Filters${activeFilterCount > 0 ? ` · ${activeFilterCount} active` : ''} ${
+                showFilters ? '−' : '+'
+              }`}
+              accessibilityLabel={
+                activeFilterCount > 0
+                  ? `Timeline filters, ${activeFilterCount} active`
+                  : 'Timeline filters'
+              }
+              expanded={showFilters}
+              onPress={() => setShowFilters((open) => !open)}
+            />
+          ) : null}
+        </View>
 
-      {!hasAnyActivity && !isLoading ? (
-        <EmptyStateCard
-          accentColor={SECTION_COLORS.todos}
-          title="Nothing logged yet"
-          description="Completed tasks, habits, focus sessions, workouts, and plans will appear here."
-        />
-      ) : hasAnyActivity ? (
-        <>
-          {/* Current selection stays visible while the controls are collapsed
-              (one text node, so it reads as one sentence to a screen reader). */}
-          <Text className="text-xs" style={{ color: tokens.textMuted }}>
+        {/* Current selection stays visible while the controls are collapsed
+            (one text node, so it reads as one sentence to a screen reader). */}
+        {hasAnyActivity ? (
+          <Text variant="caption" tone="muted">
             {`${sourceSummary} · ${rangeSummary}${
               selectedDay ? ` · ${formatTimelineDayLabel(selectedDay, todayKey)}` : ''
             }`}
           </Text>
+        ) : null}
+      </View>
 
-          {showFilters ? (
-            <Card innerClassName="p-3">
-              <View className="gap-2">
-                <View className="flex-row flex-wrap">
-                  {SOURCE_FILTERS.map((f) => (
-                    <PillChip
-                      key={f.key}
-                      label={f.label}
-                      accessibilityLabel={`Filter timeline by ${f.label}`}
-                      active={sourceFilter === f.key}
-                      color={SECTION_COLORS.todos}
-                      onPress={() => setSourceFilter(f.key)}
-                    />
-                  ))}
-                </View>
-                <View className="flex-row flex-wrap">
-                  {RANGE_FILTERS.map((f) => (
-                    <PillChip
-                      key={f.key}
-                      label={f.label}
-                      accessibilityLabel={`Show activity from ${f.spoken}`}
-                      active={rangeFilter === f.key}
-                      color={SECTION_COLORS.focus}
-                      onPress={() => setRangeFilter(f.key)}
-                    />
-                  ))}
-                </View>
-                {dayKeys.length > 0 ? (
-                  <View className="flex-row flex-wrap">
-                    <PillChip
-                      label="All days"
-                      active={selectedDay === null}
-                      color={SECTION_COLORS.habits}
-                      onPress={() => setSelectedDay(null)}
-                    />
-                    {dayKeys.slice(0, 14).map((key) => (
-                      <PillChip
-                        key={key}
-                        label={formatTimelineDayLabel(key, todayKey)}
-                        accessibilityLabel={`Show activity from ${key}`}
-                        active={selectedDay === key}
-                        color={SECTION_COLORS.habits}
-                        onPress={() => setSelectedDay(selectedDay === key ? null : key)}
-                      />
-                    ))}
-                  </View>
-                ) : null}
-                <View className="flex-row">
-                  <Button
-                    label="Reset filters"
-                    variant="ghost"
-                    size="sm"
-                    disabled={activeFilterCount === 0}
-                    onPress={resetFilters}
+      {showFilters && hasAnyActivity ? (
+        <Card innerClassName="p-3">
+          <View style={{ gap: spacing.md }}>
+            <View style={{ gap: spacing.xs }}>
+              <SectionLabel>Source</SectionLabel>
+              <View className="flex-row flex-wrap">
+                {SOURCE_FILTERS.map((f) => (
+                  <PillChip
+                    key={f.key}
+                    label={f.label}
+                    accessibilityLabel={`Filter timeline by ${f.label}`}
+                    active={sourceFilter === f.key}
+                    color={COLOR}
+                    onPress={() => setSourceFilter(f.key)}
                   />
-                </View>
+                ))}
               </View>
-            </Card>
-          ) : null}
-
-          {!isLoading && groups.length === 0 ? (
-            <Card className="mb-0">
-              <View className="items-center gap-2 py-4">
-                <Text variant="titleMd" style={{ textAlign: 'center' }}>
-                  No matching activity
-                </Text>
-                <Text variant="bodyMd" tone="muted" style={{ textAlign: 'center' }}>
-                  Nothing logged matches these filters.
-                </Text>
-                <Button label="Reset filters" variant="ghost" size="sm" onPress={resetFilters} />
+            </View>
+            <View style={{ gap: spacing.xs }}>
+              <SectionLabel>Range</SectionLabel>
+              <View className="flex-row flex-wrap">
+                {RANGE_FILTERS.map((f) => (
+                  <PillChip
+                    key={f.key}
+                    label={f.label}
+                    accessibilityLabel={`Show activity from ${f.spoken}`}
+                    active={rangeFilter === f.key}
+                    color={COLOR}
+                    onPress={() => setRangeFilter(f.key)}
+                  />
+                ))}
               </View>
-            </Card>
-          ) : (
-            groups.map((group) => (
-              <View key={group.dateKey} className="gap-1">
-                <Text
-                  variant="caption"
-                  tone="muted"
-                  style={{
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.8,
-                    marginTop: spacing.sm,
-                  }}
-                >
-                  {formatTimelineDayLabel(group.dateKey, todayKey)}
-                </Text>
-                <View
-                  className="rounded-2xl border"
-                  style={{ borderColor: tokens.border, backgroundColor: tokens.surface }}
-                >
-                  {group.items.map((item, index) => (
-                    <TimelineRow
-                      key={item.id}
-                      item={item}
-                      isFirst={index === 0}
-                      borderColor={tokens.border}
+            </View>
+            {dayKeys.length > 0 ? (
+              <View style={{ gap: spacing.xs }}>
+                <SectionLabel>Day</SectionLabel>
+                <View className="flex-row flex-wrap">
+                  <PillChip
+                    label="All days"
+                    active={selectedDay === null}
+                    color={COLOR}
+                    onPress={() => setSelectedDay(null)}
+                  />
+                  {dayKeys.slice(0, 14).map((key) => (
+                    <PillChip
+                      key={key}
+                      label={formatTimelineDayLabel(key, todayKey)}
+                      accessibilityLabel={`Show activity from ${key}`}
+                      active={selectedDay === key}
+                      color={COLOR}
+                      onPress={() => setSelectedDay(selectedDay === key ? null : key)}
                     />
                   ))}
                 </View>
               </View>
-            ))
-          )}
+            ) : null}
+            <Button
+              label="Reset filters"
+              variant="ghost"
+              size="sm"
+              disabled={activeFilterCount === 0}
+              onPress={resetFilters}
+            />
+          </View>
+        </Card>
+      ) : null}
 
-          {/* Older pages of the same window; the button is the whole
-              affordance, so the feed never silently truncates. */}
-          {nextCursor && !isLoading ? (
-            <View className="items-center">
-              <Button
-                label={isLoadingMore ? 'Loading…' : 'Load more'}
-                variant="ghost"
-                size="sm"
-                disabled={isLoadingMore}
-                onPress={() => void loadMore()}
-              />
+      {!hasAnyActivity && !isLoading ? (
+        <EmptyStateCard
+          accentColor={COLOR}
+          title="Nothing logged yet"
+          description="Completed tasks, habits, focus sessions, workouts, and plans will appear here."
+        />
+      ) : !isLoading && groups.length === 0 ? (
+        <Card innerClassName="p-4">
+          <View className="items-center" style={{ gap: spacing.sm, paddingVertical: spacing.md }}>
+            <Text variant="titleMd" style={{ textAlign: 'center' }}>
+              No matching activity
+            </Text>
+            <Text variant="bodyMd" tone="muted" style={{ textAlign: 'center' }}>
+              Nothing logged matches these filters.
+            </Text>
+            <Button label="Reset filters" variant="ghost" size="sm" onPress={resetFilters} />
+          </View>
+        </Card>
+      ) : (
+        <View style={{ gap: spacing.xl }}>
+          {groups.map((group) => (
+            <View key={group.dateKey} style={{ gap: spacing.sm }}>
+              <SectionLabel>{formatTimelineDayLabel(group.dateKey, todayKey)}</SectionLabel>
+              <ListGroup>
+                {group.items.map((item) => (
+                  <TimelineRow
+                    key={item.id}
+                    item={item}
+                    tile={activityItemTileVisual(item, sectionAccents, tokens.surface)}
+                  />
+                ))}
+              </ListGroup>
             </View>
-          ) : null}
-        </>
+          ))}
+        </View>
+      )}
+
+      {/* Older pages of the same window; the button is the whole
+          affordance, so the feed never silently truncates. */}
+      {nextCursor && !isLoading ? (
+        <View className="items-center">
+          <Button
+            label={isLoadingMore ? 'Loading…' : 'Load more'}
+            variant="ghost"
+            size="sm"
+            disabled={isLoadingMore}
+            onPress={() => void loadMore()}
+          />
+        </View>
       ) : null}
     </View>
   );
 }
 
 /**
- * One flat activity row (48–56pt): title, then one metadata line naming the
- * category and the local time. No ornamental icon tile and no per-row border —
- * the row sits on a shared surface with a hairline separator (design D12.5).
+ * One activity row (§6 `ListRow` grammar, 56–60pt): a 40px leading tile in the
+ * event source's own section hue, then the title and ONE metadata line naming
+ * the category and the local time. The tile is what makes a merged feed
+ * scannable without per-row colour claims on the text; the category word stays
+ * in the line so the row never encodes meaning in colour alone.
  */
 function TimelineRow({
   item,
-  isFirst,
-  borderColor,
+  tile,
 }: {
   item: ActivityTimelineItem;
-  isFirst: boolean;
-  borderColor: string;
+  tile: ActivitySourceTileVisual;
 }) {
-  const { tokens } = useAppTheme();
   const time = formatTime(item.occurredAt);
   const category = CATEGORY_LABEL[item.category] ?? item.category;
   return (
     <View
-      style={
-        isFirst
-          ? undefined
-          : { borderTopWidth: 1, borderTopColor: borderColor, marginHorizontal: spacing.lg }
-      }
+      className="flex-row items-center"
+      style={{
+        minHeight: 56,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm,
+        gap: spacing.md,
+      }}
     >
-      <View className="justify-center px-4" style={{ minHeight: 56, paddingVertical: spacing.sm }}>
-        <Text className="text-sm font-medium" style={{ color: tokens.text }}>
+      <View
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: radius.sm,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: tile.face,
+        }}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        <MaterialIcons
+          name={tile.glyph as keyof typeof MaterialIcons.glyphMap}
+          size={20}
+          color={tile.ink}
+        />
+      </View>
+      <View className="min-w-0 flex-1">
+        <Text variant="bodyMd" className="font-bold" numberOfLines={2} style={{ lineHeight: 20 }}>
           {item.title}
         </Text>
-        <Text className="text-xs" style={{ color: tokens.textMuted }}>
+        <Text variant="caption" tone="muted" numberOfLines={1} style={{ marginTop: 2 }}>
           {category}
           {time ? ` · ${time}` : ''}
           {item.subtitle ? ` · ${item.subtitle}` : ''}
         </Text>
       </View>
+    </View>
+  );
+}
+
+/**
+ * The timeline's one collapsed filter control (a `depth.lip.sm` toggle chip).
+ *
+ * A plain `Pressable`, not `Pressable3D`: this react-native-web version does
+ * not map `accessibilityState` to the DOM, and the W12 contract asserts
+ * `aria-expanded` on the button element itself
+ * (`e2e/planning-w12.spec.ts`). The lip is composed by hand — a
+ * `borderStrong` slab behind a bounded frame — so the control still reads as
+ * the same pressable family as every other chip on this surface.
+ */
+function DisclosureChip({
+  label,
+  accessibilityLabel,
+  expanded,
+  onPress,
+}: {
+  label: string;
+  accessibilityLabel: string;
+  expanded: boolean;
+  onPress: () => void;
+}) {
+  const { tokens, sectionAccents } = useAppTheme();
+  return (
+    <View
+      style={{
+        alignSelf: 'flex-start',
+        backgroundColor: tokens.borderStrong,
+        borderRadius: radius.md,
+      }}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ expanded }}
+        aria-expanded={expanded}
+        onPress={onPress}
+        className="flex-row items-center justify-center"
+        style={{
+          minHeight: 44,
+          paddingHorizontal: spacing.lg,
+          marginBottom: 2,
+          borderRadius: radius.md,
+          borderWidth: 2,
+          borderColor: tokens.border,
+          backgroundColor: tokens.surface,
+        }}
+      >
+        {/* §5.1 appearance-resolved colored-text tier — the raw Sky `solid`
+            is 3.18:1 on a dark surface. */}
+        <Text variant="bodyMd" style={{ color: sectionAccents.todos.text, fontWeight: '700' }}>
+          {label}
+        </Text>
+      </Pressable>
     </View>
   );
 }
