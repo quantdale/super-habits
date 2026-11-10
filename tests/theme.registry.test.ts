@@ -215,3 +215,87 @@ describe('brand-hue swaps (§5.4)', () => {
     }
   });
 });
+
+// `textOnAccent` is DERIVED from `buttonText` (createTheme:
+// `textOnAccent: input.textOnAccent ?? input.buttonText`). P21-C moved
+// royal-purple's button onto the §5.3 bright-fill/ink-label pattern, which
+// silently flipped that derived token to `#10131A` — 1.13:1 as an icon on the
+// theme's velvet card, and the opposite contrast of the amber/rose accent fills
+// it also inks. (Codex review finding, PR #208.)
+//
+// The contract asserted here is a NO-DRIFT contract, not new behaviour:
+// `textOnAccent` must equal the theme's PRE-PR value, i.e. each theme's
+// pre-brand-hue `buttonText`. light/dark never moved, and the 11 other swapped
+// themes kept their label colour, so for them `textOnAccent === buttonText` is
+// exactly the pre-PR value. royal-purple is the one theme whose label colour
+// DID move, hence its explicit pin.
+describe('textOnAccent matches its pre-PR value in every theme', () => {
+  /**
+   * `buttonText` as shipped on `origin/main` before this PR (i.e. before the
+   * P21-C brand-hue swap). `git show origin/main:core/theme/themes/<id>.ts`.
+   * A theme that changes its own label colour must pin `textOnAccent` back to
+   * this value so the fixed-fill consumers do not silently invert.
+   *
+   * Royal-purple is the only entry whose current `buttonText` differs; it is
+   * therefore also the only entry that has to pin `textOnAccent`.
+   */
+  const PRE_PR_BUTTON_TEXT: Record<string, string> = {
+    light: '#FFFFFF',
+    dark: '#10131A',
+    'midnight-blue': '#ffffff',
+    'forest-green': '#052e1f',
+    'ocean-teal': '#ffffff',
+    'royal-purple': '#ffffff',
+    'crimson-red': '#ffffff',
+    'sunset-orange': '#ffffff',
+    'rose-pink': '#ffffff',
+    'cyberpunk-neon': '#14020f',
+    'nord-arctic': '#20262e',
+    solarized: '#ffffff',
+    'emerald-dark': '#04241a',
+    'coffee-brown': '#ffffff',
+  };
+
+  it('covers all 14 themes', () => {
+    expect(Object.keys(PRE_PR_BUTTON_TEXT).sort()).toEqual([...THEME_IDS].sort());
+  });
+
+  it('keeps textOnAccent identical to the pre-PR button label', () => {
+    for (const [id, pre] of Object.entries(PRE_PR_BUTTON_TEXT)) {
+      const t = THEME_REGISTRY[id].tokens;
+      expect(t.textOnAccent, `${id}.textOnAccent`).toBe(pre);
+    }
+  });
+
+  it('leaves every non-royal-purple label colour untouched by this PR', () => {
+    // For those themes the derived token is still their own `buttonText`, so the
+    // no-drift assertion above is exactly "the label colour did not move".
+    for (const [id, pre] of Object.entries(PRE_PR_BUTTON_TEXT)) {
+      if (id === 'royal-purple') continue;
+      const t = THEME_REGISTRY[id].tokens;
+      expect(t.buttonText, `${id}.buttonText`).toBe(pre);
+      expect(t.textOnAccent, `${id}.textOnAccent`).toBe(t.buttonText);
+    }
+  });
+
+  it('pins royal-purple back to the value the card surfaces were validated on', () => {
+    const t = THEME_REGISTRY['royal-purple'].tokens;
+    // The label moved (bright fill + ink label); the pin did not.
+    expect(t.buttonText).toBe('#10131A');
+    expect(t.textOnAccent).toBe('#ffffff');
+    // Proof the pin matters: the DERIVED value cannot ink a neutral card face,
+    // which is exactly the regression the review measured (1.13:1).
+    expect(contrastRatio(t.buttonText, t.surface)).toBeLessThan(WCAG_AA_NON_TEXT);
+  });
+
+  it('keeps royal-purple textOnAccent >= 3:1 on the neutral card surface', () => {
+    // The exact pair the review measured: a `Card variant="header"` icon on
+    // `tokens.surface`. Restoring the pre-PR white yields 16.38:1.
+    const t = THEME_REGISTRY['royal-purple'].tokens;
+    const ratio = contrastRatio(t.textOnAccent, t.surface);
+    expect(
+      ratio,
+      `royal-purple: textOnAccent on surface — ${ratio.toFixed(2)}:1`,
+    ).toBeGreaterThanOrEqual(WCAG_AA_NON_TEXT);
+  });
+});

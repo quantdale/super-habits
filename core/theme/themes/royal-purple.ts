@@ -38,5 +38,12 @@ export const royalPurple = createTheme({
   // The derived tint reads 4.25:1 under the brand label, so the inactive
   // chip face is pinned (4.62:1).
   chipBackground: '#362C5C',
+  // `textOnAccent` is DERIVED from `buttonText`, and this theme's button is the
+  // §5.3 bright fill + ink label — so without this pin the token would become
+  // `#10131A` and paint the "on accent" ink at ~1:1 on the accent fills it
+  // actually lands on (amber `#FBBF24`, danger rose `#E11D48`). Pin the
+  // pre-swap value: it is what the fixed-fill consumers were validated against
+  // and it is the label colour of the theme's saturated solids.
+  textOnAccent: '#ffffff',
   brandGradient: ['#A78BFA', '#A78BFA'],
 });
