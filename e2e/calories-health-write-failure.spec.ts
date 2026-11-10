@@ -77,6 +77,41 @@ async function countRows(page: Page, sql: string): Promise<number> {
   return Number(rows[0]?.n ?? -1);
 }
 
+/**
+ * Wait until the reward write triggered by a successful save has COMMITTED.
+ *
+ * `recordAction` is fire-and-forget: `GamificationProvider.recordAction` runs
+ * `awardGamificationAction` in a floating promise AFTER the feature row
+ * commits, so "the entry is visible" says nothing about the ledger. Reading it
+ * on that signal alone races the write (the documented slow-runner flake that
+ * `e2e/reward-key-upgrade.spec.ts` fixed the same way in #207).
+ *
+ * The DB harness cannot be polled for it either: every `queryRows` navigates
+ * the page to the harness document, tearing the app down before a still-pending
+ * award reaches SQLite. The app-side proof that the award transaction committed
+ * is the shell XP chip, which renders from the snapshot `recordAction` sets when
+ * the award resolves. Switching section goes through the in-app rail, NOT
+ * `goToTab` (which reloads and would also kill the pending write).
+ */
+async function settleRewards(page: Page): Promise<void> {
+  await page
+    .getByRole('tablist', { name: 'Section tabs' })
+    .getByRole('tab', { name: 'Today', exact: true })
+    .click();
+  await expect
+    .poll(
+      async () => {
+        const label = await page
+          .getByRole('button', { name: /^XP total \d+ — open achievements$/ })
+          .first()
+          .getAttribute('aria-label');
+        return Number(/^XP total (\d+)/.exec(label ?? '')?.[1] ?? 0);
+      },
+      { timeout: 15_000 },
+    )
+    .toBeGreaterThan(0);
+}
+
 async function openSavedMeals(page: Page): Promise<Locator> {
   await page.getByRole('button', { name: /Browse saved meals/ }).click();
   const sheet = page.getByRole('dialog', { name: 'Saved meals' });
@@ -141,6 +176,9 @@ test.describe('Calories / Health write-failure honesty', () => {
     await expect(page.getByText('Blocked add', { exact: true }).first()).toBeVisible({
       timeout: 15_000,
     });
+    // The reward is written after the entry, so settle on the in-app proof of
+    // that commit before the single ledger read.
+    await settleRewards(page);
 
     expect(await countRows(page, 'SELECT COUNT(*) AS n FROM calorie_entries')).toBe(1);
     expect(
@@ -150,7 +188,15 @@ test.describe('Calories / Health write-failure honesty', () => {
          WHERE entity = 'calorie_entries' AND operation = 'create'`,
       ),
     ).toBe(1);
-    expect(await countRows(page, 'SELECT COUNT(*) AS n FROM gamification_events')).toBe(1);
+    // Nutrition is keyed per DAY, so this retry's own award is the single
+    // `nutrition` row for today — the honest contract, and the same identity
+    // the app uses to make the award idempotent.
+    expect(
+      await countRows(
+        page,
+        `SELECT COUNT(*) AS n FROM gamification_events WHERE event_kind = 'nutrition'`,
+      ),
+    ).toBe(1);
     await returnToApp(page);
   });
 

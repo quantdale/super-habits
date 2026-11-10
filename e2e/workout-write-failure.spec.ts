@@ -91,6 +91,45 @@ async function openHistory(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'History and insights' }).click();
 }
 
+/**
+ * Wait until the reward write triggered by a successful log has COMMITTED.
+ *
+ * `recordAction` is fire-and-forget (`GamificationProvider.recordAction` runs
+ * `awardGamificationAction` in a floating promise, AFTER the log transaction
+ * commits), so a log row becoming visible says nothing about the ledger. Two
+ * consequences this helper exists for:
+ *
+ *   - reading the ledger on the "Logged" marker races that write;
+ *   - the DB harness cannot be used to poll for it: every `queryRows` navigates
+ *     the page to the harness document, which tears the app down before a
+ *     still-pending award reaches SQLite (that is precisely how the first read
+ *     could observe 0 and stay 0 on a loaded CI runner).
+ *
+ * The app-side signal that PROVES the award transaction committed is the shell
+ * XP chip, which renders from the snapshot `recordAction` sets once the award
+ * resolves (the rule already used by `e2e/reward-key-upgrade.spec.ts`).
+ * Switching section through the in-app rail — never `goToTab`, which reloads —
+ * keeps the page (and any in-flight write) alive.
+ */
+async function settleRewards(page: Page): Promise<void> {
+  await page
+    .getByRole('tablist', { name: 'Section tabs' })
+    .getByRole('tab', { name: 'Today', exact: true })
+    .click();
+  await expect
+    .poll(
+      async () => {
+        const label = await page
+          .getByRole('button', { name: /^XP total \d+ — open achievements$/ })
+          .first()
+          .getAttribute('aria-label');
+        return Number(/^XP total (\d+)/.exec(label ?? '')?.[1] ?? 0);
+      },
+      { timeout: 15_000 },
+    )
+    .toBeGreaterThan(0);
+}
+
 test.describe('Workout write-failure honesty', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -263,14 +302,37 @@ test.describe('Workout write-failure honesty', () => {
     await goToTab(page, 'workout');
     await page.getByText('Complete workout', { exact: true }).first().click();
     await expect(page.getByText('Logged', { exact: true })).toBeVisible();
+    // The award lands after the log, so settle on the in-app proof first.
+    await settleRewards(page);
 
     const logsAfterRetry = await queryRows(page, `SELECT COUNT(*) AS n FROM workout_logs`);
     expect(Number(logsAfterRetry[0]?.n ?? -1)).toBe(1);
-    const rewardsAfterRetry = await queryRows(
+
+    // The honest contract is the ONE reward this quick log is responsible for:
+    // the `workout` event keyed by the committed log id. Counting every ledger
+    // row is not that contract — an award can legitimately emit sibling rows
+    // (a completed daily quest, a perfect day, a streak milestone), and which
+    // quests rotate in depends on the local date key, so a raw row count flips
+    // between 1 and 2 as the calendar advances.
+    const workoutEventsAfterRetry = await queryRows(
       page,
-      'SELECT COUNT(*) AS n FROM gamification_events',
+      `SELECT source_key FROM gamification_events WHERE event_kind = 'workout'`,
     );
-    expect(Number(rewardsAfterRetry[0]?.n ?? -1)).toBe(1);
+    expect(workoutEventsAfterRetry).toHaveLength(1);
+    expect(
+      await queryRows(
+        page,
+        `SELECT COUNT(*) AS n FROM gamification_events
+          WHERE event_kind = 'workout'
+            AND source_key = (SELECT id FROM workout_logs LIMIT 1)`,
+      ),
+    ).toEqual([{ n: 1 }]);
+    // Any sibling row is a DIFFERENT award kind — never a second workout award.
+    const siblingKinds = await queryRows(
+      page,
+      `SELECT DISTINCT event_kind FROM gamification_events WHERE event_kind <> 'workout'`,
+    );
+    expect(siblingKinds.map((row) => row.event_kind)).not.toContain('workout');
     await returnToApp(page);
   });
 
