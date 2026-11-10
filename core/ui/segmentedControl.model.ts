@@ -27,3 +27,38 @@ export function nextSegmentValue<T extends string>(
   const nextIndex = (currentIndex + direction + enabled.length) % enabled.length;
   return enabled[nextIndex].value;
 }
+
+/** The V3 §6 default: 36pt segment faces inside a 40pt (36 + 2x2) tray. */
+export const DEFAULT_SEGMENT_MIN_HEIGHT = 36;
+
+/** Tray padding top/bottom around the segment faces (§6). */
+export const SEGMENT_TRACK_PADDING = 2;
+
+/**
+ * Upper bound on a requested face height, so a runaway value cannot silently
+ * turn a compact tray into a hero surface. 52 is the largest face that keeps
+ * the tray inside the phone-width layouts the responsive sweep measures; the
+ * sweep's active no-overflow case is what would catch a genuine overrun.
+ */
+export const MAX_SEGMENT_MIN_HEIGHT = 52;
+
+/**
+ * Resolve the requested minimum segment height into a safe, ordered value.
+ *
+ * Contract this exists to keep (CG-12): the tier is a LAYOUT tier, not a
+ * `hitSlop` tier. react-native-web never applies `hitSlop` to the DOM box, so
+ * the only way a segment's real hit area reaches 44 CSS px on web is for the
+ * face itself to be 44. A request below the V3 default, a non-finite request,
+ * or any non-web platform resolves to the untouched 36pt default, which is why
+ * every other `SegmentedControl` caller stays pixel-identical.
+ */
+export function resolveSegmentMinHeight(request: {
+  minSegmentHeight?: number;
+  isWeb: boolean;
+}): number {
+  const { minSegmentHeight, isWeb } = request;
+  if (!isWeb || minSegmentHeight === undefined) return DEFAULT_SEGMENT_MIN_HEIGHT;
+  if (!Number.isFinite(minSegmentHeight)) return DEFAULT_SEGMENT_MIN_HEIGHT;
+  if (minSegmentHeight <= DEFAULT_SEGMENT_MIN_HEIGHT) return DEFAULT_SEGMENT_MIN_HEIGHT;
+  return Math.min(Math.round(minSegmentHeight), MAX_SEGMENT_MIN_HEIGHT);
+}
