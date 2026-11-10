@@ -44,6 +44,7 @@ import { PillChip } from '@/core/ui/PillChip';
 import { TextField } from '@/core/ui/TextField';
 import { RoutineExerciseCard } from './RoutineExerciseCard';
 import { CustomExerciseManagerModal } from './CustomExerciseManager';
+import { workoutWriteFailureCopy } from './workoutWriteFailure';
 
 const COLOR = SECTION_COLORS.workout;
 
@@ -117,6 +118,10 @@ export function RoutineDetailModal({
   const [exercises, setExercises] = useState<ExerciseWithSets[]>([]);
   const [newExerciseName, setNewExerciseName] = useState('');
   const [workoutError, setWorkoutError] = useState<string | null>(null);
+  // Same failure, mirrored for the surfaces that sit ON TOP of this sheet: the
+  // library picker and the custom-exercise manager are their own dialogs, so an
+  // alert rendered here would be behind them and read as silence.
+  const [sheetError, setSheetError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerPending, setPickerPending] = useState(false);
@@ -191,8 +196,9 @@ export function RoutineDetailModal({
       try {
         await mutation();
         setWorkoutError(null);
+        setSheetError(null);
       } catch (error) {
-        setWorkoutError(error instanceof Error ? error.message : 'Could not save the change.');
+        setWorkoutError(workoutWriteFailureCopy(error, 'Could not save the change. Try again.'));
       }
     },
     [],
@@ -298,7 +304,9 @@ export function RoutineDetailModal({
       await refresh();
       setExpandedId(exId);
     } catch (error) {
-      setWorkoutError(error instanceof Error ? error.message : 'Could not add the exercise.');
+      // The legacy free-text field lives ON this sheet, so its own alert is the
+      // surface that owns the write (unlike the library picker above).
+      setWorkoutError(workoutWriteFailureCopy(error, 'Could not add the exercise. Try again.'));
     }
   };
 
@@ -319,17 +327,23 @@ export function RoutineDetailModal({
         sortOrder: exercises.length + 1,
       });
       await queuedAddDefaultSet(exId);
+      // Clear the previous failure only once the write landed: this picker stays
+      // mounted, so a stale alert would reappear over a routine that already has
+      // the exercise.
+      setSheetError(null);
       closePicker();
       await refresh();
       setExpandedId(exId);
     } catch (error) {
-      setWorkoutError(error instanceof Error ? error.message : 'Could not add the exercise.');
+      // The picker is the surface the user acted from; the builder's own alert
+      // would be behind it.
+      setSheetError(workoutWriteFailureCopy(error, 'Could not add the exercise. Try again.'));
     }
   };
 
   const handleCreateCustomExercise = async () => {
     if (!customName.trim()) {
-      setWorkoutError('Custom exercise name is required.');
+      setSheetError('Custom exercise name is required.');
       return;
     }
     try {
@@ -363,8 +377,11 @@ export function RoutineDetailModal({
       setCustomUnilateral(false);
       setCustomSupportsExternalLoad(customModality === 'weighted_strength');
       setWorkoutError(null);
+      // The create landed: drop its own failure copy too, or it would render
+      // over the next time this sheet opens.
+      setSheetError(null);
     } catch (error) {
-      setWorkoutError(error instanceof Error ? error.message : 'Could not create exercise.');
+      setSheetError(workoutWriteFailureCopy(error, 'Could not create exercise. Try again.'));
     }
   };
 
@@ -1046,6 +1063,7 @@ export function RoutineDetailModal({
             variant="ghost"
             onPress={() => {
               setWorkoutError(null);
+              setSheetError(null);
               // iOS cannot present a second RN Modal until the first has
               // finished dismissing. Keep the routine sheet hidden until the
               // library closes, then bring it back for prescription editing.
@@ -1108,6 +1126,7 @@ export function RoutineDetailModal({
         title="Exercise library"
         scroll
       >
+        <ValidationError message={sheetError} />
         <TextField
           label="Search exercises"
           accessibilityLabel="Exercise library search"
