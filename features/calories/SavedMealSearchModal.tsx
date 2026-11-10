@@ -5,6 +5,7 @@ import { useAppTheme } from '@/core/providers/themeContext';
 import { Modal } from '@/core/ui/Modal';
 import { EmptyStateCard } from '@/core/ui/EmptyStateCard';
 import { PillChip } from '@/core/ui/PillChip';
+import { ValidationError } from '@/core/ui/ValidationError';
 import { useConfirmationDialog } from '@/core/ui/useConfirmationDialog';
 import { SECTION_COLORS } from '@/constants/sectionColors';
 import {
@@ -29,6 +30,12 @@ export function SavedMealSearchModal({ visible, meals, onSelect, onClose, onDele
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  /**
+   * A rejected catalog delete must never look like a removed meal. The row is
+   * still in SQLite (and still listed here), so the failure is announced beside
+   * the list instead of escaping as an unhandled rejection with no feedback.
+   */
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const categories = useMemo(() => listSavedMealCategories(meals), [meals]);
   const filtered = useMemo(() => {
     const matchingQuery = filterSavedMeals(meals, query);
@@ -48,6 +55,7 @@ export function SavedMealSearchModal({ visible, meals, onSelect, onClose, onDele
     if (!visible) {
       setQuery('');
       setActiveCategory(null);
+      setDeleteError(null);
     }
   }
 
@@ -60,7 +68,15 @@ export function SavedMealSearchModal({ visible, meals, onSelect, onClose, onDele
         confirmVariant: 'danger',
       });
       if (!confirmed) return;
-      await deleteSavedMeal(meal.id);
+      setDeleteError(null);
+      try {
+        await deleteSavedMeal(meal.id);
+      } catch {
+        // Local-first honesty: the catalog row survived, so keep it on screen
+        // and say why. The list refreshes only after a committed delete.
+        setDeleteError('Could not remove that saved meal. Try again.');
+        return;
+      }
       onDeleted();
     })();
   };
@@ -85,6 +101,8 @@ export function SavedMealSearchModal({ visible, meals, onSelect, onClose, onDele
             placeholderTextColor={tokens.textMuted}
           />
         </View>
+
+        <ValidationError message={deleteError} />
 
         {categories.length > 0 ? (
           <View className="mb-3 flex-row flex-wrap">
