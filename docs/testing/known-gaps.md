@@ -165,7 +165,6 @@ per width where a width changes the measurement):
 | `features/planning-hub` + `features/daily-plan` + `features/progress` | the hub's five view tabs, `Carry forward unfinished priorities from yesterday`, `Show plan history`, `Show the last 7/30/90 days`, `7 days`/`28 days`                                                                             | 61.2x36; 216x34; 102x34; 48.2/56.3 x40; 72.6/80.7 x40                                           |
 | `features/overview`                                                   | Streak chip, XP chip, `View Momentum Garden`                                                                                                                                                                                      | 48.1x32; 64.3x32; 128.1x36                                                                      |
 | `features/pomodoro`                                                   | `Focus`/`Short Break`/`Long Break` mode tabs                                                                                                                                                                                      | 95.3/100.3/105.3 x36                                                                            |
-| `features/command`                                                    | the two `Use example:` chips                                                                                                                                                                                                      | 235.1x40; 284/299.3/299 x40                                                                     |
 
 The three surfaces with **no** finding (`Habits`, `hub-goals`, `hub-projects` returned
 zero entries; `hub-timeline` and `hub-progress` only carry the shared hub tabs
@@ -183,7 +182,9 @@ case's body is the full release assertion (same helper, same thresholds, same
 surface set, all widths), so un-fixme-ing it is the fix's own proof. The other
 three promises in the same spec (no horizontal overflow, wide-viewport cap +
 centre + shell swap, reduced-motion quiet) stay ordinary active cases, so a new
-overflow, layout or motion defect still fails the lane.
+overflow, layout or motion defect still fails the lane. The `features/command`
+slice is released and guarded by its own active case (the command-overlay
+sweep above).
 
 **Owning lane:** the per-surface feature folders above (the shared primitives
 that make slop-only sizing possible are `core/ui/Button.tsx` (`size=sm` 36pt),
