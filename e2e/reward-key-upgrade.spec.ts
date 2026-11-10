@@ -117,6 +117,12 @@ test.describe('Todo reward key upgrade compatibility', () => {
     const checkbox = page.getByRole('checkbox', { name: 'Mark complete: Water the plants' });
     await checkbox.first().click({ force: true });
     await expect(page.getByText('1 completed', { exact: true })).toBeVisible();
+    // `1 completed` paints from the list refresh, which does not wait for the
+    // reward write (`recordAction('todo', id)` runs just before `refresh()`).
+    // Reading the ledger on that signal alone races the write on a loaded
+    // runner. The shell XP chip is the user-visible proof the day-qualified row
+    // landed: the seeded legacy row is worth 5 and today's completion adds 5.
+    await expect(page.getByRole('button', { name: /^XP total 10 / })).toBeVisible();
 
     const rows = await queryRows(
       page,
