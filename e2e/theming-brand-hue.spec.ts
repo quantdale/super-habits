@@ -1,6 +1,7 @@
 import { type Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { auditPage } from './helpers/a11yAudit';
+import { clearDatabase } from './helpers/db';
 
 /**
  * P21-C — Playful Momentum §5.4 "brand-hue swap" proof.
@@ -267,10 +268,26 @@ async function applyTheme(page: Page, theme: ThemeExpectation) {
 
 test.describe('Theme brand-hue swaps (§5.4)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    // Every case must start from a genuinely empty device (AGENTS.md → E2E:
+    // `clearDatabase()` runs in `test.beforeEach`; the fixture installs the DB
+    // harness but never resets app state). This also wipes the persisted theme
+    // slot (`superhabits.theme.mode` / `superhabits.theme.slots.v2`), so each
+    // test re-applies its own theme AFTER the reset.
+    await page.goto('/');
+    await page.waitForLoadState('load');
+    await clearDatabase(page);
     await expect(
       page.getByRole('tablist', { name: 'Section tabs' }).getByRole('tab', { name: 'Today' }),
     ).toBeVisible({ timeout: 30_000 });
+    // Prove the reset really cleared persisted state: a leaked theme slot would
+    // let a previous test's theme bleed into this one, and `applyTheme` below
+    // is only meaningful on top of a pristine device.
+    expect(
+      await page.evaluate(() => window.localStorage.getItem('superhabits.theme.slots.v2')),
+    ).toBeNull();
+    expect(
+      await page.evaluate(() => window.localStorage.getItem('superhabits.theme.mode')),
+    ).toBeNull();
   });
 
   const groups: [string, ThemeExpectation[]][] = [
