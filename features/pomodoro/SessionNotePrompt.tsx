@@ -28,7 +28,13 @@ export function SessionNotePrompt({ sessionId, onSaved, onDismiss }: Props) {
     setSaving(true);
     setError(null);
     try {
-      await setPomodoroSessionMeta({ sessionId, note });
+      // A resolved `false` means the session row no longer exists: the write
+      // changed nothing, so closing as saved would silently drop the note.
+      const changed = await setPomodoroSessionMeta({ sessionId, note });
+      if (!changed) {
+        setError('That focus session is no longer available, so the note was not saved.');
+        return;
+      }
       onSaved();
     } catch (e) {
       // A rejected note write must be visible with the typed value intact and

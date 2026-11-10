@@ -66,15 +66,28 @@ export function SessionMetaEditModal({
   const linkChanged = (association?.todoId ?? null) !== (session.linked_todo_id ?? null);
 
   const handleSave = async () => {
+    // Nothing edited: there is no write to make, and reporting “no longer
+    // available” for an unchanged form would be a lie. The editor closes as it
+    // always did.
+    if (!noteChanged && !linkChanged) {
+      onSaved();
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      await setPomodoroSessionMeta({
+      // A resolved `false` means the session row no longer exists, so the write
+      // changed nothing. Closing as saved would silently drop the edit.
+      const changed = await setPomodoroSessionMeta({
         sessionId: session.id,
         note: noteChanged ? note.trim() : undefined,
         linkedTodoId: linkChanged ? (association?.todoId ?? null) : undefined,
         linkedTodoTitle: linkChanged ? (association?.todoTitle ?? null) : undefined,
       });
+      if (!changed) {
+        setError('That focus session is no longer available, so the changes were not saved.');
+        return;
+      }
       onSaved();
     } catch (e) {
       // A rejected write (note or link/unlink) surfaces inline with typed
