@@ -21,26 +21,28 @@ import { auditPage } from './helpers/a11yAudit';
  * persisted weekly review, so rows/bars/badges render populated instead of
  * their empty states.
  *
- * FINDINGS THIS SWEEP CONFIRMS (quarantined below, not excluded):
- * On the Nord Arctic canvas the dark-appearance colour tiers are resolved per
+ * FINDINGS THIS SWEEP FOUND, AND WHERE THEY WENT:
+ * On the Nord Arctic canvas the dark-appearance colour tiers were resolved per
  * APPEARANCE and never validated against a third theme's own surfaces, so
- * four hues miss the 4.5:1 text floor there:
+ * four hues missed the 4.5:1 text floor there:
  *   - Sky bright  #2FA8F7 → 3.86:1 on `surface` #3B4252 (`More details −/ +`,
  *     `Filters −`, garden `Tasks`)
  *   - Coral bright #FF6A4D → 3.56:1 on `surface` #3B4252 (garden `Workout`)
  *   - Berry bright #FF6FAE → 3.90:1 on `surface` #3B4252 (garden `Nutrition`)
  *   - lifted Grape #B49BFF → 4.35:1 on `surface` #3B4252 (garden `Focus`)
  * plus one on the derived chip wash: Today's `Plan today` label
- * (`tokens.primary` #88C0D0) reads 3.50:1 on `tokens.chipBackground` #4A5B6B.
+ * (`tokens.primary` #88C0D0) read 3.50:1 on `tokens.chipBackground` #4A5B6B.
  *
- * These are real product contrast defects, so they stay as `test.fixme`
- * entries with the measured ratio; neither the threshold nor the node set is
- * weakened for them. The remaining surfaces are asserted normally in the same
- * theme (and every surface is asserted normally in light, dark and
- * cyberpunk-neon), so a NEW defect anywhere — including on one of the
- * quarantined surfaces — still fails this spec.
- * QUARANTINE REGISTER: each gate below is registered as CG-11 in
- * `docs/testing/known-gaps.md` with the measured ratios and the owning lane.
+ * Those were real product contrast defects. They are FIXED rather than
+ * quarantined: `getSectionAccents()` now takes the active theme's own neutral
+ * faces and resolves each coloured-text tier against them (the surface-aware
+ * half of the `readableAccent` contract Settings already used), returning the
+ * §5.1 hue unchanged wherever it already clears the floor and lifting only its
+ * lightness where it does not — and the Nord `chipBackground` pin makes the
+ * `Plan today` label clear its own wash. The four cases are now ordinary
+ * passing assertions below, with no threshold lowered and no node excluded.
+ * `tests/sectionAccentSurfaces.test.ts` pins the same matrix in all 14 themes
+ * and pins light/dark to their previously-shipped values; CG-11 is closed.
  */
 
 const PHONE = { width: 390, height: 844 } as const;
@@ -267,9 +269,10 @@ const SURFACES: readonly Surface[] = [
   },
   {
     // Adjacent chrome, not one of the P19–P21 surfaces: the sweep surfaced a
-    // Nord-only defect on Today's `Plan today` chip (see `QUARANTINE`), and
-    // hiding it behind overlay scoping would have deleted real evidence. It is
-    // asserted normally everywhere else, like every other surface here.
+    // Nord-only defect on Today's `Plan today` chip (CG-11, now fixed by the
+    // theme's pinned `chipBackground`), and hiding it behind overlay scoping
+    // would have deleted real evidence. It is asserted like every other
+    // surface here.
     name: 'today header (Plan today chip)',
     scope: { kind: 'panel', panelId: 'sh-section-panel-overview' },
     open: async (page) => {
@@ -332,15 +335,6 @@ async function auditSurface(page: Page, scope: Scope): Promise<string[]> {
   return findings;
 }
 
-/** Seed stable representative data, then audit one surface under one theme. */
-async function auditOne(page: Page, appearance: Appearance, surface: Surface): Promise<string[]> {
-  await seedFixture(page, 'TYPICAL');
-  await seedReviewHistory(page);
-  await applyTheme(page, appearance);
-  await surface.open(page);
-  return auditSurface(page, surface.scope);
-}
-
 /** Audit every surface of one theme in a single seeded session (grouped for runtime). */
 async function auditTheme(page: Page, appearance: Appearance, surfaces: readonly Surface[]) {
   await seedFixture(page, 'TYPICAL');
@@ -358,92 +352,26 @@ async function auditTheme(page: Page, appearance: Appearance, surfaces: readonly
 }
 
 /**
- * Known product contrast defects, quarantined per quarantine-protocol.
+ * Every surface is asserted in every theme — no quarantine, no exclusion.
  *
- * Each entry documents the exact surface, theme, selector, and measured ratio
- * so the fix can be routed to its owner. When the owner fixes it, this entry
- * becomes an ordinary passing case (the `test.fixme` body below already
- * asserts the full clean result, so releasing it is a one-line change and
- * removing it from `QUARANTINE`).
+ * CG-11 used to hold four of these as `test.fixme` gates (three Nord surfaces
+ * plus Today's `Plan today` chip). The gates are released: the surface-aware
+ * resolver and the Nord `chipBackground` pin fix the underlying defect, and
+ * the assertions below are the same helper, the same thresholds and the same
+ * surface set the gates used, so a regression fails here immediately.
  */
-const QUARANTINE: Record<string, Record<string, string>> = {
-  nord: {
-    'progress insights': [
-      'nord / Progress insights (`features/progress/ProgressInsightsView.tsx`',
-      '`DisclosureChip` label "More details +/−", ink `sectionAccents.todos.text`',
-      '= Sky bright #2FA8F7 = rgb(47, 168, 247)): 3.86:1 at 15px on Nord',
-      '`surface` #3B4252 = rgb(59, 66, 82) — the dark-appearance section text',
-      'tier is never validated against a third theme canvas.',
-    ].join(' '),
-    'momentum garden detail': [
-      'nord / Momentum Garden detail (`features/momentum/MomentumDetailView.tsx`',
-      '`sourceColor`) source labels on Nord `surface` #3B4252: Sky bright #2FA8F7',
-      '(rgb(47,168,247)) 3.86:1, Coral bright #FF6A4D (rgb(255,106,77)) 3.56:1,',
-      'Berry bright #FF6FAE (rgb(255,111,174)) 3.90:1, lifted Grape #B49BFF',
-      '(rgb(180,155,255)) 4.35:1 — all at 15px, all below the 4.5 floor.',
-    ].join(' '),
-    'activity timeline + filters': [
-      'nord / Activity timeline (`features/activity/ActivityTimelineView.tsx`',
-      '`DisclosureChip` label "Filters −/+", ink `sectionAccents.todos.text`',
-      '= Sky bright #2FA8F7 = rgb(47, 168, 247)): 3.86:1 at 15px on Nord',
-      '`surface` #3B4252 = rgb(59, 66, 82).',
-    ].join(' '),
-    'today header (Plan today chip)': [
-      'nord / Today header `Plan today` chip (`features/overview/OverviewScreen.tsx`,',
-      'label painted `tokens.primary` = Nord `#88C0D0` = rgb(136, 192, 208)):',
-      '3.50:1 at 14px on the chip face `tokens.chipBackground` = Nord `#4A5B6B`',
-      '= rgb(74, 91, 107) — the derived 20% primary-over-surface chip wash is',
-      'never contrast-checked against its own label (the same-hue-on-its-own-blend',
-      'class, already fixed once for Settings status pills in register entry 19).',
-    ].join(' '),
-  },
-};
-
-function quarantinedNote(label: string, surface: string): string | null {
-  const note = QUARANTINE[label]?.[surface];
-  if (note === undefined) return null;
-  // Every quarantine note must carry its measured ratio, so the gate can be
-  // routed (and released) with evidence instead of a vague pointer.
-  if (!/\d\.\d\d:1/.test(note)) {
-    throw new Error(`quarantine note for ${label}/${surface} names no measured ratio`);
-  }
-  return note;
-}
-
 test.describe('v2 secondary surfaces AA audit', () => {
   for (const appearance of THEMES) {
-    const clean = SURFACES.filter(
-      (surface) => quarantinedNote(appearance.label, surface.name) == null,
-    );
-
     test(`the v2 secondary surfaces are AA-clean (${appearance.label})`, async ({ page }) => {
       test.setTimeout(600_000);
       page.setDefaultNavigationTimeout(90_000);
       await page.setViewportSize({ ...PHONE });
       await page.emulateMedia({ reducedMotion: 'reduce' });
 
-      const perSurface = await auditTheme(page, appearance, clean);
+      const perSurface = await auditTheme(page, appearance, SURFACES);
       for (const [surface, findings] of Object.entries(perSurface)) {
         expect.soft(findings, `${appearance.label} / ${surface}`).toEqual([]);
       }
     });
-
-    // Quarantined defects stay visible as gates, never as exclusions: the body
-    // here is the release assertion (same helper, same thresholds, same
-    // surface), so un-fixme-ing it is the fix's own proof.
-    for (const surface of SURFACES) {
-      const note = quarantinedNote(appearance.label, surface.name);
-      if (!note) continue;
-      test.fixme(`${appearance.label}: "${surface.name}" has no AA defects (known contrast gap)`, async ({
-        page,
-      }) => {
-        test.setTimeout(300_000);
-        page.setDefaultNavigationTimeout(90_000);
-        await page.setViewportSize({ ...PHONE });
-        await page.emulateMedia({ reducedMotion: 'reduce' });
-        const findings = await auditOne(page, appearance, surface);
-        expect(findings, `${appearance.label} / ${surface.name}`).toEqual([]);
-      });
-    }
   }
 });

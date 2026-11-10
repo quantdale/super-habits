@@ -121,9 +121,21 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     [mode, setMode],
   );
 
+  // The §5.1 coloured-TEXT tier is appearance-resolved, but it is PAINTED on a
+  // theme's own neutral faces — and the §5.1 table was measured on the default
+  // dark canvas (#1A1F2B). Handing the resolver this theme's faces makes the
+  // ink surface-aware: unchanged wherever the shipped hue already clears 4.5:1
+  // on every face (light, dark and every theme whose neutral ladder is that
+  // deep, so those renders stay byte-identical), lifted in lightness only where
+  // a mid-tone canvas (Nord Arctic) would otherwise miss the text floor.
   const sectionAccents = useMemo(
-    () => getSectionAccents(resolvedTheme, theme.sectionOverrides),
-    [resolvedTheme, theme.sectionOverrides],
+    () =>
+      getSectionAccents(resolvedTheme, theme.sectionOverrides, [
+        tokens.surface,
+        tokens.surfaceElevated,
+        tokens.surfaceSunken,
+      ]),
+    [resolvedTheme, theme.sectionOverrides, tokens],
   );
 
   const rewardAccents = useMemo(() => getRewardAccents(resolvedTheme), [resolvedTheme]);
