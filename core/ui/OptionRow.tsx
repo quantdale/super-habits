@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
+import { useCallback } from 'react';
 import { View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import { Text } from '@/core/ui/Text';
 import { Pressable3D } from '@/core/ui/Pressable3D';
+import { useSpaceActivation } from '@/core/ui/useSpaceActivation';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { readableAccent, tintOver } from '@/core/theme/contrast';
 import { radius, spacing } from '@/core/theme/designTokens';
@@ -52,6 +54,15 @@ export function OptionRow({
   const tintBase = resolvedTheme === 'dark' ? '#1A1F2B' : '#FFFFFF';
   const selectedFace = tintOver(tintBase, accent, resolvedTheme === 'dark' ? 0.18 : 0.14);
   const selectedInk = readableAccent(accent, selectedFace);
+  const activate = useCallback(() => {
+    if (!disabled) onPress();
+  }, [disabled, onPress]);
+  // CG-13 (`docs/testing/known-gaps.md`): a `radio` gets RN-Web's Enter and
+  // pointer paths but not its Space. `Pressable3D` hands out no ref, so the hook
+  // is attached to the label block already rendered inside the row and resolves
+  // the row's own `role="radio"` press target as its nearest role-bearing
+  // ancestor: no wrapper, no new box, so the rendered tree is unchanged.
+  const spaceRef = useSpaceActivation({ role: 'radio', onActivate: activate, disabled });
 
   return (
     <Pressable3D
@@ -60,7 +71,7 @@ export function OptionRow({
       lipColor={selected ? accent : tokens.borderStrong}
       radius={radius.md}
       disabled={disabled}
-      onPress={onPress}
+      onPress={activate}
       testID={testID}
       accessibilityRole="radio"
       accessibilityLabel={accessibilityLabel ?? label}
@@ -80,7 +91,7 @@ export function OptionRow({
         gap: spacing.md,
       }}
     >
-      <View style={{ flex: 1, minWidth: 0 }}>
+      <View ref={spaceRef} style={{ flex: 1, minWidth: 0 }}>
         <Text
           variant="bodyMd"
           style={{ color: selected ? selectedInk : tokens.text, fontWeight: '700' }}
