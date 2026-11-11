@@ -180,7 +180,11 @@ function PressableWithRing({
       hitSlop={{ top: 4, bottom: 4 }}
       style={[
         {
-          minHeight: 40,
+          // The repo's 44pt contract has to live on the FACE here: this is a
+          // plain `Pressable`, and react-native-web never applies `hitSlop` to
+          // the DOM box (docs/testing/known-gaps.md CG-12), so a 40pt face was
+          // a 40px web hit area for a pointer user.
+          minHeight: 44,
           maxWidth: '100%',
           borderRadius: radius.full,
           borderWidth: 2,

@@ -872,6 +872,60 @@ test.describe('V2 responsive sweep', () => {
     expect(offenders, 'every Focus (pomodoro) control reaches a 44x44 CSS px hit area').toEqual([]);
   });
 
+  // CG-12 slice 2, Command Center: the same predicate, thresholds and helpers
+  // as the gated case above, auditing ONLY the command overlay scope. The
+  // overlay is opened through the shipped Add -> Describe it path, the example
+  // chips are `features/command/CommandInputCard.tsx`'s feature-local
+  // `ChipButton` (a plain `Pressable`, so its own DOM box is the hit area), and
+  // the history chips reuse the same control: one history entry is seeded so
+  // both accessible names ("Use example:" and "Reuse recent command:") are
+  // measured. Zero sub-44 entries at 360/375/390 in light and dark.
+  test('the Command Center overlay reaches a 44px CSS hit area at phone widths', async ({
+    page,
+  }) => {
+    test.setTimeout(300_000);
+    await prepare(page);
+    // AsyncStorage is localStorage on the web build, so seeding one recent
+    // command exercises the shared `ChipButton` under both of its accessible
+    // names instead of only the empty-history example chips.
+    await page.evaluate(() =>
+      window.localStorage.setItem(
+        'superhabits.command.history',
+        JSON.stringify([{ rawText: 'complete Buy groceries', at: '2026-10-13T11:30:00.000Z' }]),
+      ),
+    );
+
+    const undersized: string[] = [];
+    for (const theme of ['light', 'dark'] as const) {
+      await setTheme(page, theme);
+      for (const width of PHONE_WIDTHS) {
+        await page.setViewportSize({ width, height: 844 });
+        const scope = await openOverlay(page, 'command');
+        const result = await measure(page, scope);
+        // Non-vacuity: the sub-44 controls the sweep reported here are the
+        // chips, so both chip rows must really be rendered and measured — a
+        // scope that landed on the shell would report zero offenders for
+        // nothing.
+        await expect(
+          page.getByRole('button', { name: /^Use example: / }),
+          `${theme} ${width}: the example chips are rendered and measured`,
+        ).not.toHaveCount(0);
+        await expect(
+          page.getByRole('button', { name: /^Reuse recent command: / }),
+          `${theme} ${width}: the history chips are rendered and measured`,
+        ).not.toHaveCount(0);
+        for (const target of result.undersizedTargets) {
+          undersized.push(
+            `${theme} ${width} › "${target.name}" measured ${target.width}x${target.height} px`,
+          );
+        }
+        await dismissOverlay(page, 'command');
+      }
+    }
+
+    expect(undersized, 'every Command Center control reaches a 44x44 CSS px hit area').toEqual([]);
+  });
+
   test('wide viewports cap and centre the content column and swap the nav shell', async ({
     page,
   }) => {
