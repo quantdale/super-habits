@@ -4,6 +4,7 @@ import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useReducedMotion } from '@/core/theme/motion';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
+import { useSpaceActivation } from '@/core/ui/useSpaceActivation';
 import { radius } from '@/core/theme/designTokens';
 import {
   nextSegmentValue,
@@ -48,16 +49,26 @@ function SegmentOptionButton<T extends string>({
 }: SegmentOptionProps<T>) {
   const { tokens } = useAppTheme();
   const ring = useKeyboardFocusRing(ringColor);
+  const activate = useCallback(() => {
+    if (!option.disabled) onSelect(option.value);
+  }, [onSelect, option.disabled, option.value]);
+  // CG-13 (`docs/testing/known-gaps.md`): RN-Web's press responder maps Space
+  // only to button-shaped roles, so a `tab` needs the same Space binding the
+  // habit checkbox and `Switch` carry. Enter and pointer presses stay RN-Web's.
+  const spaceRef = useSpaceActivation({
+    role: 'tab',
+    onActivate: activate,
+    disabled: option.disabled,
+  });
   return (
     <Pressable
+      ref={spaceRef}
       disabled={option.disabled}
       accessibilityRole="tab"
       accessibilityLabel={option.accessibilityLabel ?? option.label}
       aria-selected={active}
       accessibilityState={{ selected: active, disabled: option.disabled ?? false }}
-      onPress={() => {
-        if (!option.disabled) onSelect(option.value);
-      }}
+      onPress={activate}
       onFocus={ring.onFocus}
       onBlur={ring.onBlur}
       // Vertical-only slop lifts the 36pt segment face to the 44pt touch

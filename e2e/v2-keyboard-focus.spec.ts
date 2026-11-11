@@ -664,6 +664,56 @@ test.fixme('Space activates tab-shaped and picker controls like a click', async 
   await expect(presets, 'Space selects the preset row and closes the sheet').toHaveCount(0);
 });
 
+/**
+ * 3c — the segmented-tab half of the CG-13 Space contract, active since
+ * `core/ui/SegmentedControl.tsx` began binding Space for its `tab`s (the rail
+ * `Habits` tab is the remaining quarantined third above). Same walk, same
+ * assertions as the corresponding part of that case: Focus `Short Break`, then
+ * Calories `Diary view`.
+ */
+test('Space activates a segmented tab like a click', async ({ page }) => {
+  test.setTimeout(300_000);
+  await prepare(page);
+
+  await showSection(page, 'pomodoro');
+  const shortBreak = page.getByRole('tab', { name: 'Short Break', exact: true });
+  await focusAsKeyboardUser(page, shortBreak);
+  await page.keyboard.press('Space');
+  await expect(shortBreak, 'Space activates the segmented tab like a click').toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+
+  await showSection(page, 'calories');
+  const diaryTab = page.getByRole('tab', { name: 'Diary view', exact: true });
+  await expect(diaryTab).toBeVisible({ timeout: 20_000 });
+  await focusAsKeyboardUser(page, diaryTab);
+  await page.keyboard.press('Space');
+  await expect(diaryTab, 'Space activates the segmented tab like a click').toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+});
+
+/**
+ * 3d — the picker-row half of the CG-13 Space contract, active since
+ * `core/ui/OptionRow.tsx` began binding Space for its `radio` (same walk, same
+ * assertions as the corresponding part of the quarantined case above).
+ */
+test('Space selects an OptionRow picker row and closes the sheet', async ({ page }) => {
+  test.setTimeout(300_000);
+  await prepare(page);
+
+  await showSection(page, 'pomodoro');
+  await page.getByRole('button', { name: 'Choose preset' }).click();
+  const presets = page.getByRole('dialog', { name: 'Presets' });
+  await expect(presets).toBeVisible({ timeout: 20_000 });
+  const presetRow = presets.getByRole('radio').nth(1);
+  await focusAsKeyboardUser(page, presetRow);
+  await page.keyboard.press('Space');
+  await expect(presets, 'Space selects the preset row and closes the sheet').toHaveCount(0);
+});
+
 // Quarantined defect (CG-13 in `docs/testing/known-gaps.md`). Measured
 // 2026-11-10 at 390x844 light and dark: the To Do row's completion checkbox is
 // nested inside the row's own `Pressable` (`features/todos/TodoItem.tsx`:
