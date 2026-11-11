@@ -737,7 +737,7 @@ test('Space selects an OptionRow picker row and closes the sheet', async ({ page
 // before the walk. The SQLite oracle runs ONCE after the loop because
 // `queryRows` navigates the page into the DB-harness document and would
 // otherwise destroy the app state the second iteration needs.
-test.fixme('Enter and Space complete a to-do from its completion checkbox', async ({ page }) => {
+test('Enter and Space complete a to-do from its completion checkbox', async ({ page }) => {
   test.setTimeout(300_000);
   await prepare(page);
   await showSection(page, 'todos');

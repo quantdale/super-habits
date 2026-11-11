@@ -12,6 +12,7 @@ import { radius, size, springs } from '@/core/theme/designTokens';
 import { SECTION_COLORS, SECTION_HUES } from '@/constants/sectionColors';
 import { toDateKey } from '@/lib/time';
 import { buildTodoRowMeta, type TodoRowMetaTone } from './todos.domain';
+import { useTodoCheckboxKeyboard } from './useTodoCheckboxKeyboard';
 import type { Todo } from './types';
 
 type Props = {
@@ -57,6 +58,12 @@ function RowMoreButton({ title, onPress }: { title: string; onPress: () => void 
  * §5.8 `light` row), so the celebration runs off the JS critical path and
  * never delays the state update or the durable write. Reduced motion: no
  * scale, no dots — state change is instant.
+ *
+ * Keyboard: the control is nested inside the row's own `Pressable`, and RN Web
+ * resolves `Enter`/`Space` through the ancestor press responder (so the row was
+ * opening Edit task and the task never completed). `useTodoCheckboxKeyboard`
+ * makes the checkbox own both keys and stops the event before it can reach the
+ * row — the row keeps `Enter` on its own focus.
  */
 function TodoCheckControl({
   title,
@@ -89,9 +96,12 @@ function TodoCheckControl({
     burst.trigger();
     onPress();
   };
+  // One handler for both paths, so a key press and a click each write once.
+  const keyRef = useTodoCheckboxKeyboard(true, false, handlePress);
 
   return (
     <Pressable
+      ref={keyRef}
       onPress={handlePress}
       onPressIn={() => settle(0.88)}
       onPressOut={() => settle(1)}
