@@ -6,6 +6,13 @@ import {
 } from '@/core/providers/navigationContext';
 
 import { isHistoryMirrorAvailable } from '@/core/providers/historyMirror';
+import {
+  WEEKLY_REVIEW_FOCUS_RETURN_DELAYS_MS,
+  focusIsStrayed,
+  focusedControl,
+  isWebDocumentAvailable,
+  weeklyReviewFocusTarget,
+} from '@/core/providers/weeklyReviewFocusReturn';
 
 export type { AppSection, PlanningHubView } from '@/core/providers/navigationContext';
 
@@ -137,27 +144,95 @@ export function NavigationProvider({ children }: PropsWithChildren) {
 
   const openSettings = useCallback(() => setIsSettingsOpen(true), []);
   const closeSettings = useCallback(() => setIsSettingsOpen(false), []);
+  /**
+   * The control that opened the current Planning Hub chain (set by
+   * `openPlanningHub`, consumed by the Weekly Review's focus return). A ref, not
+   * state: it is DOM bookkeeping for one web-only focus restore, so it must
+   * neither re-render the shell nor restart the history-mirror effect.
+   */
+  const weeklyReviewOpenerRef = useRef<HTMLElement | null>(null);
+  /** Focus-return timers, cleared on unmount and before every new chain. */
+  const weeklyReviewFocusTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const clearWeeklyReviewFocusReturn = useCallback(() => {
+    for (const timer of weeklyReviewFocusTimers.current) clearTimeout(timer);
+    weeklyReviewFocusTimers.current = [];
+  }, []);
+  /**
+   * Hand focus back to the recorded opener once the review's dialog is gone.
+   *
+   * The dialog unmounts on a later commit (React Native Web keeps its portal
+   * mounted briefly), so this re-checks on a bounded schedule and stops at the
+   * first attempt the DOM accepts. It only competes while focus is strayed (the
+   * page root, or a removed node) — RN-Web's own restore having failed is the
+   * condition it exists for — so it can never pull focus away from a control
+   * the user has reached since. Never throws and never focuses `<body>`: with no
+   * usable opener and no rail tab it leaves focus alone.
+   */
+  const restoreWeeklyReviewFocus = useCallback(() => {
+    if (!isWebDocumentAvailable()) return;
+    const opener = weeklyReviewOpenerRef.current;
+    weeklyReviewOpenerRef.current = null;
+    clearWeeklyReviewFocusReturn();
+    // No recorded opener means this review was opened directly from a section
+    // surface, where RN-Web's own restore already works. Leave it untouched.
+    if (!opener) return;
+    const attempt = (index: number) => {
+      const scheduleNext = () => {
+        if (index >= WEEKLY_REVIEW_FOCUS_RETURN_DELAYS_MS.length) return;
+        weeklyReviewFocusTimers.current.push(
+          setTimeout(() => attempt(index + 1), WEEKLY_REVIEW_FOCUS_RETURN_DELAYS_MS[index]),
+        );
+      };
+      // A dialog still in the document means the review is closing, not closed.
+      if (document.querySelector('[role="dialog"]')) return scheduleNext();
+      if (!focusIsStrayed(document)) return;
+      const target = weeklyReviewFocusTarget(opener, document);
+      if (!target) return;
+      target.focus();
+      scheduleNext();
+    };
+    attempt(0);
+  }, [clearWeeklyReviewFocusReturn]);
+  // Never leave a focus timer (or a stray focus call) behind a torn-down shell.
+  useEffect(() => clearWeeklyReviewFocusReturn, [clearWeeklyReviewFocusReturn]);
   // The review is a full-screen overlay stacked in the same modal layer as the
   // Plan hub and Settings drawers — opening it must dismiss those, or their
   // content paints over the review's own controls (same convention as openHabit
-  // closing Settings).
+  // closing Settings). Dismissing the hub also unmounts the control this call
+  // was invoked from, so the chain's opener is recorded for the focus return.
   const openWeeklyReview = useCallback(() => {
+    clearWeeklyReviewFocusReturn();
     setIsPlanningHubOpen(false);
     setIsSettingsOpen(false);
     setIsWeeklyReviewOpen(true);
-  }, []);
-  const closeWeeklyReview = useCallback(() => setIsWeeklyReviewOpen(false), []);
+  }, [clearWeeklyReviewFocusReturn]);
+  const closeWeeklyReview = useCallback(() => {
+    setIsWeeklyReviewOpen(false);
+    restoreWeeklyReviewFocus();
+  }, [restoreWeeklyReviewFocus]);
   const openPlanningHub = useCallback((initialView: PlanningHubView = 'today') => {
+    // Record the opener of the chain the hub may hand to the Weekly Review: the
+    // hub itself is dismissed by `openWeeklyReview`, which unmounts the review's
+    // own invoker, so this is the only control left to return focus to.
+    if (isWebDocumentAvailable()) weeklyReviewOpenerRef.current = focusedControl();
     setPlanningHubInitialView(initialView);
     setIsPlanningHubOpen(true);
   }, []);
-  const closePlanningHub = useCallback(() => setIsPlanningHubOpen(false), []);
+  const closePlanningHub = useCallback(() => {
+    // The hub was dismissed on its own (its opener is still mounted, so
+    // RN-Web's own restore handles it) — drop the chain opener so a later,
+    // independently opened review cannot return focus to a stale control.
+    weeklyReviewOpenerRef.current = null;
+    setIsPlanningHubOpen(false);
+  }, []);
   const openQuickCapture = useCallback(() => setIsQuickCaptureOpen(true), []);
   const closeQuickCapture = useCallback(() => setIsQuickCaptureOpen(false), []);
   // The achievements overlay is a full-screen modal in the same layer as
   // Settings/Plan: opening it must dismiss those so their content cannot paint
   // over its own controls (same convention as openWeeklyReview).
   const openAchievements = useCallback(() => {
+    // Also dismisses the hub, so the hub chain's focus-return opener is stale.
+    weeklyReviewOpenerRef.current = null;
     setIsSettingsOpen(false);
     setIsPlanningHubOpen(false);
     setIsQuickCaptureOpen(false);
