@@ -91,6 +91,8 @@ type Props = {
   routineId: string;
   routineName: string;
   onClose: () => void;
+  onDelete: () => void | Promise<void>;
+  deleteError: string | null;
   onStartWorkout: () => void | Promise<void>;
   onUseAsTemplate?: () => void | Promise<void>;
   onRenamed?: (name: string) => void | Promise<void>;
@@ -101,6 +103,8 @@ export function RoutineDetailModal({
   routineId,
   routineName,
   onClose,
+  onDelete,
+  deleteError,
   onStartWorkout,
   onUseAsTemplate,
   onRenamed,
@@ -551,6 +555,10 @@ export function RoutineDetailModal({
               else setManagerVisible(true);
             }}
           />
+          <View className="mt-3">
+            <ValidationError message={deleteError} />
+            <Button label="Delete routine" variant="danger" onPress={() => void onDelete()} />
+          </View>
         </View>
 
         {Platform.OS === 'web' ? (

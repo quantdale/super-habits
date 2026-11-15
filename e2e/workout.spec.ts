@@ -88,6 +88,80 @@ test.describe('Workout', () => {
     await expect(page.getByText('Leg press')).not.toBeVisible();
   });
 
+  test('routine detail Delete routine is reachable by Tab and confirms on Enter and Space', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await fillRoutineName(page, 'Keyboard routine');
+    await page.getByText('Add routine', { exact: true }).click();
+    const opener = page.getByRole('button', { name: 'Open Keyboard routine routine', exact: true });
+    await opener.click();
+    const detail = page.getByRole('dialog', { name: 'Keyboard routine', exact: true });
+    const deleteButton = detail.getByRole('button', { name: 'Delete routine', exact: true });
+
+    // Start at the sheet's close control, then walk the real Tab order.
+    await detail.getByRole('button', { name: 'Close', exact: true }).focus();
+    for (let i = 0; i < 20; i += 1) {
+      await page.keyboard.press('Tab');
+      if (await deleteButton.evaluate((el) => el === document.activeElement)) break;
+    }
+    await expect(deleteButton).toBeFocused();
+    await expect(deleteButton).toBeVisible();
+    await expect(deleteButton).toHaveCSS('outline-style', 'solid');
+    await expect(deleteButton).toHaveCSS('outline-width', '2px');
+    // The sheet springs from scale .96 to 1. Measure the settled hit target,
+    // rather than taking a single box while that entrance is still running.
+    await expect(async () => {
+      const box = await deleteButton.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+      expect(box!.width).toBeGreaterThanOrEqual(44);
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(360);
+    }).toPass({ timeout: 5_000 });
+
+    await page.keyboard.press('Enter');
+    const confirmation = page.getByRole('dialog', { name: 'Remove routine', exact: true });
+    await expect(confirmation).toBeVisible();
+    await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(confirmation).toHaveCount(0);
+    await expect(detail).toBeVisible();
+    await expect(deleteButton).toBeFocused();
+
+    // The cancelled delete left the routine live in SQLite too.
+    expect(
+      await queryRows(
+        page,
+        "SELECT deleted_at FROM workout_routines WHERE name = 'Keyboard routine'",
+      ),
+    ).toEqual([{ deleted_at: null }]);
+    await returnToApp(page);
+    await goToTab(page, 'workout');
+    await opener.click();
+    await detail.getByRole('button', { name: 'Close', exact: true }).focus();
+    for (let i = 0; i < 20; i += 1) {
+      await page.keyboard.press('Tab');
+      if (await deleteButton.evaluate((el) => el === document.activeElement)) break;
+    }
+    await expect(deleteButton).toBeFocused();
+    await page.keyboard.press('Space');
+    await expect(confirmation).toBeVisible();
+    await confirmation.getByRole('button', { name: 'Delete routine', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(opener).toHaveCount(0);
+    expect(
+      await queryRows(
+        page,
+        "SELECT deleted_at FROM workout_routines WHERE name = 'Keyboard routine'",
+      ),
+    ).toEqual([{ deleted_at: expect.any(String) }]);
+    expect(
+      await queryRows(page, "SELECT operation FROM sync_outbox WHERE entity = 'workout_routines'"),
+    ).toEqual([{ operation: 'delete' }]);
+    await returnToApp(page);
+  });
+
   test('deleting a planned routine clears its weekday instead of leaving a ghost plan', async ({
     page,
   }) => {
