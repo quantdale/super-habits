@@ -357,6 +357,74 @@ test.describe('Workout write-failure honesty', () => {
     await returnToApp(page);
   });
 
+  test('a rejected detail-sheet routine delete reports inside the sheet and retries without a reload', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await createRoutine(page, 'Sheet delete probe');
+    await createRoutine(page, 'Sheet survivor');
+    const waitForWindowToClose = await injectTransientAbort(
+      page,
+      `CREATE TRIGGER ${ROUTINE_DELETE}
+         BEFORE UPDATE ON workout_routines
+         WHEN NEW.deleted_at IS NOT NULL
+           AND CAST(strftime('%s', 'now') AS INTEGER) < __DEADLINE__
+         BEGIN SELECT RAISE(ABORT, 'routine-delete-blocked'); END;`,
+    );
+    await returnToApp(page);
+    await goToTab(page, 'workout');
+    await page
+      .getByRole('button', { name: 'Open Sheet delete probe routine', exact: true })
+      .click();
+    const detail = page.getByRole('dialog', { name: 'Sheet delete probe', exact: true });
+    const remove = detail.getByRole('button', { name: 'Delete routine', exact: true });
+    const confirmation = page.getByRole('dialog', { name: 'Remove routine', exact: true });
+    await remove.click();
+    await confirmation.getByRole('button', { name: 'Delete routine', exact: true }).click();
+
+    // The sheet stays open, with an alert beside the still-usable retry action.
+    await expect(confirmation).toHaveCount(0);
+    await expect(detail).toBeVisible();
+    await expect(detail.getByRole('alert')).toBeVisible();
+    await expect(detail.getByRole('alert')).toContainText(COPY.routineDelete);
+    await expect(remove).toBeEnabled();
+    await remove.click();
+    await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(detail.getByRole('alert')).toContainText(COPY.routineDelete);
+
+    // Preserve this React instance through recovery: a reload would hide stale
+    // errors and would not prove that the same sheet's button can retry.
+    await waitForWindowToClose();
+    await remove.click();
+    await confirmation.getByRole('button', { name: 'Delete routine', exact: true }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Open Sheet delete probe routine', exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Open Sheet survivor routine', exact: true }),
+    ).toBeVisible();
+    expect(
+      await queryRows(page, 'SELECT name, deleted_at FROM workout_routines ORDER BY name'),
+    ).toEqual([
+      { name: 'Sheet delete probe', deleted_at: expect.any(String) },
+      { name: 'Sheet survivor', deleted_at: null },
+    ]);
+    expect(
+      await queryRows(
+        page,
+        `SELECT r.name, o.operation FROM sync_outbox o
+           JOIN workout_routines r ON r.id = o.id
+          WHERE o.entity = 'workout_routines' ORDER BY r.name`,
+      ),
+    ).toEqual([
+      { name: 'Sheet delete probe', operation: 'delete' },
+      { name: 'Sheet survivor', operation: 'create' },
+    ]);
+    await returnToApp(page);
+  });
+
   test('a rejected quick log reports it, leaves today unlogged and earns no reward, then logs once on retry', async ({
     page,
   }) => {

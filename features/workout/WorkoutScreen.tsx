@@ -496,6 +496,10 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   // `workoutError` sits inside the New routine card, so it is invisible from
   // those surfaces; each of them names its own failure here instead.
   const [actionError, setActionError] = useState<string | null>(null);
+  const [routineDeleteError, setRoutineDeleteError] = useState<{
+    routineId: string;
+    message: string;
+  } | null>(null);
   // Synchronous re-entry guards for the async write paths: React state
   // updates are async, so two taps in the same tick would both pass a state
   // check and persist twice (CG-3 defect class). tryStart() is synchronous
@@ -503,6 +507,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   // the two forms never block each other.
   const createRoutineGuardRef = useRef(createSubmitGuard());
   const quickCompleteGuardRef = useRef(createSubmitGuard());
+  const deleteRoutineGuardRef = useRef(createSubmitGuard());
   const [draft, setDraft] = useState<WorkoutSessionDraft | null>(null);
   /** Finished-but-unsaved session (`AUD-SH04-A`); cleared only by save or discard. */
   const [pendingSave, setPendingSave] = useState<WorkoutPendingSave | null>(null);
@@ -669,35 +674,47 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
   };
 
   const openRoutineModal = useCallback((routineId: string, routineName: string) => {
+    setRoutineDeleteError(null);
     setRoutineModal({ routineId, routineName });
   }, []);
 
   const handleDeleteRoutine = useCallback(
-    async (routine: WorkoutRoutine) => {
-      const confirmed = await confirm({
-        title: 'Remove routine',
-        message: `Remove "${routine.name}"?`,
-        confirmLabel: 'Delete routine',
-        confirmVariant: 'danger',
-      });
-      if (!confirmed) return;
-
+    async (routine: Pick<WorkoutRoutine, 'id' | 'name'>) => {
+      if (!deleteRoutineGuardRef.current.tryStart()) return;
       try {
-        await deleteRoutine(routine.id);
-      } catch (error) {
-        // The routine is still live; report it on the landing that owns the
-        // row instead of closing the flow as if it had been removed.
-        setActionError(workoutWriteFailureCopy(error, 'Could not remove the routine. Try again.'));
-        return;
+        const confirmed = await confirm({
+          title: 'Remove routine',
+          message: `Remove "${routine.name}"?`,
+          confirmLabel: 'Delete routine',
+          confirmVariant: 'danger',
+        });
+        if (!confirmed) return;
+
+        try {
+          await deleteRoutine(routine.id);
+        } catch (error) {
+          // Keep the routine live and report the failure on both possible
+          // invoking surfaces, including the sheet above the landing.
+          const message = workoutWriteFailureCopy(
+            error,
+            'Could not remove the routine. Try again.',
+          );
+          setActionError(message);
+          setRoutineDeleteError({ routineId: routine.id, message });
+          return;
+        }
+        // Clear the previous failure only once the write landed: a retry that
+        // succeeds must not leave "Could not remove the routine" on a landing
+        // whose row is already gone.
+        setActionError(null);
+        setRoutineDeleteError(null);
+        if (routineModal?.routineId === routine.id) {
+          setRoutineModal(null);
+        }
+        await refresh();
+      } finally {
+        deleteRoutineGuardRef.current.finish();
       }
-      // Clear the previous failure only once the write landed: a retry that
-      // succeeds must not leave "Could not remove the routine" on a landing
-      // whose row is already gone.
-      setActionError(null);
-      if (routineModal?.routineId === routine.id) {
-        setRoutineModal(null);
-      }
-      await refresh();
     },
     [confirm, refresh, routineModal],
   );
@@ -1685,6 +1702,18 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         routineId={routineModal?.routineId ?? ''}
         routineName={routineModal?.routineName ?? ''}
         onClose={() => setRoutineModal(null)}
+        onDelete={() => {
+          if (!routineModal) return;
+          return handleDeleteRoutine({
+            id: routineModal.routineId,
+            name: routineModal.routineName,
+          });
+        }}
+        deleteError={
+          routineDeleteError?.routineId === routineModal?.routineId
+            ? (routineDeleteError?.message ?? null)
+            : null
+        }
         onUseAsTemplate={async () => {
           if (!routineModal) return;
           await duplicateRoutine(routineModal.routineId);
