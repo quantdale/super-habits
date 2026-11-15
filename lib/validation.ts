@@ -269,11 +269,57 @@ export function assertExerciseWrite(input: { name: string }): void {
 }
 
 export function validateSetTiming(activeSeconds: number, restSeconds: number): string | null {
+  if (!Number.isInteger(activeSeconds) || !Number.isInteger(restSeconds)) {
+    return 'Set timing must use finite whole seconds.';
+  }
   if (activeSeconds < 5) return 'Active time must be at least 5 seconds.';
   if (activeSeconds > 3600) return 'Active time cannot exceed 60 minutes.';
   if (restSeconds < 0) return 'Rest time cannot be negative.';
   if (restSeconds > 1800) return 'Rest time cannot exceed 30 minutes.';
   return null;
+}
+
+/** Validate resolved optional targets before SQLite can coerce NaN to NULL. */
+export function assertSetPrescriptionWrite(input: {
+  setNumber?: number;
+  targetRepsMin?: number | null;
+  targetRepsMax?: number | null;
+  targetLoad?: number | null;
+  targetDurationSeconds?: number | null;
+  targetDistance?: number | null;
+  targetPace?: number | null;
+}): void {
+  if (
+    input.setNumber !== undefined &&
+    (!Number.isSafeInteger(input.setNumber) || input.setNumber < 1)
+  ) {
+    throw new Error('Set number must be a positive whole number.');
+  }
+  for (const [value, label, minimum] of [
+    [input.targetRepsMin, 'Target reps minimum', 1],
+    [input.targetRepsMax, 'Target reps maximum', 1],
+    [input.targetDurationSeconds, 'Target duration', 0],
+  ] as const) {
+    if (value != null && (!Number.isSafeInteger(value) || value < minimum)) {
+      throw new Error(`${label} must be a whole number ${minimum} or greater.`);
+    }
+  }
+  for (const [value, label] of [
+    [input.targetLoad, 'Target load'],
+    [input.targetDistance, 'Target distance'],
+    [input.targetPace, 'Target pace'],
+  ] as const) {
+    if (value != null && (!Number.isFinite(value) || value < 0)) {
+      throw new Error(`${label} must be a finite number 0 or greater.`);
+    }
+  }
+  if (
+    input.targetRepsMin != null &&
+    input.targetRepsMax != null &&
+    input.targetRepsMin > input.targetRepsMax
+  ) {
+    throw new Error('Target reps minimum cannot exceed maximum reps.');
+  }
 }
 
 export function validatePomodoroSettings(

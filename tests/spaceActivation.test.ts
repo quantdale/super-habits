@@ -38,6 +38,19 @@ describe('spaceActivationDecision', () => {
     }
   });
 
+  it('only owns Enter when a nested control explicitly opts in', () => {
+    expect(spaceActivationDecision(input({ key: 'Enter', includeEnter: true }))).toBe('activate');
+    expect(
+      spaceActivationDecision(input({ key: 'Enter', includeEnter: true, disabled: true })),
+    ).toBe('swallow');
+    expect(spaceActivationDecision(input({ key: 'Enter', includeEnter: true, repeat: true }))).toBe(
+      'swallow',
+    );
+    expect(
+      spaceActivationDecision(input({ key: 'Enter', includeEnter: true, onOwnControl: false })),
+    ).toBe('ignore');
+  });
+
   it('ignores Space that landed on another control (a nested button, a link)', () => {
     expect(spaceActivationDecision(input({ onOwnControl: false }))).toBe('ignore');
     expect(spaceActivationDecision(input({ onOwnControl: false, key: 'Spacebar' }))).toBe('ignore');
@@ -235,6 +248,18 @@ describe('useSpaceActivation (web)', () => {
     expect(onActivate).not.toHaveBeenCalled();
     expect(event.defaultPrevented).toBe(false);
     expect(event.propagationStopped).toBe(false);
+  });
+
+  it('intercepts nested-checkbox Enter once so a parent cannot open its editor', async () => {
+    const onActivate = vi.fn();
+    const node = fakeNode('checkbox');
+    await mount({ role: 'checkbox', onActivate, includeEnter: true }, node);
+    const event = fire(node, keyEvent({ key: 'Enter', target: node }));
+    expect(onActivate).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(true);
+    expect(event.propagationStopped).toBe(true);
+    fire(node, keyEvent({ key: 'Enter', target: node, repeat: true }));
+    expect(onActivate).toHaveBeenCalledTimes(1);
   });
 
   it('binds on the owning control when the ref sits inside it (OptionRow)', async () => {

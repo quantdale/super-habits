@@ -9,6 +9,13 @@ export type TodoPriority = 'urgent' | 'normal' | 'low';
 
 export type TodoRecurrence = 'daily' | null;
 
+/** Canonical content for a daily series; instance edits never mutate this row. */
+export type TodoRecurrenceSeries = BaseEntity & {
+  title: string;
+  notes: string | null;
+  priority: TodoPriority;
+};
+
 export type Todo = BaseEntity & {
   title: string;
   notes: string | null;
@@ -19,6 +26,12 @@ export type Todo = BaseEntity & {
   sort_order: number;
   recurrence: TodoRecurrence;
   recurrence_id: string | null;
+  /** Original occurrence date (migration 26), not changed by one-off rescheduling. */
+  recurrence_date_key?: string | null;
+  /** A user write (or unknown legacy provenance) forbids destructive undo retraction. */
+  recurrence_touched?: 0 | 1;
+  /** Exact completion parent (migration 27); null for rollover/legacy copies. */
+  recurrence_spawned_by_id?: string | null;
   project_id: string | null;
   goal_id: string | null;
 };

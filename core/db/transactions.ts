@@ -59,15 +59,19 @@ export async function withSQLiteTransaction<T>(
   try {
     return await withSQLiteWriter(db, async () => {
       let result!: T;
+      const afterCommit: (() => void)[] = [];
       if (Platform.OS !== 'web' && typeof db.withExclusiveTransactionAsync === 'function') {
         await db.withExclusiveTransactionAsync(async (transactionDb) => {
-          result = await withSQLiteTransactionScope(transactionDb, task);
+          result = await withSQLiteTransactionScope(transactionDb, task, afterCommit);
         });
       } else {
         await db.withTransactionAsync(async () => {
-          result = await withSQLiteTransactionScope(db, task);
+          result = await withSQLiteTransactionScope(db, task, afterCommit);
         });
       }
+      // Adapter resolution means COMMIT succeeded. Publish while still owning
+      // the FIFO, before the next writer can replace the committed state.
+      for (const publish of afterCommit) publish();
       return result;
     });
   } catch (error) {

@@ -1,7 +1,21 @@
 import type * as SQLite from 'expo-sqlite';
 
 const writerTails = new WeakMap<SQLite.SQLiteDatabase, Promise<void>>();
-const transactionScopes = new WeakMap<SQLite.SQLiteDatabase, { active: boolean }>();
+const transactionScopes = new WeakMap<
+  SQLite.SQLiteDatabase,
+  { active: boolean; afterCommit: (() => void)[] }
+>();
+
+/** Publish synchronous, non-throwing cache updates only after the caller commits. */
+export function afterSQLiteCommit(db: SQLite.SQLiteDatabase, publish: () => void): void {
+  const scope = transactionScopes.get(db);
+  if (scope) {
+    assertActiveScope(scope);
+    scope.afterCommit.push(publish);
+  } else {
+    publish();
+  }
+}
 
 function assertActiveScope(scope: { active: boolean }): void {
   if (!scope.active) throw new Error('SQLite transaction capability has expired.');
@@ -43,8 +57,9 @@ export function assertSQLiteTransactionRoot(db: SQLite.SQLiteDatabase): void {
 export async function withSQLiteTransactionScope<T>(
   db: SQLite.SQLiteDatabase,
   task: (transactionDb: SQLite.SQLiteDatabase) => Promise<T>,
+  afterCommit: (() => void)[],
 ): Promise<T> {
-  const scope = { active: true };
+  const scope = { active: true, afterCommit };
   const capability = new Proxy({} as SQLite.SQLiteDatabase, {
     get(_target, property) {
       assertActiveScope(scope);

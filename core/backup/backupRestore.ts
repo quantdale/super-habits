@@ -36,12 +36,14 @@ import {
   type RemoteUserBackupSettingsRow,
 } from '@/core/backup/backup.types';
 import { validateBackupGraph, validateBackupRow } from '@/core/backup/backupValidators';
+import { projectCertifiedBackupRows } from '@/core/backup/backupProjection';
 import {
   applyRecoverableSettingsToSqlite,
   applyPendingThemeApplication,
   canonicalizeSettingsPayload,
   isValidRecoverableSettings,
   normalizeRecoverableSettings,
+  projectCertifiedRecoverableSettings,
   stagePendingThemeApplication,
 } from '@/core/backup/backupSettings';
 import type {
@@ -58,6 +60,7 @@ import type {
   RoutineExerciseSet,
   SavedMeal,
   Todo,
+  TodoRecurrenceSeries,
   WorkoutLog,
   WorkoutRoutine,
   WorkoutSessionExercise,
@@ -67,7 +70,7 @@ import type {
 } from '@/core/db/types';
 import type { LinkedActionRuleRow } from '@/core/linked-actions/linkedActions.types';
 import type { WeeklyReview } from '@/features/weekly-review/weeklyReview.types';
-import { applyRemoteTodos } from '@/features/todos/todos.data';
+import { applyRemoteTodos, applyRemoteTodoRecurrenceSeries } from '@/features/todos/todos.data';
 import { applyRemoteHabits, applyRemoteHabitCompletions } from '@/features/habits/habits.data';
 import {
   applyRemoteCalorieEntries,
@@ -107,6 +110,10 @@ export const RESTORE_IMPORTERS: readonly [
 ][] = [
   ['projects', (db, rows) => applyRemoteProjects(db, rows as Project[])],
   ['goals', (db, rows) => applyRemoteGoals(db, rows as Goal[])],
+  [
+    'todo_recurrence_series',
+    (db, rows) => applyRemoteTodoRecurrenceSeries(db, rows as TodoRecurrenceSeries[]),
+  ],
   ['todos', (db, rows) => applyRemoteTodos(db, rows as Todo[])],
   ['habits', (db, rows) => applyRemoteHabits(db, rows as Habit[])],
   ['daily_plans', (db, rows) => applyRemoteDailyPlans(db, rows as DailyPlan[])],
@@ -398,18 +405,17 @@ async function fetchPublishedGenerationRows(ownerUserId: string): Promise<{
   // The new protocol was verified above against its own frozen byte contract.
   // Adapt its verified content to the common row/graph/import pipeline; legacy
   // manifests continue using their original checksums, unchanged.
+  const generationEntities = BACKUP_ENTITIES.filter((entity) => entity in parsedManifest.entities);
+  const generationColumns = backupEntityColumnsForScope(parsedManifest.scopeVersion);
   const manifest: BackupManifest = {
     backupSchemaVersion: parsedManifest.backupSchemaVersion,
     backupScopeVersion: parsedManifest.scopeVersion,
     generation: parsedManifest.sequence,
     completedAt: parsedManifest.capturedAt,
     entityMetadata: Object.fromEntries(
-      BACKUP_ENTITIES.map((entity) => [
+      generationEntities.map((entity) => [
         entity,
-        checksumRows(
-          decoded.rowsByEntity.get(entity) ?? [],
-          backupEntityColumnsForScope(BACKUP_SCOPE_VERSION)[entity],
-        ),
+        checksumRows(decoded.rowsByEntity.get(entity) ?? [], generationColumns[entity]),
       ]),
     ),
     settingsVersion: parsedManifest.settingsVersion,
@@ -703,7 +709,8 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     }
   }
 
-  const graphErrors = validateBackupGraph(rowsByEntity);
+  const certifiedRows = projectCertifiedBackupRows(rowsByEntity, scope.entitySet, scopeColumns);
+  const graphErrors = validateBackupGraph(certifiedRows);
   if (graphErrors.length > 0) {
     return {
       status: 'invalid',
@@ -797,7 +804,10 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
       diagnostics: ['user_backup_settings payload failed runtime validation'],
     };
   }
-  const normalizedSettings = normalizeRecoverableSettings(settingsRow.payload);
+  const normalizedSettings = projectCertifiedRecoverableSettings(
+    settingsRow.payload,
+    settingsVersion,
+  );
   const historicalSettingsVersion = isHistoricalSettingsV2
     ? 2
     : isHistoricalSettingsV3
@@ -853,7 +863,7 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     // done above). Rows were runtime-validated and integrity-verified above;
     // the ordered importer table applies every scope entity exactly once.
     for (const [entity, apply] of RESTORE_IMPORTERS) {
-      await apply(transactionDb, rowsByEntity[entity] ?? []);
+      await apply(transactionDb, certifiedRows[entity] ?? []);
     }
 
     // Settings: the payload was fetched and integrity-verified ABOVE, before
@@ -896,7 +906,9 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     } else {
       await setVerifiedGenerationBaseHead(transactionDb, null);
       await recordVerifiedLegacyRestore(transactionDb, ownerUserId, {
-        rowsByEntity,
+        // Provenance must bind the same certified bytes that were imported,
+        // not unsigned future columns present in the raw legacy response.
+        rowsByEntity: certifiedRows,
         settingsPayload: normalizedSettings,
       });
     }

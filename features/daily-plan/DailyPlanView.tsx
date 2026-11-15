@@ -1,6 +1,7 @@
 import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
+import { size } from '@/core/theme/designTokens';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Button } from '@/core/ui/Button';
 import { Card } from '@/core/ui/Card';
@@ -311,8 +312,12 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Carry forward unfinished priorities from yesterday"
-          className="self-start rounded-full border px-3 py-1.5"
-          style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+          className="self-start justify-center rounded-full border px-3 py-1.5"
+          style={{
+            borderColor: tokens.border,
+            backgroundColor: tokens.surfaceElevated,
+            minHeight: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
+          }}
           onPress={() => void handleCarryForward()}
           disabled={carryingForward}
         >
@@ -549,8 +554,12 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
         accessibilityRole="button"
         accessibilityLabel={showHistory ? 'Hide plan history' : 'Show plan history'}
         accessibilityState={{ expanded: showHistory }}
-        className="self-start rounded-full border px-3 py-1.5"
-        style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
+        className="self-start justify-center rounded-full border px-3 py-1.5"
+        style={{
+          borderColor: tokens.border,
+          backgroundColor: tokens.surfaceElevated,
+          minHeight: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
+        }}
         onPress={() => setShowHistory((current) => !current)}
       >
         <Text className="text-sm" style={{ color: tokens.text }}>

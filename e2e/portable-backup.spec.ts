@@ -102,12 +102,20 @@ test.describe('Portable data export & import', () => {
     expect(file.format).toBe('superhabits-portable-backup');
     expect(file.formatVersion).toBe(2);
     expect(file.backupSchemaVersion).toBe(2);
-    // Scope V7 adds the deep Gym V2 exercise metadata while retaining the
-    // complete scope-V6 workout identity, planning, and body-weight state.
-    expect(file.backupScopeVersion).toBe(7);
+    // Scope 9 includes canonical series (8) and exact completion-spawn parents,
+    // while retaining the complete Gym V2 identity/planning/history metadata.
+    expect(file.backupScopeVersion).toBe(9);
     expect(typeof file.exportedAt).toBe('string');
     const entities = file.entities as Record<string, unknown[]>;
+    expect(Object.keys(entities)).toHaveLength(22);
     expect(entities.todos).toHaveLength(1);
+    expect(entities.todos[0]).toMatchObject({
+      title: 'Portable export todo',
+      recurrence_date_key: null,
+      recurrence_touched: 0,
+      recurrence_spawned_by_id: null,
+    });
+    expect(entities.todo_recurrence_series).toEqual([]);
     expect(entities.habits).toHaveLength(0);
     expect((file.integrity as Record<string, unknown>).payloadChecksum).toMatch(/^[0-9a-f]{64}$/);
     expect(text).not.toContain('access_token');

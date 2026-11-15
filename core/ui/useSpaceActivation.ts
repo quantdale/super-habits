@@ -24,8 +24,9 @@ import { Platform, type View } from 'react-native';
  *   nested interactive child (a real `button`, a `link`, a preview tile) keeps
  *   its own native Space handling,
  * - web-only: native has no DOM key events and needs no binding,
- * - and it does not touch `Enter` (RN-Web already resolves it) or any pointer
- *   path, so neither a key nor a pointer click can double-fire.
+ * - Enter stays with RN-Web by default; a nested control can explicitly own
+ *   Enter too so an ancestor disclosure cannot receive that key.
+ * - pointer handling is untouched.
  */
 
 /** `key` values browsers report for the space bar (`Spacebar` is legacy). */
@@ -40,6 +41,8 @@ export type SpaceActivationInput = {
   disabled: boolean;
   /** Whether the focused element is this component's own control. */
   onOwnControl: boolean;
+  /** Nested controls may also own Enter instead of an ancestor disclosure. */
+  includeEnter?: boolean;
 };
 
 /**
@@ -53,7 +56,8 @@ export type SpaceActivationDecision = 'ignore' | 'swallow' | 'activate';
 /** Pure decision table behind the hook (unit-tested in `tests/spaceActivation.test.ts`). */
 export function spaceActivationDecision(input: SpaceActivationInput): SpaceActivationDecision {
   const { key, repeat, disabled, onOwnControl } = input;
-  if (!SPACE_KEYS.has(key) || !onOwnControl) return 'ignore';
+  const activationKey = SPACE_KEYS.has(key) || (input.includeEnter === true && key === 'Enter');
+  if (!activationKey || !onOwnControl) return 'ignore';
   if (disabled || repeat) return 'swallow';
   return 'activate';
 }
@@ -85,6 +89,8 @@ export type SpaceActivationOptions = {
   /** Runs the same callback the pointer press runs. */
   onActivate: () => void;
   disabled?: boolean;
+  /** Opt in for nested checkboxes that must intercept their parent's Enter path. */
+  includeEnter?: boolean;
 };
 
 /**
@@ -98,6 +104,7 @@ export function useSpaceActivation<T extends View = View>({
   role,
   onActivate,
   disabled = false,
+  includeEnter = false,
 }: SpaceActivationOptions) {
   const ref = useRef<T>(null);
   useEffect(() => {
@@ -113,6 +120,7 @@ export function useSpaceActivation<T extends View = View>({
         key: event.key,
         repeat: event.repeat,
         disabled,
+        includeEnter,
         onOwnControl: (event.target as unknown) === control,
       });
       if (decision === 'ignore') return;

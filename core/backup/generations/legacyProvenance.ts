@@ -3,6 +3,7 @@ import { appMetaKeys, getAppMetaJsonOrDefault, setAppMetaJson } from '@/core/db/
 import {
   BACKUP_ENTITIES,
   BACKUP_ENTITY_COLUMNS,
+  KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET,
   type BackupEntity,
 } from '@/core/backup/backup.types';
 import { sha256Hex } from '@/lib/checksum';
@@ -17,10 +18,19 @@ type ContentSummary = {
 type VerifiedLegacyRestore = { ownerUserId: string; contentChecksum: string };
 
 /** Ignore generation identity/sequence, but bind EVERY recoverable content byte. */
-function contentChecksum(summary: ContentSummary): string {
+function contentChecksum(
+  summary: ContentSummary,
+  entitySet: readonly BackupEntity[] = BACKUP_ENTITIES,
+): string {
   return sha256Hex(
     JSON.stringify({
-      entities: BACKUP_ENTITIES.map((entity) => ({ entity, ...summary.entities[entity] })),
+      // A historical manifest omits tables introduced after its certified
+      // scope; restore represents those as empty. Normalize that absence on
+      // both sides of the proof without inventing signed rows or columns.
+      entities: entitySet.map((entity) => ({
+        entity,
+        ...(summary.entities[entity] ?? { rows: 0, checksum: sha256Hex('[]') }),
+      })),
       settingsChecksum: summary.settingsChecksum,
     }),
   );
@@ -101,5 +111,14 @@ export async function isVerifiedLegacyRestoreBase(
     typeof manifest[0].settingsChecksum !== 'string'
   )
     throw new Error('Legacy capture manifest is malformed; publication remains paused.');
-  return proof.contentChecksum === contentChecksum(manifest[0]);
+  if (proof.contentChecksum === contentChecksum(manifest[0])) return true;
+  // Pre-series clients persisted this proof against the frozen 21-table
+  // catalog. Preserve it only for historical captures that omit the new table;
+  // never authorize a current epoch by ignoring its recurrence-series group.
+  if (captured.capture.scope.scopeVersion > 7 || 'todo_recurrence_series' in manifest[0].entities)
+    return false;
+  return (
+    proof.contentChecksum ===
+    contentChecksum(manifest[0], KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET)
+  );
 }

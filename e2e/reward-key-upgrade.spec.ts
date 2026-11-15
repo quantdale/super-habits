@@ -2,6 +2,7 @@ import { expect, test, type Page } from './fixtures';
 import { clearDatabase } from './helpers/db';
 import { goToTab, hardReload, openNewTodoModal, submitTodoModal } from './helpers/navigation';
 import { queryRows, returnToApp, runSql } from './helpers/dbHarness';
+import { installClock } from './helpers/clock';
 
 /**
  * Upgrade compatibility for the todo reward key.
@@ -19,6 +20,10 @@ import { queryRows, returnToApp, runSql } from './helpers/dbHarness';
  */
 
 const LEVEL_LABEL = /Level 1, Starter\./;
+// This rotation has no one-task quest. Keep exact base-XP assertions independent
+// of the host day (2026-11-15 legitimately adds a 15-XP Quick win bonus).
+const TODAY = '2026-10-19';
+const YESTERDAY = '2026-10-18';
 
 async function addTodo(page: Page, title: string) {
   await openNewTodoModal(page);
@@ -29,6 +34,7 @@ async function addTodo(page: Page, title: string) {
 
 test.describe('Todo reward key upgrade compatibility', () => {
   test.beforeEach(async ({ page }) => {
+    await installClock(page, `${TODAY}T10:00:00+08:00`);
     await goToTab(page, 'todos');
     await clearDatabase(page);
     await goToTab(page, 'todos');
@@ -53,7 +59,7 @@ test.describe('Todo reward key upgrade compatibility', () => {
        DELETE FROM gamification_quests;
        INSERT INTO gamification_events (id, event_kind, source_key, date_key, xp, created_at)
        VALUES ('gxp_legacy_todo', 'todo', '${todoId}',
-               date('now', 'localtime'), 5, '2026-01-01T00:00:00.000Z');`,
+               '${TODAY}', 5, '2026-01-01T00:00:00.000Z');`,
     );
     await returnToApp(page);
 
@@ -106,7 +112,7 @@ test.describe('Todo reward key upgrade compatibility', () => {
        DELETE FROM gamification_quests;
        INSERT INTO gamification_events (id, event_kind, source_key, date_key, xp, created_at)
        VALUES ('gxp_legacy_todo', 'todo', '${todoId}',
-               date('now', 'localtime', '-1 day'), 5, '2026-01-01T00:00:00.000Z');
+               '${YESTERDAY}', 5, '2026-01-01T00:00:00.000Z');
        UPDATE todos SET completed = 0, completed_at = NULL WHERE id = '${todoId}';`,
     );
     await returnToApp(page);
@@ -133,7 +139,7 @@ test.describe('Todo reward key upgrade compatibility', () => {
     // exactly once — the two coexist without either being double-paid.
     expect(rows).toHaveLength(2);
     expect(rows[0].source_key).toBe(todoId);
-    expect(rows[1].source_key).toBe(`${await todayKey(page)}:${todoId}`);
+    expect(rows[1].source_key).toBe(`${TODAY}:${todoId}`);
 
     // A reload cannot pay today a second time.
     await hardReload(page);
@@ -144,9 +150,3 @@ test.describe('Todo reward key upgrade compatibility', () => {
     expect(afterReload).toEqual([{ n: 2 }]);
   });
 });
-
-/** Today's local date key, read from the app's own clock seam. */
-async function todayKey(page: Page): Promise<string> {
-  const [row] = await queryRows(page, `SELECT date('now', 'localtime') AS today`);
-  return row.today as string;
-}

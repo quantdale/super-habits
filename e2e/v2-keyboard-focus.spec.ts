@@ -33,13 +33,10 @@ import { seedFixture } from './helpers/seed';
  * passes across the six sections and the five overlays, and it measures the
  * indicator from the focused element's own computed paint.
  *
- * Four measured product defects are quarantined per the repo's standing
- * protocol (`docs/testing/known-gaps.md` CG-13): `test.fixme` with the
- * measurement in the note above the case, and the body kept as the *release
- * assertion*, so un-fixme-ing a case is the fix's own proof. Every other case
- * here is an ordinary active test: a new missing ring, a new hidden tab stop,
- * a new focus leak, or a newly broken Enter/Space path still fails this lane.
- * No threshold is lowered and no control is excluded.
+ * Former CG-13 is released: all measured keyboard defects now have active
+ * regression coverage. Historical measurements remain above their cases;
+ * assertion bodies, thresholds and surface coverage are unchanged. A missing
+ * ring, hidden tab stop, focus leak or broken key path still fails this lane.
  */
 
 const VIEWPORT = { width: 390, height: 844 } as const;
@@ -320,7 +317,7 @@ test('Tab never lands on an aria-hidden or inert control on the six sections', a
   }
 });
 
-// Quarantined defect (CG-13 in `docs/testing/known-gaps.md`). Measured
+// Released former CG-13 regression. Historical RED measurements:
 // 2026-11-10 at 390x844 light and dark, `TYPICAL` fixture:
 //
 //   To Do     14 stops, every swipe action parked at left -9790/-9706
@@ -335,8 +332,8 @@ test('Tab never lands on an aria-hidden or inert control on the six sections', a
 // those actions is the row's `More actions for <task>` menu; the fix is to keep
 // the swipe actions out of the tab order (`tabIndex={-1}` / `aria-hidden`)
 // until the row is revealed. The body below is the release assertion (same
-// walk, same thresholds, same fixture): un-fixme-ing it is the fix's own proof.
-test.fixme('Tab never lands on an offscreen gesture-only control', async ({ page }) => {
+// walk, same thresholds, same fixture), now active after the repair.
+test('Tab never lands on an offscreen gesture-only control', async ({ page }) => {
   test.setTimeout(420_000);
   await prepare(page);
 
@@ -475,7 +472,7 @@ test('Settings, Command Center, quick capture and the Planning Hub return focus 
   await prepare(page);
 
   // The Weekly Review is covered by its own case below: at 390px it opens from
-  // the hub, which the review dismisses (see the CG-13 entry).
+  // the hub, which the review dismisses before opening the review.
   const returning: OverlayName[] = ['settings', 'command', 'quick-capture', 'hub'];
   for (const theme of ['light', 'dark'] as const) {
     await setTheme(page, theme);
@@ -496,7 +493,7 @@ test('Settings, Command Center, quick capture and the Planning Hub return focus 
   }
 });
 
-// Quarantined defect (CG-13 in `docs/testing/known-gaps.md`). Measured
+// Released former CG-13 regression. Historical RED measurements:
 // 2026-11-10 at 390x844 light and dark: the hub's Progress view is the only
 // shipped path to the Weekly Review at phone width. `openWeeklyReview`
 // (`core/providers/NavigationProvider.tsx`) deliberately dismisses the hub
@@ -614,7 +611,7 @@ test('a section-rail tab and a segmented tab activate on Enter', async ({ page }
   );
 });
 
-// Quarantined defect (CG-13 in `docs/testing/known-gaps.md`). Measured
+// Released former CG-13 regression. Historical RED measurements:
 // 2026-11-10 at 390x844 light and dark: Space does nothing on every
 // `role="tab"`/`role="radio"` Pressable. RN-Web's `PressResponder`
 // (`isValidKeyPress`) accepts Enter for any role but Space only for
@@ -630,9 +627,8 @@ test('a section-rail tab and a segmented tab activate on Enter', async ({ page }
 // Owning lane: `app/index.tsx` (TabButton), `core/ui/SegmentedControl.tsx`
 // (SegmentOptionButton) and `core/ui/OptionRow.tsx` — the fix is the same
 // "bind Space for non-button roles" contract those two files already implement.
-// The body below is the release assertion; un-fixme-ing it is the fix's own
-// proof.
-test.fixme('Space activates tab-shaped and picker controls like a click', async ({ page }) => {
+// The unchanged release assertion below now runs as an active regression.
+test('Space activates tab-shaped and picker controls like a click', async ({ page }) => {
   test.setTimeout(300_000);
   await prepare(page);
 
@@ -712,7 +708,7 @@ test('Space selects an OptionRow picker row and closes the sheet', async ({ page
   await expect(presets, 'Space selects the preset row and closes the sheet').toHaveCount(0);
 });
 
-// Quarantined defect (CG-13 in `docs/testing/known-gaps.md`). Measured
+// Released former CG-13 regression. Historical RED measurements:
 // 2026-11-10 at 390x844 light and dark: the To Do row's completion checkbox is
 // nested inside the row's own `Pressable` (`features/todos/TodoItem.tsx`:
 // `accessibilityLabel="Edit task: …"`, `accessibilityRole="button"`), and RN-Web
@@ -737,7 +733,7 @@ test('Space selects an OptionRow picker row and closes the sheet', async ({ page
 // before the walk. The SQLite oracle runs ONCE after the loop because
 // `queryRows` navigates the page into the DB-harness document and would
 // otherwise destroy the app state the second iteration needs.
-test.fixme('Enter and Space complete a to-do from its completion checkbox', async ({ page }) => {
+test('Enter and Space complete a to-do from its completion checkbox', async ({ page }) => {
   test.setTimeout(300_000);
   await prepare(page);
   await showSection(page, 'todos');

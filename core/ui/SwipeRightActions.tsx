@@ -1,17 +1,28 @@
 import { Text } from '@/core/ui/Text';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { radius } from '@/core/theme/designTokens';
+import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 
 type Props = {
   onEdit: () => void;
   onDelete: () => void;
   editColor: string;
   compact?: boolean;
+  /** Closed gesture panels must not expose offscreen web tab stops. */
+  visible?: boolean;
 };
 
-export function SwipeRightActions({ onEdit, onDelete, editColor, compact }: Props) {
+export function SwipeRightActions({
+  onEdit,
+  onDelete,
+  editColor,
+  compact,
+  visible = false,
+}: Props) {
   const { tokens } = useAppTheme();
+  const editFocus = useKeyboardFocusRing(tokens.accent);
+  const deleteFocus = useKeyboardFocusRing(tokens.accent);
   const btnWidth = compact ? 56 : 80;
   const actionStyle = {
     justifyContent: 'center' as const,
@@ -45,7 +56,11 @@ export function SwipeRightActions({ onEdit, onDelete, editColor, compact }: Prop
         onPress={onEdit}
         accessibilityRole="button"
         accessibilityLabel="Edit item"
-        style={[actionStyle, { backgroundColor: editColor }]}
+        tabIndex={Platform.OS === 'web' ? (visible ? 0 : -1) : undefined}
+        aria-hidden={Platform.OS === 'web' ? !visible : undefined}
+        onFocus={editFocus.onFocus}
+        onBlur={editFocus.onBlur}
+        style={[actionStyle, { backgroundColor: editColor }, editFocus.focusRingStyle]}
       >
         <Text variant="label" style={{ color: tokens.textOnAccent }}>
           Edit
@@ -55,7 +70,11 @@ export function SwipeRightActions({ onEdit, onDelete, editColor, compact }: Prop
         onPress={onDelete}
         accessibilityRole="button"
         accessibilityLabel="Delete item"
-        style={[actionStyle, { backgroundColor: tokens.dangerSolid }]}
+        tabIndex={Platform.OS === 'web' ? (visible ? 0 : -1) : undefined}
+        aria-hidden={Platform.OS === 'web' ? !visible : undefined}
+        onFocus={deleteFocus.onFocus}
+        onBlur={deleteFocus.onBlur}
+        style={[actionStyle, { backgroundColor: tokens.dangerSolid }, deleteFocus.focusRingStyle]}
       >
         <Text variant="label" style={{ color: tokens.textOnAccent }}>
           Delete

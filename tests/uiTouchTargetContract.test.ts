@@ -59,18 +59,22 @@ describe('V3 compact control touch targets', () => {
     expect(source).toMatch(/const inactive = disabled \|\| loading;/);
   });
 
-  it('PillChip face stays 40 with vertical hitSlop reaching 44', () => {
+  it('PillChip preserves native 40 plus slop and exposes a real 44px web face', () => {
     const source = read('PillChip.tsx');
-    expect(source).toMatch(/minHeight: 40/);
+    const tokensSource = readFileSync(join(CORE_UI, '..', 'theme', 'designTokens.ts'), 'utf8');
+    expect(tokensSource).toMatch(/webTouchTargetMin:\s*44/);
+    expect(source).toMatch(/minHeight:\s*Platform\.OS === 'web' \? size\.webTouchTargetMin : 40/);
+    expect(source).toMatch(
+      /minWidth:\s*Platform\.OS === 'web' \? size\.webTouchTargetMin : undefined/,
+    );
     expect(source).toMatch(/hitSlop=\{\{\s*top:\s*2,\s*bottom:\s*2\s*\}\}/);
   });
 
-  it('SegmentedControl segments stay 36 by default with vertical-only hitSlop reaching 44', () => {
+  it('SegmentedControl preserves native 36 plus slop with real web geometry from its model', () => {
     const source = read('SegmentedControl.tsx');
-    // CG-12: the face height is no longer a literal — it is the model's
-    // DEFAULT (36, so the tray stays the 40pt V3 §6 tray) unless a caller
-    // explicitly opts up. Both halves are pinned, so the default cannot drift
-    // and the opt-in cannot bypass the clamp.
+    // Native retains its compact geometry. The model resolves every web
+    // caller to at least 44px (behavior pinned by segmentedControlSizing),
+    // and the component must apply that resolved height to the real target.
     expect(readFileSync(join(CORE_UI, 'segmentedControl.model.ts'), 'utf8')).toMatch(
       /DEFAULT_SEGMENT_MIN_HEIGHT\s*=\s*36/,
     );

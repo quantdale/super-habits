@@ -367,7 +367,7 @@ describe('Gym V2 durable model', () => {
           "SELECT value FROM app_meta WHERE key = 'db_schema_version'",
         )
       )?.value,
-    ).toBe('25');
+    ).toBe('27');
     expect(
       await db.getFirstAsync<{
         catalog_exercise_id: string;

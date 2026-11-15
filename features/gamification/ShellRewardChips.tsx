@@ -1,10 +1,10 @@
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { REWARD_HUES } from '@/constants/sectionColors';
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Text } from '@/core/ui/Text';
 import { FlameIcon, XpBoltIcon } from '@/core/ui/illustrations/icons';
-import { radius, spacing } from '@/core/theme/designTokens';
+import { radius, size, spacing } from '@/core/theme/designTokens';
 import { useGamification } from './gamificationContext';
 
 /**
@@ -35,7 +35,7 @@ export function ShellRewardChips() {
         onPress={openAchievements}
         hitSlop={{ top: 6, bottom: 6 }}
         style={{
-          height: 32,
+          height: Platform.OS === 'web' ? size.webTouchTargetMin : 32,
           borderRadius: radius.full,
           borderWidth: 2,
           borderColor: REWARD_HUES.streak.bright,
@@ -56,7 +56,7 @@ export function ShellRewardChips() {
         onPress={openAchievements}
         hitSlop={{ top: 6, bottom: 6 }}
         style={{
-          height: 32,
+          height: Platform.OS === 'web' ? size.webTouchTargetMin : 32,
           borderRadius: radius.full,
           borderWidth: 2,
           borderColor: REWARD_HUES.accent.bright,

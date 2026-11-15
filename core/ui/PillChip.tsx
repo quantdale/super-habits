@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Animated, Pressable } from 'react-native';
+import { Animated, Platform, Pressable } from 'react-native';
 import { Text } from '@/core/ui/Text';
 import { useAppTheme } from '@/core/providers/themeContext';
-import { radius, spacing, springs, typography } from '@/core/theme/designTokens';
+import { radius, size, spacing, springs, typography } from '@/core/theme/designTokens';
 import { readableAccent, tintOver } from '@/core/theme/contrast';
 import { useReducedMotion } from '@/core/theme/motion';
 
@@ -24,9 +24,8 @@ export type ChipProps = Props;
  * `chipBackground`/`chipBorder` so a row of inactive chips stops competing
  * with content.
  *
- * The visible face stays at the W4.5 touch-contract 40pt minimum (the §6
- * 32px pill cannot shrink below the repo's 44pt hit contract without slop
- * games on web, where `hitSlop` does not expand the DOM hit box).
+ * Native retains its 40pt face plus hitSlop. Web uses a real 44px DOM face,
+ * because react-native-web does not expand hit boxes through hitSlop.
  *
  * Chips hug their content and never exceed their container width: inside a
  * wrapping row a long label wraps instead of overflowing or truncating
@@ -80,7 +79,8 @@ export function Chip({ label, accessibilityLabel, active, color, onPress, icon }
           borderWidth: 2,
           paddingHorizontal: spacing.md + 2,
           paddingVertical: spacing.xs + 2,
-          minHeight: 40,
+          minHeight: Platform.OS === 'web' ? size.webTouchTargetMin : 40,
+          minWidth: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
           maxWidth: '100%',
           flexDirection: 'row',
           alignItems: 'center',

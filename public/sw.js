@@ -133,7 +133,11 @@ self.addEventListener('activate', (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
+        Promise.all(
+          keys
+            .filter((key) => key.startsWith('superhabits-shell-') && key !== CACHE_NAME)
+            .map((key) => caches.delete(key)),
+        ),
       )
       .then(() => self.clients.claim()),
   );
@@ -156,24 +160,28 @@ self.addEventListener('fetch', (event) => {
   // fetch stack directly (including Playwright's route interception).
   if (url.origin !== self.location.origin) return;
 
-  event.respondWith(
+  let cacheWrite = Promise.resolve();
+  const response = (async () => {
     // Explicit cacheName: during the install/waiting window two generations
-    // coexist; searching only our own cache keeps responses version-consistent
-    // instead of depending on cache creation order (audit AREA 9 F7).
-    caches.match(event.request, { cacheName: CACHE_NAME }).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request)
-        .then((response) => {
-          // Never cache error pages (e.g. old Vercel 404 for /todos); they stick until cache bump.
-          if (response.ok) {
-            const cloned = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, cloned).catch(() => Promise.resolve());
-            });
-          }
-          return response;
-        })
-        .catch(() => cached ?? fetch(event.request));
-    }),
-  );
+    // coexist; searching only our own cache keeps responses version-consistent.
+    // Cache Storage can be unavailable (quota/private mode); that must not
+    // prevent an otherwise usable network response.
+    const cached = await caches
+      .match(event.request, { cacheName: CACHE_NAME })
+      .catch(() => undefined);
+    if (cached) return cached;
+    const fetched = await fetch(event.request);
+    // Never cache error pages. Cache writes are best-effort but must remain
+    // alive after the response is delivered, including opening Cache Storage.
+    if (fetched.ok) {
+      const cloned = fetched.clone();
+      cacheWrite = caches
+        .open(CACHE_NAME)
+        .then((cache) => cache.put(event.request, cloned))
+        .catch(() => undefined);
+    }
+    return fetched;
+  })();
+  event.respondWith(response);
+  event.waitUntil(response.then(() => cacheWrite).catch(() => undefined));
 });

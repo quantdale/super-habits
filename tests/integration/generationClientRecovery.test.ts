@@ -8,8 +8,9 @@ import {
   BACKUP_ENTITIES,
   BACKUP_SCOPE_VERSION,
   BACKUP_SETTINGS_VERSION,
+  KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET,
 } from '@/core/backup/backup.types';
-import { checksumRows } from '@/lib/checksum';
+import { checksumRows, sha256Hex } from '@/lib/checksum';
 import {
   BACKUP_REQUEST_BYTES,
   GENERATION_PAYLOAD_BYTES,
@@ -26,6 +27,7 @@ function remote() {
   let failPublish = false;
   let capabilities = true;
   let capabilityProtocol = 2;
+  let capabilityScope = BACKUP_SCOPE_VERSION;
   let failManifestRead = false;
   let raceNextPublish = false;
   let loseAcknowledgement = false;
@@ -33,7 +35,10 @@ function remote() {
   const client = {
     rpc: vi.fn(async (name: string, args: Record<string, unknown> = {}) => {
       if (!capabilities) return { data: null, error: { message: 'missing capability RPC' } };
-      if (name === 'backup_generation_capabilities' && capabilityProtocol !== 2) {
+      if (
+        name === 'backup_generation_capabilities' &&
+        (capabilityProtocol !== 2 || capabilityScope !== BACKUP_SCOPE_VERSION)
+      ) {
         return {
           data: {
             protocol_version: capabilityProtocol,
@@ -41,7 +46,7 @@ function remote() {
             content_verification_version: 1,
             sequence_reservation_version: 1,
             backup_schema_version: 2,
-            scope_version: 7,
+            scope_version: capabilityScope,
             settings_version: 5,
           },
           error: null,
@@ -150,6 +155,9 @@ function remote() {
     setCapabilityProtocol: (value: number) => {
       capabilityProtocol = value;
     },
+    setCapabilityScope: (value: number) => {
+      capabilityScope = value;
+    },
     setFailManifestRead: (value: boolean) => {
       failManifestRead = value;
     },
@@ -200,7 +208,9 @@ async function seedLegacy(
   const { backupEntityColumnsForScope } = await import('@/core/backup/backup.types');
   const payload = await readRecoverableSettings(db as never);
   const entityMetadata: Record<string, unknown> = {};
-  for (const entity of BACKUP_ENTITIES) {
+  const entities =
+    scope === BACKUP_SCOPE_VERSION ? BACKUP_ENTITIES : KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET;
+  for (const entity of entities) {
     const rows = await db.getAllAsync<Record<string, unknown>>(
       `SELECT * FROM ${entity} ORDER BY id`,
     );
@@ -239,6 +249,219 @@ const todoRecord = {
 };
 
 describe('review R3: actual capture → publication → restore contracts', () => {
+  it.each(['restore', 'cutover'] as const)(
+    'does not apply unsigned future settings during legacy %s',
+    async (mode) => {
+      const target = remote();
+      const source = await device(target.client);
+      await seedLegacy(source, target, 7);
+      const { normalizeRecoverableSettings, canonicalizeSettingsPayload } =
+        await import('@/core/backup/backupSettings');
+      const settingsRow = target.tables.get('user_backup_settings')![0];
+      const settings = normalizeRecoverableSettings(settingsRow.payload);
+      settings.workoutPreferences = {
+        effortScale: 'rir',
+        goalWeight: { value: 75, unit: 'kg' },
+        workoutReminder: { enabled: true, time: { hour: 9, minute: 30 } },
+      };
+      settingsRow.payload = settings;
+      settingsRow.settings_version = 2;
+      const manifest = target.tables.get('backup_manifest')![0];
+      manifest.settings_version = 2;
+      manifest.settings_metadata = {
+        version: 2,
+        checksum: canonicalizeSettingsPayload(settings, { settingsVersion: 2 }),
+      };
+      if (mode === 'restore') {
+        await source.closeAsync();
+        const recovered = await device(target.client, false);
+        const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+        const outcome = await restoreFromRemoteBackupV2();
+        const { appMetaKeys } = await import('@/core/db/appMeta');
+        const persisted = await recovered.getFirstAsync(
+          'SELECT value FROM app_meta WHERE key = ?',
+          [appMetaKeys.workoutPreferences.key],
+        );
+        await recovered.closeAsync();
+        expect(outcome.status, JSON.stringify(outcome)).toBe('restored');
+        expect(persisted).toBeNull();
+      } else {
+        await source.runAsync("UPDATE todos SET title='Local divergence'");
+        const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+        await expect(new SupabaseSyncAdapter().push([todoRecord])).rejects.toThrow(
+          /conflict|review/i,
+        );
+        const head = target.generations.heads.get('user_a')!;
+        const chunk = [...target.generations.chunks.values()].find(
+          (row) => row.snapshot_id === head.snapshot_id && row.entity === 'user_backup_settings',
+        )!;
+        const preserved = normalizeRecoverableSettings(JSON.parse(String(chunk.payload)));
+        await source.closeAsync();
+        expect(preserved.workoutPreferences).toBeNull();
+      }
+    },
+  );
+
+  it('refuses Scope-7 write capability before publishing or mutating remote content', async () => {
+    const target = remote();
+    target.setCapabilityScope(7);
+    const db = await device(target.client);
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    await expect(new SupabaseSyncAdapter().push([todoRecord])).rejects.toThrow(
+      /current backup migrations/,
+    );
+    expect(target.writes).toEqual([]);
+    expect(target.generations.heads.size).toBe(0);
+    await db.closeAsync();
+  });
+
+  it('preserves only certified legacy fields during immutable generation cutover', async () => {
+    const target = remote();
+    const db = await device(target.client);
+    await db.runAsync(`INSERT INTO custom_exercises(id,name,description,primary_area,secondary_areas,equipment,modality,created_at,updated_at,deleted_at)
+      VALUES('cex_1','Legacy exercise',NULL,'chest','[]',NULL,'weighted_strength','2026-10-18T00:00:00.000Z','2026-10-18T00:00:00.000Z',NULL)`);
+    await seedLegacy(db, target, 6);
+    const mutable = target.tables.get('custom_exercises')![0];
+    mutable.aliases = '["Not certified by Scope 6"]';
+    mutable.instructions = 'Changed after the certified recovery point';
+    await db.runAsync("UPDATE todos SET title='Local divergence'");
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    await expect(new SupabaseSyncAdapter().push([todoRecord])).rejects.toThrow(/conflict|review/i);
+    const head = target.generations.heads.get('user_a')!;
+    const chunk = [...target.generations.chunks.values()].find(
+      (row) => row.snapshot_id === head.snapshot_id && row.entity === 'custom_exercises',
+    )!;
+    const rows: Record<string, unknown>[] = JSON.parse(String(chunk.payload));
+    expect(rows[0].name).toBe('Legacy exercise');
+    expect(rows[0].aliases).toBeUndefined();
+    expect(rows[0].instructions).toBeUndefined();
+    await db.closeAsync();
+  });
+
+  it('restores canonical recurring content and original occurrence dates before spawning', async () => {
+    const target = remote();
+    const source = await device(target.client, false);
+    const todos = await import('@/features/todos/todos.data');
+    const id = await todos.addTodo({
+      title: 'Canonical series',
+      notes: 'Series notes',
+      priority: 'normal',
+      dueDate: '2050-01-01',
+      recurrence: 'daily',
+    });
+    await todos.updateTodo(id, {
+      title: 'Only this copy',
+      notes: 'One-off notes',
+      priority: 'urgent',
+      dueDate: '2050-01-08',
+    });
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    const queued = await source.getAllAsync<import('@/core/sync/sync.engine').SyncRecord>(
+      'SELECT entity, id, updated_at AS updatedAt, operation, owner_user_id AS ownerUserId, revision FROM sync_outbox ORDER BY revision',
+    );
+    await new SupabaseSyncAdapter().push(queued);
+    expect(target.tables.get('todo_recurrence_series')).toHaveLength(1);
+    await source.closeAsync();
+
+    const recovered = await device(target.client, false);
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    const outcome = await restoreFromRemoteBackupV2();
+    expect(outcome.status, JSON.stringify(outcome)).toBe('restored');
+    expect(await recovered.getAllAsync('SELECT id FROM sync_outbox')).toEqual([]);
+    const restoredTodos = await import('@/features/todos/todos.data');
+    await restoredTodos.completeTodo(id);
+    expect(
+      await recovered.getFirstAsync(
+        'SELECT title, notes, priority, due_date FROM todos WHERE id <> ? AND deleted_at IS NULL',
+        [id],
+      ),
+    ).toEqual({
+      title: 'Canonical series',
+      notes: 'Series notes',
+      priority: 'normal',
+      due_date: '2050-01-02',
+    });
+
+    // A second generation must retain pristine provenance so recovery does not
+    // turn an untouched follow-up into an edited row that undo cannot retract.
+    const { SupabaseSyncAdapter: NextAdapter } = await import('@/core/sync/supabase.adapter');
+    await new NextAdapter().push(
+      await recovered.getAllAsync<import('@/core/sync/sync.engine').SyncRecord>(
+        'SELECT entity, id, updated_at AS updatedAt, operation, owner_user_id AS ownerUserId, revision FROM sync_outbox ORDER BY revision',
+      ),
+    );
+    await recovered.closeAsync();
+    const recoveredAgain = await device(target.client, false);
+    const { restoreFromRemoteBackupV2: restoreAgain } = await import('@/core/backup/backupRestore');
+    expect((await restoreAgain()).status).toBe('restored');
+    const finalTodos = await import('@/features/todos/todos.data');
+    await finalTodos.setTodoCompletionState(id, 0);
+    expect(
+      await recoveredAgain.getAllAsync(
+        'SELECT id FROM todos WHERE id <> ? AND deleted_at IS NULL',
+        [id],
+      ),
+    ).toEqual([]);
+    await recoveredAgain.closeAsync();
+  });
+
+  it('retains exact overdue-spawn undo through two cloud recoveries across timezones', async () => {
+    const target = remote();
+    let current: TestDatabase | undefined;
+    const pending = (database: TestDatabase) =>
+      database.getAllAsync<import('@/core/sync/sync.engine').SyncRecord>(
+        'SELECT entity, id, updated_at AS updatedAt, operation, owner_user_id AS ownerUserId, revision FROM sync_outbox ORDER BY revision',
+      );
+    try {
+      vi.stubEnv('TZ', 'Asia/Manila');
+      vi.setSystemTime(new Date('2026-11-15T01:30:00.000Z'));
+      current = await device(target.client, false);
+      const sourceTodos = await import('@/features/todos/todos.data');
+      const id = await sourceTodos.addTodo({
+        title: 'Cloud travel undo',
+        recurrence: 'daily',
+        dueDate: '2026-11-01',
+      });
+      await sourceTodos.completeTodo(id);
+      const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+      await new SupabaseSyncAdapter().push(await pending(current));
+      await current.closeAsync();
+      current = undefined;
+
+      vi.stubEnv('TZ', 'Pacific/Honolulu');
+      current = await device(target.client, false);
+      const firstRestore = await import('@/core/backup/backupRestore');
+      expect((await firstRestore.restoreFromRemoteBackupV2()).status).toBe('restored');
+      expect(await current.getAllAsync('SELECT id FROM sync_outbox')).toEqual([]);
+      const firstTodos = await import('@/features/todos/todos.data');
+      await firstTodos.setTodoCompletionState(id, 0);
+      expect(
+        await current.getAllAsync('SELECT id FROM todos WHERE id<>? AND deleted_at IS NULL', [id]),
+      ).toEqual([]);
+      vi.setSystemTime(new Date('2026-11-15T02:30:00.000Z'));
+      await firstTodos.completeTodo(id);
+      const nextAdapter = await import('@/core/sync/supabase.adapter');
+      await new nextAdapter.SupabaseSyncAdapter().push(await pending(current));
+      await current.closeAsync();
+      current = undefined;
+
+      vi.stubEnv('TZ', 'Asia/Manila');
+      current = await device(target.client, false);
+      const secondRestore = await import('@/core/backup/backupRestore');
+      expect((await secondRestore.restoreFromRemoteBackupV2()).status).toBe('restored');
+      expect(await current.getAllAsync('SELECT id FROM sync_outbox')).toEqual([]);
+      const secondTodos = await import('@/features/todos/todos.data');
+      await secondTodos.setTodoCompletionState(id, 0);
+      expect(
+        await current.getAllAsync('SELECT id FROM todos WHERE id<>? AND deleted_at IS NULL', [id]),
+      ).toEqual([]);
+    } finally {
+      await current?.closeAsync();
+      vi.unstubAllEnvs();
+      vi.useRealTimers();
+    }
+  });
+
   it.each(['user_backup_settings', 'backup_manifest'])(
     'refuses over-budget synthetic %s uploads while preserving the published point',
     async (entity) => {
@@ -387,12 +610,19 @@ describe('review R3: actual capture → publication → restore contracts', () =
     },
   );
 
-  it.each(['unchanged', 'changed remotely', 'other owner'] as const)(
-    'continues from a verified legacy restore only for the same owner and %s baseline',
-    async (scenario) => {
+  it.each(
+    [6, 7, BACKUP_SCOPE_VERSION].flatMap((scope) =>
+      (['unchanged', 'changed remotely', 'other owner'] as const).map((scenario) => ({
+        scope,
+        scenario,
+      })),
+    ),
+  )(
+    'continues from a verified legacy restore for Scope $scope, same owner and $scenario baseline',
+    async ({ scope, scenario }) => {
       const target = remote();
       const source = await device(target.client);
-      await seedLegacy(source, target);
+      await seedLegacy(source, target, scope);
       await source.closeAsync();
       const db = await device(target.client, false);
       const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
@@ -400,12 +630,15 @@ describe('review R3: actual capture → publication → restore contracts', () =
       await db.runAsync("UPDATE todos SET title='Edit after legacy restore'");
       if (scenario === 'changed remotely') {
         target.tables.get('todos')![0].title = 'Newer legacy remote';
-        const { BACKUP_ENTITY_COLUMNS } = await import('@/core/backup/backup.types');
+        const { backupEntityColumnsForScope } = await import('@/core/backup/backup.types');
         const metadata = target.tables.get('backup_manifest')![0].entity_metadata as Record<
           string,
           unknown
         >;
-        metadata.todos = checksumRows(target.tables.get('todos')!, BACKUP_ENTITY_COLUMNS.todos);
+        metadata.todos = checksumRows(
+          target.tables.get('todos')!,
+          backupEntityColumnsForScope(scope).todos,
+        );
       }
       if (scenario === 'other owner') {
         const { appMetaKeys, getAppMetaJson, setAppMetaJson } = await import('@/core/db/appMeta');
@@ -437,6 +670,56 @@ describe('review R3: actual capture → publication → restore contracts', () =
         );
         expect(target.tables.get('todos')?.[0].title).toBe(
           scenario === 'changed remotely' ? 'Newer legacy remote' : 'Original',
+        );
+      }
+      await db.closeAsync();
+    },
+  );
+
+  it.each([6, 7, BACKUP_SCOPE_VERSION])(
+    'recognizes pre-series legacy proof only for historical Scope %s',
+    async (scope) => {
+      const target = remote();
+      const source = await device(target.client);
+      await seedLegacy(source, target, scope);
+      await source.closeAsync();
+      const db = await device(target.client, false);
+      const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+      expect((await restoreFromRemoteBackupV2()).status).toBe('restored');
+      const { readVerifiedLegacySnapshot } = await import('@/core/backup/legacySnapshot');
+      const legacy = await readVerifiedLegacySnapshot(target.client as never, 'user_a');
+      expect(legacy).not.toBeNull();
+      const { captureVerifiedRows } = await import('@/core/backup/generations/capture');
+      const captured = captureVerifiedRows({ ownerUserId: 'user_a', ...legacy! });
+      const [manifest] = JSON.parse(captured.capture.manifest) as {
+        entities: Record<string, { rows: number; checksum: string }>;
+        settingsChecksum: string;
+      }[];
+      // Exact pre-series durable proof encoding (21 entities). The current
+      // source epoch must never be authorized by dropping its 22nd group.
+      const { setAppMetaJson, appMetaKeys } = await import('@/core/db/appMeta');
+      await setAppMetaJson(db as never, appMetaKeys.backupVerifiedLegacyRestore, {
+        ownerUserId: 'user_a',
+        contentChecksum: sha256Hex(
+          JSON.stringify({
+            entities: KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET.map((entity) => ({
+              entity,
+              ...manifest.entities[entity],
+            })),
+            settingsChecksum: manifest.settingsChecksum,
+          }),
+        ),
+      });
+      await db.runAsync("UPDATE todos SET title='Edit after older-client restore'");
+      const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+      const pushing = new SupabaseSyncAdapter().push([todoRecord]);
+      if (scope <= 7) {
+        await expect(pushing).resolves.toBeUndefined();
+        expect(target.tables.get('todos')?.[0].title).toBe('Edit after older-client restore');
+      } else {
+        await expect(pushing).rejects.toThrow(/conflict|review/i);
+        expect(target.writes.filter((entity) => !entity.startsWith('backup_generation'))).toEqual(
+          [],
         );
       }
       await db.closeAsync();

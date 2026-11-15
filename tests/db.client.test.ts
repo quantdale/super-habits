@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 type MockDatabase = {
   execAsync: ReturnType<typeof vi.fn>;
-  runAsync: ReturnType<typeof vi.fn>;
-  getAllAsync: ReturnType<typeof vi.fn>;
+  runAsync: ReturnType<typeof vi.fn<(sql: string, args?: unknown[]) => Promise<void>>>;
+  getAllAsync: ReturnType<typeof vi.fn<(sql: string) => Promise<Record<string, unknown>[]>>>;
   getFirstAsync: ReturnType<typeof vi.fn>;
   closeAsync: ReturnType<typeof vi.fn>;
   withTransactionAsync: ReturnType<typeof vi.fn>;
@@ -457,10 +457,10 @@ describe('core/db/client', () => {
   it('wraps each pending migration in a transaction and none when up to date', async () => {
     const pending = await loadDbClient({ schemaVersion: '9' });
     await pending.client.getDatabase();
-    // v10 through v25 are outstanding -> one transaction per version block.
-    expect(pending.db.withTransactionAsync).toHaveBeenCalledTimes(16);
+    // v10 through v27 are outstanding -> one transaction per version block.
+    expect(pending.db.withTransactionAsync).toHaveBeenCalledTimes(18);
 
-    const upToDate = await loadDbClient({ schemaVersion: '25' });
+    const upToDate = await loadDbClient({ schemaVersion: '27' });
     await upToDate.client.getDatabase();
     expect(upToDate.db.withTransactionAsync).not.toHaveBeenCalled();
   });
@@ -532,7 +532,7 @@ describe('core/db/client', () => {
         String(sql).includes('INSERT OR REPLACE INTO app_meta') &&
         Array.isArray(args) &&
         args[0] === 'db_schema_version' &&
-        args[1] === '25',
+        args[1] === '27',
     );
     expect(versionBump).toBeDefined();
   });
@@ -542,7 +542,13 @@ describe('core/db/client', () => {
     const db = buildDb('8');
     db.getAllAsync.mockImplementation(async (sql: string) => {
       if (String(sql).includes('PRAGMA table_info(todos)')) {
-        return [{ name: 'recurrence' }, { name: 'recurrence_id' }];
+        return [
+          { name: 'recurrence' },
+          { name: 'recurrence_id' },
+          { name: 'recurrence_date_key' },
+          { name: 'recurrence_touched' },
+          { name: 'recurrence_spawned_by_id' },
+        ];
       }
       return [];
     });

@@ -1,5 +1,5 @@
-import { useRef, type ReactNode } from 'react';
-import { type StyleProp, View, type ViewStyle } from 'react-native';
+import { useRef, useState, type ReactNode } from 'react';
+import { Platform, type StyleProp, View, type ViewStyle } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Card } from './Card';
@@ -26,6 +26,7 @@ const STRIP_WIDTH = 4;
 export function SwipeableCard({ children, accentColor, style, compact, onEdit, onDelete }: Props) {
   const { tokens } = useAppTheme();
   const swipeableRef = useRef<Swipeable>(null);
+  const [actionsVisible, setActionsVisible] = useState(false);
   const stripColor = accentColor ?? tokens.border;
 
   const handleEdit = () => {
@@ -42,12 +43,15 @@ export function SwipeableCard({ children, accentColor, style, compact, onEdit, o
     <Card variant="standard" className="mb-0 overflow-hidden" innerClassName="p-0" style={style}>
       <Swipeable
         ref={swipeableRef}
+        onSwipeableWillOpen={Platform.OS === 'web' ? () => setActionsVisible(true) : undefined}
+        onSwipeableWillClose={Platform.OS === 'web' ? () => setActionsVisible(false) : undefined}
         renderRightActions={() => (
           <SwipeRightActions
             editColor={accentColor ?? tokens.textMuted}
             onEdit={handleEdit}
             onDelete={handleDelete}
             compact={compact}
+            visible={actionsVisible}
           />
         )}
         rightThreshold={40}

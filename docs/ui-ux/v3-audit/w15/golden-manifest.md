@@ -69,6 +69,41 @@ needs masking and no pixel tolerance is granted.
 in-flight states (Focus running, active workout session) which are covered by
 their behavioural specs rather than frozen screenshots.
 
+## Linux corpus reconciliation — 2026-11-15
+
+See [the Linux per-capture review](../../../audit/LINUX_VISUAL_BASELINE_REVIEW_2026-11-15.md)
+for all30 original/actual/diff dispositions. Exactly28 reviewed genuine Ubuntu
+captures align the actual44px controls, canonical recurrence fixtures and A31
+long-title capture repair. Focus and Habits already compare exactly and remain
+unchanged. Missing-emoji-font captures were rejected and corrected using CI's
+font prerequisites, never adopted. No Windows image is used as a Linux golden.
+Normal strict34-case comparisons on the rebuilt A33 shell, not update mode,
+are the acceptance evidence; thresholds/masks/readiness/negative controls remain.
+
+| Date       | Corpus                      | Source                                                                            | Reason / review                                                                                                    |
+| ---------- | --------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 2026-11-15 | Win32,30 captures           | b98d2d88 + preserved audit WIP; sha-3d8184a2d1d3ac9c                              | Per-image Playful Momentum/44px/fixture reconciliation, A31 capture repair; two34/34 strict comparisons.           |
+| 2026-11-15 | Linux,28 changes/2 retained | Same WIP, Ubuntu24.04.4, Chromium147/revision1217; final A33 sha-15d364b4a1d6db79 | Per-image44px/canonical fixture/capture alignment; CI font prerequisites; strict repeat proof tracked in ExecPlan. |
+
+## Windows corpus reconciliation — 2026-11-15
+
+The deferred Windows corpus is now reconciled to the shipped **Playful
+Momentum** design, canonical recurrence fixtures and real 44px web controls.
+See [the per-capture review](../../../audit/WINDOWS_VISUAL_BASELINE_REVIEW_2026-11-15.md)
+for all 30 dispositions, preserved original hashes, source revision and test
+proof. Each old Windows / existing Linux-reference / actual Windows triple
+was inspected; Linux PNGs were neither copied nor changed during this Windows
+stage. The separately reviewed Linux stage above uses genuine Linux captures. The long-title
+capture also fixes a demonstrated scroll-normalization defect: its entire
+named row must be in the viewport immediately before comparison.
+
+Source: base `b98d2d88` plus the preserved repository-remediation working tree,
+hermetic web revision `sha-3d8184a2d1d3ac9c`, Windows Chromium/scale 1. This is
+agent per-image review, not Michael's separate P22 design sign-off or Linux/
+native certification. Strict `maxDiffPixels: 0`, no masks, the fixed clock,
+required font/section readiness and all four negative controls remain intact.
+Normal comparison runs, not snapshot-update mode, are the acceptance evidence.
+
 ## Baseline change log
 
 | Date       | Snapshot(s)                                                                                                                                                                                                  | Source                                                       | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Review                                                                                                                                                                                                                                                                                                                                                                                                          |

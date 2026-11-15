@@ -19,7 +19,7 @@ async function metaValue(db: CorpusDb, key: string): Promise<string | null> {
 // CG-9: backfilling a ~9k-row corpus issues thousands of durable outbox
 // writes; correctness is not a timing contract.
 describe('corpus backfill from the edge marker', { timeout: 120_000 }, () => {
-  it('runs the scope-6 MATURE corpus forward to scope 7 exactly once', async () => {
+  it('runs the scope-6 MATURE corpus forward to scope 9 exactly once', async () => {
     const db = await seedMature();
     expect(await metaValue(db, 'backup.scope_version')).toBe('6');
 
@@ -32,11 +32,12 @@ describe('corpus backfill from the edge marker', { timeout: 120_000 }, () => {
 
     const { ensureBackupBackfill } = await import('@/core/backup/backupBackfill');
     expect(await ensureBackupBackfill()).toBe('running');
-    expect(await metaValue(db, 'backup.scope_version')).toBe('7');
+    expect(await metaValue(db, 'backup.scope_version')).toBe('9');
 
     // The mature volume is covered: spot-check entity presence in the outbox.
     for (const entity of [
       'todos',
+      'todo_recurrence_series',
       'habits',
       'habit_completions',
       'calorie_entries',

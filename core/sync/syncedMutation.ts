@@ -1,8 +1,9 @@
 import type * as SQLite from 'expo-sqlite';
 import {
   getCachedLocalDatasetOwner,
-  getCachedOwnerBindingProvisional,
+  getLocalDatasetOwner,
   inspectLocalAccountDataState,
+  readImportOriginFingerprint,
   primeLocalDatasetOwner,
   promoteLocalDatasetOwnerIfProvisional,
   setLocalDatasetOwner,
@@ -39,15 +40,31 @@ export type SyncedMutationOutcome<T> = {
  * local data to a wrong account, which is the exact outcome this check exists
  * to prevent.
  */
-export async function resolveSyncOwnerUserId(db: SQLite.SQLiteDatabase): Promise<string | null> {
-  let sessionUserId: string | null = null;
+async function readSessionOwnerCandidate(): Promise<string | null> {
+  // getSession can wait for Auth initialization/refresh. An established local
+  // owner needs no session evidence to keep writing offline; the transaction
+  // still rechecks durable ownership before assigning any intent.
+  const owner = getCachedLocalDatasetOwner();
+  if (typeof owner === 'string' && owner.length > 0) return owner;
   try {
-    sessionUserId = await getSupabaseSessionUserId();
+    return await getSupabaseSessionUserId();
   } catch {
-    sessionUserId = null;
+    return null;
   }
+}
 
-  const existingOwnerUserId = getCachedLocalDatasetOwner();
+export async function resolveSyncOwnerUserId(db: SQLite.SQLiteDatabase): Promise<string | null> {
+  return resolveLocalSyncOwner(db, await readSessionOwnerCandidate());
+}
+
+/** No auth calls: safe to recheck against the committing transaction. */
+async function resolveLocalSyncOwner(
+  db: SQLite.SQLiteDatabase,
+  sessionUserId: string | null,
+  knownOwner?: string | null,
+): Promise<string | null> {
+  const existingOwnerUserId =
+    knownOwner === undefined ? await getLocalDatasetOwner(db) : knownOwner;
   if (typeof existingOwnerUserId === 'string' && existingOwnerUserId.length > 0) {
     return existingOwnerUserId;
   }
@@ -55,9 +72,15 @@ export async function resolveSyncOwnerUserId(db: SQLite.SQLiteDatabase): Promise
   // may not be pristine, so it must be proven before a session owner is adopted.
   try {
     const local = await inspectLocalAccountDataState(db);
+    if (local.ownerBinding) return local.ownerBinding;
     if (local.hasUserData || local.pendingOutboxCount > 0) {
       return null;
     }
+    // A settings-only import has no entity rows, but its protected origin is
+    // still ownership evidence. A cached session is not verified recovery:
+    // leave intents unowned until the coordinator binds the source account.
+    // The unreadable-origin sentinel also fails closed here.
+    if ((await readImportOriginFingerprint(db)) !== null) return null;
   } catch {
     return null;
   }
@@ -79,11 +102,20 @@ export async function runBackupMutation<T>(input: {
     enqueue: (record: SyncRecord) => void,
   ) => Promise<SyncedMutationOutcome<T>>;
 }): Promise<SyncedMutationOutcome<T>> {
-  const ownerUserId = await resolveSyncOwnerUserId(input.db);
-  const existingOwnerUserId = getCachedLocalDatasetOwner();
-  const canPersistOwner = ownerUserId !== null;
+  const sessionOwnerCandidate = await readSessionOwnerCandidate();
+  let ownerUserId: string | null = null;
+  let existingOwnerUserId: string | null = null;
   const preparedRecords: PreparedSyncRecord[] = [];
   const outcome = await withSQLiteTransaction(input.db, async (transactionDb) => {
+    // The writer may have queued behind an import or account reconciliation.
+    // Refresh from durable state and resolve BEFORE the mutation, on the same
+    // transaction that commits its rows and intents; never trust a stale cache.
+    existingOwnerUserId = await getLocalDatasetOwner(transactionDb);
+    ownerUserId = await resolveLocalSyncOwner(
+      transactionDb,
+      sessionOwnerCandidate,
+      existingOwnerUserId,
+    );
     const enqueue = (record: SyncRecord): void => {
       const { ownerUserId: _ignored, ...bare } = record;
       const prepared = syncEngine.prepare(ownerUserId ? { ...bare, ownerUserId } : bare);
@@ -102,15 +134,13 @@ export async function runBackupMutation<T>(input: {
       );
     }
     if (result.changed) {
-      if (!existingOwnerUserId && ownerUserId && canPersistOwner) {
+      if (!existingOwnerUserId && ownerUserId) {
         await setLocalDatasetOwner(transactionDb, ownerUserId);
       }
       // First meaningful content durably claims the dataset: a provisional
       // anonymous binding becomes permanent in the same transaction as the
       // write, so later activity can never re-open account replacement.
-      if (getCachedOwnerBindingProvisional() === true) {
-        await promoteLocalDatasetOwnerIfProvisional(transactionDb);
-      }
+      await promoteLocalDatasetOwnerIfProvisional(transactionDb);
       for (const prepared of preparedRecords) {
         await upsertSyncOutboxRecord(transactionDb, prepared, prepared.revision);
       }
@@ -128,7 +158,7 @@ export async function runBackupMutation<T>(input: {
   });
 
   if (outcome.changed) {
-    if (!existingOwnerUserId && ownerUserId && canPersistOwner) {
+    if (!existingOwnerUserId && ownerUserId) {
       primeLocalDatasetOwner(ownerUserId);
     }
     for (const prepared of preparedRecords) {
@@ -215,12 +245,15 @@ async function persistSettingsOutboxInTransaction(
   ownerUserId: string | null,
   settingsSnapshot: SettingsCaptureSnapshot,
 ): Promise<PreparedSyncRecord> {
+  // Snapshot capture may have preceded an import. Resolve the owner again
+  // against durable state at the write boundary, just like entity mutations.
+  const committedOwnerUserId = await resolveLocalSyncOwner(transactionDb, ownerUserId);
   const record = {
     entity: 'user_backup_settings',
     id: BACKUP_SETTINGS_RECORD_ID,
     updatedAt: nowIso(),
     operation: 'update' as const,
-    ...(ownerUserId ? { ownerUserId } : {}),
+    ...(committedOwnerUserId ? { ownerUserId: committedOwnerUserId } : {}),
   };
   const prepared = syncEngine.prepare(record);
   await setAppMetaJson(transactionDb, appMetaKeys.backupPendingSettings, {
@@ -265,7 +298,7 @@ export async function runRecoverableSettingsMutation<T>(input: {
   db: SQLite.SQLiteDatabase;
   mutate: (transactionDb: SQLite.SQLiteDatabase) => Promise<T> | T;
 }): Promise<RecoverableSettingsWriteResult<T>> {
-  const ownerUserId = await resolveSyncOwnerUserId(input.db);
+  const ownerUserId = await readSessionOwnerCandidate();
   let prepared: PreparedSyncRecord | null = null;
   const value = await withSQLiteTransaction(input.db, async (transactionDb) => {
     const result = await input.mutate(transactionDb);

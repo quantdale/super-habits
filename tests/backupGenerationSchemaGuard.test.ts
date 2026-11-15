@@ -109,6 +109,7 @@ describe('backup generation protocol schema guard (hermetic mutation suite)', ()
 
   // ---- Mandatory negative family 1: missing RLS (per table) ---------------
   for (const table of [
+    'todo_recurrence_series',
     'backup_generation',
     'backup_generation_chunk',
     'backup_generation_head',
@@ -129,6 +130,98 @@ describe('backup generation protocol schema guard (hermetic mutation suite)', ()
       }
     });
   }
+
+  it('FAILS when the current private verifier loses its own search_path pin', () => {
+    const { root, script } = makeFixture();
+    try {
+      mutateFile(root, '_add_recoverable_todo_recurrence', (source) =>
+        source.replace('SECURITY DEFINER SET search_path = pg_catalog', 'SECURITY DEFINER'),
+      );
+      const result = runValidator(script);
+      expect(result.ok).toBe(false);
+      expect(result.output).toMatch(/must pin search_path/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('FAILS when the Scope-9 private verifier loses its own search_path pin', () => {
+    const { root, script } = makeFixture();
+    try {
+      mutateFile(root, '_add_recurring_spawn_provenance', (source) =>
+        source.replace('SECURITY DEFINER SET search_path = pg_catalog', 'SECURITY DEFINER'),
+      );
+      const result = runValidator(script);
+      expect(result.ok).toBe(false);
+      expect(result.output).toMatch(/must pin search_path/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    [
+      'column migration',
+      'ADD COLUMN IF NOT EXISTS recurrence_spawned_by_id TEXT',
+      'ADD COLUMN IF NOT EXISTS unrelated_column TEXT',
+      /spawn column migration/,
+    ],
+    [
+      'historical metadata fence',
+      "scope_version < 9 AND v_entity = 'todos'",
+      "scope_version < 8 AND v_entity = 'todos'",
+      /spawn old-scope metadata fence/,
+    ],
+    [
+      'parent graph',
+      "RAISE EXCEPTION 'missing or self completion-spawn parent'",
+      "RAISE EXCEPTION 'missing relationship'",
+      /spawn exact parent graph/,
+    ],
+  ] as const)('FAILS when Scope-9 loses its %s', (_label, needle, replacement, errorPattern) => {
+    const { root, script } = makeFixture();
+    try {
+      mutateFile(root, '_add_recurring_spawn_provenance', (source) =>
+        source.replace(needle, replacement),
+      );
+      const result = runValidator(script);
+      expect(result.ok).toBe(false);
+      expect(result.output).toMatch(errorPattern);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('FAILS when the series table loses its TRUNCATE-closing privilege reset', () => {
+    const { root, script } = makeFixture();
+    try {
+      mutateFile(root, '_add_recoverable_todo_recurrence', (source) =>
+        source.replace(/REVOKE ALL PRIVILEGES ON TABLE public\.todo_recurrence_series[^;]*;/, ''),
+      );
+      const result = runValidator(script);
+      expect(result.ok).toBe(false);
+      expect(result.output).toMatch(/recurrence privilege reset is missing/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('FAILS when a recurring-series owner predicate is widened', () => {
+    const { root, script } = makeFixture();
+    try {
+      mutateFile(root, '_add_recoverable_todo_recurrence', (source) =>
+        source.replace(
+          'USING ((SELECT auth.uid()) = user_id);',
+          'USING ((SELECT auth.uid()) = user_id OR true);',
+        ),
+      );
+      const result = runValidator(script);
+      expect(result.ok).toBe(false);
+      expect(result.output).toMatch(/strict/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 
   // ---- Mandatory negative family 2: blanket access ------------------------
   it('FAILS when a blanket generation policy is introduced', () => {

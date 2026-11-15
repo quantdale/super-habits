@@ -142,7 +142,7 @@ async function setupAdapter(options: AdapterSetupOptions) {
             content_verification_version: 1,
             sequence_reservation_version: 1,
             backup_schema_version: 2,
-            scope_version: 7,
+            scope_version: 9,
             settings_version: 5,
           },
           error: null,

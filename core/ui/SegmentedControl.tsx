@@ -30,7 +30,7 @@ type SegmentOptionProps<T extends string> = {
   active: boolean;
   /** Accent used for the keyboard focus ring. */
   ringColor: string;
-  /** Resolved face height; 36 (the V3 default) unless a caller opted up. */
+  /** Resolved face height: native 36, web at least 44 actual CSS pixels. */
   segmentMinHeight: number;
   onSelect: (value: T) => void;
 };
@@ -111,18 +111,15 @@ type SegmentedControlProps<T extends string> = {
   /**
    * Opt up to a taller segment FACE, so the real DOM hit area (not `hitSlop`,
    * which react-native-web never applies — `docs/testing/known-gaps.md` CG-12)
-   * reaches >= 44 CSS px on web. Omitted (every caller but Focus today) → 36pt
-   * faces in a 40pt tray, pixel-identical to V3 §6. Clamped to 52 and ignored
-   * off-web by `resolveSegmentMinHeight`; values <= 36 are the default.
+   * reaches >= 44 CSS px on web. Defaults to a real 44px web face; a taller
+   * request is clamped to 52. Native retains the 36pt face plus hitSlop.
    */
   minSegmentHeight?: number;
 };
 
 /**
- * Segmented control (V3): a compact sunken tray (36pt segments) with a solid
- * pill that *slides* between options, so switching modes reads as physical
- * motion rather than a repaint. Pop's 48pt tray made every mode switch a
- * dominant surface; V3 keeps it quiet.
+ * Segmented control: a quiet sunken tray with a solid sliding pill. Native
+ * retains 36pt faces; web faces reach the actual 44px hit-area floor.
  *
  * Accessibility contract (unchanged from the previous implementation):
  * - group announces its `accessibilityLabel` (role `tablist`);
@@ -141,8 +138,7 @@ export function SegmentedControl<T extends string>({
   const { tokens } = useAppTheme();
   const reducedMotion = useReducedMotion();
   const resolvedAccent = accentColor ?? tokens.primary;
-  // Web-only layout tier: off-web (and for every default caller) this is the
-  // untouched 36pt V3 face.
+  // Real web hit geometry; native retains its compact 36pt V3 face.
   const segmentMinHeight = resolveSegmentMinHeight({
     minSegmentHeight,
     isWeb: Platform.OS === 'web',

@@ -7,6 +7,7 @@ import {
   KNOWN_HISTORICAL_BACKUP_SCOPE_V3_ENTITY_SET,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET,
+  KNOWN_HISTORICAL_BACKUP_SCOPE_V8_ENTITY_SET,
   resolveBackupScope,
 } from '@/core/backup/backup.types';
 
@@ -151,7 +152,8 @@ describe('resolveBackupScope epoch matrix', () => {
 
   it('falls back to exact entity-set matching when no explicit scope version exists', () => {
     for (const [expected, set] of [
-      [BACKUP_SCOPE_VERSION, BACKUP_ENTITIES],
+      // The same 22 entity names cannot certify the new Scope-9 columns.
+      [8, KNOWN_HISTORICAL_BACKUP_SCOPE_V8_ENTITY_SET],
       [4, KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET],
       [3, KNOWN_HISTORICAL_BACKUP_SCOPE_V3_ENTITY_SET],
       [2, KNOWN_HISTORICAL_BACKUP_SCOPE_V2_ENTITY_SET],

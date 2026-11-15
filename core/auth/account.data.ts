@@ -2,6 +2,7 @@ import type * as SQLite from 'expo-sqlite';
 import { appMetaKeys, getAppMetaText, setAppMetaText } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
 import { withSQLiteTransaction } from '@/core/db/transactions';
+import { afterSQLiteCommit, withSQLiteWriter } from '@/core/db/sqliteWriter';
 import {
   ACCOUNT_USER_TABLES,
   type AccountUserTable,
@@ -16,6 +17,7 @@ import {
 
 const TABLES_WITH_DELETED_AT = new Set<AccountUserTable>([
   'todos',
+  'todo_recurrence_series',
   'habits',
   'workout_routines',
   'routine_exercises',
@@ -63,10 +65,13 @@ async function countTable(
 }
 
 export async function getLocalDatasetOwner(db: SQLite.SQLiteDatabase): Promise<string | null> {
-  const value = await getAppMetaText(db, appMetaKeys.accountOwnerUserId);
-  cachedLocalDatasetOwner = typeof value === 'string' ? value : null;
-  await primeOwnerBindingProvisionalCache(db);
-  return cachedLocalDatasetOwner;
+  return withSQLiteWriter(db, async () => {
+    const value = await getAppMetaText(db, appMetaKeys.accountOwnerUserId);
+    const owner = typeof value === 'string' ? value : null;
+    const provisional = await getLocalDatasetOwnerProvisional(db);
+    afterSQLiteCommit(db, () => primeLocalDatasetOwner(owner, provisional));
+    return owner;
+  });
 }
 
 export function getCachedLocalDatasetOwner(): string | null | undefined {
@@ -88,10 +93,6 @@ export function primeLocalDatasetOwner(owner: string | null, provisional = false
   cachedOwnerBindingProvisional = provisional;
 }
 
-async function primeOwnerBindingProvisionalCache(db: SQLite.SQLiteDatabase): Promise<void> {
-  cachedOwnerBindingProvisional = await getLocalDatasetOwnerProvisional(db);
-}
-
 export async function setLocalDatasetOwner(
   db: SQLite.SQLiteDatabase,
   userId: string,
@@ -102,7 +103,7 @@ export async function setLocalDatasetOwner(
   }
   await setAppMetaText(db, appMetaKeys.accountOwnerUserId, userId);
   await setAppMetaText(db, appMetaKeys.accountOwnerBindingState, 'permanent');
-  primeLocalDatasetOwner(userId, false);
+  afterSQLiteCommit(db, () => primeLocalDatasetOwner(userId, false));
 }
 
 /**
@@ -118,7 +119,7 @@ export async function clearLocalDatasetOwner(db: SQLite.SQLiteDatabase): Promise
     appMetaKeys.accountOwnerUserId.key,
     appMetaKeys.accountOwnerBindingState.key,
   ]);
-  primeLocalDatasetOwner(null, false);
+  afterSQLiteCommit(db, () => primeLocalDatasetOwner(null, false));
 }
 
 /**
@@ -218,6 +219,18 @@ export async function bindLocalDatasetOwner(
     if (!message.includes('no transaction is active')) {
       throw error;
     }
+    // The message alone cannot distinguish a post-commit driver error from
+    // a real rollback. Only accept the cosmetic case when durable state proves
+    // the complete binding/adoption landed.
+    const local = await inspectLocalAccountDataState(db);
+    if (
+      local.ownerBinding !== userId ||
+      local.ownerBindingProvisional ||
+      (options.adoptUnownedOutbox &&
+        (local.unownedOutboxCount > 0 || local.outboxOwnerIds.some((owner) => owner !== userId)))
+    ) {
+      throw error;
+    }
   }
   primeLocalDatasetOwner(userId, false);
 }
@@ -240,7 +253,7 @@ export async function bindProvisionalLocalDatasetOwner(
   }
   await setAppMetaText(db, appMetaKeys.accountOwnerUserId, userId);
   await setAppMetaText(db, appMetaKeys.accountOwnerBindingState, 'provisional');
-  primeLocalDatasetOwner(userId, true);
+  afterSQLiteCommit(db, () => primeLocalDatasetOwner(userId, true));
 }
 
 /**
@@ -250,9 +263,6 @@ export async function bindProvisionalLocalDatasetOwner(
 export async function promoteLocalDatasetOwnerIfProvisional(
   db: SQLite.SQLiteDatabase,
 ): Promise<void> {
-  if (cachedOwnerBindingProvisional !== true) {
-    return;
-  }
   const owner = await getLocalDatasetOwner(db);
   if (!owner) {
     return;
@@ -260,7 +270,7 @@ export async function promoteLocalDatasetOwnerIfProvisional(
   if ((await getLocalDatasetOwnerProvisional(db)) === true) {
     await setAppMetaText(db, appMetaKeys.accountOwnerBindingState, 'permanent');
   }
-  primeLocalDatasetOwner(owner, false);
+  afterSQLiteCommit(db, () => primeLocalDatasetOwner(owner, false));
 }
 
 /**
@@ -306,7 +316,7 @@ export async function replaceProvisionalLocalDatasetOwner(
     appMetaKeys.accountOwnerBindingState,
     options.keepProvisional ? 'provisional' : 'permanent',
   );
-  primeLocalDatasetOwner(userId, options.keepProvisional === true);
+  afterSQLiteCommit(db, () => primeLocalDatasetOwner(userId, options.keepProvisional === true));
 }
 
 export async function inspectLocalAccountDataState(

@@ -59,6 +59,10 @@ const { syncEngine } = vi.hoisted(() => ({
 // behaviour itself is covered by its own test.
 vi.mock('@/core/auth/account.data', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/core/auth/account.data')>()),
+  // Ownership rechecks have their own real-SQLite coverage; do not consume
+  // this feature fixture's order-sensitive todo query results.
+  getLocalDatasetOwner: vi.fn(async () => null),
+  readImportOriginFingerprint: vi.fn(async () => null),
   inspectLocalAccountDataState: vi.fn(async () => ({
     hasUserData: false,
     pendingOutboxCount: 0,
@@ -258,7 +262,19 @@ describe('features/todos/todos.data', () => {
       withTransactionAsync: async (task: () => Promise<void>) => {
         await task();
       },
-      getFirstAsync: vi.fn(),
+      getFirstAsync: vi.fn(async (sql: string) =>
+        sql.includes('FROM todo_recurrence_series')
+          ? {
+              id: 'rec_1',
+              title: 'Daily review',
+              notes: null,
+              priority: 'normal',
+              created_at: '2026-04-16T10:00:00.000Z',
+              updated_at: '2026-04-16T10:00:00.000Z',
+              deleted_at: null,
+            }
+          : null,
+      ),
       runAsync: vi.fn().mockResolvedValue({ changes: 0 }),
     };
     getDatabase.mockResolvedValue(db);
@@ -300,7 +316,15 @@ describe('features/todos/todos.data', () => {
       expect.stringContaining('INSERT INTO todos'),
       expect.arrayContaining(['rec_1', '2026-04-17']),
     );
-    expect(syncEngine.enqueuePrepared).toHaveBeenCalledTimes(1);
+    expect(syncEngine.enqueuePrepared).toHaveBeenCalledTimes(2);
+    expect(syncEngine.enqueuePrepared).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entity: 'todo_recurrence_series',
+        id: 'rec_1',
+        operation: 'create',
+      }),
+      { durablyPersisted: true },
+    );
     expect(syncEngine.enqueuePrepared).toHaveBeenCalledWith(
       {
         entity: 'todos',
@@ -970,6 +994,7 @@ describe('bulk todo operations', () => {
           return null;
         }),
         runAsync: vi.fn(async (sql: string, args: unknown[]) => {
+          void sql;
           void args;
           events.push('insert');
           return { changes: 1 };
@@ -1038,7 +1063,12 @@ describe('bulk todo operations', () => {
       );
       expect(inserts).toHaveLength(3);
       expect(inserts.map((call) => call[1][5])).toEqual([6, 7, 8]);
-      expect(syncEngine.enqueuePrepared).toHaveBeenCalledTimes(3);
+      expect(syncEngine.enqueuePrepared).toHaveBeenCalledTimes(6);
+      expect(
+        syncEngine.prepare.mock.calls.filter(
+          ([record]) => record.entity === 'todo_recurrence_series',
+        ),
+      ).toHaveLength(3);
     });
   });
 

@@ -18,8 +18,8 @@ Read this before writing any code that touches the database or data layer.
 
 ## Schema version
 
-- Current stored version: **25** (`app_meta.db_schema_version`)
-- Next migration number: **26** (add `if (version < 26) { ... }` in `runMigrations()` in `core/db/client.ts` when a schema change lands)
+- Current stored version: **27** (`app_meta.db_schema_version`)
+- Next migration number: **28** (add `if (version < 28) { ... }` in `runMigrations()` in `core/db/client.ts` when a schema change lands)
 - Migrations are append-only `if (version < N)` blocks inside `runMigrations()` in `core/db/client.ts` — there are no numbered migration files. `core/db/migrations/` holds only a Supabase reference SQL (`001_initial_supabase.sql`), never runtime code.
 - schema.sql is a partial REFERENCE ONLY snapshot — not executed at runtime; bootstrap DDL plus migrations are authoritative
 - To add a column or table: add a new migration block only; never alter past `if (version < N)` blocks or the bootstrap DDL in place
@@ -32,7 +32,7 @@ created_at: string — ISO 8601 UTC via nowIso()
 updated_at: string — ISO 8601 UTC via nowIso()
 deleted_at: string | null — null = active, non-null = soft deleted
 
-Exported shapes include: **Todo**, **Habit**, **HabitCompletion**, **PomodoroSession**, **WorkoutRoutine**, **WorkoutLog**, **RoutineExercise**, **RoutineExerciseSet**, **WorkoutSessionExercise**, **CalorieEntry**, **SavedMeal** (and related unions such as **TodoPriority**, **TodoRecurrence**, **HabitCategory**, **HabitIcon**). Runtime metadata keys (e.g. `db_schema_version`) live in the **app_meta** table, not as a TS export.
+Exported shapes include: **Todo**, **TodoRecurrenceSeries**, **Habit**, **HabitCompletion**, **PomodoroSession**, **WorkoutRoutine**, **WorkoutLog**, **RoutineExercise**, **RoutineExerciseSet**, **WorkoutSessionExercise**, **CalorieEntry**, **SavedMeal** (and related unions such as **TodoPriority**, **TodoRecurrence**, **HabitCategory**, **HabitIcon**). Runtime metadata keys (e.g. `db_schema_version`) live in the **app_meta** table, not as a TS export.
 
 ## Soft delete rule
 
@@ -81,7 +81,7 @@ cutover used UTC calendar dates; no automatic backfill.
 ## Adding a new table
 
 1. Add TypeScript type to core/db/types.ts (extending BaseEntity where appropriate)
-2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 26) { ... }` — bump N+1 when the version advances)
+2. Add DDL in a **new** migration block in `core/db/client.ts` (next: `if (version < 28) { ... }` — bump N+1 when the version advances)
 3. Create features/{name}/{name}.data.ts with CRUD functions
 4. Every function: getDatabase() → soft delete for deletes → enqueue sync (where applicable)
 5. Add unit tests for domain functions in tests/

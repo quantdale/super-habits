@@ -359,6 +359,8 @@ export const size = {
   iconXl: 32,
   /** Minimum frequent touch target (WCAG/HIG guidance). */
   touchTargetMin: 48,
+  /** Minimum actual web DOM hit box; RN Web does not apply native hitSlop. */
+  webTouchTargetMin: 44,
   /** Standard button height (compact md size). */
   buttonHeight: 44,
   /** Large button height (primary screen-level actions). */

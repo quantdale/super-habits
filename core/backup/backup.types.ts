@@ -18,7 +18,9 @@ export const BACKUP_SETTINGS_VERSION = 5;
  * Bumped from 5 → 6 for Gym V2 custom exercises, weekly plan entries, date
  * overrides, and body-weight entries plus extended workout prescriptions.
  * Bumped from 6 → 7 for durable exercise metadata and unilateral/external-load
- * snapshots.
+ * snapshots. Scope 8 adds canonical recurring-series content and independent
+ * occurrence-date/edit provenance. Scope 9 adds exact completion-spawn parent
+ * identity; frozen Scope-7/8 columns remain recoverable.
  *
  * Scope is deliberately distinct from `BACKUP_SCHEMA_VERSION`: the row *shape*
  * stayed compatible (new columns are nullable), so the schema version did not
@@ -26,7 +28,7 @@ export const BACKUP_SETTINGS_VERSION = 5;
  *
  * Local marker: when `backup.scope_version` is below this, backfill runs.
  */
-export const BACKUP_SCOPE_VERSION = 7;
+export const BACKUP_SCOPE_VERSION = 9;
 
 /**
  * Every locally durable, user-owned table in the recoverable backup scope,
@@ -60,6 +62,7 @@ export const BACKUP_ENTITIES = [
   'workout_weekly_plan',
   'workout_schedule_overrides',
   'body_weight_entries',
+  'todo_recurrence_series',
 ] as const;
 
 export type BackupEntity = (typeof BACKUP_ENTITIES)[number];
@@ -82,6 +85,15 @@ export const BACKUP_MANIFEST_RECORD_ID = 'manifest';
 
 /** Fixed canonical column order per entity (local schema order; user_id excluded). */
 export const BACKUP_ENTITY_COLUMNS: Record<BackupEntity, readonly string[]> = {
+  todo_recurrence_series: [
+    'id',
+    'title',
+    'notes',
+    'priority',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
   todos: [
     'id',
     'title',
@@ -98,6 +110,9 @@ export const BACKUP_ENTITY_COLUMNS: Record<BackupEntity, readonly string[]> = {
     'project_id',
     'goal_id',
     'completed_at',
+    'recurrence_date_key',
+    'recurrence_touched',
+    'recurrence_spawned_by_id',
   ],
   habits: [
     'id',
@@ -802,8 +817,47 @@ export const BACKUP_SCOPE_V6_ENTITY_COLUMNS: Partial<Record<BackupEntity, readon
   ],
 };
 
+/** Frozen Scope 7: before independent recurring-series state. */
+export const KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET = [
+  ...KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET,
+  'custom_exercises',
+  'workout_weekly_plan',
+  'workout_schedule_overrides',
+  'body_weight_entries',
+] as const;
+export const BACKUP_SCOPE_V7_ENTITY_COLUMNS: Partial<Record<BackupEntity, readonly string[]>> = {
+  todos: [
+    'id',
+    'title',
+    'notes',
+    'completed',
+    'due_date',
+    'priority',
+    'sort_order',
+    'recurrence',
+    'recurrence_id',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+    'project_id',
+    'goal_id',
+    'completed_at',
+  ],
+};
+
+/** Frozen Scope 8: independent series, before exact completion-spawn links. */
+export const KNOWN_HISTORICAL_BACKUP_SCOPE_V8_ENTITY_SET = [
+  ...KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET,
+  'todo_recurrence_series',
+] as const;
+export const BACKUP_SCOPE_V8_ENTITY_COLUMNS: Partial<Record<BackupEntity, readonly string[]>> = {
+  todos: [...BACKUP_SCOPE_V7_ENTITY_COLUMNS.todos!, 'recurrence_date_key', 'recurrence_touched'],
+};
+
 /** Scope immediately before the deep-expansion metadata columns. */
-export const KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET = [...BACKUP_ENTITIES] as const;
+export const KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET = [
+  ...KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET,
+] as const;
 
 /** Current (deep-expanded Gym V2) recoverable scope epoch. */
 export const CURRENT_BACKUP_SCOPE_ENTITY_SET = BACKUP_ENTITIES;
@@ -828,21 +882,35 @@ export function resolveBackupScope(input: {
   backupScopeVersion?: number | null;
   entityMetadata: Partial<Record<BackupEntity, unknown>>;
 }): { scope: number; entitySet: readonly BackupEntity[] } | null {
+  const keys = Object.keys(input.entityMetadata);
+  const exactScope = (scope: number, entitySet: readonly BackupEntity[]) =>
+    sortedEquals(keys, [...entitySet]) ? { scope, entitySet } : null;
   if (typeof input.backupScopeVersion === 'number') {
+    if (!Number.isSafeInteger(input.backupScopeVersion) || input.backupScopeVersion < -1)
+      return null;
     if (input.backupScopeVersion === BACKUP_SCOPE_VERSION) {
-      return { scope: BACKUP_SCOPE_VERSION, entitySet: [...BACKUP_ENTITIES] };
+      return exactScope(BACKUP_SCOPE_VERSION, BACKUP_ENTITIES);
+    }
+    if (input.backupScopeVersion === 8) {
+      return exactScope(8, KNOWN_HISTORICAL_BACKUP_SCOPE_V8_ENTITY_SET);
+    }
+    if (input.backupScopeVersion === 7) {
+      return exactScope(7, KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET);
     }
     if (input.backupScopeVersion === 5) {
-      return { scope: 5, entitySet: KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET };
+      return exactScope(5, KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET);
     }
     if (input.backupScopeVersion === 6) {
-      return { scope: 6, entitySet: KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET };
+      return exactScope(6, KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET);
     }
     if (input.backupScopeVersion === 4) {
-      return { scope: 4, entitySet: KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET };
+      return exactScope(4, KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET);
     }
-    // Older explicit versions (2/3) and anything newer fall through to exact
-    // entity-set matching below; a future scope must not resolve as current.
+    if (input.backupScopeVersion === 3)
+      return exactScope(3, KNOWN_HISTORICAL_BACKUP_SCOPE_V3_ENTITY_SET);
+    if (input.backupScopeVersion === 2)
+      return exactScope(2, KNOWN_HISTORICAL_BACKUP_SCOPE_V2_ENTITY_SET);
+    // An unsupported future scope must not resolve from familiar entity keys.
     if (input.backupScopeVersion > BACKUP_SCOPE_VERSION) {
       return null;
     }
@@ -854,9 +922,13 @@ export function resolveBackupScope(input: {
       return null;
     }
   }
-  const keys = Object.keys(input.entityMetadata);
-  if (sortedEquals(keys, [...BACKUP_ENTITIES])) {
-    return { scope: BACKUP_SCOPE_VERSION, entitySet: [...BACKUP_ENTITIES] };
+  // Scope 9 always carries an explicit stamp. Its entity names alone cannot
+  // distinguish its parent-link column contract from historical Scope 8.
+  if (sortedEquals(keys, [...KNOWN_HISTORICAL_BACKUP_SCOPE_V8_ENTITY_SET])) {
+    return { scope: 8, entitySet: KNOWN_HISTORICAL_BACKUP_SCOPE_V8_ENTITY_SET };
+  }
+  if (sortedEquals(keys, [...KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET])) {
+    return { scope: 7, entitySet: KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET };
   }
   if (sortedEquals(keys, [...KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET])) {
     return { scope: 5, entitySet: KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET };
@@ -889,15 +961,20 @@ export function backupEntityColumnsForScope(
   }
   const historical: Record<BackupEntity, readonly string[]> = {
     ...BACKUP_ENTITY_COLUMNS,
+    todos: BACKUP_SCOPE_V7_ENTITY_COLUMNS.todos!,
   };
   const snapshot =
-    scope === 6
-      ? BACKUP_SCOPE_V6_ENTITY_COLUMNS
-      : scope === 5
-        ? BACKUP_SCOPE_V5_ENTITY_COLUMNS
-        : scope === 4
-          ? BACKUP_SCOPE_V4_ENTITY_COLUMNS
-          : PORTABLE_V1_ENTITY_COLUMNS;
+    scope === 8
+      ? BACKUP_SCOPE_V8_ENTITY_COLUMNS
+      : scope === 7
+        ? BACKUP_SCOPE_V7_ENTITY_COLUMNS
+        : scope === 6
+          ? BACKUP_SCOPE_V6_ENTITY_COLUMNS
+          : scope === 5
+            ? BACKUP_SCOPE_V5_ENTITY_COLUMNS
+            : scope === 4
+              ? BACKUP_SCOPE_V4_ENTITY_COLUMNS
+              : PORTABLE_V1_ENTITY_COLUMNS;
   for (const entity of Object.keys(historical) as BackupEntity[]) {
     const frozen = snapshot[entity];
     if (frozen) historical[entity] = frozen;
@@ -922,6 +999,7 @@ export const BACKUP_SOFT_DELETE_ENTITIES: ReadonlySet<BackupEntity> = new Set([
   'workout_weekly_plan',
   'workout_schedule_overrides',
   'body_weight_entries',
+  'todo_recurrence_series',
 ]);
 
 /**

@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import { appMetaKeys, getAppMetaText, setAppMetaText } from '@/core/db/appMeta';
 import { timestampToLocalDateKey, toDateKey } from '@/lib/time';
+import { BACKFILL_TODO_RECURRENCE_SERIES_SQL } from './todoRecurrenceMigration';
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
@@ -12,7 +13,7 @@ let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
  * would re-enter that block on the next launch, including the destructive
  * block-6 ordering backfill). Bump this with every appended migration block.
  */
-const EXPECTED_SCHEMA_VERSION = 25;
+const EXPECTED_SCHEMA_VERSION = 27;
 
 const bootstrapStatements = [
   ...(Platform.OS === 'web' ? [] : ['PRAGMA journal_mode = WAL;']),
@@ -150,15 +151,16 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   // recovery has to be earned, not asserted: a populated database with an
   // unreadable version is a loud failure, and only a genuinely empty one may be
   // treated as a fresh install.
-  const parsedVersion = schemaVersion === null ? 0 : parseInt(schemaVersion, 10);
-  if (schemaVersion !== null && !Number.isFinite(parsedVersion) && (await hasUserData(db))) {
+  const parsedVersion =
+    schemaVersion === null ? 0 : /^(0|[1-9]\d*)$/.test(schemaVersion) ? Number(schemaVersion) : NaN;
+  if (schemaVersion !== null && !Number.isSafeInteger(parsedVersion) && (await hasUserData(db))) {
     throw new Error(
-      `Refusing to migrate: app_meta.db_schema_version is '${schemaVersion}', which is not a number, and this database holds user data. ` +
+      `Refusing to migrate: app_meta.db_schema_version is '${schemaVersion}', which is not a valid nonnegative integer, and this database holds user data. ` +
         `Re-running the migration chain would rewrite todo ordering (block 6). ` +
         `Restore a backup, or delete the database to start fresh — do not hand-edit the stored version.`,
     );
   }
-  const version = Number.isFinite(parsedVersion) ? parsedVersion : 0;
+  const version = Number.isSafeInteger(parsedVersion) ? parsedVersion : 0;
   if (version < 2) {
     await applyMigration(db, 2, async () => {
       await addColumnIfMissing(db, 'habits', 'category', "TEXT NOT NULL DEFAULT 'anytime'");
@@ -1035,12 +1037,57 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
     });
   }
 
+  // Migration 26: authoritative recurring-series content is independent of
+  // instance overrides; the occurrence key is independent of editable due_date.
+  if (version < 26) {
+    await applyMigration(db, 26, async () => {
+      // Historical/skipped-block shapes accepted by earlier upgrades can lack
+      // optional recurrence/notes columns. Repair them before indexing/seeding.
+      await addColumnIfMissing(db, 'todos', 'notes', 'TEXT');
+      await addColumnIfMissing(db, 'todos', 'recurrence', 'TEXT');
+      await addColumnIfMissing(db, 'todos', 'recurrence_id', 'TEXT');
+      await addColumnIfMissing(db, 'todos', 'recurrence_date_key', 'TEXT');
+      await addColumnIfMissing(db, 'todos', 'recurrence_touched', 'INTEGER NOT NULL DEFAULT 0');
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS todo_recurrence_series (
+          id TEXT PRIMARY KEY NOT NULL,
+          title TEXT NOT NULL,
+          notes TEXT,
+          priority TEXT NOT NULL DEFAULT 'normal',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          deleted_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_todos_recurrence_date
+          ON todos (recurrence_id, recurrence_date_key) WHERE deleted_at IS NULL;
+        -- Historical rows have no reliable same-tick edit provenance. Keep
+        -- them on undo instead of risking retraction of a user-edited copy.
+        UPDATE todos SET recurrence_date_key = due_date, recurrence_touched = 1 WHERE recurrence = 'daily';
+      `);
+      await db.execAsync(BACKFILL_TODO_RECURRENCE_SERIES_SQL);
+      // Scope 8's existing versioned backfill publishes reconstructed series;
+      // migration never replays completions, rewards, reminders or linked effects.
+    });
+  }
+
+  // Migration 27: completion-created copies retain their exact source identity.
+  // No timestamp/date heuristic can safely reconstruct this for old rows.
+  if (version < 27) {
+    await applyMigration(db, 27, async () => {
+      await addColumnIfMissing(db, 'todos', 'recurrence_spawned_by_id', 'TEXT');
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_todos_recurrence_spawn_parent
+          ON todos (recurrence_spawned_by_id) WHERE recurrence_spawned_by_id IS NOT NULL;
+      `);
+    });
+  }
+
   // The chain must have LANDED on the expected head. A block that silently did
   // not apply (a swallowed error, a renamed key) would leave a database that
   // reports an old version forever, and the next run would re-enter that block
   // — including the destructive one. Assert the head instead of assuming it.
   const headVersion = await getAppMetaText(db, appMetaKeys.dbSchemaVersion);
-  if (parseInt(headVersion ?? '0', 10) !== EXPECTED_SCHEMA_VERSION) {
+  if (headVersion !== String(EXPECTED_SCHEMA_VERSION)) {
     throw new Error(
       `Migration chain did not reach the expected schema version ${EXPECTED_SCHEMA_VERSION} (found ${headVersion ?? 'none'}).`,
     );
@@ -1049,9 +1096,14 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
 
 /** True when the database holds anything a re-run of the chain could rewrite. */
 async function hasUserData(db: SQLite.SQLiteDatabase): Promise<boolean> {
-  for (const table of ['todos', 'habits', 'calorie_entries']) {
-    const row = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) AS count FROM ${table}`);
-    if ((row?.count ?? 0) > 0) return true;
+  // Only query tables that exist at this device's schema version. Planning,
+  // workout history, tombstones and operational receipts also make it nonempty.
+  const tables = await db.getAllAsync<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name <> 'app_meta' AND name NOT LIKE 'sqlite_%'",
+  );
+  for (const { name } of tables) {
+    assertSafeSqlIdentifier(name);
+    if (await db.getFirstAsync(`SELECT 1 FROM ${name} LIMIT 1`)) return true;
   }
   return false;
 }

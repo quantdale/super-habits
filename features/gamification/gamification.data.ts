@@ -900,7 +900,11 @@ type ActivityCandidate = { kind: ActionKind; entityId: string };
  * This is how actions that never touched a gamification-aware screen (habit
  * reminder quick-actions, command center, restore-side writes) still earn XP
  * once — and it is why the screens' direct calls are pure latency
- * optimization rather than the source of truth.
+ * optimization rather than the source of truth. Filter paid keys BEFORE the
+ * query limit: limiting all historical candidates first permanently starves
+ * action 26 and needlessly recomputes rewards for already-paid actions. These
+ * key predicates mirror actionSourceKey / legacyActionSourceKeys; the indexed
+ * (event_kind, source_key) receipt remains authoritative inside computeAward.
  */
 async function loadActivityCandidates(db: Db, todayKey: string): Promise<ActivityCandidate[]> {
   const { startUtcIso, endUtcExclusiveIso } = getUtcIsoRangeForLocalDateKeys(todayKey, todayKey);
@@ -908,44 +912,72 @@ async function loadActivityCandidates(db: Db, todayKey: string): Promise<Activit
     // `habit_id`, not the completion row id: the reward key must match what a
     // screen passes (`habitId`), or reconcile would pay the same check-in twice.
     db.getAllAsync<{ id: string }>(
-      `SELECT habit_id AS id FROM habit_completions WHERE date_key = ? AND count > 0
-        ORDER BY created_at ASC LIMIT ?`,
+      `SELECT c.habit_id AS id FROM habit_completions c WHERE c.date_key = ? AND c.count > 0
+          AND NOT EXISTS (
+            SELECT 1 FROM gamification_events e
+             WHERE e.event_kind = 'habit' AND e.source_key = c.date_key || ':' || c.habit_id
+          )
+        ORDER BY c.created_at ASC, c.id ASC LIMIT ?`,
       [todayKey, RECONCILE_AWARD_LIMIT],
     ),
     db.getAllAsync<{ id: string }>(
-      `SELECT id FROM todos
-        WHERE completed = 1 AND deleted_at IS NULL AND completed_at >= ? AND completed_at < ?
-        ORDER BY completed_at ASC LIMIT ?`,
+      `SELECT t.id FROM todos t
+        WHERE t.completed = 1 AND t.deleted_at IS NULL AND t.completed_at >= ? AND t.completed_at < ?
+          AND NOT EXISTS (
+            SELECT 1 FROM gamification_events e
+             WHERE e.event_kind = 'todo'
+               AND (e.source_key = ? || ':' || t.id OR (e.source_key = t.id AND e.date_key = ?))
+          )
+        ORDER BY t.completed_at ASC, t.id ASC LIMIT ?`,
+      [startUtcIso, endUtcExclusiveIso, todayKey, todayKey, RECONCILE_AWARD_LIMIT],
+    ),
+    db.getAllAsync<{ id: string }>(
+      `SELECT f.id FROM pomodoro_sessions f
+        WHERE f.session_type = 'focus' AND f.ended_at IS NOT NULL AND f.duration_seconds > 0
+          AND f.started_at >= ? AND f.started_at < ?
+          AND NOT EXISTS (
+            SELECT 1 FROM gamification_events e
+             WHERE e.event_kind = 'focus' AND e.source_key = f.id
+          )
+        ORDER BY f.started_at ASC, f.id ASC LIMIT ?`,
       [startUtcIso, endUtcExclusiveIso, RECONCILE_AWARD_LIMIT],
     ),
     db.getAllAsync<{ id: string }>(
-      `SELECT id FROM pomodoro_sessions
-        WHERE session_type = 'focus' AND ended_at IS NOT NULL AND duration_seconds > 0
-          AND started_at >= ? AND started_at < ?
-        ORDER BY started_at ASC LIMIT ?`,
-      [startUtcIso, endUtcExclusiveIso, RECONCILE_AWARD_LIMIT],
-    ),
-    db.getAllAsync<{ id: string }>(
-      `SELECT id FROM workout_logs WHERE completed_at >= ? AND completed_at < ?
-        ORDER BY completed_at ASC LIMIT ?`,
+      `SELECT w.id FROM workout_logs w WHERE w.completed_at >= ? AND w.completed_at < ?
+          AND NOT EXISTS (
+            SELECT 1 FROM gamification_events e
+             WHERE e.event_kind = 'workout' AND e.source_key = w.id
+          )
+        ORDER BY w.completed_at ASC, w.id ASC LIMIT ?`,
       [startUtcIso, endUtcExclusiveIso, RECONCILE_AWARD_LIMIT],
     ),
     db.getFirstAsync<{ id: string }>(
-      `SELECT id FROM calorie_entries
-        WHERE deleted_at IS NULL AND consumed_on = ? LIMIT 1`,
+      `SELECT n.id FROM calorie_entries n
+        WHERE n.deleted_at IS NULL AND n.consumed_on = ?
+          AND NOT EXISTS (
+            SELECT 1 FROM gamification_events e
+             WHERE e.event_kind = 'nutrition' AND e.source_key = n.consumed_on
+          ) LIMIT 1`,
       [todayKey],
     ),
     db.getAllAsync<{ id: string }>(
-      `SELECT id FROM daily_plans
-        WHERE deleted_at IS NULL AND date_key = ? AND status IN ('committed', 'completed')
-        LIMIT ?`,
+      `SELECT p.id FROM daily_plans p
+        WHERE p.deleted_at IS NULL AND p.date_key = ? AND p.status IN ('committed', 'completed')
+          AND NOT EXISTS (
+            SELECT 1 FROM gamification_events e
+             WHERE e.event_kind = 'plan' AND e.source_key = p.id
+          ) LIMIT ?`,
       [todayKey, RECONCILE_AWARD_LIMIT],
     ),
     db.getAllAsync<{ id: string }>(
-      `SELECT id FROM weekly_reviews
-        WHERE status = 'completed' AND deleted_at IS NULL
-          AND completed_at >= ? AND completed_at < ?
-        ORDER BY completed_at ASC LIMIT ?`,
+      `SELECT r.id FROM weekly_reviews r
+        WHERE r.status = 'completed' AND r.deleted_at IS NULL
+          AND r.completed_at >= ? AND r.completed_at < ?
+          AND NOT EXISTS (
+            SELECT 1 FROM gamification_events e
+             WHERE e.event_kind = 'review' AND e.source_key = r.id
+          )
+        ORDER BY r.completed_at ASC, r.id ASC LIMIT ?`,
       [startUtcIso, endUtcExclusiveIso, RECONCILE_AWARD_LIMIT],
     ),
   ]);

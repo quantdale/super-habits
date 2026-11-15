@@ -549,6 +549,7 @@ describe('backup completeness v2 restore — settings integrity (closure)', () =
         'workout_weekly_plan',
         'workout_schedule_overrides',
         'body_weight_entries',
+        'todo_recurrence_series',
       ]) {
         delete metadata[dropped];
       }
@@ -1230,7 +1231,7 @@ describe('backup completeness v2 restore', () => {
     const version = await targetDb.getFirstAsync<{ value: string }>(
       "SELECT value FROM app_meta WHERE key = 'db_schema_version'",
     );
-    expect(version?.value).toBe('25');
+    expect(version?.value).toBe('27');
     const metaAfter = await targetDb.getAllAsync<{ key: string; value: string }>(
       'SELECT key, value FROM app_meta ORDER BY key ASC',
     );

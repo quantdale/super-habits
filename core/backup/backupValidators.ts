@@ -36,6 +36,15 @@ const STRING_LIMITS: Record<string, number> = {
   icon: 50,
   linked_todo_title: 200,
   note: 500,
+  // Daily reflections allow 2,000 characters; weekly reviews override this.
+  reflection: 2_000,
+  // These are serialized snapshots, not short UI text fields. Their size grows
+  // with the dataset; the portable envelope already caps the complete file at
+  // 100 MiB and cloud generation requests enforce their own byte budget.
+  summary_payload: 100 * 1024 * 1024,
+  plan_payload: 100 * 1024 * 1024,
+  // Three 200-character titles can expand sixfold under JSON escaping.
+  top_todo_titles: 5_000,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -81,9 +90,9 @@ function isEnum(value: unknown, allowed: readonly string[]): boolean {
   return typeof value === 'string' && allowed.includes(value);
 }
 
-function isBoundedString(value: unknown, key: string): boolean {
+function isBoundedString(value: unknown, key: string, maxLength?: number): boolean {
   if (typeof value !== 'string') return false;
-  const limit = STRING_LIMITS[key] ?? 1_000;
+  const limit = maxLength ?? STRING_LIMITS[key] ?? 1_000;
   return value.length <= limit;
 }
 
@@ -208,9 +217,9 @@ function idRule(field: string): FieldRule {
   };
 }
 
-function textRule(field: string, required: boolean, label?: string): FieldRule {
+function textRule(field: string, required: boolean, maxLength?: number): FieldRule {
   const check = (row: Record<string, unknown>) =>
-    checkField(row, field, (v) => isBoundedString(v, field), label ?? field);
+    checkField(row, field, (v) => isBoundedString(v, field, maxLength), field);
   return required ? { required: check } : { required: () => null, optional: check };
 }
 
@@ -331,6 +340,9 @@ const TODO_RULES: FieldRule[] = [
   optionalColumnRule('project_id', isNullableIdText),
   optionalColumnRule('goal_id', isNullableIdText),
   optionalColumnRule('completed_at', isNullableIso),
+  optionalColumnRule('recurrence_date_key', (v) => v === null || isDateKey(v)),
+  optionalColumnRule('recurrence_touched', (v) => v === 0 || v === 1),
+  optionalColumnRule('recurrence_spawned_by_id', isNullableIdText),
 ];
 
 const HABIT_RULES: FieldRule[] = [
@@ -716,7 +728,7 @@ const WEEKLY_REVIEW_RULES: FieldRule[] = [
   enumRule('status', ['draft', 'completed']),
   textRule('summary_payload', true),
   textRule('plan_payload', true),
-  textRule('reflection', true),
+  textRule('reflection', true, 4_000),
   isoRule('created_at', true),
   isoRule('updated_at', true),
   nullableIsoRule('deleted_at'),
@@ -772,6 +784,25 @@ const DAILY_PLAN_RULES: FieldRule[] = [
 
 const RULES_BY_ENTITY: Record<BackupEntity, FieldRule[]> = {
   todos: TODO_RULES,
+  todo_recurrence_series: [
+    // Historical recurrence ids were bounded text, not validated entity ids.
+    // The publication identity pass additionally requires non-empty row ids.
+    {
+      required: (row) =>
+        checkField(
+          row,
+          'id',
+          (v) => typeof v === 'string' && v.length > 0 && isBoundedString(v, 'id'),
+          'id',
+        ),
+    },
+    textRule('title', true),
+    nullableTextRule('notes'),
+    enumRule('priority', ['urgent', 'normal', 'low']),
+    isoRule('created_at', true),
+    isoRule('updated_at', true),
+    nullableIsoRule('deleted_at'),
+  ],
   habits: HABIT_RULES,
   habit_completions: HABIT_COMPLETION_RULES,
   calorie_entries: CALORIE_ENTRY_RULES,
@@ -954,7 +985,24 @@ export function validateBackupGraph(
   const projectIds = ids('projects');
   const goalIds = ids('goals');
 
+  const recurrenceIds = ids('todo_recurrence_series');
   for (const row of rowsByEntity.todos ?? []) {
+    if (
+      typeof row.recurrence_spawned_by_id === 'string' &&
+      (!todoIds.has(row.recurrence_spawned_by_id) || row.recurrence_spawned_by_id === row.id)
+    ) {
+      errors.push(
+        `todos references missing or self completion parent: ${row.recurrence_spawned_by_id}`,
+      );
+    }
+    if (
+      rowsByEntity.todo_recurrence_series !== undefined &&
+      row.recurrence === 'daily' &&
+      typeof row.recurrence_id === 'string' &&
+      !recurrenceIds.has(row.recurrence_id)
+    ) {
+      errors.push(`todos references missing recurring series: ${row.recurrence_id}`);
+    }
     if (
       typeof row.project_id === 'string' &&
       row.project_id.length > 0 &&

@@ -18,9 +18,9 @@ import { seedMature } from './fixtures';
  * | workout              | 8 routines + 70 logs + 1 interrupted draft           |
  * | pomodoro             | 105 sessions + 1 live intent + 1 pending retry log   |
  * | planning             | 4 projects (mixed statuses) + 12 goals               |
- * | sync_outbox          | 4933 pending intents (never drained: restart input)  |
- * | backup.scope_version | '6' (pre-cutover marker; current code writes '7')    |
- * | schema               | 25                                                   |
+ * | sync_outbox          | 4945 pending intents (never drained: restart input)  |
+ * | backup.scope_version | '6' (pre-cutover marker; current code writes '8')    |
+ * | schema               | 26                                                   |
  *
  * Counts are exact on purpose: any product change that shifts them must
  * update this manifest consciously, like journey oracles. Determinism is
@@ -51,6 +51,7 @@ async function corpusTables(db: CorpusDb): Promise<string[]> {
     `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
   );
   const wanted = new Set([
+    'todo_recurrence_series',
     'todos',
     'habits',
     'habit_completions',
@@ -152,7 +153,8 @@ describe('tests/integration/corpus', { timeout: 120_000 }, () => {
     expect(await count(db, 'SELECT COUNT(*) AS n FROM pomodoro_sessions')).toBe(105);
     expect(await count(db, 'SELECT COUNT(*) AS n FROM projects WHERE deleted_at IS NULL')).toBe(4);
     expect(await count(db, 'SELECT COUNT(*) AS n FROM goals WHERE deleted_at IS NULL')).toBe(12);
-    expect(await count(db, 'SELECT COUNT(*) AS n FROM sync_outbox')).toBe(4933);
+    expect(await count(db, 'SELECT COUNT(*) AS n FROM todo_recurrence_series')).toBe(12);
+    expect(await count(db, 'SELECT COUNT(*) AS n FROM sync_outbox')).toBe(4945);
 
     // Edge-state stage.
     expect(await metaValue(db, 'backup.scope_version')).toBe('6');
@@ -163,7 +165,7 @@ describe('tests/integration/corpus', { timeout: 120_000 }, () => {
     expect(JSON.parse(pendingLogs ?? '[]')).toHaveLength(1);
 
     const version = await metaValue(db, 'db_schema_version');
-    expect(version).toBe('25');
+    expect(version).toBe('27');
     await db.closeAsync();
   });
 

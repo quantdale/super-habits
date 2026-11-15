@@ -1,4 +1,7 @@
 import { type Page } from '@playwright/test';
+import { randomBytes } from 'node:crypto';
+// Shared with the standalone CommonJS simulation compiler (no app alias loader).
+import { BACKFILL_TODO_RECURRENCE_SERIES_SQL } from '../../core/db/todoRecurrenceMigration';
 import { ensureAppContext, ensureDbContext, runSql } from './dbHarness';
 import { resetAll } from './reset';
 
@@ -12,10 +15,9 @@ import { resetAll } from './reset';
  * after reset), so the seeded columns are exactly what the app writes — no
  * hand-written DDL snapshot to keep in sync.
  *
- * Fixture CONTENT is defined here (SMALL/TYPICAL/HEAVY) because the canonical
- * `tests/integration/fixtures/` is being built in parallel by another agent and
- * does not exist yet. The volumes and realism requirements follow the design's
- * Test Data Strategy; divergence from the canonical set is noted inline.
+ * Browser fixture CONTENT is defined here (SMALL/TYPICAL/HEAVY). The real-SQLite
+ * `tests/integration/browserFixtureContracts.test.ts` checks every generated row
+ * and relationship against the app's current recovery contract.
  *
  * NOTE: rows are inserted directly, so they do NOT appear in the sync outbox
  * (they are "historical" — a 3-month-old todo is not pending a push). Journeys
@@ -33,7 +35,7 @@ export interface FixtureDescriptor {
 
 export const FIXTURES: Record<FixtureSize, FixtureDescriptor> = {
   SMALL: {
-    about: 'Empty or 1–3 rows per feature: empty states, first-run, validation.',
+    about: 'Empty or 1–3 rows per feature: non-recurring tasks, first-run, validation.',
     counts: { todos: 2, habits: 1, calorie_entries: 2, pomodoro_sessions: 1, workout_routines: 0 },
   },
   TYPICAL: {
@@ -67,16 +69,14 @@ export const FIXTURES: Record<FixtureSize, FixtureDescriptor> = {
 
 // --- id / date helpers (Node side) ---
 
-let idCounter = 0;
-/**
- * Generate an id in the app's `createId` format: `{prefix}_{ts}_{8 random}`.
- * The counter guarantees uniqueness within a run.
+/** Node-only fixture counterpart to createId (whose imports require RN/Expo).
+ * Keep its decimal timestamp and eight CSPRNG characters recovery-compatible;
+ * the actual runtime validators enforce this in browserFixtureContracts.test.
  */
 function id(prefix: string): string {
-  idCounter += 1;
-  const ts = Date.now().toString(36);
-  const rand = Math.random().toString(36).slice(2, 10);
-  return `${prefix}_${ts}_${rand}${idCounter.toString(36)}`;
+  const alphabet = '0123456789abcdefghijklmnopqrstuvwxyz';
+  const random = Array.from(randomBytes(8), (byte) => alphabet[byte % alphabet.length]).join('');
+  return `${prefix}_${Date.now()}_${random}`;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -137,7 +137,11 @@ function esc(s: string): string {
 
 // --- SQL builders ---
 
-function buildTodos(todayKey: string, count: number, opts: { heavy: boolean }): string {
+function buildTodos(
+  todayKey: string,
+  count: number,
+  opts: { heavy: boolean; recurring: boolean },
+): string {
   const rows: string[] = [];
   const n = count;
   for (let i = 0; i < n; i++) {
@@ -148,7 +152,10 @@ function buildTodos(todayKey: string, count: number, opts: { heavy: boolean }): 
     const completed = i % 5 === 0 || i % 7 === 0 ? 1 : 0;
     const priority = PRIORITIES[i % 3];
     const sortOrder = i;
-    const recurrence = i % 6 === 0 ? "'daily'" : 'null';
+    // SMALL is a stable one-visible-task baseline across reloads and midnight.
+    // A deleted occurrence alone does not stop its canonical series; only the
+    // larger fixtures deliberately include that live recurrence/rollover state.
+    const recurrence = opts.recurring && i % 6 === 0 ? "'daily'" : 'null';
     const recurrenceId = recurrence === "'daily'" ? `'${id('rec')}'` : 'null';
     const notes = i % 4 === 0 ? `'${esc(`notes for task ${i} — with emoji ☕`)}'` : 'null';
     const dueDate = i % 3 === 0 ? `'${offsetKey(todayKey, (i % 5) - 2)}'` : 'null';
@@ -159,7 +166,7 @@ function buildTodos(todayKey: string, count: number, opts: { heavy: boolean }): 
     if (i === 1) title = 'B'.repeat(201);
     if (i === 2) title = 'Ünïcode ☕ タスク 🚀';
     rows.push(
-      `('${id('todo')}','${esc(title)}',${notes},${completed},'${created}','${updated}',${deleted},${dueDate},'${priority}',${sortOrder},${recurrence},${recurrenceId})`,
+      `('${id('todo')}','${esc(title)}',${notes},${completed},'${created}','${updated}',${deleted},${dueDate},'${priority}',${sortOrder},${recurrence},${recurrenceId},${recurrence === "'daily'" ? dueDate : 'null'},1)`,
     );
   }
   return rows.join(',\n');
@@ -413,7 +420,8 @@ export function buildFixtureSql(anchorKey: string, size: FixtureSize): string {
 
   if (todoCount > 0) {
     statements.push(
-      `INSERT INTO todos (id,title,notes,completed,created_at,updated_at,deleted_at,due_date,priority,sort_order,recurrence,recurrence_id) VALUES\n${buildTodos(anchorKey, todoCount, { heavy })};`,
+      `INSERT INTO todos (id,title,notes,completed,created_at,updated_at,deleted_at,due_date,priority,sort_order,recurrence,recurrence_id,recurrence_date_key,recurrence_touched) VALUES\n${buildTodos(anchorKey, todoCount, { heavy, recurring: size !== 'SMALL' })};`,
+      BACKFILL_TODO_RECURRENCE_SERIES_SQL,
     );
   }
 

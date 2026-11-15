@@ -3,7 +3,7 @@ import { seedHeavy, seedSmall, seedTypical } from './fixtures';
 
 /**
  * Smoke verification for the fixture seeders (task 2.11). Each seeder must
- * produce a real, version-11 database whose rows were created through the real
+ * produce a real, current-version database whose rows were created through the real
  * data layers (not hand-written INSERTs) and whose timestamps/date keys come
  * from the injected clock. Row counts are asserted as ranges, not exact
  * numbers, because the corpus is a fixed but not trivially-predictable shape.
@@ -41,7 +41,7 @@ describe('tests/integration/fixtures', { timeout: 30_000 }, () => {
       'SELECT value FROM app_meta WHERE key = ?',
       ['db_schema_version'],
     );
-    expect(version?.value).toBe('25');
+    expect(version?.value).toBe('27');
     await db.closeAsync();
   });
 

@@ -457,6 +457,34 @@ export function canonicalSettingsPayloadText(
   return JSON.stringify(canonical);
 }
 
+/** Only apply settings represented by the checksum epoch that was verified. */
+export function projectCertifiedRecoverableSettings(
+  payload: unknown,
+  settingsVersion: number,
+): RecoverableSettingsV5 {
+  if (![2, 3, 4, BACKUP_SETTINGS_VERSION].includes(settingsVersion)) {
+    throw new Error('Unsupported recoverable-settings integrity version.');
+  }
+  const normalized = normalizeRecoverableSettings(payload);
+  // This JSON is produced by our frozen canonical serializer, not external
+  // text. Reuse its exact allowlist (including nested versioned fields).
+  const canonical: unknown = JSON.parse(
+    canonicalSettingsPayloadText(normalized, { settingsVersion }),
+  );
+  const certified = normalizeRecoverableSettings(canonical);
+  // Canonical hashes ignore preset ordering. Preserve existing display order,
+  // but take every preset's fields from the certified projection, never raw data.
+  if (certified.pomodoroPresets && normalized.pomodoroPresets) {
+    const byId = new Map(certified.pomodoroPresets.presets.map((preset) => [preset.id, preset]));
+    certified.pomodoroPresets.presets = normalized.pomodoroPresets.presets.map((preset) => {
+      const projected = byId.get(preset.id);
+      if (!projected) throw new Error('Settings projection lost a preset identity.');
+      return projected;
+    });
+  }
+  return certified;
+}
+
 function canonicalWorkoutPreferences(preferences: RecoverableWorkoutPreferences) {
   return {
     effortScale: preferences.effortScale,
@@ -749,6 +777,9 @@ export async function readPendingThemeApplication(
   ) {
     return null;
   }
+  // SAFETY: this local-only marker is written by stagePendingThemeApplication
+  // from normalized settings, never imported from a backup or remote row. The
+  // checks above retain compatibility with older markers lacking notifications.
   return candidate as unknown as PendingThemeApplication;
 }
 

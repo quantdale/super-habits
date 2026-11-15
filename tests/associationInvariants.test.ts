@@ -43,6 +43,8 @@ const linkedActionDataMocks = vi.hoisted(() => ({
 // surface so the in-transaction owner-claiming side effects are inert under test.
 const accountDataMocks = vi.hoisted(() => ({
   getCachedLocalDatasetOwner: vi.fn(() => undefined),
+  getLocalDatasetOwner: vi.fn(async () => null),
+  readImportOriginFingerprint: vi.fn(async () => null),
   getCachedOwnerBindingProvisional: vi.fn(() => false),
   inspectLocalAccountDataState: vi.fn(async () => ({ hasUserData: false, pendingOutboxCount: 0 })),
   primeLocalDatasetOwner: vi.fn(),

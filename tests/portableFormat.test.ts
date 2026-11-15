@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BACKUP_ENTITIES,
+  KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET,
   backupEntityColumnsForScope,
   type BackupEntity,
 } from '@/core/backup/backup.types';
@@ -27,6 +28,15 @@ function makeRow(
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   const base: Record<string, unknown> = {
+    todo_recurrence_series: {
+      id: 'rec_1',
+      title: 'Recurring task',
+      notes: null,
+      priority: 'normal',
+      created_at: ISO,
+      updated_at: ISO,
+      deleted_at: null,
+    },
     todos: {
       id: 'todo_1',
       title: 'Write report',
@@ -367,11 +377,13 @@ describe('portable envelope build + validate round trip', () => {
     const file = buildFixture();
     file.backupScopeVersion = 6;
     const columns = backupEntityColumnsForScope(6);
-    for (const entity of BACKUP_ENTITIES) {
+    delete file.entities.todo_recurrence_series;
+    delete file.integrity.entities.todo_recurrence_series;
+    for (const entity of KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET) {
       file.integrity.entities[entity] = checksumRows(file.entities[entity] ?? [], columns[entity]);
     }
     file.integrity.payloadChecksum = computePortablePayloadChecksum(file, {
-      entities: BACKUP_ENTITIES,
+      entities: KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET,
       columns,
     });
     expectValid(file);

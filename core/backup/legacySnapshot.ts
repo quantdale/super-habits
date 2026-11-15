@@ -10,10 +10,12 @@ import {
 } from './backup.types';
 import { checksumRows } from '@/lib/checksum';
 import { validateBackupGraph, validateBackupRow } from './backupValidators';
+import { projectCertifiedBackupRows } from './backupProjection';
 import {
   canonicalizeSettingsPayload,
   isValidRecoverableSettings,
   normalizeRecoverableSettings,
+  projectCertifiedRecoverableSettings,
 } from './backupSettings';
 
 export function parseManifestRow(row: unknown): BackupManifest | null {
@@ -40,11 +42,9 @@ export function parseManifestRow(row: unknown): BackupManifest | null {
     if (typeof meta.checksum !== 'string' || !/^[0-9a-f]{64}$/.test(meta.checksum)) {
       return null;
     }
-    // Unknown/future entity keys are not cast into the BackupEntity type:
-    // they are excluded here so scope resolution downstream still classifies
-    // the manifest honestly (unknown scopes fail closed) instead of this
-    // parser inventing entity names it does not understand.
-    if (!(BACKUP_ENTITIES as readonly string[]).includes(entity)) continue;
+    // Dropping unknown keys would manufacture a familiar complete scope from
+    // an unsupported recovery contract. Preserve the fail-closed boundary.
+    if (!(BACKUP_ENTITIES as readonly string[]).includes(entity)) return null;
     metadata[entity as BackupEntity] = { count: meta.count, checksum: meta.checksum };
   }
   // Settings integrity metadata (closure contract). A v2 manifest without it
@@ -77,6 +77,7 @@ export async function readVerifiedLegacySnapshot(
 ): Promise<{
   rowsByEntity: Partial<Record<BackupEntity, Record<string, unknown>[]>>;
   settingsPayload: ReturnType<typeof normalizeRecoverableSettings>;
+  scopeVersion: number;
 } | null> {
   const manifestResult = await client
     .from('backup_manifest')
@@ -147,7 +148,8 @@ export async function readVerifiedLegacySnapshot(
       );
     rowsByEntity[entity] = rows;
   }
-  if (validateBackupGraph(rowsByEntity).length > 0)
+  const certifiedRows = projectCertifiedBackupRows(rowsByEntity, scope.entitySet, columns);
+  if (validateBackupGraph(certifiedRows).length > 0)
     throw new Error('Backup upgrade paused: previous recovery relationships are invalid.');
   const settingsResult = await client
     .from('user_backup_settings')
@@ -180,5 +182,9 @@ export async function readVerifiedLegacySnapshot(
     throw new Error(
       'Backup upgrade paused: previous settings fail their frozen integrity contract.',
     );
-  return { rowsByEntity, settingsPayload: normalized };
+  return {
+    rowsByEntity: certifiedRows,
+    settingsPayload: projectCertifiedRecoverableSettings(normalized, version),
+    scopeVersion: scope.scope,
+  };
 }

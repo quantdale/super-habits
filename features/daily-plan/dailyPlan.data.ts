@@ -17,7 +17,6 @@ import {
 } from '@/features/daily-plan/dailyPlan.domain';
 import { INTENTION_MAX, NOTES_MAX, REFLECTION_MAX } from '@/features/daily-plan/dailyPlan.types';
 import type { DailyPlanAdherence } from '@/features/daily-plan/dailyPlan.domain';
-import { listPendingTodos } from '@/features/todos/todos.data';
 
 const DAILY_PLAN_SELECT = `id, date_key, intention, top_todo_ids, top_todo_titles, focus_target_minutes, notes, reflection, energy_score, status, completed_at, created_at, updated_at, deleted_at`;
 
@@ -134,7 +133,10 @@ export async function upsertDailyPlanInTx(
   if (!existing) {
     const id = createId('dplan');
     const nextTopTodoIdList = updates.topTodoIds
-      ? await filterExistingTodoIdsInTx(tx, updates.topTodoIds)
+      ? await filterExistingTodoIdsInTx(
+          tx,
+          parseTopTodoIds(serializeTopTodoIds(updates.topTodoIds)),
+        )
       : [];
     const nextTopTodoIds = serializeTopTodoIds(nextTopTodoIdList);
     const nextTopTodoTitles = await snapshotTopTodoTitlesInTx(tx, nextTopTodoIdList);
@@ -321,18 +323,12 @@ export async function listDailyPlansInRange(
  * when there is no previous-day plan (nothing to pull from).
  *
  * The merge runs inside the write transaction and re-reads BOTH plans there
- * (F7): candidates are computed against fresh current selections, so a
- * concurrent plan edit between the outer reads and the write is never
- * reverted. The outbox record rides the same transaction (F1).
+ * (F7), along with the selected tasks' completion/deletion state. Concurrent
+ * plan edits are never reverted and a queued completion/reopen cannot make
+ * carry-forward stale. The outbox record rides the same transaction (F1).
  */
 export async function carryForwardFromPreviousDay(dateKey: string): Promise<DailyPlan | null> {
   const previousKey = shiftDateKeyByDays(dateKey, -1);
-  const [previousPlan, pendingTodos] = await Promise.all([
-    getDailyPlan(previousKey),
-    listPendingTodos(),
-  ]);
-  if (!previousPlan) return null;
-
   const db = await getDatabase();
   const outcome = await runBackupMutation<DailyPlan | null>({
     db,
@@ -341,11 +337,20 @@ export async function carryForwardFromPreviousDay(dateKey: string): Promise<Dail
       if (!freshPrevious) return { value: null, changed: false };
       const freshCurrent = await readActivePlanByDateKey(transactionDb, dateKey);
 
-      const unfinishedById = new Map(pendingTodos.map((t) => [t.id, t]));
+      const previousIds = parseTopTodoIds(freshPrevious.top_todo_ids);
+      const pending =
+        previousIds.length === 0
+          ? []
+          : await transactionDb.getAllAsync<{ id: string }>(
+              `SELECT id FROM todos WHERE id IN (${previousIds.map(() => '?').join(',')})
+         AND completed = 0 AND deleted_at IS NULL`,
+              previousIds,
+            );
+      const unfinishedIds = new Set(pending.map((todo) => todo.id));
       const candidates = computeCarryForwardIds({
-        previousPlanTopTodoIds: parseTopTodoIds(freshPrevious.top_todo_ids),
+        previousPlanTopTodoIds: previousIds,
         currentPlanTopTodoIds: parseTopTodoIds(freshCurrent?.top_todo_ids ?? '[]'),
-        isTodoUnfinished: (todoId) => unfinishedById.has(todoId),
+        isTodoUnfinished: (todoId) => unfinishedIds.has(todoId),
       });
       if (candidates.length === 0) {
         return { value: freshCurrent, changed: false };

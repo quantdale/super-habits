@@ -8,6 +8,7 @@ const supabaseRoot = path.join(repoRoot, 'supabase');
 const migrationsRoot = path.join(supabaseRoot, 'migrations');
 const syncTables = ['todos', 'habits', 'calorie_entries', 'workout_routines'];
 const backupTables = [
+  'todo_recurrence_series',
   'habit_completions',
   'pomodoro_sessions',
   'routine_exercises',
@@ -107,6 +108,18 @@ const deepGymMigration = deepGymMigrationName
 const ownerScopedRemediation = ownerScopedRemediationName
   ? read(`supabase/migrations/${ownerScopedRemediationName}`)
   : '';
+const recurrenceMigrationName = migrationNames.find((name) =>
+  name.endsWith('_add_recoverable_todo_recurrence.sql'),
+);
+if (!recurrenceMigrationName) failures.push('missing recoverable Todo recurrence migration');
+const recurrenceMigration = recurrenceMigrationName
+  ? read(`supabase/migrations/${recurrenceMigrationName}`)
+  : '';
+const spawnMigrationName = migrationNames.find((name) =>
+  name.endsWith('_add_recurring_spawn_provenance.sql'),
+);
+if (!spawnMigrationName) failures.push('missing completion-spawn provenance migration');
+const spawnMigration = spawnMigrationName ? read(`supabase/migrations/${spawnMigrationName}`) : '';
 const fixture = read('simulation/backend/schema.sql');
 
 // A local SQLite REAL stores an eight-byte JavaScript number, while remote
@@ -189,14 +202,17 @@ for (const table of syncTables) {
 requireText('ownership UUID owner column migration', ownership, /ADD COLUMN user_id UUID/i);
 
 for (const table of backupTables) {
-  const tableMigration = [
-    'custom_exercises',
-    'workout_weekly_plan',
-    'workout_schedule_overrides',
-    'body_weight_entries',
-  ].includes(table)
-    ? gymMigration
-    : v2Migration;
+  const tableMigration =
+    table === 'todo_recurrence_series'
+      ? recurrenceMigration
+      : [
+            'custom_exercises',
+            'workout_weekly_plan',
+            'workout_schedule_overrides',
+            'body_weight_entries',
+          ].includes(table)
+        ? gymMigration
+        : v2Migration;
   requireText(
     `backup migration ${table}`,
     tableMigration,
@@ -263,6 +279,7 @@ for (const table of backupTables) {
 }
 
 const backupOwnerIndexTables = [
+  'todo_recurrence_series',
   'habit_completions',
   'pomodoro_sessions',
   'routine_exercises',
@@ -277,14 +294,17 @@ const backupOwnerIndexTables = [
   'body_weight_entries',
 ];
 for (const table of backupOwnerIndexTables) {
-  const tableMigration = [
-    'custom_exercises',
-    'workout_weekly_plan',
-    'workout_schedule_overrides',
-    'body_weight_entries',
-  ].includes(table)
-    ? gymMigration
-    : v2Migration;
+  const tableMigration =
+    table === 'todo_recurrence_series'
+      ? recurrenceMigration
+      : [
+            'custom_exercises',
+            'workout_weekly_plan',
+            'workout_schedule_overrides',
+            'body_weight_entries',
+          ].includes(table)
+        ? gymMigration
+        : v2Migration;
   requireText(`backup migration ${table} owner index`, tableMigration, new RegExp(`idx_${table}`));
 }
 
@@ -1129,19 +1149,20 @@ expectPlanningRejection(unsafeGlobalDateUniqueness, 'global date uniqueness + an
 // stayed green. The checks below pin the FINAL post-chain state, which is what
 // a freshly-migrated project actually serves.
 const generationMigrationNames = migrationNames.filter((name) =>
-  /_backup_generation|_verify_and_reserve_backup_generations|_enforce_backup_publication_provenance/.test(
+  /_backup_generation|_verify_and_reserve_backup_generations|_enforce_backup_publication_provenance|_add_recoverable_todo_recurrence|_add_recurring_spawn_provenance/.test(
     name,
   ),
 );
-if (generationMigrationNames.length < 4) {
+if (generationMigrationNames.length < 6) {
   failures.push(
-    `expected >= 4 backup-generation migration files, found ${generationMigrationNames.length}`,
+    `expected >= 6 backup-generation migration files, found ${generationMigrationNames.length}`,
   );
 }
 const generationSource = generationMigrationNames
   .map((name) => read(`supabase/migrations/${name}`))
   .join(String.fromCharCode(10));
-// The final provenance migration is authoritative for the post-chain state.
+// Provenance remains authoritative for the public RPC wrappers; the additive
+// recurrence migration owns the current capability and private content verifier.
 const publicationMigration =
   migrationNames.find((name) => name.endsWith('_enforce_backup_publication_provenance.sql')) ?? '';
 const publicationSource = publicationMigration
@@ -1158,8 +1179,9 @@ const publicationFunctionBlocks = publicationSource
 
 // Every generation table must have RLS enabled. There is no exception here —
 // unlike ai_request_quota there are no deny-all-by-omission tables: these all
-// serve the owner-scoped client path.
+// serve the owner-scoped client path. Include the new series state as well.
 for (const table of [
+  'todo_recurrence_series',
   'backup_generation',
   'backup_generation_chunk',
   'backup_generation_head',
@@ -1185,6 +1207,10 @@ for (const policy of [
   'backup_generation_head_select_owner',
   'backup_generation_reservation_select_owner',
   'backup_generation_publication_select_owner',
+  'sync_todo_recurrence_series_select_owner',
+  'sync_todo_recurrence_series_insert_owner',
+  'sync_todo_recurrence_series_update_owner',
+  'sync_todo_recurrence_series_delete_owner',
 ]) {
   req(`generation policy ${policy}`, generationSource, policy);
   // The policy NAME existing is not owner scoping: the PREDICATE must be the
@@ -1331,25 +1357,27 @@ for (const fn of ['publish_backup_generation', 'reserve_backup_generation_sequen
 // binding: every SECURITY DEFINER function in the provenance migration must
 // pin search_path (in its own definition block or via ALTER FUNCTION) — a
 // single surviving pin must not mask an unpinned definer sibling.
-for (const block of publicationFunctionBlocks) {
-  if (!/SECURITY DEFINER/i.test(block)) continue;
-  const nameMatch = block.match(/CREATE (OR REPLACE )?FUNCTION\s+(?:public\.)?([a-z0-9_]+)/i);
-  const fnName = nameMatch ? nameMatch[1] : '<unnamed>';
-  // Comment-stripped (final review P1: a commented-out pin must not count),
-  // and the ALTER fallback is LINE-bound to this function's name (a sibling's
-  // pin on a later line must not vouch for this one).
-  const blockWithoutComments = block.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
-  const pinnedInBlock = /SET search_path\s*=/i.test(blockWithoutComments);
-  const pinnedByAlter = new RegExp(
-    `ALTER FUNCTION[^\\n;]*${fnName}[^\\n;]*SET search_path`,
-    'i',
-  ).test(publicationSource);
-  if (!pinnedInBlock && !pinnedByAlter) {
-    failures.push(
-      `generation definer function ${fnName} must pin search_path (SECURITY DEFINER without SET search_path is a privilege-escalation primitive)`,
-    );
+const definerSources = [publicationSource, recurrenceMigration, spawnMigration];
+for (const source of definerSources)
+  for (const block of source.split(/(?=CREATE (OR REPLACE )?FUNCTION)/i)) {
+    if (!/CREATE (OR REPLACE )?FUNCTION/i.test(block) || !/SECURITY DEFINER/i.test(block)) continue;
+    const nameMatch = block.match(/CREATE (OR REPLACE )?FUNCTION\s+(?:public\.)?([a-z0-9_]+)/i);
+    const fnName = nameMatch ? nameMatch[1] : '<unnamed>';
+    // Comment-stripped (final review P1: a commented-out pin must not count),
+    // and the ALTER fallback is LINE-bound to this function's name (a sibling's
+    // pin on a later line must not vouch for this one).
+    const blockWithoutComments = block.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    const pinnedInBlock = /SET search_path\s*=/i.test(blockWithoutComments);
+    const pinnedByAlter = new RegExp(
+      `ALTER FUNCTION[^\\n;]*${fnName}[^\\n;]*SET search_path`,
+      'i',
+    ).test(source);
+    if (!pinnedInBlock && !pinnedByAlter) {
+      failures.push(
+        `generation definer function ${fnName} must pin search_path (SECURITY DEFINER without SET search_path is a privilege-escalation primitive)`,
+      );
+    }
   }
-}
 req('provenance migration present', publicationSource, 'SECURITY DEFINER');
 req('provenance migration pins search_path', publicationSource, 'SET search_path = pg_catalog');
 // The retired v1 publisher must stay revoked — it was replaced precisely because
@@ -1377,6 +1405,103 @@ reqAbsent(
       'generation execution grants must stay function-scoped: a schema-wide EXECUTE grant would make the retired v1 publisher callable again',
     );
   }
+}
+
+// Scope 8 is additive, never an excuse to replace the provenance fence or to
+// reinterpret historical captures. The new verifier must accept exact Scope 7
+// preservation and exact Scope 8, certify both occurrence fields, and require
+// each daily occurrence's canonical series parent.
+requireText('recurrence capability scope', recurrenceMigration, /'scope_version',\s*8/);
+requireText(
+  'recurrence verifier historical scope fence',
+  recurrenceMigration,
+  /scope_version NOT IN \(7,8\)/,
+);
+requireText(
+  'recurrence verifier parent graph',
+  recurrenceMigration,
+  /RAISE EXCEPTION 'missing recurring-series parent'/,
+);
+requireText(
+  'recurrence occurrence date',
+  recurrenceMigration,
+  /ADD COLUMN IF NOT EXISTS recurrence_date_key TEXT/,
+);
+requireText(
+  'recurrence occurrence provenance',
+  recurrenceMigration,
+  /ADD COLUMN IF NOT EXISTS recurrence_touched INTEGER NOT NULL DEFAULT 0/,
+);
+requireText('recurrence fixture date', fixture, /recurrence_date_key TEXT/);
+requireText(
+  'recurrence fixture provenance',
+  fixture,
+  /recurrence_touched INTEGER NOT NULL DEFAULT 0/,
+);
+requireText(
+  'recurrence privilege reset',
+  recurrenceMigration,
+  /REVOKE ALL PRIVILEGES ON TABLE public\.todo_recurrence_series FROM PUBLIC, anon, authenticated/,
+);
+try {
+  const contract = JSON.parse(
+    recurrenceMigration.match(/\$contract\$([\s\S]*?)\$contract\$/)?.[1] ?? '',
+  );
+  for (const column of ['recurrence_date_key', 'recurrence_touched']) {
+    if (!contract.todos.columns.includes(column) || !contract.todos.fields[column])
+      failures.push(`recurrence validator missing ${column}`);
+  }
+  if (contract.todo_recurrence_series.fields.id.maxLength !== 1000)
+    failures.push('recurrence validator must preserve bounded legacy series ids');
+  if (
+    contract.weekly_reviews.fields.reflection.maxLength !== 4000 ||
+    contract.daily_plans.fields.reflection.maxLength !== 2000 ||
+    contract.daily_plans.fields.top_todo_titles.maxLength !== 5000
+  )
+    failures.push('recurrence validator must preserve product-authored review/planning text');
+} catch {
+  failures.push('recurrence row-validation contract is missing or malformed');
+}
+
+// Scope 9 keeps the public provenance admission wrapper and private grants,
+// freezes Scope 7/8 bytes, and certifies exact (not timezone-derived) parents.
+requireText('spawn capability scope', spawnMigration, /'scope_version',\s*9/);
+requireText('spawn historical scope fence', spawnMigration, /scope_version NOT IN \(7,8,9\)/);
+requireText(
+  'spawn column migration',
+  spawnMigration,
+  /ADD COLUMN IF NOT EXISTS recurrence_spawned_by_id TEXT/,
+);
+requireText('spawn fixture column', fixture, /recurrence_spawned_by_id TEXT/);
+requireText(
+  'spawn old-scope metadata fence',
+  spawnMigration,
+  /scope_version < 9 AND v_entity = 'todos'[\s\S]*?v_row::jsonb \? 'recurrence_spawned_by_id'/,
+);
+requireText(
+  'spawn exact parent graph',
+  spawnMigration,
+  /RAISE EXCEPTION 'missing or self completion-spawn parent'/,
+);
+requireText(
+  'spawn private verifier revoke',
+  spawnMigration,
+  /REVOKE ALL ON FUNCTION public\.backup_generation_validate_row\(text,jsonb\),\s*public\.backup_generation_publish_v1\(text,bigint,integer,text\) FROM PUBLIC,\s*anon,\s*authenticated/,
+);
+try {
+  const contract = JSON.parse(
+    spawnMigration.match(/\$contract\$([\s\S]*?)\$contract\$/)?.[1] ?? '',
+  );
+  const field = contract.todos.fields.recurrence_spawned_by_id;
+  if (
+    !contract.todos.columns.includes('recurrence_spawned_by_id') ||
+    field.kind !== 'id' ||
+    field.nullable !== true ||
+    field.optional !== true
+  )
+    failures.push('spawn validator must certify an optional nullable parent id');
+} catch {
+  failures.push('spawn row-validation contract is missing or malformed');
 }
 
 // Negative coverage: prove the generation checks actually reject unsafe
@@ -1419,7 +1544,7 @@ if (failures.length > 0) {
   console.log(
     `Supabase schema contract PASS (${migrationNames.length} migration files; ` +
       `4 owner-scoped sync tables; ${backupTables.length} owner-scoped backup tables; ` +
-      'planning + weekly_reviews + workout_session_sets scope-V5 + Gym V2 scope-V6/7 closure; ' +
+      'planning + weekly_reviews + workout_session_sets scope-V5 + Gym V2 scope-V6/7 + Todo recurrence/spawn provenance scope-V8/9 closure; ' +
       'private AI quota RPC). Static source validation only — NOT hosted certification: ' +
       'applied migrations, live pg_policies/ACLs and PostgREST exposure are verified ' +
       'only by a hosted audit.',

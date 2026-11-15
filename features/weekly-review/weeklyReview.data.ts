@@ -261,10 +261,27 @@ export async function applyNextWeekPlanSuggestions(
           [suggestion.dateKey],
         );
         const merged = [...parseTopTodoIds(existing?.top_todo_ids ?? '[]')];
+        // Suggestions can become stale while the review is open. Resolve the
+        // live candidates in the SAME transaction before counting additions;
+        // the daily-plan writer would otherwise silently prune these IDs.
+        const candidateIds = [...new Set(suggestion.todoIds)];
+        const liveRows = await transactionDb.getAllAsync<{ id: string }>(
+          `SELECT id FROM todos WHERE deleted_at IS NULL AND id IN (${candidateIds.map(() => '?').join(',')})`,
+          candidateIds,
+        );
+        const liveIds = new Set(liveRows.map((row) => row.id));
         let dayChanged = false;
         for (const todoId of suggestion.todoIds) {
           if (merged.includes(todoId)) {
             skipped.push({ dateKey: suggestion.dateKey, todoId, reason: 'already_selected' });
+            continue;
+          }
+          if (!liveIds.has(todoId)) {
+            failed.push({
+              dateKey: suggestion.dateKey,
+              todoId,
+              error: 'Task is no longer available.',
+            });
             continue;
           }
           if (merged.length >= MAX_TOP_PRIORITIES) {

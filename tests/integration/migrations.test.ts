@@ -83,6 +83,7 @@ vi.mock('@/core/db/appMeta', async (importOriginal) => {
 
 /** All tables the app creates (bootstrap DDL + append-only migrations). */
 const EXPECTED_TABLES = [
+  'todo_recurrence_series',
   'todos',
   'habits',
   'habit_completions',
@@ -108,6 +109,7 @@ const EXPECTED_TABLES = [
 
 /** Named indexes the app creates across the runtime schema. */
 const EXPECTED_NAMED_INDEXES = [
+  'idx_todos_recurrence_date',
   'idx_saved_meals_food_name',
   'idx_linked_action_rules_source_lookup',
   'idx_linked_action_rules_bidirectional_group',
@@ -133,6 +135,7 @@ const EXPECTED_NAMED_INDEXES = [
 const EXPECTED_REFERENCE_NAMED_INDEXES = EXPECTED_NAMED_INDEXES.filter(
   (index) =>
     ![
+      'idx_todos_recurrence_date',
       'idx_custom_exercises_active_name',
       'idx_custom_exercises_active_search',
       'uq_workout_weekly_plan_active_weekday',
@@ -153,6 +156,7 @@ const EXPECTED_REFERENCE_NAMED_INDEXES = EXPECTED_NAMED_INDEXES.filter(
 const EXPECTED_REFERENCE_TABLES = EXPECTED_TABLES.filter(
   (table) =>
     ![
+      'todo_recurrence_series',
       'custom_exercises',
       'workout_weekly_plan',
       'workout_schedule_overrides',
@@ -182,14 +186,14 @@ async function openDb(options: OpenDbOptions = {}): Promise<TestDatabase> {
 }
 
 describe('tests/integration/migrations', () => {
-  it('bootstraps from zero and reaches stored schema version 25', async () => {
+  it('bootstraps from zero and reaches stored schema version 27', async () => {
     const db = await openDb();
 
     const row = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
       ['db_schema_version'],
     );
-    expect(row?.value).toBe('25');
+    expect(row?.value).toBe('27');
 
     const dateKeyFormat = await db.getFirstAsync<{ value: string }>(
       'SELECT value FROM app_meta WHERE key = ?',
@@ -385,7 +389,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v1?.value).toBe('25');
+      expect(v1?.value).toBe('27');
       await session1.closeAsync();
 
       // Session 2: reopen the SAME file. Bootstrap DDL (CREATE TABLE IF NOT
@@ -396,7 +400,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(v2?.value).toBe('25');
+      expect(v2?.value).toBe('27');
 
       const sessions = await session2.getAllAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table'",
@@ -507,7 +511,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(version?.value).toBe('25');
+      expect(version?.value).toBe('27');
 
       const index = await db.getFirstAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_todos_pending_sort'",
@@ -643,7 +647,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(version?.value).toBe('25');
+      expect(version?.value).toBe('27');
 
       const todo = await db.getFirstAsync<{ title: string }>(
         'SELECT title FROM todos WHERE id = ?',
@@ -750,7 +754,7 @@ describe('tests/integration/migrations', () => {
         'SELECT value FROM app_meta WHERE key = ?',
         ['db_schema_version'],
       );
-      expect(finalVersion?.value).toBe('25');
+      expect(finalVersion?.value).toBe('27');
       await retried.closeAsync();
     } finally {
       appMetaFailures.failVersionSixBump = false;

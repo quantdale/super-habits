@@ -1,7 +1,8 @@
 import type * as SQLite from 'expo-sqlite';
 import { getDatabase } from '@/core/db/client';
 import { resolveProjectGoalAssociation } from '@/features/shared/associations';
-import type { Todo, TodoPriority, TodoRecurrence } from '@/core/db/types';
+import type { Todo, TodoPriority, TodoRecurrence, TodoRecurrenceSeries } from '@/core/db/types';
+import { BACKFILL_TODO_RECURRENCE_SERIES_SQL } from '@/core/db/todoRecurrenceMigration';
 import type {
   LinkedActionEffectAdapterResult,
   LinkedActionProcessResult,
@@ -43,9 +44,9 @@ import { getTomorrowDateKey } from './todos.domain';
  * would look for an instance on the *same* future date, find itself, and stop
  * the series (boundary chain contract).
  *
- * `reference` defaults to now; a retraction passes the instant the occurrence
- * was originally completed, so it resolves the copy that completion spawned
- * instead of the one today's clock would ask for.
+ * Completion passes its transaction's fixed instant, so the date cannot drift
+ * between the source write and child insertion. Undo never recomputes this
+ * date: it follows the child's durable completion-parent identity.
  */
 function nextRecurringSpawnDueDate(
   completedDueDate: string | null,
@@ -59,11 +60,15 @@ function nextRecurringSpawnDueDate(
 /**
  * A spawned daily copy is "pristine" while nothing has written it since the
  * spawn. `createRecurringInstances` inserts with `created_at = updated_at`, and
- * every later write (instance edit, series-template rename, reorder,
- * completion) bumps `updated_at` — so this predicate is the exact
- * "untouched since it was spawned" oracle without adding a provenance column.
+ * later user writes set durable `recurrence_touched` provenance as well as
+ * bumping `updated_at`. The flag also protects edits in the same clock tick.
  */
-const PRISTINE_SPAWN_SQL = 'completed = 0 AND deleted_at IS NULL AND updated_at = created_at';
+const PRISTINE_SPAWN_SQL =
+  'completed = 0 AND deleted_at IS NULL AND recurrence_touched = 0 AND updated_at = created_at';
+
+function occurrenceDate(todo: Pick<Todo, 'due_date' | 'recurrence_date_key'>): string | null {
+  return todo.recurrence_date_key === undefined ? todo.due_date : todo.recurrence_date_key;
+}
 
 /**
  * Undo the copy that completing `parent` spawned.
@@ -89,17 +94,15 @@ async function removePristineSpawnedCopyWithinTransaction(
     | 'completed_at'
     | 'recurrence'
     | 'recurrence_id'
+    | 'recurrence_date_key'
   >,
   now: string,
   enqueue: (record: SyncRecord) => void,
 ): Promise<string | null> {
-  // `parent` is the pre-update row, so `completed_at` is the ORIGINAL completion
-  // instant: replaying the spawn from it finds the copy that completion created
-  // even when the reopen happens days later. No provenance, nothing to retract.
-  const spawnDueDate = parent.completed_at
-    ? nextRecurringSpawnDueDate(parent.due_date, new Date(parent.completed_at))
-    : null;
-  if (parent.recurrence !== 'daily' || !parent.recurrence_id || !spawnDueDate) return null;
+  // Old timestamps cannot reconstruct the device's original calendar zone,
+  // and an existing rollover copy is not this completion's own creation.
+  // Only the durable parent link is proof; retain unlinked legacy copies.
+  if (parent.recurrence !== 'daily' || !parent.recurrence_id || !parent.completed_at) return null;
   const spawned = await transactionDb.getFirstAsync<{
     id: string;
     title: string;
@@ -108,24 +111,16 @@ async function removePristineSpawnedCopyWithinTransaction(
     due_date: string | null;
   }>(
     `SELECT id, title, notes, priority, due_date FROM todos
-     WHERE recurrence_id = ?
-       AND due_date = ?
+     WHERE recurrence_spawned_by_id = ?
+       AND recurrence_id = ?
        AND id != ?
        AND ${PRISTINE_SPAWN_SQL}`,
-    [parent.recurrence_id, spawnDueDate, parent.id],
+    [parent.id, parent.recurrence_id, parent.id],
   );
   if (!spawned) return null;
-  // The pristine timestamp is millisecond-granular, so an edit landing in the
-  // same millisecond as the insert cannot be distinguished by time alone.
-  // Every field the spawn copies must therefore still match the parent.
-  if (
-    spawned.title !== parent.title ||
-    spawned.notes !== parent.notes ||
-    spawned.priority !== parent.priority ||
-    spawned.due_date !== spawnDueDate
-  ) {
-    return null;
-  }
+  // recurrence_touched is durable user-write provenance, including same-tick
+  // edits. Content need not match an instance-overridden parent: the copy was
+  // authored from the independent series template.
 
   const removed = await removeTodoWithinTransaction(transactionDb, spawned.id, now, enqueue);
   if (!removed) return null;
@@ -285,7 +280,7 @@ export async function addTodo(input: {
   await runSyncedMutation({
     db,
     record: { entity: 'todos', id, updatedAt: now, operation: 'create' },
-    mutate: async (transactionDb) => {
+    mutate: async (transactionDb, enqueue) => {
       // `AUD-SH12-A`: creation goes through the SAME association resolver as
       // edits, so a dangling parent is refused instead of persisted and a
       // Project-backed Goal aligns its Project. Previously this INSERT wrote
@@ -303,13 +298,22 @@ export async function addTodo(input: {
          FROM todos WHERE deleted_at IS NULL AND completed = 0`,
       );
       const sortOrder = (maxRow?.maxOrder ?? 0) + 1;
+      if (recurrenceId) {
+        await ensureRecurringSeries(
+          transactionDb,
+          recurrenceId,
+          { title: input.title, notes: input.notes ?? null, priority: input.priority ?? 'normal' },
+          now,
+          enqueue,
+        );
+      }
       await transactionDb.runAsync(
         `INSERT INTO todos
            (id, title, notes, completed, completed_at, due_date, priority,
-            sort_order, recurrence, recurrence_id,
+            sort_order, recurrence, recurrence_id, recurrence_date_key,
             project_id, goal_id,
             created_at, updated_at, deleted_at)
-         VALUES (?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+         VALUES (?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
         [
           id,
           input.title,
@@ -319,6 +323,7 @@ export async function addTodo(input: {
           sortOrder,
           input.recurrence ?? null,
           recurrenceId,
+          recurrenceId ? dueDate : null,
           resolution.nextProjectId,
           resolution.nextGoalId,
           now,
@@ -336,6 +341,35 @@ export async function addTodo(input: {
   return id;
 }
 
+/** A stopped identity is a tombstone, never permission to recreate the series. */
+async function ensureRecurringSeries(
+  tx: SQLite.SQLiteDatabase,
+  recurrenceId: string,
+  fallback: Pick<Todo, 'title' | 'notes' | 'priority'>,
+  now: string,
+  enqueue: (record: SyncRecord) => void,
+): Promise<{ series: TodoRecurrenceSeries | null; created: boolean }> {
+  const existing = await tx.getFirstAsync<TodoRecurrenceSeries>(
+    'SELECT * FROM todo_recurrence_series WHERE id = ?',
+    [recurrenceId],
+  );
+  if (existing) return { series: existing.deleted_at === null ? existing : null, created: false };
+  await tx.runAsync(
+    'INSERT INTO todo_recurrence_series (id, title, notes, priority, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, NULL)',
+    [recurrenceId, fallback.title, fallback.notes, fallback.priority, now, now],
+  );
+  enqueue({
+    entity: 'todo_recurrence_series',
+    id: recurrenceId,
+    updatedAt: now,
+    operation: 'create',
+  });
+  return {
+    series: { id: recurrenceId, ...fallback, created_at: now, updated_at: now, deleted_at: null },
+    created: true,
+  };
+}
+
 type RecurringInstanceInput = {
   title: string;
   notes: string | null;
@@ -343,6 +377,58 @@ type RecurringInstanceInput = {
   recurrenceId: string;
   dueDate: string;
 };
+
+async function insertRecurringInstanceWithinTransaction(
+  tx: SQLite.SQLiteDatabase,
+  input: RecurringInstanceInput,
+  now: string,
+  enqueue: (record: SyncRecord) => void,
+  sortOrder?: number,
+  spawnedById: string | null = null,
+): Promise<{ createdSeries: boolean; copy: TodoReminderSnapshot | null }> {
+  const resolved = await ensureRecurringSeries(tx, input.recurrenceId, input, now, enqueue);
+  if (!resolved.series) return { createdSeries: resolved.created, copy: null };
+  const template = resolved.series;
+  const order =
+    sortOrder ??
+    ((
+      await tx.getFirstAsync<{ maxOrder: number }>(
+        `SELECT COALESCE(MAX(sort_order), 0) AS maxOrder FROM todos WHERE deleted_at IS NULL AND completed = 0`,
+      )
+    )?.maxOrder ?? 0) + 1;
+  const id = createId('todo');
+  const result = await tx.runAsync(
+    `INSERT INTO todos
+       (id, title, notes, completed, completed_at, due_date, priority,
+        sort_order, recurrence, recurrence_id, recurrence_date_key,
+        recurrence_spawned_by_id, created_at, updated_at, deleted_at)
+     SELECT ?, ?, ?, 0, NULL, ?, ?, ?, 'daily', ?, ?, ?, ?, ?, NULL
+     WHERE NOT EXISTS (
+       SELECT 1 FROM todos WHERE recurrence_id = ? AND recurrence_date_key = ? AND deleted_at IS NULL
+     )`,
+    [
+      id,
+      template.title,
+      template.notes,
+      input.dueDate,
+      template.priority,
+      order,
+      input.recurrenceId,
+      input.dueDate,
+      spawnedById,
+      now,
+      now,
+      input.recurrenceId,
+      input.dueDate,
+    ],
+  );
+  if (result.changes !== 1) return { createdSeries: resolved.created, copy: null };
+  enqueue({ entity: 'todos', id, updatedAt: now, operation: 'create' });
+  return {
+    createdSeries: resolved.created,
+    copy: { id, title: template.title, dueDate: input.dueDate, completedAt: null },
+  };
+}
 
 export async function createRecurringInstance(input: RecurringInstanceInput): Promise<void> {
   await createRecurringInstances([input]);
@@ -355,6 +441,15 @@ export async function createRecurringInstances(inputs: RecurringInstanceInput[])
   // corrupted template can never propagate invalid rows into the series.
   for (const input of inputs) {
     assertTodoWrite({ title: input.title, notes: input.notes, dueDate: input.dueDate });
+    // Legacy identities may be arbitrary bounded text, but publication cannot
+    // certify an empty row identity or one beyond the recovery string limit.
+    if (
+      typeof input.recurrenceId !== 'string' ||
+      input.recurrenceId.length === 0 ||
+      input.recurrenceId.length > 1000
+    ) {
+      throw new Error('Recurring series identity must contain 1–1000 characters.');
+    }
   }
 
   const db = await getDatabase();
@@ -375,43 +470,22 @@ export async function createRecurringInstances(inputs: RecurringInstanceInput[])
       );
       const firstSortOrder = (maxRow?.maxOrder ?? 0) + 1;
       let inserted = 0;
+      let createdSeries = false;
       for (const [index, input] of inputs.entries()) {
-        const id = createId('todo');
-        const now = nowIso();
-        const result = await transactionDb.runAsync(
-          `INSERT INTO todos
-             (id, title, notes, completed, completed_at, due_date, priority,
-              sort_order, recurrence, recurrence_id,
-              created_at, updated_at, deleted_at)
-           SELECT ?, ?, ?, 0, NULL, ?, ?, ?, 'daily', ?, ?, ?, NULL
-           WHERE NOT EXISTS (
-             SELECT 1
-             FROM todos
-             WHERE recurrence_id = ?
-               AND due_date = ?
-               AND deleted_at IS NULL
-           )`,
-          [
-            id,
-            input.title,
-            input.notes,
-            input.dueDate,
-            input.priority,
-            firstSortOrder + index,
-            input.recurrenceId,
-            now,
-            now,
-            input.recurrenceId,
-            input.dueDate,
-          ],
+        const result = await insertRecurringInstanceWithinTransaction(
+          transactionDb,
+          input,
+          nowIso(),
+          enqueue,
+          firstSortOrder + index,
         );
-        if (result.changes === 1) {
+        createdSeries ||= result.createdSeries;
+        if (result.copy) {
           inserted += 1;
-          spawned.push({ id, title: input.title, dueDate: input.dueDate, completedAt: null });
-          enqueue({ entity: 'todos', id, updatedAt: now, operation: 'create' });
+          spawned.push(result.copy);
         }
       }
-      return { changed: inserted > 0, value: inserted };
+      return { changed: inserted > 0 || createdSeries, value: inserted };
     },
   });
 
@@ -424,28 +498,19 @@ export async function createRecurringInstances(inputs: RecurringInstanceInput[])
   }
 }
 
-export async function getRecurringTodosByIds(recurrenceIds: string[]): Promise<Todo[]> {
+export async function getRecurringTodosByIds(
+  recurrenceIds: string[],
+): Promise<Pick<Todo, 'title' | 'notes' | 'priority' | 'recurrence_id'>[]> {
   if (recurrenceIds.length === 0) return [];
   const db = await getDatabase();
 
-  // Single query instead of one SELECT per id; newest todo per series wins.
   const placeholders = recurrenceIds.map(() => '?').join(', ');
-  const rows = await db.getAllAsync<Todo>(
-    `SELECT *
-     FROM todos
-     WHERE recurrence_id IN (${placeholders})
-       AND deleted_at IS NULL
-     ORDER BY created_at DESC`,
+  return db.getAllAsync(
+    `SELECT title, notes, priority, id AS recurrence_id
+     FROM todo_recurrence_series
+     WHERE id IN (${placeholders}) AND deleted_at IS NULL`,
     recurrenceIds,
   );
-
-  const newestBySeries = new Map<string, Todo>();
-  for (const row of rows) {
-    if (row.recurrence_id && !newestBySeries.has(row.recurrence_id)) {
-      newestBySeries.set(row.recurrence_id, row);
-    }
-  }
-  return [...newestBySeries.values()];
 }
 
 export async function listAllActiveTodosForRecurrence(): Promise<
@@ -453,9 +518,11 @@ export async function listAllActiveTodosForRecurrence(): Promise<
 > {
   const db = await getDatabase();
   return db.getAllAsync(
-    `SELECT recurrence_id, recurrence, due_date, completed, deleted_at
-     FROM todos
-     WHERE deleted_at IS NULL`,
+    `SELECT recurrence_id, recurrence, recurrence_date_key AS due_date, completed, deleted_at
+     FROM todos WHERE deleted_at IS NULL
+     UNION ALL
+     SELECT id AS recurrence_id, 'daily' AS recurrence, NULL AS due_date, 1 AS completed, deleted_at
+     FROM todo_recurrence_series WHERE deleted_at IS NULL`,
   );
 }
 
@@ -472,7 +539,7 @@ export async function updateTodoOrder(orderedIds: string[]): Promise<void> {
       let changed = 0;
       for (let i = 0; i < orderedIds.length; i++) {
         const result = await transactionDb.runAsync(
-          `UPDATE todos SET sort_order = ?, updated_at = ?
+          `UPDATE todos SET sort_order = ?, updated_at = ?, recurrence_touched = 1
            WHERE id = ?
              AND deleted_at IS NULL`,
           [i + 1, now, orderedIds[i]],
@@ -595,8 +662,9 @@ async function updateTodoWithinTransaction(
     recurrence?: TodoRecurrence;
   },
   now: string,
+  enqueue: (record: SyncRecord) => void,
 ): Promise<{ changed: boolean; value: undefined }> {
-  const fields: string[] = ['updated_at = ?'];
+  const fields: string[] = ['updated_at = ?', 'recurrence_touched = 1'];
   const values: (string | null)[] = [now];
 
   if (updates.title !== undefined) {
@@ -617,9 +685,19 @@ async function updateTodoWithinTransaction(
   }
 
   const current = await transactionDb.getFirstAsync<
-    Pick<Todo, 'project_id' | 'goal_id' | 'recurrence' | 'recurrence_id' | 'due_date'>
+    Pick<
+      Todo,
+      | 'title'
+      | 'notes'
+      | 'priority'
+      | 'project_id'
+      | 'goal_id'
+      | 'recurrence'
+      | 'recurrence_id'
+      | 'due_date'
+    >
   >(
-    `SELECT project_id, goal_id, recurrence, recurrence_id, due_date
+    `SELECT title, notes, priority, project_id, goal_id, recurrence, recurrence_id, due_date
      FROM todos WHERE id = ? AND deleted_at IS NULL`,
     [id],
   );
@@ -627,11 +705,29 @@ async function updateTodoWithinTransaction(
     return { changed: false, value: undefined };
   }
 
+  let seriesToEnsure =
+    current.recurrence === 'daily' && current.recurrence_id
+      ? {
+          id: current.recurrence_id,
+          title: current.title,
+          notes: current.notes,
+          priority: current.priority,
+        }
+      : null;
   // Restart: starting recurrence on a non-recurring task begins a NEW series
   // chain (fresh recurrence id); stopped chains stay ended.
   if (updates.recurrence === 'daily' && current.recurrence !== 'daily') {
-    fields.push('recurrence = ?', 'recurrence_id = ?');
-    values.push('daily', createId('rec'));
+    const recurrenceId = createId('rec');
+    const dueDate =
+      updates.dueDate === undefined ? (current.due_date ?? toDateKey()) : updates.dueDate;
+    fields.push('recurrence = ?', 'recurrence_id = ?', 'recurrence_date_key = ?');
+    values.push('daily', recurrenceId, dueDate);
+    seriesToEnsure = {
+      id: recurrenceId,
+      title: updates.title ?? current.title,
+      notes: updates.notes ?? current.notes,
+      priority: updates.priority ?? current.priority,
+    };
     if (updates.dueDate === undefined && current.due_date === null) {
       fields.push('due_date = ?');
       values.push(toDateKey());
@@ -657,6 +753,9 @@ async function updateTodoWithinTransaction(
        AND deleted_at IS NULL`,
     [...values, id],
   );
+  if (result.changes === 1 && seriesToEnsure) {
+    await ensureRecurringSeries(transactionDb, seriesToEnsure.id, seriesToEnsure, now, enqueue);
+  }
   return { changed: result.changes === 1, value: undefined };
 }
 
@@ -691,7 +790,8 @@ export async function updateTodo(
   await runSyncedMutation({
     db,
     record: { entity: 'todos', id, updatedAt: now, operation: 'update' },
-    mutate: async (transactionDb) => updateTodoWithinTransaction(transactionDb, id, updates, now),
+    mutate: async (transactionDb, enqueue) =>
+      updateTodoWithinTransaction(transactionDb, id, updates, now, enqueue),
   });
 
   // Re-read the row so the reminder reflects the final title/due/completed state.
@@ -701,8 +801,8 @@ export async function updateTodo(
 /**
  * Applies a template edit to the remaining life of a daily series: every live
  * (non-deleted, non-completed) instance sharing the recurrence id receives the
- * field changes, so subsequently spawned copies (which are copied from the
- * active instance) inherit them too. Completed history rows are NEVER
+ * field changes. Subsequent copies read the canonical series row rather than
+ * inferring a template from an instance override. Completed history rows are NEVER
  * rewritten. One durable update intent is enqueued per touched row.
  */
 export async function updateRecurringSeriesTemplate(
@@ -715,7 +815,7 @@ export async function updateRecurringSeriesTemplate(
   const db = await getDatabase();
   const now = nowIso();
 
-  const fields: string[] = ['updated_at = ?'];
+  const fields: string[] = ['updated_at = ?', 'recurrence_touched = 1'];
   const values: (string | null)[] = [now];
   if (updates.title !== undefined) {
     fields.push('title = ?');
@@ -733,14 +833,32 @@ export async function updateRecurringSeriesTemplate(
   const outcome = await runBackupMutation<void>({
     db,
     mutate: async (transactionDb, enqueue) => {
+      const existingSeries = await transactionDb.getFirstAsync<TodoRecurrenceSeries>(
+        'SELECT * FROM todo_recurrence_series WHERE id = ? AND deleted_at IS NULL',
+        [recurrenceId],
+      );
+      if (!existingSeries) return { changed: false, value: undefined };
+      await transactionDb.runAsync(
+        'UPDATE todo_recurrence_series SET title = ?, notes = ?, priority = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+        [
+          updates.title ?? existingSeries.title,
+          updates.notes === undefined ? existingSeries.notes : updates.notes,
+          updates.priority ?? existingSeries.priority,
+          now,
+          recurrenceId,
+        ],
+      );
+      enqueue({
+        entity: 'todo_recurrence_series',
+        id: recurrenceId,
+        updatedAt: now,
+        operation: 'update',
+      });
       const targets = await transactionDb.getAllAsync<{ id: string }>(
         `SELECT id FROM todos
          WHERE recurrence_id = ? AND completed = 0 AND deleted_at IS NULL`,
         [recurrenceId],
       );
-      if (targets.length === 0) {
-        return { changed: false, value: undefined };
-      }
       for (const target of targets) {
         await transactionDb.runAsync(`UPDATE todos SET ${fields.join(', ')} WHERE id = ?`, [
           ...values,
@@ -783,16 +901,29 @@ export async function stopRecurringSeries(recurrenceId: string): Promise<void> {
   const outcome = await runBackupMutation<void>({
     db,
     mutate: async (transactionDb, enqueue) => {
+      const ended = await transactionDb.runAsync(
+        'UPDATE todo_recurrence_series SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
+        [now, now, recurrenceId],
+      );
+      if (ended.changes > 0)
+        enqueue({
+          entity: 'todo_recurrence_series',
+          id: recurrenceId,
+          updatedAt: now,
+          operation: 'delete',
+        });
       const members = await transactionDb.getAllAsync<{
         id: string;
         completed: 0 | 1;
         deleted_at: string | null;
         due_date: string | null;
-      }>(`SELECT id, completed, deleted_at, due_date FROM todos WHERE recurrence_id = ?`, [
-        recurrenceId,
-      ]);
+        recurrence_date_key: string | null;
+      }>(
+        `SELECT id, completed, deleted_at, due_date, recurrence_date_key FROM todos WHERE recurrence_id = ?`,
+        [recurrenceId],
+      );
       if (members.length === 0) {
-        return { changed: false, value: undefined };
+        return { changed: ended.changes > 0, value: undefined };
       }
       for (const member of members) {
         if (member.deleted_at !== null) {
@@ -808,7 +939,9 @@ export async function stopRecurringSeries(recurrenceId: string): Promise<void> {
           continue;
         }
         const endsFuture =
-          member.completed === 0 && member.due_date !== null && member.due_date > todayKey;
+          member.completed === 0 &&
+          occurrenceDate(member) !== null &&
+          occurrenceDate(member)! > todayKey;
         if (endsFuture) {
           // F2: the tombstone must run through the shared dependent cleanup
           // (daily-plan top-priority prune + linked-action rules in both
@@ -898,7 +1031,7 @@ export async function setTodoProjectGoal(
       );
 
       const result = await transactionDb.runAsync(
-        `UPDATE todos SET project_id = ?, goal_id = ?, updated_at = ?
+        `UPDATE todos SET project_id = ?, goal_id = ?, updated_at = ?, recurrence_touched = 1
          WHERE id = ? AND deleted_at IS NULL`,
         [resolution.nextProjectId, resolution.nextGoalId, now, todoId],
       );
@@ -964,13 +1097,22 @@ export async function addTodoWithLinkedActionRules(input: {
          FROM todos WHERE deleted_at IS NULL AND completed = 0`,
       );
       const sortOrder = (maxRow?.maxOrder ?? 0) + 1;
+      if (recurrenceId) {
+        await ensureRecurringSeries(
+          transactionDb,
+          recurrenceId,
+          { title: input.title, notes: input.notes ?? null, priority: input.priority ?? 'normal' },
+          now,
+          enqueue,
+        );
+      }
       await transactionDb.runAsync(
         `INSERT INTO todos
            (id, title, notes, completed, completed_at, due_date, priority,
-            sort_order, recurrence, recurrence_id,
+            sort_order, recurrence, recurrence_id, recurrence_date_key,
             project_id, goal_id,
             created_at, updated_at, deleted_at)
-         VALUES (?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+         VALUES (?, ?, ?, 0, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
         [
           id,
           input.title,
@@ -980,6 +1122,7 @@ export async function addTodoWithLinkedActionRules(input: {
           sortOrder,
           input.recurrence ?? null,
           recurrenceId,
+          recurrenceId ? dueDate : null,
           resolution.nextProjectId,
           resolution.nextGoalId,
           now,
@@ -1034,7 +1177,13 @@ export async function updateTodoWithLinkedActionRules(
     db,
     record: { entity: 'todos', id: todoId, updatedAt: now, operation: 'update' },
     mutate: async (transactionDb, enqueue) => {
-      const applied = await updateTodoWithinTransaction(transactionDb, todoId, updates, now);
+      const applied = await updateTodoWithinTransaction(
+        transactionDb,
+        todoId,
+        updates,
+        now,
+        enqueue,
+      );
       if (!applied.changed) return { changed: false, value: undefined };
       await replaceLinkedActionRulesForSourceEntity({
         feature: 'todos',
@@ -1096,6 +1245,7 @@ async function setTodoCompletion(
   const linkedEventId = createId('levt');
   const linkedSourceDateKey = toDateKey();
   type ToggleMutation = {
+    spawnedCopy?: TodoReminderSnapshot | null;
     current: Todo | null;
     previous: 0 | 1;
     next: 0 | 1;
@@ -1127,7 +1277,7 @@ async function setTodoCompletion(
       }
       const completedAtValue = next === 1 ? now : null;
       const result = await transactionDb.runAsync(
-        `UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?
+        `UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?, recurrence_touched = 1
          WHERE id = ? AND completed = ? AND deleted_at IS NULL`,
         [next, completedAtValue, now, current.id, previous],
       );
@@ -1173,7 +1323,26 @@ async function setTodoCompletion(
           now,
         );
       }
-      return { changed: true, value: { current, previous, next, removedSpawnId } };
+      const spawnedCopy =
+        next === 1 && current.recurrence === 'daily' && current.recurrence_id
+          ? (
+              await insertRecurringInstanceWithinTransaction(
+                transactionDb,
+                {
+                  title: current.title,
+                  notes: current.notes,
+                  priority: current.priority,
+                  recurrenceId: current.recurrence_id,
+                  dueDate: nextRecurringSpawnDueDate(occurrenceDate(current), new Date(now)),
+                },
+                now,
+                enqueue,
+                undefined,
+                current.id,
+              )
+            ).copy
+          : null;
+      return { changed: true, value: { current, previous, next, removedSpawnId, spawnedCopy } };
     },
   });
 
@@ -1185,7 +1354,7 @@ async function setTodoCompletion(
     };
   }
 
-  const { current, previous, next, removedSpawnId } = outcome.value;
+  const { current, previous, next, removedSpawnId, spawnedCopy } = outcome.value;
 
   // The retracted copy is gone from the database already; drop its pending
   // device reminder so a notification cannot resurrect a completed-looking row.
@@ -1209,25 +1378,7 @@ async function setTodoCompletion(
     await syncReminderSafely({ id: current.id, title: current.title, dueDate: current.due_date });
   }
 
-  if (next === 1 && current.recurrence === 'daily' && current.recurrence_id) {
-    const spawnDueDate = nextRecurringSpawnDueDate(current.due_date);
-    const existing = await db.getFirstAsync<{ id: string }>(
-      `SELECT id FROM todos
-       WHERE recurrence_id = ?
-         AND due_date = ?
-         AND deleted_at IS NULL`,
-      [current.recurrence_id, spawnDueDate],
-    );
-    if (!existing) {
-      await createRecurringInstance({
-        title: current.title,
-        notes: current.notes,
-        priority: current.priority,
-        recurrenceId: current.recurrence_id,
-        dueDate: spawnDueDate,
-      });
-    }
-  }
+  if (spawnedCopy) await syncReminderSafely(spawnedCopy);
 
   if (previous !== 0 || next !== 1 || current.recurrence === 'daily') {
     return {
@@ -1302,6 +1453,7 @@ type BulkCompletionRow = Pick<
   | 'completed_at'
   | 'recurrence'
   | 'recurrence_id'
+  | 'recurrence_date_key'
 >;
 
 /**
@@ -1309,8 +1461,8 @@ type BulkCompletionRow = Pick<
  * counterparts (soft delete, sync enqueue, linked-action dispatch), but commit
  * all row writes in ONE transaction so a mid-batch failure can never leave a
  * half-applied edit behind. Per-row backup intents are enqueued inside that
- * same transaction; post-commit side effects (reminders, recurring follow-ups,
- * linked-action dispatch) then run per changed item exactly like the
+ * same transaction, including recurring follow-ups. Post-commit reminders and
+ * linked-action dispatch then run per changed item exactly like the
  * single-item path, preserving idempotent retry semantics.
  */
 export async function bulkSetTodoCompletion(
@@ -1323,6 +1475,7 @@ export async function bulkSetTodoCompletion(
   const linkedSourceDateKey = toDateKey();
 
   type AppliedCompletion = {
+    spawnedCopy: TodoReminderSnapshot | null;
     row: BulkCompletionRow;
     previous: 0 | 1;
     linkedEventId: string;
@@ -1335,7 +1488,7 @@ export async function bulkSetTodoCompletion(
       const applied: AppliedCompletion[] = [];
       for (const id of ids) {
         const current = await transactionDb.getFirstAsync<BulkCompletionRow>(
-          `SELECT id, title, notes, priority, completed, due_date, completed_at, recurrence, recurrence_id
+          `SELECT id, title, notes, priority, completed, due_date, completed_at, recurrence, recurrence_id, recurrence_date_key
            FROM todos
            WHERE id = ?
              AND deleted_at IS NULL`,
@@ -1347,7 +1500,7 @@ export async function bulkSetTodoCompletion(
         // safe no-op for that row.
         if (previous === completed) continue;
         const result = await transactionDb.runAsync(
-          `UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?
+          `UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?, recurrence_touched = 1
            WHERE id = ? AND completed = ? AND deleted_at IS NULL`,
           [completed, completed === 1 ? now : null, now, current.id, previous],
         );
@@ -1391,7 +1544,27 @@ export async function bulkSetTodoCompletion(
             now,
           );
         }
+        const spawnedCopy =
+          completed === 1 && current.recurrence === 'daily' && current.recurrence_id
+            ? (
+                await insertRecurringInstanceWithinTransaction(
+                  transactionDb,
+                  {
+                    title: current.title,
+                    notes: current.notes,
+                    priority: current.priority,
+                    recurrenceId: current.recurrence_id,
+                    dueDate: nextRecurringSpawnDueDate(occurrenceDate(current), new Date(now)),
+                  },
+                  now,
+                  enqueue,
+                  undefined,
+                  current.id,
+                )
+              ).copy
+            : null;
         applied.push({
+          spawnedCopy,
           row: current,
           previous,
           linkedEventId: linkedEventId ?? '',
@@ -1403,7 +1576,7 @@ export async function bulkSetTodoCompletion(
   });
 
   // Post-commit side effects, identical to setTodoCompletion's per-item path.
-  for (const { row, previous, linkedEventId, removedSpawnId } of outcome.value) {
+  for (const { row, previous, linkedEventId, removedSpawnId, spawnedCopy } of outcome.value) {
     const next = completed;
     if (removedSpawnId) {
       await cancelTodoReminderSafely(removedSpawnId);
@@ -1414,25 +1587,7 @@ export async function bulkSetTodoCompletion(
       await syncReminderSafely({ id: row.id, title: row.title, dueDate: row.due_date });
     }
 
-    if (next === 1 && row.recurrence === 'daily' && row.recurrence_id) {
-      const spawnDueDate = nextRecurringSpawnDueDate(row.due_date);
-      const existing = await db.getFirstAsync<{ id: string }>(
-        `SELECT id FROM todos
-         WHERE recurrence_id = ?
-           AND due_date = ?
-           AND deleted_at IS NULL`,
-        [row.recurrence_id, spawnDueDate],
-      );
-      if (!existing) {
-        await createRecurringInstance({
-          title: row.title,
-          notes: row.notes,
-          priority: row.priority,
-          recurrenceId: row.recurrence_id,
-          dueDate: spawnDueDate,
-        });
-      }
-    }
+    if (spawnedCopy) await syncReminderSafely(spawnedCopy);
 
     // Linked actions fire only on a genuine non-recurring 0->1 completion,
     // exactly like setTodoCompletion; the per-item event id was persisted in
@@ -1484,7 +1639,7 @@ export async function bulkUpdateTodoPriority(
         // Rows already at the target priority are skipped without rewriting
         // updated_at or re-enqueueing a redundant backup intent.
         const result = await transactionDb.runAsync(
-          `UPDATE todos SET priority = ?, updated_at = ?
+          `UPDATE todos SET priority = ?, updated_at = ?, recurrence_touched = 1
            WHERE id = ? AND priority != ? AND deleted_at IS NULL`,
           [priority, now, id, priority],
         );
@@ -1527,7 +1682,7 @@ export async function bulkAssignTodosProject(
           continue;
         }
         const result = await transactionDb.runAsync(
-          `UPDATE todos SET project_id = ?, goal_id = ?, updated_at = ?
+          `UPDATE todos SET project_id = ?, goal_id = ?, updated_at = ?, recurrence_touched = 1
            WHERE id = ? AND deleted_at IS NULL`,
           [resolution.nextProjectId, resolution.nextGoalId, now, id],
         );
@@ -1684,7 +1839,7 @@ export async function completeTodoFromLinkedAction(
     mutate: async (transactionDb) => {
       const result = await transactionDb.runAsync(
         `UPDATE todos
-         SET completed = 1, completed_at = ?, updated_at = ?
+         SET completed = 1, completed_at = ?, updated_at = ?, recurrence_touched = 1
          WHERE id = ?
            AND completed = 0
            AND deleted_at IS NULL`,
@@ -1737,8 +1892,11 @@ export async function applyRemoteTodos(
          updated_at,
          deleted_at,
          project_id,
-         goal_id
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         goal_id,
+         recurrence_date_key,
+         recurrence_touched,
+         recurrence_spawned_by_id
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id,
         row.title,
@@ -1757,7 +1915,31 @@ export async function applyRemoteTodos(
         // them and restore as unassigned.
         legacy.project_id ?? null,
         legacy.goal_id ?? null,
+        row.recurrence_date_key === undefined
+          ? row.recurrence === 'daily'
+            ? row.due_date
+            : null
+          : row.recurrence_date_key,
+        // Missing historical provenance is unknown, not proof of pristine.
+        row.recurrence_touched ?? 1,
+        row.recurrence_spawned_by_id ?? null,
       ],
+    );
+  }
+  // Legacy backups have no independent series entity. Reconstruct only missing
+  // templates; an explicitly restored series (including its tombstone) wins.
+  await db.execAsync(BACKFILL_TODO_RECURRENCE_SERIES_SQL);
+}
+
+/** Restore-only, before occurrence import; never enqueues or replays effects. */
+export async function applyRemoteTodoRecurrenceSeries(
+  db: SQLite.SQLiteDatabase,
+  rows: TodoRecurrenceSeries[],
+): Promise<void> {
+  for (const row of rows) {
+    await db.runAsync(
+      'INSERT OR REPLACE INTO todo_recurrence_series (id, title, notes, priority, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [row.id, row.title, row.notes, row.priority, row.created_at, row.updated_at, row.deleted_at],
     );
   }
 }

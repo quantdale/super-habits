@@ -34,9 +34,9 @@ import type { RunArtifacts } from './report';
 /** Gitignored output root (relative to the repo root / process.cwd()). */
 export const SIMULATION_OUTPUT = 'simulation-output';
 
-/** Absolute path to the gitignored output root. */
+/** Absolute evidence root; agents may route it outside the checkout. */
 export function simulationOutputRoot(): string {
-  return path.resolve(process.cwd(), SIMULATION_OUTPUT);
+  return path.resolve(process.cwd(), process.env.SIMULATION_OUTPUT_DIR || SIMULATION_OUTPUT);
 }
 
 /** Absolute path to one run's output directory. */
@@ -156,7 +156,7 @@ export function buildRunArtifacts(input: {
   digest?: string;
 }): RunArtifacts {
   return {
-    root: `${SIMULATION_OUTPUT}/${input.runId}`,
+    root: relativeToRoot(runOutputDir(input.runId)),
     report: input.reportPath,
     screenshots: input.screenshots,
     video: input.video,

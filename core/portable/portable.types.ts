@@ -89,6 +89,7 @@ export type PortableBackupFile = {
 /** Human-readable domain labels for the import preview (no raw table names). */
 export const PORTABLE_DOMAIN_LABELS: Record<BackupEntity, string> = {
   todos: 'Todos',
+  todo_recurrence_series: 'Recurring task series',
   habits: 'Habits',
   habit_completions: 'Habit history',
   calorie_entries: 'Calorie entries',
