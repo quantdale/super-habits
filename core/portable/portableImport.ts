@@ -47,6 +47,7 @@ import type {
   RoutineExerciseSet,
   SavedMeal,
   Todo,
+  TodoRecurrenceSeries,
   WorkoutLog,
   WorkoutRoutine,
   WorkoutSessionExercise,
@@ -56,7 +57,7 @@ import type {
 } from '@/core/db/types';
 import type { LinkedActionRuleRow } from '@/core/linked-actions/linkedActions.types';
 import type { WeeklyReview } from '@/features/weekly-review/weeklyReview.types';
-import { applyRemoteTodos } from '@/features/todos/todos.data';
+import { applyRemoteTodos, applyRemoteTodoRecurrenceSeries } from '@/features/todos/todos.data';
 import { applyRemoteHabits, applyRemoteHabitCompletions } from '@/features/habits/habits.data';
 import {
   applyRemoteCalorieEntries,
@@ -277,6 +278,31 @@ export async function preparePortableImport(input: {
 export async function confirmPortableImport(input: {
   file: PortableBackupFile;
 }): Promise<PortableImportResult> {
+  // The preview is not an integrity capability: callers can retain or mutate
+  // its object. Revalidate a detached JSON snapshot before any await/write.
+  // SAFETY: JSON.parse returns unknown and the runtime validator checks it;
+  // no assertion bypasses row, scope, settings or checksum validation.
+  let snapshot: unknown;
+  try {
+    snapshot = JSON.parse(JSON.stringify(input.file));
+  } catch {
+    return {
+      status: 'blocked',
+      reason: 'invalid',
+      message: 'The backup is unreadable.',
+      diagnostics: [],
+    };
+  }
+  const validation = validatePortableBackupFile(snapshot);
+  if (!validation.ok) {
+    return {
+      status: 'blocked',
+      reason: 'invalid',
+      message: 'The backup changed or is invalid; nothing was imported.',
+      diagnostics: validation.errors,
+    };
+  }
+  const file = validation.file;
   const db = await getDatabase();
   const importedAt = nowIso();
 
@@ -295,10 +321,7 @@ export async function confirmPortableImport(input: {
             'Local data appeared while preparing the import; nothing was imported and your data is unchanged.',
         };
       }
-      const owner = evaluateOwnerCompatibility(
-        transactionState,
-        input.file.source.ownerFingerprint,
-      );
+      const owner = evaluateOwnerCompatibility(transactionState, file.source.ownerFingerprint);
       if (owner.blockedReason === 'owner_mismatch') {
         return {
           reason: 'owner_mismatch',
@@ -310,13 +333,17 @@ export async function confirmPortableImport(input: {
       // Dependency order: parents before children (Projects → Goals →
       // Todos/Habits → Daily Plans; workout_session_sets after its session
       // exercises). Rows were runtime-validated and integrity-verified in
-      // `preparePortableImport`; the casts apply the validated shapes.
-      const entities = input.file.entities;
-      // SAFETY: preparePortableImport validated each row with the entity's
-      // runtime validator before producing this typed, owner-compatible file.
+      // this confirmation; the casts apply the validated shapes.
+      const entities = file.entities;
+      // SAFETY: confirmation revalidated each row and its integrity before
+      // producing this detached, scope-projected file.
       const typed = <T>(entity: BackupEntity): T => (entities[entity] ?? []) as unknown as T;
       await applyRemoteProjects(transactionDb, typed<Project[]>('projects'));
       await applyRemoteGoals(transactionDb, typed<Goal[]>('goals'));
+      await applyRemoteTodoRecurrenceSeries(
+        transactionDb,
+        typed<TodoRecurrenceSeries[]>('todo_recurrence_series'),
+      );
       await applyRemoteTodos(transactionDb, typed<Todo[]>('todos'));
       await applyRemoteHabits(transactionDb, typed<Habit[]>('habits'));
       await applyRemoteDailyPlans(transactionDb, typed<DailyPlan[]>('daily_plans'));
@@ -370,8 +397,8 @@ export async function confirmPortableImport(input: {
       // Settings: SQLite-backed values join the transaction directly; theme
       // (AsyncStorage) is staged durably here and applied after commit with
       // restart reconciliation. NO file read or network call happens inside.
-      await applyRecoverableSettingsToSqlite(transactionDb, input.file.settings);
-      await stagePendingThemeApplication(transactionDb, input.file.settings, importedAt);
+      await applyRecoverableSettingsToSqlite(transactionDb, file.settings);
+      await stagePendingThemeApplication(transactionDb, file.settings, importedAt);
 
       // Import-origin metadata (internal, never user settings; the fingerprint
       // is compatibility metadata, never Auth).
@@ -379,12 +406,12 @@ export async function confirmPortableImport(input: {
       await setAppMetaText(
         transactionDb,
         appMetaKeys.portableLastImportFormatVersion,
-        String(input.file.formatVersion),
+        String(file.formatVersion),
       );
       await setAppMetaText(
         transactionDb,
         appMetaKeys.portableLastImportOwnerFingerprint,
-        input.file.source.ownerFingerprint ?? 'null',
+        file.source.ownerFingerprint ?? 'null',
       );
 
       // Owner binding: a PROVISIONAL anonymous binding on a pristine device is
@@ -451,7 +478,7 @@ export async function confirmPortableImport(input: {
   }
 
   const importedCounts = Object.fromEntries(
-    BACKUP_ENTITIES.map((entity) => [entity, (input.file.entities[entity] ?? []).length]),
+    BACKUP_ENTITIES.map((entity) => [entity, (file.entities[entity] ?? []).length]),
   ) as Partial<Record<BackupEntity, number>>;
 
   return { status: 'restored', importedAt, importedCounts };

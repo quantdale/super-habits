@@ -48,10 +48,31 @@ export async function readBoundedJson(request, maxBytes = MAX_REQUEST_BODY_BYTES
     throw new Error('Request body is too large.');
   }
 
-  const text = await request.text();
-  const byteLength = new TextEncoder().encode(text).byteLength;
-  if (byteLength > maxBytes) throw new Error('Request body is too large.');
-  return JSON.parse(text);
+  // Content-Length is optional and untrusted. Bound the stream itself before
+  // buffering/decoding it, rather than allocating an arbitrarily large string
+  // and checking its size afterwards.
+  if (!request.body) return JSON.parse('');
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  const parts = [];
+  let byteLength = 0;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      byteLength += value.byteLength;
+      if (byteLength > maxBytes) {
+        // Do not wait for an untrusted producer's cancellation promise.
+        void reader.cancel().catch(() => undefined);
+        throw new Error('Request body is too large.');
+      }
+      parts.push(decoder.decode(value, { stream: true }));
+    }
+    parts.push(decoder.decode());
+    return JSON.parse(parts.join(''));
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 export async function authenticateSupabaseUser(request, options = {}) {

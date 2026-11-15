@@ -1,4 +1,5 @@
 import { test, expect, type Page } from './fixtures';
+import type { Locator } from '@playwright/test';
 import { seedFixture } from './helpers/seed';
 import { resetAll } from './helpers/reset';
 import { installClock } from './helpers/clock';
@@ -233,7 +234,11 @@ async function prepareCapture(page: Page, scrollTop = 0): Promise<void> {
   await settle(page);
 }
 
-async function capture(page: Page, name: string, opts: { scrollTop?: number } = {}): Promise<void> {
+async function capture(
+  page: Page,
+  name: string,
+  opts: { scrollTop?: number; reveal?: Locator } = {},
+): Promise<void> {
   // Normalize scroll position. Overlay backgrounds render the page *behind*
   // the modal, and Playwright's click auto-scrolls that page to bring the
   // trigger into view — which is not deterministic across runs (observed as a
@@ -244,6 +249,13 @@ async function capture(page: Page, name: string, opts: { scrollTop?: number } = 
   // scrollable element in the document to the requested offset instead, so the
   // whole rendered tree is captured from a known position.
   await prepareCapture(page, opts.scrollTop ?? 0);
+  if (opts.reveal) {
+    // Normalize first, then reveal: resetting after scrollIntoView used to
+    // capture the top of the list instead of the title this golden protects.
+    await opts.reveal.scrollIntoViewIfNeeded();
+    await settle(page);
+    await expect(opts.reveal).toBeInViewport({ ratio: 1 });
+  }
   await expect(page).toHaveScreenshot(`${name}.png`, {
     animations: 'disabled',
     caret: 'hide',
@@ -410,8 +422,12 @@ test.describe('W15 primary destinations', () => {
     // not-yet-rendered row), then normalize scroll for a deterministic capture.
     const row = page.getByRole('button', { name: `Edit task: ${longTitle}`, exact: true });
     await expect(row).toBeVisible({ timeout: 20_000 });
-    await row.scrollIntoViewIfNeeded();
-    await capture(page, 'todos-long-title-390-light');
+    // This golden owns title wrapping, not the relative order of independent
+    // rollover copies. Filter through the real UI so the named row is the
+    // entire capture subject rather than whichever seeded neighbors precede it.
+    await page.getByPlaceholder('Search tasks').fill('insurance company');
+    await expect(page.getByRole('button', { name: /^Edit task:/ })).toHaveCount(1);
+    await capture(page, 'todos-long-title-390-light', { reveal: row });
   });
 
   test('to do HEAVY (desktop, light)', async ({ page }) => {

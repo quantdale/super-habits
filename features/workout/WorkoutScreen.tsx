@@ -1,7 +1,7 @@
 import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, View, useWindowDimensions } from 'react-native';
-import { layout, spacing } from '@/core/theme/designTokens';
+import { Alert, Platform, Pressable, View, useWindowDimensions } from 'react-native';
+import { layout, size, spacing } from '@/core/theme/designTokens';
 import { MaterialIcons } from '@expo/vector-icons';
 import { RectButton } from 'react-native-gesture-handler';
 import { Screen } from '@/core/ui/Screen';
@@ -222,7 +222,13 @@ function QuickStartRoutineRow({
         accessibilityRole="button"
         accessibilityLabel={`Complete workout ${row.name}`}
         hitSlop={4}
-        style={{ alignSelf: 'flex-start', backgroundColor: 'transparent', paddingVertical: 6 }}
+        style={{
+          alignSelf: 'flex-start',
+          backgroundColor: 'transparent',
+          paddingVertical: 6,
+          minHeight: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
+          justifyContent: 'center',
+        }}
       >
         <Text className="text-xs font-semibold" style={{ color: tokens.textMuted }}>
           Complete workout
@@ -252,11 +258,15 @@ function WeekDayNodesRow({
 }) {
   const { tokens } = useAppTheme();
   return (
-    // Narrow phones: 7 cells must fit 360 (and 375) without clipping, so each
-    // cell flexes to the available width with a 40pt floor (workout-w9's ≥40
-    // target rule; the pressable keeps 44pt vertical). No fixed gap: padding
-    // inside the cell supplies the visual rhythm.
-    <View className="flex-row items-stretch">
+    // Half-gutters recover the room for seven real 44px web targets at 360px
+    // without clipping or horizontal scrolling. Smaller windows may wrap;
+    // native retains its compact strip. Dots keep their quiet 38px face.
+    <View
+      className="flex-row items-stretch"
+      style={
+        Platform.OS === 'web' ? { marginHorizontal: -spacing.sm, flexWrap: 'wrap' } : undefined
+      }
+    >
       {cells.map((cell) => {
         // Assignment is NOT completion: a planned routine renders `planned`
         // (outline + dot) and only a real logged session this week renders
@@ -289,7 +299,11 @@ function WeekDayNodesRow({
             // (the selection semantics belong to the day sheet, not the node).
             aria-current={cell.isToday ? 'date' : undefined}
             className="flex-1 items-center gap-1"
-            style={{ minWidth: 40, minHeight: 44, paddingHorizontal: 1 }}
+            style={{
+              minWidth: Platform.OS === 'web' ? size.webTouchTargetMin : 40,
+              minHeight: 44,
+              paddingHorizontal: 1,
+            }}
           >
             <View className="h-[38px] w-[38px] items-center justify-center">
               <View

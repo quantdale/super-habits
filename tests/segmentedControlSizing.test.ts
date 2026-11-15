@@ -10,11 +10,9 @@ import {
  * CG-12 first slice (`docs/testing/known-gaps.md`): the Focus (pomodoro) mode
  * tabs must expose a >= 44 CSS px DOM box on web. react-native-web never
  * applies `hitSlop` to the DOM box (documented in `core/ui/PillChip.tsx`), so
- * the only honest fix is a taller FACE, and the only safe way to ship it is an
- * opt-in tier that leaves every other `SegmentedControl` caller untouched.
- *
- * This pins that tier's model: the default is bit-for-bit the V3 §6 geometry,
- * and the opt-in can only ever *raise* the face on web.
+ * the honest fix is a real >=44px web face for every caller. Native keeps its
+ * V3 geometry. Requested heights cannot lower that web floor or exceed the
+ * layout ceiling.
  */
 describe('SegmentedControl segment sizing (CG-12)', () => {
   it('keeps the V3 §6 default: 36pt faces in a 40pt tray', () => {
@@ -23,24 +21,24 @@ describe('SegmentedControl segment sizing (CG-12)', () => {
     expect(DEFAULT_SEGMENT_MIN_HEIGHT + SEGMENT_TRACK_PADDING * 2).toBe(40);
   });
 
-  it('resolves every non-opted caller to the untouched default on web', () => {
-    expect(resolveSegmentMinHeight({ isWeb: true })).toBe(36);
-    expect(resolveSegmentMinHeight({ minSegmentHeight: undefined, isWeb: true })).toBe(36);
+  it('gives every default web caller a real 44px hit box', () => {
+    expect(resolveSegmentMinHeight({ isWeb: true })).toBe(44);
+    expect(resolveSegmentMinHeight({ minSegmentHeight: undefined, isWeb: true })).toBe(44);
   });
 
   it('ignores the opt-in off-web, where hitSlop still applies', () => {
     expect(resolveSegmentMinHeight({ minSegmentHeight: 44, isWeb: false })).toBe(36);
   });
 
-  it('cannot lower the face: a sub-default request is the default', () => {
-    for (const requested of [0, 20, 35, 36, -44]) {
-      expect(resolveSegmentMinHeight({ minSegmentHeight: requested, isWeb: true })).toBe(36);
+  it('cannot lower the web face below the actual hit-area contract', () => {
+    for (const requested of [0, 20, 35, 36, 40, 43.4, -44]) {
+      expect(resolveSegmentMinHeight({ minSegmentHeight: requested, isWeb: true })).toBe(44);
     }
   });
 
   it('cannot emit a garbage height', () => {
     for (const requested of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
-      expect(resolveSegmentMinHeight({ minSegmentHeight: requested, isWeb: true })).toBe(36);
+      expect(resolveSegmentMinHeight({ minSegmentHeight: requested, isWeb: true })).toBe(44);
     }
   });
 
@@ -57,11 +55,11 @@ describe('SegmentedControl segment sizing (CG-12)', () => {
     );
   });
 
-  it('reaches the web 44px contract only through the opt-in tier', () => {
+  it('reaches the web 44px contract by default while retaining the native tray', () => {
     const touchTarget = 44;
     const trayHeight = (face: number) => face + SEGMENT_TRACK_PADDING * 2;
-    // Default callers keep the 40pt tray (CG-12 stays open for their surfaces).
-    expect(trayHeight(resolveSegmentMinHeight({ isWeb: true }))).toBe(40);
+    expect(trayHeight(resolveSegmentMinHeight({ isWeb: true }))).toBe(48);
+    expect(trayHeight(resolveSegmentMinHeight({ isWeb: false }))).toBe(40);
     // Focus opts in: the face itself is the hit area, so it clears 44.
     expect(resolveSegmentMinHeight({ minSegmentHeight: 44, isWeb: true })).toBeGreaterThanOrEqual(
       touchTarget,

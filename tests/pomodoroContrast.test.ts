@@ -83,7 +83,11 @@ describe('Focus hero ghost action label ink (all themes)', () => {
 });
 
 describe('Button ink defaults are unchanged (no global behaviour change)', () => {
-  const button = readFileSync(resolve(__dirname, '../core/ui/Button.tsx'), 'utf8');
+  // Source wiring is platform-independent; Git may check TSX out with CRLF.
+  const button = readFileSync(resolve(__dirname, '../core/ui/Button.tsx'), 'utf8').replace(
+    /\r\n/g,
+    '\n',
+  );
 
   for (const [id, theme] of Object.entries(THEME_REGISTRY)) {
     const { tokens } = theme;
@@ -132,7 +136,7 @@ describe('Pomodoro hero ghost-action wiring', () => {
   const screen = readFileSync(
     resolve(__dirname, '../features/pomodoro/PomodoroScreen.tsx'),
     'utf8',
-  );
+  ).replace(/\r\n/g, '\n');
 
   it('every face-less control on the hero states the hero face', () => {
     // End (running), End (paused), Done (completion summary), Starting…

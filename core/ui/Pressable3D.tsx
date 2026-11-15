@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import {
+  Platform,
   Pressable,
+  StyleSheet,
   View,
   type AccessibilityRole,
   type AccessibilityState,
@@ -11,6 +13,7 @@ import {
 import Animated from 'react-native-reanimated';
 
 import { useAppTheme } from '@/core/providers/themeContext';
+import { size } from '@/core/theme/designTokens';
 import { usePressDepth } from '@/core/ui/motion/usePressDepth';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
 
@@ -84,14 +87,43 @@ export function Pressable3D({
   const { tokens } = useAppTheme();
   const focusRing = useKeyboardFocusRing(tokens.accent);
   const { onPressIn, onPressOut, animatedStyle } = usePressDepth({ lip });
+  const webMinimum = (geometry: StyleProp<ViewStyle>, minHeight: number): ViewStyle | undefined => {
+    if (Platform.OS !== 'web') return undefined;
+    const flat = StyleSheet.flatten(geometry);
+    return {
+      minWidth:
+        typeof flat?.minWidth === 'string'
+          ? flat.minWidth
+          : Math.max(
+              size.webTouchTargetMin,
+              typeof flat?.minWidth === 'number' ? flat.minWidth : 0,
+            ),
+      minHeight:
+        typeof flat?.minHeight === 'string'
+          ? flat.minHeight
+          : Math.max(minHeight, typeof flat?.minHeight === 'number' ? flat.minHeight : 0),
+    };
+  };
 
   return (
-    <View style={[style, { backgroundColor: lipColor, borderRadius: radius }]}>
+    <View
+      style={[
+        style,
+        { backgroundColor: lipColor, borderRadius: radius },
+        webMinimum(style, size.webTouchTargetMin + lip),
+      ]}
+    >
       <Animated.View
         style={[
-          { marginBottom: lip, borderRadius: radius, backgroundColor: faceColor },
+          {
+            marginBottom: lip,
+            borderRadius: radius,
+            backgroundColor: faceColor,
+            flexGrow: Platform.OS === 'web' ? 1 : undefined,
+          },
           animatedStyle,
           faceStyle,
+          webMinimum(faceStyle, size.webTouchTargetMin),
         ]}
       >
         <Pressable
@@ -108,7 +140,12 @@ export function Pressable3D({
           onFocus={focusRing.onFocus}
           onBlur={focusRing.onBlur}
           className={className}
-          style={[{ borderRadius: radius }, contentStyle, focusRing.focusRingStyle]}
+          style={[
+            { borderRadius: radius, flexGrow: Platform.OS === 'web' ? 1 : undefined },
+            contentStyle,
+            webMinimum(contentStyle, size.webTouchTargetMin),
+            focusRing.focusRingStyle,
+          ]}
         >
           {children}
         </Pressable>

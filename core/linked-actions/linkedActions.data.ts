@@ -1,19 +1,10 @@
 import { getDatabase } from '@/core/db/client';
 import type * as SQLite from 'expo-sqlite';
-import {
-  claimOwnerBindingOnFirstContent,
-  getCachedLocalDatasetOwner,
-  getCachedOwnerBindingProvisional,
-  promoteLocalDatasetOwnerIfProvisional,
-  setLocalDatasetOwner,
-} from '@/core/auth/account.data';
-import { appMetaKeys, setAppMetaText } from '@/core/db/appMeta';
-import { withSQLiteTransaction } from '@/core/db/transactions';
+import { claimOwnerBindingOnFirstContent } from '@/core/auth/account.data';
 import { createId } from '@/lib/id';
 import { nowIso } from '@/lib/time';
-import { upsertSyncOutboxRecord } from '@/core/sync/syncPersistence';
-import { syncEngine, type PreparedSyncRecord, type SyncRecord } from '@/core/sync/sync.engine';
-import { resolveSyncOwnerUserId } from '@/core/sync/syncedMutation';
+import type { SyncRecord } from '@/core/sync/sync.engine';
+import { runBackupMutation } from '@/core/sync/syncedMutation';
 import {
   type LinkedActionEventRecord,
   type LinkedActionEventRow,
@@ -39,38 +30,23 @@ import {
  * Wrap a rule write (or set of rule writes) and its durable backup intents in
  * one SQLite transaction. Rule configuration is recoverable user state, so
  * every created/updated/tombstoned rule row enqueues a `linked_action_rules`
- * outbox record in the same transaction the row lands in. Owner resolution
- * mirrors `runBackupMutation`.
+ * outbox record in the same transaction the row lands in. The canonical
+ * `runBackupMutation` owns transaction-time owner resolution and publication.
  */
 async function runWithBackupIntents<T>(
   db: SQLite.SQLiteDatabase,
   collect: (transactionDb: SQLite.SQLiteDatabase, intents: SyncRecord[]) => Promise<T>,
 ): Promise<T> {
-  const ownerUserId = await resolveSyncOwnerUserId(db);
-  const existingOwnerUserId = getCachedLocalDatasetOwner();
-  const preparedList: PreparedSyncRecord[] = [];
-  const result = await withSQLiteTransaction(db, async (transactionDb) => {
-    const intents: SyncRecord[] = [];
-    const value = await collect(transactionDb, intents);
-    if (intents.length === 0) return value;
-    if (!existingOwnerUserId && ownerUserId) {
-      await setLocalDatasetOwner(transactionDb, ownerUserId);
-    }
-    if (getCachedOwnerBindingProvisional() === true) {
-      await promoteLocalDatasetOwnerIfProvisional(transactionDb);
-    }
-    for (const intent of intents) {
-      const prepared = syncEngine.prepare(ownerUserId ? { ...intent, ownerUserId } : intent);
-      preparedList.push(prepared);
-      await upsertSyncOutboxRecord(transactionDb, prepared, prepared.revision);
-    }
-    await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
-    return value;
+  const outcome = await runBackupMutation({
+    db,
+    mutate: async (transactionDb, enqueue) => {
+      const intents: SyncRecord[] = [];
+      const value = await collect(transactionDb, intents);
+      for (const intent of intents) enqueue(intent);
+      return { changed: intents.length > 0, value };
+    },
   });
-  for (const prepared of preparedList) {
-    syncEngine.enqueuePrepared(prepared, { durablyPersisted: true });
-  }
-  return result;
+  return outcome.value;
 }
 
 function ruleIntent(

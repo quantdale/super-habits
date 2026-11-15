@@ -357,7 +357,9 @@ lanes (scenario / seeded / repro) per task 4.4.
 
 ### Artifacts (task 4.2) + digest (task 4.3)
 
-Output lives under the gitignored `simulation-output/<runId>/`: per-step
+Output defaults to the gitignored `simulation-output/<runId>/`. Set
+`SIMULATION_OUTPUT_DIR` to an absolute session-evidence directory to keep agent
+runs outside the checkout; report links resolve to the same directory. Per-step
 screenshots always; video/trace/console.log retained only on failure; a
 `digest.md` failure digest on failure (persona, scenario, step, seed, expected
 vs actual, state summary, artifact links) formatted to paste into a defect

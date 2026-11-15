@@ -369,6 +369,7 @@ describe('core/linked-actions/linkedActions.data', () => {
       withTransactionAsync: async (task: () => Promise<void>) => {
         await task();
       },
+      getFirstAsync: vi.fn().mockResolvedValue(null),
       getAllAsync: vi.fn().mockResolvedValue([
         {
           id: 'link_legacy',

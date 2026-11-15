@@ -32,7 +32,7 @@ describe('corpus restart over the same file', { timeout: 120_000 }, () => {
 
       // Reopen the same file: migrations must be idempotent no-ops here.
       const reopened: CorpusDb = await freshDatabase(file);
-      expect(await metaValue(reopened, 'db_schema_version')).toBe('25');
+      expect(await metaValue(reopened, 'db_schema_version')).toBe('27');
 
       // Full manifest re-verified after restart.
       expect(await count(reopened, 'SELECT COUNT(*) AS n FROM todos')).toBe(612);
@@ -55,7 +55,8 @@ describe('corpus restart over the same file', { timeout: 120_000 }, () => {
       expect(
         await count(reopened, 'SELECT COUNT(*) AS n FROM goals WHERE deleted_at IS NULL'),
       ).toBe(12);
-      expect(await count(reopened, 'SELECT COUNT(*) AS n FROM sync_outbox')).toBe(4933);
+      expect(await count(reopened, 'SELECT COUNT(*) AS n FROM todo_recurrence_series')).toBe(12);
+      expect(await count(reopened, 'SELECT COUNT(*) AS n FROM sync_outbox')).toBe(4945);
 
       // Durable edge state survives the restart.
       expect(await metaValue(reopened, 'backup.scope_version')).toBe('6');

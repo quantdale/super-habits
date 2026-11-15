@@ -1,6 +1,7 @@
 import { expect, test, type Page } from './fixtures';
 import { clearDatabase } from './helpers/db';
 import { openSettingsScreen } from './helpers/commandObservation';
+import { WEEKLY_REVIEW_REMINDER_STORAGE_KEY } from '@/features/weekly-review/weeklyReviewReminder.domain';
 
 /**
  * P18 (Playful Momentum) Settings grammar — rendered assertions.
@@ -169,6 +170,59 @@ test.describe('P18 Settings grammar', () => {
       timeout: 20_000,
     });
   });
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`notification toggle owns its padded hit area and keys (${theme})`, async ({ page }) => {
+      await page.setViewportSize({ width: 360, height: 844 });
+      const dialog = await openSettings(page);
+      if (theme === 'dark') await dialog.getByRole('button', { name: 'Dark', exact: true }).click();
+      const toggle = dialog.getByRole('switch', { name: 'Weekly review reminder', exact: true });
+      await expect(toggle).toBeEnabled();
+      await toggle.scrollIntoViewIfNeeded();
+      await expect(toggle).toHaveAttribute('aria-checked', 'false');
+      const box = await toggle.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.width).toBeGreaterThanOrEqual(44);
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+
+      // Top-centre lies inside the rounded target but outside its compact
+      // 40x22 track. The extreme square corner is outside the circular hit
+      // shape (verified with elementFromPoint), not an owned padding point.
+      // Prove hit ownership too: a decorative 44px wrapper must not pass.
+      const position = { x: box!.width / 2, y: 2 };
+      expect(
+        await toggle.evaluate((node, point) => {
+          const bounds = node.getBoundingClientRect();
+          const hit = document.elementFromPoint(bounds.left + point.x, bounds.top + point.y);
+          return hit === node || (hit !== null && node.contains(hit));
+        }, position),
+      ).toBe(true);
+      await toggle.click({ position });
+      await expect(toggle).toHaveAttribute('aria-checked', 'true');
+      await expect(toggle).toBeEnabled();
+      await toggle.focus();
+      await page.keyboard.press('Space');
+      await expect(toggle).toHaveAttribute('aria-checked', 'false');
+      await expect(toggle).toBeEnabled();
+      await page.keyboard.press('Enter');
+      await expect(toggle).toHaveAttribute('aria-checked', 'true');
+      await expect(toggle).toBeEnabled();
+      await expect
+        .poll(() =>
+          page.evaluate((key) => {
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw).enabled : null;
+          }, WEEKLY_REVIEW_REMINDER_STORAGE_KEY),
+        )
+        .toBe(true);
+
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await openSettingsScreen(page);
+      await expect(
+        page.getByRole('switch', { name: 'Weekly review reminder', exact: true }),
+      ).toHaveAttribute('aria-checked', 'true');
+    });
+  }
 
   test('the switch keeps its accessible and keyboard contract', async ({ page }) => {
     const dialog = await openSettings(page);

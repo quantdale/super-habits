@@ -2,6 +2,7 @@ import type * as SQLite from 'expo-sqlite';
 
 export const ACCOUNT_USER_TABLES = [
   'todos',
+  'todo_recurrence_series',
   'habits',
   'habit_completions',
   'pomodoro_sessions',

@@ -1,11 +1,12 @@
 import { Text } from '@/core/ui/Text';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Animated, Pressable, View } from 'react-native';
+import { Animated, Platform, Pressable, View } from 'react-native';
 import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Swipeable } from 'react-native-gesture-handler';
 import { MenuSheet } from '@/core/ui/MenuSheet';
 import { SwipeRightActions } from '@/core/ui/SwipeRightActions';
 import { useCheckBurst } from '@/core/ui/motion/useCheckBurst';
+import { useSpaceActivation } from '@/core/ui/useSpaceActivation';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { useMotionDuration, useReducedMotion } from '@/core/theme/motion';
 import { radius, size, springs } from '@/core/theme/designTokens';
@@ -89,9 +90,15 @@ function TodoCheckControl({
     burst.trigger();
     onPress();
   };
+  const checkboxRef = useSpaceActivation({
+    role: 'checkbox',
+    onActivate: handlePress,
+    includeEnter: true,
+  });
 
   return (
     <Pressable
+      ref={checkboxRef}
       onPress={handlePress}
       onPressIn={() => settle(0.88)}
       onPressOut={() => settle(1)}
@@ -205,6 +212,7 @@ export const TodoItem = memo(function TodoItem({
   const prevDoneRef = useRef(done);
   const [settleOpacity] = useState(() => new Animated.Value(1));
   const swipeableRef = useRef<Swipeable>(null);
+  const [actionsVisible, setActionsVisible] = useState(false);
   const todayKey = toDateKey();
   const metaItems = buildTodoRowMeta(todo, todayKey, { projectName });
 
@@ -262,9 +270,12 @@ export const TodoItem = memo(function TodoItem({
       <Animated.View style={{ opacity: settleOpacity }}>
         <Swipeable
           ref={swipeableRef}
+          onSwipeableWillOpen={Platform.OS === 'web' ? () => setActionsVisible(true) : undefined}
+          onSwipeableWillClose={Platform.OS === 'web' ? () => setActionsVisible(false) : undefined}
           renderRightActions={() => (
             <SwipeRightActions
               editColor={SECTION_COLORS.todos}
+              visible={actionsVisible}
               onEdit={handleEdit}
               onDelete={handleDelete}
             />

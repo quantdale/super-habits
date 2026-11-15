@@ -6,7 +6,7 @@ import { freshDatabase } from './helpers/db';
  * insertion boundary: two callers can arrive with the same series/day before
  * the screen's snapshot refreshes. The row and sync queue must remain one-to-one.
  */
-it('materializes one recurring instance and one outbox record per series/day', async () => {
+it('materializes one occurrence and atomically creates its canonical series exactly once', async () => {
   const db = await freshDatabase();
   const todos = await import('@/features/todos/todos.data');
   const { syncEngine } = await import('@/core/sync/sync.engine');
@@ -28,7 +28,16 @@ it('materializes one recurring instance and one outbox record per series/day', a
     ['rec_daily_review', '2026-07-01'],
   );
   expect(rows).toHaveLength(1);
-  expect(syncEngine.getPendingCount()).toBe(1);
+  expect(syncEngine.getPendingCount()).toBe(2);
+  expect(await db.getAllAsync('SELECT id FROM todo_recurrence_series')).toEqual([
+    { id: 'rec_daily_review' },
+  ]);
+  expect(await db.getAllAsync('SELECT entity, operation FROM sync_outbox ORDER BY entity')).toEqual(
+    [
+      { entity: 'todo_recurrence_series', operation: 'create' },
+      { entity: 'todos', operation: 'create' },
+    ],
+  );
 
   await db.closeAsync();
 });

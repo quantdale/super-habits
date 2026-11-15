@@ -1,4 +1,5 @@
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
+import { size } from '@/core/theme/designTokens';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { Card } from '@/core/ui/Card';
 import { ProgressBar } from '@/core/ui/ProgressBar';
@@ -78,7 +79,13 @@ export function CaloriesDailyHero({
           accessibilityRole="button"
           accessibilityLabel="Edit daily calorie goal"
           className="rounded-full px-3 py-1.5"
-          style={{ backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border }}
+          style={{
+            backgroundColor: tokens.surface,
+            borderWidth: 1,
+            borderColor: tokens.border,
+            minHeight: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
+            justifyContent: 'center',
+          }}
         >
           <Text variant="label" style={{ color: tokens.text }}>
             Edit goal

@@ -24,6 +24,10 @@ const { linkedActionsEngine } = vi.hoisted(() => ({
 // shifting every queue; the pristine-check behaviour has its own coverage.
 vi.mock('@/core/auth/account.data', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/core/auth/account.data')>()),
+  // Ownership rechecks have their own real-SQLite coverage; do not consume
+  // this feature fixture's order-sensitive routine/set query results.
+  getLocalDatasetOwner: vi.fn(async () => null),
+  readImportOriginFingerprint: vi.fn(async () => null),
   inspectLocalAccountDataState: vi.fn(async () => ({
     hasUserData: false,
     pendingOutboxCount: 0,

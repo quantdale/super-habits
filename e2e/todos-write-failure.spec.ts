@@ -3,6 +3,7 @@ import { goToTab, openNewTodoModal, submitTodoModal } from './helpers/navigation
 import { clearDatabase } from './helpers/db';
 import { queryRows, returnToApp } from './helpers/dbHarness';
 import { seedSql } from './helpers/seed';
+import { installClock } from './helpers/clock';
 
 /**
  * Tier-2 silent-write honesty: To Do row actions.
@@ -46,6 +47,9 @@ async function expectWriteFailureNotice(page: Page, reason: string): Promise<voi
 
 test.describe('To Do write-failure honesty', () => {
   test.beforeEach(async ({ page }) => {
+    // No one-task quest on this fixed day: the exact one-event assertion below
+    // measures the retried action, not a host-date-dependent quest bonus.
+    await installClock(page, '2026-10-19T10:00:00+08:00');
     await page.setViewportSize({ width: 390, height: 844 });
     await goToTab(page, 'todos');
     await clearDatabase(page);

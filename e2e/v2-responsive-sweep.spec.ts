@@ -32,14 +32,9 @@ import { layout } from '@/core/theme/designTokens';
  *     reaches the DOM box or the DOM as an attribute, documented in
  *     `core/ui/PillChip.tsx`), so a phone-sized face that only reaches 44
  *     through a slop it declares is a *web* hit-area defect and is reported as
- *     one. The current build does not keep this promise everywhere, so this
- *     case is quarantined per the repo's standing quarantine protocol
- *     (`docs/testing/known-gaps.md` CG-12): `test.fixme` with the full
- *     assertion body preserved as the release assertion. The measured
- *     inventory, per surface and per width, lives in the CG-12 register entry;
- *     un-fixme-ing this case is the fix's own proof. The other three promises
- *     below stay ordinary active cases, so a NEW overflow, layout or motion
- *     defect still fails this lane.
+ *     one. Former CG-12 is released after real web sizing repairs: the full
+ *     assertion is active with unchanged helpers, thresholds and surface set.
+ *     Any new undersized target, overflow, layout or motion defect fails.
  *  3. **Wide layout** — >= 900 shows the side rail (80px, widening to the
  *     248px labelled sidebar at >= 1280), the content column honours its cap
  *     (`layout.contentMaxWidth` 640, with the documented Today dashboard
@@ -797,14 +792,9 @@ test.describe('V2 responsive sweep', () => {
     }
   });
 
-  // Quarantined defect (CG-12 in `docs/testing/known-gaps.md`), quarantined per
-  // the standing protocol rather than excluded: the body below IS the release
-  // assertion (same helper, same thresholds, same surface set), so un-fixme-ing
-  // this case is the fix's own proof. The measured inventory lives in the CG-12
-  // register entry.
-  test.fixme('every control reaches a 44px CSS hit area at phone widths (known web touch-target gap)', async ({
-    page,
-  }) => {
+  // Former CG-12 release assertion: now active after zero-offender proof,
+  // with the same helper, thresholds and surface set.
+  test('every control reaches a 44px CSS hit area at phone widths', async ({ page }) => {
     test.setTimeout(600_000);
     await prepare(page);
     const inventory = await collectSub44Inventory(page);

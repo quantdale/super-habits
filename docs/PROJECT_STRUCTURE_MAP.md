@@ -6,7 +6,7 @@
 - Validation is hard-reject; errors are surfaced to users.
 - See audit findings for more details.
 
-Token-dense navigation map. Authoritative detail: `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md`. **Schema v25** is current in `core/db/client.ts`: migration 13 adds durable processed-notification-action state, 14 the durable SQLite sync outbox, 15 its enqueue-time owner binding, 16–19 the planning entities and habit schedule history, 20 the hardening-wave-v2 durable-state promotion (habit lifecycle columns, Pomodoro session metadata columns, `workout_session_sets`, workout timing columns), 21 `daily_plans.top_todo_titles`, 22 the Gym V2 routine/session extensions plus custom-exercise, weekly-plan, date-override, and body-weight tables, 23 deep Gym V2 semantic metadata (aliases, instructions, unilateral and external-load snapshots), 24 hot-path range indexes for the unbounded history tables plus a partial pending-todos index, and 25 the local-only reward ledger (`gamification_events`, `gamification_streak_freezes`, `gamification_quests`, `gamification_badges`). The habit engine retains effective-dated weekly schedule/target history in `habits.rule_history`. Linked Actions, Backup Completeness V2 / Restore V2, Recoverable Account V1, and Gym V2 cloud/portable recovery are live; **Portable Backup V1** (`core/portable/`) adds a user-controlled file export/import path that works without Supabase.
+Token-dense navigation map. Runtime sources below are authoritative; `docs/knowledge-base/SUPERHABITS_UNIFIED_KNOWLEDGE_BASE.md` is historical only. **Schema v27** is current in `core/db/client.ts`: migration 13 adds durable processed-notification-action state, 14 the durable SQLite sync outbox, 15 its enqueue-time owner binding, 16–19 the planning entities and habit schedule history, 20 the hardening-wave-v2 durable-state promotion (habit lifecycle columns, Pomodoro session metadata columns, `workout_session_sets`, workout timing columns), 21 `daily_plans.top_todo_titles`, 22 the Gym V2 routine/session extensions plus custom-exercise, weekly-plan, date-override, and body-weight tables, 23 deep Gym V2 semantic metadata (aliases, instructions, unilateral and external-load snapshots), 24 hot-path range indexes for the unbounded history tables plus a partial pending-todos index, 25 the local-only reward ledger (`gamification_events`, `gamification_streak_freezes`, `gamification_quests`, `gamification_badges`), 26 canonical `todo_recurrence_series` plus original occurrence dates and durable edit provenance, and 27 exact completion-spawn parent links for atomic, timezone-safe undo. The habit engine retains effective-dated weekly schedule/target history in `habits.rule_history`. Linked Actions, Backup Completeness V2 / Restore V2, Recoverable Account V1, and Gym V2 cloud/portable recovery are live; **Portable Backup V1** (`core/portable/`) adds a user-controlled file export/import path that works without Supabase.
 
 Current shell truth:
 
@@ -55,7 +55,7 @@ Screens are mounted in the single-page shell `app/index.tsx` behind `NavigationC
 
 | Concern         | File                                                                                            | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | --------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Persistence** | `core/db/client.ts`                                                                             | `getDatabase()`, `initializeDatabase()`, bootstrap DDL, **append-only** `runMigrations()` (`if (version < N)` blocks; current v25). WAL native-only. `schema.sql` = hand-maintained reference snapshot **not** runtime; it lags the runtime DDL (the runtime authority is `runMigrations()`); keep it aligned when touching tables it documents. `core/db/migrations/` holds remote/Supabase reference SQL only — local migrations never live there. |
+| **Persistence** | `core/db/client.ts`                                                                             | `getDatabase()`, `initializeDatabase()`, bootstrap DDL, **append-only** `runMigrations()` (`if (version < N)` blocks; current v27). WAL native-only. `schema.sql` = hand-maintained reference snapshot **not** runtime; it lags the runtime DDL (the runtime authority is `runMigrations()`); keep it aligned when touching tables it documents. `core/db/migrations/` holds remote/Supabase reference SQL only — local migrations never live there. |
 | **Row shapes**  | `core/db/types.ts`                                                                              | TypeScript entity types consumed by data layer.                                                                                                                                                                                                                                                                                                                                                                                                      |
 | **Sync**        | `core/sync/sync.engine.ts`, `core/sync/supabase.adapter.ts`, `core/sync/restore.coordinator.ts` | `SyncRecord`, `SyncEngine`, `syncEngine.enqueue`, `flush` → **`SupabaseSyncAdapter`** on the exported **`syncEngine`** (push upsert; `NoopSyncAdapter` remains for ctor default / tests). Restore v1 preview/import lives beside the adapter and is intentionally narrower than full sync.                                                                                                                                                           |
 
@@ -152,14 +152,15 @@ Format: `{prefix}_{ms}_{rand8}` — rand8 from a CSPRNG (`expo-crypto` / `crypto
 
 ## 7. Sync enqueue (by entity string)
 
-Enqueued after writes: all 21 `BACKUP_ENTITIES` (`core/backup/backup.types.ts`) ride
+Enqueued after writes: all 22 `BACKUP_ENTITIES` (`core/backup/backup.types.ts`) ride
 the durable outbox through `runSyncedMutation`/`runBackupMutation`: **todos**,
 **habits**, **habit_completions**, **calorie_entries**, **saved_meals**,
 **workout_routines**, **routine_exercises**, **routine_exercise_sets**,
 **workout_logs**, **workout_session_exercises**, **pomodoro_sessions**,
 **linked_action_rules**, **weekly_reviews**, **projects**, **goals**,
 **daily_plans**, **workout_session_sets**, **custom_exercises**,
-**workout_weekly_plan**, **workout_schedule_overrides**, **body_weight_entries** — plus synthetic
+**workout_weekly_plan**, **workout_schedule_overrides**, **body_weight_entries**,
+**todo_recurrence_series** — plus synthetic
 `user_backup_settings` / `backup_manifest` records (hard-delete entities
 remote-delete; soft-delete tables push tombstones; nested workout edits
 enqueue their own rows). Only local operational state stays unsynced:
@@ -175,7 +176,7 @@ UUID before entering this same preview/import path; it does not add
 merging or account switching.
 
 **Portable Backup V1** (`core/portable/`) is the user-controlled FILE path —
-no Supabase required. Export snapshots the current Scope-7 recoverable entities +
+no Supabase required. Export snapshots the current Scope-9 recoverable entities +
 recoverable settings in one serialized read-only transaction into a
 versioned JSON envelope with per-entity checksums, a settings checksum, and
 a canonical payload checksum; import validates everything (envelope,

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
+import { size } from '@/core/theme/designTokens';
 import { useAppTheme } from '@/core/providers/themeContext';
 import { PillChip } from '@/core/ui/PillChip';
 import { SectionLabel } from '@/core/ui/SectionLabel';
@@ -130,6 +131,10 @@ export function FrequentFoodChips({ foods, onSelect, color }: FrequentProps) {
           accessibilityRole="button"
           accessibilityLabel={`Show ${hiddenCount} more frequent foods`}
           onPress={() => setExpanded(true)}
+          style={{
+            minHeight: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
+            justifyContent: 'center',
+          }}
         >
           <SectionLabel className="mb-0">{`${hiddenCount} more in frequent foods`}</SectionLabel>
         </Pressable>

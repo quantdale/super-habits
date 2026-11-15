@@ -551,6 +551,29 @@ export class LinkedActionsEngine {
       } catch (error) {
         if (error instanceof LinkedActionCrashError) throw error;
         const message = error instanceof Error ? error.message : 'Unknown execution failure';
+        // Some adapters commit the terminal receipt atomically with the effect;
+        // a notice can also fail after ordinary finalization has succeeded.
+        // Never turn either committed success into a retryable failure: replay
+        // would otherwise apply a non-idempotent habit increment a second time.
+        const committed = await getLinkedActionExecutionByRuleAndSourceEvent(
+          executionPlan.rule.id,
+          sourceEvent.eventId,
+        );
+        if (committed && executionIsTerminal(committed)) {
+          console.warn('[linked-actions] post-effect bookkeeping failed', {
+            executionId: committed.id,
+            message,
+          });
+          effects.push({
+            ...mapExecutionToDuplicateResult(
+              committed,
+              executionPlan,
+              'post_effect_bookkeeping_failed',
+            ),
+            status: committed.status === 'applied' ? 'applied' : 'skipped',
+          });
+          continue;
+        }
         await updateLinkedActionExecution(execution.id, {
           status: 'failed',
           errorMessage: message,

@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS public.todos (
   sort_order    INTEGER NOT NULL DEFAULT 0,
   recurrence    TEXT,
   recurrence_id TEXT,
+  recurrence_date_key TEXT,
+  recurrence_touched INTEGER NOT NULL DEFAULT 0,
+  recurrence_spawned_by_id TEXT,
   project_id    TEXT,
   goal_id       TEXT,
   completed_at  TEXT,
@@ -31,6 +34,29 @@ CREATE TABLE IF NOT EXISTS public.todos (
   updated_at    TEXT NOT NULL,
   deleted_at    TEXT
 );
+
+CREATE TABLE IF NOT EXISTS public.todo_recurrence_series (
+  id TEXT PRIMARY KEY NOT NULL,
+  user_id UUID NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  notes TEXT,
+  priority TEXT NOT NULL DEFAULT 'normal',
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  deleted_at TIMESTAMPTZ
+);
+CREATE INDEX idx_todo_recurrence_series_user_id ON public.todo_recurrence_series (user_id);
+ALTER TABLE public.todo_recurrence_series ENABLE ROW LEVEL SECURITY;
+REVOKE ALL PRIVILEGES ON TABLE public.todo_recurrence_series FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.todo_recurrence_series TO authenticated, service_role;
+CREATE POLICY sync_todo_recurrence_series_select_owner ON public.todo_recurrence_series
+  FOR SELECT TO authenticated USING ((SELECT auth.uid()) = user_id);
+CREATE POLICY sync_todo_recurrence_series_insert_owner ON public.todo_recurrence_series
+  FOR INSERT TO authenticated WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY sync_todo_recurrence_series_update_owner ON public.todo_recurrence_series
+  FOR UPDATE TO authenticated USING ((SELECT auth.uid()) = user_id) WITH CHECK ((SELECT auth.uid()) = user_id);
+CREATE POLICY sync_todo_recurrence_series_delete_owner ON public.todo_recurrence_series
+  FOR DELETE TO authenticated USING ((SELECT auth.uid()) = user_id);
 
 CREATE TABLE IF NOT EXISTS public.habits (
   id               TEXT PRIMARY KEY NOT NULL,

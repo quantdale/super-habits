@@ -51,6 +51,9 @@ import {
   BACKUP_SCHEMA_VERSION,
   BACKUP_SETTINGS_VERSION,
   BACKUP_SCOPE_VERSION,
+  KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET,
+  KNOWN_HISTORICAL_BACKUP_SCOPE_V8_ENTITY_SET,
+  backupEntityColumnsForScope,
 } from '@/core/backup/backup.types';
 import {
   currentGenerationScope,
@@ -508,6 +511,8 @@ export function captureVerifiedRows(input: {
   ownerUserId: string;
   rowsByEntity: Partial<Record<(typeof BACKUP_ENTITIES)[number], Record<string, unknown>[]>>;
   settingsPayload: unknown;
+  /** Certified source epoch; omitted historical captures never invent Scope-9 links. */
+  scopeVersion?: number;
   baseHead?: { snapshotId: string; sequence: number } | null;
 }): CapturedGeneration {
   const snapshotId = createId('gsnap');
@@ -515,7 +520,22 @@ export function captureVerifiedRows(input: {
   const chunks: GenerationChunk[] = [];
   const expectedChunks: Record<string, number> = {};
   const entities: Record<string, { rows: number; checksum: string }> = {};
-  for (const entity of BACKUP_ENTITIES) {
+  // Preservation must certify the remote legacy bytes under their own scope,
+  // not fabricate a new series table from unrelated local data.
+  const scopeVersion = Math.max(
+    7,
+    input.scopeVersion ?? (input.rowsByEntity.todo_recurrence_series === undefined ? 7 : 8),
+  );
+  if (![7, 8, BACKUP_SCOPE_VERSION].includes(scopeVersion))
+    throw new Error('Backup preservation uses an unsupported source scope.');
+  const captureEntities =
+    scopeVersion === 7
+      ? KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET
+      : scopeVersion === 8
+        ? KNOWN_HISTORICAL_BACKUP_SCOPE_V8_ENTITY_SET
+        : BACKUP_ENTITIES;
+  const captureColumns = backupEntityColumnsForScope(scopeVersion);
+  for (const entity of captureEntities) {
     // IDs use ASCII. Match SQLite BINARY / PostgreSQL C ordering; localeCompare
     // orders punctuation differently and can invalidate a supported old backup.
     const rows = [...(input.rowsByEntity[entity] ?? [])].sort((a, b) =>
@@ -523,7 +543,7 @@ export function captureVerifiedRows(input: {
     );
     const projected = rows.map((row) =>
       Object.fromEntries(
-        BACKUP_ENTITY_COLUMNS[entity]
+        captureColumns[entity]
           .filter((column) => row[column] !== undefined)
           .map((column) => [column, row[column]]),
       ),
@@ -559,7 +579,7 @@ export function captureVerifiedRows(input: {
   entities.user_backup_settings = { rows: 1, checksum: settingsChecksum };
   const scope = currentGenerationScope({
     backupSchemaVersion: BACKUP_SCHEMA_VERSION,
-    scopeVersion: BACKUP_SCOPE_VERSION,
+    scopeVersion,
     settingsVersion: BACKUP_SETTINGS_VERSION,
   });
   const sequence = 1; // Provisional only; the authenticated server reserves the authoritative value.

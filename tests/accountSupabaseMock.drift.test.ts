@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { Route } from '@playwright/test';
-import { BACKUP_ENTITIES, BACKUP_SYNTHETIC_ENTITIES } from '@/core/backup/backup.types';
-import { BACKUP_REST_ENTITIES, isBackupRestEntity } from '../e2e/helpers/accountBackupEntities';
+import {
+  BACKUP_ENTITIES,
+  BACKUP_SCOPE_VERSION,
+  BACKUP_SYNTHETIC_ENTITIES,
+  resolveBackupScope,
+} from '@/core/backup/backup.types';
+import {
+  BACKUP_GENERATION_ENTITY_SCOPES,
+  BACKUP_REST_ENTITIES,
+  isBackupRestEntity,
+} from '../e2e/helpers/accountBackupEntities';
 import { handleBackupRestRequest } from '../e2e/helpers/accountSupabaseMock';
 
 describe('account backup REST boundary drift guard', () => {
@@ -9,6 +18,25 @@ describe('account backup REST boundary drift guard', () => {
     const expected = [...BACKUP_ENTITIES, ...BACKUP_SYNTHETIC_ENTITIES].sort();
     const actual = [...BACKUP_REST_ENTITIES].sort();
     expect(actual).toEqual(expected);
+  });
+
+  it.each(Object.entries(BACKUP_GENERATION_ENTITY_SCOPES))(
+    'frozen generation Scope %s exactly matches production',
+    (version, names) => {
+      expect(new Set(names).size).toBe(names.length);
+      const resolved = resolveBackupScope({
+        backupScopeVersion: Number(version),
+        entityMetadata: Object.fromEntries(names.map((name) => [name, {}])),
+      });
+      expect(resolved?.scope).toBe(Number(version));
+      expect([...(resolved?.entitySet ?? [])].sort()).toEqual([...names].sort());
+    },
+  );
+
+  it('requires a current generation scope entry when production advances', () => {
+    expect([...(BACKUP_GENERATION_ENTITY_SCOPES[BACKUP_SCOPE_VERSION] ?? [])].sort()).toEqual(
+      [...BACKUP_ENTITIES].sort(),
+    );
   });
 
   it('recognizes weekly_reviews (added by Weekly Review V1)', () => {

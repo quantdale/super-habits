@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Route } from '@playwright/test';
-import { BACKUP_REST_ENTITIES } from './accountBackupEntities';
+import { BACKUP_GENERATION_ENTITY_SCOPES, BACKUP_REST_ENTITIES } from './accountBackupEntities';
 
 type Row = Record<string, unknown>;
 const entities = BACKUP_REST_ENTITIES.filter(
@@ -82,7 +82,7 @@ export class GenerationSupabaseMock {
       {
         protocolVersion: 1,
         backupSchemaVersion: 2,
-        scopeVersion: 7,
+        scopeVersion: 9,
         settingsVersion: 5,
         snapshotId: snapshot,
         sequence: 1,
@@ -97,7 +97,7 @@ export class GenerationSupabaseMock {
       sequence: 1,
       protocol_version: 1,
       backup_schema_version: 2,
-      scope_version: 7,
+      scope_version: 9,
       settings_version: 5,
       manifest,
       manifest_checksum: sha(manifest),
@@ -167,7 +167,7 @@ export class GenerationSupabaseMock {
             content_verification_version: 1,
             sequence_reservation_version: 1,
             backup_schema_version: 2,
-            scope_version: 7,
+            scope_version: 9,
             settings_version: 5,
           });
         const args = request.postDataJSON() as Row;
@@ -249,11 +249,23 @@ export class GenerationSupabaseMock {
           string,
           { rows: number; checksum: string }
         >;
+        const certified =
+          typeof manifest.scopeVersion === 'number'
+            ? BACKUP_GENERATION_ENTITY_SCOPES[manifest.scopeVersion]
+            : undefined;
+        if (!certified || manifest.scopeVersion !== metadata.scope_version)
+          throw new Error('Unsupported or inconsistent generation scope');
+        const names = [...certified, 'user_backup_settings'];
+        const declared = Object.keys(descriptions);
+        if (declared.length !== names.length || declared.some((name) => !names.includes(name)))
+          throw new Error('Generation entity set does not match its certified scope');
         const staged = [...this.chunks.values()].filter(
           (row) => row.user_id === owner && row.snapshot_id === snapshot,
         );
         if (staged.length !== args.p_expected_chunk_count) throw new Error('Incomplete generation');
-        for (const name of [...entities, 'user_backup_settings']) {
+        if (staged.some((row) => !names.includes(String(row.entity))))
+          throw new Error('Generation chunk outside certified scope');
+        for (const name of names) {
           const expected = descriptions[name];
           const pieces = staged
             .filter((row) => row.entity === name)

@@ -94,9 +94,12 @@ defineJourney({
         store('todosTotalAtStart', 200);
         store(
           'dailyRecurrenceSeriesAtStart',
+          // Deleting an occurrence does not stop its series. The canonical
+          // registry includes the three HEAVY identities whose only seed row
+          // is deleted; they must still get exactly one rollover copy.
           await num(
             page,
-            "SELECT COUNT(DISTINCT recurrence_id) AS n FROM todos WHERE recurrence = 'daily' AND recurrence_id IS NOT NULL AND deleted_at IS NULL",
+            'SELECT COUNT(*) AS n FROM todo_recurrence_series WHERE deleted_at IS NULL',
           ),
         );
         store(

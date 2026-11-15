@@ -11,6 +11,8 @@ import {
   KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET,
+  KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET,
+  KNOWN_HISTORICAL_BACKUP_SCOPE_V8_ENTITY_SET,
   PORTABLE_V1_ENTITY_COLUMNS,
   type BackupEntity,
 } from '@/core/backup/backup.types';
@@ -19,8 +21,10 @@ import {
   canonicalSettingsPayloadText,
   isValidRecoverableSettings,
   normalizeRecoverableSettings,
+  projectCertifiedRecoverableSettings,
 } from '@/core/backup/backupSettings';
 import { validateBackupGraph, validateBackupRow } from '@/core/backup/backupValidators';
+import { projectCertifiedBackupRows } from '@/core/backup/backupProjection';
 import { canonicalizeRow, checksumRows, sha256Hex } from '@/lib/checksum';
 import {
   PORTABLE_BACKUP_FORMAT,
@@ -294,10 +298,17 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
       typeof explicitScope === 'number' && Number.isInteger(explicitScope) && explicitScope === 5;
     const isHistoricalScope6 =
       typeof explicitScope === 'number' && Number.isInteger(explicitScope) && explicitScope === 6;
+    const isHistoricalScope7 = explicitScope === 7;
+    const isHistoricalScope8 = explicitScope === 8;
     if (
       typeof explicitScope !== 'number' ||
       !Number.isInteger(explicitScope) ||
-      (!isCurrentScope && !isHistoricalScope4 && !isHistoricalScope5 && !isHistoricalScope6)
+      (!isCurrentScope &&
+        !isHistoricalScope4 &&
+        !isHistoricalScope5 &&
+        !isHistoricalScope6 &&
+        !isHistoricalScope7 &&
+        !isHistoricalScope8)
     ) {
       errors.push(
         `This file uses backup scope version ${String(input.backupScopeVersion)}, which this app cannot import.`,
@@ -306,11 +317,15 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
     }
     const expectedEntities: readonly BackupEntity[] = isCurrentScope
       ? BACKUP_ENTITIES
-      : isHistoricalScope6
-        ? KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET
-        : isHistoricalScope5
-          ? KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET
-          : KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET;
+      : isHistoricalScope8
+        ? KNOWN_HISTORICAL_BACKUP_SCOPE_V8_ENTITY_SET
+        : isHistoricalScope7
+          ? KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET
+          : isHistoricalScope6
+            ? KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET
+            : isHistoricalScope5
+              ? KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET
+              : KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET;
     const missing = [...expectedEntities].filter((entity) => !(entity in entities));
     const unknown = entityKeys.filter(
       (key) => !(expectedEntities as readonly string[]).includes(key),
@@ -327,11 +342,15 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
     scopeEntities = expectedEntities;
     scopeColumns = isCurrentScope
       ? BACKUP_ENTITY_COLUMNS
-      : isHistoricalScope6
-        ? backupEntityColumnsForScope(6)
-        : isHistoricalScope5
-          ? backupEntityColumnsForScope(5)
-          : (BACKUP_SCOPE_V4_ENTITY_COLUMNS as Record<BackupEntity, readonly string[]>);
+      : isHistoricalScope8
+        ? backupEntityColumnsForScope(8)
+        : isHistoricalScope7
+          ? backupEntityColumnsForScope(7)
+          : isHistoricalScope6
+            ? backupEntityColumnsForScope(6)
+            : isHistoricalScope5
+              ? backupEntityColumnsForScope(5)
+              : (BACKUP_SCOPE_V4_ENTITY_COLUMNS as Record<BackupEntity, readonly string[]>);
   }
 
   for (const entity of scopeEntities) {
@@ -341,6 +360,9 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
   }
   if (errors.length > 0) return { ok: false, errors: errors.slice(0, 50) };
 
+  // SAFETY: every declared entity was just checked to be an array. Elements
+  // remain untrusted until the per-row validators immediately below succeed;
+  // nothing from this boundary is written before validation/integrity/graph checks.
   const rowsByEntity = entities as unknown as Partial<
     Record<BackupEntity, Record<string, unknown>[]>
   >;
@@ -440,6 +462,9 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
 
   // Envelope payload checksum (covers identity fields + every canonical row).
   if (typeof integrity.payloadChecksum === 'string') {
+    // SAFETY: the envelope/source fields, scope, rows and settings were checked
+    // above. This typed view is used only for canonical checksum calculation,
+    // never to bypass validation or import an unchecked payload.
     const candidate = {
       format: input.format,
       formatVersion: input.formatVersion,
@@ -463,8 +488,9 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
 
   if (errors.length > 0) return { ok: false, errors: errors.slice(0, 50) };
 
+  const certifiedRows = projectCertifiedBackupRows(rowsByEntity, scopeEntities, scopeColumns);
   // Dependency graph (shared with cloud Restore V2).
-  const graphErrors = validateBackupGraph(rowsByEntity);
+  const graphErrors = validateBackupGraph(certifiedRows);
   if (graphErrors.length > 0) {
     return {
       ok: false,
@@ -474,6 +500,16 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
 
   return {
     ok: true,
-    file: input as unknown as PortableBackupFile,
+    // SAFETY: the envelope, rows, settings, checksums and relationships were
+    // validated above. Preserve the historical scope while importing only its
+    // certified columns; never mutate the caller's source document.
+    file: {
+      ...input,
+      entities: certifiedRows,
+      settings: projectCertifiedRecoverableSettings(
+        input.settings,
+        historicalVersion ?? BACKUP_SETTINGS_VERSION,
+      ),
+    } as unknown as PortableBackupFile,
   };
 }

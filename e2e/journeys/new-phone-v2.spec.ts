@@ -808,10 +808,16 @@ defineJourney({
           .toBe('dark');
         await expect
           .poll(
-            async () => page.evaluate(() => localStorage.getItem('superhabits.theme.slots.v2')),
+            async () =>
+              page.evaluate(() => {
+                const raw = localStorage.getItem('superhabits.theme.slots.v2');
+                return raw === null ? null : (JSON.parse(raw) as unknown);
+              }),
             { timeout: 10_000 },
           )
-          .toBe('{"lightThemeId":"ocean","darkThemeId":"midnight"}');
+          // The certified projection canonicalizes object-key order, not values.
+          // Require the exact restored shape; absent/extra/wrong fields still fail.
+          .toStrictEqual({ lightThemeId: 'ocean', darkThemeId: 'midnight' });
         // No pending theme application remains — the durable marker cleared.
         await expectRows(
           page,

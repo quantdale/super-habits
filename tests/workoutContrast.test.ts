@@ -337,10 +337,13 @@ describe('Workout landing wiring', () => {
   });
 
   it('the day-node row fits narrow phones without clipping', () => {
-    // 7 flex-1 cells with a 40pt floor and no fixed gap: 360/7 = 51.4, 375/7 = 53.6.
-    expect(screen).toMatch(/<View className="flex-row items-stretch">/);
+    // Native keeps its 40pt floor; web uses real 44px cells and half-gutters
+    // to fit seven at 360px, with wrapping for still narrower containers.
+    expect(screen).toMatch(/<View\s+className="flex-row items-stretch"/);
+    expect(screen).toMatch(/marginHorizontal: -spacing\.sm, flexWrap: 'wrap'/);
     expect(screen).toMatch(/className="flex-1 items-center gap-1"/);
-    expect(screen).toMatch(/style=\{\{ minWidth: 40, minHeight: 44, paddingHorizontal: 1 \}\}/);
+    expect(screen).toMatch(/minWidth:\s*Platform\.OS === 'web' \? size\.webTouchTargetMin : 40/);
+    expect(screen).toMatch(/minHeight: 44,\s*paddingHorizontal: 1/);
     expect(screen).not.toMatch(/justify-between gap-1/);
   });
 

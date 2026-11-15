@@ -87,9 +87,9 @@ Key product facts:
 - A local-only dataset owner binding (`app_meta.account.owner_user_id`) prevents session loss or wrong-account Auth state from silently rebinding local data; local use continues while remote sync/restore is paused.
 - The command center launches as a **global overlay** mounted by `GlobalCommandCenterHost` in `app/_layout.tsx`; there is no `/command` route.
 - Calories supports **Form** and **Diary** modes and remembers the last selected view in AsyncStorage (`superhabits.calories.viewMode`).
-- Backup Completeness V2: backfill (`backup.scope_version = 7`), the
+- Backup Completeness V2: backfill (`backup.scope_version = 9`), the
   completeness checkpoint, and Restore V2 live in `core/backup/`; the sync
-  adapter backs all 21 recoverable entity tables plus synthetic
+  adapter backs all 22 recoverable entity tables plus synthetic
   `user_backup_settings` / `backup_manifest` records, including Gym V2 custom
   exercises, weekly plans, date overrides, body weight, and modality-rich
   workout history; hard-delete entities remote-delete; restore requires a
@@ -109,7 +109,7 @@ Key product facts:
 - **Notifications:** `expo-notifications` (iOS/Android only)
 - **Charts/Lists:** `react-native-gifted-charts`, `@shopify/flash-list`; **drag-reorder:** `react-native-draggable-flatlist` (TodosScreen intentionally uses `DraggableFlatList` — do not convert it to `FlashList`); **date/time picker:** `@react-native-community/datetimepicker`
 - **Animations:** `react-native-reanimated`
-- **Testing:** Vitest `^3.2.7` (unit), Playwright `^1.58.2` (E2E)
+- **Testing:** Vitest `^4.1.11` (unit/integration), Playwright `^1.58.2` (E2E)
 - **Patching:** `patch-package` (runs in `postinstall`)
 
 ## Key Configuration Files
@@ -153,7 +153,7 @@ Key product facts:
 
 - Single SQLite connection through `getDatabase()` in `core/db/client.ts`.
 - Bootstrap DDL runs on first open, then sequential migrations in `runMigrations()`.
-- Current stored schema version: **25** (`app_meta.db_schema_version`), adding the local reward ledger (25: `gamification_events`, `gamification_streak_freezes`, `gamification_quests`, `gamification_badges` — local-only, outside backup scope and account ownership), on top of the earlier durable state: processed-notification-action state, the SQLite sync outbox and its durable owner binding, the planning entities (16–19), the hardening-wave-v2 durable-state promotion (20: habit lifecycle columns, Pomodoro session metadata columns, `workout_session_sets`, workout timing columns), migration 21 (`daily_plans.top_todo_titles`), Gym V2's routine/session/catalog/planning/body-weight tables (22), deep Gym V2 semantic metadata (23: aliases, instructions, unilateral and external-load snapshots), and hot-path range indexes (24: `pomodoro_sessions.started_at`, `workout_logs.completed_at`, `habit_completions.date_key`, partial `idx_todos_pending_sort`). Next migration: add a new `if (version < 26) { ... }` block.
+- Current stored schema version: **27** (`app_meta.db_schema_version`), adding exact completion-spawn parent links for timezone-safe atomic recurring undo (27), above canonical `todo_recurrence_series` content and occurrence date/edit provenance independently of one-off edits (26), above the local reward ledger (25: `gamification_events`, `gamification_streak_freezes`, `gamification_quests`, `gamification_badges` — local-only, outside backup scope and account ownership), on top of the earlier durable state: processed-notification-action state, the SQLite sync outbox and its durable owner binding, the planning entities (16–19), the hardening-wave-v2 durable-state promotion (20: habit lifecycle columns, Pomodoro session metadata columns, `workout_session_sets`, workout timing columns), migration 21 (`daily_plans.top_todo_titles`), Gym V2's routine/session/catalog/planning/body-weight tables (22), deep Gym V2 semantic metadata (23: aliases, instructions, unilateral and external-load snapshots), and hot-path range indexes (24: `pomodoro_sessions.started_at`, `workout_logs.completed_at`, `habit_completions.date_key`, partial `idx_todos_pending_sort`). Next migration: add a new `if (version < 28) { ... }` block.
 - `core/db/schema.sql` remains a **reference-only partial snapshot** and is never executed at runtime. It records the v15 owner-bound outbox addition, but it is not a complete replacement for the bootstrap DDL + migration blocks in `core/db/client.ts`; derive the real schema from those runtime sources.
 - Entity TypeScript shapes live in `core/db/types.ts`.
 
@@ -164,7 +164,7 @@ Key product facts:
 - The exported `syncEngine` uses `SupabaseSyncAdapter` (`core/sync/supabase.adapter.ts`), which groups records by entity, reads local rows, and upserts them to Supabase (`onConflict: "id"`).
 - `NoopSyncAdapter` is the constructor default for tests.
 - `AppProviders` registers `syncEngine.flush()` on a 30-second interval, web `visibilitychange` (hidden), and NetInfo reconnect events — but only when `isRemoteEnabled()` returns true (`remoteMode` defaults to `"enabled"`) and the account coordinator has verified current UID, local binding, and every outbox owner agree.
-- Restore v1 (`core/sync/restore.coordinator.ts`) remains the labeled legacy path; Backup Completeness V2 (`core/backup/backupRestore.ts`) previews and imports the complete current Scope-7 dataset only when every account table and outbox row is empty, while frozen Scope-6 payloads remain compatible.
+- Restore v1 (`core/sync/restore.coordinator.ts`) remains the labeled legacy path; Backup Completeness V2 (`core/backup/backupRestore.ts`) previews and imports the complete current Scope-9 dataset only when every account table and outbox row is empty, while frozen Scope-6/7/8 payloads remain compatible.
 
 ### Bootstrap
 
@@ -224,7 +224,7 @@ Any component that calls a `*.data.ts` function must be a descendant of `AppProv
 Violating these can cause silent data corruption or break the app on cold start.
 
 1. **Soft delete only** for main entities. Use `UPDATE ... SET deleted_at = '<nowIso()>'` and `WHERE deleted_at IS NULL`. Do not use `DELETE FROM` on synced entity tables.
-2. **Sync enqueue on every applicable write.** All 21 `BACKUP_ENTITIES` (see `core/backup/backup.types.ts`) ride the durable outbox through `runSyncedMutation`/`runBackupMutation` — including `pomodoro_sessions`, `workout_logs`, the nested workout tables, `saved_meals`, `linked_action_rules`, planning entities, custom exercises, weekly plans, date overrides, and body weight. Only local operational state stays unsynced: `linked_action_events`, `linked_action_executions`, and `processed_notification_actions`.
+2. **Sync enqueue on every applicable write.** All 22 `BACKUP_ENTITIES` (see `core/backup/backup.types.ts`) ride the durable outbox through `runSyncedMutation`/`runBackupMutation` — including `pomodoro_sessions`, `workout_logs`, the nested workout tables, `saved_meals`, `linked_action_rules`, planning entities, custom exercises, weekly plans, date overrides, and body weight. Only local operational state stays unsynced: `linked_action_events`, `linked_action_executions`, and `processed_notification_actions`.
 3. **DB singleton.** `getDatabase()` in `core/db/client.ts` is the only entrypoint. Never open a second SQLite connection or access the DB before initialization.
 4. **IDs via `createId(prefix)` from `lib/id.ts`.** Format: `{prefix}_{timestamp_ms}_{8_random_chars}`. Never use `Math.random()`, `crypto.randomUUID()`, or `Date.now()` alone.
 5. **Date keys via `toDateKey()` from `lib/time.ts`.** Returns local-calendar `YYYY-MM-DD`. Migration 5 records `app_meta.date_key_format` and `date_key_cutover`; old rows are not backfilled.

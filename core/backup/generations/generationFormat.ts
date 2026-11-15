@@ -1,9 +1,9 @@
 import { sha256Hex } from '@/lib/checksum';
 import {
-  BACKUP_ENTITIES,
   BACKUP_SCHEMA_VERSION,
   BACKUP_SCOPE_VERSION,
   BACKUP_SETTINGS_VERSION,
+  resolveBackupScope,
 } from '@/core/backup/backup.types';
 import { GENERATION_PROTOCOL_VERSION, type GenerationChunk } from './generationProtocol';
 import { GENERATION_PAYLOAD_BYTES, utf8Bytes } from './requestBudget';
@@ -114,7 +114,7 @@ export function parseGenerationManifest(
   if (
     !supportedWriteProtocols.includes(manifest.protocolVersion) ||
     manifest.backupSchemaVersion !== BACKUP_SCHEMA_VERSION ||
-    manifest.scopeVersion !== BACKUP_SCOPE_VERSION ||
+    ![7, 8, BACKUP_SCOPE_VERSION].includes(manifest.scopeVersion) ||
     manifest.settingsVersion !== BACKUP_SETTINGS_VERSION
   )
     return fail('unsupported protocol or scope');
@@ -137,7 +137,14 @@ export function parseGenerationManifest(
   ) {
     return fail('entity metadata missing');
   }
-  const entities = [...BACKUP_ENTITIES, 'user_backup_settings'];
+  const scope = resolveBackupScope({
+    backupScopeVersion: manifest.scopeVersion,
+    entityMetadata: Object.fromEntries(
+      Object.entries(manifest.entities).filter(([key]) => key !== 'user_backup_settings'),
+    ),
+  });
+  if (!scope) return fail('unsupported recoverable scope');
+  const entities: string[] = [...scope.entitySet, 'user_backup_settings'];
   if (
     Object.keys(manifest.entities).length !== entities.length ||
     Object.keys(manifest.entities).some((entity) => !entities.includes(entity))

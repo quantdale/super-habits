@@ -1,6 +1,8 @@
 import { Text } from '@/core/ui/Text';
 import { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, Switch, TextInput, View } from 'react-native';
+import { Platform, Pressable, TextInput, View } from 'react-native';
+import { BooleanSwitch as Switch } from '@/core/ui/BooleanSwitch';
+import { size } from '@/core/theme/designTokens';
 import { getNotificationPermissionState, requestTodoReminderPermission } from '@/lib/notifications';
 import {
   getDailyPlanReminderTime,
@@ -452,6 +454,7 @@ export function SettingsNotificationsSection() {
               accessibilityLabel="Daily plan reminder time"
               className="w-24 rounded-xl border px-3 py-2 text-sm"
               style={{
+                minHeight: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
                 borderColor: tokens.border,
                 backgroundColor: tokens.surfaceElevated,
                 color: tokens.text,
@@ -470,8 +473,12 @@ export function SettingsNotificationsSection() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Save daily plan reminder time"
-              className="rounded-full px-4 py-2"
-              style={{ backgroundColor: `${ACCENT}18`, opacity: todoRemindersEnabled ? 1 : 0.5 }}
+              className="justify-center rounded-full px-4 py-2"
+              style={{
+                backgroundColor: `${ACCENT}18`,
+                opacity: todoRemindersEnabled ? 1 : 0.5,
+                minHeight: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
+              }}
               disabled={loading || saving || !todoRemindersEnabled}
               onPress={() => void handleSaveDailyPlanTime()}
             >
@@ -527,8 +534,10 @@ export function SettingsNotificationsSection() {
                     setSavedNote(null);
                     setWeeklyWeekday(day);
                   }}
-                  className="rounded-lg border px-2 py-1"
+                  className="items-center justify-center rounded-lg border px-2 py-1"
                   style={{
+                    minHeight: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
+                    minWidth: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
                     borderColor: active ? ACCENT : tokens.border,
                     backgroundColor: active ? `${ACCENT}18` : tokens.surfaceElevated,
                   }}
@@ -545,6 +554,7 @@ export function SettingsNotificationsSection() {
               accessibilityLabel="Weekly review reminder time"
               className="w-24 rounded-xl border px-3 py-2 text-sm"
               style={{
+                minHeight: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
                 borderColor: tokens.border,
                 backgroundColor: tokens.surfaceElevated,
                 color: tokens.text,
@@ -563,8 +573,12 @@ export function SettingsNotificationsSection() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Save weekly review reminder time"
-              className="rounded-full px-4 py-2"
-              style={{ backgroundColor: `${ACCENT}18`, opacity: loading || saving ? 0.5 : 1 }}
+              className="justify-center rounded-full px-4 py-2"
+              style={{
+                backgroundColor: `${ACCENT}18`,
+                opacity: loading || saving ? 0.5 : 1,
+                minHeight: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
+              }}
               disabled={loading || saving}
               onPress={() => void handleSaveWeeklyTime()}
             >
@@ -608,6 +622,7 @@ export function SettingsNotificationsSection() {
               accessibilityLabel="Workout reminder time"
               className="w-24 rounded-xl border px-3 py-2 text-sm"
               style={{
+                minHeight: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
                 borderColor: tokens.border,
                 backgroundColor: tokens.surfaceElevated,
                 color: tokens.text,
@@ -626,8 +641,12 @@ export function SettingsNotificationsSection() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Save workout reminder time"
-              className="rounded-full px-4 py-2"
-              style={{ backgroundColor: `${ACCENT}18`, opacity: loading || saving ? 0.5 : 1 }}
+              className="justify-center rounded-full px-4 py-2"
+              style={{
+                backgroundColor: `${ACCENT}18`,
+                opacity: loading || saving ? 0.5 : 1,
+                minHeight: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
+              }}
               disabled={loading || saving || workoutPreferences === null}
               onPress={() => void handleSaveWorkoutReminderTime()}
             >
@@ -657,8 +676,9 @@ export function SettingsNotificationsSection() {
                   accessibilityState={{ selected: active }}
                   disabled={loading || saving || workoutPreferences === null}
                   onPress={() => void handleChangeEffortScale(scale)}
-                  className="rounded-xl border px-3 py-2"
+                  className="justify-center rounded-xl border px-3 py-2"
                   style={{
+                    minHeight: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
                     borderColor: active ? ACCENT : tokens.border,
                     backgroundColor: active ? `${ACCENT}18` : tokens.surfaceElevated,
                   }}

@@ -38,7 +38,12 @@ import {
 import type { WorkoutEffortScale, WorkoutWeightUnit } from '@/core/db/types';
 import type { SyncRecord } from '@/core/sync/sync.engine';
 import { requestWorkoutReminderReconciliation } from '@/core/notifications/workoutReminderSignals';
-import { assertExerciseWrite, assertRoutineWrite, validateSetTiming } from '@/lib/validation';
+import {
+  assertExerciseWrite,
+  assertRoutineWrite,
+  assertSetPrescriptionWrite,
+  validateSetTiming,
+} from '@/lib/validation';
 import {
   clampRestSeconds,
   DEFAULT_REST_SECONDS,
@@ -721,6 +726,7 @@ export async function addSet(input: {
 }): Promise<string> {
   const timingErr = validateSetTiming(input.activeSeconds, input.restSeconds);
   if (timingErr) throw new Error(timingErr);
+  assertSetPrescriptionWrite(input);
   const db = await getDatabase();
   const id = createId('eset');
   const now = nowIso();
@@ -879,6 +885,21 @@ export async function updateSet(
       const nextRest = updates.restSeconds ?? activeSet.rest_seconds;
       const timingErr = validateSetTiming(nextActive, nextRest);
       if (timingErr) throw new Error(timingErr);
+      const prescription = {
+        targetRepsMin:
+          updates.targetRepsMin === undefined ? activeSet.target_reps_min : updates.targetRepsMin,
+        targetRepsMax:
+          updates.targetRepsMax === undefined ? activeSet.target_reps_max : updates.targetRepsMax,
+        targetLoad: updates.targetLoad === undefined ? activeSet.target_load : updates.targetLoad,
+        targetDurationSeconds:
+          updates.targetDurationSeconds === undefined
+            ? activeSet.target_duration_seconds
+            : updates.targetDurationSeconds,
+        targetDistance:
+          updates.targetDistance === undefined ? activeSet.target_distance : updates.targetDistance,
+        targetPace: updates.targetPace === undefined ? activeSet.target_pace : updates.targetPace,
+      };
+      assertSetPrescriptionWrite(prescription);
       const update = hasPrescriptionUpdate
         ? await transactionDb.runAsync(
             `UPDATE routine_exercise_sets
@@ -890,20 +911,12 @@ export async function updateSet(
             [
               nextActive,
               nextRest,
-              updates.targetRepsMin === undefined
-                ? activeSet.target_reps_min
-                : updates.targetRepsMin,
-              updates.targetRepsMax === undefined
-                ? activeSet.target_reps_max
-                : updates.targetRepsMax,
-              updates.targetLoad === undefined ? activeSet.target_load : updates.targetLoad,
-              updates.targetDurationSeconds === undefined
-                ? activeSet.target_duration_seconds
-                : updates.targetDurationSeconds,
-              updates.targetDistance === undefined
-                ? activeSet.target_distance
-                : updates.targetDistance,
-              updates.targetPace === undefined ? activeSet.target_pace : updates.targetPace,
+              prescription.targetRepsMin,
+              prescription.targetRepsMax,
+              prescription.targetLoad,
+              prescription.targetDurationSeconds,
+              prescription.targetDistance,
+              prescription.targetPace,
               now,
               id,
             ],

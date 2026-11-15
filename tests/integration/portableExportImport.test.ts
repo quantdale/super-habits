@@ -17,7 +17,7 @@ import { PORTABLE_BACKUP_FORMAT_VERSION } from '@/core/portable/portable.types';
  *
  * Phase 2 replays the exported FILE onto a fresh empty device:
  * prepare → preview (nothing written yet) → confirm → ONE atomic import.
- * Assertions: row-level equality across all 21 Scope-7 tables, habit progress
+ * Assertions: row-level equality across all 22 Scope-8 tables, habit progress
  * insights (current/longest streak, 7/30/90-day rates, consistency,
  * scheduled occurrences, progress) equal, calorie daily totals + macros
  * equal, saved meals + usage metadata equal, focus minutes + session counts
@@ -132,6 +132,7 @@ const ALL_TABLES = [
   'workout_weekly_plan',
   'workout_schedule_overrides',
   'body_weight_entries',
+  'todo_recurrence_series',
   'pomodoro_sessions',
   'linked_action_rules',
   'weekly_reviews',

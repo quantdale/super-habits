@@ -31,6 +31,7 @@ import {
   type HeroIconProps,
 } from '@/core/ui/illustrations/icons';
 import { useKeyboardFocusRing } from '@/core/ui/useKeyboardFocusRing';
+import { useSpaceActivation } from '@/core/ui/useSpaceActivation';
 import { elevation, layout, radius, size, spacing } from '@/core/theme/designTokens';
 import { useReducedMotion } from '@/core/theme/motion';
 import { OverviewScreen } from '@/features/overview/OverviewScreen';
@@ -177,7 +178,7 @@ function TabButton({
   const isRail = layoutRole !== 'bar';
   const isWide = layoutRole === 'rail-wide';
   const HeroIcon = item.heroIcon;
-  const railRef = useRef<View>(null);
+  const railRef = useSpaceActivation({ role: 'tab', onActivate: onPress });
   // The parent rebuilds `onArrowKey` on every render; keeping it in a ref lets
   // the DOM listener subscribe once instead of churning on each layout pass.
   const arrowKeyRef = useRef(onArrowKey);
@@ -209,7 +210,7 @@ function TabButton({
     };
     node.addEventListener('keydown', listener);
     return () => node.removeEventListener('keydown', listener);
-  }, []);
+  }, [railRef]);
 
   return (
     <Pressable

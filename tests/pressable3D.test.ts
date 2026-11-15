@@ -89,12 +89,25 @@ vi.mock('react/jsx-dev-runtime', () => jsxRuntime);
   }),
 };
 
+const platform = vi.hoisted(() => ({ os: 'ios' }));
+
 vi.mock('react-native', () => ({
+  StyleSheet: {
+    flatten: (style: unknown): Record<string, unknown> => {
+      const flatten = (value: unknown): Record<string, unknown> => {
+        if (Array.isArray(value)) return Object.assign({}, ...value.map(flatten));
+        return value && typeof value === 'object' ? { ...value } : {};
+      };
+      return flatten(style);
+    },
+  },
   View: 'View',
   Pressable: 'Pressable',
   Platform: {
-    OS: 'ios',
-    select: (obj: Record<string, unknown>) => obj['ios'] ?? obj['default'],
+    get OS() {
+      return platform.os;
+    },
+    select: (obj: Record<string, unknown>) => obj[platform.os] ?? obj['default'],
   },
   AccessibilityInfo: {
     isReduceMotionEnabled: async () => false,
@@ -181,6 +194,7 @@ function mergedStyle(node: Element): Record<string, unknown> {
 }
 
 beforeEach(() => {
+  platform.os = 'ios';
   rea.reset();
   storage.store.clear();
 });
@@ -207,6 +221,72 @@ describe('Pressable3D lip slab geometry (§5.7)', () => {
       });
     },
   );
+});
+
+describe('Pressable3D actual web hit geometry (CG-12)', () => {
+  it.each([2, 3, 4] as const)('keeps a 44px interactive face plus the %ipx lip', async (lip) => {
+    platform.os = 'web';
+    const ctx = await loadComponent();
+    const tree = ctx.Pressable3D({
+      lip,
+      faceColor: '#fff',
+      lipColor: '#ddd',
+      radius: 14,
+      onPress: () => {},
+      style: { width: 40, height: 40 },
+      faceStyle: { minHeight: 36 },
+      contentStyle: { minHeight: 24 },
+    }) as Element;
+    expect(mergedStyle(findAll(tree, 'View')[0])).toMatchObject({
+      minWidth: 44,
+      minHeight: 44 + lip,
+    });
+    expect(mergedStyle(findAll(tree, 'Animated.View')[0])).toMatchObject({
+      minWidth: 44,
+      minHeight: 44,
+      flexGrow: 1,
+    });
+    expect(mergedStyle(findAll(tree, 'Pressable')[0])).toMatchObject({
+      minWidth: 44,
+      minHeight: 44,
+      flexGrow: 1,
+    });
+  });
+
+  it('does not lower larger caller minimums', async () => {
+    platform.os = 'web';
+    const ctx = await loadComponent();
+    const tree = ctx.Pressable3D({
+      lip: 3,
+      faceColor: '#fff',
+      lipColor: '#ddd',
+      radius: 14,
+      onPress: () => {},
+      style: [{ minHeight: 90, minWidth: 120 }],
+      faceStyle: { minHeight: 80 },
+      contentStyle: [{ minHeight: 70, minWidth: 100 }],
+    }) as Element;
+    expect(mergedStyle(findAll(tree, 'View')[0])).toMatchObject({ minHeight: 90, minWidth: 120 });
+    expect(mergedStyle(findAll(tree, 'Animated.View')[0])).toMatchObject({ minHeight: 80 });
+    expect(mergedStyle(findAll(tree, 'Pressable')[0])).toMatchObject({
+      minHeight: 70,
+      minWidth: 100,
+    });
+  });
+
+  it('keeps native compact geometry and growth behavior unchanged', async () => {
+    const ctx = await loadComponent();
+    const tree = render(ctx, 2);
+    for (const node of [
+      findAll(tree, 'View')[0],
+      findAll(tree, 'Animated.View')[0],
+      findAll(tree, 'Pressable')[0],
+    ]) {
+      expect(mergedStyle(node).minHeight).toBeUndefined();
+      expect(mergedStyle(node).minWidth).toBeUndefined();
+      expect(mergedStyle(node).flexGrow).toBeUndefined();
+    }
+  });
 });
 
 describe('Pressable3D press travel (§5.8 "Press" row)', () => {

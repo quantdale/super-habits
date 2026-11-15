@@ -109,7 +109,17 @@ describe('recurring series correction (features/todos/todos.data)', () => {
         withTransactionAsync: async (task: () => Promise<void>) => {
           await task();
         },
-        getFirstAsync: vi.fn(),
+        getFirstAsync: vi.fn(async (sql: string) =>
+          sql.includes('FROM todo_recurrence_series')
+            ? {
+                id: 'rec_series',
+                title: 'Standup',
+                notes: null,
+                priority: 'normal',
+                deleted_at: null,
+              }
+            : null,
+        ),
         getAllAsync: vi.fn().mockImplementation(async (sql: string) =>
           /completed = 0/.test(sql)
             ? [
@@ -141,9 +151,14 @@ describe('recurring series correction (features/todos/todos.data)', () => {
       const enqueued = syncEngine.prepare.mock.calls.map(
         (call: unknown[]) => call[0] as Record<string, unknown>,
       );
-      expect(enqueued).toHaveLength(2);
-      expect(enqueued[0]).toMatchObject({ entity: 'todos', id: 'todo_today', operation: 'update' });
-      expect(enqueued[1]).toMatchObject({
+      expect(enqueued).toHaveLength(3);
+      expect(enqueued[0]).toMatchObject({
+        entity: 'todo_recurrence_series',
+        id: 'rec_series',
+        operation: 'update',
+      });
+      expect(enqueued[1]).toMatchObject({ entity: 'todos', id: 'todo_today', operation: 'update' });
+      expect(enqueued[2]).toMatchObject({
         entity: 'todos',
         id: 'todo_tomorrow',
         operation: 'update',
@@ -199,7 +214,7 @@ describe('recurring series correction (features/todos/todos.data)', () => {
       // The future copy is tombstoned through the shared dependent cleanup
       // (removeTodoWithinTransaction), whose tombstone carries deleted_at.
       const deletedFuture = db.runAsync.mock.calls.filter((call: unknown[]) =>
-        String(call[0]).includes('SET deleted_at = ?'),
+        String(call[0]).includes('UPDATE todos SET deleted_at = ?'),
       );
       expect(deletedFuture).toHaveLength(1);
       expect(deletedFuture[0][1]).toContain('todo_future');
@@ -232,13 +247,17 @@ describe('recurring series correction (features/todos/todos.data)', () => {
         },
         getFirstAsync: vi.fn(),
         getAllAsync: vi.fn().mockResolvedValue([]),
-        runAsync: vi.fn().mockResolvedValue({ changes: 1 }),
+        runAsync: vi.fn().mockResolvedValue({ changes: 0 }),
       };
       getDatabase.mockResolvedValue(db);
 
       await stopRecurringSeries('rec_missing');
 
-      expect(db.runAsync).not.toHaveBeenCalled();
+      expect(db.runAsync).toHaveBeenCalledTimes(1);
+      expect(db.runAsync).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE todo_recurrence_series'),
+        ['2026-04-16T10:00:00.000Z', '2026-04-16T10:00:00.000Z', 'rec_missing'],
+      );
       expect(syncEngine.prepare).not.toHaveBeenCalled();
     });
   });

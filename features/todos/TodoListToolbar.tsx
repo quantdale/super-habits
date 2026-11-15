@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Platform, Pressable, TextInput, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Text } from '@/core/ui/Text';
 import { Modal } from '@/core/ui/Modal';
@@ -85,7 +85,11 @@ export function TodoListToolbar({
         <TextInput
           accessibilityLabel="Search tasks"
           className="min-w-0 flex-1 text-base"
-          style={{ color: tokens.text, paddingVertical: spacing.sm }}
+          style={{
+            color: tokens.text,
+            paddingVertical: spacing.sm,
+            minHeight: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
+          }}
           value={search}
           onChangeText={onSearchChange}
           placeholder="Search tasks"
@@ -98,6 +102,16 @@ export function TodoListToolbar({
             accessibilityRole="button"
             accessibilityLabel="Clear search"
             hitSlop={8}
+            style={
+              Platform.OS === 'web'
+                ? {
+                    minHeight: size.webTouchTargetMin,
+                    minWidth: size.webTouchTargetMin,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }
+                : undefined
+            }
           >
             <MaterialIcons name="close" size={18} color={tokens.iconMuted} />
           </Pressable>

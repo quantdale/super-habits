@@ -364,10 +364,15 @@ test.describe('Todos', () => {
     // Reopening it must retract that spawn: the user is left with ONE pending
     // copy, never the reopened row plus an untouched copy beside it.
     await page.getByRole('button', { name: 'Show completed tasks' }).click();
-    await page
+    await expect(page.getByRole('button', { name: 'Hide completed tasks' })).toBeVisible();
+    const completedCheck = page
       .getByRole('checkbox', { name: 'Mark incomplete: Daily review' })
-      .first()
-      .click({ force: true });
+      .first();
+    // Showing history replaces the draggable list with a virtualized SectionList.
+    // Its semantic node mounts before its measured hit box; do not force a click
+    // through that actionability boundary. The persisted-row oracles stay below.
+    await expect(completedCheck).toBeVisible();
+    await completedCheck.click();
     // "1 open" alone is true both BEFORE the reopen lands (the spawned copy is
     // the one open task) and after it (the reopened row, spawn retracted), so it
     // cannot prove the write finished. The completed count disappearing is the

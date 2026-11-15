@@ -150,7 +150,7 @@ describe('Workout session wiring', () => {
   const screen = readFileSync(
     resolve(__dirname, '../features/workout/WorkoutSessionScreen.tsx'),
     'utf8',
-  );
+  ).replace(/\r\n/g, '\n');
 
   it('the set node is a 48pt target with resolved inks', () => {
     expect(screen).toMatch(new RegExp(`const SET_NODE_TARGET = ${SET_NODE_TARGET};`));

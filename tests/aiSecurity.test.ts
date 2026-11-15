@@ -156,6 +156,50 @@ describe('AI endpoint security boundary', () => {
     expect(provider).toHaveBeenCalledTimes(2);
   });
 
+  it('stops reading an undeclared oversized stream at the byte limit', async () => {
+    let reads = 0;
+    const cancel = vi.fn();
+    const stream = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          reads += 1;
+          controller.enqueue(new Uint8Array(8));
+          if (reads === 100) controller.close();
+        },
+        cancel,
+      },
+      { highWaterMark: 0 },
+    );
+    const request = new Request('https://example.test', {
+      method: 'POST',
+      body: stream,
+      duplex: 'half',
+    } as RequestInit & { duplex: string });
+
+    await expect(readBoundedJson(request, 16)).rejects.toThrow('too large');
+    expect(reads).toBe(3);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(stream.locked).toBe(false);
+  });
+
+  it('counts UTF-8 bytes, including multibyte characters split between chunks', async () => {
+    const bytes = new TextEncoder().encode(JSON.stringify({ text: '🌱' }));
+    function chunkedRequest() {
+      return new Request('https://example.test', {
+        method: 'POST',
+        body: new ReadableStream<Uint8Array>({
+          start(controller) {
+            for (const byte of bytes) controller.enqueue(Uint8Array.of(byte));
+            controller.close();
+          },
+        }),
+        duplex: 'half',
+      } as RequestInit & { duplex: string });
+    }
+    await expect(readBoundedJson(chunkedRequest(), bytes.length)).resolves.toEqual({ text: '🌱' });
+    await expect(readBoundedJson(chunkedRequest(), bytes.length - 1)).rejects.toThrow('too large');
+  });
+
   it('rejects oversized bodies before JSON/provider handling', async () => {
     const oversized = new Request('https://example.test', {
       method: 'POST',

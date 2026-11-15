@@ -216,9 +216,14 @@ describe('applyNextWeekPlanSuggestions structured outcomes (F4)', () => {
     await freshDatabase();
     const apply = await import('@/features/weekly-review/weeklyReview.applyNextWeek');
 
+    const todos = await import('@/features/todos/todos.data');
+    // This case covers an invalid day plus one genuinely persisted addition.
+    // A phantom ID cannot substantiate a successful addition (separate stale
+    // suggestion regressions assert failures AND unchanged persisted state).
+    const liveId = await todos.addTodo({ title: 'Valid next-week priority' });
     const result = await apply.applyNextWeekPlanSuggestions([
       { dateKey: 'not-a-date', todoIds: ['x1'] },
-      { dateKey: '2026-08-24', todoIds: ['y1'] },
+      { dateKey: '2026-08-24', todoIds: [liveId] },
     ]);
 
     expect(result.appliedDateKeys).toEqual(['2026-08-24']);
@@ -226,6 +231,8 @@ describe('applyNextWeekPlanSuggestions structured outcomes (F4)', () => {
       { dateKey: 'not-a-date', todoId: 'x1', error: 'Invalid date key.' },
     ]);
     expect(result.addedCount).toBe(1);
+    const plans = await import('@/features/daily-plan/dailyPlan.data');
+    expect(JSON.parse((await plans.getDailyPlan('2026-08-24'))!.top_todo_ids)).toEqual([liveId]);
   });
 });
 

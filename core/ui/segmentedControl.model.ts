@@ -1,3 +1,5 @@
+import { size } from '@/core/theme/designTokens';
+
 /**
  * Pure segmented-control navigation model (no React): computes the next
  * selected value for web arrow-key navigation with wrap-around, skipping
@@ -48,17 +50,19 @@ export const MAX_SEGMENT_MIN_HEIGHT = 52;
  * Contract this exists to keep (CG-12): the tier is a LAYOUT tier, not a
  * `hitSlop` tier. react-native-web never applies `hitSlop` to the DOM box, so
  * the only way a segment's real hit area reaches 44 CSS px on web is for the
- * face itself to be 44. A request below the V3 default, a non-finite request,
- * or any non-web platform resolves to the untouched 36pt default, which is why
- * every other `SegmentedControl` caller stays pixel-identical.
+ * face itself to be at least 44. All web callers get that real floor, including
+ * omitted/invalid requests; native retains the compact 36pt face plus hitSlop.
  */
 export function resolveSegmentMinHeight(request: {
   minSegmentHeight?: number;
   isWeb: boolean;
 }): number {
   const { minSegmentHeight, isWeb } = request;
-  if (!isWeb || minSegmentHeight === undefined) return DEFAULT_SEGMENT_MIN_HEIGHT;
-  if (!Number.isFinite(minSegmentHeight)) return DEFAULT_SEGMENT_MIN_HEIGHT;
-  if (minSegmentHeight <= DEFAULT_SEGMENT_MIN_HEIGHT) return DEFAULT_SEGMENT_MIN_HEIGHT;
-  return Math.min(Math.round(minSegmentHeight), MAX_SEGMENT_MIN_HEIGHT);
+  if (!isWeb) return DEFAULT_SEGMENT_MIN_HEIGHT;
+  if (minSegmentHeight === undefined || !Number.isFinite(minSegmentHeight))
+    return size.webTouchTargetMin;
+  return Math.min(
+    Math.max(Math.round(minSegmentHeight), size.webTouchTargetMin),
+    MAX_SEGMENT_MIN_HEIGHT,
+  );
 }
