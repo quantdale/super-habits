@@ -339,12 +339,18 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
             ? { recurrence: 'daily' as const }
             : {}),
         };
-        if (isRecurringLinkedActionSource) {
-          // Recurring sources cannot own rules, so there is no pair to compose.
-          await updateTodo(editingId, editFields);
-        } else {
-          await updateTodoWithLinkedActionRules(editingId, editFields, linkedActionRules);
+        const preserveCompletedHistory =
+          editRecurrenceScope === 'series' && editingTodo?.completed === 1;
+        if (!preserveCompletedHistory) {
+          if (isRecurringLinkedActionSource) {
+            // Recurring sources cannot own rules, so there is no pair to compose.
+            await updateTodo(editingId, editFields);
+          } else {
+            await updateTodoWithLinkedActionRules(editingId, editFields, linkedActionRules);
+          }
         }
+        // Series scope can be opened from completed history. Only the template
+        // API may run there; an instance edit first would rewrite that history.
         // The series template is a separate entity with its own identity, so it
         // is updated after the composed save — its failure is reported without
         // undoing a committed task edit.
@@ -357,7 +363,9 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
             });
           } catch {
             setTodoError(
-              'This task was saved, but the recurring series update failed. Save again to retry the series.',
+              preserveCompletedHistory
+                ? 'The recurring series update failed. Save again to retry.'
+                : 'This task was saved, but the recurring series update failed. Save again to retry the series.',
             );
             void refresh();
             return;
