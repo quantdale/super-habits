@@ -167,7 +167,7 @@ const EMPTY_LINKED_ACTIONS_RESULT: TodoLinkedActionsDispatchResult = {
  * data write, so every call is best-effort; the scheduler itself is a no-op on
  * web and respects the notifications preference.
  */
-async function syncReminderSafely(todo: TodoReminderSnapshot): Promise<void> {
+export async function syncReminderSafely(todo: TodoReminderSnapshot): Promise<void> {
   try {
     await syncTodoDueReminder(todo);
   } catch {
@@ -428,6 +428,42 @@ async function insertRecurringInstanceWithinTransaction(
     createdSeries: resolved.created,
     copy: { id, title: template.title, dueDate: input.dueDate, completedAt: null },
   };
+}
+
+/** Shared by in-app, bulk and notification completion inside the parent's transaction. */
+export async function spawnNextRecurringTodoWithinTransaction(
+  tx: SQLite.SQLiteDatabase,
+  todo: Pick<
+    Todo,
+    | 'id'
+    | 'title'
+    | 'notes'
+    | 'priority'
+    | 'due_date'
+    | 'recurrence'
+    | 'recurrence_id'
+    | 'recurrence_date_key'
+  >,
+  now: string,
+  enqueue: (record: SyncRecord) => void,
+): Promise<TodoReminderSnapshot | null> {
+  if (todo.recurrence !== 'daily' || !todo.recurrence_id) return null;
+  return (
+    await insertRecurringInstanceWithinTransaction(
+      tx,
+      {
+        title: todo.title,
+        notes: todo.notes,
+        priority: todo.priority,
+        recurrenceId: todo.recurrence_id,
+        dueDate: nextRecurringSpawnDueDate(occurrenceDate(todo), new Date(now)),
+      },
+      now,
+      enqueue,
+      undefined,
+      todo.id,
+    )
+  ).copy;
 }
 
 export async function createRecurringInstance(input: RecurringInstanceInput): Promise<void> {
@@ -1324,23 +1360,8 @@ async function setTodoCompletion(
         );
       }
       const spawnedCopy =
-        next === 1 && current.recurrence === 'daily' && current.recurrence_id
-          ? (
-              await insertRecurringInstanceWithinTransaction(
-                transactionDb,
-                {
-                  title: current.title,
-                  notes: current.notes,
-                  priority: current.priority,
-                  recurrenceId: current.recurrence_id,
-                  dueDate: nextRecurringSpawnDueDate(occurrenceDate(current), new Date(now)),
-                },
-                now,
-                enqueue,
-                undefined,
-                current.id,
-              )
-            ).copy
+        next === 1
+          ? await spawnNextRecurringTodoWithinTransaction(transactionDb, current, now, enqueue)
           : null;
       return { changed: true, value: { current, previous, next, removedSpawnId, spawnedCopy } };
     },
@@ -1545,23 +1566,8 @@ export async function bulkSetTodoCompletion(
           );
         }
         const spawnedCopy =
-          completed === 1 && current.recurrence === 'daily' && current.recurrence_id
-            ? (
-                await insertRecurringInstanceWithinTransaction(
-                  transactionDb,
-                  {
-                    title: current.title,
-                    notes: current.notes,
-                    priority: current.priority,
-                    recurrenceId: current.recurrence_id,
-                    dueDate: nextRecurringSpawnDueDate(occurrenceDate(current), new Date(now)),
-                  },
-                  now,
-                  enqueue,
-                  undefined,
-                  current.id,
-                )
-              ).copy
+          completed === 1
+            ? await spawnNextRecurringTodoWithinTransaction(transactionDb, current, now, enqueue)
             : null;
         applied.push({
           spawnedCopy,
