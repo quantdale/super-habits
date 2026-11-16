@@ -330,7 +330,7 @@ export function TodosScreen({ isActive }: { isActive: boolean }) {
         // because they never executed this screen orchestration.
         const editFields = {
           title: title.trim(),
-          notes: notes.trim() || undefined,
+          notes: notes.trim(),
           dueDate: dueDate ?? null,
           priority,
           projectId: editProjectId,
