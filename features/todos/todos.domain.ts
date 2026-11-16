@@ -38,7 +38,9 @@ export function getTodayDateKey(reference: Date = new Date()): string {
  * undated row must not cover its series, or finishing today's copy would
  * suppress every future copy of the chain forever.
  *
- * activeTodos: all non-deleted todos (completed and pending)
+ * Explicit user deletions cover only their own occurrence day, so loading the
+ * screen cannot undo a deletion. Automatic undo retractions do not cover it.
+ * activeTodos: live todos plus user-deleted occurrences and active series
  * todayKey: today's date key
  */
 export function findMissingRecurrenceIds(
@@ -48,6 +50,7 @@ export function findMissingRecurrenceIds(
     due_date: string | null;
     completed: 0 | 1;
     deleted_at: string | null;
+    recurrence_touched?: 0 | 1;
   }[],
   todayKey: string,
 ): string[] {
@@ -60,7 +63,13 @@ export function findMissingRecurrenceIds(
 
   const coveredToday = new Set<string>();
   for (const t of activeTodos) {
-    if (!t.recurrence_id || t.deleted_at !== null) continue;
+    if (!t.recurrence_id) continue;
+    if (t.deleted_at !== null) {
+      if (t.recurrence_touched === 1 && t.due_date === todayKey) {
+        coveredToday.add(t.recurrence_id);
+      }
+      continue;
+    }
     // Dated coverage is unchanged (a completed row due today still covers).
     if (t.due_date === todayKey || (t.due_date === null && t.completed === 0)) {
       coveredToday.add(t.recurrence_id);

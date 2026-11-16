@@ -174,7 +174,7 @@ describe('features/todos/todos.data', () => {
 
     expect(db.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?'),
-      [1, expect.any(String), '2026-04-16T10:00:00.000Z', 'todo_1', 0],
+      [1, expect.any(String), '2026-04-16T10:00:00.000Z', '2026-04-16', 'todo_1', 0],
     );
     expect(linkedActionsEngine.processSourceAction).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -492,8 +492,12 @@ describe('features/todos/todos.data', () => {
     await removeTodo('todo_1');
 
     expect(db.runAsync).toHaveBeenCalledWith(
-      'UPDATE todos SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
-      ['2026-04-16T10:00:00.000Z', '2026-04-16T10:00:00.000Z', 'todo_1'],
+      `UPDATE todos SET deleted_at = ?, updated_at = ?,
+       recurrence_touched = CASE WHEN ? THEN recurrence_touched ELSE 1 END,
+       recurrence_date_key = CASE WHEN recurrence = 'daily'
+         THEN COALESCE(recurrence_date_key, ?) ELSE recurrence_date_key END
+     WHERE id = ? AND deleted_at IS NULL`,
+      ['2026-04-16T10:00:00.000Z', '2026-04-16T10:00:00.000Z', 0, '2026-04-16', 'todo_1'],
     );
 
     expect(linkedActionDataMocks.replaceLinkedActionRulesForSourceEntity).toHaveBeenCalledWith(
@@ -776,11 +780,12 @@ describe('bulk todo operations', () => {
       runAsync: vi.fn(async (sql: string, args: unknown[]) => {
         const queryArgs = args ?? [];
         if (/UPDATE todos SET completed/.test(sql)) {
-          // [next, completedAt, updatedAt, id, previous]
-          const [completed, , , id, previous] = queryArgs as [
+          // [next, completedAt, updatedAt, occurrenceDate, id, previous]
+          const [completed, , , , id, previous] = queryArgs as [
             number,
             unknown,
             unknown,
+            string,
             string,
             number,
           ];
@@ -790,7 +795,7 @@ describe('bulk todo operations', () => {
           return { changes: 1 };
         }
         if (/UPDATE todos SET deleted_at/.test(sql)) {
-          const row = rows.get(queryArgs[2] as string);
+          const row = rows.get(queryArgs[4] as string);
           if (!row || row.deleted_at !== null) return { changes: 0 };
           row.deleted_at = '2026-04-16T10:00:00.000Z';
           return { changes: 1 };
@@ -907,7 +912,7 @@ describe('bulk todo operations', () => {
     const { db } = makeStatefulDb({ todo_a: {}, todo_b: {} });
     const baseRun = db.runAsync.getMockImplementation()!;
     db.runAsync.mockImplementation(async (sql: string, args: unknown[] = []) => {
-      if (/UPDATE todos SET completed/.test(sql) && args[3] === 'todo_b') {
+      if (/UPDATE todos SET completed/.test(sql) && args[4] === 'todo_b') {
         throw new Error('disk I/O error');
       }
       return baseRun(sql, args);
