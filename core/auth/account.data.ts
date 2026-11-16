@@ -97,6 +97,9 @@ export async function setLocalDatasetOwner(
   db: SQLite.SQLiteDatabase,
   userId: string,
 ): Promise<void> {
+  // Restore and first-content adoption also use this low-level setter. Every
+  // binding path must honor a protected origin, including settings-only imports.
+  await assertImportOriginAllowsBinding(db, userId);
   const current = await getLocalDatasetOwner(db);
   if (current && current !== userId) {
     throw new Error('LOCAL_DATASET_OWNER_CONFLICT');

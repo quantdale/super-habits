@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import { getLocalDatasetOwner } from '@/core/auth/account.data';
+import { getLocalDatasetOwner, readImportOriginFingerprint } from '@/core/auth/account.data';
 import { BACKUP_ENTITIES } from '@/core/backup/backup.types';
 import {
   canonicalSettingsPayloadText,
@@ -9,7 +9,10 @@ import {
 import { getDatabase } from '@/core/db/client';
 import { withSQLiteTransaction } from '@/core/db/transactions';
 import { utf8Bytes } from '@/lib/checksum';
-import { portableOwnerFingerprint } from '@/lib/portableOwnerFingerprint';
+import {
+  isPortableOwnerFingerprint,
+  portableOwnerFingerprint,
+} from '@/lib/portableOwnerFingerprint';
 import { nowIso } from '@/lib/time';
 import {
   buildPortableBackupFile,
@@ -30,9 +33,9 @@ import type { BackupEntity, RecoverableSettingsV2 } from '@/core/backup/backup.t
  * sync records, no linked-action events, no saved-meal use-count changes, no
  * `app_meta` mutations.
  *
- * The owner fingerprint comes from the DURABLE local dataset binding (the
- * authority), never from the current session: a file describes data, it does
- * not authenticate anyone.
+ * The owner fingerprint comes from the durable binding or, before account
+ * recovery, the protected import origin. It never comes from the current
+ * session: a file describes data, it does not authenticate anyone.
  */
 
 export type PortableSnapshot = {
@@ -69,10 +72,16 @@ async function capturePortableSnapshot(
     // transaction and retries once if it changed.
     const settings = await readRecoverableSettings(transactionDb);
     const ownerUserId = await getLocalDatasetOwner(transactionDb);
+    const ownerFingerprint = ownerUserId
+      ? portableOwnerFingerprint(ownerUserId)
+      : await readImportOriginFingerprint(transactionDb);
+    if (ownerFingerprint !== null && !isPortableOwnerFingerprint(ownerFingerprint)) {
+      throw new Error('The imported dataset origin could not be verified for export.');
+    }
     return {
       rowsByEntity,
       settings,
-      ownerFingerprint: ownerUserId ? portableOwnerFingerprint(ownerUserId) : null,
+      ownerFingerprint,
     };
   });
 }
