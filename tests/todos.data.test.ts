@@ -174,7 +174,7 @@ describe('features/todos/todos.data', () => {
 
     expect(db.runAsync).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?'),
-      [1, expect.any(String), '2026-04-16T10:00:00.000Z', '2026-04-16', 'todo_1', 0],
+      [1, expect.any(String), '2026-04-16T10:00:00.000Z', 1, '2026-04-16', 'todo_1', 0],
     );
     expect(linkedActionsEngine.processSourceAction).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -780,11 +780,12 @@ describe('bulk todo operations', () => {
       runAsync: vi.fn(async (sql: string, args: unknown[]) => {
         const queryArgs = args ?? [];
         if (/UPDATE todos SET completed/.test(sql)) {
-          // [next, completedAt, updatedAt, occurrenceDate, id, previous]
-          const [completed, , , , id, previous] = queryArgs as [
+          // [next, completedAt, updatedAt, next, occurrenceDate, id, previous]
+          const [completed, , , , , id, previous] = queryArgs as [
             number,
             unknown,
             unknown,
+            number,
             string,
             string,
             number,
@@ -912,7 +913,7 @@ describe('bulk todo operations', () => {
     const { db } = makeStatefulDb({ todo_a: {}, todo_b: {} });
     const baseRun = db.runAsync.getMockImplementation()!;
     db.runAsync.mockImplementation(async (sql: string, args: unknown[] = []) => {
-      if (/UPDATE todos SET completed/.test(sql) && args[4] === 'todo_b') {
+      if (/UPDATE todos SET completed/.test(sql) && args[5] === 'todo_b') {
         throw new Error('disk I/O error');
       }
       return baseRun(sql, args);

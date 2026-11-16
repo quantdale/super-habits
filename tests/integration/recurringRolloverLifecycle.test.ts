@@ -55,6 +55,42 @@ describe('recurrence lifecycle across the screen rollover scan', () => {
     },
   );
 
+  it.each(['single', 'bulk'] as const)(
+    '%s undo of an undated completion restores pending coverage on the next day',
+    async (mode) => {
+      const todos = await import('@/features/todos/todos.data');
+      const id = await todos.addTodo({
+        title: 'Reopened undated daily task',
+        recurrence: 'daily',
+        dueDate: null,
+      });
+      if (mode === 'single') {
+        await todos.completeTodo(id);
+        await todos.setTodoCompletionState(id, 0);
+      } else {
+        await todos.bulkSetTodoCompletion([id], 1);
+        await todos.bulkSetTodoCompletion([id], 0);
+      }
+      expect(await todos.listPendingTodos()).toMatchObject([{ id, due_date: null }]);
+      vi.setSystemTime(new Date(2026, 10, 16, 10));
+      await rollover();
+      const pending = await todos.listPendingTodos();
+      expect(pending).toHaveLength(1);
+      expect(pending[0]).toMatchObject({
+        id,
+        completed: 0,
+        due_date: null,
+        recurrence_date_key: null,
+      });
+      expect(
+        await db.getFirstAsync('SELECT operation FROM sync_outbox WHERE entity = ? AND id = ?', [
+          'todos',
+          id,
+        ]),
+      ).toEqual({ operation: 'update' });
+    },
+  );
+
   it('a deliberately deleted future copy is not recreated by completing its parent again', async () => {
     const todos = await import('@/features/todos/todos.data');
     const id = await todos.addTodo({ title: 'Skip tomorrow', recurrence: 'daily' });

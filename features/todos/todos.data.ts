@@ -1284,12 +1284,15 @@ async function setTodoCompletion(
       const completedAtValue = next === 1 ? now : null;
       // Undated daily tasks acquire a stable occurrence day when handled, so
       // rollover remembers today's completion without changing the visible due date.
+      // Reopening restores pending-undated coverage for subsequent days.
       const result = await transactionDb.runAsync(
         `UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?, recurrence_touched = 1,
-           recurrence_date_key = CASE WHEN recurrence = 'daily'
-             THEN COALESCE(recurrence_date_key, ?) ELSE recurrence_date_key END
+           recurrence_date_key = CASE
+             WHEN recurrence = 'daily' AND ? = 0 AND due_date IS NULL THEN NULL
+             WHEN recurrence = 'daily' THEN COALESCE(recurrence_date_key, ?)
+             ELSE recurrence_date_key END
          WHERE id = ? AND completed = ? AND deleted_at IS NULL`,
-        [next, completedAtValue, now, linkedSourceDateKey, current.id, previous],
+        [next, completedAtValue, now, next, linkedSourceDateKey, current.id, previous],
       );
       if (result.changes !== 1) {
         return {
@@ -1511,10 +1514,20 @@ export async function bulkSetTodoCompletion(
         if (previous === completed) continue;
         const result = await transactionDb.runAsync(
           `UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?, recurrence_touched = 1,
-             recurrence_date_key = CASE WHEN recurrence = 'daily'
-               THEN COALESCE(recurrence_date_key, ?) ELSE recurrence_date_key END
+             recurrence_date_key = CASE
+               WHEN recurrence = 'daily' AND ? = 0 AND due_date IS NULL THEN NULL
+               WHEN recurrence = 'daily' THEN COALESCE(recurrence_date_key, ?)
+               ELSE recurrence_date_key END
            WHERE id = ? AND completed = ? AND deleted_at IS NULL`,
-          [completed, completed === 1 ? now : null, now, linkedSourceDateKey, current.id, previous],
+          [
+            completed,
+            completed === 1 ? now : null,
+            now,
+            completed,
+            linkedSourceDateKey,
+            current.id,
+            previous,
+          ],
         );
         if (result.changes !== 1) continue;
         enqueue({ entity: 'todos', id: current.id, updatedAt: now, operation: 'update' });
