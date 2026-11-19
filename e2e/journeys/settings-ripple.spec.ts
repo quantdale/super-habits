@@ -417,6 +417,21 @@ defineJourney({
           }),
         ).toBeVisible();
 
+        // #239: saving a time preserves the enabled preference instead of
+        // silently enabling the cadence, so the journey enables it explicitly.
+        const weeklyToggle = page.getByRole('switch', {
+          name: 'Weekly review reminder',
+          exact: true,
+        });
+        await expect(weeklyToggle).not.toBeChecked();
+        await weeklyToggle.click();
+        await expect(weeklyToggle).toBeChecked();
+        await expect(
+          page.getByText('Saved for Fri 17:45. Native reminders are unavailable here.', {
+            exact: true,
+          }),
+        ).toBeVisible();
+
         const stored = await page.evaluate(() =>
           window.localStorage.getItem('superhabits.notifications.weekly-review-reminder'),
         );
