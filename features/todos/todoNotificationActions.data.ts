@@ -1,5 +1,5 @@
 import { getDatabase } from '@/core/db/client';
-import type { TodoPriority } from '@/core/db/types';
+import type { TodoPriority, TodoRecurrence } from '@/core/db/types';
 import { runBackupMutation } from '@/core/sync/syncedMutation';
 import {
   buildTransactionalSourceEvent,
@@ -12,8 +12,12 @@ import {
 } from '@/features/habits/notificationActions.data';
 import { TODO_REMINDER_DATA_KIND } from '@/lib/notificationConstants';
 import { toDateKey } from '@/lib/time';
-import { createRecurringInstance, type TodoLinkedActionsDispatchResult } from './todos.data';
-import { getTomorrowDateKey } from './todos.domain';
+import type { TodoReminderSnapshot } from '@/core/notifications/todoReminderScheduler';
+import {
+  spawnNextRecurringTodoWithinTransaction,
+  syncReminderSafely,
+  type TodoLinkedActionsDispatchResult,
+} from './todos.data';
 
 /**
  * Notification-side completion for todo due-date reminders. Mirrors
@@ -23,9 +27,9 @@ import { getTomorrowDateKey } from './todos.domain';
  * two durable boundaries, and replays are exact duplicates (no double
  * mutation, no double dispatch).
  *
- * This is deliberately a separate file from `todos.data.ts`: the canonical
- * toggle/complete APIs stay untouched, and this variant is exclusively
- * desired-completion=1 (a notification tap must never reopen a todo).
+ * This variant also commits recurring children through the same spawn helper
+ * as in-app completion. It is exclusively desired-completion=1: a notification
+ * tap must never reopen a task.
  */
 
 export type NotificationTodoCompletionResult = {
@@ -36,13 +40,6 @@ export type NotificationTodoCompletionResult = {
 const EMPTY_LINKED_ACTIONS_RESULT: TodoLinkedActionsDispatchResult = {
   matchedRuleCount: 0,
   notices: [],
-};
-
-type SpawnRecurrencePlan = {
-  title: string;
-  notes: string | null;
-  priority: TodoPriority;
-  recurrenceId: string;
 };
 
 let notificationCompletionQueue: Promise<void> = Promise.resolve();
@@ -79,7 +76,7 @@ async function runCompleteTodoFromNotification(input: {
   let todoTitle: string | null = null;
   let shouldDispatchLinkedActions = false;
   let mutationApplied = false;
-  let spawnRecurrence: SpawnRecurrencePlan | null = null;
+  let spawnedCopy: TodoReminderSnapshot | null = null;
 
   await runBackupMutation({
     db,
@@ -98,10 +95,12 @@ async function runCompleteTodoFromNotification(input: {
         completed: 0 | 1;
         notes: string | null;
         priority: TodoPriority;
-        recurrence: string | null;
+        recurrence: TodoRecurrence;
         recurrence_id: string | null;
+        due_date: string | null;
+        recurrence_date_key: string | null;
       }>(
-        `SELECT id, title, completed, notes, priority, recurrence, recurrence_id
+        `SELECT id, title, completed, notes, priority, recurrence, recurrence_id, due_date, recurrence_date_key
          FROM todos
          WHERE id = ?
            AND deleted_at IS NULL`,
@@ -129,11 +128,13 @@ async function runCompleteTodoFromNotification(input: {
 
       const result = await transactionDb.runAsync(
         `UPDATE todos
-         SET completed = 1, completed_at = ?, updated_at = ?
+         SET completed = 1, completed_at = ?, updated_at = ?, recurrence_touched = 1,
+           recurrence_date_key = CASE WHEN recurrence = 'daily'
+             THEN COALESCE(recurrence_date_key, ?) ELSE recurrence_date_key END
          WHERE id = ?
            AND completed = 0
            AND deleted_at IS NULL`,
-        [processedAt, processedAt, input.todoId],
+        [processedAt, processedAt, toDateKey(now), input.todoId],
       );
       if (result.changes !== 1) {
         await setNotificationActionLinkedRequiredInTransaction(
@@ -158,12 +159,12 @@ async function runCompleteTodoFromNotification(input: {
       // Daily recurring todos spawn their next instance instead of dispatching
       // Linked Actions — identical to the in-app completion contract.
       if (todo.recurrence === 'daily' && todo.recurrence_id) {
-        spawnRecurrence = {
-          title: todo.title,
-          notes: todo.notes,
-          priority: todo.priority,
-          recurrenceId: todo.recurrence_id,
-        };
+        spawnedCopy = await spawnNextRecurringTodoWithinTransaction(
+          transactionDb,
+          todo,
+          processedAt,
+          enqueue,
+        );
       } else {
         shouldDispatchLinkedActions = true;
         // Durable dispatch handoff: persist the source event in this same
@@ -210,28 +211,7 @@ async function runCompleteTodoFromNotification(input: {
       : 'noop'
     : 'duplicate';
 
-  if (spawnRecurrence) {
-    // Explicit alias: the assignment happens inside the transaction closure,
-    // so the post-transaction narrowing is not reliable here.
-    const recurrence: SpawnRecurrencePlan = spawnRecurrence;
-    const tomorrow = getTomorrowDateKey();
-    const existing = await db.getFirstAsync<{ id: string }>(
-      `SELECT id FROM todos
-       WHERE recurrence_id = ?
-         AND due_date = ?
-         AND deleted_at IS NULL`,
-      [recurrence.recurrenceId, tomorrow],
-    );
-    if (!existing) {
-      await createRecurringInstance({
-        title: recurrence.title,
-        notes: recurrence.notes,
-        priority: recurrence.priority,
-        recurrenceId: recurrence.recurrenceId,
-        dueDate: tomorrow,
-      });
-    }
-  }
+  if (spawnedCopy) await syncReminderSafely(spawnedCopy);
 
   if (!shouldDispatchLinkedActions || !todoTitle || !claim.linkedEventId) {
     return {
