@@ -24,6 +24,13 @@ export type ValidationResult =
 const ID_PATTERN = /^[a-z0-9]+_[0-9]+(_[a-z0-9]+)?$/;
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+// Workout writers do not cap free text or array item length. Use the same
+// recovery ceiling as serialized snapshots below: a successful portable
+// export (100 MiB total) must never be rejected by a shorter field limit.
+// Routine/exercise creates also preserve raw name whitespace even though
+// their name validation caps only the trimmed length. Do not trim on restore.
+const WORKOUT_TEXT_MAX_LENGTH = 100 * 1024 * 1024;
+
 const STRING_LIMITS: Record<string, number> = {
   title: 500,
   name: 300,
@@ -223,6 +230,23 @@ function textRule(field: string, required: boolean, maxLength?: number): FieldRu
   return required ? { required: check } : { required: () => null, optional: check };
 }
 
+function workoutNameRule(): FieldRule {
+  return {
+    required: (row) =>
+      checkField(
+        row,
+        'name',
+        (v) =>
+          typeof v === 'string' &&
+          v.length <= WORKOUT_TEXT_MAX_LENGTH &&
+          // Keep the historical recovery allowance for name content. Only
+          // surrounding writer-persisted whitespace needs the larger ceiling.
+          isBoundedString(v.trim(), 'name'),
+        'name',
+      ),
+  };
+}
+
 function intRule(field: string, required: boolean, min: number): FieldRule {
   const validate = (v: unknown) => Number.isInteger(v) && Number(v) >= min;
   const check = (row: Record<string, unknown>) => checkField(row, field, validate, field);
@@ -254,14 +278,14 @@ function nullableIsoRule(field: string): FieldRule {
   };
 }
 
-function nullableTextRule(field: string): FieldRule {
+function nullableTextRule(field: string, maxLength?: number): FieldRule {
   return {
     required: () => null,
     optional: (row) =>
       checkField(
         row,
         field,
-        (v) => isNullableString(v) && (v === null || isBoundedString(v, field)),
+        (v) => isNullableString(v) && (v === null || isBoundedString(v, field, maxLength)),
         field,
       ),
   };
@@ -280,13 +304,12 @@ function nullableIdRule(field: string): FieldRule {
 }
 
 function isStringArrayJson(value: unknown): boolean {
-  if (typeof value !== 'string' || value.length > 5_000) return false;
+  // Aliases and secondary areas are count-normalized by their writers, with
+  // no per-item text cap. JSON escaping can also expand the stored array.
+  if (typeof value !== 'string' || value.length > WORKOUT_TEXT_MAX_LENGTH) return false;
   try {
     const parsed: unknown = JSON.parse(value);
-    return (
-      Array.isArray(parsed) &&
-      parsed.every((item) => typeof item === 'string' && item.length <= 100)
-    );
+    return Array.isArray(parsed) && parsed.every((item) => typeof item === 'string');
   } catch {
     return false;
   }
@@ -448,18 +471,21 @@ const SAVED_MEAL_RULES: FieldRule[] = [
 
 const WORKOUT_ROUTINE_RULES: FieldRule[] = [
   idRule('id'),
-  textRule('name', true),
-  nullableTextRule('description'),
+  workoutNameRule(),
+  nullableTextRule('description', WORKOUT_TEXT_MAX_LENGTH),
   isoRule('created_at', true),
   isoRule('updated_at', true),
   nullableIsoRule('deleted_at'),
-  optionalColumnRule('goal_tag', (v) => v === null || isBoundedString(v, 'name')),
+  optionalColumnRule(
+    'goal_tag',
+    (v) => v === null || isBoundedString(v, 'goal_tag', WORKOUT_TEXT_MAX_LENGTH),
+  ),
 ];
 
 const ROUTINE_EXERCISE_RULES: FieldRule[] = [
   idRule('id'),
   idRule('routine_id'),
-  textRule('name', true),
+  workoutNameRule(),
   intRule('sort_order', true, 0),
   isoRule('created_at', true),
   isoRule('updated_at', true),
@@ -470,8 +496,14 @@ const ROUTINE_EXERCISE_RULES: FieldRule[] = [
   ),
   optionalColumnRule('unilateral', (v) => v === 0 || v === 1),
   optionalColumnRule('supports_external_load', (v) => v === 0 || v === 1),
-  optionalColumnRule('notes', (v) => v === null || isBoundedString(v, 'notes')),
-  optionalColumnRule('superset_group', (v) => v === null || isBoundedString(v, 'name')),
+  optionalColumnRule(
+    'notes',
+    (v) => v === null || isBoundedString(v, 'notes', WORKOUT_TEXT_MAX_LENGTH),
+  ),
+  optionalColumnRule(
+    'superset_group',
+    (v) => v === null || isBoundedString(v, 'superset_group', WORKOUT_TEXT_MAX_LENGTH),
+  ),
   optionalColumnRule('progression_mode', (v) => isEnum(v, ['none', 'linear', 'double'])),
   optionalColumnRule('progression_increment', (v) => v === null || isNonNegativeNumber(v)),
   optionalColumnRule(
@@ -513,7 +545,7 @@ const ROUTINE_EXERCISE_SET_RULES: FieldRule[] = [
 const WORKOUT_LOG_RULES: FieldRule[] = [
   idRule('id'),
   idRule('routine_id'),
-  nullableTextRule('notes'),
+  nullableTextRule('notes', WORKOUT_TEXT_MAX_LENGTH),
   isoRule('completed_at', true),
   isoRule('created_at', true),
   // V5 timing columns: optional so historical manifests without them validate.
@@ -523,13 +555,16 @@ const WORKOUT_LOG_RULES: FieldRule[] = [
     'duration_seconds',
     (v) => v === null || (Number.isInteger(v) && Number(v) >= 0),
   ),
-  optionalColumnRule('routine_name', (v) => v === null || isBoundedString(v, 'name')),
+  optionalColumnRule(
+    'routine_name',
+    (v) => v === null || isBoundedString(v, 'routine_name', WORKOUT_TEXT_MAX_LENGTH),
+  ),
 ];
 
 const WORKOUT_SESSION_EXERCISE_RULES: FieldRule[] = [
   idRule('id'),
   idRule('log_id'),
-  textRule('exercise_name', true),
+  textRule('exercise_name', true, WORKOUT_TEXT_MAX_LENGTH),
   intRule('sets_completed', true, 0),
   isoRule('created_at', true),
   optionalColumnRule('catalog_exercise_id', isNullableString),
@@ -578,12 +613,15 @@ const WORKOUT_SESSION_SET_RULES: FieldRule[] = [
 const CUSTOM_EXERCISE_RULES: FieldRule[] = [
   idRule('id'),
   textRule('name', true),
-  nullableTextRule('description'),
+  nullableTextRule('description', WORKOUT_TEXT_MAX_LENGTH),
   optionalColumnRule('aliases', (v) => v === null || isStringArrayJson(v)),
-  optionalColumnRule('instructions', (v) => v === null || isBoundedString(v, 'instructions')),
-  textRule('primary_area', true),
+  optionalColumnRule(
+    'instructions',
+    (v) => v === null || isBoundedString(v, 'instructions', WORKOUT_TEXT_MAX_LENGTH),
+  ),
+  textRule('primary_area', true, WORKOUT_TEXT_MAX_LENGTH),
   { required: (row) => checkField(row, 'secondary_areas', isStringArrayJson, 'secondary_areas') },
-  nullableTextRule('equipment'),
+  nullableTextRule('equipment', WORKOUT_TEXT_MAX_LENGTH),
   enumRule('modality', ['weighted_strength', 'bodyweight', 'timed', 'cardio']),
   { required: (row) => checkField(row, 'unilateral', (v) => v === 0 || v === 1, 'unilateral') },
   optionalColumnRule('supports_external_load', (v) => v === 0 || v === 1),
@@ -605,7 +643,7 @@ const WORKOUT_WEEKLY_PLAN_RULES: FieldRule[] = [
   },
   nullableIdRule('routine_id'),
   enumRule('plan_kind', ['workout', 'rest']),
-  nullableTextRule('note'),
+  nullableTextRule('note', WORKOUT_TEXT_MAX_LENGTH),
   isoRule('created_at', true),
   isoRule('updated_at', true),
   nullableIsoRule('deleted_at'),
@@ -617,7 +655,7 @@ const WORKOUT_SCHEDULE_OVERRIDE_RULES: FieldRule[] = [
   enumRule('override_kind', ['workout', 'rest']),
   nullableIdRule('routine_id'),
   nullableDateKeyRule('moved_from_date_key'),
-  nullableTextRule('note'),
+  nullableTextRule('note', WORKOUT_TEXT_MAX_LENGTH),
   isoRule('created_at', true),
   isoRule('updated_at', true),
   nullableIsoRule('deleted_at'),
@@ -629,7 +667,7 @@ const BODY_WEIGHT_ENTRY_RULES: FieldRule[] = [
   isoRule('measured_at', true),
   { required: (row) => checkField(row, 'weight', isPositiveNumber, 'weight') },
   enumRule('unit', ['kg', 'lb']),
-  nullableTextRule('note'),
+  nullableTextRule('note', WORKOUT_TEXT_MAX_LENGTH),
   isoRule('created_at', true),
   isoRule('updated_at', true),
   nullableIsoRule('deleted_at'),
