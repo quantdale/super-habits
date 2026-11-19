@@ -266,7 +266,7 @@ export async function applyNextWeekPlanSuggestions(
         // the daily-plan writer would otherwise silently prune these IDs.
         const candidateIds = [...new Set(suggestion.todoIds)];
         const liveRows = await transactionDb.getAllAsync<{ id: string }>(
-          `SELECT id FROM todos WHERE deleted_at IS NULL AND id IN (${candidateIds.map(() => '?').join(',')})`,
+          `SELECT id FROM todos WHERE deleted_at IS NULL AND completed = 0 AND id IN (${candidateIds.map(() => '?').join(',')})`,
           candidateIds,
         );
         const liveIds = new Set(liveRows.map((row) => row.id));
