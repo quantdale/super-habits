@@ -32,9 +32,11 @@ import { freshDatabase, type TestDatabase } from './helpers/db';
  * compatibility. Only the writer is brought up to the validator's bounds, so
  * every writer-accepted row imports.
  *
- * The same holds for imported per-set prescriptions: a reversed `target_reps_*
- * range written before #225 still imports and can be repaired, but it may no
- * longer be RE-STORED by an unrelated edit (see the legacy compatibility test).
+ * The same holds for imported per-set prescriptions: a reversed `target_reps_*`
+ * range written before #225 still imports, stays editable for unrelated fields
+ * and can be repaired — but an endpoint edit may never preserve the reversal
+ * (see the legacy compatibility tests in this file and in
+ * `workoutProgressionImportContract.test.ts`).
  */
 
 type Progression = Partial<{
