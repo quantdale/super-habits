@@ -164,10 +164,11 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
 
   const toggleTodo = useCallback(
     (todoId: string) => {
+      if (carryingForward || saving) return;
       draft.markDirty('topTodoIds');
       setTopTodoIds((current) => toggleTopTodoId(current, todoId));
     },
-    [draft],
+    [draft, carryingForward, saving],
   );
 
   const [carryForwardError, setCarryForwardError] = useState<string | null>(null);
@@ -177,7 +178,16 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
     setCarryingForward(true);
     setCarryForwardError(null);
     try {
-      await carryForwardFromPreviousDay(today);
+      const updated = await carryForwardFromPreviousDay(
+        today,
+        draft.isDirty('topTodoIds') ? topTodoIds : undefined,
+      );
+      if (updated) {
+        setPlan(updated);
+        // This explicit action owns the priority merge; a normal refresh must
+        // continue protecting the other unsaved fields.
+        setTopTodoIds(parseTopTodoIds(updated.top_todo_ids));
+      }
       await refresh();
     } catch (e) {
       // Surface the failure instead of leaking an unhandled rejection; the
@@ -188,7 +198,7 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
     } finally {
       setCarryingForward(false);
     }
-  }, [today, refresh]);
+  }, [today, refresh, draft, topTodoIds]);
 
   const persist = useCallback(
     async (
@@ -319,7 +329,7 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
             minHeight: Platform.OS === 'web' ? size.webTouchTargetMin : undefined,
           }}
           onPress={() => void handleCarryForward()}
-          disabled={carryingForward}
+          disabled={carryingForward || saving}
         >
           <Text className="text-sm" style={{ color: tokens.text }}>
             {carryingForward ? 'Carrying forward…' : 'Carry forward from yesterday'}
@@ -384,6 +394,7 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
               className="mb-2 flex-row items-center gap-2 rounded-xl border p-2"
               style={{ borderColor: tokens.border, backgroundColor: tokens.surfaceElevated }}
               onPress={() => toggleTodo(t.id)}
+              disabled={carryingForward || saving}
             >
               <Text style={{ fontSize: 18 }}>•</Text>
               <Text
@@ -408,7 +419,7 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
                 : 'committed',
           })
         }
-        disabled={saving}
+        disabled={saving || carryingForward}
         color={SECTION_COLORS.focus}
       />
 
@@ -534,7 +545,7 @@ export function DailyPlanView({ dateKey }: DailyPlanViewProps) {
             <Button
               label="Complete Daily Plan"
               onPress={() => persist({ status: 'completed' })}
-              disabled={saving}
+              disabled={saving || carryingForward}
               color={SECTION_COLORS.habits}
             />
           ) : (
