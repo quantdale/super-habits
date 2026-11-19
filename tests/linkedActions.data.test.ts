@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   deleteLinkedActionRulesForTargetEntity,
   getAppliedHabitIncrementExecution,
-  getAppliedHabitDayCalorieExecution,
+  getAppliedProducedRowExecution,
   listLinkedActionRulesForSourceEntity,
   replaceLinkedActionRulesForSourceEntity,
 } from '@/core/linked-actions/linkedActions.data';
@@ -149,7 +149,14 @@ describe('core/linked-actions/linkedActions.data', () => {
     getDatabase.mockResolvedValue(db);
 
     await expect(
-      getAppliedHabitDayCalorieExecution('link_calorie', 'habit_1', '2026-04-14'),
+      getAppliedProducedRowExecution(
+        'link_calorie',
+        'habits',
+        'habit',
+        'habit_1',
+        'habit.completed_for_day',
+        '2026-04-14',
+      ),
     ).resolves.toMatchObject({
       id: 'lexec_1',
       effectType: 'calorie.log',
@@ -158,7 +165,10 @@ describe('core/linked-actions/linkedActions.data', () => {
 
     expect(db.getFirstAsync).toHaveBeenCalledWith(
       expect.stringContaining('ev.source_date_key = ?'),
-      ['link_calorie', 'habit_1', '2026-04-14'],
+      [
+        ['link_calorie', 'calorie.log', 'pomodoro.log', 'workout.log'],
+        ['habits', 'habit', 'habit_1', 'habit.completed_for_day', '2026-04-14'],
+      ].flat(),
     );
   });
 

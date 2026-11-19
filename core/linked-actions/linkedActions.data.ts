@@ -576,28 +576,49 @@ export async function getLinkedActionExecutionByChainFingerprint(
   return row ? normalizeLinkedActionExecutionRow(row) : null;
 }
 
-export async function getAppliedHabitDayCalorieExecution(
+/**
+ * Effects that MINT A NEW ROW on every application. They are not idempotent by
+ * target state (unlike `todo.complete` or `habit.ensure_daily_target`), so a
+ * second fire of the same rule for the same source entity on the same local
+ * day would produce a second calorie entry / focus session / workout log —
+ * once-per-day effects that reward XP twice when they double-apply.
+ */
+const SINGLE_PRODUCED_ROW_EFFECT_TYPES = ['calorie.log', 'pomodoro.log', 'workout.log'] as const;
+
+export async function getAppliedProducedRowExecution(
   ruleId: string,
-  habitId: string,
+  sourceFeature: LinkedActionFeature,
+  sourceEntityType: LinkedActionSourceEntityType,
+  sourceEntityId: string,
+  triggerType: LinkedActionTriggerType,
   sourceDateKey: string,
 ): Promise<LinkedActionExecutionRecord | null> {
   const db = await getDatabase();
+  const placeholders = SINGLE_PRODUCED_ROW_EFFECT_TYPES.map(() => '?').join(', ');
   const row = await db.getFirstAsync<LinkedActionExecutionRow>(
     `SELECT e.*
      FROM linked_action_executions e
      INNER JOIN linked_action_events ev
        ON ev.id = e.source_event_id
      WHERE e.rule_id = ?
-       AND e.effect_type = 'calorie.log'
+       AND e.effect_type IN (${placeholders})
        AND e.status IN ('planned', 'running', 'applied', 'skipped', 'failed')
-       AND ev.source_feature = 'habits'
-       AND ev.source_entity_type = 'habit'
+       AND ev.source_feature = ?
+       AND ev.source_entity_type = ?
        AND ev.source_entity_id = ?
-       AND ev.trigger_type = 'habit.completed_for_day'
+       AND ev.trigger_type = ?
        AND ev.source_date_key = ?
      ORDER BY e.created_at DESC
      LIMIT 1`,
-    [ruleId, habitId, sourceDateKey],
+    [
+      ruleId,
+      ...SINGLE_PRODUCED_ROW_EFFECT_TYPES,
+      sourceFeature,
+      sourceEntityType,
+      sourceEntityId,
+      triggerType,
+      sourceDateKey,
+    ],
   );
   return row ? normalizeLinkedActionExecutionRow(row) : null;
 }

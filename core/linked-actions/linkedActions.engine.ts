@@ -4,7 +4,7 @@ import {
   createLinkedActionExecution,
   claimLinkedActionExecution,
   getAppliedHabitIncrementExecution,
-  getAppliedHabitDayCalorieExecution,
+  getAppliedProducedRowExecution,
   getLinkedActionEvent,
   getLinkedActionExecutionByChainFingerprint,
   getLinkedActionExecutionByRuleAndSourceEvent,
@@ -156,26 +156,21 @@ function normalizeSourceAction(input: LinkedActionSourceActionInput): LinkedActi
   };
 }
 
-async function findPriorAppliedExecutionForFirstRealPath(
+async function findPriorAppliedExecutionForProducedRowEffect(
   plan: LinkedActionEffectPlan,
 ): Promise<LinkedActionExecutionRecord | null> {
-  if (plan.rule.target.effect.type !== 'calorie.log') {
-    return null;
-  }
-  if (
-    plan.sourceEvent.feature !== 'habits' ||
-    plan.sourceEvent.entityType !== 'habit' ||
-    plan.sourceEvent.triggerType !== 'habit.completed_for_day' ||
-    !plan.sourceEvent.entityId ||
-    !plan.sourceEvent.sourceDateKey
-  ) {
+  const sourceEvent = plan.sourceEvent;
+  if (!sourceEvent.entityId || !sourceEvent.sourceDateKey) {
     return null;
   }
 
-  return getAppliedHabitDayCalorieExecution(
+  return getAppliedProducedRowExecution(
     plan.rule.id,
-    plan.sourceEvent.entityId,
-    plan.sourceEvent.sourceDateKey,
+    sourceEvent.feature,
+    sourceEvent.entityType,
+    sourceEvent.entityId,
+    sourceEvent.triggerType,
+    sourceEvent.sourceDateKey,
   );
 }
 
@@ -430,10 +425,10 @@ export class LinkedActionsEngine {
       }
 
       if (!execution) {
-        const priorAppliedExecution = await findPriorAppliedExecutionForFirstRealPath(plan);
+        const priorAppliedExecution = await findPriorAppliedExecutionForProducedRowEffect(plan);
         if (
           priorAppliedExecution &&
-          recoverOrDedupe(priorAppliedExecution, 'habit_day_already_logged')
+          recoverOrDedupe(priorAppliedExecution, 'source_identity_already_executed')
         ) {
           continue;
         }
