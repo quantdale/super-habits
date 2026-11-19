@@ -38,6 +38,7 @@ describe('recurrence lifecycle across the screen rollover scan', () => {
     '%s completion of a task created by Repeat daily without a date stays completed on reload',
     async (mode) => {
       const todos = await import('@/features/todos/todos.data');
+      const { findMissingRecurrenceIds } = await import('@/features/todos/todos.domain');
       // The editor explicitly sends null when no date is entered.
       const id = await todos.addTodo({ title: 'Daily review', recurrence: 'daily', dueDate: null });
       if (mode === 'single') await todos.completeTodo(id);
@@ -49,9 +50,62 @@ describe('recurrence lifecycle across the screen rollover scan', () => {
       expect(
         await db.getFirstAsync('SELECT completed, due_date FROM todos WHERE id=?', [id]),
       ).toEqual({ completed: 1, due_date: null });
+      // Completion must NOT invent an occurrence key: the row was never given
+      // a date, and rollover derives its handled day from completed_at instead.
       expect(
         await db.getFirstAsync('SELECT recurrence_date_key FROM todos WHERE id=?', [id]),
-      ).toEqual({ recurrence_date_key: toDateKey() });
+      ).toEqual({ recurrence_date_key: null });
+      // The completed row covers TODAY (it was handled today), so the same-day
+      // reload cannot append a second copy of today's already-handled task.
+      expect(
+        findMissingRecurrenceIds(await todos.listAllActiveTodosForRecurrence(), toDateKey()),
+      ).toEqual([]);
+    },
+  );
+
+  it.each(['single', 'bulk'] as const)(
+    '%s complete/reopen of a cleared-date occurrence keeps its original occurrence date and still rolls over',
+    async (mode) => {
+      const todos = await import('@/features/todos/todos.data');
+      const { findMissingRecurrenceIds } = await import('@/features/todos/todos.domain');
+      // Created WITH a date: the occurrence key is the original creation date.
+      const id = await todos.addTodo({ title: 'Dated then undated', recurrence: 'daily' });
+      const originalKey = toDateKey();
+      const recurrenceRow = (await db.getFirstAsync<{ recurrence_id: string }>(
+        'SELECT recurrence_id FROM todos WHERE id=?',
+        [id],
+      ))!;
+      // The user clears only the VISIBLE due date; the original occurrence date
+      // is not an edit surface and must survive completion and reopen.
+      await todos.updateTodo(id, { dueDate: null });
+      if (mode === 'single') {
+        await todos.completeTodo(id);
+        await todos.setTodoCompletionState(id, 0);
+      } else {
+        await todos.bulkSetTodoCompletion([id], 1);
+        await todos.bulkSetTodoCompletion([id], 0);
+      }
+      expect(
+        await db.getFirstAsync(
+          'SELECT due_date, recurrence_date_key, completed FROM todos WHERE id=?',
+          [id],
+        ),
+      ).toEqual({ due_date: null, recurrence_date_key: originalKey, completed: 0 });
+
+      vi.setSystemTime(new Date(2026, 10, 16, 10));
+      // The original occurrence date covers only itself: the next day is still
+      // missing, so the chain keeps producing new copies.
+      expect(
+        findMissingRecurrenceIds(await todos.listAllActiveTodosForRecurrence(), toDateKey()),
+      ).toContain(recurrenceRow.recurrence_id);
+      await rollover();
+      expect(await todos.listPendingTodos()).toMatchObject([
+        { id, due_date: null, completed: 0, recurrence_date_key: originalKey },
+        { due_date: toDateKey(), completed: 0 },
+      ]);
+      expect(
+        await db.getAllAsync('SELECT id FROM todos WHERE recurrence_spawned_by_id = ?', [id]),
+      ).toHaveLength(1);
     },
   );
 

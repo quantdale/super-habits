@@ -553,17 +553,28 @@ export async function getRecurringTodosByIds(
 export async function listAllActiveTodosForRecurrence(): Promise<
   Pick<
     Todo,
-    'recurrence_id' | 'recurrence' | 'due_date' | 'completed' | 'deleted_at' | 'recurrence_touched'
+    | 'recurrence_id'
+    | 'recurrence'
+    | 'due_date'
+    | 'completed'
+    | 'completed_at'
+    | 'deleted_at'
+    | 'recurrence_touched'
   >[]
 > {
   const db = await getDatabase();
   // Explicitly deleted occurrences still cover their own calendar day. Undo
   // retractions remain untouched tombstones and allow a fresh spawn.
+  // `completed_at` rides along because an undated occurrence has no persisted
+  // occurrence key: the scan derives the day it was handled from the completion
+  // instant, so an ORIGINAL occurrence date is never overwritten at completion.
   return db.getAllAsync(
-    `SELECT recurrence_id, recurrence, recurrence_date_key AS due_date, completed, deleted_at, recurrence_touched
+    `SELECT recurrence_id, recurrence, recurrence_date_key AS due_date, completed, completed_at,
+            deleted_at, recurrence_touched
      FROM todos WHERE deleted_at IS NULL OR (recurrence = 'daily' AND recurrence_touched = 1)
      UNION ALL
-     SELECT id AS recurrence_id, 'daily' AS recurrence, NULL AS due_date, 1 AS completed, deleted_at, 0 AS recurrence_touched
+     SELECT id AS recurrence_id, 'daily' AS recurrence, NULL AS due_date, 1 AS completed,
+            NULL AS completed_at, deleted_at, 0 AS recurrence_touched
      FROM todo_recurrence_series WHERE deleted_at IS NULL`,
   );
 }
@@ -1318,17 +1329,20 @@ async function setTodoCompletion(
         return { changed: false, value: { current, previous, next, removedSpawnId: null } };
       }
       const completedAtValue = next === 1 ? now : null;
-      // Undated daily tasks acquire a stable occurrence day when handled, so
-      // rollover remembers today's completion without changing the visible due date.
-      // Reopening restores pending-undated coverage for subsequent days.
+      // Completion never invents an occurrence day. `recurrence_date_key`
+      // records the ORIGINAL occurrence date and is not an edit surface, so a
+      // visible due-date clear must not erase it. Undated occurrences stay
+      // keyless here; rollover derives their handled day from `completed_at`
+      // (see listAllActiveTodosForRecurrence), which keeps a completion covering
+      // only the day it happened and lets a reopen restore pending-undated
+      // coverage without guessing whether the key was auto-assigned.
       const result = await transactionDb.runAsync(
         `UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?, recurrence_touched = 1,
            recurrence_date_key = CASE
-             WHEN recurrence = 'daily' AND ? = 0 AND due_date IS NULL THEN NULL
-             WHEN recurrence = 'daily' THEN COALESCE(recurrence_date_key, ?)
+             WHEN recurrence = 'daily' THEN COALESCE(recurrence_date_key, due_date)
              ELSE recurrence_date_key END
          WHERE id = ? AND completed = ? AND deleted_at IS NULL`,
-        [next, completedAtValue, now, next, linkedSourceDateKey, current.id, previous],
+        [next, completedAtValue, now, current.id, previous],
       );
       if (result.changes !== 1) {
         return {
@@ -1533,22 +1547,16 @@ export async function bulkSetTodoCompletion(
         // Idempotent per-item semantics: applying the desired state twice is a
         // safe no-op for that row.
         if (previous === completed) continue;
+        // Same contract as setTodoCompletion: completion never invents an
+        // occurrence day, so an undated copy keeps a NULL key and rollover
+        // derives its handled day from completed_at.
         const result = await transactionDb.runAsync(
           `UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?, recurrence_touched = 1,
              recurrence_date_key = CASE
-               WHEN recurrence = 'daily' AND ? = 0 AND due_date IS NULL THEN NULL
-               WHEN recurrence = 'daily' THEN COALESCE(recurrence_date_key, ?)
+               WHEN recurrence = 'daily' THEN COALESCE(recurrence_date_key, due_date)
                ELSE recurrence_date_key END
            WHERE id = ? AND completed = ? AND deleted_at IS NULL`,
-          [
-            completed,
-            completed === 1 ? now : null,
-            now,
-            completed,
-            linkedSourceDateKey,
-            current.id,
-            previous,
-          ],
+          [completed, completed === 1 ? now : null, now, current.id, previous],
         );
         if (result.changes !== 1) continue;
         enqueue({ entity: 'todos', id: current.id, updatedAt: now, operation: 'update' });

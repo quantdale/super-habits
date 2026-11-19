@@ -126,15 +126,20 @@ async function runCompleteTodoFromNotification(input: {
         return { changed: false, value: undefined };
       }
 
+      // Same occurrence-date contract as the in-app and bulk completions:
+      // `recurrence_date_key` only ever holds the ORIGINAL occurrence date, so a
+      // dated copy keeps it and an undated copy stays keyless — rollover derives
+      // the handled day from `completed_at`. Writing "today" here would erase a
+      // cleared original due date and suppress the next day's rollover.
       const result = await transactionDb.runAsync(
         `UPDATE todos
          SET completed = 1, completed_at = ?, updated_at = ?, recurrence_touched = 1,
            recurrence_date_key = CASE WHEN recurrence = 'daily'
-             THEN COALESCE(recurrence_date_key, ?) ELSE recurrence_date_key END
+             THEN COALESCE(recurrence_date_key, due_date) ELSE recurrence_date_key END
          WHERE id = ?
            AND completed = 0
            AND deleted_at IS NULL`,
-        [processedAt, processedAt, toDateKey(now), input.todoId],
+        [processedAt, processedAt, input.todoId],
       );
       if (result.changes !== 1) {
         await setNotificationActionLinkedRequiredInTransaction(

@@ -73,4 +73,41 @@ describe('recurring notification completion uses the canonical spawn boundary', 
       { due_date: addLocalDays(toDateKey(instant), 1) },
     ]);
   });
+
+  it('preserves an original occurrence date when a cleared-date copy is completed from a notification', async () => {
+    const todos = await import('@/features/todos/todos.data');
+    const actions = await import('@/features/todos/todoNotificationActions.data');
+    // Created WITH a date: that date is the ORIGINAL occurrence, not an edit.
+    const id = await todos.addTodo({ title: 'Notification dated repeat', recurrence: 'daily' });
+    const originalKey = toDateKey();
+    const input = { todoId: id, actionKey: `done:${id}`, occurrenceId: `reminder:${id}` };
+    // Clearing the VISIBLE due date is not an occurrence-date edit.
+    await todos.updateTodo(id, { dueDate: null });
+    expect((await actions.completeTodoFromNotification(input)).status).toBe('applied');
+    expect(
+      await db.getFirstAsync('SELECT due_date, recurrence_date_key FROM todos WHERE id=?', [id]),
+    ).toEqual({ due_date: null, recurrence_date_key: originalKey });
+  });
+
+  it('never invents an occurrence date for an undated copy completed from a notification', async () => {
+    const todos = await import('@/features/todos/todos.data');
+    const actions = await import('@/features/todos/todoNotificationActions.data');
+    const id = await todos.addTodo({
+      title: 'Notification undated repeat',
+      recurrence: 'daily',
+      dueDate: null,
+    });
+    const input = { todoId: id, actionKey: `done:${id}`, occurrenceId: `reminder:${id}` };
+    expect((await actions.completeTodoFromNotification(input)).status).toBe('applied');
+    // Completion derives the handled day from completed_at; it must not persist
+    // an occurrence key that a later reopen would read as an ORIGINAL date.
+    expect(
+      await db.getFirstAsync('SELECT due_date, recurrence_date_key FROM todos WHERE id=?', [id]),
+    ).toEqual({ due_date: null, recurrence_date_key: null });
+    // The handled day stays covered, so a same-day reload adds no duplicate.
+    const { findMissingRecurrenceIds } = await import('@/features/todos/todos.domain');
+    expect(
+      findMissingRecurrenceIds(await todos.listAllActiveTodosForRecurrence(), toDateKey()),
+    ).toEqual([]);
+  });
 });

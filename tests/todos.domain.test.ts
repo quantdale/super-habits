@@ -40,6 +40,7 @@ type MissingRecurrenceRow = {
   recurrence: string | null;
   due_date: string | null;
   completed: 0 | 1;
+  completed_at?: string | null;
   deleted_at: string | null;
 };
 
@@ -128,6 +129,60 @@ describe('findMissingRecurrenceIds', () => {
         recurrence: 'daily',
         due_date: null,
         completed: 1,
+        deleted_at: null,
+      },
+    ];
+    expect(findMissingRecurrenceIds(todos, '2025-01-02')).toEqual(['rec_001']);
+  });
+
+  it('a keyless COMPLETED undated instance covers only its own completion day', () => {
+    // Undated occurrences never persist an occurrence key: their handled day is
+    // derived from the completion instant in the LOCAL calendar. The day it was
+    // completed must stay covered (a same-day reload cannot append a duplicate),
+    // and every later day must still roll over.
+    const completedAt = new Date(2025, 0, 2, 9, 30).toISOString();
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: null,
+        completed: 1,
+        completed_at: completedAt,
+        deleted_at: null,
+      },
+    ];
+    expect(findMissingRecurrenceIds(todos, '2025-01-02')).toEqual([]);
+    expect(findMissingRecurrenceIds(todos, '2025-01-03')).toEqual(['rec_001']);
+  });
+
+  it('derives the handled day from the completion instant in local calendar terms', () => {
+    // 23:30 local on Jan 2 is already Jan 3 in UTC east of the line and still
+    // Jan 2 in UTC west of it: only the local calendar decides the covered day.
+    const completedAt = new Date(2025, 0, 2, 23, 30).toISOString();
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: null,
+        completed: 1,
+        completed_at: completedAt,
+        deleted_at: null,
+      },
+    ];
+    expect(findMissingRecurrenceIds(todos, '2025-01-02')).toEqual([]);
+    expect(findMissingRecurrenceIds(todos, '2025-01-03')).toEqual(['rec_001']);
+  });
+
+  it('a DATED original occurrence keeps covering only its own date', () => {
+    // The ORIGINAL occurrence date is not an edit surface: a completed row still
+    // covers exactly the day it is dated for, never the day it was handled.
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: '2025-01-01',
+        completed: 1,
+        completed_at: new Date(2025, 0, 2, 9, 30).toISOString(),
         deleted_at: null,
       },
     ];
