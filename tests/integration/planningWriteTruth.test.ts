@@ -75,4 +75,37 @@ describe('planning writes match their persisted outcome', () => {
     const { getDailyPlan } = await import('@/features/daily-plan/dailyPlan.data');
     expect(JSON.parse((await getDailyPlan('2026-11-16'))!.top_todo_ids)).toEqual([live]);
   });
+
+  it('frees deleted existing priorities before checking suggestion capacity', async () => {
+    const { addTodo, removeTodo } = await import('@/features/todos/todos.data');
+    const plans = await import('@/features/daily-plan/dailyPlan.data');
+    const ids: string[] = [];
+    for (const title of ['Retained', 'Deleted A', 'Deleted B', 'New A', 'New B']) {
+      ids.push(await addTodo({ title }));
+    }
+    const original = await plans.upsertDailyPlan('2026-11-16', {
+      intention: 'Preserve my plan',
+      topTodoIds: ids.slice(0, 3),
+    });
+    await removeTodo(ids[1]);
+    await removeTodo(ids[2]);
+    const { applyNextWeekPlanSuggestions } =
+      await import('@/features/weekly-review/weeklyReview.data');
+    const result = await applyNextWeekPlanSuggestions([
+      { dateKey: '2026-11-16', todoIds: ids.slice(3) },
+    ]);
+    expect(result).toMatchObject({
+      addedCount: 2,
+      appliedDateKeys: ['2026-11-16'],
+      skipped: [],
+      failed: [],
+    });
+    const updated = await plans.getDailyPlan('2026-11-16');
+    expect(updated).toMatchObject({ id: original.id, intention: 'Preserve my plan' });
+    expect(JSON.parse(updated!.top_todo_ids)).toEqual([ids[0], ...ids.slice(3)]);
+    expect(JSON.parse(updated!.top_todo_titles!)).toEqual(['Retained', 'New A', 'New B']);
+    expect(
+      await db.getFirstAsync('SELECT operation FROM sync_outbox WHERE id = ?', [original.id]),
+    ).toEqual({ operation: 'update' });
+  });
 });

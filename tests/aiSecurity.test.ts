@@ -200,6 +200,45 @@ describe('AI endpoint security boundary', () => {
     await expect(readBoundedJson(chunkedRequest(), bytes.length - 1)).rejects.toThrow('too large');
   });
 
+  it('propagates an aborted body and releases its reader lock', async () => {
+    const aborted = new DOMException('client disconnected', 'AbortError');
+    let reads = 0;
+    const stream = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          if (reads++ === 0) controller.enqueue(new TextEncoder().encode('{"text":'));
+          else controller.error(aborted);
+        },
+      },
+      { highWaterMark: 0 },
+    );
+    const request = new Request('https://example.test', {
+      method: 'POST',
+      body: stream,
+      duplex: 'half',
+    } as RequestInit & { duplex: string });
+    await expect(readBoundedJson(request)).rejects.toBe(aborted);
+    expect(stream.locked).toBe(false);
+  });
+
+  it('rejects an oversized body even when producer cancellation never settles', async () => {
+    const cancel = vi.fn(() => new Promise<void>(() => undefined));
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(17));
+      },
+      cancel,
+    });
+    const request = new Request('https://example.test', {
+      method: 'POST',
+      body: stream,
+      duplex: 'half',
+    } as RequestInit & { duplex: string });
+    await expect(readBoundedJson(request, 16)).rejects.toThrow('too large');
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(stream.locked).toBe(false);
+  });
+
   it('rejects oversized bodies before JSON/provider handling', async () => {
     const oversized = new Request('https://example.test', {
       method: 'POST',
