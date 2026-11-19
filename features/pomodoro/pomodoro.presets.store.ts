@@ -84,29 +84,67 @@ export async function getPomodoroPresetsState(): Promise<PomodoroPresetsState> {
   return readPresetsState();
 }
 
+/**
+ * Serialized turn over the preset state.
+ *
+ * `app_meta.pomodoro_presets` is a read-modify-write key with THREE writers on
+ * independent surfaces: the manager replaces the list
+ * (`savePomodoroPresets`), the picker sets the selection
+ * (`setActivePresetId`), and manual duration edits detach it
+ * (`clearActivePresetId`). Unsynchronized, the late writer restored the state it
+ * had read BEFORE the other write landed — a preset created in the manager
+ * vanished when the picker's selection resolved second, and a selection was
+ * lost when the list write resolved second. Both are durable preferences carried
+ * by the recoverable-settings backup, so a lost write is a lost setting.
+ *
+ * Each writer therefore reads the stored state and writes the merged result
+ * inside ONE turn, so the second write always sees the first one's outcome.
+ */
+let presetStateChain: Promise<void> = Promise.resolve();
+
+function runPresetStateTurn<T>(task: () => Promise<T>): Promise<T> {
+  const run = presetStateChain.then(task);
+  presetStateChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+async function withIdlePresetState(): Promise<PomodoroPresetsState> {
+  await importLegacyPresetsIfNeeded();
+  return readPresetsState();
+}
+
 /** Persists the normalized preset list, preserving a still-valid selection. */
 export async function savePomodoroPresets(presets: PomodoroPreset[]): Promise<void> {
-  const prev = await getPomodoroPresetsState();
-  await writePomodoroPresetsState({
-    presets: normalizePomodoroPresets(presets),
-    activePresetId:
-      prev.activePresetId !== null
-        ? (findPresetById(presets, prev.activePresetId)?.id ?? null)
-        : null,
+  return runPresetStateTurn(async () => {
+    const prev = await withIdlePresetState();
+    await writePomodoroPresetsState({
+      presets: normalizePomodoroPresets(presets),
+      activePresetId:
+        prev.activePresetId !== null
+          ? (findPresetById(presets, prev.activePresetId)?.id ?? null)
+          : null,
+    });
   });
 }
 
-/** Stores the active preset id after validating it against the preset list. */
+/** Stores the active preset id after validating it against the stored preset list. */
 export async function setActivePresetId(id: string): Promise<void> {
-  const state = await getPomodoroPresetsState();
-  const resolved = findPresetById(state.presets, id)?.id ?? null;
-  if (!resolved || resolved === state.activePresetId) return;
-  await writePomodoroPresetsState({ ...state, activePresetId: resolved });
+  return runPresetStateTurn(async () => {
+    const state = await withIdlePresetState();
+    const resolved = findPresetById(state.presets, id)?.id ?? null;
+    if (!resolved || resolved === state.activePresetId) return;
+    await writePomodoroPresetsState({ ...state, activePresetId: resolved });
+  });
 }
 
 /** Clears the stored selection (e.g. after manual duration edits). */
 export async function clearActivePresetId(): Promise<void> {
-  const state = await getPomodoroPresetsState();
-  if (state.activePresetId === null) return;
-  await writePomodoroPresetsState({ ...state, activePresetId: null });
+  return runPresetStateTurn(async () => {
+    const state = await withIdlePresetState();
+    if (state.activePresetId === null) return;
+    await writePomodoroPresetsState({ ...state, activePresetId: null });
+  });
 }

@@ -6,6 +6,7 @@ import {
   setAppMetaJson,
 } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
+import type * as SQLite from 'expo-sqlite';
 import { PomodoroSession } from '@/core/db/types';
 import type { LinkedActionEffectAdapterResult } from '@/core/linked-actions/linkedActions.types';
 import { createId } from '@/lib/id';
@@ -174,18 +175,57 @@ export async function getPomodoroSettings(): Promise<PomodoroSettings> {
 
 export async function savePomodoroSettings(settings: PomodoroSettings): Promise<void> {
   const db = await getDatabase();
+  const normalized = normalizePomodoroSettings(settings);
   const result = await runRecoverableSettingsMutation({
     db,
-    mutate: (transactionDb) =>
-      setAppMetaJson(
-        transactionDb,
-        appMetaKeys.pomodoroSettings,
-        normalizePomodoroSettings(settings),
-      ),
+    mutate: async (transactionDb) => {
+      await setAppMetaJson(transactionDb, appMetaKeys.pomodoroSettings, normalized);
+      await detachStalePresetSelection(transactionDb, normalized);
+    },
   });
   if (!result.backupEnqueued) {
     console.warn('[backup] pomodoro settings saved locally; settings intent not recorded');
   }
+}
+
+function presetDurationsMatch(preset: PomodoroPreset, settings: PomodoroSettings): boolean {
+  return (
+    preset.focusMinutes === settings.focusMinutes &&
+    preset.shortBreakMinutes === settings.shortBreakMinutes &&
+    preset.longBreakMinutes === settings.longBreakMinutes &&
+    preset.sessionsBeforeLongBreak === settings.sessionsBeforeLongBreak
+  );
+}
+
+/**
+ * Durations and the stored preset selection must describe the same rhythm.
+ *
+ * The selection drives TIMER BEHAVIOUR (the preset's auto-start flags), so a
+ * selection left behind by a duration edit keeps imposing a rhythm the user
+ * replaced: the picker still highlights "Deep Work · 50/10" beside a 30:00
+ * timer, and the next completion starts an unrequested break. Both titles
+ * persist `pomodoro_presets`, and the recoverable-settings payload carries the
+ * pair, so the two facts have to be reconciled in the SAME transaction as the
+ * duration write. Runs inside the caller's transaction (the JSON helpers take
+ * the scoped handle and re-enter the serialized writer).
+ */
+async function detachStalePresetSelection(
+  transactionDb: SQLite.SQLiteDatabase,
+  settings: PomodoroSettings,
+): Promise<void> {
+  const stored = await getAppMetaJsonOrDefault<PomodoroPresetsState | null>(
+    transactionDb,
+    appMetaKeys.pomodoroPresets,
+    null,
+    normalizePomodoroPresetsState,
+  );
+  if (!stored || stored.activePresetId === null) return;
+  const selected = findPresetById(stored.presets, stored.activePresetId);
+  if (!selected || presetDurationsMatch(selected, settings)) return;
+  await setAppMetaJson(transactionDb, appMetaKeys.pomodoroPresets, {
+    ...stored,
+    activePresetId: null,
+  });
 }
 
 /**
