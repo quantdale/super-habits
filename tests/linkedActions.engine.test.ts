@@ -11,6 +11,10 @@ const dataMocks = vi.hoisted(() => ({
   claimLinkedActionExecution: vi.fn(),
   getAppliedHabitIncrementExecution: vi.fn(),
   getAppliedProducedRowExecution: vi.fn(),
+  // Mirrors the shipped predicate: produced-row guards never run for
+  // target-state effects.
+  isSingleProducedRowEffectType: (effectType: string) =>
+    ['calorie.log', 'pomodoro.log', 'workout.log'].includes(effectType),
   getLinkedActionEvent: vi.fn(),
   getLinkedActionExecutionByChainFingerprint: vi.fn(),
   getLinkedActionExecutionByRuleAndSourceEvent: vi.fn(),
@@ -179,6 +183,120 @@ describe('core/linked-actions/linkedActions.engine', () => {
       targetFeature: 'habits',
       targetEntityType: 'habit',
       targetEntityId: 'habit_2',
+    });
+  });
+
+  it('does not consult the produced-row guard for target-state effects', async () => {
+    dataMocks.listMatchingLinkedActionRules.mockResolvedValue([buildRule()]);
+    const staleProducedReceipt: LinkedActionExecutionRecord = {
+      id: 'lexec_pomodoro',
+      ruleId: 'link_1',
+      sourceEventId: 'levt_first',
+      chainId: 'lchain_first',
+      rootEventId: 'levt_first',
+      originRuleId: null,
+      effectType: 'pomodoro.log',
+      effectFingerprint: 'fingerprint',
+      status: 'applied',
+      targetFeature: 'pomodoro',
+      targetEntityType: 'pomodoro_session',
+      targetEntityId: null,
+      producedEntityType: 'pomodoro_session',
+      producedEntityId: 'pom_1',
+      noticePayload: null,
+      errorMessage: null,
+      createdAt: '2026-04-14T00:00:00.000Z',
+      updatedAt: '2026-04-14T00:00:00.000Z',
+    };
+    dataMocks.getAppliedProducedRowExecution.mockResolvedValue(staleProducedReceipt);
+
+    const executor = vi.fn().mockResolvedValue({ status: 'applied', targetLabel: 'Write' });
+    const engine = new LinkedActionsEngine({ effectRegistry: { 'todo.complete': executor } });
+
+    const result = await engine.processSourceAction({
+      eventId: 'levt_second',
+      feature: 'todos',
+      entityType: 'todo',
+      entityId: 'todo_1',
+      triggerType: 'todo.completed',
+      sourceDateKey: '2026-04-14',
+    });
+
+    // The rule was edited in place from pomodoro.log to todo.complete. Its old
+    // produced-row receipt is not a duplicate of the current effect, so the
+    // completion must actually run.
+    expect(dataMocks.getAppliedProducedRowExecution).not.toHaveBeenCalled();
+    expect(executor).toHaveBeenCalledTimes(1);
+    expect(result.effects[0]?.status).toBe('applied');
+  });
+
+  it('still deduplicates a repeated produced-row effect on the same source day', async () => {
+    const producedRule = buildRule({
+      id: 'link_pomodoro',
+      target: {
+        feature: 'pomodoro',
+        entityType: 'pomodoro_session',
+        entityId: null,
+        effect: {
+          kind: 'log',
+          type: 'pomodoro.log',
+          sessionType: 'focus',
+          durationSeconds: 1500,
+        },
+      },
+      rawTargetFeature: 'pomodoro',
+      rawTargetEntityType: 'pomodoro_session',
+      rawEffectType: 'pomodoro.log',
+    });
+    dataMocks.listMatchingLinkedActionRules.mockResolvedValue([producedRule]);
+    const priorReceipt: LinkedActionExecutionRecord = {
+      id: 'lexec_pomodoro',
+      ruleId: 'link_pomodoro',
+      sourceEventId: 'levt_first',
+      chainId: 'lchain_first',
+      rootEventId: 'levt_first',
+      originRuleId: null,
+      effectType: 'pomodoro.log',
+      effectFingerprint: 'fingerprint',
+      status: 'applied',
+      targetFeature: 'pomodoro',
+      targetEntityType: 'pomodoro_session',
+      targetEntityId: null,
+      producedEntityType: 'pomodoro_session',
+      producedEntityId: 'pom_1',
+      noticePayload: null,
+      errorMessage: null,
+      createdAt: '2026-04-14T00:00:00.000Z',
+      updatedAt: '2026-04-14T00:00:00.000Z',
+    };
+    dataMocks.getAppliedProducedRowExecution.mockResolvedValue(priorReceipt);
+
+    const executor = vi.fn();
+    const engine = new LinkedActionsEngine({ effectRegistry: { 'pomodoro.log': executor } });
+
+    const result = await engine.processSourceAction({
+      eventId: 'levt_second',
+      feature: 'todos',
+      entityType: 'todo',
+      entityId: 'todo_1',
+      triggerType: 'todo.completed',
+      sourceDateKey: '2026-04-14',
+    });
+
+    expect(dataMocks.getAppliedProducedRowExecution).toHaveBeenCalledWith(
+      'link_pomodoro',
+      'pomodoro.log',
+      'todos',
+      'todo',
+      'todo_1',
+      'todo.completed',
+      '2026-04-14',
+    );
+    expect(executor).not.toHaveBeenCalled();
+    expect(result.effects[0]).toMatchObject({
+      status: 'duplicate',
+      reason: 'source_identity_already_executed',
+      executionId: 'lexec_pomodoro',
     });
   });
 

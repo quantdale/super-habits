@@ -8,6 +8,7 @@ import {
   getLinkedActionEvent,
   getLinkedActionExecutionByChainFingerprint,
   getLinkedActionExecutionByRuleAndSourceEvent,
+  isSingleProducedRowEffectType,
   listMatchingLinkedActionRules,
   updateLinkedActionExecution,
 } from '@/core/linked-actions/linkedActions.data';
@@ -159,6 +160,15 @@ function normalizeSourceAction(input: LinkedActionSourceActionInput): LinkedActi
 async function findPriorAppliedExecutionForProducedRowEffect(
   plan: LinkedActionEffectPlan,
 ): Promise<LinkedActionExecutionRecord | null> {
+  const effectType = plan.rule.target.effect.type;
+  // Only effects that mint a fresh row per application are re-entry-guarded
+  // here; binary/target-state effects are idempotent by target and a prior
+  // produced-row receipt for this rule must never satisfy them (a rule can be
+  // edited in place, keeping its id while its effect type changes).
+  if (!isSingleProducedRowEffectType(effectType)) {
+    return null;
+  }
+
   const sourceEvent = plan.sourceEvent;
   if (!sourceEvent.entityId || !sourceEvent.sourceDateKey) {
     return null;
@@ -166,6 +176,7 @@ async function findPriorAppliedExecutionForProducedRowEffect(
 
   return getAppliedProducedRowExecution(
     plan.rule.id,
+    effectType,
     sourceEvent.feature,
     sourceEvent.entityType,
     sourceEvent.entityId,

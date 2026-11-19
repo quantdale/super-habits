@@ -10,6 +10,7 @@ import {
   type LinkedActionEventRow,
   type LinkedActionExecutionRecord,
   type LinkedActionExecutionRow,
+  type LinkedActionEffectType,
   type LinkedActionFeature,
   type LinkedActionRuleDefinition,
   type LinkedActionRuleRow,
@@ -585,23 +586,42 @@ export async function getLinkedActionExecutionByChainFingerprint(
  */
 const SINGLE_PRODUCED_ROW_EFFECT_TYPES = ['calorie.log', 'pomodoro.log', 'workout.log'] as const;
 
+/** True only for the effects that mint a fresh row on every application. */
+export function isSingleProducedRowEffectType(effectType: string): boolean {
+  return (SINGLE_PRODUCED_ROW_EFFECT_TYPES as readonly string[]).includes(effectType);
+}
+
+/**
+ * Prior execution of the SAME rule for the same source entity, trigger and
+ * local day — scoped to one effect type.
+ *
+ * The effect type must be part of the lookup: a rule can be re-authored in
+ * place (the editor keeps `existingRuleId`), so its durable identity outlives
+ * its effect type. Without the scope, a `pomodoro.log` receipt left on disk by
+ * the previous effect made a later `todo.complete` rule report a duplicate and
+ * skip the completion entirely.
+ */
 export async function getAppliedProducedRowExecution(
   ruleId: string,
+  effectType: LinkedActionEffectType,
   sourceFeature: LinkedActionFeature,
   sourceEntityType: LinkedActionSourceEntityType,
   sourceEntityId: string,
   triggerType: LinkedActionTriggerType,
   sourceDateKey: string,
 ): Promise<LinkedActionExecutionRecord | null> {
+  if (!isSingleProducedRowEffectType(effectType)) {
+    return null;
+  }
+
   const db = await getDatabase();
-  const placeholders = SINGLE_PRODUCED_ROW_EFFECT_TYPES.map(() => '?').join(', ');
   const row = await db.getFirstAsync<LinkedActionExecutionRow>(
     `SELECT e.*
      FROM linked_action_executions e
      INNER JOIN linked_action_events ev
        ON ev.id = e.source_event_id
      WHERE e.rule_id = ?
-       AND e.effect_type IN (${placeholders})
+       AND e.effect_type = ?
        AND e.status IN ('planned', 'running', 'applied', 'skipped', 'failed')
        AND ev.source_feature = ?
        AND ev.source_entity_type = ?
@@ -612,7 +632,7 @@ export async function getAppliedProducedRowExecution(
      LIMIT 1`,
     [
       ruleId,
-      ...SINGLE_PRODUCED_ROW_EFFECT_TYPES,
+      effectType,
       sourceFeature,
       sourceEntityType,
       sourceEntityId,

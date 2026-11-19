@@ -151,6 +151,7 @@ describe('core/linked-actions/linkedActions.data', () => {
     await expect(
       getAppliedProducedRowExecution(
         'link_calorie',
+        'calorie.log',
         'habits',
         'habit',
         'habit_1',
@@ -166,10 +167,60 @@ describe('core/linked-actions/linkedActions.data', () => {
     expect(db.getFirstAsync).toHaveBeenCalledWith(
       expect.stringContaining('ev.source_date_key = ?'),
       [
-        ['link_calorie', 'calorie.log', 'pomodoro.log', 'workout.log'],
-        ['habits', 'habit', 'habit_1', 'habit.completed_for_day', '2026-04-14'],
-      ].flat(),
+        'link_calorie',
+        'calorie.log',
+        'habits',
+        'habit',
+        'habit_1',
+        'habit.completed_for_day',
+        '2026-04-14',
+      ],
     );
+  });
+
+  it('scopes the produced-row lookup to the CURRENT effect type', async () => {
+    // A rule keeps its id across an in-place edit, so a receipt from the
+    // old effect type must not satisfy the new one (and a non-produced-row
+    // effect type never consults the lookup at all).
+    const db = {
+      getFirstAsync: vi.fn().mockResolvedValue(null),
+    };
+    getDatabase.mockResolvedValue(db);
+
+    await expect(
+      getAppliedProducedRowExecution(
+        'link_edited',
+        'pomodoro.log',
+        'todos',
+        'todo',
+        'todo_1',
+        'todo.completed',
+        '2026-04-14',
+      ),
+    ).resolves.toBeNull();
+    expect(db.getFirstAsync).toHaveBeenCalledWith(expect.stringContaining('e.effect_type = ?'), [
+      'link_edited',
+      'pomodoro.log',
+      'todos',
+      'todo',
+      'todo_1',
+      'todo.completed',
+      '2026-04-14',
+    ]);
+
+    db.getFirstAsync.mockClear();
+    await expect(
+      getAppliedProducedRowExecution(
+        'link_edited',
+        'todo.complete',
+        'todos',
+        'todo',
+        'todo_1',
+        'todo.completed',
+        '2026-04-14',
+      ),
+    ).resolves.toBeNull();
+    expect(db.getFirstAsync).not.toHaveBeenCalled();
   });
 
   it('looks up an applied habit increment by source identity and day', async () => {
