@@ -337,8 +337,14 @@ export async function logPomodoroSessionFromLinkedAction(input: {
   id: string;
   durationSeconds: number;
   type: PomodoroMode;
+  /**
+   * Instant the producing source action happened. Replayed dispatches (startup
+   * recovery after a crash) run later than the user's act; stamping the replay
+   * clock would date the focus block — and its reward — to the wrong day.
+   */
+  endedAtIso?: string;
 }): Promise<LinkedActionEffectAdapterResult> {
-  const endedAt = new Date();
+  const endedAt = new Date(input.endedAtIso ?? new Date().toISOString());
   const startedAt = new Date(endedAt.getTime() - Math.max(0, input.durationSeconds) * 1000);
   const record = await insertPomodoroSessionRecord({
     id: input.id,

@@ -1248,9 +1248,15 @@ export async function logWorkoutFromLinkedAction(input: {
   id: string;
   routineId: string;
   notes?: string | null;
+  /**
+   * Instant the producing source action happened. Replayed dispatches (startup
+   * recovery after a crash) run later than the user's act; stamping the replay
+   * clock would date the session — and its reward — to the wrong day.
+   */
+  completedAtIso?: string;
 }): Promise<LinkedActionEffectAdapterResult> {
   const db = await getDatabase();
-  const now = nowIso();
+  const now = input.completedAtIso ?? nowIso();
   const outcome = await runBackupMutation<CompleteRoutineResult>({
     db,
     mutate: async (transactionDb, enqueue) => {

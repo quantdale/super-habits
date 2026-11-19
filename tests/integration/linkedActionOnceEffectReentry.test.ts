@@ -89,19 +89,22 @@ describe('once-per-source-day effects are not re-applied by a re-completion', ()
     // A genuine completion on a different day is still a new source action.
     const today = toDateKey();
     const engine = (await import('@/core/linked-actions/linkedActions.engine')).linkedActionsEngine;
-    const nextDay = await engine.processSourceAction({
-      eventId: 'levt_next_day',
-      occurredAt: `${addLocalDays(today, 1)}T09:00:00.000Z`,
+    const earlierDay = addLocalDays(today, -1);
+    const earlier = await engine.processSourceAction({
+      eventId: 'levt_earlier_day',
+      occurredAt: `${earlierDay}T09:00:00.000Z`,
       feature: 'todos',
       entityType: 'todo',
       entityId: sourceId,
       triggerType: 'todo.completed',
-      sourceDateKey: addLocalDays(today, 1),
+      sourceDateKey: earlierDay,
     });
-    expect(nextDay.effects[0]?.status).toBe('applied');
+    expect(earlier.effects[0]?.status).toBe('applied');
     expect(
-      await countOnce('SELECT COUNT(*) AS n FROM calorie_entries WHERE deleted_at IS NULL', []),
-    ).toBe(2);
+      await db.getAllAsync<{ consumed_on: string }>(
+        'SELECT consumed_on FROM calorie_entries WHERE deleted_at IS NULL ORDER BY consumed_on',
+      ),
+    ).toEqual([{ consumed_on: earlierDay }, { consumed_on: today }]);
   });
 
   it('a focus-session log fires once for one source task even after untick → retick', async () => {
