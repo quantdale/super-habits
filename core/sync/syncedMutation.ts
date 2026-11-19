@@ -205,6 +205,9 @@ export async function runSyncedMutation<T>(input: {
  */
 export async function enqueueBackupSettingsRecord(db?: SQLite.SQLiteDatabase): Promise<void> {
   const database = db ?? (await getDatabase());
+  // The caller's AsyncStorage value is already saved. Keep retry evidence
+  // even if capture or the later outbox transaction fails and rolls back.
+  await setAppMetaText(database, appMetaKeys.backupDirty, '1');
   const capture = await captureSettingsOutbox(database);
   let prepared: PreparedSyncRecord | null = null;
   await withSQLiteTransaction(database, async (transactionDb) => {
@@ -303,6 +306,9 @@ export async function runRecoverableSettingsMutation<T>(input: {
   const value = await withSQLiteTransaction(input.db, async (transactionDb) => {
     const result = await input.mutate(transactionDb);
     try {
+      // The local value survives backup bookkeeping failures. Mark it dirty
+      // before any snapshot read/write so maintenance can recapture it later.
+      await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
       const settingsSnapshot = await readRecoverableSettings(transactionDb);
       prepared = await persistSettingsOutboxInTransaction(
         transactionDb,
