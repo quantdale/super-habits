@@ -571,6 +571,30 @@ async function readPendingLogQueue(db: Awaited<ReturnType<typeof getDatabase>>) 
   );
 }
 
+/**
+ * One serialized turn over the pending-log queue.
+ *
+ * The queue is a read-modify-write on a single app_meta key with TWO writers:
+ * the completion path (`enqueuePendingPomodoroLog`) and the retry pass
+ * (`retryPendingPomodoroLogs`, which retains still-failing entries and drops
+ * the resolved ones). The retry turn awaits per-entry session inserts between
+ * its read and its write, so an enqueue landing inside that window was
+ * overwritten by the retry's stale retained list — the just-failed completion
+ * silently disappeared from the durable queue and was never logged (no row, no
+ * focus minutes, no reward, no notice). Both writers therefore run through this
+ * chain, and each turn reads the queue at ITS OWN start.
+ */
+let pendingLogQueueChain: Promise<void> = Promise.resolve();
+
+function runPendingLogQueueTurn<T>(task: () => Promise<T>): Promise<T> {
+  const run = pendingLogQueueChain.then(task);
+  pendingLogQueueChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 /** Queue a completed focus whose insert failed; retried on next foreground. */
 export async function enqueuePendingPomodoroLog(input: {
   startedAtIso: string;
@@ -579,21 +603,23 @@ export async function enqueuePendingPomodoroLog(input: {
   type: PomodoroMode;
   meta?: PomodoroSessionMetaInput | null;
 }): Promise<string> {
-  const db = await getDatabase();
-  const queue = await readPendingLogQueue(db);
-  const entry: PendingPomodoroLog = {
-    id: createId('pom'),
-    startedAtIso: input.startedAtIso,
-    endedAtIso: input.endedAtIso,
-    durationSeconds: input.durationSeconds,
-    type: input.type,
-    meta: input.meta ?? null,
-    attempts: 0,
-    firstQueuedAtIso: nowIso(),
-    lastErrorAtIso: null,
-  };
-  await setAppMetaJson(db, appMetaKeys.pomodoroPendingLogs, [...queue, entry]);
-  return entry.id;
+  return runPendingLogQueueTurn(async () => {
+    const db = await getDatabase();
+    const queue = await readPendingLogQueue(db);
+    const entry: PendingPomodoroLog = {
+      id: createId('pom'),
+      startedAtIso: input.startedAtIso,
+      endedAtIso: input.endedAtIso,
+      durationSeconds: input.durationSeconds,
+      type: input.type,
+      meta: input.meta ?? null,
+      attempts: 0,
+      firstQueuedAtIso: nowIso(),
+      lastErrorAtIso: null,
+    };
+    await setAppMetaJson(db, appMetaKeys.pomodoroPendingLogs, [...queue, entry]);
+    return entry.id;
+  });
 }
 
 export type PendingLogRetryResult = {
@@ -603,23 +629,18 @@ export type PendingLogRetryResult = {
   finalFailures: PendingPomodoroLog[];
 };
 
-// Serialized so concurrent foreground refreshes cannot interleave the
-// queue's read-modify-write and drop entries (same pattern as meta writes).
-let pendingLogRetryChain: Promise<void> = Promise.resolve();
-
 /**
  * Retry every queued focus log. Insert dedupe-by-id makes retries idempotent.
  * Entries succeed → removed; still failing below the attempt cap → retained
  * with attempts bumped; exhausting the cap → returned in `finalFailures`
  * (caller surfaces a notice) and dropped from the queue.
+ *
+ * Shares the queue turn with `enqueuePendingPomodoroLog`: concurrent
+ * foreground refreshes cannot interleave the queue's read-modify-write, and a
+ * completion queued during this pass can no longer be clobbered by it.
  */
 export async function retryPendingPomodoroLogs(): Promise<PendingLogRetryResult> {
-  const run = pendingLogRetryChain.then(() => retryPendingPomodoroLogsInner());
-  pendingLogRetryChain = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  return run;
+  return runPendingLogQueueTurn(() => retryPendingPomodoroLogsInner());
 }
 
 async function retryPendingPomodoroLogsInner(): Promise<PendingLogRetryResult> {
