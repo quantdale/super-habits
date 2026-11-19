@@ -339,12 +339,17 @@ export async function logPomodoroSessionFromLinkedAction(input: {
   type: PomodoroMode;
 }): Promise<LinkedActionEffectAdapterResult> {
   const endedAt = new Date();
-  const startedAt = new Date(endedAt.getTime() - Math.max(0, input.durationSeconds) * 1000);
+  // The backup/portable contract for this column is a whole number of seconds
+  // (restore rejects non-integers), and a linked-action duration is authored in
+  // whole minutes. Rounding here keeps every writer inside the schema contract,
+  // so the row can be backed up and restored instead of failing validation.
+  const durationSeconds = Math.max(0, Math.round(input.durationSeconds));
+  const startedAt = new Date(endedAt.getTime() - durationSeconds * 1000);
   const record = await insertPomodoroSessionRecord({
     id: input.id,
     startedAtIso: startedAt.toISOString(),
     endedAtIso: endedAt.toISOString(),
-    durationSeconds: input.durationSeconds,
+    durationSeconds,
     type: input.type,
   });
 
