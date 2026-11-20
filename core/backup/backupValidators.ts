@@ -31,6 +31,14 @@ const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 // their name validation caps only the trimmed length. Do not trim on restore.
 const WORKOUT_TEXT_MAX_LENGTH = 100 * 1024 * 1024;
 
+// Recovery ceiling for values a writer persists RAW or without validation at
+// all (`name` is validated trimmed-only everywhere, and the Habit `icon`/`color`
+// are never checked at write time: the Command Center's `create_habit` path
+// persists whatever text its parser returned, and edit normalization repairs an
+// unknown value instead of refusing the row). A rejected habit row rejects the
+// WHOLE backup file, so recovery must accept every writer-valid value.
+const RAW_NAME_RECOVERY_TEXT_LENGTH = 100 * 1024 * 1024;
+
 const STRING_LIMITS: Record<string, number> = {
   title: 500,
   name: 300,
@@ -230,7 +238,14 @@ function textRule(field: string, required: boolean, maxLength?: number): FieldRu
   return required ? { required: check } : { required: () => null, optional: check };
 }
 
-function workoutNameRule(): FieldRule {
+/**
+ * `name` validated against its TRIMMED length (the writer contract), while the
+ * stored raw value may carry surrounding whitespace: the Workout routine /
+ * exercise create paths and every habit writer validate only the trimmed
+ * length before persisting the raw string. `RAW_NAME_RECOVERY_TEXT_LENGTH`
+ * bounds the raw value so a pathological row cannot exceed the envelope budget.
+ */
+function trimmedNameRule(): FieldRule {
   return {
     required: (row) =>
       checkField(
@@ -238,9 +253,7 @@ function workoutNameRule(): FieldRule {
         'name',
         (v) =>
           typeof v === 'string' &&
-          v.length <= WORKOUT_TEXT_MAX_LENGTH &&
-          // Keep the historical recovery allowance for name content. Only
-          // surrounding writer-persisted whitespace needs the larger ceiling.
+          v.length <= RAW_NAME_RECOVERY_TEXT_LENGTH &&
           isBoundedString(v.trim(), 'name'),
         'name',
       ),
@@ -370,25 +383,13 @@ const TODO_RULES: FieldRule[] = [
 
 const HABIT_RULES: FieldRule[] = [
   idRule('id'),
-  textRule('name', true),
+  trimmedNameRule(),
   intRule('target_per_day', true, 1),
   nullableTextRule('reminder_time'),
   enumRule('category', ['anytime', 'morning', 'afternoon', 'evening']),
-  enumRule('icon', [
-    'check-circle',
-    'favorite',
-    'local-drink',
-    'menu-book',
-    'fitness-center',
-    'wb-sunny',
-    'bedtime',
-    'self-improvement',
-    'water-drop',
-    'coffee',
-    'psychology',
-    'spa',
-  ]),
-  textRule('color', true),
+  // NOT an enum: the writer never checks the icon against the palette (§ above).
+  textRule('icon', true, RAW_NAME_RECOVERY_TEXT_LENGTH),
+  textRule('color', true, RAW_NAME_RECOVERY_TEXT_LENGTH),
   {
     required: (row) =>
       checkField(row, 'rule_history', (v) => parseHabitRuleHistoryJson(v).ok, 'rule_history'),
@@ -471,7 +472,7 @@ const SAVED_MEAL_RULES: FieldRule[] = [
 
 const WORKOUT_ROUTINE_RULES: FieldRule[] = [
   idRule('id'),
-  workoutNameRule(),
+  trimmedNameRule(),
   nullableTextRule('description', WORKOUT_TEXT_MAX_LENGTH),
   isoRule('created_at', true),
   isoRule('updated_at', true),
@@ -485,7 +486,7 @@ const WORKOUT_ROUTINE_RULES: FieldRule[] = [
 const ROUTINE_EXERCISE_RULES: FieldRule[] = [
   idRule('id'),
   idRule('routine_id'),
-  workoutNameRule(),
+  trimmedNameRule(),
   intRule('sort_order', true, 0),
   isoRule('created_at', true),
   isoRule('updated_at', true),
