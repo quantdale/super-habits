@@ -41,7 +41,11 @@ import { DraftPreview } from './DraftPreview';
 import { InternalMetadataCard, LaunchContextCard } from './CommandPreview';
 import { ModeToggle } from './ModeToggle';
 import type { PomodoroCommandStartResult } from '@/features/pomodoro/pomodoroCommandBridgeContext';
-import { prepareCommandReview, type CommandReview } from './command.review';
+import {
+  prepareCommandReview,
+  dropClaimedExecutionTokenOnEdit,
+  type CommandReview,
+} from './command.review';
 
 type CommandScreenProps = {
   launchContext?: CommandCenterLaunchContext | null;
@@ -507,13 +511,17 @@ export function CommandScreen({
   };
 
   const refreshDraftReview = (nextDraft: DraftAiAction, nextSelectedEntityId: string | null) => {
+    // An edit starts a NEW command: the reviewed draft it came from may already
+    // have been confirmed, and its token is spent. Keeping it would refuse the
+    // user's correction as "already submitted" forever.
+    const preparedDraft = dropClaimedExecutionTokenOnEdit(nextDraft, editableDraft);
     const requestId = ++reviewRequestId.current;
-    setEditableDraft(nextDraft);
+    setEditableDraft(preparedDraft);
     setCommandReview(null);
     setSelectedEntityId(nextSelectedEntityId);
     setExecutionError(null);
     setSuccessResult(null);
-    void prepareCommandReview(nextDraft, { selectedEntityId: nextSelectedEntityId })
+    void prepareCommandReview(preparedDraft, { selectedEntityId: nextSelectedEntityId })
       .then((review) => {
         if (requestId !== reviewRequestId.current) return;
         setCommandReview(review);

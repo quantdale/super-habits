@@ -112,12 +112,18 @@ export function validateCommandDraftFields(draft: DraftAiAction): string | null 
       if (!normalizeReference(draft.fields.goalTitle)) {
         return 'Add the goal title before continuing.';
       }
+      // Goal progress is integer-only in the product (`clampProgressPercent`
+      // rounds, `parseGoalProgressText` accepts whole numbers). The Command
+      // Center's percent field is free text parsed with `Number()`, so a
+      // fractional value was previewed as "… → 40.5%" and committed as 41%
+      // (the executor's own clamp). Refusing it at review keeps the preview
+      // and the write in agreement.
       return draft.fields.percent !== null &&
-        Number.isFinite(draft.fields.percent) &&
+        Number.isInteger(draft.fields.percent) &&
         draft.fields.percent >= 0 &&
         draft.fields.percent <= 100
         ? null
-        : 'Goal progress must be between 0 and 100 percent.';
+        : 'Goal progress must be a whole number between 0 and 100 percent.';
     case 'add_todo_to_daily_plan':
       if (!normalizeReference(draft.fields.todoTitle)) {
         return 'Add the Todo title before continuing.';

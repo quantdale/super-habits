@@ -6,6 +6,7 @@ import {
   setAppMetaJson,
 } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
+import type * as SQLite from 'expo-sqlite';
 import { PomodoroSession } from '@/core/db/types';
 import type { LinkedActionEffectAdapterResult } from '@/core/linked-actions/linkedActions.types';
 import { createId } from '@/lib/id';
@@ -174,18 +175,65 @@ export async function getPomodoroSettings(): Promise<PomodoroSettings> {
 
 export async function savePomodoroSettings(settings: PomodoroSettings): Promise<void> {
   const db = await getDatabase();
-  const result = await runRecoverableSettingsMutation({
-    db,
-    mutate: (transactionDb) =>
-      setAppMetaJson(
-        transactionDb,
-        appMetaKeys.pomodoroSettings,
-        normalizePomodoroSettings(settings),
-      ),
-  });
+  const normalized = normalizePomodoroSettings(settings);
+  // The durations AND the selection reconciliation form one read-modify-write
+  // over `pomodoro_presets`, so they hold the same turn as the preset store's
+  // writers (see `runPomodoroPresetStateTurn`): a list save that read the
+  // pre-detach state can never write its stale selection back afterwards.
+  const result = await runPomodoroPresetStateTurn(() =>
+    runRecoverableSettingsMutation({
+      db,
+      mutate: async (transactionDb) => {
+        await setAppMetaJson(transactionDb, appMetaKeys.pomodoroSettings, normalized);
+        await detachStalePresetSelection(transactionDb, normalized);
+      },
+    }),
+  );
   if (!result.backupEnqueued) {
     console.warn('[backup] pomodoro settings saved locally; settings intent not recorded');
   }
+}
+
+function presetDurationsMatch(preset: PomodoroPreset, settings: PomodoroSettings): boolean {
+  return (
+    preset.focusMinutes === settings.focusMinutes &&
+    preset.shortBreakMinutes === settings.shortBreakMinutes &&
+    preset.longBreakMinutes === settings.longBreakMinutes &&
+    preset.sessionsBeforeLongBreak === settings.sessionsBeforeLongBreak
+  );
+}
+
+/**
+ * Durations and the stored preset selection must describe the same rhythm.
+ *
+ * The selection drives TIMER BEHAVIOUR (the preset's auto-start flags), so a
+ * selection left behind by a duration edit keeps imposing a rhythm the user
+ * replaced: the picker still highlights "Deep Work · 50/10" beside a 30:00
+ * timer, and the next completion starts an unrequested break. Both titles
+ * persist `pomodoro_presets`, and the recoverable-settings payload carries the
+ * pair, so the two facts have to be reconciled in the SAME transaction as the
+ * duration write (and, because the preset store's writers merge from a state
+ * they read first, under the same preset-state turn). Runs inside the caller's
+ * transaction (the JSON helpers take the scoped handle and re-enter the
+ * serialized writer).
+ */
+async function detachStalePresetSelection(
+  transactionDb: SQLite.SQLiteDatabase,
+  settings: PomodoroSettings,
+): Promise<void> {
+  const stored = await getAppMetaJsonOrDefault<PomodoroPresetsState | null>(
+    transactionDb,
+    appMetaKeys.pomodoroPresets,
+    null,
+    normalizePomodoroPresetsState,
+  );
+  if (!stored || stored.activePresetId === null) return;
+  const selected = findPresetById(stored.presets, stored.activePresetId);
+  if (!selected || presetDurationsMatch(selected, settings)) return;
+  await setAppMetaJson(transactionDb, appMetaKeys.pomodoroPresets, {
+    ...stored,
+    activePresetId: null,
+  });
 }
 
 /**
@@ -337,14 +385,25 @@ export async function logPomodoroSessionFromLinkedAction(input: {
   id: string;
   durationSeconds: number;
   type: PomodoroMode;
+  /**
+   * Instant the producing source action happened. Replayed dispatches (startup
+   * recovery after a crash) run later than the user's act; stamping the replay
+   * clock would date the focus block — and its reward — to the wrong day.
+   */
+  endedAtIso?: string;
 }): Promise<LinkedActionEffectAdapterResult> {
-  const endedAt = new Date();
-  const startedAt = new Date(endedAt.getTime() - Math.max(0, input.durationSeconds) * 1000);
+  const endedAt = new Date(input.endedAtIso ?? new Date().toISOString());
+  // The backup/portable contract for this column is a whole number of seconds
+  // (restore rejects non-integers), and a linked-action duration is authored in
+  // whole minutes. Rounding here keeps every writer inside the schema contract,
+  // so the row can be backed up and restored instead of failing validation.
+  const durationSeconds = Math.max(0, Math.round(input.durationSeconds));
+  const startedAt = new Date(endedAt.getTime() - durationSeconds * 1000);
   const record = await insertPomodoroSessionRecord({
     id: input.id,
     startedAtIso: startedAt.toISOString(),
     endedAtIso: endedAt.toISOString(),
-    durationSeconds: input.durationSeconds,
+    durationSeconds,
     type: input.type,
   });
 
@@ -571,6 +630,30 @@ async function readPendingLogQueue(db: Awaited<ReturnType<typeof getDatabase>>) 
   );
 }
 
+/**
+ * One serialized turn over the pending-log queue.
+ *
+ * The queue is a read-modify-write on a single app_meta key with TWO writers:
+ * the completion path (`enqueuePendingPomodoroLog`) and the retry pass
+ * (`retryPendingPomodoroLogs`, which retains still-failing entries and drops
+ * the resolved ones). The retry turn awaits per-entry session inserts between
+ * its read and its write, so an enqueue landing inside that window was
+ * overwritten by the retry's stale retained list — the just-failed completion
+ * silently disappeared from the durable queue and was never logged (no row, no
+ * focus minutes, no reward, no notice). Both writers therefore run through this
+ * chain, and each turn reads the queue at ITS OWN start.
+ */
+let pendingLogQueueChain: Promise<void> = Promise.resolve();
+
+function runPendingLogQueueTurn<T>(task: () => Promise<T>): Promise<T> {
+  const run = pendingLogQueueChain.then(task);
+  pendingLogQueueChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 /** Queue a completed focus whose insert failed; retried on next foreground. */
 export async function enqueuePendingPomodoroLog(input: {
   startedAtIso: string;
@@ -579,21 +662,23 @@ export async function enqueuePendingPomodoroLog(input: {
   type: PomodoroMode;
   meta?: PomodoroSessionMetaInput | null;
 }): Promise<string> {
-  const db = await getDatabase();
-  const queue = await readPendingLogQueue(db);
-  const entry: PendingPomodoroLog = {
-    id: createId('pom'),
-    startedAtIso: input.startedAtIso,
-    endedAtIso: input.endedAtIso,
-    durationSeconds: input.durationSeconds,
-    type: input.type,
-    meta: input.meta ?? null,
-    attempts: 0,
-    firstQueuedAtIso: nowIso(),
-    lastErrorAtIso: null,
-  };
-  await setAppMetaJson(db, appMetaKeys.pomodoroPendingLogs, [...queue, entry]);
-  return entry.id;
+  return runPendingLogQueueTurn(async () => {
+    const db = await getDatabase();
+    const queue = await readPendingLogQueue(db);
+    const entry: PendingPomodoroLog = {
+      id: createId('pom'),
+      startedAtIso: input.startedAtIso,
+      endedAtIso: input.endedAtIso,
+      durationSeconds: input.durationSeconds,
+      type: input.type,
+      meta: input.meta ?? null,
+      attempts: 0,
+      firstQueuedAtIso: nowIso(),
+      lastErrorAtIso: null,
+    };
+    await setAppMetaJson(db, appMetaKeys.pomodoroPendingLogs, [...queue, entry]);
+    return entry.id;
+  });
 }
 
 export type PendingLogRetryResult = {
@@ -603,23 +688,18 @@ export type PendingLogRetryResult = {
   finalFailures: PendingPomodoroLog[];
 };
 
-// Serialized so concurrent foreground refreshes cannot interleave the
-// queue's read-modify-write and drop entries (same pattern as meta writes).
-let pendingLogRetryChain: Promise<void> = Promise.resolve();
-
 /**
  * Retry every queued focus log. Insert dedupe-by-id makes retries idempotent.
  * Entries succeed → removed; still failing below the attempt cap → retained
  * with attempts bumped; exhausting the cap → returned in `finalFailures`
  * (caller surfaces a notice) and dropped from the queue.
+ *
+ * Shares the queue turn with `enqueuePendingPomodoroLog`: concurrent
+ * foreground refreshes cannot interleave the queue's read-modify-write, and a
+ * completion queued during this pass can no longer be clobbered by it.
  */
 export async function retryPendingPomodoroLogs(): Promise<PendingLogRetryResult> {
-  const run = pendingLogRetryChain.then(() => retryPendingPomodoroLogsInner());
-  pendingLogRetryChain = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  return run;
+  return runPendingLogQueueTurn(() => retryPendingPomodoroLogsInner());
 }
 
 async function retryPendingPomodoroLogsInner(): Promise<PendingLogRetryResult> {
@@ -671,6 +751,36 @@ export type PomodoroPresetsState = {
   presets: PomodoroPreset[];
   activePresetId: string | null;
 };
+
+/**
+ * Serialized turn over the durable preset state (`app_meta.pomodoro_presets`).
+ *
+ * The key is a read-modify-write record with FOUR writers on independent
+ * surfaces: the manager replaces the list (`savePomodoroPresets`), the picker
+ * sets the selection (`setActivePresetId`), manual duration edits detach it
+ * (`clearActivePresetId` / the legacy-import write in the presets store), and
+ * `savePomodoroSettings` detaches a selection its new durations no longer
+ * match — that detach runs INSIDE its settings transaction, which knows
+ * nothing about the store's turn.
+ *
+ * `withSQLiteWriter` serializes the WRITE turns but not the READS that feed
+ * them, so a list save that reads `activePresetId = 'deep'` before a duration
+ * save commits its detach wrote the stale selection back afterwards: the
+ * picker highlighted a preset the clock no longer ran, and the next
+ * completion followed that preset's auto-start flags (an unrequested break).
+ * The duration save therefore joins this SAME boundary, so every writer's
+ * read-modify-write turn sees the outcome of the turn before it.
+ */
+let pomodoroPresetStateChain: Promise<void> = Promise.resolve();
+
+export function runPomodoroPresetStateTurn<T>(task: () => Promise<T>): Promise<T> {
+  const run = pomodoroPresetStateChain.then(task);
+  pomodoroPresetStateChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
 
 /** Same normalize-on-read contract as the recoverable-settings payload. */
 export function normalizePomodoroPresetsState(value: unknown): PomodoroPresetsState | null {

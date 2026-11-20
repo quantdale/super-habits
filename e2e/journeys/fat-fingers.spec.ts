@@ -66,8 +66,17 @@ async function toggleTodoCompletion(page: Page, title: string): Promise<void> {
   });
   const before = await checkbox.getAttribute('aria-checked');
   await checkbox.click({ force: true });
+  // A completed row can leave the open list (completion-settle window) before
+  // a poll tick observes the transient checked state. Either outcome proves
+  // the toggle landed; an unchanged, still-mounted checkbox does not.
   await expect
-    .poll(() => checkbox.getAttribute('aria-checked'), { timeout: 5_000 })
+    .poll(
+      async () =>
+        (await checkbox.count()) === 0
+          ? 'removed'
+          : await checkbox.getAttribute('aria-checked', { timeout: 1_000 }).catch(() => 'removed'),
+      { timeout: 5_000 },
+    )
     .not.toBe(before);
 }
 

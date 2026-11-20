@@ -23,6 +23,9 @@ export function SwipeRightActions({
   const { tokens } = useAppTheme();
   const editFocus = useKeyboardFocusRing(tokens.accent);
   const deleteFocus = useKeyboardFocusRing(tokens.accent);
+  // These full-height actions sit inside Swipeable's clipping viewport. Keep
+  // the web keyboard outline inside the face so every edge remains visible.
+  const insetRing = Platform.OS === 'web' ? { outlineOffset: -4 } : undefined;
   const btnWidth = compact ? 56 : 80;
   const actionStyle = {
     justifyContent: 'center' as const,
@@ -60,7 +63,7 @@ export function SwipeRightActions({
         aria-hidden={Platform.OS === 'web' ? !visible : undefined}
         onFocus={editFocus.onFocus}
         onBlur={editFocus.onBlur}
-        style={[actionStyle, { backgroundColor: editColor }, editFocus.focusRingStyle]}
+        style={[actionStyle, { backgroundColor: editColor }, editFocus.focusRingStyle, insetRing]}
       >
         <Text variant="label" style={{ color: tokens.textOnAccent }}>
           Edit
@@ -74,7 +77,12 @@ export function SwipeRightActions({
         aria-hidden={Platform.OS === 'web' ? !visible : undefined}
         onFocus={deleteFocus.onFocus}
         onBlur={deleteFocus.onBlur}
-        style={[actionStyle, { backgroundColor: tokens.dangerSolid }, deleteFocus.focusRingStyle]}
+        style={[
+          actionStyle,
+          { backgroundColor: tokens.dangerSolid },
+          deleteFocus.focusRingStyle,
+          insetRing,
+        ]}
       >
         <Text variant="label" style={{ color: tokens.textOnAccent }}>
           Delete

@@ -21,14 +21,31 @@ export type LinkedActionEffectExecutor = (
   plan: LinkedActionEffectPlan,
 ) => Promise<LinkedActionEffectAdapterResult>;
 
+/**
+ * Local day an effect belongs to, derived from the SOURCE ACTION's instant.
+ *
+ * `today` means "the day the user acted", not "the day this code happens to
+ * run": the startup recovery sweep replays a crashed dispatch at the next
+ * launch, which can be a later local day. Resolving `today` against the replay
+ * clock would land yesterday's calorie entry, focus session or workout log —
+ * and the XP each earns — on tomorrow. `source_date` prefers the persisted day
+ * key and falls back to the source instant.
+ */
 function resolveDateKey(plan: LinkedActionEffectPlan, strategy: 'today' | 'source_date') {
   if (strategy === 'source_date' && plan.sourceEvent.sourceDateKey) {
     return plan.sourceEvent.sourceDateKey;
   }
-  if (strategy === 'source_date') {
-    return toDateKey(new Date(plan.sourceEvent.occurredAt));
+  const occurredAt = new Date(plan.sourceEvent.occurredAt);
+  if (Number.isNaN(occurredAt.getTime())) {
+    return toDateKey();
   }
-  return toDateKey();
+  return toDateKey(occurredAt);
+}
+
+/** The source action's instant, used to timestamp produced log rows. */
+function sourceOccurredAt(plan: LinkedActionEffectPlan): string {
+  const occurredAt = new Date(plan.sourceEvent.occurredAt);
+  return Number.isNaN(occurredAt.getTime()) ? new Date().toISOString() : occurredAt.toISOString();
 }
 
 export const linkedActionEffectRegistry: Record<string, LinkedActionEffectExecutor> = {
@@ -95,6 +112,7 @@ export const linkedActionEffectRegistry: Record<string, LinkedActionEffectExecut
       id: plan.plannedProducedEntityId,
       routineId: targetId,
       notes: effect.notes,
+      completedAtIso: sourceOccurredAt(plan),
     });
   },
   'pomodoro.log': async (plan) => {
@@ -106,6 +124,7 @@ export const linkedActionEffectRegistry: Record<string, LinkedActionEffectExecut
       id: plan.plannedProducedEntityId,
       durationSeconds: effect.durationSeconds,
       type: effect.sessionType,
+      endedAtIso: sourceOccurredAt(plan),
     });
   },
 };

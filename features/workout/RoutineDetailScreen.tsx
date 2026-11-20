@@ -889,8 +889,10 @@ export function RoutineDetailModal({
                           {modality === 'weighted_strength' ||
                           modality === 'bodyweight' ||
                           modality === null ? (
-                            <View className="flex-row gap-2">
-                              <View className="min-w-0 flex-1">
+                            // Each web stepper needs room for two 44px buttons
+                            // and a readable input. Wrap the pair on phones.
+                            <View className="flex-row flex-wrap gap-2">
+                              <View className="min-w-[180px] flex-1">
                                 <DraftNumberField
                                   label="Target reps min"
                                   initialValue={
@@ -906,7 +908,7 @@ export function RoutineDetailModal({
                                   placeholder="—"
                                 />
                               </View>
-                              <View className="min-w-0 flex-1">
+                              <View className="min-w-[180px] flex-1">
                                 <DraftNumberField
                                   label="Target reps max"
                                   initialValue={

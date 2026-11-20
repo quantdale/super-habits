@@ -280,15 +280,30 @@ export function validateSetTiming(activeSeconds: number, restSeconds: number): s
 }
 
 /** Validate resolved optional targets before SQLite can coerce NaN to NULL. */
-export function assertSetPrescriptionWrite(input: {
-  setNumber?: number;
-  targetRepsMin?: number | null;
-  targetRepsMax?: number | null;
-  targetLoad?: number | null;
-  targetDurationSeconds?: number | null;
-  targetDistance?: number | null;
-  targetPace?: number | null;
-}): void {
+export function assertSetPrescriptionWrite(
+  input: {
+    setNumber?: number;
+    targetRepsMin?: number | null;
+    targetRepsMax?: number | null;
+    targetLoad?: number | null;
+    targetDurationSeconds?: number | null;
+    targetDistance?: number | null;
+    targetPace?: number | null;
+  },
+  /**
+   * `storedRepRange` is the persisted row's rep bounds (update path only) and
+   * `repRangeEdited` says whether this write supplies either endpoint.
+   * A rep range that is ALREADY reversed — a row recovered from a backup
+   * written before the range rule existed — stays editable for unrelated
+   * fields (timing, load, distance, pace); any endpoint edit must repair it.
+   * Without that carve-out, restoring a legacy plan silently froze every set
+   * in it: even a rest-duration change threw "minimum cannot exceed maximum".
+   */
+  context?: {
+    storedRepRange?: { min: number | null; max: number | null };
+    repRangeEdited?: boolean;
+  },
+): void {
   if (
     input.setNumber !== undefined &&
     (!Number.isSafeInteger(input.setNumber) || input.setNumber < 1)
@@ -318,7 +333,83 @@ export function assertSetPrescriptionWrite(input: {
     input.targetRepsMax != null &&
     input.targetRepsMin > input.targetRepsMax
   ) {
-    throw new Error('Target reps minimum cannot exceed maximum reps.');
+    const stored = context?.storedRepRange;
+    const preExistingReversal =
+      stored != null && stored.min != null && stored.max != null && stored.min > stored.max;
+    if (context?.repRangeEdited === true || !preExistingReversal) {
+      throw new Error('Target reps minimum cannot exceed maximum reps.');
+    }
+  }
+}
+
+const PROGRESSION_MODES: readonly string[] = ['none', 'linear', 'double'];
+
+/**
+ * Data-layer hard reject for exercise-level progression prescriptions
+ * (`routine_exercises.progression_*`). The recovery/import contract in
+ * `core/backup/backupValidators.ts` (ROUTINE_EXERCISE_RULES) already requires
+ * mode ∈ {none, linear, double}, increment null|finite ≥ 0 and min/max reps
+ * null|whole ≥ 1 — without this assert the writers stored rows their own
+ * backup/restore path then rejects, which makes the whole dataset
+ * un-importable. Mirrors `assertSetPrescriptionWrite` for the per-set fields.
+ *
+ * `storedRepRange` carries the persisted sibling bounds for a partial update:
+ * endpoints the caller did NOT supply are validated against the stored row so
+ * a partial edit cannot land a reversed range, while a row whose range was
+ * already reversed (imported from a pre-contract backup) stays editable and
+ * repairable. Throws.
+ */
+export function assertExerciseProgressionWrite(
+  input: {
+    progressionMode?: string;
+    progressionIncrement?: number | null;
+    progressionMinReps?: number | null;
+    progressionMaxReps?: number | null;
+  },
+  storedRepRange?: { min: number | null; max: number | null },
+): void {
+  if (input.progressionMode !== undefined && !PROGRESSION_MODES.includes(input.progressionMode)) {
+    throw new Error('Progression mode must be Manual, Linear, or Double.');
+  }
+  if (
+    input.progressionIncrement != null &&
+    (!Number.isFinite(input.progressionIncrement) || input.progressionIncrement < 0)
+  ) {
+    throw new Error('Progression increment must be a finite number 0 or greater.');
+  }
+  for (const [value, label] of [
+    [input.progressionMinReps, 'Progression minimum reps'],
+    [input.progressionMaxReps, 'Progression maximum reps'],
+  ] as const) {
+    if (value != null && (!Number.isSafeInteger(value) || value < 1)) {
+      throw new Error(`${label} must be a whole number 1 or greater.`);
+    }
+  }
+  const stored = storedRepRange ?? { min: null, max: null };
+  const nextMin = input.progressionMinReps === undefined ? stored.min : input.progressionMinReps;
+  const nextMax = input.progressionMaxReps === undefined ? stored.max : input.progressionMaxReps;
+  if (nextMin != null && nextMax != null && nextMin > nextMax) {
+    // An endpoint this write supplies may never leave the range reversed. A
+    // reversal that is ALREADY stored (a row imported from a backup written
+    // before this contract) is tolerated only for writes that touch neither
+    // endpoint, so unrelated edits keep working while any rep-range edit must
+    // repair the row.
+    const touchesEndpoints =
+      input.progressionMinReps !== undefined || input.progressionMaxReps !== undefined;
+    const preExistingReversal = stored.min != null && stored.max != null && stored.min > stored.max;
+    if (touchesEndpoints || !preExistingReversal) {
+      throw new Error('Progression minimum reps cannot exceed maximum reps.');
+    }
+  }
+}
+
+/**
+ * Data-layer hard reject for `routine_exercises.sort_order`: the recovery
+ * contract requires a whole number ≥ 0.
+ */
+export function assertExerciseSortOrderWrite(sortOrder: number): void {
+  if (!Number.isSafeInteger(sortOrder) || sortOrder < 0) {
+    throw new Error('Exercise order must be a whole number 0 or greater.');
   }
 }
 

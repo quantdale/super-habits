@@ -39,6 +39,8 @@ import type { WorkoutEffortScale, WorkoutWeightUnit } from '@/core/db/types';
 import type { SyncRecord } from '@/core/sync/sync.engine';
 import { requestWorkoutReminderReconciliation } from '@/core/notifications/workoutReminderSignals';
 import {
+  assertExerciseProgressionWrite,
+  assertExerciseSortOrderWrite,
   assertExerciseWrite,
   assertRoutineWrite,
   assertSetPrescriptionWrite,
@@ -532,6 +534,13 @@ export async function addExercise(input: {
   // Data-layer hard reject (same contract as the UI validateExerciseName
   // path): non-UI writers must never land an empty/overlong row.
   assertExerciseWrite({ name: input.name });
+  // The exercise-level progression prescription and ordering fields share the
+  // recovery contract enforced by `core/backup/backupValidators.ts`. Rejecting
+  // them here keeps every stored row importable; without it a routine saved
+  // with e.g. a negative increment could never be restored from backup.
+  if (input.sortOrder !== undefined) assertExerciseSortOrderWrite(input.sortOrder);
+  assertExerciseProgressionWrite(input);
+  if (input.modality !== undefined) assertWorkoutModality(input.modality);
   const db = await getDatabase();
   const id = createId('ex');
   const now = nowIso();
@@ -899,7 +908,13 @@ export async function updateSet(
           updates.targetDistance === undefined ? activeSet.target_distance : updates.targetDistance,
         targetPace: updates.targetPace === undefined ? activeSet.target_pace : updates.targetPace,
       };
-      assertSetPrescriptionWrite(prescription);
+      assertSetPrescriptionWrite(prescription, {
+        storedRepRange: {
+          min: activeSet.target_reps_min,
+          max: activeSet.target_reps_max,
+        },
+        repRangeEdited: updates.targetRepsMin !== undefined || updates.targetRepsMax !== undefined,
+      });
       const update = hasPrescriptionUpdate
         ? await transactionDb.runAsync(
             `UPDATE routine_exercise_sets
@@ -1248,9 +1263,15 @@ export async function logWorkoutFromLinkedAction(input: {
   id: string;
   routineId: string;
   notes?: string | null;
+  /**
+   * Instant the producing source action happened. Replayed dispatches (startup
+   * recovery after a crash) run later than the user's act; stamping the replay
+   * clock would date the session — and its reward — to the wrong day.
+   */
+  completedAtIso?: string;
 }): Promise<LinkedActionEffectAdapterResult> {
   const db = await getDatabase();
-  const now = nowIso();
+  const now = input.completedAtIso ?? nowIso();
   const outcome = await runBackupMutation<CompleteRoutineResult>({
     db,
     mutate: async (transactionDb, enqueue) => {
@@ -2783,6 +2804,14 @@ export async function updateExercise(id: string, updates: RoutineExerciseUpdate)
         [id],
       );
       if (!current) return { changed: false, value: undefined };
+      // Validate the COMPLETE resulting prescription, using the row read inside
+      // this serialized transaction for the endpoints the caller omitted: the
+      // editor commits min and max from two independent fields, and a stale
+      // outside read would let a partial edit land a reversed range.
+      assertExerciseProgressionWrite(updates, {
+        min: current.progression_min_reps ?? null,
+        max: current.progression_max_reps ?? null,
+      });
       const result = await transactionDb.runAsync(
         `UPDATE routine_exercises
          SET name = ?, catalog_exercise_id = ?, modality = ?, unilateral = ?,

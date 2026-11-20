@@ -226,6 +226,11 @@ export function SettingsNotificationsSection() {
     setError(null);
     setSavedNote(null);
     try {
+      const parts = normalizeTimeOfDayInput(weeklyTimeInput);
+      if (enabled && !parts) {
+        setError('Enter a valid time as HH:mm (24-hour), e.g. 18:00.');
+        return;
+      }
       if (enabled && Platform.OS !== 'web') {
         const permission = await requestTodoReminderPermission();
         if (permission !== 'granted') {
@@ -237,13 +242,19 @@ export function SettingsNotificationsSection() {
           return;
         }
       }
-      const parts = normalizeTimeOfDayInput(weeklyTimeInput);
-      const [hour, minute] = parts ? (parts.split(':').map(Number) as [number, number]) : [18, 0];
+      // Turning the reminder off must remain possible with an invalid draft,
+      // and must retain the last valid time rather than silently resetting it.
+      const stored = parts ? null : await getWeeklyReviewReminder();
+      const [hour, minute] = parts
+        ? (parts.split(':').map(Number) as [number, number])
+        : [stored!.hour, stored!.minute];
+      const normalized = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
       await setWeeklyReviewReminder({ enabled, weekday: weeklyWeekday, hour, minute });
       setWeeklyEnabledState(enabled);
+      setWeeklyTimeInput(normalized);
       enqueueReminderPrefBackup();
       const result = await syncWeeklyReviewReminder();
-      const when = `${WEEKDAY_LABELS[weeklyWeekday]} ${parts ?? weeklyTimeInput}`;
+      const when = `${WEEKDAY_LABELS[weeklyWeekday]} ${normalized}`;
       if (result.status === 'scheduled') {
         setSavedNote(`Weekly review reminder saved for ${when}.`);
       } else if (result.status === 'cancelled') {
@@ -273,12 +284,11 @@ export function SettingsNotificationsSection() {
     setSavedNote(null);
     try {
       await setWeeklyReviewReminder({
-        enabled: true,
+        enabled: weeklyEnabled,
         weekday: weeklyWeekday,
         hour,
         minute,
       });
-      setWeeklyEnabledState(true);
       setWeeklyTimeInput(normalized);
       enqueueReminderPrefBackup();
       const result = await syncWeeklyReviewReminder();
@@ -529,6 +539,7 @@ export function SettingsNotificationsSection() {
                   accessibilityRole="button"
                   accessibilityLabel={`Weekly review on ${WEEKDAY_LABELS[day]}`}
                   accessibilityState={{ selected: active }}
+                  aria-pressed={active}
                   onPress={() => {
                     setError(null);
                     setSavedNote(null);

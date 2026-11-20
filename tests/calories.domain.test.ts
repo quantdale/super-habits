@@ -14,6 +14,7 @@ import {
   listSavedMealCategories,
   sortSavedMealsForSearch,
   resolveCalorieLogDateKey,
+  resolveCalorieSurfaceDay,
   calorieEditSaveError,
   resolveEntryKcal,
 } from '@/features/calories/calories.domain';
@@ -470,6 +471,46 @@ describe('resolveCalorieLogDateKey', () => {
 
   it('treats today itself as selectable (no clamp drift)', () => {
     expect(resolveCalorieLogDateKey(TODAY, TODAY)).toBe(TODAY);
+  });
+});
+
+/**
+ * The surface day is ONE value: what the hero/day-log/navigator SHOW and what
+ * every write targets. A backwards clock or timezone move can turn an
+ * explicitly selected past day into a future day; before this resolver the
+ * screen clamped only the write, so the visible day kept 2026-11-10 while the
+ * meal landed on 2026-11-08 — invisible in the day log beneath the form.
+ */
+describe('resolveCalorieSurfaceDay', () => {
+  const TODAY = '2026-11-08';
+
+  it('shows and writes the explicitly selected past day', () => {
+    expect(resolveCalorieSurfaceDay('2026-11-01', TODAY)).toBe('2026-11-01');
+    expect(resolveCalorieSurfaceDay(TODAY, TODAY)).toBe(TODAY);
+  });
+
+  it('collapses a selection that a backwards clock move pushed into the future', () => {
+    // The user had explicitly opened 2026-11-10; the clock moved back to
+    // 2026-11-08. The surface must show today, the day writes reach.
+    expect(resolveCalorieSurfaceDay('2026-11-10', TODAY)).toBe(TODAY);
+    expect(resolveCalorieSurfaceDay('2026-12-25', TODAY)).toBe(TODAY);
+  });
+
+  it('never returns an unparseable or absent selection', () => {
+    expect(resolveCalorieSurfaceDay(null, TODAY)).toBe(TODAY);
+    expect(resolveCalorieSurfaceDay(undefined, TODAY)).toBe(TODAY);
+    expect(resolveCalorieSurfaceDay('', TODAY)).toBe(TODAY);
+    for (const bad of ['2026-11-8', '2026-02-30', 'not-a-date']) {
+      expect(resolveCalorieSurfaceDay(bad, TODAY)).toBe(TODAY);
+    }
+  });
+
+  it('is the same rule as the write resolver, so the two can never diverge', () => {
+    for (const selected of ['2026-11-01', '2026-11-10', '', null]) {
+      expect(resolveCalorieSurfaceDay(selected, TODAY)).toBe(
+        resolveCalorieLogDateKey(selected, TODAY),
+      );
+    }
   });
 });
 

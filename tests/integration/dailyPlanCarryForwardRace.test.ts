@@ -58,3 +58,57 @@ describe('daily-plan carry-forward uses committing task state', () => {
     },
   );
 });
+
+describe('daily-plan carry-forward merges an explicit editor draft atomically', () => {
+  let db: TestDatabase;
+  beforeEach(async () => {
+    db = await freshDatabase();
+  });
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await db.closeAsync();
+  });
+
+  it.each(['addition', 'removal'] as const)(
+    'honors a draft %s and is idempotent on retry',
+    async (edit) => {
+      const todos = await import('@/features/todos/todos.data');
+      const plans = await import('@/features/daily-plan/dailyPlan.data');
+      const carried = await todos.addTodo({ title: 'Carry this' });
+      const kept = await todos.addTodo({ title: 'Keep this' });
+      const removed = await todos.addTodo({ title: 'Remove this' });
+      const added = await todos.addTodo({ title: 'New priority' });
+      await plans.upsertDailyPlan('2026-11-01', { topTodoIds: [carried] });
+      await plans.upsertDailyPlan('2026-11-02', {
+        topTodoIds: edit === 'addition' ? [kept] : [kept, removed, added],
+        intention: 'Preserve my intention',
+      });
+      const draftIds = [kept, added];
+      const result = await plans.carryForwardFromPreviousDay('2026-11-02', draftIds);
+      expect(JSON.parse(result!.top_todo_ids)).toEqual([kept, added, carried]);
+      expect(JSON.parse(result!.top_todo_titles!)).toEqual([
+        'Keep this',
+        'New priority',
+        'Carry this',
+      ]);
+      expect(result!.intention).toBe('Preserve my intention');
+      const beforeRetry = await db.getAllAsync(
+        "SELECT * FROM sync_outbox WHERE entity = 'daily_plans' ORDER BY id",
+      );
+      const repeated = await plans.carryForwardFromPreviousDay('2026-11-02', [
+        kept,
+        added,
+        carried,
+      ]);
+      expect(repeated).toEqual(result);
+      expect(
+        await db.getAllAsync("SELECT * FROM sync_outbox WHERE entity = 'daily_plans' ORDER BY id"),
+      ).toEqual(beforeRetry);
+      expect(
+        await db.getFirstAsync<{ count: number }>(
+          "SELECT COUNT(*) AS count FROM daily_plans WHERE date_key = '2026-11-02' AND deleted_at IS NULL",
+        ),
+      ).toEqual({ count: 1 });
+    },
+  );
+});

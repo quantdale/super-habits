@@ -1,3 +1,4 @@
+import { withSQLiteTransaction } from '@/core/db/transactions';
 import { appMetaKeys, getAppMetaText, setAppMetaText } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
 import {
@@ -566,30 +567,38 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
 
   let localRowsAppeared = false;
   let ownerChanged = false;
-  await db.withTransactionAsync(async () => {
+  // The import MUST ride the same serialized-writer + scoped-capability helper
+  // as Restore V2. Opening `db.withTransactionAsync` on the base handle here
+  // left the legacy path outside the writer FIFO: a concurrent local write
+  // started a second `BEGIN` on the same connection, which the production
+  // adapter turns into a ROLLBACK of THIS import (the remaining statements then
+  // autocommit individually — a half-applied restore that reported failure),
+  // a standalone metadata write could join and be erased by that rollback, and
+  // cache publications happened before the commit they describe.
+  await withSQLiteTransaction(db, async (transactionDb) => {
     // Re-verify complete emptiness (ALL user tables, not only synced tables)
     // inside the transaction: local rows written between the eligibility
     // preview and this point must abort the import.
-    const transactionState = await inspectLocalAccountDataState(db);
+    const transactionState = await inspectLocalAccountDataState(transactionDb);
     if (!isDeviceEmptyForRestore(transactionState)) {
       localRowsAppeared = true;
       return;
     }
 
-    const transactionOwner = await getLocalDatasetOwner(db);
+    const transactionOwner = await getLocalDatasetOwner(transactionDb);
     if (transactionOwner && transactionOwner !== ownerUserId) {
       ownerChanged = true;
       return;
     }
 
-    await applyRemoteTodos(db, todos);
-    await applyRemoteHabits(db, habits);
-    await applyRemoteCalorieEntries(db, calorieEntries);
+    await applyRemoteTodos(transactionDb, todos);
+    await applyRemoteHabits(transactionDb, habits);
+    await applyRemoteCalorieEntries(transactionDb, calorieEntries);
 
-    await setAppMetaText(db, appMetaKeys.lastRestoreSignature, freshnessSignature);
-    await setAppMetaText(db, appMetaKeys.lastRestoreAt, restoredAt);
+    await setAppMetaText(transactionDb, appMetaKeys.lastRestoreSignature, freshnessSignature);
+    await setAppMetaText(transactionDb, appMetaKeys.lastRestoreAt, restoredAt);
     if (!transactionOwner) {
-      await setLocalDatasetOwner(db, ownerUserId);
+      await setLocalDatasetOwner(transactionDb, ownerUserId);
     }
   });
 
