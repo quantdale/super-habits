@@ -16,13 +16,16 @@ import { resolve } from 'node:path';
  *     day, `followsToday = false`) and logs an entry there.
  *  2. The clock/timezone moves backwards to 2026-11-08 (e.g. a device TZ
  *     change from Asia/Manila to America/Los_Angeles, or a manual clock fix).
- *     `selectedDateKey` stays 2026-11-10 (D9b: an explicit selection never
- *     follows midnight), and it is now a FUTURE day.
- *  3. The surface still SHOWS 2026-11-10 (hero context line, day log, navigator
- *     ring), but every write resolves to 2026-11-08 — so a meal typed while the
- *     diary visibly shows Nov 10 silently lands on Nov 8, and the day log below
- *     does not contain it. (`Copy a previous day` targets Nov 10 and is refused
- *     as a future day.)
+ *     `selectedDateKey` originally stayed 2026-11-10 (D9b: an explicit
+ *     selection never follows midnight), and it is now a FUTURE day.
+ *  3. Before the fix the surface still SHOWED 2026-11-10 (hero context line,
+ *     day log, navigator ring) while every write resolved to 2026-11-08 — so a
+ *     meal typed while the diary visibly showed Nov 10 silently landed on
+ *     Nov 8, and the day log below did not contain it. (`Copy a previous day`
+ *     targeted Nov 10 and was refused as a future day.)
+ *
+ * Fixed behaviour: the surface collapses onto today AND releases the pin, so
+ * the day it shows is the day every write uses.
  *
  * Contract this pins: the Calories surface has ONE day. The day it displays and
  * the day it writes to are the same value (`resolveCalorieSurfaceDay`), so a
@@ -39,10 +42,23 @@ describe('Calories surface day is stable under a backwards clock move', () => {
     'utf8',
   );
 
-  it('derives ONE surface day and feeds every read, display and write with it', () => {
-    // The single derivation.
-    expect(source).toMatch(/resolveCalorieSurfaceDay\(selectedDateKey, toDateKey\(\)\)/);
+  it('derives ONE surface day that re-anchors on the day-rollover generation', () => {
+    // The single derivation, with the rollover generation as an intentional
+    // extra dep so "today" is re-read at local midnight (and on the provider's
+    // foreground check) instead of being frozen at mount.
+    expect(source).toMatch(/const todayKey = useMemo\(\(\) => toDateKey\(\), \[dayGeneration\]\)/);
+    expect(source).toMatch(/resolveCalorieSurfaceDay\(selectedDateKey, todayKey\)/);
+  });
 
+  it('releases an explicitly pinned selection once it is no longer a past day', () => {
+    // A backwards day change makes the pin impossible: keeping it would show
+    // a day the writes can never reach.
+    expect(source).toMatch(/if \(selectedDateKey > todayKey\)/);
+    expect(source).toMatch(/setSelectedDateKey\(todayKey\)/);
+    expect(source).toMatch(/setFollowsToday\(true\)/);
+  });
+
+  it('feeds every read, display and write with that one surface day', () => {
     // The day-scoped READ follows the surface day (not the raw selection, which
     // can have drifted into the future).
     expect(source).toMatch(/listCalorieEntries\(surfaceDateKey\)/);
