@@ -479,12 +479,16 @@ export async function deleteSavedMeal(id: string): Promise<void> {
 /**
  * Structured copy-day outcome. `invalid-range` carries the reason so callers
  * can give precise feedback: a malformed date key, copying a day onto itself,
- * or a source day later than the target day.
+ * a source day later than the target day, or a target day after today (rows
+ * written there would be orphaned — see `assertConsumableDateKey`).
  */
 export type CopyDayResult =
   | { status: 'copied'; copiedCount: number }
   | { status: 'source-empty' }
-  | { status: 'invalid-range'; reason: 'malformed-date-key' | 'same-day' | 'source-after-target' };
+  | {
+      status: 'invalid-range';
+      reason: 'malformed-date-key' | 'same-day' | 'source-after-target' | 'target-after-today';
+    };
 
 /**
  * Copy-day: duplicate every entry logged on `sourceDateKey` into
@@ -510,6 +514,13 @@ export async function copyCalorieEntriesFromDay(
   }
   if (sourceDateKey > targetDateKey) {
     return { status: 'invalid-range', reason: 'source-after-target' };
+  }
+  // Same past-only contract as every other calorie create path: copying into
+  // a day after today would write rows the diary navigator, the summaries, and
+  // the frequent-food window can never reach (fail closed instead of orphaning
+  // them silently).
+  if (targetDateKey > toDateKey()) {
+    return { status: 'invalid-range', reason: 'target-after-today' };
   }
 
   const db = await getDatabase();
