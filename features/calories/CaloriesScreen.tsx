@@ -217,10 +217,18 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
    * collapses onto today — and the DISPLAY follows the same collapse, because
    * showing a day the writes do not reach silently files meals onto a day the
    * visible diary never showed.
+   *
+   * The memo also depends on `dayGeneration` (the app-wide local-day signal):
+   * a backwards clock/timezone move can turn an explicitly selected past day
+   * into a future one WITHOUT touching `selectedDateKey` (D9b keeps that
+   * pinned), so a selection-only dependency list would keep serving the day it
+   * cached before the move and the diary would stay on a day its writes cannot
+   * reach.
    */
   const surfaceDateKey = useMemo(
     () => resolveCalorieSurfaceDay(selectedDateKey, toDateKey()),
-    [selectedDateKey],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dayGeneration is an intentional extra dep: it re-anchors "today" when the local day changes (clock/timezone move, midnight) even though `selectedDateKey` is unchanged; the call reads the clock through `toDateKey()`.
+    [selectedDateKey, dayGeneration],
   );
 
   const refresh = useCallback(async () => {
