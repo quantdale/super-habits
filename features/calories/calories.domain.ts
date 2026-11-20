@@ -72,6 +72,48 @@ export function resolveEntryKcal(
     : kcalFromMacros(draft.protein, draft.carbs, draft.fats, draft.fiber);
 }
 
+/**
+ * Draft for the meal/chip prefill path.
+ *
+ * The macro fields are integer-only (`TextField unsignedInteger` +
+ * `parseNumericInput`), while the ledger legitimately stores fractional macros
+ * (the command parser accepts "12.5 g protein"). Prefilling the RAW numbers put
+ * text the form can never parse into those fields: submit parsed 12.5 to null,
+ * substituted 0, collapsed the kcal display to 0, and refused Save with
+ * "Protein must be a whole number." — a one-tap re-log the user could not fix
+ * without retyping every macro.
+ *
+ * The draft therefore carries the same whole grams the form submits, and the
+ * `kcalSource` handed back describes THOSE grams with the stored kcal, so an
+ * untouched prefill keeps the meal's own kcal while any later macro edit
+ * recomputes it as usual (the shipped `resolveEntryKcal` contract).
+ */
+export function prefillDraftFromMeal(meal: EntryKcalSource & { food_name: string }): {
+  food: string;
+  protein: string;
+  carbs: string;
+  fats: string;
+  fiber: string;
+  /** Whole-gram macros + stored kcal, for the screen's `kcalSource`. */
+  kcalSource: EntryKcalSource;
+} {
+  const rounded: EntryKcalSource = {
+    calories: meal.calories,
+    protein: Math.round(meal.protein),
+    carbs: Math.round(meal.carbs),
+    fats: Math.round(meal.fats),
+    fiber: Math.round(meal.fiber),
+  };
+  return {
+    food: meal.food_name,
+    protein: String(rounded.protein),
+    carbs: String(rounded.carbs),
+    fats: String(rounded.fats),
+    fiber: String(rounded.fiber),
+    kcalSource: rounded,
+  };
+}
+
 export function caloriesTotal(entries: { calories: number }[]): number {
   return entries.reduce((sum, entry) => {
     const cal = entry.calories;

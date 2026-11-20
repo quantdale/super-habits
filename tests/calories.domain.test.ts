@@ -15,6 +15,7 @@ import {
   sortSavedMealsForSearch,
   resolveCalorieLogDateKey,
   resolveCalorieSurfaceDay,
+  prefillDraftFromMeal,
   calorieEditSaveError,
   resolveEntryKcal,
 } from '@/features/calories/calories.domain';
@@ -578,5 +579,59 @@ describe('resolveEntryKcal', () => {
         { protein: 20, carbs: 0, fats: 0, fiber: 0 },
       ),
     ).toBe(500);
+  });
+});
+
+/**
+ * The meal/chip prefill path against the integer-only macro fields.
+ *
+ * The ledger stores fractional macros legitimately (command path "12.5 g
+ * protein"). Prefilling those RAW values put unparseable text into
+ * integer-only fields, so submit substitute 0, the kcal display collapsed, and
+ * Save was refused with "Protein must be a whole number." The draft is now
+ * rendered in the same whole grams the form submits, with a `kcalSource`
+ * describing those grams.
+ */
+describe('prefillDraftFromMeal', () => {
+  it('renders whole grams the integer fields can submit, keeping the meal kcal', () => {
+    const meal = {
+      food_name: 'Oats and milk',
+      calories: 350,
+      protein: 12.5,
+      carbs: 20.5,
+      fats: 8.5,
+      fiber: 3.5,
+    };
+    const draft = prefillDraftFromMeal(meal);
+    expect(draft.food).toBe('Oats and milk');
+    expect([draft.protein, draft.carbs, draft.fats, draft.fiber]).toEqual(['13', '21', '9', '4']);
+    // The stored kcal stands in for the rounded row (nothing was edited yet)…
+    expect(draft.kcalSource).toEqual({
+      calories: 350,
+      protein: 13,
+      carbs: 21,
+      fats: 9,
+      fiber: 4,
+    });
+    expect(resolveEntryKcal(draft.kcalSource, { protein: 13, carbs: 21, fats: 9, fiber: 4 })).toBe(
+      350,
+    );
+    // …and a later macro edit still recomputes from the draft.
+    expect(resolveEntryKcal(draft.kcalSource, { protein: 20, carbs: 21, fats: 9, fiber: 4 })).toBe(
+      kcalFromMacros(20, 21, 9, 4),
+    );
+  });
+
+  it('leaves whole-gram meals byte-identical to the stored values', () => {
+    const draft = prefillDraftFromMeal({
+      food_name: 'Yogurt',
+      calories: 150,
+      protein: 15,
+      carbs: 8,
+      fats: 5,
+      fiber: 0,
+    });
+    expect([draft.protein, draft.carbs, draft.fats, draft.fiber]).toEqual(['15', '8', '5', '0']);
+    expect(draft.kcalSource.calories).toBe(150);
   });
 });
