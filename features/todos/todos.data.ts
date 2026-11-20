@@ -66,6 +66,17 @@ function nextRecurringSpawnDueDate(
 const PRISTINE_SPAWN_SQL =
   'completed = 0 AND deleted_at IS NULL AND recurrence_touched = 0 AND updated_at = created_at';
 
+/**
+ * The occurrence day a row stands for, used by spawn and series-stop decisions.
+ *
+ * `recurrence_date_key` is authoritative whenever the column is present: NULL
+ * means the row was created WITHOUT an occurrence date, so the visible
+ * `due_date` must not stand in for it — that date may have been cleared or
+ * re-scheduled after creation, and treating it as the original occurrence is
+ * exactly the hybrid-row defect (a completion then spawns from an edited
+ * future date instead of the handled day). Only a row object that omits the
+ * column entirely (legacy/partial payload) falls back to `due_date`.
+ */
 function occurrenceDate(todo: Pick<Todo, 'due_date' | 'recurrence_date_key'>): string | null {
   return todo.recurrence_date_key === undefined ? todo.due_date : todo.recurrence_date_key;
 }
@@ -79,8 +90,8 @@ function occurrenceDate(todo: Pick<Todo, 'due_date' | 'recurrence_date_key'>): s
  * was supposed to make unnecessary. Only a copy nothing has touched since the
  * spawn is retracted — an edited, renamed, reordered, or completed future copy
  * belongs to the user and stays. Re-completing the parent spawns a fresh copy
- * again, because the retraction is a soft delete and the spawn guard ignores
- * tombstones.
+ * again, because the spawn guard ignores untouched undo tombstones. Explicit
+ * user deletions retain touched provenance and keep their occurrence skipped.
  */
 async function removePristineSpawnedCopyWithinTransaction(
   transactionDb: SQLite.SQLiteDatabase,
@@ -122,7 +133,7 @@ async function removePristineSpawnedCopyWithinTransaction(
   // edits. Content need not match an instance-overridden parent: the copy was
   // authored from the independent series template.
 
-  const removed = await removeTodoWithinTransaction(transactionDb, spawned.id, now, enqueue);
+  const removed = await removeTodoWithinTransaction(transactionDb, spawned.id, now, enqueue, true);
   if (!removed) return null;
   // The tombstone must ride the durable outbox exactly like removeTodo's own
   // record; without it the remote copy (and any restore) keeps the duplicate.
@@ -404,7 +415,8 @@ async function insertRecurringInstanceWithinTransaction(
         recurrence_spawned_by_id, created_at, updated_at, deleted_at)
      SELECT ?, ?, ?, 0, NULL, ?, ?, ?, 'daily', ?, ?, ?, ?, ?, NULL
      WHERE NOT EXISTS (
-       SELECT 1 FROM todos WHERE recurrence_id = ? AND recurrence_date_key = ? AND deleted_at IS NULL
+       SELECT 1 FROM todos WHERE recurrence_id = ? AND recurrence_date_key = ?
+         AND (deleted_at IS NULL OR recurrence_touched = 1)
      )`,
     [
       id,
@@ -550,14 +562,30 @@ export async function getRecurringTodosByIds(
 }
 
 export async function listAllActiveTodosForRecurrence(): Promise<
-  Pick<Todo, 'recurrence_id' | 'recurrence' | 'due_date' | 'completed' | 'deleted_at'>[]
+  Pick<
+    Todo,
+    | 'recurrence_id'
+    | 'recurrence'
+    | 'due_date'
+    | 'completed'
+    | 'completed_at'
+    | 'deleted_at'
+    | 'recurrence_touched'
+  >[]
 > {
   const db = await getDatabase();
+  // Explicitly deleted occurrences still cover their own calendar day. Undo
+  // retractions remain untouched tombstones and allow a fresh spawn.
+  // `completed_at` rides along because an undated occurrence has no persisted
+  // occurrence key: the scan derives the day it was handled from the completion
+  // instant, so an ORIGINAL occurrence date is never overwritten at completion.
   return db.getAllAsync(
-    `SELECT recurrence_id, recurrence, recurrence_date_key AS due_date, completed, deleted_at
-     FROM todos WHERE deleted_at IS NULL
+    `SELECT recurrence_id, recurrence, recurrence_date_key AS due_date, completed, completed_at,
+            deleted_at, recurrence_touched
+     FROM todos WHERE deleted_at IS NULL OR (recurrence = 'daily' AND recurrence_touched = 1)
      UNION ALL
-     SELECT id AS recurrence_id, 'daily' AS recurrence, NULL AS due_date, 1 AS completed, deleted_at
+     SELECT id AS recurrence_id, 'daily' AS recurrence, NULL AS due_date, 1 AS completed,
+            NULL AS completed_at, deleted_at, 0 AS recurrence_touched
      FROM todo_recurrence_series WHERE deleted_at IS NULL`,
   );
 }
@@ -1279,7 +1307,7 @@ async function setTodoCompletion(
   // on disk for the startup recovery sweep; the engine resumes from the
   // persisted event id, so the effect is applied exactly once.
   const linkedEventId = createId('levt');
-  const linkedSourceDateKey = toDateKey();
+  const linkedSourceDateKey = toDateKey(new Date(now));
   type ToggleMutation = {
     spawnedCopy?: TodoReminderSnapshot | null;
     current: Todo | null;
@@ -1312,6 +1340,14 @@ async function setTodoCompletion(
         return { changed: false, value: { current, previous, next, removedSpawnId: null } };
       }
       const completedAtValue = next === 1 ? now : null;
+      // Completion never invents an occurrence day and never adopts an edited
+      // visible due date as one. `recurrence_date_key` records the ORIGINAL
+      // occurrence date assigned at creation (NULL when the row was created
+      // without one) and is not an edit surface, so neither a visible due-date
+      // clear nor a later re-schedule rewrites it. Undated occurrences stay
+      // keyless; rollover derives their handled day from `completed_at` (see
+      // listAllActiveTodosForRecurrence) and the spawn follows the handled day,
+      // keeping the stored key and the next spawn consistent.
       const result = await transactionDb.runAsync(
         `UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?, recurrence_touched = 1
          WHERE id = ? AND completed = ? AND deleted_at IS NULL`,
@@ -1493,7 +1529,7 @@ export async function bulkSetTodoCompletion(
   if (ids.length === 0) return { changed: 0, skipped: 0 };
   const db = await getDatabase();
   const now = nowIso();
-  const linkedSourceDateKey = toDateKey();
+  const linkedSourceDateKey = toDateKey(new Date(now));
 
   type AppliedCompletion = {
     spawnedCopy: TodoReminderSnapshot | null;
@@ -1520,6 +1556,9 @@ export async function bulkSetTodoCompletion(
         // Idempotent per-item semantics: applying the desired state twice is a
         // safe no-op for that row.
         if (previous === completed) continue;
+        // Same contract as setTodoCompletion: completion never invents an
+        // occurrence day and never adopts an edited due date as the original
+        // occurrence, so the stored key is left exactly as created.
         const result = await transactionDb.runAsync(
           `UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?, recurrence_touched = 1
            WHERE id = ? AND completed = ? AND deleted_at IS NULL`,
@@ -1711,10 +1750,26 @@ async function removeTodoWithinTransaction(
   id: string,
   now: string,
   enqueue: (record: SyncRecord) => void,
+  retractSpawn = false,
 ): Promise<boolean> {
+  // A tombstone answers for exactly one occurrence day, so deleting it sticks
+  // for that day. Two shapes have no ORIGINAL occurrence date to name and are
+  // stamped with THIS write's instant (the local day the user deleted on):
+  // a keyless row, and a row whose visible due date was cleared (a stale
+  // creation-day key would otherwise cover the wrong day and let the same-day
+  // rollover resurrect the row the user just deleted). A row that still carries
+  // an occurrence key keeps it, so a dated deletion covers its own date.
+  // Stamping at write time (rather than re-deriving a day from `deleted_at` at
+  // scan time) keeps the day stable across a later timezone change.
   const tombstone = await transactionDb.runAsync(
-    'UPDATE todos SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
-    [now, now, id],
+    `UPDATE todos SET deleted_at = ?, updated_at = ?,
+       recurrence_touched = CASE WHEN ? THEN recurrence_touched ELSE 1 END,
+       recurrence_date_key = CASE
+         WHEN recurrence = 'daily'
+           AND (recurrence_date_key IS NULL OR due_date IS NULL) THEN ?
+         ELSE recurrence_date_key END
+     WHERE id = ? AND deleted_at IS NULL`,
+    [now, now, retractSpawn ? 1 : 0, toDateKey(new Date(now)), id],
   );
   if (tombstone.changes === 0) return false;
 

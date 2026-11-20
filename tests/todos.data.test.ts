@@ -492,8 +492,14 @@ describe('features/todos/todos.data', () => {
     await removeTodo('todo_1');
 
     expect(db.runAsync).toHaveBeenCalledWith(
-      'UPDATE todos SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
-      ['2026-04-16T10:00:00.000Z', '2026-04-16T10:00:00.000Z', 'todo_1'],
+      `UPDATE todos SET deleted_at = ?, updated_at = ?,
+       recurrence_touched = CASE WHEN ? THEN recurrence_touched ELSE 1 END,
+       recurrence_date_key = CASE
+         WHEN recurrence = 'daily'
+           AND (recurrence_date_key IS NULL OR due_date IS NULL) THEN ?
+         ELSE recurrence_date_key END
+     WHERE id = ? AND deleted_at IS NULL`,
+      ['2026-04-16T10:00:00.000Z', '2026-04-16T10:00:00.000Z', 0, '2026-04-16', 'todo_1'],
     );
 
     expect(linkedActionDataMocks.replaceLinkedActionRulesForSourceEntity).toHaveBeenCalledWith(
@@ -790,7 +796,7 @@ describe('bulk todo operations', () => {
           return { changes: 1 };
         }
         if (/UPDATE todos SET deleted_at/.test(sql)) {
-          const row = rows.get(queryArgs[2] as string);
+          const row = rows.get(queryArgs[4] as string);
           if (!row || row.deleted_at !== null) return { changes: 0 };
           row.deleted_at = '2026-04-16T10:00:00.000Z';
           return { changes: 1 };

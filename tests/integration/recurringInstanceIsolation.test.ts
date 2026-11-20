@@ -97,6 +97,53 @@ describe('recurring instances do not become the series template', () => {
     ).toContain(recurrenceId);
   });
 
+  it.each(['single', 'bulk'] as const)(
+    '%s completion of an undated occurrence scheduled later does not adopt the edited due date as its occurrence day',
+    async (mode) => {
+      const todos = await import('@/features/todos/todos.data');
+      const { findMissingRecurrenceIds } = await import('@/features/todos/todos.domain');
+      // Started with `Repeat daily` and no date: the occurrence has NO original
+      // date. Scheduling it afterwards edits only the VISIBLE due date.
+      const id = await todos.addTodo({
+        title: 'Scheduled later',
+        recurrence: 'daily',
+        dueDate: null,
+      });
+      const { recurrence_id: recurrenceId } = (await db.getFirstAsync<{
+        recurrence_id: string;
+      }>('SELECT recurrence_id FROM todos WHERE id = ?', [id]))!;
+      const scheduledDueDate = addLocalDays(toDateKey(), 5);
+      await todos.updateTodo(id, { dueDate: scheduledDueDate });
+      if (mode === 'single') await todos.completeTodo(id);
+      else await todos.bulkSetTodoCompletion([id], 1);
+      // `recurrence_date_key` is the ORIGINAL occurrence date and stays NULL: a
+      // due date edited after creation is not the occurrence this row belonged
+      // to. Completion must not back-fill the key from that visible date.
+      expect(
+        await db.getFirstAsync('SELECT due_date, recurrence_date_key FROM todos WHERE id=?', [id]),
+      ).toEqual({ due_date: scheduledDueDate, recurrence_date_key: null });
+      // The spawn follows the handled day, not the edited future due date.
+      expect((await future(recurrenceId, id))!.due_date).toBe(addLocalDays(toDateKey(), 1));
+      // Same day covered: the completed row answers for the day it was handled.
+      expect(
+        findMissingRecurrenceIds(await todos.listAllActiveTodosForRecurrence(), toDateKey()),
+      ).toEqual([]);
+
+      // Reopening retracts that pristine copy, and re-completing must land on
+      // the SAME next day. Before the fix the stored key claimed the edited
+      // future date, so the second spawn jumped to scheduledDueDate + 1.
+      if (mode === 'single') await todos.setTodoCompletionState(id, 0);
+      else await todos.bulkSetTodoCompletion([id], 0);
+      expect(await future(recurrenceId, id)).toBeNull();
+      if (mode === 'single') await todos.completeTodo(id);
+      else await todos.bulkSetTodoCompletion([id], 1);
+      expect(
+        await db.getFirstAsync('SELECT recurrence_date_key FROM todos WHERE id=?', [id]),
+      ).toEqual({ recurrence_date_key: null });
+      expect((await future(recurrenceId, id))!.due_date).toBe(addLocalDays(toDateKey(), 1));
+    },
+  );
+
   it('uses the committed series template rather than stale rollover input', async () => {
     const { todos, recurrenceId } = await seed();
     const [stale] = await todos.getRecurringTodosByIds([recurrenceId]);
