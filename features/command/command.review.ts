@@ -53,6 +53,33 @@ export type CommandReview = {
   preview: CommandPreview;
 };
 
+/**
+ * Clear the execution token when a REVIEWED draft is actually edited.
+ *
+ * `prepareCommandReview` deliberately preserves a draft's token so a repeated
+ * confirmation of the SAME review is refused by the executor's duplicate
+ * guard. The Command Center keeps the reviewed draft (and its editable fields)
+ * on screen after a save, so an edit there — the natural "that was the wrong
+ * item, let me pick the other one" correction — used to inherit the
+ * ALREADY-CLAIMED token and every later Confirm was refused as
+ * "This command has already been submitted." with no way out of that draft.
+ *
+ * An edited command is a new command, so it must get a new token; a re-review of
+ * an unchanged draft must keep the old one (that is what makes a double
+ * confirmation harmless). Pure so both rules stay unit-testable, and the caller
+ * passes the draft it is about to replace.
+ */
+export function dropClaimedExecutionTokenOnEdit(
+  next: DraftAiAction,
+  previous: DraftAiAction | null,
+): DraftAiAction {
+  if (!previous) return next;
+  // Only a REAL field change starts a new command. Rewriting the same fields
+  // (or a non-edit re-review) must not reopen the guard of a saved command.
+  if (JSON.stringify(next.fields) === JSON.stringify(previous.fields)) return next;
+  return { ...next, executionToken: undefined };
+}
+
 type ReviewInput = {
   now?: Date;
   /** Local UI choice used to disambiguate duplicate human-facing names. */
