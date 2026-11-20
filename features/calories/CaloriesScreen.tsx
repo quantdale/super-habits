@@ -39,7 +39,7 @@ import {
   caloriesTotal,
   kcalFromMacros,
   buildTargetProgress,
-  resolveCalorieLogDateKey,
+  resolveCalorieSurfaceDay,
   calorieEditSaveError,
   resolveEntryKcal,
 } from '@/features/calories/calories.domain';
@@ -204,6 +204,33 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
    *  surface leads and the heavy rolling derivations only run while open. */
   const [historyOpen, setHistoryOpen] = useState(false);
 
+  /**
+   * The ONE day the Calories surface shows AND writes to.
+   *
+   * Both modes share it: the diary navigator moves `selectedDateKey`, and the
+   * inline form, the quick-add chips, the kcal quick add, and the manual-add
+   * modal all log to this resolved day (audit C #14 — Form mode used to fall
+   * back to an implicit "today").
+   *
+   * A selection that has drifted into the future (a clock/timezone move
+   * BACKWARDS past an explicitly selected past day, or a restored preference)
+   * collapses onto today — and the DISPLAY follows the same collapse, because
+   * showing a day the writes do not reach silently files meals onto a day the
+   * visible diary never showed.
+   *
+   * The memo also depends on `dayGeneration` (the app-wide local-day signal):
+   * a backwards clock/timezone move can turn an explicitly selected past day
+   * into a future one WITHOUT touching `selectedDateKey` (D9b keeps that
+   * pinned), so a selection-only dependency list would keep serving the day it
+   * cached before the move and the diary would stay on a day its writes cannot
+   * reach.
+   */
+  const surfaceDateKey = useMemo(
+    () => resolveCalorieSurfaceDay(selectedDateKey, toDateKey()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dayGeneration is an intentional extra dep: it re-anchors "today" when the local day changes (clock/timezone move, midnight) even though `selectedDateKey` is unchanged; the call reads the clock through `toDateKey()`.
+    [selectedDateKey, dayGeneration],
+  );
+
   const refresh = useCallback(async () => {
     const isCurrent = beginRefresh();
     const startYear = new Date();
@@ -216,7 +243,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     // section appears. Start its small catalog independently of the heavier
     // entry/summary reads and publish it as soon as it is ready so an early
     // search never waits for unrelated aggregate work.
-    const entriesPromise = listCalorieEntries(selectedDateKey);
+    const entriesPromise = listCalorieEntries(surfaceDateKey);
     const savedMealsPromise = Promise.all([listRecentSavedMeals(5), searchSavedMeals('')]);
     const summaryPromise = getCalorieSummaryByRange(toDateKey(startYear), toDateKey(new Date()));
     const goalPromise = getCalorieGoal();
@@ -242,20 +269,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     setSummary364(rangeYear);
     setGoal(savedGoal);
     setFrequentFoods(buildFrequentFoods(windowEntries));
-  }, [beginRefresh, selectedDateKey]);
-
-  /**
-   * The ONE day every Calories write and read follows. Both modes share it:
-   * the diary navigator moves it, and the inline form, the quick-add chips,
-   * the kcal quick add, and the manual-add modal all log to it (audit C #14 —
-   * Form mode used to fall back to an implicit "today"). A future-dated
-   * selection from a clock change or a restored preference degrades to today
-   * instead of producing a row the data layer rejects at submit time.
-   */
-  const logDateKey = useMemo(
-    () => resolveCalorieLogDateKey(selectedDateKey, toDateKey()),
-    [selectedDateKey],
-  );
+  }, [beginRefresh, surfaceDateKey]);
 
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 
@@ -422,12 +436,12 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     // The edit-only date field starts on the day the surface is showing, so a
     // stale value from a previous edit session can never survive a reset
     // (audit C §3.6).
-    setEntryDateKey(logDateKey);
+    setEntryDateKey(surfaceDateKey);
     setShowEntryDatePicker(false);
     setEditingEntryId(null);
     setKcalSource(null);
     setCalorieError(null);
-  }, [logDateKey]);
+  }, [surfaceDateKey]);
 
   const setAndPersistViewMode = useCallback(
     (nextMode: CaloriesViewMode) => {
@@ -572,12 +586,12 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const handleCopyFromDay = useCallback(
     async (sourceDateKey: string) => {
       try {
-        const result = await copyCalorieEntriesFromDay(sourceDateKey, selectedDateKey);
+        const result = await copyCalorieEntriesFromDay(sourceDateKey, surfaceDateKey);
         if (result.status === 'copied') {
           setCopyStatus(
             `Copied ${result.copiedCount} ${
               result.copiedCount === 1 ? 'entry' : 'entries'
-            } into ${formatDayContextLabel(selectedDateKey)}.`,
+            } into ${formatDayContextLabel(surfaceDateKey)}.`,
           );
         } else if (result.status === 'source-empty') {
           setCopyStatus('No entries were logged on that day.');
@@ -590,7 +604,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
       }
       await refresh();
     },
-    [refresh, selectedDateKey],
+    [refresh, surfaceDateKey],
   );
 
   /**
@@ -615,14 +629,14 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           fats: 0,
           fiber: 0,
           mealType: 'snack',
-          consumedOn: logDateKey,
+          consumedOn: surfaceDateKey,
         },
         { maintainSavedMeal: false },
       );
       recordAction('nutrition');
       await refresh();
     },
-    [logDateKey, recordAction, refresh],
+    [surfaceDateKey, recordAction, refresh],
   );
 
   const handleSubmit = () => {
@@ -684,10 +698,12 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
             return;
           }
         } else {
-          // Both modes log to the day the surface is showing (selectedDateKey),
+          // Both modes log to the day the surface is showing (`surfaceDateKey`),
           // never an implicit "today": a meal added while the diary sits on
-          // last Tuesday belongs to last Tuesday. `addCalorieEntry` already
-          // rejects a future day, so this cannot create a forward-dated row.
+          // last Tuesday belongs to last Tuesday. The same resolved value feeds
+          // the reads and the hero, so a backwards clock/timezone move can
+          // clamp the day without the write landing somewhere the diary never
+          // displayed.
           await addCalorieEntry({
             foodName: food.trim(),
             calories: effectiveKcal,
@@ -696,7 +712,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
             fats: fatsN,
             fiber: fiberN,
             mealType,
-            consumedOn: logDateKey,
+            consumedOn: surfaceDateKey,
           });
         }
 
@@ -797,7 +813,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
             over={goalProgress.over}
             overBy={overBy}
             percent={goalProgress.percent}
-            dateKey={selectedDateKey}
+            dateKey={surfaceDateKey}
             barFill={heroVisual.barFill}
             mutedInk={heroVisual.mutedInk}
             metricInk={heroVisual.metricInk}
@@ -836,7 +852,9 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           savedMealCount={allSavedMeals.length}
           groups={groupedEntries}
           collapsedMeals={collapsedMeals}
-          logDateKey={logDateKey}
+          // Form mode's "Logging to …" line names the day the form writes to, and
+          // the reset seed for the edit-only date field starts there too.
+          logDateKey={surfaceDateKey}
           onLogToToday={() => handleSelectDiaryDate(toDateKey())}
           food={food}
           protein={protein}
@@ -889,7 +907,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           allSavedMeals={allSavedMeals}
           groups={groupedEntries}
           collapsedMeals={collapsedMeals}
-          selectedDateKey={selectedDateKey}
+          selectedDateKey={surfaceDateKey}
           summaries={summary364}
           copyStatus={copyStatus}
           error={deleteError}

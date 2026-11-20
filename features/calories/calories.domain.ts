@@ -145,22 +145,40 @@ export type TargetProgress = {
 };
 
 /**
- * The local day a Calories write belongs to.
+ * The ONE local day the Calories surface both shows and writes to.
  *
  * Both entry modes share ONE selected day (`selectedDateKey`): the diary day
  * navigator moves it, and the inline form, the quick-add path, and the
  * manual-add modal all log to it. Today is only the default when nothing has
- * been selected, and a selection that has drifted into the future (a clock
- * change, a restored `app_meta` copy) falls back to today rather than writing
- * a forward-dated row — `addCalorieEntry` rejects those and a form that only
- * fails on submit is a dead end.
+ * been selected, and a selection that has drifted into the future (a clock or
+ * timezone move BACKWARDS past an explicitly selected past day, or a restored
+ * `app_meta` copy) collapses onto today.
+ *
+ * This clamp must apply to the DISPLAYED day as well as the write day: keeping
+ * the raw selection on screen while writing to the clamped day let a backwards
+ * clock move write a meal onto a day the visible diary never showed (and let
+ * copy-day target a future day, which the data layer then refuses). The
+ * surface day is therefore the single value every read, the hero, the day log,
+ * the navigator, copy-day's target and every create share.
  */
-export function resolveCalorieLogDateKey(
+export function resolveCalorieSurfaceDay(
   selectedDateKey: string | null | undefined,
   todayKey: string,
 ): string {
   if (!selectedDateKey || !isValidDateKey(selectedDateKey)) return todayKey;
   return selectedDateKey > todayKey ? todayKey : selectedDateKey;
+}
+
+/**
+ * Backwards-compatible alias of {@link resolveCalorieSurfaceDay} for the write
+ * contract (`addCalorieEntry` must never be handed a forward-dated key, a form
+ * that only fails on submit is a dead end).
+ */
+export function resolveCalorieLogDateKey(
+  selectedDateKey: string | null | undefined,
+  todayKey: string,
+): string {
+  return resolveCalorieSurfaceDay(selectedDateKey, todayKey);
 }
 
 /** Per-macro progress toward a daily target; a non-positive target hides the bar. */
