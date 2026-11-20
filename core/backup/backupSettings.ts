@@ -167,11 +167,9 @@ function normalizeRecoverableWorkoutPreferences(
           const value = goal.value;
           const unit = goal.unit;
           const normalizedUnit: 'kg' | 'lb' | null = unit === 'kg' || unit === 'lb' ? unit : null;
-          return typeof value === 'number' &&
-            Number.isFinite(value) &&
-            value > 0 &&
-            value <= 1_000 &&
-            normalizedUnit
+          // Match saveWorkoutPreferences: the body-entry ceiling does not
+          // apply to goals. Dropping a writer-valid goal here loses it on export.
+          return typeof value === 'number' && Number.isFinite(value) && value > 0 && normalizedUnit
             ? { value, unit: normalizedUnit }
             : null;
         })()

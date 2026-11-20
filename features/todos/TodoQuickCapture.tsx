@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { MaterialIcons } from '@expo/vector-icons';
-import { TextInput, View } from 'react-native';
+import { Platform, TextInput, View } from 'react-native';
 import { SECTION_HUES, SECTION_ON_BRIGHT_INK } from '@/constants/sectionColors';
 import { Pressable3D } from '@/core/ui/Pressable3D';
 import { useAppTheme } from '@/core/providers/themeContext';
@@ -101,6 +101,11 @@ export function TodoQuickCapture({ title, onTitleChange, onSubmit, onPersistErro
         accessibilityState={{ disabled: !canSubmit }}
         style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center' }}
         faceStyle={{ alignItems: 'center', justifyContent: 'center' }}
+        // Web's enlarged press target must centre its own glyph; centring the
+        // face's child alone leaves the icon at the top of that grown target.
+        contentStyle={
+          Platform.OS === 'web' ? { alignItems: 'center', justifyContent: 'center' } : undefined
+        }
       >
         {/* §5.1: `bright` is never under white — ink label on the bright fill. */}
         <MaterialIcons

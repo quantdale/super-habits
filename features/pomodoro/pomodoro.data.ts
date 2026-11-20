@@ -385,8 +385,14 @@ export async function logPomodoroSessionFromLinkedAction(input: {
   id: string;
   durationSeconds: number;
   type: PomodoroMode;
+  /**
+   * Instant the producing source action happened. Replayed dispatches (startup
+   * recovery after a crash) run later than the user's act; stamping the replay
+   * clock would date the focus block — and its reward — to the wrong day.
+   */
+  endedAtIso?: string;
 }): Promise<LinkedActionEffectAdapterResult> {
-  const endedAt = new Date();
+  const endedAt = new Date(input.endedAtIso ?? new Date().toISOString());
   // The backup/portable contract for this column is a whole number of seconds
   // (restore rejects non-integers), and a linked-action duration is authored in
   // whole minutes. Rounding here keeps every writer inside the schema contract,
