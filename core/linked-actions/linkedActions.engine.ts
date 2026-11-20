@@ -4,10 +4,11 @@ import {
   createLinkedActionExecution,
   claimLinkedActionExecution,
   getAppliedHabitIncrementExecution,
-  getAppliedHabitDayCalorieExecution,
+  getAppliedProducedRowExecution,
   getLinkedActionEvent,
   getLinkedActionExecutionByChainFingerprint,
   getLinkedActionExecutionByRuleAndSourceEvent,
+  isSingleProducedRowEffectType,
   listMatchingLinkedActionRules,
   updateLinkedActionExecution,
 } from '@/core/linked-actions/linkedActions.data';
@@ -156,26 +157,31 @@ function normalizeSourceAction(input: LinkedActionSourceActionInput): LinkedActi
   };
 }
 
-async function findPriorAppliedExecutionForFirstRealPath(
+async function findPriorAppliedExecutionForProducedRowEffect(
   plan: LinkedActionEffectPlan,
 ): Promise<LinkedActionExecutionRecord | null> {
-  if (plan.rule.target.effect.type !== 'calorie.log') {
-    return null;
-  }
-  if (
-    plan.sourceEvent.feature !== 'habits' ||
-    plan.sourceEvent.entityType !== 'habit' ||
-    plan.sourceEvent.triggerType !== 'habit.completed_for_day' ||
-    !plan.sourceEvent.entityId ||
-    !plan.sourceEvent.sourceDateKey
-  ) {
+  const effectType = plan.rule.target.effect.type;
+  // Only effects that mint a fresh row per application are re-entry-guarded
+  // here; binary/target-state effects are idempotent by target and a prior
+  // produced-row receipt for this rule must never satisfy them (a rule can be
+  // edited in place, keeping its id while its effect type changes).
+  if (!isSingleProducedRowEffectType(effectType)) {
     return null;
   }
 
-  return getAppliedHabitDayCalorieExecution(
+  const sourceEvent = plan.sourceEvent;
+  if (!sourceEvent.entityId || !sourceEvent.sourceDateKey) {
+    return null;
+  }
+
+  return getAppliedProducedRowExecution(
     plan.rule.id,
-    plan.sourceEvent.entityId,
-    plan.sourceEvent.sourceDateKey,
+    effectType,
+    sourceEvent.feature,
+    sourceEvent.entityType,
+    sourceEvent.entityId,
+    sourceEvent.triggerType,
+    sourceEvent.sourceDateKey,
   );
 }
 
@@ -430,10 +436,10 @@ export class LinkedActionsEngine {
       }
 
       if (!execution) {
-        const priorAppliedExecution = await findPriorAppliedExecutionForFirstRealPath(plan);
+        const priorAppliedExecution = await findPriorAppliedExecutionForProducedRowEffect(plan);
         if (
           priorAppliedExecution &&
-          recoverOrDedupe(priorAppliedExecution, 'habit_day_already_logged')
+          recoverOrDedupe(priorAppliedExecution, 'source_identity_already_executed')
         ) {
           continue;
         }

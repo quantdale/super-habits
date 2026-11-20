@@ -10,6 +10,7 @@ import {
   type LinkedActionEventRow,
   type LinkedActionExecutionRecord,
   type LinkedActionExecutionRow,
+  type LinkedActionEffectType,
   type LinkedActionFeature,
   type LinkedActionRuleDefinition,
   type LinkedActionRuleRow,
@@ -576,11 +577,43 @@ export async function getLinkedActionExecutionByChainFingerprint(
   return row ? normalizeLinkedActionExecutionRow(row) : null;
 }
 
-export async function getAppliedHabitDayCalorieExecution(
+/**
+ * Effects that MINT A NEW ROW on every application. They are not idempotent by
+ * target state (unlike `todo.complete` or `habit.ensure_daily_target`), so a
+ * second fire of the same rule for the same source entity on the same local
+ * day would produce a second calorie entry / focus session / workout log —
+ * once-per-day effects that reward XP twice when they double-apply.
+ */
+const SINGLE_PRODUCED_ROW_EFFECT_TYPES = ['calorie.log', 'pomodoro.log', 'workout.log'] as const;
+
+/** True only for the effects that mint a fresh row on every application. */
+export function isSingleProducedRowEffectType(effectType: string): boolean {
+  return (SINGLE_PRODUCED_ROW_EFFECT_TYPES as readonly string[]).includes(effectType);
+}
+
+/**
+ * Prior execution of the SAME rule for the same source entity, trigger and
+ * local day — scoped to one effect type.
+ *
+ * The effect type must be part of the lookup: a rule can be re-authored in
+ * place (the editor keeps `existingRuleId`), so its durable identity outlives
+ * its effect type. Without the scope, a `pomodoro.log` receipt left on disk by
+ * the previous effect made a later `todo.complete` rule report a duplicate and
+ * skip the completion entirely.
+ */
+export async function getAppliedProducedRowExecution(
   ruleId: string,
-  habitId: string,
+  effectType: LinkedActionEffectType,
+  sourceFeature: LinkedActionFeature,
+  sourceEntityType: LinkedActionSourceEntityType,
+  sourceEntityId: string,
+  triggerType: LinkedActionTriggerType,
   sourceDateKey: string,
 ): Promise<LinkedActionExecutionRecord | null> {
+  if (!isSingleProducedRowEffectType(effectType)) {
+    return null;
+  }
+
   const db = await getDatabase();
   const row = await db.getFirstAsync<LinkedActionExecutionRow>(
     `SELECT e.*
@@ -588,16 +621,24 @@ export async function getAppliedHabitDayCalorieExecution(
      INNER JOIN linked_action_events ev
        ON ev.id = e.source_event_id
      WHERE e.rule_id = ?
-       AND e.effect_type = 'calorie.log'
+       AND e.effect_type = ?
        AND e.status IN ('planned', 'running', 'applied', 'skipped', 'failed')
-       AND ev.source_feature = 'habits'
-       AND ev.source_entity_type = 'habit'
+       AND ev.source_feature = ?
+       AND ev.source_entity_type = ?
        AND ev.source_entity_id = ?
-       AND ev.trigger_type = 'habit.completed_for_day'
+       AND ev.trigger_type = ?
        AND ev.source_date_key = ?
      ORDER BY e.created_at DESC
      LIMIT 1`,
-    [ruleId, habitId, sourceDateKey],
+    [
+      ruleId,
+      effectType,
+      sourceFeature,
+      sourceEntityType,
+      sourceEntityId,
+      triggerType,
+      sourceDateKey,
+    ],
   );
   return row ? normalizeLinkedActionExecutionRow(row) : null;
 }
