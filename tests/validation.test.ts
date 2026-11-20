@@ -10,6 +10,9 @@ import {
   validateExerciseName,
   validateSetTiming,
   validatePomodoroSettings,
+  assertExerciseProgressionWrite,
+  assertExerciseSortOrderWrite,
+  assertSetPrescriptionWrite,
 } from '@/lib/validation';
 import { toDateKey } from '@/lib/time';
 
@@ -172,6 +175,115 @@ describe('validateRoutineName', () => {
 describe('validateExerciseName', () => {
   it('rejects empty', () => {
     expect(validateExerciseName('')).not.toBeNull();
+  });
+});
+
+describe('assertExerciseProgressionWrite', () => {
+  it('rejects an unsupported progression mode', () => {
+    expect(() => assertExerciseProgressionWrite({ progressionMode: 'bogus' })).toThrow(
+      'Progression mode must be Manual, Linear, or Double.',
+    );
+  });
+
+  it.each([-1, Number.NaN, Infinity])(
+    'rejects the increment %s instead of letting SQLite coerce it',
+    (progressionIncrement) => {
+      expect(() => assertExerciseProgressionWrite({ progressionIncrement })).toThrow(
+        'Progression increment must be a finite number 0 or greater.',
+      );
+    },
+  );
+
+  it.each([0, -1, 1.5, Number.NaN, Infinity])(
+    'rejects the rep bounds %s (whole numbers 1 or greater)',
+    (value) => {
+      expect(() => assertExerciseProgressionWrite({ progressionMinReps: value })).toThrow(
+        /whole number 1 or greater/,
+      );
+      expect(() => assertExerciseProgressionWrite({ progressionMaxReps: value })).toThrow(
+        /whole number 1 or greater/,
+      );
+    },
+  );
+
+  it('rejects a reversed range supplied by one write', () => {
+    expect(() =>
+      assertExerciseProgressionWrite({ progressionMinReps: 12, progressionMaxReps: 8 }),
+    ).toThrow('Progression minimum reps cannot exceed maximum reps.');
+  });
+
+  it('checks a partial update against the stored sibling bound', () => {
+    expect(() =>
+      assertExerciseProgressionWrite({ progressionMinReps: 13 }, { min: 8, max: 12 }),
+    ).toThrow('Progression minimum reps cannot exceed maximum reps.');
+    expect(() =>
+      assertExerciseProgressionWrite({ progressionMaxReps: 7 }, { min: 8, max: 12 }),
+    ).toThrow('Progression minimum reps cannot exceed maximum reps.');
+  });
+
+  it('keeps an already-reversed recovered row editable unless its range is edited', () => {
+    const stored = { min: 12, max: 8 };
+    expect(() =>
+      assertExerciseProgressionWrite({ progressionMode: 'linear' }, stored),
+    ).not.toThrow();
+    expect(() => assertExerciseProgressionWrite({ progressionMinReps: 13 }, stored)).toThrow(
+      'Progression minimum reps cannot exceed maximum reps.',
+    );
+    expect(() =>
+      assertExerciseProgressionWrite({ progressionMinReps: 12, progressionMaxReps: 20 }, stored),
+    ).not.toThrow();
+  });
+
+  it('accepts the writer-valid corpus (manual, decimals, zero, single bounds, equal bounds)', () => {
+    for (const input of [
+      {},
+      { progressionMode: 'none' },
+      { progressionMode: 'linear', progressionIncrement: 1.25 },
+      { progressionIncrement: 0 },
+      { progressionMinReps: 8 },
+      { progressionMaxReps: 20 },
+      { progressionMinReps: 10, progressionMaxReps: 10 },
+      { progressionIncrement: null, progressionMinReps: null, progressionMaxReps: null },
+    ]) {
+      expect(() => assertExerciseProgressionWrite(input)).not.toThrow();
+    }
+  });
+});
+
+describe('assertExerciseSortOrderWrite', () => {
+  it('requires a whole number 0 or greater', () => {
+    for (const value of [-1, 1.5, Number.NaN, Infinity]) {
+      expect(() => assertExerciseSortOrderWrite(value)).toThrow(
+        'Exercise order must be a whole number 0 or greater.',
+      );
+    }
+    expect(() => assertExerciseSortOrderWrite(0)).not.toThrow();
+    expect(() => assertExerciseSortOrderWrite(3)).not.toThrow();
+  });
+});
+
+describe('assertSetPrescriptionWrite', () => {
+  it('rejects a reversed range the write supplies', () => {
+    expect(() => assertSetPrescriptionWrite({ targetRepsMin: 15, targetRepsMax: 10 })).toThrow(
+      'Target reps minimum cannot exceed maximum reps.',
+    );
+  });
+
+  it('rejects a reversed range only when this write edits an endpoint', () => {
+    // Unrelated edit on an already-reversed recovered row stays allowed.
+    expect(() =>
+      assertSetPrescriptionWrite(
+        { targetRepsMin: 15, targetRepsMax: 10, targetLoad: 60 },
+        { storedRepRange: { min: 15, max: 10 }, repRangeEdited: false },
+      ),
+    ).not.toThrow();
+    // An endpoint edit must repair it.
+    expect(() =>
+      assertSetPrescriptionWrite(
+        { targetRepsMin: 16, targetRepsMax: 10 },
+        { storedRepRange: { min: 15, max: 10 }, repRangeEdited: true },
+      ),
+    ).toThrow('Target reps minimum cannot exceed maximum reps.');
   });
 });
 
