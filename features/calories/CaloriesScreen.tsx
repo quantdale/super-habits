@@ -42,6 +42,7 @@ import {
   resolveCalorieSurfaceDay,
   calorieEditSaveError,
   resolveEntryKcal,
+  prefillDraftFromMeal,
 } from '@/features/calories/calories.domain';
 import type {
   CalorieGoal,
@@ -464,22 +465,25 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
   const applyMealToDraft = useCallback((meal: MealPrefillSource) => {
     setCalorieError(null);
     setEditingEntryId(null);
-    // The meal's stored kcal stands in for the macro-derived value while the
-    // macro fields stay as prefilled: kcal-only rows and explicit-kcal rows
-    // (command path, quick-capture saved meals) carry calories no macro sum
-    // can derive — the same `kcalSource` mechanism as `openEntryEditModal`.
-    setKcalSource({
+    // Draft fields are integer-only, so the stored macros are rendered in the
+    // same whole grams the form submits and the `kcalSource` describes THOSE
+    // grams with the meal's own kcal. Prefilling the raw numbers put text the
+    // form can never parse into an integer field ("12.5"), which submit
+    // collapsed to 0 and refused — a one-tap re-log that could not be saved.
+    const draft = prefillDraftFromMeal({
+      food_name: meal.food_name,
       calories: meal.calories,
       protein: meal.protein,
       carbs: meal.carbs,
       fats: meal.fats,
       fiber: meal.fiber ?? 0,
     });
-    setFood(meal.food_name);
-    setProtein(String(meal.protein));
-    setCarbs(String(meal.carbs));
-    setFats(String(meal.fats));
-    setFiber(String(meal.fiber));
+    setKcalSource(draft.kcalSource);
+    setFood(draft.food);
+    setProtein(draft.protein);
+    setCarbs(draft.carbs);
+    setFats(draft.fats);
+    setFiber(draft.fiber);
     setMealType(meal.meal_type as MealType);
   }, []);
 
