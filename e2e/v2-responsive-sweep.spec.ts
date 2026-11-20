@@ -1,6 +1,7 @@
 import { expect, test, type Page } from './fixtures';
 import { planningHubTab, sectionTab, TAB_LABELS } from './helpers/navigation';
 import { seedFixture } from './helpers/seed';
+import { clearDatabase } from './helpers/db';
 import { openCommandScreen, openSettingsScreen } from './helpers/commandObservation';
 import { layout } from '@/core/theme/designTokens';
 
@@ -562,6 +563,21 @@ type PayloadColumn = {
  * as To Do's swipe actions, and children of horizontal scrollers, whose content
  * is *meant* to overflow its frame). What remains is the box the user reads, so
  * a removed cap widens it past the contract and fails.
+ *
+ * The span is the union of the STRUCTURALLY CENTRED content wrappers those
+ * payload nodes live in (`alignSelf: center` or symmetric non-zero side
+ * margins, strictly narrower than the section panel), which is the same rule
+ * promise 3 documents above. Taking the raw min/max of the payload nodes' own
+ * boxes instead makes the result depend on which nodes happen to be mounted:
+ * controls aligned to a content EDGE (a right-aligned header action, the Quick
+ * Add input plus its trailing 52px add button) are laid out inside the column
+ * but their boxes start/end short of it, so a column measured from them alone
+ * reports a centre biased away from the field centre. That bias was exactly
+ * the CI-only "899 todos" failure (2px, measured on the empty branch the To Do
+ * panel renders while its list is still loading) and it also fires on the empty
+ * Habits branch at 1280 (12px). Measuring the wrapper is independent of both
+ * the loaded state and the controls that exist in it, while an uncapped page
+ * still widens the wrapper past the contract.
  */
 async function measurePayloadColumn(page: Page, scopeSelector: string): Promise<PayloadColumn> {
   return page.evaluate(
@@ -605,10 +621,11 @@ async function measurePayloadColumn(page: Page, scopeSelector: string): Promise<
         return false;
       };
 
-      let left = Number.POSITIVE_INFINITY;
-      let right = Number.NEGATIVE_INFINITY;
       let controls = 0;
       let textLeaves = 0;
+
+      /** The payload nodes that are inside the flow (index 0 = payload). */
+      const payloadNodes: HTMLElement[] = [];
 
       const include = (node: HTMLElement): void => {
         if (!isRendered(node)) return;
@@ -623,8 +640,7 @@ async function measurePayloadColumn(page: Page, scopeSelector: string): Promise<
           clip.left >= -1 &&
           clip.right <= window.innerWidth + 1;
         if (parked) return;
-        left = Math.min(left, box.left);
-        right = Math.max(right, box.right);
+        payloadNodes.push(node);
       };
 
       for (const candidate of Array.from(root.querySelectorAll(interactiveSelector))) {
@@ -636,6 +652,59 @@ async function measurePayloadColumn(page: Page, scopeSelector: string): Promise<
         if (!(element.textContent ?? '').trim()) continue;
         textLeaves += 1;
         include(element);
+      }
+
+      const rootBox = root.getBoundingClientRect();
+      /** Is this wrapper structurally centred (the rule promise 3 documents)? */
+      const isCentredWrapper = (node: HTMLElement): boolean => {
+        const style = getComputedStyle(node);
+        if (style.alignSelf === 'center') return true;
+        const marginLeft = Number.parseFloat(style.marginLeft);
+        const marginRight = Number.parseFloat(style.marginRight);
+        // `auto` side margins (the `mx-auto` half of the rule) resolve to equal
+        // used values in px, so symmetric positive margins cover both halves.
+        return (
+          Number.isFinite(marginLeft) &&
+          Number.isFinite(marginRight) &&
+          marginLeft > 0 &&
+          Math.abs(marginLeft - marginRight) < 0.5
+        );
+      };
+
+      // Candidate columns: every structurally centred wrapper below the panel
+      // that holds at least half of the payload nodes. A pinned hero and the
+      // scrolling body are SIBLINGS (both capped, both centred), so requiring
+      // every payload node in ONE ancestor would find nothing and fall back to
+      // the biased raw span; requiring a majority keeps a row/group (which holds
+      // a handful of nodes) out while either capped wrapper qualifies.
+      const half = payloadNodes.length / 2;
+      let left = Number.POSITIVE_INFINITY;
+      let right = Number.NEGATIVE_INFINITY;
+      for (const candidate of Array.from(root.querySelectorAll<HTMLElement>('*'))) {
+        if (!isRendered(candidate)) continue;
+        if (!isCentredWrapper(candidate)) continue;
+        const box = candidate.getBoundingClientRect();
+        if (box.width === 0 || box.height === 0) continue;
+        // Skip the section panel / content field itself: the column is a
+        // centred box INSIDE the field, never the full-width field.
+        if (box.width >= rootBox.width - 1) continue;
+        let held = 0;
+        for (const node of payloadNodes) {
+          if (candidate.contains(node)) held += 1;
+        }
+        if (held < half) continue;
+        left = Math.min(left, box.left);
+        right = Math.max(right, box.right);
+      }
+      if (!Number.isFinite(left)) {
+        // No centred wrapper at all (e.g. a section whose content is a single
+        // uncapped block): fall back to the payload span, so a removed cap is
+        // still measured instead of reporting a vacuous zero.
+        for (const node of payloadNodes) {
+          const box = node.getBoundingClientRect();
+          left = Math.min(left, box.left);
+          right = Math.max(right, box.right);
+        }
       }
 
       return {
@@ -990,6 +1059,40 @@ test.describe('V2 responsive sweep', () => {
             `${width} ${section.key}: the bar floats at the bottom`,
           ).toBeGreaterThan(600);
         }
+      }
+    }
+
+    // An EMPTY device (fresh install) is a second content state: To Do renders
+    // its empty branch, which has no list row to span the column, and Habits
+    // renders its own empty card. The measured column must still be the centred
+    // wrapper it was capped inside — not the biased span of whichever few
+    // controls the empty branch happens to render (`alignSelf: center` / `mx-auto`
+    // are the contract, the widest thing on screen is not).
+    await clearDatabase(page);
+    for (const width of [899, 900, 1280] as const) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const section of SECTIONS) {
+        await showSection(page, section.label);
+        await waitForSettledGeometry(page, panelScope(section.key));
+        const shell = await measureShell(page);
+        const payload = await measurePayloadColumn(page, panelScope(section.key));
+        expect(
+          payload.controls,
+          `empty ${width} ${section.key}: the section renders interactive controls to measure`,
+        ).toBeGreaterThan(1);
+        expect(
+          payload.textLeaves,
+          `empty ${width} ${section.key}: the section renders text to measure`,
+        ).toBeGreaterThan(1);
+        const cap = section.key === 'overview' ? layout.dashboardMaxWidth : layout.contentMaxWidth;
+        expect(
+          payload.width,
+          `empty ${width} ${section.key}: content is no wider than ${cap}px`,
+        ).toBeLessThanOrEqual(cap + 1);
+        expect(
+          Math.abs(payload.centre - shell.fieldCentre),
+          `empty ${width} ${section.key}: content is centred in the ${shell.fieldWidth}px content area`,
+        ).toBeLessThanOrEqual(1.5);
       }
     }
 
