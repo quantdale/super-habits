@@ -286,6 +286,27 @@ describe('buildMomentumGarden', () => {
     expect(model.milestones).toEqual([]);
   });
 
+  it('keeps a tombstoned habit contribution (F3) and skips only orphaned rows', () => {
+    // A completion is a past fact: deleting the habit must not erase the day
+    // it was logged (Progress counts it unjoined, the Timeline keeps it via a
+    // LEFT JOIN). A completion whose habit ROW is gone entirely has no rule /
+    // lifecycle facts to ask "was this day scheduled?", so it stays out.
+    const deleted = habit({ deleted_at: iso(TODAY, 20) });
+    const model = buildMomentumGarden(
+      baseInput({
+        habits: [deleted],
+        habitCompletions: [
+          { habit_id: deleted.id, date_key: TODAY, count: 1 },
+          { habit_id: 'row-lost', date_key: TODAY, count: 1 },
+        ],
+      }),
+    );
+
+    expect(model.today.contributions.habits.level).toBe(1);
+    expect(model.today.activeSources).toContain('habits');
+    expect(model.activeDays).toBe(1);
+  });
+
   it('ignores malformed local date facts', () => {
     const h = habit();
     const model = buildMomentumGarden(

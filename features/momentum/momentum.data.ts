@@ -91,11 +91,19 @@ export async function getMomentumGarden(
     // Only habits with a positive completion in the requested window can
     // contribute to this read model. This keeps the canonical scheduler's
     // bulk input bounded without issuing a query per habit.
+    //
+    // Deliberately NO `h.deleted_at IS NULL` filter (F3 canonical history rule,
+    // the same one Progress's unjoined `countHabitCompletions` and the
+    // Activity Timeline's `LEFT JOIN habits` already apply): a completion is a
+    // past fact, so deleting the habit must not erase the day it was logged.
+    // The domain needs the tombstoned row's OWN rule/lifecycle history to ask
+    // whether that day was a scheduled, eligible occurrence — filtering here
+    // made the garden drop every completion of a deleted habit while Progress
+    // and the Timeline kept showing it.
     db.getAllAsync<Habit>(
       `SELECT h.*
          FROM habits h
-         WHERE h.deleted_at IS NULL
-           AND EXISTS (
+         WHERE EXISTS (
              SELECT 1
              FROM habit_completions hc
              WHERE hc.habit_id = h.id

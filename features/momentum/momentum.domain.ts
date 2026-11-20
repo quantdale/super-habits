@@ -129,8 +129,15 @@ function collectHabitDates(input: MomentumDomainInput, window: MomentumWindow): 
     completionsByHabit.set(completion.habit_id, rows);
   }
 
+  // F3 canonical history rule (shared with progress.data.ts's unjoined
+  // completions and activityTimeline.data.ts's LEFT JOIN): a completion is a
+  // past fact and survives the habit's deletion, so this loop deliberately
+  // does NOT skip tombstoned habits. There is nothing to fall back to for a
+  // habit whose row is GONE entirely (no target/rule/lifecycle facts exist to
+  // ask "was this day scheduled?"), so a fully orphaned completion row cannot
+  // contribute here — that is the same boundary the timeline labels
+  // `Logged "a deleted habit"`.
   for (const habit of input.habits) {
-    if (habit.deleted_at !== null && habit.deleted_at !== undefined) continue;
     const completions = completionsByHabit.get(habit.id) ?? [];
     // Use the canonical rule/lifecycle resolver while explicitly bounding the
     // generated local dates to the Garden window.
