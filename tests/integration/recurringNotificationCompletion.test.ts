@@ -89,6 +89,30 @@ describe('recurring notification completion uses the canonical spawn boundary', 
     ).toEqual({ due_date: null, recurrence_date_key: originalKey });
   });
 
+  it('keeps an occurrence scheduled after creation keyless and spawns from the handled day', async () => {
+    const todos = await import('@/features/todos/todos.data');
+    const actions = await import('@/features/todos/todoNotificationActions.data');
+    // Started without a date, then scheduled later: the visible due date is an
+    // edit, not the occurrence date the row was created for.
+    const id = await todos.addTodo({
+      title: 'Notification scheduled later',
+      recurrence: 'daily',
+      dueDate: null,
+    });
+    const scheduledDueDate = addLocalDays(toDateKey(), 5);
+    await todos.updateTodo(id, { dueDate: scheduledDueDate });
+    const input = { todoId: id, actionKey: `done:${id}`, occurrenceId: `reminder:${id}` };
+    expect((await actions.completeTodoFromNotification(input)).status).toBe('applied');
+    expect(
+      await db.getFirstAsync('SELECT due_date, recurrence_date_key FROM todos WHERE id=?', [id]),
+    ).toEqual({ due_date: scheduledDueDate, recurrence_date_key: null });
+    // The spawn follows the handled day, not the edited future due date; the
+    // stored key and the next spawn therefore agree on the same occurrence gap.
+    expect(await todos.listPendingTodos()).toMatchObject([
+      { due_date: addLocalDays(toDateKey(), 1) },
+    ]);
+  });
+
   it('never invents an occurrence date for an undated copy completed from a notification', async () => {
     const todos = await import('@/features/todos/todos.data');
     const actions = await import('@/features/todos/todoNotificationActions.data');

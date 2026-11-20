@@ -45,8 +45,13 @@ export function getTodayDateKey(reference: Date = new Date()): string {
  * undated occurrences. It cannot be confused with an occurrence date the user
  * set (or cleared) through the visible due date.
  *
- * Explicit user deletions cover only their own occurrence day, so loading the
- * screen cannot undo a deletion. Automatic undo retractions do not cover it.
+ * Explicit user deletions cover exactly one day, so loading the screen cannot
+ * undo a deletion. A dated row keeps covering the day it is dated for. A row
+ * whose visible due date was cleared has no date left to name, so the tombstone
+ * records the day the deletion happened (stamped from the tombstone instant at
+ * WRITE time, never re-derived here) — otherwise a stale creation-day key
+ * would cover the wrong day and the same-day rollover would resurrect the row.
+ * Automatic undo retractions do not cover their day.
  * activeTodos: live todos plus user-deleted occurrences and active series
  * todayKey: today's date key
  */

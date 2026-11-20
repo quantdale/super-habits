@@ -42,6 +42,7 @@ type MissingRecurrenceRow = {
   completed: 0 | 1;
   completed_at?: string | null;
   deleted_at: string | null;
+  recurrence_touched?: 0 | 1;
 };
 
 describe('findMissingRecurrenceIds', () => {
@@ -184,6 +185,58 @@ describe('findMissingRecurrenceIds', () => {
         completed: 1,
         completed_at: new Date(2025, 0, 2, 9, 30).toISOString(),
         deleted_at: null,
+      },
+    ];
+    expect(findMissingRecurrenceIds(todos, '2025-01-02')).toEqual(['rec_001']);
+  });
+
+  it('a user-deleted occurrence covers the day its tombstone names', () => {
+    // Delete must stick: the tombstone answer for the day it was made on. A row
+    // whose visible due date was cleared has its key stamped for that day at
+    // write time (see removeTodoWithinTransaction), so the same-day reload
+    // cannot respawn the copy the user just removed.
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: '2025-01-02',
+        completed: 0,
+        deleted_at: new Date(2025, 0, 2, 9, 30).toISOString(),
+        recurrence_touched: 1,
+      },
+    ];
+    expect(findMissingRecurrenceIds(todos, '2025-01-02')).toEqual([]);
+    // Only that day is skipped; the chain still rolls over afterwards.
+    expect(findMissingRecurrenceIds(todos, '2025-01-03')).toEqual(['rec_001']);
+  });
+
+  it('a tombstone whose stored occurrence day is not today does not mask today', () => {
+    // The regression this guards: an UNRESOLVED stale key (creation day) would
+    // leave today uncovered and let the rollover resurrect a deleted task.
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: '2025-01-01',
+        completed: 0,
+        deleted_at: new Date(2025, 0, 2, 9, 30).toISOString(),
+        recurrence_touched: 1,
+      },
+    ];
+    expect(findMissingRecurrenceIds(todos, '2025-01-02')).toEqual(['rec_001']);
+  });
+
+  it('an automatic undo retraction never covers its day', () => {
+    // Retractions leave recurrence_touched untouched, so a rollover may spawn a
+    // fresh copy of the same series again (the user did not delete it).
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: '2025-01-02',
+        completed: 0,
+        deleted_at: new Date(2025, 0, 2, 9, 30).toISOString(),
+        recurrence_touched: 0,
       },
     ];
     expect(findMissingRecurrenceIds(todos, '2025-01-02')).toEqual(['rec_001']);

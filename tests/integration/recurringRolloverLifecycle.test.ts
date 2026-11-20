@@ -201,6 +201,47 @@ describe('recurrence lifecycle across the screen rollover scan', () => {
     expect(await todos.listTodos()).toMatchObject([{ due_date: toDateKey() }]);
   });
 
+  it.each(['single', 'bulk'] as const)(
+    '%s deletion of a stale-keyed occurrence whose due date was cleared skips the deletion day',
+    async (mode) => {
+      const todos = await import('@/features/todos/todos.data');
+      // Created WITH a date: the stored occurrence key stays on that creation
+      // day even after the user clears the VISIBLE due date.
+      const id = await todos.addTodo({
+        title: 'Cleared stale occurrence',
+        recurrence: 'daily',
+        dueDate: '2026-11-10',
+      });
+      await todos.updateTodo(id, { dueDate: null });
+      expect(
+        await db.getFirstAsync('SELECT due_date, recurrence_date_key FROM todos WHERE id=?', [id]),
+      ).toEqual({ due_date: null, recurrence_date_key: '2026-11-10' });
+
+      // The user deletes the row on 2026-11-18. The tombstone must answer for
+      // the day the deletion happened, not for the stale creation-day key.
+      vi.setSystemTime(new Date(2026, 10, 18, 10));
+      if (mode === 'single') await todos.removeTodo(id);
+      else await todos.bulkRemoveTodos([id]);
+
+      // Loading the screen on the deletion day must not undo the deletion.
+      await rollover();
+      expect(await todos.listTodos()).toEqual([]);
+      // With no visible due date left to name, the tombstone records the day
+      // it was deleted on (11-18) instead of the stale creation-day key.
+      expect(
+        await db.getFirstAsync(
+          'SELECT recurrence_date_key, recurrence_touched, deleted_at IS NOT NULL AS gone FROM todos WHERE id=?',
+          [id],
+        ),
+      ).toEqual({ recurrence_date_key: '2026-11-18', recurrence_touched: 1, gone: 1 });
+
+      // Only that day is skipped: the chain rolls over again the next day.
+      vi.setSystemTime(new Date(2026, 10, 19, 10));
+      await rollover();
+      expect(await todos.listTodos()).toMatchObject([{ due_date: toDateKey(), completed: 0 }]);
+    },
+  );
+
   it('keeps the existing pending-undated coverage until that task is handled', async () => {
     const todos = await import('@/features/todos/todos.data');
     const id = await todos.addTodo({ title: 'Still pending', recurrence: 'daily', dueDate: null });

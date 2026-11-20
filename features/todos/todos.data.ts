@@ -66,6 +66,17 @@ function nextRecurringSpawnDueDate(
 const PRISTINE_SPAWN_SQL =
   'completed = 0 AND deleted_at IS NULL AND recurrence_touched = 0 AND updated_at = created_at';
 
+/**
+ * The occurrence day a row stands for, used by spawn and series-stop decisions.
+ *
+ * `recurrence_date_key` is authoritative whenever the column is present: NULL
+ * means the row was created WITHOUT an occurrence date, so the visible
+ * `due_date` must not stand in for it — that date may have been cleared or
+ * re-scheduled after creation, and treating it as the original occurrence is
+ * exactly the hybrid-row defect (a completion then spawns from an edited
+ * future date instead of the handled day). Only a row object that omits the
+ * column entirely (legacy/partial payload) falls back to `due_date`.
+ */
 function occurrenceDate(todo: Pick<Todo, 'due_date' | 'recurrence_date_key'>): string | null {
   return todo.recurrence_date_key === undefined ? todo.due_date : todo.recurrence_date_key;
 }
@@ -1329,18 +1340,16 @@ async function setTodoCompletion(
         return { changed: false, value: { current, previous, next, removedSpawnId: null } };
       }
       const completedAtValue = next === 1 ? now : null;
-      // Completion never invents an occurrence day. `recurrence_date_key`
-      // records the ORIGINAL occurrence date and is not an edit surface, so a
-      // visible due-date clear must not erase it. Undated occurrences stay
-      // keyless here; rollover derives their handled day from `completed_at`
-      // (see listAllActiveTodosForRecurrence), which keeps a completion covering
-      // only the day it happened and lets a reopen restore pending-undated
-      // coverage without guessing whether the key was auto-assigned.
+      // Completion never invents an occurrence day and never adopts an edited
+      // visible due date as one. `recurrence_date_key` records the ORIGINAL
+      // occurrence date assigned at creation (NULL when the row was created
+      // without one) and is not an edit surface, so neither a visible due-date
+      // clear nor a later re-schedule rewrites it. Undated occurrences stay
+      // keyless; rollover derives their handled day from `completed_at` (see
+      // listAllActiveTodosForRecurrence) and the spawn follows the handled day,
+      // keeping the stored key and the next spawn consistent.
       const result = await transactionDb.runAsync(
-        `UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?, recurrence_touched = 1,
-           recurrence_date_key = CASE
-             WHEN recurrence = 'daily' THEN COALESCE(recurrence_date_key, due_date)
-             ELSE recurrence_date_key END
+        `UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?, recurrence_touched = 1
          WHERE id = ? AND completed = ? AND deleted_at IS NULL`,
         [next, completedAtValue, now, current.id, previous],
       );
@@ -1548,13 +1557,10 @@ export async function bulkSetTodoCompletion(
         // safe no-op for that row.
         if (previous === completed) continue;
         // Same contract as setTodoCompletion: completion never invents an
-        // occurrence day, so an undated copy keeps a NULL key and rollover
-        // derives its handled day from completed_at.
+        // occurrence day and never adopts an edited due date as the original
+        // occurrence, so the stored key is left exactly as created.
         const result = await transactionDb.runAsync(
-          `UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?, recurrence_touched = 1,
-             recurrence_date_key = CASE
-               WHEN recurrence = 'daily' THEN COALESCE(recurrence_date_key, due_date)
-               ELSE recurrence_date_key END
+          `UPDATE todos SET completed = ?, completed_at = ?, updated_at = ?, recurrence_touched = 1
            WHERE id = ? AND completed = ? AND deleted_at IS NULL`,
           [completed, completed === 1 ? now : null, now, current.id, previous],
         );
@@ -1746,11 +1752,22 @@ async function removeTodoWithinTransaction(
   enqueue: (record: SyncRecord) => void,
   retractSpawn = false,
 ): Promise<boolean> {
+  // A tombstone answers for exactly one occurrence day, so deleting it sticks
+  // for that day. Two shapes have no ORIGINAL occurrence date to name and are
+  // stamped with THIS write's instant (the local day the user deleted on):
+  // a keyless row, and a row whose visible due date was cleared (a stale
+  // creation-day key would otherwise cover the wrong day and let the same-day
+  // rollover resurrect the row the user just deleted). A row that still carries
+  // an occurrence key keeps it, so a dated deletion covers its own date.
+  // Stamping at write time (rather than re-deriving a day from `deleted_at` at
+  // scan time) keeps the day stable across a later timezone change.
   const tombstone = await transactionDb.runAsync(
     `UPDATE todos SET deleted_at = ?, updated_at = ?,
        recurrence_touched = CASE WHEN ? THEN recurrence_touched ELSE 1 END,
-       recurrence_date_key = CASE WHEN recurrence = 'daily'
-         THEN COALESCE(recurrence_date_key, ?) ELSE recurrence_date_key END
+       recurrence_date_key = CASE
+         WHEN recurrence = 'daily'
+           AND (recurrence_date_key IS NULL OR due_date IS NULL) THEN ?
+         ELSE recurrence_date_key END
      WHERE id = ? AND deleted_at IS NULL`,
     [now, now, retractSpawn ? 1 : 0, toDateKey(new Date(now)), id],
   );

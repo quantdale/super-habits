@@ -494,8 +494,10 @@ describe('features/todos/todos.data', () => {
     expect(db.runAsync).toHaveBeenCalledWith(
       `UPDATE todos SET deleted_at = ?, updated_at = ?,
        recurrence_touched = CASE WHEN ? THEN recurrence_touched ELSE 1 END,
-       recurrence_date_key = CASE WHEN recurrence = 'daily'
-         THEN COALESCE(recurrence_date_key, ?) ELSE recurrence_date_key END
+       recurrence_date_key = CASE
+         WHEN recurrence = 'daily'
+           AND (recurrence_date_key IS NULL OR due_date IS NULL) THEN ?
+         ELSE recurrence_date_key END
      WHERE id = ? AND deleted_at IS NULL`,
       ['2026-04-16T10:00:00.000Z', '2026-04-16T10:00:00.000Z', 0, '2026-04-16', 'todo_1'],
     );
