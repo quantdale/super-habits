@@ -149,13 +149,47 @@ export function buildInitialHabitRule(
   return [createHabitRule(effectiveFromDate, weekdays, targetPerDay)];
 }
 
+function sameHabitSchedule(a: HabitRule, b: HabitRule): boolean {
+  return (
+    a.target_per_day === b.target_per_day &&
+    a.weekdays.length === b.weekdays.length &&
+    a.weekdays.every((weekday, index) => weekday === b.weekdays[index])
+  );
+}
+
+/**
+ * Insert or replace the rule effective on `nextRule.effective_from_date`.
+ *
+ * Only a real schedule/target change may append history. `updateHabit` runs on
+ * every edit (rename, category, colour, reminder, linked-action rule save) and
+ * derives the next rule from the CURRENT one, so a change that leaves the
+ * weekdays and target untouched used to append a byte-identical rule for the
+ * new date: pure history growth that eventually pushed `rule_history` past the
+ * 50,000-character recovery bound, making the habit exportable but not
+ * importable. A rule that says nothing new is therefore dropped instead of
+ * stored — `getHabitRuleForDate` resolves the same schedule either way, so no
+ * read behaviour changes.
+ */
 export function upsertHabitRule(history: HabitRuleHistoryInput, nextRule: HabitRule): HabitRule[] {
-  const next = parseHabitRuleHistory(history).filter(
-    (rule) => rule.effective_from_date !== nextRule.effective_from_date,
+  const parsed = parseHabitRuleHistory(history);
+  const next = parsed.filter((rule) => rule.effective_from_date !== nextRule.effective_from_date);
+  const candidate = createHabitRule(
+    nextRule.effective_from_date,
+    nextRule.weekdays,
+    nextRule.target_per_day,
   );
-  next.push(
-    createHabitRule(nextRule.effective_from_date, nextRule.weekdays, nextRule.target_per_day),
-  );
+  // The rule in effect immediately BEFORE the new effective date already
+  // covers every date the candidate would cover. Identical content therefore
+  // carries no information and must not enter the history. A candidate earlier
+  // than all recorded rules has no such predecessor (dropping it WOULD change
+  // which dates resolve to a rule), so it is always stored.
+  const previous = parsed
+    .filter((rule) => rule.effective_from_date < candidate.effective_from_date)
+    .at(-1);
+  if (previous && sameHabitSchedule(previous, candidate)) {
+    return next;
+  }
+  next.push(candidate);
   next.sort((a, b) => a.effective_from_date.localeCompare(b.effective_from_date));
   return next;
 }
