@@ -57,8 +57,16 @@ export const COMMAND_PROJECT_COLOR_HEX: Record<string, string> = {
   lime: '#84CC16',
 };
 
+const COMMAND_PROJECT_COLOR_NAMES = Object.keys(COMMAND_PROJECT_COLOR_HEX).join('|');
+/**
+ * A color is only a color when the sentence marks it as one: "in blue",
+ * "with emerald", "blue color". A bare color word belongs to the project NAME
+ * ("create project Red Team", "create project Blue Ocean"), and the previous
+ * match-anywhere regex deleted it — creating a project literally named
+ * "Team"/"Ocean" with an unrequested color.
+ */
 const COMMAND_PROJECT_COLOR_PATTERN = new RegExp(
-  `\\b(${Object.keys(COMMAND_PROJECT_COLOR_HEX).join('|')})\\b`,
+  `\\b(?:in|with)\\s+(${COMMAND_PROJECT_COLOR_NAMES})\\b|\\b(${COMMAND_PROJECT_COLOR_NAMES})\\s+colou?r\\b`,
   'i',
 );
 
@@ -290,11 +298,8 @@ function parseProjectCreation(input: ParseCommandInput): DraftCreateProject | nu
   const colorMatch = workingText.match(COMMAND_PROJECT_COLOR_PATTERN);
   let color: string | null = null;
   if (colorMatch) {
-    color = colorMatch[1].toLowerCase();
+    color = (colorMatch[1] ?? colorMatch[2]).toLowerCase();
     workingText = workingText.replace(colorMatch[0], ' ');
-    // Removing the color word can strand its leading preposition
-    // ("Apollo due 2026-05-01 in blue" → "Apollo in"); strip it.
-    workingText = workingText.replace(/\s+\b(?:in|with)\b\s*$/i, ' ');
   }
 
   const name = clean(workingText.replace(/[.,!?;:]+$/g, ''));

@@ -12,6 +12,14 @@ import type {
 import { parseV2CommandDraft } from './command.v2.domain';
 
 const SAFE_DATE_PATTERN = /\b\d{4}-\d{2}-\d{2}\b/;
+/**
+ * Bare `today`/`tomorrow` date tokens. The negative lookahead stops a possessive
+ * ("today's paper", "tomorrow's milk") from being read as a date: the bare word
+ * was stripped and the possessive suffix left behind, producing a Todo titled
+ * `buy 's paper`. Apostrophe variants are both excluded (U+0027 and U+2019).
+ */
+const TODAY_DATE_TOKEN = /\btoday(?!['’])\b/i;
+const TOMORROW_DATE_TOKEN = /\btomorrow(?!['’])\b/i;
 const TODO_TIME_PATTERN = /\bat\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)|\d{1,2}:\d{2})\b/i;
 const MULTI_ACTION_PATTERN =
   /\b(?:and|then|also)\b\s+(?:to\s+)?(?:add|create|make|remind|call|pay|send|email|text|buy|book|schedule|do|write|read|finish|complete|submit|review|clean|fix|update)\b|;\s*(?:add|create|make|remind|call|pay|send|email|text|buy|book|schedule|do|write|read|finish|complete|submit|review|clean|fix|update)\b/i;
@@ -91,7 +99,8 @@ function isClearlyTaskLikeINeedTo(remainder: string): boolean {
 
   const tokenCount = next.split(' ').filter(Boolean).length;
   if (tokenCount < 2) return false;
-  if (SAFE_DATE_PATTERN.test(next) || /\b(?:today|tomorrow)\b/i.test(next)) return true;
+  if (SAFE_DATE_PATTERN.test(next) || TODAY_DATE_TOKEN.test(next) || TOMORROW_DATE_TOKEN.test(next))
+    return true;
 
   return I_NEED_TO_TASK_VERB_PATTERN.test(next);
 }
@@ -212,12 +221,12 @@ function parseTodoDraft(input: ParseCommandInput): ParseCommandResult {
   const explicitDateMatch = workingText.match(SAFE_DATE_PATTERN);
   let dueDate: string | null = null;
 
-  if (/\btoday\b/i.test(workingText)) {
+  if (TODAY_DATE_TOKEN.test(workingText)) {
     dueDate = toDateKey(input.now);
-    workingText = normalizeWhitespace(workingText.replace(/\btoday\b/i, ' '));
-  } else if (/\btomorrow\b/i.test(workingText)) {
+    workingText = normalizeWhitespace(workingText.replace(TODAY_DATE_TOKEN, ' '));
+  } else if (TOMORROW_DATE_TOKEN.test(workingText)) {
     dueDate = getTomorrowDateKey(input.now);
-    workingText = normalizeWhitespace(workingText.replace(/\btomorrow\b/i, ' '));
+    workingText = normalizeWhitespace(workingText.replace(TOMORROW_DATE_TOKEN, ' '));
   } else if (explicitDateMatch) {
     dueDate = explicitDateMatch[0];
     workingText = normalizeWhitespace(workingText.replace(explicitDateMatch[0], ' '));
