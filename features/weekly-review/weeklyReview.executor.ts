@@ -9,7 +9,8 @@
  * same week, and skips creation when that Todo still exists non-deleted. So a
  * retry after a partial failure — or re-confirming an already-saved week —
  * never duplicates commitments. Reschedule/carry-forward decisions are
- * naturally idempotent (re-setting the same due date is a no-op).
+ * naturally idempotent (re-setting the same due date is a no-op), and skip a
+ * Todo that was completed or deleted after the summary captured it.
  *
  * Each Todo mutation still goes through canonical domain APIs (addTodo /
  * updateTodo) so that Linked Actions, recurrence, and sync semantics are
@@ -68,7 +69,14 @@ export async function executeWeeklyReview(input: {
 
   // One bounded read for existence checks; listTodos excludes soft-deleted rows,
   // so a deleted receipt target is correctly re-created rather than skipped.
-  const liveTodoIds = new Set((await listTodos()).map((t) => t.id));
+  const liveTodos = await listTodos();
+  const liveTodoIds = new Set(liveTodos.map((t) => t.id));
+  // Decisions were captured when the summary loaded; a task finished or
+  // deleted since then (notification action, another tab, a re-confirm of a
+  // saved week) is no longer a carry-forward candidate. Rewriting a COMPLETED
+  // task's due date would move its history into next week, and counting a
+  // deleted one as rescheduled is a false receipt.
+  const unfinishedTodoIds = new Set(liveTodos.filter((t) => !t.completed).map((t) => t.id));
 
   // 1. Create new Todo commitments through canonical API, skipping commitments
   // whose Todo already exists from an earlier attempt.
@@ -115,6 +123,7 @@ export async function executeWeeklyReview(input: {
 
   // 2. Apply Todo decisions
   for (const decision of draft.todoDecisions) {
+    if (decision.action !== 'leave' && !unfinishedTodoIds.has(decision.todoId)) continue;
     switch (decision.action) {
       case 'leave':
         // No mutation
