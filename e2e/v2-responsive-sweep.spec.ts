@@ -351,17 +351,40 @@ async function sampleMotion(
   return samples;
 }
 
-/** Summarise a sample series into the facts the reduced-motion contract needs. */
+/**
+ * Summarise a sample series into the facts the reduced-motion contract needs.
+ *
+ * `opacityRampMs` is how long the opacity itself takes to move: from the first
+ * sampled frame whose value differs from the previous frame to the last frame
+ * that changes. It deliberately is NOT "the timestamp of the last change": that
+ * number also contains the wall-clock latency between the sampler being armed
+ * and the section effect committing its first value (a React render plus an
+ * effect, on whatever CPU the runner happens to have). Measured on the shipped
+ * build here, the reduced-motion section switch always reports exactly TWO
+ * opacity values (0 -> 1, a snap), yet the old metric read ~80-110ms at full
+ * speed, ~510-570ms at 6x CPU throttling and ~1.7-2.5s at 20x — it was timing
+ * the scheduler, not motion. The CI failure at 139ms therefore described a
+ * transition that never had an intermediate frame at all.
+ */
 function summariseMotion(samples: MotionSample[]) {
   const opacities = Array.from(new Set(samples.map((sample) => sample.opacity.toFixed(3))));
   const transforms = Array.from(new Set(samples.map((sample) => sample.transform)));
-  // Last frame at which opacity still differed from the previous frame.
-  let opacitySettledAtMs = 0;
+  let firstChangeAtMs: number | null = null;
+  let lastChangeAtMs = 0;
   for (let index = 1; index < samples.length; index += 1) {
-    if (samples[index].opacity.toFixed(3) !== samples[index - 1].opacity.toFixed(3)) {
-      opacitySettledAtMs = samples[index].t;
-    }
+    if (samples[index].opacity.toFixed(3) === samples[index - 1].opacity.toFixed(3)) continue;
+    firstChangeAtMs ??= samples[index].t;
+    lastChangeAtMs = samples[index].t;
   }
+  const opacityRampMs = firstChangeAtMs === null ? 0 : lastChangeAtMs - firstChangeAtMs;
+  // Evidence only: frames the ramp really spent BETWEEN its two endpoints. A
+  // reduced-motion snap has none; a timed cross-fade has many.
+  const startOpacity = samples.length > 0 ? samples[0].opacity.toFixed(3) : '0.000';
+  const endOpacity = samples.length > 0 ? samples[samples.length - 1].opacity.toFixed(3) : '0.000';
+  const intermediateFrames = samples.filter((sample) => {
+    const value = sample.opacity.toFixed(3);
+    return value !== startOpacity && value !== endOpacity;
+  }).length;
   // Translation: any matrix with a non-zero x/y component. `none` and identity
   // matrices are "no translation".
   const translated = transforms.filter((transform) => {
@@ -372,7 +395,7 @@ function summariseMotion(samples: MotionSample[]) {
     const [x = 0, y = 0] = [parts[4] ?? 0, parts[5] ?? 0];
     return Math.abs(x) > 0.01 || Math.abs(y) > 0.01;
   });
-  return { opacities, transforms, translated, opacitySettledAtMs };
+  return { opacities, transforms, translated, opacityRampMs, intermediateFrames };
 }
 
 async function setTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
@@ -1104,9 +1127,17 @@ test.describe('V2 responsive sweep', () => {
         ).toBeGreaterThan(4);
 
         const motion = summariseMotion(samples);
+        // Non-vacuity for the ramp measurement: the incoming panel must really
+        // have finished its cross-fade in the sampled window. A sampler that
+        // missed the transition entirely (or a panel stuck below 1) would
+        // otherwise report a 0ms ramp for nothing at all.
+        expect(
+          samples[samples.length - 1]?.opacity,
+          `${width} ${key}: the incoming panel reached full opacity`,
+        ).toBeGreaterThanOrEqual(0.99);
         const evidence = `${width} ${key}: opacity ${motion.opacities.join(
           ' -> ',
-        )} over ${motion.opacitySettledAtMs}ms; transforms ${JSON.stringify(
+        )} over ${motion.opacityRampMs}ms (${motion.intermediateFrames} intermediate frames); transforms ${JSON.stringify(
           motion.transforms.slice(0, 6),
         )}`;
 
@@ -1116,7 +1147,7 @@ test.describe('V2 responsive sweep', () => {
         // §5.8: "Opacity cross-fade of 120ms only". One frame of slack
         // absorbs the sampling granularity (a 16ms frame quantum).
         expect(
-          motion.opacitySettledAtMs,
+          motion.opacityRampMs,
           `reduced-motion opacity may not ramp beyond 120ms — ${evidence}`,
         ).toBeLessThanOrEqual(120 + 16);
       }
