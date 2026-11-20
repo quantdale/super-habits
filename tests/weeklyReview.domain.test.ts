@@ -118,6 +118,32 @@ describe('validateNewCommitments', () => {
   });
 });
 
+describe('weekly review due dates must name a real calendar day', () => {
+  // The write path (`addTodo` / `updateTodo`) rejects an impossible key, so a
+  // shape-only check let the review reach Confirm, save, and silently drop the
+  // commitment as a failed outcome the user then had to recreate by hand.
+  it.each(['2026-02-30', '2026-13-01', '2026-04-31'])('rejects commitment due date %s', (key) => {
+    expect(
+      validateNewCommitments([{ id: '1', title: 'Test', dueDate: key, priority: 'normal' }]),
+    ).toEqual(['Commitment due date must be YYYY-MM-DD']);
+  });
+
+  it('rejects an impossible reschedule date', () => {
+    expect(
+      validateTodoDecisions([{ todoId: 't1', action: 'reschedule', dueDate: '2026-02-30' }]),
+    ).toEqual(['Invalid due date format for todo t1']);
+  });
+
+  it('accepts a leap day and a cleared commitment date', () => {
+    expect(
+      validateNewCommitments([
+        { id: '1', title: 'Leap', dueDate: '2028-02-29', priority: 'normal' },
+        { id: '2', title: 'Cleared', dueDate: '', priority: 'normal' },
+      ]),
+    ).toEqual([]);
+  });
+});
+
 describe('validateReflection', () => {
   it('passes with short text', () => {
     expect(validateReflection('Good week')).toHaveLength(0);

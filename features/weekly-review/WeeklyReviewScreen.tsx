@@ -1099,7 +1099,7 @@ function PlanStep({
                 }}
               >
                 <Text variant="caption" tone="muted" style={{ flex: 1 }}>
-                  Due {c.dueDate ?? nextWeekStartDateKey}
+                  Due {c.dueDate || nextWeekStartDateKey}
                 </Text>
                 {/* 44pt touch contract (W14-01); the visible label stays small. */}
                 <PlanningDisclosure
