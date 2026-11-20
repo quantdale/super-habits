@@ -388,6 +388,19 @@ test.describe('Pomodoro', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page.getByText('Focused 25 min')).toBeVisible();
     await expect(page.getByText('Session ended — nothing logged')).toHaveCount(0);
+    // The completion SUMMARY is painted from the pure plan before the durable
+    // write resolves (`applyCompletedFocusLog` is async), so on a slow runner the
+    // row can still be in flight when the summary appears. `queryRows` navigates
+    // to the DB harness page, which kills the in-flight write — that is exactly
+    // how this case used to log 0 rows after a visible "Focused 25 min". The
+    // post-completion note prompt is the app's own committed-row signal: it is
+    // only rendered for `result.inserted === true`, i.e. after
+    // `recordCompletedPomodoroSession` has written the focus row. Waiting for it
+    // therefore proves the session is durable WITHOUT asserting anything about
+    // navigation away from the app.
+    await expect(page.getByText('What did you focus on?').first()).toBeVisible({
+      timeout: 10_000,
+    });
     const rows = await queryRows(
       page,
       "SELECT COUNT(*) AS n FROM pomodoro_sessions WHERE session_type = 'focus'",
