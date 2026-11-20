@@ -279,6 +279,27 @@ function intRule(field: string, required: boolean, min: number): FieldRule {
   return required ? { required: check } : { required: () => null, optional: check };
 }
 
+/**
+ * Integer column bounded to the range its writer enforces. Import must not
+ * accept a value no writer can produce: `clampProgressPercent` (and
+ * `normalizeGoalProgress`) round and clamp a Goal's progress into 0–100, so a
+ * restored `progress_percent: 250` would render an impossible "Progress: 250%"
+ * in the Goal editor while Project rollups clamp it to 100% and the
+ * Overview/Progress "average goal progress" reports 250% — the display would
+ * disagree with every stored entry.
+ */
+function boundedIntRule(field: string, min: number, max: number): FieldRule {
+  return {
+    required: (row) =>
+      checkField(
+        row,
+        field,
+        (v) => Number.isInteger(v) && Number(v) >= min && Number(v) <= max,
+        field,
+      ),
+  };
+}
+
 function enumRule(field: string, allowed: readonly string[]): FieldRule {
   return {
     required: (row) => checkField(row, field, (v) => isEnum(v, allowed), field),
@@ -808,7 +829,7 @@ const GOAL_RULES: FieldRule[] = [
   enumRule('horizon', ['week', 'month', 'quarter', 'year', 'custom']),
   nullableDateKeyRule('target_date'),
   enumRule('status', ['active', 'paused', 'completed', 'archived']),
-  intRule('progress_percent', true, 0),
+  boundedIntRule('progress_percent', 0, 100),
   isoRule('created_at', true),
   isoRule('updated_at', true),
   nullableIsoRule('deleted_at'),
