@@ -16,6 +16,23 @@ import { toDateKey } from '@/lib/time';
 
 const DATE_PATTERN = /\b\d{4}-\d{2}-\d{2}\b/;
 const CALORIE_PATTERN = /(\d+(?:\.\d+)?)\s*(?:kcal|cal(?:ories)?|cals?)\b/i;
+
+/**
+ * Explicit create scaffolding ("add a todo to …", "remind me to …", "add a
+ * habit to …"). When the user has already named WHAT to create, the loose
+ * V2 content-signal parsers (calorie / focus), which match on content words
+ * ANYWHERE in the sentence, must not retarget the command. Without this the
+ * default local parser turned "add a todo to buy 500 kcal protein bars" into a
+ * ready calorie draft (food name "todo to buy bars") that wrote to the calorie
+ * ledger instead of creating the Todo.
+ */
+const EXPLICIT_CREATE_SCAFFOLDING_PATTERN =
+  /^(?:please\s+|kindly\s+)?(?:(?:can|could|would)\s+you\s+)?(?:i\s+need\s+to\s+)?(?:remind\s+me\s+to|add\s+(?:(?:a|an)\s+)?(?:todo|task|habit)|create\s+(?:(?:a|an)\s+)?(?:todo|task|habit)|make\s+(?:(?:a|an)\s+)?(?:todo|task|habit)|(?:todo|task|habit)\s*:)/i;
+
+function namesExplicitCreateTarget(text: string): boolean {
+  return EXPLICIT_CREATE_SCAFFOLDING_PATTERN.test(text.trim());
+}
+
 const MACRO_PATTERN =
   /(\d+(?:\.\d+)?)\s*(?:g|grams?)\s*(protein|carbs?|carbohydrates|fat|fats|fiber)\b/gi;
 
@@ -118,6 +135,9 @@ function parseHabitLog(input: ParseCommandInput): DraftLogHabit | null {
 
 function parseCalorieEntry(input: ParseCommandInput): DraftLogCalorieEntry | null {
   const text = input.rawText.trim();
+  // An explicit create request is never a calorie log, even when it mentions
+  // nutrition words ("add a todo to log my calories").
+  if (namesExplicitCreateTarget(text)) return null;
   if (!/\b(?:ate|had|add|log|record)\b/i.test(text)) return null;
   if (
     !CALORIE_PATTERN.test(text) &&
@@ -129,12 +149,24 @@ function parseCalorieEntry(input: ParseCommandInput): DraftLogCalorieEntry | nul
 
   const calorieMatch = text.match(CALORIE_PATTERN);
   const matchedCalories = calorieMatch ? Number(calorieMatch[1]) : null;
-  // Calories are whole numbers by contract (command.validation +
-  // realCommandParser). A fractional amount must not surface as a ready
-  // draft whose Confirm is guaranteed to be rejected — fall through to the
-  // missing-calories prompt so the user can enter a whole number.
+  // Thousands separators are NOT a numeric input here: "1,500 kcal" matched
+  // only the digits after the comma, so the draft was prefilled with 500 kcal
+  // (a silent 3x error) and the "1," was left inside the food name. There is
+  // no declared separator format (lib/numericInput accepts no separators), so
+  // the only safe answer is to ask for the calories instead of committing a
+  // number the user never typed. A fractional amount is rejected for the same
+  // reason (command.validation + realCommandParser are whole-number contracts:
+  // a ready draft whose Confirm is guaranteed to fail is not a valid draft).
+  const calorieMatchIndex = calorieMatch?.index ?? -1;
+  // Only the two characters before the matched run matter: a digit followed by
+  // a separator means the run is the tail of a larger literal.
+  const caloriePrefix =
+    calorieMatchIndex >= 0 ? text.slice(Math.max(0, calorieMatchIndex - 2), calorieMatchIndex) : '';
+  const caloriesWereSeparatorGrouped = /\d[\s.,']$/.test(caloriePrefix);
   const calories =
-    matchedCalories !== null && Number.isInteger(matchedCalories) ? matchedCalories : null;
+    matchedCalories !== null && Number.isInteger(matchedCalories) && !caloriesWereSeparatorGrouped
+      ? matchedCalories
+      : null;
   const macros: Record<'protein' | 'carbs' | 'fats' | 'fiber', number | null> = {
     protein: null,
     carbs: null,
@@ -219,6 +251,9 @@ function parseWorkoutLog(input: ParseCommandInput): DraftLogWorkoutRoutine | nul
 
 function parseFocusStart(input: ParseCommandInput): DraftStartFocusSession | null {
   const text = input.rawText.trim();
+  // "add a todo to start a 25 minute focus session" asks for a Todo about
+  // focus, not for the live timer to be driven.
+  if (namesExplicitCreateTarget(text)) return null;
   const hasExplicitStart = /\b(?:start|begin)\b/i.test(text) && /\bfocus\b/i.test(text);
   const hasFocusFor = /^\s*(?:please\s+)?focus\s+for\b/i.test(text);
   if (!hasExplicitStart && !hasFocusFor) return null;
@@ -300,6 +335,13 @@ function parseGoalProgressUpdate(input: ParseCommandInput): DraftUpdateGoalProgr
   });
 }
 
+/**
+ * A daily-plan insertion request ("add X to my plan today"). The plan
+ * destination is deliberately matched BEFORE the calorie parser: the calorie
+ * parser fires on any "add"/"log" plus a nutrition word, so a plan command that
+ * mentions calories ("add 500 kcal pasta to plan") was taken by it and became a
+ * ready calorie entry with the leftover scaffolding as its food name.
+ */
 function parseDailyPlanAddition(input: ParseCommandInput): DraftAddTodoToDailyPlan | null {
   const text = input.rawText.trim();
   const match = text.match(
@@ -336,6 +378,7 @@ export function parseV2CommandDraft(input: ParseCommandInput): ParseCommandResul
 
   const parsed =
     parseFocusStart(input) ??
+    parseDailyPlanAddition(input) ??
     parseCalorieEntry(input) ??
     parseWorkoutLog(input) ??
     parseTodoCompletion(input) ??
