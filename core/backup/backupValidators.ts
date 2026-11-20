@@ -103,6 +103,19 @@ function isBoundedString(value: unknown, key: string, maxLength?: number): boole
   return value.length <= limit;
 }
 
+/**
+ * Fold only ASCII letters, exactly like SQLite's `COLLATE NOCASE`.
+ *
+ * SQLite's NOCASE is an ASCII-only case fold by definition: `'É'` and `'é'`,
+ * or `'K'` (Kelvin sign) and `'k'`, compare as DIFFERENT values there. Both
+ * copies of the `saved_meals` uniqueness rule (the `idx_saved_meals_food_name`
+ * UNIQUE index and this backup-graph check) must agree, or a device can refuse
+ * to restore a catalog its own writer created.
+ */
+function foldAsciiCase(value: string): string {
+  return value.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+}
+
 /** Normalize rule_history JSON: array of effective-dated rules. */
 export function parseHabitRuleHistoryJson(
   value: unknown,
@@ -920,11 +933,15 @@ export function validateBackupGraph(
     }
   }
 
-  // Saved meals: case-insensitive unique food_name.
+  // Saved meals: unique food_name under the SAME rule the database enforces
+  // (`idx_saved_meals_food_name` is `COLLATE NOCASE`, which folds ASCII
+  // letters only). A Unicode-aware/locale-aware fold here would declare
+  // writer-legal pairs like "Éclair" / "éclair" duplicates, so the app could
+  // refuse to restore its own export. `foldAsciiCase` mirrors NOCASE exactly.
   const mealNames = new Map<string, string>();
   for (const row of rowsByEntity.saved_meals ?? []) {
     if (typeof row.food_name === 'string') {
-      const normalized = row.food_name.toLocaleLowerCase();
+      const normalized = foldAsciiCase(row.food_name);
       const existing = mealNames.get(normalized);
       if (existing !== undefined) {
         errors.push(`saved_meals duplicate food_name: "${existing}" / "${row.food_name}"`);
