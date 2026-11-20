@@ -208,6 +208,13 @@ export function createEmptyLinkedActionEditorRow(
 /** Effects that create a fresh row instead of targeting an existing item. */
 const PRODUCE_NEW_EFFECT_TYPES: readonly LinkedActionEffectType[] = ['calorie.log', 'pomodoro.log'];
 
+/**
+ * Highest kcal a `calorie.log` template may carry. Exactly the ledger's
+ * limit (`validateCalorieComputedKcal` → "Calories cannot exceed 9999 kcal.");
+ * a higher template would author a rule that can never execute.
+ */
+const MAX_LINKED_ACTION_CALORIE_KCAL = 9999;
+
 export function isProduceNewLinkedActionEffect(effectType: LinkedActionEffectType | null) {
   return effectType !== null && PRODUCE_NEW_EFFECT_TYPES.includes(effectType);
 }
@@ -319,12 +326,17 @@ function buildLinkedActionRuleTargetFromEditorRow(
       throw new Error('Add the calorie entry template before saving this linked action.');
     }
     const foodName = params.foodName.trim();
-    const calories = parseIntegerInRange(params.calories, 1, 10000);
+    // The ledger's whole-kcal contract caps at 9999
+    // (`validateCalorieComputedKcal`). Accepting 10000 here produced a rule
+    // that saves as valid and then fails on every execution.
+    const calories = parseIntegerInRange(params.calories, 1, MAX_LINKED_ACTION_CALORIE_KCAL);
     if (!foodName || foodName.length > 120) {
       throw new Error('Add a food name (max 120 characters) for the calorie entry.');
     }
     if (calories === null) {
-      throw new Error('Enter calories as a whole number between 1 and 10000.');
+      throw new Error(
+        `Enter calories as a whole number between 1 and ${MAX_LINKED_ACTION_CALORIE_KCAL}.`,
+      );
     }
     return {
       feature: row.targetFeature,
@@ -516,9 +528,9 @@ export function validateLinkedActionEditorRow(
       !params ||
       !/^\d+$/.test(params.calories.trim()) ||
       Number(params.calories.trim()) < 1 ||
-      Number(params.calories.trim()) > 10000
+      Number(params.calories.trim()) > MAX_LINKED_ACTION_CALORIE_KCAL
     ) {
-      errors.calorieParams = 'Enter calories as a whole number between 1 and 10000.';
+      errors.calorieParams = `Enter calories as a whole number between 1 and ${MAX_LINKED_ACTION_CALORIE_KCAL}.`;
     }
   }
   if (row.effectType === 'pomodoro.log') {

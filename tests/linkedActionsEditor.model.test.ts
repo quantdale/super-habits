@@ -677,7 +677,38 @@ describe('linkedActionsEditor.model', () => {
         ...row,
         calorieLogParams: { foodName: 'X', calories: '0', mealType: 'snack' },
       }).calorieParams,
-    ).toBe('Enter calories as a whole number between 1 and 10000.');
+    ).toBe('Enter calories as a whole number between 1 and 9999.');
+  });
+
+  it('bounds the calorie template by the ledger limit, not an off-by-one over it', () => {
+    const empty = createEmptyLinkedActionEditorRow({
+      key: 'todo_1',
+      feature: 'todos',
+      entityType: 'todo',
+      entityId: 'todo_1',
+      label: 'Task',
+      description: '',
+    });
+    let row = applyLinkedActionTargetFeature(
+      { ...empty, triggerType: 'todo.completed' },
+      'calories',
+    );
+    row = applyLinkedActionEffectType(row, 'calorie.log');
+    const withCalories = (calories: string) => ({
+      ...row,
+      calorieLogParams: { foodName: 'Post-run smoothie', calories, mealType: 'snack' as const },
+    });
+
+    // 9999 is the highest kcal `assertCalorieEntryWrite` accepts, so a template
+    // at that value must author cleanly...
+    expect(validateLinkedActionEditorRow(withCalories('9999'))).toEqual({});
+    // ...while 10000 would author a rule every execution rejects.
+    expect(validateLinkedActionEditorRow(withCalories('10000'))).toEqual({
+      calorieParams: 'Enter calories as a whole number between 1 and 9999.',
+    });
+    expect(() => createSaveLinkedActionRuleInputFromEditorRow(withCalories('10000'))).toThrow(
+      'Enter calories as a whole number between 1 and 9999.',
+    );
   });
 
   it('hydrates a persisted pomodoro.log rule without flagging it orphaned', () => {
