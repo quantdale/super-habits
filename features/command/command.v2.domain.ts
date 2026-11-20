@@ -335,6 +335,13 @@ function parseGoalProgressUpdate(input: ParseCommandInput): DraftUpdateGoalProgr
   });
 }
 
+/**
+ * A daily-plan insertion request ("add X to my plan today"). The plan
+ * destination is deliberately matched BEFORE the calorie parser: the calorie
+ * parser fires on any "add"/"log" plus a nutrition word, so a plan command that
+ * mentions calories ("add 500 kcal pasta to plan") was taken by it and became a
+ * ready calorie entry with the leftover scaffolding as its food name.
+ */
 function parseDailyPlanAddition(input: ParseCommandInput): DraftAddTodoToDailyPlan | null {
   const text = input.rawText.trim();
   const match = text.match(
@@ -371,6 +378,7 @@ export function parseV2CommandDraft(input: ParseCommandInput): ParseCommandResul
 
   const parsed =
     parseFocusStart(input) ??
+    parseDailyPlanAddition(input) ??
     parseCalorieEntry(input) ??
     parseWorkoutLog(input) ??
     parseTodoCompletion(input) ??
