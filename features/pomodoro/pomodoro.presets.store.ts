@@ -9,6 +9,7 @@ import {
 import {
   getPomodoroPresetsState as readPresetsState,
   hasStoredPomodoroPresetsState,
+  runPomodoroPresetStateTurn,
   writePomodoroPresetsState,
   type PomodoroPresetsState,
 } from './pomodoro.data';
@@ -44,6 +45,46 @@ async function removeLegacyKeys(): Promise<void> {
  * after a successful import so subsequent launches skip straight to app_meta.
  */
 export async function importLegacyPresetsIfNeeded(): Promise<void> {
+  // The import is itself a read-modify-write of `pomodoro_presets` (check for
+  // stored state, otherwise read the legacy keys and write the imported set),
+  // so it takes the same turn as every other writer of that record.
+  await runPomodoroPresetStateTurn(importLegacyPresetsInOwnedTurn);
+}
+
+export async function getPomodoroPresets(): Promise<PomodoroPreset[]> {
+  await importLegacyPresetsIfNeeded();
+  return (await readPresetsState()).presets;
+}
+
+export async function getPomodoroPresetsState(): Promise<PomodoroPresetsState> {
+  await importLegacyPresetsIfNeeded();
+  return readPresetsState();
+}
+
+/**
+ * The boundary lives in the data layer (`runPomodoroPresetStateTurn`) because
+ * `savePomodoroSettings` reconciles the stored selection from INSIDE its
+ * settings transaction: the duration save and the store writers are writers of
+ * the same record on different surfaces. `withSQLiteWriter` alone serialized
+ * their writes, so a list save that read `activePresetId` before the detach
+ * committed wrote the stale selection back — a preset the clock no longer ran,
+ * still highlighted, still imposing its auto-start flags.
+ *
+ * Every writer below therefore reads and writes inside ONE turn
+ * (`runPomodoroPresetStateTurn`), never a bare read followed by a later write.
+ */
+
+/** Reads the current state; caller must already own a preset-state turn. */
+async function withIdlePresetState(): Promise<PomodoroPresetsState> {
+  // Caller already owns a preset-state turn: run the import inline, because
+  // awaiting `importLegacyPresetsIfNeeded` (which takes its own turn) here
+  // would deadlock the chain against itself.
+  await importLegacyPresetsInOwnedTurn();
+  return readPresetsState();
+}
+
+/** Performs the one-time import; the caller already owns a preset-state turn. */
+async function importLegacyPresetsInOwnedTurn(): Promise<void> {
   if (await hasStoredPomodoroPresetsState()) {
     await removeLegacyKeys();
     return;
@@ -74,51 +115,9 @@ export async function importLegacyPresetsIfNeeded(): Promise<void> {
   await removeLegacyKeys();
 }
 
-export async function getPomodoroPresets(): Promise<PomodoroPreset[]> {
-  await importLegacyPresetsIfNeeded();
-  return (await readPresetsState()).presets;
-}
-
-export async function getPomodoroPresetsState(): Promise<PomodoroPresetsState> {
-  await importLegacyPresetsIfNeeded();
-  return readPresetsState();
-}
-
-/**
- * Serialized turn over the preset state.
- *
- * `app_meta.pomodoro_presets` is a read-modify-write key with THREE writers on
- * independent surfaces: the manager replaces the list
- * (`savePomodoroPresets`), the picker sets the selection
- * (`setActivePresetId`), and manual duration edits detach it
- * (`clearActivePresetId`). Unsynchronized, the late writer restored the state it
- * had read BEFORE the other write landed — a preset created in the manager
- * vanished when the picker's selection resolved second, and a selection was
- * lost when the list write resolved second. Both are durable preferences carried
- * by the recoverable-settings backup, so a lost write is a lost setting.
- *
- * Each writer therefore reads the stored state and writes the merged result
- * inside ONE turn, so the second write always sees the first one's outcome.
- */
-let presetStateChain: Promise<void> = Promise.resolve();
-
-function runPresetStateTurn<T>(task: () => Promise<T>): Promise<T> {
-  const run = presetStateChain.then(task);
-  presetStateChain = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  return run;
-}
-
-async function withIdlePresetState(): Promise<PomodoroPresetsState> {
-  await importLegacyPresetsIfNeeded();
-  return readPresetsState();
-}
-
 /** Persists the normalized preset list, preserving a still-valid selection. */
 export async function savePomodoroPresets(presets: PomodoroPreset[]): Promise<void> {
-  return runPresetStateTurn(async () => {
+  return runPomodoroPresetStateTurn(async () => {
     const prev = await withIdlePresetState();
     await writePomodoroPresetsState({
       presets: normalizePomodoroPresets(presets),
@@ -132,7 +131,7 @@ export async function savePomodoroPresets(presets: PomodoroPreset[]): Promise<vo
 
 /** Stores the active preset id after validating it against the stored preset list. */
 export async function setActivePresetId(id: string): Promise<void> {
-  return runPresetStateTurn(async () => {
+  return runPomodoroPresetStateTurn(async () => {
     const state = await withIdlePresetState();
     const resolved = findPresetById(state.presets, id)?.id ?? null;
     if (!resolved || resolved === state.activePresetId) return;
@@ -142,7 +141,7 @@ export async function setActivePresetId(id: string): Promise<void> {
 
 /** Clears the stored selection (e.g. after manual duration edits). */
 export async function clearActivePresetId(): Promise<void> {
-  return runPresetStateTurn(async () => {
+  return runPomodoroPresetStateTurn(async () => {
     const state = await withIdlePresetState();
     if (state.activePresetId === null) return;
     await writePomodoroPresetsState({ ...state, activePresetId: null });

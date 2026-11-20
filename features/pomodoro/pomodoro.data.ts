@@ -176,13 +176,19 @@ export async function getPomodoroSettings(): Promise<PomodoroSettings> {
 export async function savePomodoroSettings(settings: PomodoroSettings): Promise<void> {
   const db = await getDatabase();
   const normalized = normalizePomodoroSettings(settings);
-  const result = await runRecoverableSettingsMutation({
-    db,
-    mutate: async (transactionDb) => {
-      await setAppMetaJson(transactionDb, appMetaKeys.pomodoroSettings, normalized);
-      await detachStalePresetSelection(transactionDb, normalized);
-    },
-  });
+  // The durations AND the selection reconciliation form one read-modify-write
+  // over `pomodoro_presets`, so they hold the same turn as the preset store's
+  // writers (see `runPomodoroPresetStateTurn`): a list save that read the
+  // pre-detach state can never write its stale selection back afterwards.
+  const result = await runPomodoroPresetStateTurn(() =>
+    runRecoverableSettingsMutation({
+      db,
+      mutate: async (transactionDb) => {
+        await setAppMetaJson(transactionDb, appMetaKeys.pomodoroSettings, normalized);
+        await detachStalePresetSelection(transactionDb, normalized);
+      },
+    }),
+  );
   if (!result.backupEnqueued) {
     console.warn('[backup] pomodoro settings saved locally; settings intent not recorded');
   }
@@ -206,8 +212,10 @@ function presetDurationsMatch(preset: PomodoroPreset, settings: PomodoroSettings
  * timer, and the next completion starts an unrequested break. Both titles
  * persist `pomodoro_presets`, and the recoverable-settings payload carries the
  * pair, so the two facts have to be reconciled in the SAME transaction as the
- * duration write. Runs inside the caller's transaction (the JSON helpers take
- * the scoped handle and re-enter the serialized writer).
+ * duration write (and, because the preset store's writers merge from a state
+ * they read first, under the same preset-state turn). Runs inside the caller's
+ * transaction (the JSON helpers take the scoped handle and re-enter the
+ * serialized writer).
  */
 async function detachStalePresetSelection(
   transactionDb: SQLite.SQLiteDatabase,
@@ -737,6 +745,36 @@ export type PomodoroPresetsState = {
   presets: PomodoroPreset[];
   activePresetId: string | null;
 };
+
+/**
+ * Serialized turn over the durable preset state (`app_meta.pomodoro_presets`).
+ *
+ * The key is a read-modify-write record with FOUR writers on independent
+ * surfaces: the manager replaces the list (`savePomodoroPresets`), the picker
+ * sets the selection (`setActivePresetId`), manual duration edits detach it
+ * (`clearActivePresetId` / the legacy-import write in the presets store), and
+ * `savePomodoroSettings` detaches a selection its new durations no longer
+ * match — that detach runs INSIDE its settings transaction, which knows
+ * nothing about the store's turn.
+ *
+ * `withSQLiteWriter` serializes the WRITE turns but not the READS that feed
+ * them, so a list save that reads `activePresetId = 'deep'` before a duration
+ * save commits its detach wrote the stale selection back afterwards: the
+ * picker highlighted a preset the clock no longer ran, and the next
+ * completion followed that preset's auto-start flags (an unrequested break).
+ * The duration save therefore joins this SAME boundary, so every writer's
+ * read-modify-write turn sees the outcome of the turn before it.
+ */
+let pomodoroPresetStateChain: Promise<void> = Promise.resolve();
+
+export function runPomodoroPresetStateTurn<T>(task: () => Promise<T>): Promise<T> {
+  const run = pomodoroPresetStateChain.then(task);
+  pomodoroPresetStateChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
 
 /** Same normalize-on-read contract as the recoverable-settings payload. */
 export function normalizePomodoroPresetsState(value: unknown): PomodoroPresetsState | null {
