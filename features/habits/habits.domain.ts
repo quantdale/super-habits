@@ -265,7 +265,8 @@ export function serializeHabitLifecycleHistory(value: HabitLifecycleHistoryInput
  * - Returning to active closes the open interval the day BEFORE `dateKey`: the
  *   habit resumes on `dateKey` inclusive, so that day is scheduled and
  *   actionable again. A same-day pause + resume closes an empty interval and
- *   therefore leaves none behind.
+ *   therefore leaves none behind. A pause closed on the day an archive
+ *   opened also releases that boundary if the archive is undone that day.
  * Idempotent: re-entering the current state leaves the history unchanged.
  */
 export function applyHabitLifecycleTransition(
@@ -277,8 +278,16 @@ export function applyHabitLifecycleTransition(
 
   if (nextStatus === 'active') {
     const lastCoveredDateKey = addLocalDays(dateKey, -1);
+    const switchesStatusToday = intervals.some(
+      (interval) => interval.from_date_key === dateKey && interval.to_date_key === null,
+    );
     return intervals.flatMap((interval) => {
-      if (interval.to_date_key !== null) return [interval];
+      if (
+        interval.to_date_key !== null &&
+        !(switchesStatusToday && interval.to_date_key === dateKey)
+      ) {
+        return [interval];
+      }
       // Masking uses inclusive bounds, so closing earlier leaves the resume day
       // actionable; an interval that closes before it opens covered no day.
       return lastCoveredDateKey < interval.from_date_key
@@ -462,11 +471,13 @@ export function formatHabitSchedule(weekdays: readonly number[]): string {
 }
 
 function buildDateKeysBetween(startDateKey: string, endDateKey: string): string[] {
-  if (startDateKey > endDateKey) return [];
+  if (!isDateKey(endDateKey) || startDateKey > endDateKey) return [];
   const result: string[] = [];
   const cursor = dateKeyToLocalDate(startDateKey);
   const end = dateKeyToLocalDate(endDateKey);
-  while (cursor <= end) {
+  // A skipped midnight can leave the cursor at 01:00 on later days. Include
+  // the final local date even when the cursor is past its start of day.
+  while (cursor <= end || toDateKey(cursor) === endDateKey) {
     result.push(toDateKey(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }

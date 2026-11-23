@@ -11,11 +11,18 @@ import type {
   LinkedActionEffectAdapterResult,
   LinkedActionProcessResult,
   LinkedActionRuleDefinition,
+  LinkedActionSourceActionInput,
   SaveLinkedActionRuleForSourceInput,
 } from '@/core/linked-actions/linkedActions.types';
 import { createId } from '@/lib/id';
 import { assertHabitWrite } from '@/lib/validation';
-import { addLocalDays, nowIso, timestampToLocalDateKey, toDateKey } from '@/lib/time';
+import {
+  addLocalDays,
+  DATE_KEY_PATTERN,
+  nowIso,
+  timestampToLocalDateKey,
+  toDateKey,
+} from '@/lib/time';
 import { runBackupMutation, runSyncedMutation } from '@/core/sync/syncedMutation';
 import {
   buildTransactionalSourceEvent,
@@ -178,74 +185,50 @@ export async function incrementHabit(
 ): Promise<IncrementHabitResult> {
   const db = await getDatabase();
   const now = nowIso();
-  const habit = await db.getFirstAsync<{
-    name: string;
-    target_per_day: number;
-    created_at: string;
-    rule_history: string | null;
-    status: string | null;
-    lifecycle_history: string | null;
-  }>(
-    `SELECT name, target_per_day, created_at, rule_history, status, lifecycle_history
-     FROM habits
-     WHERE id = ?
-       AND deleted_at IS NULL`,
-    [habitId],
-  );
-
-  // Guard before writing: a missing/soft-deleted habit must not accrete
-  // orphan completion rows.
-  if (!habit) {
-    return {
-      count: 0,
-      linkedActions: EMPTY_LINKED_ACTIONS_RESULT,
-    };
-  }
-
-  const creationDateKey = safeTimestampToLocalDateKey(habit.created_at);
-  // Lifecycle/schedule write gate (spec: historical edits obey lifecycle and
-  // schedule history): a paused/archived habit, or a date that is unscheduled,
-  // pre-creation/pre-effective, or inside a paused/archived interval, accepts
-  // no completion writes.
-  if (
-    (habit.status ?? 'active') !== 'active' ||
-    !isHabitActionableOn(
-      habit.rule_history,
-      dateKey,
-      habit.target_per_day,
-      creationDateKey,
-      habit.lifecycle_history,
-    )
-  ) {
-    return {
-      count: 0,
-      linkedActions: EMPTY_LINKED_ACTIONS_RESULT,
-    };
-  }
-
-  const targetPerDay = getHabitTargetForDate(
-    parseHabitRuleHistory(habit.rule_history),
-    dateKey,
-    habit.target_per_day,
-    creationDateKey,
-  );
-
-  // Durable dispatch handoff (same contract as setTodoCompletion): the event
-  // id is pre-minted so the source event row can be persisted inside the
-  // completion's transaction when the threshold crossing happens.
-  const linkedEventId = createId('levt');
-
-  // Atomic upsert inside a transaction with a durable backup intent: two
-  // rapid taps previously either raced the UNIQUE(habit_id, date_key)
-  // constraint (crash) or lost an increment. The outbox record carries the
-  // actual row id returned by the upsert (which may predate this tap).
+  type ThresholdEvent = LinkedActionSourceActionInput & { eventId: string };
   type IncrementOutcome = {
-    completionId: string | null;
+    sourceEvent: ThresholdEvent | null;
     count: number;
   };
+  const refused = { changed: false, value: { sourceEvent: null, count: 0 } };
   const outcome = await runBackupMutation<IncrementOutcome>({
     db,
     mutate: async (transactionDb, enqueue) => {
+      // Resolve the lifecycle and target under the same writer lock as the
+      // count, so an edit or archive that commits first governs this tap.
+      const habit = await transactionDb.getFirstAsync<{
+        name: string;
+        target_per_day: number;
+        created_at: string;
+        rule_history: string | null;
+        status: string | null;
+        lifecycle_history: string | null;
+      }>(
+        `SELECT name, target_per_day, created_at, rule_history, status, lifecycle_history
+         FROM habits
+         WHERE id = ?
+           AND deleted_at IS NULL`,
+        [habitId],
+      );
+      if (!habit || (habit.status ?? 'active') !== 'active') return refused;
+      const creationDateKey = safeTimestampToLocalDateKey(habit.created_at);
+      if (
+        !isHabitActionableOn(
+          habit.rule_history,
+          dateKey,
+          habit.target_per_day,
+          creationDateKey,
+          habit.lifecycle_history,
+        )
+      ) {
+        return refused;
+      }
+      const targetPerDay = getHabitTargetForDate(
+        habit.rule_history,
+        dateKey,
+        habit.target_per_day,
+        creationDateKey,
+      );
       const row = await transactionDb.getFirstAsync<{ id: string; count: number }>(
         `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
          VALUES (?, ?, ?, 1, ?, ?)
@@ -255,9 +238,7 @@ export async function incrementHabit(
          RETURNING id, count`,
         [createId('hcmp'), habitId, dateKey, now, now],
       );
-      if (!row) {
-        return { changed: false, value: { completionId: null, count: 0 } };
-      }
+      if (!row) return refused;
       enqueue({
         entity: 'habit_completions',
         id: row.id,
@@ -265,82 +246,56 @@ export async function incrementHabit(
         operation: 'create',
       });
       // Durable dispatch handoff: when this increment crosses the day's
-      // target, persist the source event in the SAME transaction as the
-      // completion write, then dispatch after commit with the same event id.
-      // A crash between the two durable boundaries leaves the event row on
-      // disk for the startup recovery sweep.
+      // target, persist the event with the completion. Dispatch the same
+      // event after commit, or recover it from the ledger on startup.
+      let sourceEvent: ThresholdEvent | null = null;
       if (row.count >= targetPerDay && row.count - 1 < targetPerDay) {
+        sourceEvent = {
+          eventId: createId('levt'),
+          occurredAt: now,
+          feature: 'habits',
+          entityType: 'habit',
+          entityId: habitId,
+          triggerType: 'habit.completed_for_day',
+          label: habit.name,
+          sourceDateKey: dateKey,
+          sourceRecordId: row.id,
+          origin: {
+            originKind: 'user',
+            originRuleId: null,
+            originEventId: null,
+          },
+          payload: {
+            previousCount: row.count - 1,
+            currentCount: row.count,
+            targetPerDay,
+          },
+        };
         await insertLinkedActionEventInTransaction(
           transactionDb,
-          buildTransactionalSourceEvent({
-            eventId: linkedEventId,
-            occurredAt: now,
-            feature: 'habits',
-            entityType: 'habit',
-            entityId: habitId,
-            triggerType: 'habit.completed_for_day',
-            label: habit.name,
-            sourceDateKey: dateKey,
-            sourceRecordId: row.id,
-            origin: {
-              originKind: 'user',
-              originRuleId: null,
-              originEventId: null,
-            },
-            payload: {
-              previousCount: row.count - 1,
-              currentCount: row.count,
-              targetPerDay,
-            },
-          }),
+          buildTransactionalSourceEvent(sourceEvent),
           now,
         );
       }
-      return { changed: true, value: { completionId: row.id, count: row.count } };
+      return { changed: true, value: { sourceEvent, count: row.count } };
     },
   });
-  requestHabitReminderReconciliation();
-
-  const nextCount = outcome.value.count;
-  const previousCount = nextCount - 1;
-  const completionId = outcome.value.completionId;
-
-  if (previousCount >= targetPerDay || nextCount < targetPerDay) {
+  if (outcome.changed) requestHabitReminderReconciliation();
+  const { count, sourceEvent } = outcome.value;
+  if (!sourceEvent) {
     return {
-      count: nextCount,
+      count,
       linkedActions: EMPTY_LINKED_ACTIONS_RESULT,
     };
   }
 
-  const processResult = await linkedActionsEngine.processSourceAction({
-    eventId: linkedEventId,
-    occurredAt: now,
-    feature: 'habits',
-    entityType: 'habit',
-    entityId: habitId,
-    triggerType: 'habit.completed_for_day',
-    label: habit.name,
-    sourceDateKey: dateKey,
-    sourceRecordId: completionId,
-    origin: {
-      originKind: 'user',
-      originRuleId: null,
-      originEventId: null,
-    },
-    payload: {
-      previousCount,
-      currentCount: nextCount,
-      targetPerDay,
-    },
-  });
-  const linkedActions: LinkedActionsDispatchResult = {
-    matchedRuleCount: processResult.matchedRuleCount,
-    notices: processResult.notices,
-  };
-
+  const processResult = await linkedActionsEngine.processSourceAction(sourceEvent);
   return {
-    count: nextCount,
-    linkedActions,
+    count,
+    linkedActions: {
+      matchedRuleCount: processResult.matchedRuleCount,
+      notices: processResult.notices,
+    },
   };
 }
 
@@ -1069,13 +1024,19 @@ async function applyHabitUpdateWithinTransaction(
   );
   if (!existing) return false;
 
-  const effectiveFromDate = updates.effectiveFromDate ?? timestampToLocalDateKey(now);
+  const requestedDate = updates.effectiveFromDate ?? timestampToLocalDateKey(now);
+  if (!DATE_KEY_PATTERN.test(requestedDate)) {
+    throw new Error(`Invalid habit rule effective date: ${requestedDate}`);
+  }
   const fallbackCreationDate = safeTimestampToLocalDateKey(existing.created_at);
   const history = parseHabitRuleHistory(existing.rule_history);
   const normalizedHistory =
     history.length > 0
       ? history
       : buildInitialHabitRule(fallbackCreationDate, existing.target_per_day);
+  // A clock rewind must not extend the history before its first occurrence.
+  const firstEffectiveDate = normalizedHistory[0].effective_from_date;
+  const effectiveFromDate = requestedDate < firstEffectiveDate ? firstEffectiveDate : requestedDate;
   const currentRule = getHabitRuleForDate(
     normalizedHistory,
     effectiveFromDate,

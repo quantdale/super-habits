@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { addLocalDays, toDateKey } from '@/lib/time';
 import { freshDatabase, type TestDatabase } from './helpers/db';
 
@@ -11,6 +11,7 @@ describe('habit lifecycle and linked rules (real SQLite)', () => {
   let db: TestDatabase;
 
   afterEach(async () => {
+    vi.useRealTimers();
     await db?.closeAsync();
   });
 
@@ -61,6 +62,26 @@ describe('habit lifecycle and linked rules (real SQLite)', () => {
     await expect(habits.incrementHabit(habitId, yesterdayKey)).resolves.toMatchObject({
       count: 0,
     });
+  });
+
+  it('reopens today when a paused habit is archived and restored on the same day', async () => {
+    db = await freshDatabase();
+    const habits = await import('@/features/habits/habits.data');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 7, 1, 12));
+    const habitId = await habits.addHabit('Read 20 pages', 1);
+    expect(await habits.pauseHabit(habitId)).toBe(true);
+
+    vi.setSystemTime(new Date(2026, 7, 3, 12));
+    expect(await habits.archiveHabit(habitId)).toBe(true);
+    expect(await habits.unarchiveHabit(habitId)).toBe(true);
+
+    expect(await habits.listHabits()).toMatchObject([{ id: habitId, status: 'active' }]);
+    await expect(habits.incrementHabit(habitId)).resolves.toMatchObject({ count: 1 });
+    await expect(habits.incrementHabit(habitId, '2026-08-02')).resolves.toMatchObject({ count: 0 });
+    expect(await habits.getCompletionHistory(habitId)).toMatchObject([
+      { date_key: '2026-08-03', count: 1 },
+    ]);
   });
 
   it('saves, lists, and clears habit linked-action rules durably', async () => {

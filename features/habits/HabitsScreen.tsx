@@ -62,6 +62,7 @@ import {
   getHabitSchedulePreset,
   habitCreationDateKey,
   normalizeHabitWeekdays,
+  parseHabitRuleHistory,
   shouldAwardHabitFastPath,
   sortHabits,
   type HabitSchedulePreset,
@@ -154,6 +155,7 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const { tokens, sectionAccents } = useAppTheme();
   const { consumePendingHabitFocus } = useAppNavigation();
   const dayGeneration = useDayRolloverGeneration();
+  const todayKey = toDateKey();
   const { showNotice } = useInAppNotices();
   const { recordAction } = useGamification();
   const { confirm, confirmationDialog } = useConfirmationDialog();
@@ -166,21 +168,18 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
   const [countsByHabitDate, setCountsByHabitDate] = useState<
     Record<string, Record<string, number>>
   >({});
-  const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKey());
-  // D9b (the Calories day-selection contract): a selection that pointed at
-  // "today" follows the new day so check-ins never keep targeting yesterday
-  // after midnight; an explicitly selected past day (backfilling) stays put.
-  const [followsToday, setFollowsToday] = useState(true);
+  const [pinnedDateKey, setPinnedDateKey] = useState<string | null>(null);
+  // Keep an explicit past-day selection while it is still in the past.
+  const selectedDateKey = pinnedDateKey && pinnedDateKey < todayKey ? pinnedDateKey : todayKey;
   const handleSelectDate = useCallback((dateKey: string) => {
-    setFollowsToday(dateKey === toDateKey());
-    setSelectedDateKey(dateKey);
+    setPinnedDateKey(dateKey < toDateKey() ? dateKey : null);
   }, []);
-  // Day rollover: the strip selection is captured at mount, so without this
-  // snap the ring/check-ins would keep targeting yesterday after midnight.
   useEffect(() => {
-    if (!followsToday) return;
-    queueMicrotask(() => setSelectedDateKey(toDateKey()));
-  }, [dayGeneration, followsToday]);
+    if (!pinnedDateKey || pinnedDateKey < todayKey) return;
+    queueMicrotask(() =>
+      setPinnedDateKey((current) => (current === pinnedDateKey ? null : current)),
+    );
+  }, [pinnedDateKey, todayKey]);
   const [streakMap, setStreakMap] = useState<Record<string, number>>({});
   const [modalVisible, setModalVisible] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
@@ -374,7 +373,6 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
       setLinkedActionsLoading(true);
       setEditingHabit(habit);
       setName(habit.name);
-      setTarget(String(habit.target_per_day));
       setCategory(habit.category ?? 'anytime');
       setIcon(HABIT_ICONS.includes(habit.icon) ? habit.icon : DEFAULT_HABIT_ICON);
       setColor(HABIT_COLORS.includes(habit.color) ? habit.color : DEFAULT_HABIT_COLOR);
@@ -386,11 +384,9 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
       setShowReminderTimePicker(false);
       setReminderPermission('not_determined');
       setReminderError(null);
-      const currentRule = getHabitRuleForDate(
-        habit.rule_history,
-        toDateKey(),
-        habit.target_per_day,
-      );
+      const rules = parseHabitRuleHistory(habit.rule_history);
+      const currentRule = getHabitRuleForDate(rules, toDateKey(), habit.target_per_day) ?? rules[0];
+      setTarget(String(currentRule?.target_per_day ?? habit.target_per_day));
       const currentWeekdays = currentRule?.weekdays ?? [...ALL_HABIT_WEEKDAYS];
       setWeekdays(currentWeekdays);
       setSchedulePreset(getHabitSchedulePreset(currentWeekdays));
@@ -730,7 +726,6 @@ export function HabitsScreen({ isActive }: { isActive: boolean }) {
     description: 'Rules below run when this habit completes for the day.',
   };
 
-  const todayKey = toDateKey();
   // Paused/archived habits carry no obligation today (F1): only durable-active
   // rows count toward the scheduled/completed denominators. Memoized on the
   // source list so a re-render with unchanged data recomputes nothing, and so

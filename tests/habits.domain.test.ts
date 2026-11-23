@@ -292,6 +292,14 @@ describe('calculateCurrentStreak', () => {
       calculateCurrentStreak(buildDayCompletions(completions, 1, undefined, history)),
     ).toBeGreaterThan(30);
   });
+
+  it('counts the complete current streak when its live run exceeds 4,000 days', () => {
+    const today = new Date(2026, 7, 10, 12);
+    const days = Array.from({ length: 4_001 }, (_, index) =>
+      day(offsetDateKey(index - 4_000, today), 1, 1),
+    );
+    expect(calculateCurrentStreak(days, toDateKey(today))).toBe(4_001);
+  });
 });
 
 describe('calculateLongestStreak', () => {

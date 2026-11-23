@@ -5,7 +5,11 @@
 
 import type { DailyPlan, HabitLifecycleStatus } from '@/core/db/types';
 import { parseTopTodoIds } from '@/features/daily-plan/dailyPlan.domain';
-import { isHabitScheduledOn } from '@/features/habits/habits.domain';
+import {
+  getHabitTargetForDate,
+  habitCreationDateKey,
+  isHabitActionableOn,
+} from '@/features/habits/habits.domain';
 import { ACTIVE_PROJECT_STATUSES } from '@/features/projects/projects.domain';
 import { ACTIVE_GOAL_STATUSES } from '@/features/goals/goals.domain';
 import type { Goal } from '@/features/goals/goals.types';
@@ -235,7 +239,9 @@ export function shapeHabitsSummary(
     color: string;
     target_per_day: number;
     rule_history?: string | null;
+    created_at?: string;
     status?: HabitLifecycleStatus;
+    lifecycle_history?: string | null;
   }[],
   completions: readonly { habit_id: string; date_key: string; count: number }[],
   todayKey: string,
@@ -246,24 +252,42 @@ export function shapeHabitsSummary(
       countByHabit.set(row.habit_id, (countByHabit.get(row.habit_id) ?? 0) + row.count);
     }
   }
-  // F1: paused/archived habits never render rings or inflate today's counts.
-  const scheduled = habits
-    .filter((habit) => isActiveHabit(habit))
-    .filter((habit) => isHabitScheduledOn(habit.rule_history, todayKey, habit.target_per_day));
-  const isComplete = (habit: (typeof scheduled)[number]): boolean =>
-    Math.min(countByHabit.get(habit.id) ?? 0, habit.target_per_day) >= habit.target_per_day;
+  const scheduled = habits.flatMap((habit) => {
+    const creationKey = habitCreationDateKey(habit.created_at);
+    if (
+      !isActiveHabit(habit) ||
+      !isHabitActionableOn(
+        habit.rule_history,
+        todayKey,
+        habit.target_per_day,
+        creationKey,
+        habit.lifecycle_history,
+      )
+    ) {
+      return [];
+    }
+    const target = getHabitTargetForDate(
+      habit.rule_history,
+      todayKey,
+      habit.target_per_day,
+      creationKey,
+    );
+    return [
+      {
+        id: habit.id,
+        name: habit.name,
+        color: habit.color,
+        count: Math.min(countByHabit.get(habit.id) ?? 0, target),
+        target,
+      },
+    ];
+  });
   return {
     scheduledToday: scheduled.length,
     // F2: numerator spans ALL scheduled habits; `rings` below stays a capped
     // display sample so the card never undercounts with more than 6 habits.
-    completedToday: scheduled.filter(isComplete).length,
-    rings: scheduled.slice(0, 6).map((habit) => ({
-      id: habit.id,
-      name: habit.name,
-      color: habit.color,
-      count: Math.min(countByHabit.get(habit.id) ?? 0, habit.target_per_day),
-      target: habit.target_per_day,
-    })),
+    completedToday: scheduled.filter((habit) => habit.count >= habit.target).length,
+    rings: scheduled.slice(0, 6),
   };
 }
 
