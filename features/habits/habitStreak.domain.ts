@@ -50,7 +50,7 @@ export type StreakRun = {
   lastActiveDateKey: string | null;
 };
 
-/** Defensive bound: a decade of history is past any realistic streak. */
+/** Defensive bound for expanding a sparse history into calendar days. */
 const MAX_WALK_DAYS = 4000;
 
 function sortAndIndex(days: readonly StreakRunDay[]): {
@@ -154,7 +154,8 @@ export function computeStreakRun(
   }
 
   let current = 0;
-  for (let guard = 0; guard < MAX_WALK_DAYS; guard += 1) {
+  // Each step visits a distinct date. The recorded history bounds the walk.
+  for (let walked = 0; walked < byDate.size; walked += 1) {
     const day = byDate.get(cursor);
     if (!day) break;
     if (day.completed) current += 1;
