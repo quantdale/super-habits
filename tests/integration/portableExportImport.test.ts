@@ -3,6 +3,7 @@ import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
 import { BACKUP_SCOPE_VERSION, type BackupEntity } from '@/core/backup/backup.types';
 import { PORTABLE_BACKUP_FORMAT_VERSION } from '@/core/portable/portable.types';
+import type { HabitReminderPlanItem } from '@/features/habits/habitReminders.domain';
 
 /**
  * Portable Data Export & Import V1 — real-SQLite source→export→import
@@ -497,6 +498,87 @@ describe('portable export', () => {
 });
 
 describe('portable import — source→import semantic equivalence', () => {
+  it.each(['25:00', '24:00', '12:60', 'not a time'])(
+    'restores a habit with legacy reminder %s without scheduling it',
+    async (invalidTime) => {
+      const sourceDb = await freshDatabase();
+      const { addHabit } = await import('@/features/habits/habits.data');
+      const validId = await addHabit(
+        'Read',
+        1,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        '07:30',
+      );
+      const legacyId = await addHabit('Stretch', 1);
+      // Simulate an older writer before the backup is checksummed.
+      await sourceDb.runAsync('UPDATE habits SET reminder_time = ? WHERE id = ?', [
+        invalidTime,
+        legacyId,
+      ]);
+      const result = await exportSourceDevice(sourceDb);
+      await sourceDb.closeAsync();
+
+      const targetDb = await freshDatabase();
+      const { preparePortableImport, confirmPortableImport } =
+        await import('@/core/portable/portableImport');
+      const { reconcileHabitReminders, setHabitReminderReconciliationHandler } =
+        await import('@/features/habits/habitReminders.service');
+      const { listHabits } = await import('@/features/habits/habits.data');
+      const now = new Date();
+      now.setDate(now.getDate() + 1);
+      now.setHours(0, 0, 0, 0);
+      const schedule = vi.fn(async (item: HabitReminderPlanItem) => item.identifier);
+      const reconcile = vi.fn(() =>
+        reconcileHabitReminders({
+          now,
+          windowDays: 1,
+          adapter: {
+            getPermissionState: async () => 'granted',
+            ensureChannel: async () => undefined,
+            listScheduled: async () => [],
+            schedule,
+            cancel: vi.fn(),
+          },
+        }),
+      );
+      setHabitReminderReconciliationHandler(async () => {
+        await reconcile();
+      });
+      try {
+        const outcome = await preparePortableImport({
+          fileName: result.fileName,
+          text: result.json,
+        });
+        if (outcome.status !== 'ready') throw new Error(`Import preview was ${outcome.status}`);
+        expect(await confirmPortableImport({ file: outcome.file })).toMatchObject({
+          status: 'restored',
+          importedCounts: { habits: 2 },
+        });
+        expect(reconcile).toHaveBeenCalledTimes(1);
+        await expect(reconcile.mock.results[0].value).resolves.toMatchObject({
+          status: 'reconciled',
+        });
+        expect(schedule.mock.calls.map(([item]) => item.data)).toEqual([
+          expect.objectContaining({ habitId: validId, time: '07:30' }),
+        ]);
+        expect(
+          new Map((await listHabits()).map((habit) => [habit.id, habit.reminder_time])),
+        ).toEqual(
+          new Map([
+            [validId, '07:30'],
+            [legacyId, null],
+          ]),
+        );
+      } finally {
+        setHabitReminderReconciliationHandler(null);
+        await targetDb.closeAsync();
+      }
+    },
+  );
+
   it('restores the complete scope atomically, without side effects', async () => {
     asyncStorageMock.state.set(THEME_MODE_KEY, 'dark');
     asyncStorageMock.state.set(THEME_SLOTS_KEY, JSON.stringify({ lightThemeId: 'ocean' }));
