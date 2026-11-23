@@ -1130,12 +1130,13 @@ export async function logWorkoutSession(input: {
         pending?.routineId === input.routineId && pending.startedAtIso === input.startedAt
           ? pending.routineSnapshot
           : undefined;
+      const endedAtMs = Date.parse(input.endedAt ?? '');
       const record = await insertWorkoutLogRecord({
         db: transactionDb,
         logId,
         routineId: input.routineId,
         notes: input.notes ?? null,
-        completedAtIso: now,
+        completedAtIso: Number.isFinite(endedAtMs) ? new Date(endedAtMs).toISOString() : now,
         createdAtIso: now,
         startedAtIso: input.startedAt ?? null,
         endedAtIso: input.endedAt ?? null,
@@ -2040,6 +2041,8 @@ export type WorkoutPendingSave = {
   routineId: string;
   /** ISO timestamp of the session's first Start press (stable identity). */
   startedAtIso: string;
+  /** When the workout ended. Absent in drafts created before this was recorded. */
+  endedAtIso?: string;
   /**
    * The phase cursor the session had reached when the summary was entered.
    *
@@ -2242,6 +2245,10 @@ function normalizeWorkoutPendingSave(value: unknown): WorkoutPendingSave | null 
   return {
     routineId: candidate.routineId,
     startedAtIso: candidate.startedAtIso,
+    ...(typeof candidate.endedAtIso === 'string' &&
+    Number.isFinite(Date.parse(candidate.endedAtIso))
+      ? { endedAtIso: candidate.endedAtIso }
+      : {}),
     phaseIndex,
     exerciseNames,
     ...(routineSnapshot ? { routineSnapshot } : {}),

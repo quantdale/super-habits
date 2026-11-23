@@ -108,8 +108,9 @@ function isNonNegativeNumber(value: unknown): boolean {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
-function isPositiveNumber(value: unknown): boolean {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+function isValidBodyWeight(value: unknown): boolean {
+  // Match the entry limit used by both body-weight writers.
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1_000;
 }
 
 function isNullableString(value: unknown): boolean {
@@ -719,7 +720,7 @@ const BODY_WEIGHT_ENTRY_RULES: FieldRule[] = [
   idRule('id'),
   { required: (row) => checkField(row, 'measured_on', isDateKey, 'measured_on') },
   isoRule('measured_at', true),
-  { required: (row) => checkField(row, 'weight', isPositiveNumber, 'weight') },
+  { required: (row) => checkField(row, 'weight', isValidBodyWeight, 'weight') },
   enumRule('unit', ['kg', 'lb']),
   nullableTextRule('note', WORKOUT_TEXT_MAX_LENGTH),
   isoRule('created_at', true),

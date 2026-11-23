@@ -327,6 +327,29 @@ describe('shapeFocusWeekSummary', () => {
 });
 
 describe('shapeWorkoutSummary', () => {
+  it('counts a recovered workout on its completion day instead of its save day', () => {
+    const completed = new Date(2026, 9, 18, 23, 55);
+    const saved = new Date(2026, 9, 19, 0, 5);
+    const logs = [
+      { routine_id: 'r1', completed_at: completed.toISOString(), created_at: saved.toISOString() },
+    ];
+    const names = new Map([['r1', 'Push Day']]);
+    expect(shapeWorkoutSummary(logs, names, ['2026-10-18'])).toMatchObject({
+      sessionsThisWeek: 1,
+      lastWorkoutDateKey: '2026-10-18',
+    });
+    expect(shapeWorkoutSummary(logs, names, ['2026-10-19']).sessionsThisWeek).toBe(0);
+  });
+
+  it('keeps the performed name when the routine is renamed or removed', () => {
+    const logs = [{ routine_id: 'r1', date_key: '2026-10-18', routine_name: 'Push Day' }];
+    const week = ['2026-10-18'];
+    expect(shapeWorkoutSummary(logs, new Map([['r1', 'New routine']]), week).lastWorkoutName).toBe(
+      'Push Day',
+    );
+    expect(shapeWorkoutSummary(logs, new Map(), week).lastWorkoutName).toBe('Push Day');
+  });
+
   it('counts this-week sessions and finds the last workout by date key', () => {
     const names = new Map([['r1', 'Push Day']]);
     const logs = [

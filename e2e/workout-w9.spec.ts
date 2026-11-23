@@ -419,4 +419,36 @@ test.describe('W9 Workout', () => {
     const logsAfter = await queryRows(page, 'SELECT COUNT(*) AS n FROM workout_logs');
     expect(Number(logsAfter[0]?.n)).toBe(1);
   });
+
+  test('resuming a draft keeps rest time added above the prescription', async ({ page }) => {
+    await openRoutineBuilder(page, 'Extended Rest Day');
+    const builder = page.getByRole('dialog');
+    await builder.getByPlaceholder(/e\.g\. Rows, Curls, Push-ups/i).fill('Press');
+    await builder.getByText('Add', { exact: true }).click({ force: true });
+    await builder.getByRole('textbox', { name: 'Rest (seconds, 0 = no rest)' }).fill('90');
+    await builder.getByText('+ Add set').first().click();
+    await expect(builder.getByText('Set 2')).toBeVisible();
+    await builder.getByText('Start workout', { exact: true }).click();
+    await page.getByRole('button', { name: 'Complete set 1' }).click();
+    await page.getByRole('button', { name: 'Add 15 seconds of rest' }).click();
+    await page.getByRole('button', { name: 'Add 15 seconds of rest' }).click();
+    await page.getByRole('button', { name: 'End workout' }).click();
+    await page.getByRole('button', { name: 'Leave', exact: true }).click();
+    await expect(page.getByText('Session in progress', { exact: true })).toBeVisible();
+
+    const drafts = await queryRows(
+      page,
+      `SELECT value FROM app_meta WHERE key = 'workout.active_session_draft'`,
+    );
+    expect(drafts).toHaveLength(1);
+    const draft = JSON.parse(String(drafts[0].value)) as { remainingSeconds: number };
+    expect(draft.remainingSeconds).toBeGreaterThan(90);
+    const minutes = Math.floor(draft.remainingSeconds / 60);
+    const seconds = String(draft.remainingSeconds % 60).padStart(2, '0');
+
+    await goToTab(page, 'workout');
+    await page.getByRole('button', { name: 'Resume workout · Extended Rest Day' }).click();
+    await expect(page.getByText('Rest', { exact: true })).toBeVisible();
+    await expect(page.getByText(`${minutes}:${seconds}`, { exact: true })).toBeVisible();
+  });
 });

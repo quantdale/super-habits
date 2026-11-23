@@ -325,24 +325,27 @@ export type WorkoutTodayContext = {
 };
 
 export function shapeWorkoutSummary(
-  logs: readonly { created_at?: string; date_key?: string; routine_id?: string }[],
+  logs: readonly {
+    completed_at?: string;
+    created_at?: string;
+    date_key?: string;
+    routine_id?: string;
+    routine_name?: string | null;
+  }[],
   routineNames: ReadonlyMap<string, string>,
   weekDateKeys: readonly string[],
   today?: WorkoutTodayContext,
 ): WorkoutSummary {
   const weekKeys = new Set(weekDateKeys);
-  const inWeek = logs.filter((log) => {
-    const key =
-      log.date_key ?? (log.created_at ? safeTimestampToLocalDateKey(log.created_at) : null);
-    return key !== null && weekKeys.has(key);
-  });
-  const last = [...logs]
+  const datedLogs = logs
     .map((log) => ({
-      key: log.date_key ?? (log.created_at ? safeTimestampToLocalDateKey(log.created_at) : null),
-      name: log.routine_id ? (routineNames.get(log.routine_id) ?? null) : null,
+      key: log.date_key ?? safeTimestampToLocalDateKey(log.completed_at ?? log.created_at ?? ''),
+      name:
+        log.routine_name ?? (log.routine_id ? (routineNames.get(log.routine_id) ?? null) : null),
     }))
-    .filter((entry): entry is { key: string; name: string | null } => entry.key !== null)
-    .sort((a, b) => b.key.localeCompare(a.key))[0];
+    .filter((entry): entry is { key: string; name: string | null } => entry.key !== null);
+  const inWeek = datedLogs.filter((log) => weekKeys.has(log.key));
+  const last = datedLogs.sort((a, b) => b.key.localeCompare(a.key))[0];
   const summary: WorkoutSummary = {
     sessionsThisWeek: inWeek.length,
     lastWorkoutName: last?.name ?? null,

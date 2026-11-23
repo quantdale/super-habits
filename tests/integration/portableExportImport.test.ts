@@ -583,6 +583,39 @@ describe('portable import — source→import semantic equivalence', () => {
       }
     },
   );
+  it('accepts the body-weight writer ceiling and refuses a backup above it', async () => {
+    const sourceDb = await freshDatabase();
+    const workout = await import('@/features/workout/workout.data');
+    const { exportPortableBackup } = await import('@/core/portable/portableExport');
+    const id = await workout.addBodyWeightEntry({ weight: 1_000, unit: 'lb' });
+    const valid = await exportPortableBackup();
+    if (!valid.ok) throw new Error(valid.error);
+    await expect(workout.updateBodyWeightEntry(id, { weight: 1_001 })).rejects.toThrow(
+      'Invalid body weight.',
+    );
+    // Seal both files through the real exporter so checksum errors cannot mask
+    // a missing validation rule.
+    await sourceDb.runAsync('UPDATE body_weight_entries SET weight = 1001 WHERE id = ?', [id]);
+    const invalid = await exportPortableBackup();
+    if (!invalid.ok) throw new Error(invalid.error);
+    await sourceDb.closeAsync();
+
+    const targetDb = await freshDatabase();
+    try {
+      const { preparePortableImport } = await import('@/core/portable/portableImport');
+      expect(
+        await preparePortableImport({ fileName: 'valid.json', text: valid.json }),
+      ).toMatchObject({ status: 'ready' });
+      const result = await preparePortableImport({ fileName: 'invalid.json', text: invalid.json });
+      expect(result.status).toBe('rejected');
+      if (result.status === 'rejected') {
+        expect(result.diagnostics.join('\n')).toContain('weight is invalid');
+      }
+      expect(await countRows(targetDb, 'body_weight_entries')).toBe(0);
+    } finally {
+      await targetDb.closeAsync();
+    }
+  });
 
   it('restores the complete scope atomically, without side effects', async () => {
     asyncStorageMock.state.set(THEME_MODE_KEY, 'dark');

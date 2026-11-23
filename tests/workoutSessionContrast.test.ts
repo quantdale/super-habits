@@ -187,7 +187,13 @@ describe('Workout session wiring', () => {
   });
 
   it('Finish routes into the existing completion summary (no new save path)', () => {
-    expect(screen).toMatch(/const handleFinishEarly = \(\) => \{[\s\S]*?setIsComplete\(true\)/);
+    const finishEarly = screen.match(/const handleFinishEarly = \(\) => \{([\s\S]*?)\n  \};/)?.[1];
+    const completeSession = screen.match(
+      /const completeSession = useCallback\(\(\) => \{([\s\S]*?)\n  \}, \[\]\);/,
+    )?.[1];
+    expect(finishEarly).toContain('completeSession();');
+    expect(finishEarly).not.toMatch(/handleFinish\(|logWorkoutSession\(/);
+    expect(completeSession).toContain('setIsComplete(true);');
     expect(screen).toMatch(/onPress=\{handleFinishEarly\}/);
     // The summary keeps its one save authority.
     expect(screen).toMatch(
