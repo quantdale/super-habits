@@ -52,7 +52,7 @@ export const DEFAULT_LIGHT_THEME_ID: ThemeId = 'light';
 export const DEFAULT_DARK_THEME_ID: ThemeId = 'dark';
 
 export function isThemeId(value: unknown): value is ThemeId {
-  return typeof value === 'string' && value in THEME_REGISTRY;
+  return typeof value === 'string' && THEME_IDS.includes(value);
 }
 
 export function getTheme(id: ThemeId): ThemeDefinition {
