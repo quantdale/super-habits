@@ -90,7 +90,8 @@ export async function getMomentumGarden(
     ),
     // Only habits with a positive completion in the requested window can
     // contribute to this read model. This keeps the canonical scheduler's
-    // bulk input bounded without issuing a query per habit.
+    // bulk input bounded. Rank each habit by its latest completion date and
+    // use the same habit ID tie-breaker as the capped completion query.
     //
     // Every capped source below is `ORDER BY … DESC LIMIT n`: a cap must keep
     // the NEWEST facts of the window (the days the Garden is about), not the
@@ -109,15 +110,12 @@ export async function getMomentumGarden(
     db.getAllAsync<Habit>(
       `SELECT h.*
          FROM habits h
-         WHERE EXISTS (
-             SELECT 1
-             FROM habit_completions hc
-             WHERE hc.habit_id = h.id
-               AND hc.date_key >= ?
-               AND hc.date_key <= ?
-               AND hc.count > 0
-           )
-         ORDER BY h.created_at DESC
+         JOIN habit_completions hc ON hc.habit_id = h.id
+         WHERE hc.date_key >= ?
+           AND hc.date_key <= ?
+           AND hc.count > 0
+         GROUP BY h.id
+         ORDER BY MAX(hc.date_key) DESC, h.id ASC
          LIMIT ?`,
       [window.startKey, window.endKey, MOMENTUM_LIMITS.queryRowsPerHabitSource],
     ),

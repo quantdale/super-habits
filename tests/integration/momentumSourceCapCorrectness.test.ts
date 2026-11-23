@@ -52,4 +52,47 @@ describe('Momentum Garden bounded caps keep the newest facts', async () => {
     expect(garden.today.contributions.workout.level).toBe(1);
     expect(garden.today.activeSources).toContain('workout');
   });
+
+  it('keeps an older habit completed today when newer habits fill the definition cap', async () => {
+    db = await freshDatabase();
+    const { toDateKey } = await import('@/lib/time');
+    const { MOMENTUM_LIMITS } = await import('@/features/momentum/momentum.types');
+    const { getMomentumGarden } = await import('@/features/momentum/momentum.data');
+
+    const todayIso = localIso(0);
+    const yesterdayIso = localIso(1);
+    const todayKey = toDateKey(new Date(todayIso));
+    const yesterdayKey = toDateKey(new Date(yesterdayIso));
+    const olderHabitCreatedAt = localIso(7);
+    const olderHabitId = 'habit-older';
+    await db.runAsync(`INSERT INTO habits (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)`, [
+      olderHabitId,
+      'Older habit',
+      olderHabitCreatedAt,
+      olderHabitCreatedAt,
+    ]);
+
+    for (let i = 0; i <= MOMENTUM_LIMITS.queryRowsPerHabitSource; i += 1) {
+      const habitId = `habit-newer-${i}`;
+      await db.runAsync(
+        `INSERT INTO habits (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)`,
+        [habitId, `Newer habit ${i}`, yesterdayIso, yesterdayIso],
+      );
+      await db.runAsync(
+        `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+         VALUES (?, ?, ?, 1, ?, ?)`,
+        [`hcmp-newer-${i}`, habitId, yesterdayKey, yesterdayIso, yesterdayIso],
+      );
+    }
+
+    await db.runAsync(
+      `INSERT INTO habit_completions (id, habit_id, date_key, count, created_at, updated_at)
+       VALUES (?, ?, ?, 1, ?, ?)`,
+      ['hcmp-older', olderHabitId, todayKey, todayIso, todayIso],
+    );
+
+    const garden = await getMomentumGarden({ todayKey, days: 7 });
+    expect(garden.today.contributions.habits.count).toBe(1);
+    expect(garden.today.activeSources).toContain('habits');
+  });
 });
