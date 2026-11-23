@@ -73,6 +73,11 @@ describe('THEME_REGISTRY invariants', () => {
     expect(isThemeId(null)).toBe(false);
   });
 
+  it('recognizes only catalog entries as saved theme IDs', () => {
+    expect(isThemeId('toString')).toBe(false);
+    expect(isThemeId('constructor')).toBe(false);
+  });
+
   it('ships at least the 14 catalog themes from the design doc', () => {
     expect(THEME_IDS.length).toBeGreaterThanOrEqual(14);
   });
