@@ -158,6 +158,23 @@ describe('reconcileHabitReminders', () => {
     expect(fake.cancelled).toContain(desired[0].identifier);
   });
 
+  it('updates the pending reminder when the habit is renamed', async () => {
+    const habits = [habit('gym')];
+    const [item] = buildHabitReminderPlan({ habits, now: NOW, windowDays: 1 });
+    const fake = fakeAdapter([requestFor(item)]);
+
+    const result = await reconcileHabitReminders({
+      habits: [{ ...habits[0], name: 'Go to the gym' }],
+      completions: [],
+      now: NOW,
+      windowDays: 1,
+      adapter: fake.adapter,
+    });
+
+    expect(result).toMatchObject({ scheduled: 1, cancelled: 1 });
+    expect(fake.scheduled).toEqual([expect.objectContaining({ title: 'Go to the gym' })]);
+  });
+
   it('collapses duplicates without touching Pomodoro requests', async () => {
     const desired = buildHabitReminderPlan({ habits: [habit('gym')], now: NOW });
     const duplicate = requestFor(desired[0], 'habit-reminder:legacy:duplicate');

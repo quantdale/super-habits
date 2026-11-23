@@ -102,6 +102,7 @@ function isCorrectScheduledRequest(
   const data = getNotificationData(request);
   return (
     request.identifier === item.identifier &&
+    request.content.title === item.title &&
     data?.kind === item.data.kind &&
     data?.version === item.data.version &&
     data?.habitId === item.data.habitId &&
