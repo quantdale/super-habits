@@ -225,10 +225,14 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
    * cached before the move and the diary would stay on a day its writes cannot
    * reach.
    */
+  // `dayGeneration` is an INTENTIONAL extra dep: it re-anchors "today" at local
+  // midnight (and on the rollover provider's foreground check) even when the
+  // selection identity is unchanged, so the surface cannot keep a stale day.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const todayKey = useMemo(() => toDateKey(), [dayGeneration]);
   const surfaceDateKey = useMemo(
-    () => resolveCalorieSurfaceDay(selectedDateKey, toDateKey()),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- dayGeneration is an intentional extra dep: it re-anchors "today" when the local day changes (clock/timezone move, midnight) even though `selectedDateKey` is unchanged; the call reads the clock through `toDateKey()`.
-    [selectedDateKey, dayGeneration],
+    () => resolveCalorieSurfaceDay(selectedDateKey, todayKey),
+    [selectedDateKey, todayKey],
   );
 
   const refresh = useCallback(async () => {
@@ -277,10 +281,22 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     // D9b: when the local day rolls over, a selection that pointed at
     // "today" must follow the new day so the active section never renders
     // yesterday's totals under the Today header. An explicitly selected
-    // past day stays put.
-    if (!followsToday) return;
-    queueMicrotask(() => setSelectedDateKey(toDateKey()));
-  }, [dayGeneration, followsToday]);
+    // past day stays put — while it is still a past day.
+    if (followsToday) {
+      queueMicrotask(() => setSelectedDateKey(todayKey));
+      return;
+    }
+    // A BACKWARDS day change (clock or timezone moved before the explicitly
+    // selected day) makes that pin impossible: `surfaceDateKey` already clamps
+    // the surface to today, and keeping the stale pin would snap the surface
+    // back to an unreachable day on the next forward move. Release it.
+    if (selectedDateKey > todayKey) {
+      queueMicrotask(() => {
+        setSelectedDateKey(todayKey);
+        setFollowsToday(true);
+      });
+    }
+  }, [followsToday, selectedDateKey, todayKey]);
 
   useEffect(() => {
     let active = true;
