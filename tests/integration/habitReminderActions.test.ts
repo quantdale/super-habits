@@ -332,6 +332,35 @@ describe('habit reminder Snooze against real SQLite', () => {
     }
   });
 
+  it('cancels a pending snooze after the user disables the habit reminder', async () => {
+    const db = await freshDatabase();
+    try {
+      const habits = await import('@/features/habits/habits.data');
+      const { snoozeHabitReminderAction } = await import('@/features/habits/habitReminderActions');
+      const { reconcileHabitReminders } = await import('@/features/habits/habitReminders.service');
+      const habitId = await createHabit(habits);
+      const now = new Date(2026, 7, 12, 18);
+      const native = adapter();
+      const result = await snoozeHabitReminderAction(
+        { ...actionInput(habitId, toDateKey(now), HABIT_REMINDER_SNOOZE_ACTION), now },
+        native,
+      );
+      expect(result.status).toBe('scheduled');
+
+      await habits.updateHabit(habitId, {
+        name: 'Gym',
+        targetPerDay: 1,
+        category: 'anytime',
+        reminderTime: null,
+      });
+      await reconcileHabitReminders({ now, windowDays: 1, adapter: native });
+
+      expect(native.scheduled).toEqual([]);
+    } finally {
+      await db.closeAsync();
+    }
+  });
+
   it('deduplicates a repeated snooze response and does not cross local midnight', async () => {
     const db = await freshDatabase();
     const habits = await import('@/features/habits/habits.data');

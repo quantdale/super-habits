@@ -13,6 +13,7 @@ import {
   getHabitReminderSnoozeIdentifier,
   isHabitReminderIdentifier,
   isHabitReminderSnoozeIdentifier,
+  parseHabitReminderTime,
   type HabitReminderHabit,
   type HabitReminderCompletion,
   type HabitReminderPlanItem,
@@ -132,6 +133,7 @@ function isValidSnoozeRequest(
   }
   const habit = habits.find((candidate) => candidate.id === data.habitId);
   if (!habit || habit.deleted_at !== null || toDateKey(now) !== data.dateKey) return false;
+  if (!parseHabitReminderTime(habit.reminder_time)) return false;
   // Snoozing a paused/archived habit would reschedule a reminder the planner
   // no longer wants; treat it as invalid so reconciliation cancels it.
   if ((habit.status ?? 'active') !== 'active') return false;
