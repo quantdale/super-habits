@@ -100,7 +100,9 @@ export async function executeWeeklyReview(input: {
       const todoId = await addTodo({
         title: commitment.title,
         notes: commitment.notes,
-        dueDate: commitment.dueDate ?? summary.week.nextWeekStartDateKey,
+        // `||`, not `??`: a Due field typed into and then cleared is `''`, and
+        // the row reads "Due <next week start>" for it.
+        dueDate: commitment.dueDate || summary.week.nextWeekStartDateKey,
         priority: commitment.priority,
       });
       createdTodoIds.push(todoId);

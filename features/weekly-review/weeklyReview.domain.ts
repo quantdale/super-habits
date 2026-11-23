@@ -100,7 +100,7 @@ export function validateNewCommitments(commitments: NewTodoCommitmentDraft[]): s
       errors.push(`Commitment title must be at most ${MAX_COMMITMENT_TITLE_LENGTH} characters`);
     if (c.notes && c.notes.length > MAX_COMMITMENT_NOTES_LENGTH)
       errors.push(`Commitment notes must be at most ${MAX_COMMITMENT_NOTES_LENGTH} characters`);
-    if (c.dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(c.dueDate))
+    if (c.dueDate && !isValidDateKey(c.dueDate))
       errors.push('Commitment due date must be YYYY-MM-DD');
   }
   return errors;
@@ -126,7 +126,7 @@ export function validateTodoDecisions(decisions: WeeklyTodoDecision[]): string[]
         errors.push(`Reschedule action for todo ${d.todoId} requires a due date`);
       }
     }
-    if ('dueDate' in d && d.dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(d.dueDate)) {
+    if ('dueDate' in d && d.dueDate && !isValidDateKey(d.dueDate)) {
       errors.push(`Invalid due date format for todo ${d.todoId}`);
     }
   }
