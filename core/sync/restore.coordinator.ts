@@ -1,3 +1,5 @@
+import { notifyRewardRestore } from '@/core/backup/rewardRestoreSignal';
+import { applyRewardBackupRows } from '@/core/backup/backupRewards';
 import { withSQLiteTransaction } from '@/core/db/transactions';
 import { appMetaKeys, getAppMetaText, setAppMetaText } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
@@ -594,6 +596,7 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
     await applyRemoteTodos(transactionDb, todos);
     await applyRemoteHabits(transactionDb, habits);
     await applyRemoteCalorieEntries(transactionDb, calorieEntries);
+    await applyRewardBackupRows(transactionDb, {}, restoredAt);
 
     await setAppMetaText(transactionDb, appMetaKeys.lastRestoreSignature, freshnessSignature);
     await setAppMetaText(transactionDb, appMetaKeys.lastRestoreAt, restoredAt);
@@ -620,6 +623,8 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
 
   requestHabitReminderReconciliation();
   requestWorkoutReminderReconciliation();
+
+  notifyRewardRestore();
 
   return {
     status: 'restored',

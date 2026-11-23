@@ -996,12 +996,9 @@ async function runMigrations(db: SQLite.SQLiteDatabase): Promise<void> {
   // Migration 25: local gamification state (XP ledger, consumed streak
   // freezes, completed daily quests, unlocked badges).
   //
-  // Deliberately OUTSIDE the backup scope and the account user-table list:
-  // rewards are a pure function of the authoritative feature tables above, so
-  // a restore/import rebuilds nothing stale, an unbound device still has the
-  // full loop, and `gamification_events` alone can recompute every streak,
-  // level, and quest board. `UNIQUE(event_kind, source_key)` is the
-  // idempotency contract that makes one real action worth XP exactly once.
+  // Keep the local ledger independent of live feature rows: receipts survive
+  // deleted activity and are idempotent on UNIQUE(event_kind, source_key).
+  // Current backups can capture these tables together without row-level sync.
   if (version < 25) {
     await applyMigration(db, 25, async () => {
       await db.execAsync(`

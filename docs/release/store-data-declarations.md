@@ -46,7 +46,7 @@ platforms, including conditional paths.
   - **User Content / App Activity** (choose the form's precise categories) —
     todos, habits + completions, focus sessions, workouts + history, body
     weight, meals + calorie entries, plans, reviews, linked-action rules,
-    allowlisted settings in configured backup; AI questions, selected
+    reward history, and allowlisted settings in configured backup; AI questions, selected
     conversation context, and retrieved facts when an AI route is enabled
     and used.
   - **Identifiers → User ID** — the anonymous per-account owner id can be
@@ -114,8 +114,8 @@ manifest (`android:allowBackup` and the permission list in
 > offline without a registration step. A build connected to our backup
 > service can create an anonymous account and back up your data to a private
 > per-account store for restore on an empty device. A portable
-> export file moves your data between devices on your terms. Rewards (XP,
-> streaks, badges) are a fun local-only layer — never uploaded or backed up.
+> export file moves your data between devices on your terms. Reward history
+> is included in portable exports and enabled cloud backups.
 >
 > First release (1.0.0). Interface in English.
 

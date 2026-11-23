@@ -167,7 +167,7 @@ export class GenerationSupabaseMock {
             content_verification_version: 1,
             sequence_reservation_version: 1,
             backup_schema_version: 2,
-            scope_version: 9,
+            scope_version: 10,
             settings_version: 5,
           });
         const args = request.postDataJSON() as Row;

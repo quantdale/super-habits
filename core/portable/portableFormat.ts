@@ -1,8 +1,10 @@
 import {
-  BACKUP_ENTITY_COLUMNS,
   BACKUP_ENTITIES,
   BACKUP_SCHEMA_VERSION,
   BACKUP_SCOPE_VERSION,
+  BACKUP_SNAPSHOT_SCOPE_VERSION,
+  BACKUP_SNAPSHOT_ENTITIES,
+  BACKUP_SNAPSHOT_COLUMNS,
   BACKUP_SETTINGS_VERSION,
   backupEntityColumnsForScope,
   BACKUP_SCOPE_V4_ENTITY_COLUMNS,
@@ -15,6 +17,7 @@ import {
   KNOWN_HISTORICAL_BACKUP_SCOPE_V8_ENTITY_SET,
   PORTABLE_V1_ENTITY_COLUMNS,
   type BackupEntity,
+  type BackupSnapshotEntity,
 } from '@/core/backup/backup.types';
 import {
   canonicalizeSettingsPayload,
@@ -23,7 +26,11 @@ import {
   normalizeRecoverableSettings,
   projectCertifiedRecoverableSettings,
 } from '@/core/backup/backupSettings';
-import { validateBackupGraph, validateBackupRow } from '@/core/backup/backupValidators';
+import {
+  validateBackupGraph,
+  validateBackupSnapshotRow,
+  validateRewardBackupKeys,
+} from '@/core/backup/backupValidators';
 import { projectCertifiedBackupRows } from '@/core/backup/backupProjection';
 import { canonicalizeRow, checksumRows, sha256Hex } from '@/lib/checksum';
 import {
@@ -92,18 +99,21 @@ function setEqualsExactly(keys: string[], expected: readonly string[]): boolean 
 export function canonicalPortablePayloadText(
   file: PortableBackupFile,
   options?: {
-    entities?: readonly BackupEntity[];
-    columns?: Record<BackupEntity, readonly string[]>;
+    entities?: readonly BackupSnapshotEntity[];
+    columns?: Partial<Record<BackupSnapshotEntity, readonly string[]>>;
     settingsVersion?: number;
   },
 ): string {
-  const entities = options?.entities ?? BACKUP_ENTITIES;
-  const columns = options?.columns ?? BACKUP_ENTITY_COLUMNS;
+  const entities =
+    options?.entities ?? (file.formatVersion >= 3 ? BACKUP_SNAPSHOT_ENTITIES : BACKUP_ENTITIES);
+  const columns = { ...BACKUP_SNAPSHOT_COLUMNS, ...options?.columns };
   const settingsVersion = options?.settingsVersion ?? BACKUP_SETTINGS_VERSION;
   const lines: string[] = [
     `format:${PORTABLE_BACKUP_FORMAT}`,
     `formatVersion:${file.formatVersion}`,
     `backupSchemaVersion:${file.backupSchemaVersion}`,
+    // Earlier writers did not hash the scope stamp. Freeze their original bytes.
+    ...(file.formatVersion >= 3 ? [`backupScopeVersion:${file.backupScopeVersion}`] : []),
     `exportedAt:${file.exportedAt}`,
     `appVersion:${file.source.appVersion}`,
     `platform:${file.source.platform}`,
@@ -125,8 +135,8 @@ export function canonicalPortablePayloadText(
 export function computePortablePayloadChecksum(
   file: PortableBackupFile,
   options?: {
-    entities?: readonly BackupEntity[];
-    columns?: Record<BackupEntity, readonly string[]>;
+    entities?: readonly BackupSnapshotEntity[];
+    columns?: Partial<Record<BackupSnapshotEntity, readonly string[]>>;
     settingsVersion?: number;
   },
 ): string {
@@ -143,15 +153,15 @@ export function buildPortableBackupFile(input: {
   appVersion: string;
   platform: string;
   ownerFingerprint: string | null;
-  rowsByEntity: Partial<Record<BackupEntity, Record<string, unknown>[]>>;
+  rowsByEntity: Partial<Record<BackupSnapshotEntity, Record<string, unknown>[]>>;
   settings: unknown;
 }): PortableBackupFile {
   const entities: PortableBackupFile['entities'] = {};
   const entityIntegrity: PortableBackupFile['integrity']['entities'] = {};
-  for (const entity of BACKUP_ENTITIES) {
+  for (const entity of BACKUP_SNAPSHOT_ENTITIES) {
     const rows = sortedRows(input.rowsByEntity[entity] ?? []);
     entities[entity] = rows;
-    entityIntegrity[entity] = checksumRows(rows, BACKUP_ENTITY_COLUMNS[entity]);
+    entityIntegrity[entity] = checksumRows(rows, BACKUP_SNAPSHOT_COLUMNS[entity]);
   }
   const normalizedSettings = normalizeRecoverableSettings(input.settings);
   const settingsChecksum = canonicalizeSettingsPayload(normalizedSettings);
@@ -159,7 +169,7 @@ export function buildPortableBackupFile(input: {
     format: PORTABLE_BACKUP_FORMAT,
     formatVersion: PORTABLE_BACKUP_FORMAT_VERSION,
     backupSchemaVersion: BACKUP_SCHEMA_VERSION,
-    backupScopeVersion: BACKUP_SCOPE_VERSION,
+    backupScopeVersion: BACKUP_SNAPSHOT_SCOPE_VERSION,
     exportedAt: input.exportedAt,
     source: {
       appVersion: input.appVersion,
@@ -224,7 +234,7 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
     );
     return { ok: false, errors: errors.slice(0, 50) };
   }
-  if (input.formatVersion !== 1 && input.formatVersion !== PORTABLE_BACKUP_FORMAT_VERSION) {
+  if (![1, 2, PORTABLE_BACKUP_FORMAT_VERSION].includes(input.formatVersion)) {
     errors.push(`Portable format version ${input.formatVersion} is not supported.`);
     return { ok: false, errors: errors.slice(0, 50) };
   }
@@ -273,7 +283,7 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
   // historical columns) or the current scope — a future scope is rejected as requiring a
   // newer app. Any other/partial set is rejected — scope is never inferred
   // permissively ("missing table = empty").
-  let scopeEntities: readonly BackupEntity[];
+  let scopeEntities: readonly BackupSnapshotEntity[];
   let scopeColumns: Record<BackupEntity, readonly string[]>;
   if (input.formatVersion === 1) {
     if (setEqualsExactly(entityKeys, KNOWN_HISTORICAL_BACKUP_SCOPE_V2_ENTITY_SET)) {
@@ -288,48 +298,30 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
     }
   } else {
     const explicitScope = input.backupScopeVersion;
-    const isCurrentScope =
-      typeof explicitScope === 'number' &&
-      Number.isInteger(explicitScope) &&
-      explicitScope === BACKUP_SCOPE_VERSION;
-    const isHistoricalScope4 =
-      typeof explicitScope === 'number' && Number.isInteger(explicitScope) && explicitScope === 4;
-    const isHistoricalScope5 =
-      typeof explicitScope === 'number' && Number.isInteger(explicitScope) && explicitScope === 5;
-    const isHistoricalScope6 =
-      typeof explicitScope === 'number' && Number.isInteger(explicitScope) && explicitScope === 6;
-    const isHistoricalScope7 = explicitScope === 7;
-    const isHistoricalScope8 = explicitScope === 8;
+    const scopes: Record<number, readonly BackupSnapshotEntity[]> = {
+      4: KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET,
+      5: KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET,
+      6: KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET,
+      7: KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET,
+      8: KNOWN_HISTORICAL_BACKUP_SCOPE_V8_ENTITY_SET,
+      [BACKUP_SCOPE_VERSION]: BACKUP_ENTITIES,
+      [BACKUP_SNAPSHOT_SCOPE_VERSION]: BACKUP_SNAPSHOT_ENTITIES,
+    };
+    const expectsRewards = input.formatVersion === PORTABLE_BACKUP_FORMAT_VERSION;
     if (
       typeof explicitScope !== 'number' ||
       !Number.isInteger(explicitScope) ||
-      (!isCurrentScope &&
-        !isHistoricalScope4 &&
-        !isHistoricalScope5 &&
-        !isHistoricalScope6 &&
-        !isHistoricalScope7 &&
-        !isHistoricalScope8)
+      !scopes[explicitScope] ||
+      expectsRewards !== (explicitScope === BACKUP_SNAPSHOT_SCOPE_VERSION)
     ) {
       errors.push(
-        `This file uses backup scope version ${String(input.backupScopeVersion)}, which this app cannot import.`,
+        `This file uses backup scope version ${String(explicitScope)}, which this app cannot import.`,
       );
       return { ok: false, errors: errors.slice(0, 50) };
     }
-    const expectedEntities: readonly BackupEntity[] = isCurrentScope
-      ? BACKUP_ENTITIES
-      : isHistoricalScope8
-        ? KNOWN_HISTORICAL_BACKUP_SCOPE_V8_ENTITY_SET
-        : isHistoricalScope7
-          ? KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET
-          : isHistoricalScope6
-            ? KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET
-            : isHistoricalScope5
-              ? KNOWN_HISTORICAL_BACKUP_SCOPE_V5_ENTITY_SET
-              : KNOWN_HISTORICAL_BACKUP_SCOPE_V4_ENTITY_SET;
-    const missing = [...expectedEntities].filter((entity) => !(entity in entities));
-    const unknown = entityKeys.filter(
-      (key) => !(expectedEntities as readonly string[]).includes(key),
-    );
+    scopeEntities = scopes[explicitScope];
+    const missing = scopeEntities.filter((entity) => !(entity in entities));
+    const unknown = entityKeys.filter((key) => !(scopeEntities as readonly string[]).includes(key));
     if (missing.length > 0) {
       errors.push(`The file is missing the complete backup scope: ${missing.join(', ')}.`);
     }
@@ -339,19 +331,12 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
     if (missing.length > 0 || unknown.length > 0) {
       return { ok: false, errors: errors.slice(0, 50) };
     }
-    scopeEntities = expectedEntities;
-    scopeColumns = isCurrentScope
-      ? BACKUP_ENTITY_COLUMNS
-      : isHistoricalScope8
-        ? backupEntityColumnsForScope(8)
-        : isHistoricalScope7
-          ? backupEntityColumnsForScope(7)
-          : isHistoricalScope6
-            ? backupEntityColumnsForScope(6)
-            : isHistoricalScope5
-              ? backupEntityColumnsForScope(5)
-              : (BACKUP_SCOPE_V4_ENTITY_COLUMNS as Record<BackupEntity, readonly string[]>);
+    scopeColumns =
+      explicitScope === 4
+        ? (BACKUP_SCOPE_V4_ENTITY_COLUMNS as Record<BackupEntity, readonly string[]>)
+        : backupEntityColumnsForScope(explicitScope);
   }
+  const certifiedColumns = { ...BACKUP_SNAPSHOT_COLUMNS, ...scopeColumns };
 
   for (const entity of scopeEntities) {
     if (!Array.isArray(entities[entity])) {
@@ -364,7 +349,7 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
   // remain untrusted until the per-row validators immediately below succeed;
   // nothing from this boundary is written before validation/integrity/graph checks.
   const rowsByEntity = entities as unknown as Partial<
-    Record<BackupEntity, Record<string, unknown>[]>
+    Record<BackupSnapshotEntity, Record<string, unknown>[]>
   >;
 
   // Per-row runtime validation (shared with cloud Restore V2). The validator
@@ -374,7 +359,7 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
   let rowErrors = 0;
   for (const entity of scopeEntities) {
     for (const row of rowsByEntity[entity] ?? []) {
-      const validation = validateBackupRow(entity, row);
+      const validation = validateBackupSnapshotRow(entity, row);
       if (!validation.ok) {
         rowErrors += 1;
         if (rowErrors <= 50) errors.push(`${entity}: ${validation.errors.join('; ')}`);
@@ -413,7 +398,7 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
       errors.push(`${entity}: integrity metadata is malformed.`);
       continue;
     }
-    const actual = checksumRows(rowsByEntity[entity] ?? [], scopeColumns[entity]);
+    const actual = checksumRows(rowsByEntity[entity] ?? [], certifiedColumns[entity]);
     if (expected.count !== actual.count || expected.checksum !== actual.checksum) {
       errors.push(
         `${entity}: integrity mismatch (expected ${expected.count} rows / ${expected.checksum}; found ${actual.count} / ${actual.checksum}).`,
@@ -469,6 +454,7 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
       format: input.format,
       formatVersion: input.formatVersion,
       backupSchemaVersion: input.backupSchemaVersion,
+      backupScopeVersion: input.backupScopeVersion,
       exportedAt: input.exportedAt,
       source: input.source,
       entities: rowsByEntity,
@@ -476,7 +462,7 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
     } as unknown as PortableBackupFile;
     const actualPayloadChecksum = computePortablePayloadChecksum(candidate, {
       entities: scopeEntities,
-      columns: scopeColumns,
+      columns: certifiedColumns,
       settingsVersion: historicalVersion ?? BACKUP_SETTINGS_VERSION,
     });
     if (actualPayloadChecksum !== integrity.payloadChecksum) {
@@ -488,9 +474,12 @@ export function validatePortableBackupFile(input: unknown): PortableValidationRe
 
   if (errors.length > 0) return { ok: false, errors: errors.slice(0, 50) };
 
-  const certifiedRows = projectCertifiedBackupRows(rowsByEntity, scopeEntities, scopeColumns);
+  const certifiedRows = projectCertifiedBackupRows(rowsByEntity, scopeEntities, certifiedColumns);
   // Dependency graph (shared with cloud Restore V2).
-  const graphErrors = validateBackupGraph(certifiedRows);
+  const graphErrors = [
+    ...validateBackupGraph(certifiedRows),
+    ...validateRewardBackupKeys(certifiedRows),
+  ];
   if (graphErrors.length > 0) {
     return {
       ok: false,

@@ -1,3 +1,5 @@
+import { notifyRewardRestore } from '@/core/backup/rewardRestoreSignal';
+import { applyRewardBackupRows } from '@/core/backup/backupRewards';
 import {
   clearLocalDatasetOwner,
   getLocalDatasetOwner,
@@ -15,7 +17,11 @@ import {
   stagePendingThemeApplication,
 } from '@/core/backup/backupSettings';
 import { ensureBackupBackfill } from '@/core/backup/backupBackfill';
-import { BACKUP_ENTITIES, type BackupEntity } from '@/core/backup/backup.types';
+import {
+  BACKUP_SNAPSHOT_ENTITIES,
+  type BackupEntity,
+  type BackupSnapshotEntity,
+} from '@/core/backup/backup.types';
 import { validatePortableBackupFile } from '@/core/portable/portableFormat';
 import {
   PORTABLE_DOMAIN_LABELS,
@@ -189,9 +195,9 @@ function buildPreview(
   file: PortableBackupFile,
   local: LocalAccountDataState,
 ): PortableImportPreview {
-  const counts: Partial<Record<BackupEntity, number>> = {};
+  const counts: Partial<Record<BackupSnapshotEntity, number>> = {};
   let totalRows = 0;
-  for (const entity of BACKUP_ENTITIES) {
+  for (const entity of BACKUP_SNAPSHOT_ENTITIES) {
     const rows = file.entities[entity] ?? [];
     counts[entity] = rows.length;
     totalRows += rows.length;
@@ -394,6 +400,8 @@ export async function confirmPortableImport(input: {
       );
       await applyRemoteWeeklyReviews(transactionDb, typed<WeeklyReview[]>('weekly_reviews'));
 
+      await applyRewardBackupRows(transactionDb, entities, importedAt);
+
       // Settings: SQLite-backed values join the transaction directly; theme
       // (AsyncStorage) is staged durably here and applied after commit with
       // restart reconciliation. NO file read or network call happens inside.
@@ -447,6 +455,8 @@ export async function confirmPortableImport(input: {
     return { status: 'blocked', reason: blocked.reason, message: blocked.message, diagnostics: [] };
   }
 
+  notifyRewardRestore();
+
   // Post-commit reconciliation: apply the staged theme settings to
   // AsyncStorage (durable marker; retried on bootstrap until it succeeds),
   // then ONLY current/future reminder scheduling.
@@ -478,17 +488,17 @@ export async function confirmPortableImport(input: {
   }
 
   const importedCounts = Object.fromEntries(
-    BACKUP_ENTITIES.map((entity) => [entity, (file.entities[entity] ?? []).length]),
-  ) as Partial<Record<BackupEntity, number>>;
+    BACKUP_SNAPSHOT_ENTITIES.map((entity) => [entity, (file.entities[entity] ?? []).length]),
+  ) as Partial<Record<BackupSnapshotEntity, number>>;
 
   return { status: 'restored', importedAt, importedCounts };
 }
 
 /** Human labels + formatted counts for the preview (no raw table names). */
 export function describePortableCounts(
-  counts: Partial<Record<BackupEntity, number>>,
+  counts: Partial<Record<BackupSnapshotEntity, number>>,
 ): { label: string; count: number }[] {
-  return BACKUP_ENTITIES.filter((entity) => (counts[entity] ?? 0) > 0).map((entity) => ({
+  return BACKUP_SNAPSHOT_ENTITIES.filter((entity) => (counts[entity] ?? 0) > 0).map((entity) => ({
     label: PORTABLE_DOMAIN_LABELS[entity],
     count: counts[entity] ?? 0,
   }));

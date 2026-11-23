@@ -43,6 +43,7 @@ import {
   BackupGenerationConflictError,
   readActiveBackupGenerationConflict,
 } from '@/core/backup/generations/conflict';
+import { readRewardBackupRows } from '@/core/backup/backupRewards';
 import { canonicalGenerationRows, generationRowPayloads } from './generationFormat';
 import { GENERATION_PAYLOAD_BYTES, utf8Bytes } from './requestBudget';
 import {
@@ -51,6 +52,9 @@ import {
   BACKUP_SCHEMA_VERSION,
   BACKUP_SETTINGS_VERSION,
   BACKUP_SCOPE_VERSION,
+  BACKUP_SNAPSHOT_SCOPE_VERSION,
+  BACKUP_SNAPSHOT_ENTITIES,
+  isBackupRewardEntity,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V8_ENTITY_SET,
   backupEntityColumnsForScope,
@@ -333,18 +337,12 @@ async function captureInto(
     const expectedChunks: Record<string, number> = {};
     const manifestEntities: Record<string, { rows: number; checksum: string }> = {};
 
-    for (const entity of BACKUP_ENTITIES) {
-      const columns = BACKUP_ENTITY_COLUMNS[entity];
-      const rows = await transactionDb.getAllAsync<Record<string, unknown>>(
-        `SELECT ${columns.join(', ')} FROM ${entity} ORDER BY id ASC`,
-      );
-      // Project onto the canonical column set so the capture is decoupled from
-      // local-only columns.
-      const projected = rows.map((row) => {
-        const out: Record<string, unknown> = {};
-        for (const column of columns) if (row[column] !== undefined) out[column] = row[column];
-        return out;
-      });
+    for (const entity of BACKUP_SNAPSHOT_ENTITIES) {
+      const projected = isBackupRewardEntity(entity)
+        ? await readRewardBackupRows(transactionDb, entity)
+        : await transactionDb.getAllAsync<Record<string, unknown>>(
+            `SELECT ${BACKUP_ENTITY_COLUMNS[entity].join(', ')} FROM ${entity} ORDER BY id ASC`,
+          );
 
       let ordinal = 0;
       for (const payload of generationRowPayloads(projected)) {
@@ -381,7 +379,7 @@ async function captureInto(
 
     const scope = currentGenerationScope({
       backupSchemaVersion: BACKUP_SCHEMA_VERSION,
-      scopeVersion: BACKUP_SCOPE_VERSION,
+      scopeVersion: BACKUP_SNAPSHOT_SCOPE_VERSION,
       settingsVersion: BACKUP_SETTINGS_VERSION,
     });
     const manifest = canonicalGenerationRows([
@@ -436,6 +434,11 @@ async function captureInto(
       ...capture,
       chunks,
     });
+    await setAppMetaText(
+      transactionDb,
+      appMetaKeys.backupRewardSnapshotScope,
+      String(scope.scopeVersion),
+    );
     return { capture, chunks };
   }
 }

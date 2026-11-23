@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BACKUP_ENTITIES,
+  BACKUP_REWARD_ENTITIES,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET,
   backupEntityColumnsForScope,
   type BackupEntity,
@@ -375,7 +376,12 @@ describe('portable envelope build + validate round trip', () => {
 
   it('verifies a frozen scope-6 file without hashing the new metadata columns', () => {
     const file = buildFixture();
+    file.formatVersion = 2;
     file.backupScopeVersion = 6;
+    for (const entity of BACKUP_REWARD_ENTITIES) {
+      delete file.entities[entity];
+      delete file.integrity.entities[entity];
+    }
     const columns = backupEntityColumnsForScope(6);
     delete file.entities.todo_recurrence_series;
     delete file.integrity.entities.todo_recurrence_series;

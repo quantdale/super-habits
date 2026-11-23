@@ -25,10 +25,25 @@ signatures, database schema version, date-key cutover, `account.*` state,
 session material, calories view-mode, command-center preferences, or
 internal rollout flags.
 
+Immutable cloud scope 10 MUST also capture `gamification_events`,
+`gamification_streak_freezes`, `gamification_quests`, and
+`gamification_badges` as owner-scoped, checksummed generation chunks.
+Individual reward rows stay outside the mutable Scope 9 manifest and
+outbox. Restore MUST validate and write reward history in the same SQLite
+transaction as the rest of the backup, without running the award engine.
+
+#### Scenario: Restore a published generation written before scope 10
+
+- **WHEN** an eligible empty device restores an older cloud backup
+- **THEN** the reward ledger starts empty with level 1, 0 XP, and no
+  earned or spent freezes
+- **AND** historical activity is not awarded again after restore.
+
 #### Scenario: Recovery scope is complete but bounded
 
 - **WHEN** a user backs up a populated device
-- **THEN** every row of every recoverable table (including soft-delete tombstones) and the settings snapshot are durably enqueued owner-scoped
+- **THEN** mutable recoverable rows (including tombstones) and the settings snapshot are durably enqueued owner-scoped
+- **AND** reward history is captured in the immutable generation
 - **AND** the execution ledgers and device/internal state are never uploaded
 
 #### Scenario: Settings payload contains only allowlisted keys

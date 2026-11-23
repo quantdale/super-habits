@@ -90,7 +90,7 @@
       <h1>super-habits — Privacy Policy</h1>
       <p class="meta">
         <strong>Effective date:</strong> <code>[OWNER ACTION: publication date]</code> (draft
-        revised 2026-09-25)<br />
+        revised 2026-11-23)<br />
         <strong>Applies to:</strong> super-habits 1.0.0 — web (PWA), Android, and iOS builds from
         this repository.
       </p>
@@ -106,8 +106,8 @@
       <h2>The short version</h2>
       <ul>
         <li>
-          super-habits works fully offline. Your tasks, habits, workouts, meals, and settings live in
-          a database <strong>on your device</strong>.
+          super-habits works fully offline. Your tasks, habits, workouts, meals, and settings live
+          in a database <strong>on your device</strong>.
         </li>
         <li>
           No registration step is needed, and there are
@@ -119,7 +119,10 @@
           app context to a model provider. See "AI-assisted requests" below.
         </li>
         <li>An <strong>optional email</strong> is used only to protect and recover that backup.</li>
-        <li>Rewards (XP, streaks, badges) never leave your device and are never backed up.</li>
+        <li>
+          Reward history (XP, streak freezes, quests, and badges) is included in portable exports
+          and in cloud backups when cloud backup is enabled.
+        </li>
       </ul>
 
       <h2>1. Data stored on your device</h2>
@@ -146,13 +149,8 @@
           <strong>What is included:</strong> todos, habits, habit completions, focus (Pomodoro)
           sessions, saved meals and calorie entries, the full workout structure and history
           (routines, exercises, sets, weekly plans, date overrides, body weight), linked-action
-          rules, planning entities (projects, goals, daily plans, weekly reviews), and an allowlist
-          of settings, plus an integrity manifest used to verify restores.
-        </li>
-        <li>
-          <strong>What is NOT included:</strong> your rewards state (XP, levels, streaks, quests,
-          badges) is intentionally local-only and is never uploaded or backed up. A restore starts
-          rewards from the activity that survived.
+          rules, planning entities (projects, goals, daily plans, weekly reviews), reward history,
+          and an allowlist of settings, plus an integrity manifest used to verify restores.
         </li>
         <li>
           <strong>Direction:</strong> backup is a <strong>one-way push plus restore</strong>, not
@@ -321,6 +319,10 @@
           2026-09-25 — draft correction: configured automatic backup, possible anonymous Auth
           bootstrap, and enabled AI-provider requests disclosed; effective date and provider terms
           remain owner review items.
+        </li>
+        <li>
+          2026-11-23 — draft correction: current portable exports and enabled cloud backups include
+          reward history.
         </li>
       </ul>
 

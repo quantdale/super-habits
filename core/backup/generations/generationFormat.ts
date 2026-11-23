@@ -2,6 +2,8 @@ import { sha256Hex } from '@/lib/checksum';
 import {
   BACKUP_SCHEMA_VERSION,
   BACKUP_SCOPE_VERSION,
+  BACKUP_SNAPSHOT_SCOPE_VERSION,
+  BACKUP_SNAPSHOT_ENTITIES,
   BACKUP_SETTINGS_VERSION,
   resolveBackupScope,
 } from '@/core/backup/backup.types';
@@ -114,7 +116,7 @@ export function parseGenerationManifest(
   if (
     !supportedWriteProtocols.includes(manifest.protocolVersion) ||
     manifest.backupSchemaVersion !== BACKUP_SCHEMA_VERSION ||
-    ![7, 8, BACKUP_SCOPE_VERSION].includes(manifest.scopeVersion) ||
+    ![7, 8, BACKUP_SCOPE_VERSION, BACKUP_SNAPSHOT_SCOPE_VERSION].includes(manifest.scopeVersion) ||
     manifest.settingsVersion !== BACKUP_SETTINGS_VERSION
   )
     return fail('unsupported protocol or scope');
@@ -137,14 +139,17 @@ export function parseGenerationManifest(
   ) {
     return fail('entity metadata missing');
   }
-  const scope = resolveBackupScope({
-    backupScopeVersion: manifest.scopeVersion,
-    entityMetadata: Object.fromEntries(
-      Object.entries(manifest.entities).filter(([key]) => key !== 'user_backup_settings'),
-    ),
-  });
-  if (!scope) return fail('unsupported recoverable scope');
-  const entities: string[] = [...scope.entitySet, 'user_backup_settings'];
+  const scopeEntities =
+    manifest.scopeVersion === BACKUP_SNAPSHOT_SCOPE_VERSION
+      ? BACKUP_SNAPSHOT_ENTITIES
+      : resolveBackupScope({
+          backupScopeVersion: manifest.scopeVersion,
+          entityMetadata: Object.fromEntries(
+            Object.entries(manifest.entities).filter(([key]) => key !== 'user_backup_settings'),
+          ),
+        })?.entitySet;
+  if (!scopeEntities) return fail('unsupported recoverable scope');
+  const entities: string[] = [...scopeEntities, 'user_backup_settings'];
   if (
     Object.keys(manifest.entities).length !== entities.length ||
     Object.keys(manifest.entities).some((entity) => !entities.includes(entity))
@@ -187,7 +192,7 @@ export function decodeGenerationContents(
   for (const chunk of chunks) {
     if (
       chunk.snapshotId !== manifest.snapshotId ||
-      !(chunk.entity in manifest.entities) ||
+      !Object.prototype.hasOwnProperty.call(manifest.entities, chunk.entity) ||
       !Number.isSafeInteger(chunk.ordinal) ||
       chunk.ordinal < 0 ||
       typeof chunk.payload !== 'string' ||

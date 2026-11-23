@@ -1,6 +1,6 @@
 # super-habits — Privacy Policy (draft for owner review)
 
-**Effective date:** `[OWNER ACTION: publication date]` (draft revised 2026-09-25)
+**Effective date:** `[OWNER ACTION: publication date]` (draft revised 2026-11-23)
 
 **Applies to:** super-habits 1.0.0 — web (PWA), Android, and iOS builds from
 this repository.
@@ -23,8 +23,8 @@ this repository.
   text and selected app context to a model provider. See "AI-assisted
   requests" below.
 - An **optional email** is used only to protect and recover that backup.
-- Rewards (XP, streaks, badges) never leave your device and are never backed
-  up.
+- Reward history (XP, streak freezes, quests, and badges) is included in
+  portable exports and in cloud backups when cloud backup is enabled.
 
 ## 1. Data stored on your device
 
@@ -49,11 +49,8 @@ If the service is not configured or is unavailable, local use continues.
   sessions, saved meals and calorie entries, the full workout structure and
   history (routines, exercises, sets, weekly plans, date overrides, body
   weight), linked-action rules, planning entities (projects, goals, daily
-  plans, weekly reviews), and an allowlist of settings, plus an integrity
-  manifest used to verify restores.
-- **What is NOT included:** your rewards state (XP, levels, streaks, quests,
-  badges) is intentionally local-only and is never uploaded or backed up. A
-  restore starts rewards from the activity that survived.
+  plans, weekly reviews), reward history, and an allowlist of settings,
+  plus an integrity manifest used to verify restores.
 - **Direction:** backup is a **one-way push plus restore**, not continuous
   two-way sync. Conflicting edits are not merged. Restore only runs onto a
   completely empty device and never replays historical side effects.
@@ -193,3 +190,5 @@ Questions about this policy or requests relating to your backup data:
 - 2026-09-25 — draft correction: configured automatic backup, possible
   anonymous Auth bootstrap, and enabled AI-provider requests disclosed;
   effective date and provider terms remain owner review items.
+- 2026-11-23 — draft correction: current portable exports and enabled cloud
+  backups include reward history.

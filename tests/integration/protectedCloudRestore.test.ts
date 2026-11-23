@@ -1,3 +1,4 @@
+import { BACKUP_ENTITIES, BACKUP_SCOPE_VERSION } from '@/core/backup/backup.types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { freshDatabase } from './helpers/db';
 import { portableOwnerFingerprint } from '@/lib/portableOwnerFingerprint';
@@ -53,19 +54,21 @@ function installRemote(owner: string) {
   const backup = file(owner, true);
   const tables: Record<string, Record<string, unknown>[]> = {
     ...Object.fromEntries(
-      Object.entries(backup.entities).map(([entity, rows]) => [
+      BACKUP_ENTITIES.map((entity) => [
         entity,
-        rows.map((row) => ({ ...row, user_id: owner })),
+        (backup.entities[entity] ?? []).map((row) => ({ ...row, user_id: owner })),
       ]),
     ),
     backup_manifest: [
       {
         user_id: owner,
         backup_schema_version: backup.backupSchemaVersion,
-        backup_scope_version: backup.backupScopeVersion,
+        backup_scope_version: BACKUP_SCOPE_VERSION,
         generation: 1,
         completed_at: stamp,
-        entity_metadata: backup.integrity.entities,
+        entity_metadata: Object.fromEntries(
+          BACKUP_ENTITIES.map((entity) => [entity, backup.integrity.entities[entity]]),
+        ),
         settings_version: backup.integrity.settings.version,
         settings_metadata: backup.integrity.settings,
       },

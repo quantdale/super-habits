@@ -29,11 +29,10 @@ trader declaration. All answers describe the app **as implemented**
   send submitted text and selected context through an Edge Function to a
   model provider. Provider-backed rollout and privacy terms remain subject
   to owner review; see `privacy-policy.md` "AI-assisted requests".
-- **Rewards are local-only:** XP/levels, streaks + freezes, rotating daily
-  quests, 36 badge tiers, celebration overlay, haptics + synthesized
-  tones. Reward state is never uploaded, backed up, or tied to an
-  account. There are no stakes, prizes, purchasable loot boxes, or
-  real-money play.
+- **Rewards:** XP/levels, streaks and freezes, rotating daily quests, badge
+  tiers, celebrations, haptics, and synthesized tones. Reward history is
+  included in portable exports and enabled cloud backups. There are no
+  stakes, prizes, purchasable loot boxes, or real-money play.
 - **No user-to-user surface:** no social feed, chat, comments, follows,
   shared profiles, or shared user content in `features/` product code.
   User-entered content can leave the device for configured backup and

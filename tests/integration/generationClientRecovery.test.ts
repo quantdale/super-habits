@@ -1,3 +1,9 @@
+import {
+  REWARD_DAY,
+  REWARD_TABLES,
+  readRewardHistory,
+  seedRewardHistory,
+} from './helpers/rewardBackupFixture';
 import { describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -7,6 +13,7 @@ import { GenerationRemoteDouble } from './helpers/generationRemoteDouble';
 import {
   BACKUP_ENTITIES,
   BACKUP_SCOPE_VERSION,
+  BACKUP_SNAPSHOT_SCOPE_VERSION,
   BACKUP_SETTINGS_VERSION,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET,
 } from '@/core/backup/backup.types';
@@ -27,7 +34,7 @@ function remote() {
   let failPublish = false;
   let capabilities = true;
   let capabilityProtocol = 2;
-  let capabilityScope = BACKUP_SCOPE_VERSION;
+  let capabilityScope = BACKUP_SNAPSHOT_SCOPE_VERSION;
   let failManifestRead = false;
   let raceNextPublish = false;
   let loseAcknowledgement = false;
@@ -37,7 +44,7 @@ function remote() {
       if (!capabilities) return { data: null, error: { message: 'missing capability RPC' } };
       if (
         name === 'backup_generation_capabilities' &&
-        (capabilityProtocol !== 2 || capabilityScope !== BACKUP_SCOPE_VERSION)
+        (capabilityProtocol !== 2 || capabilityScope !== BACKUP_SNAPSHOT_SCOPE_VERSION)
       ) {
         return {
           data: {
@@ -726,6 +733,34 @@ describe('review R3: actual capture → publication → restore contracts', () =
     },
   );
 
+  it('restores a preserved Scope 9 generation with an empty reward ledger', async () => {
+    const target = remote();
+    const source = await device(target.client);
+    await seedLegacy(source, target, 9);
+    await seedRewardHistory(source);
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    await expect(new SupabaseSyncAdapter().push([todoRecord])).rejects.toThrow(/conflict|review/i);
+    const head = target.generations.heads.get('user_a')!;
+    const metadata = target.generations.generations.get(`user_a:${head.snapshot_id}`)!;
+    expect(metadata.scope_version).toBe(9);
+    await source.closeAsync();
+
+    const destination = await device(target.client, false);
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    expect((await restoreFromRemoteBackupV2()).status).toBe('restored');
+    expect(await destination.getFirstAsync('SELECT title FROM todos')).toEqual({
+      title: 'Original',
+    });
+    expect(await readRewardHistory(destination)).toEqual([[], [], [], []]);
+    const { readGamificationSnapshot } = await import('@/features/gamification/gamification.data');
+    expect(await readGamificationSnapshot({ todayKey: REWARD_DAY })).toMatchObject({
+      totalXp: 0,
+      level: { level: 1 },
+      freezes: { earned: 0, used: 0, banked: 0 },
+    });
+    await destination.closeAsync();
+  });
+
   it('does not adopt a preserved remote legacy snapshot as the divergent local baseline', async () => {
     const target = remote();
     const db = await device(target.client);
@@ -1260,4 +1295,70 @@ describe('review R3: actual capture → publication → restore contracts', () =
     expect(await empty.getAllAsync('SELECT * FROM todos')).toEqual([]);
     await empty.closeAsync();
   });
+});
+
+it('preserves the reward ledger through cloud publication and restore', async () => {
+  const target = remote();
+  const source = await device(target.client);
+  await seedRewardHistory(source);
+  const { readGamificationSnapshot } = await import('@/features/gamification/gamification.data');
+  const snapshot = await readGamificationSnapshot({ todayKey: REWARD_DAY });
+  expect(snapshot.totalXp).toBe(181);
+  expect(snapshot.freezes).toMatchObject({ earned: 1, used: 1, banked: 0 });
+  const history = await readRewardHistory(source);
+  const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+  await new SupabaseSyncAdapter().push([todoRecord]);
+  expect(target.writes.filter((table) => REWARD_TABLES.some((reward) => reward === table))).toEqual(
+    [],
+  );
+  await source.closeAsync();
+
+  const destination = await device(target.client, false);
+  const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+  expect((await restoreFromRemoteBackupV2()).status).toBe('restored');
+  expect(await readRewardHistory(destination)).toEqual(history);
+  const restored = await import('@/features/gamification/gamification.data');
+  expect(await restored.readGamificationSnapshot({ todayKey: REWARD_DAY })).toEqual(snapshot);
+  await destination.closeAsync();
+});
+
+it('rejects a checksummed malformed cloud reward row before writing feature rows', async () => {
+  const target = remote();
+  const source = await device(target.client);
+  await seedRewardHistory(source);
+  await source.runAsync("UPDATE gamification_events SET xp = -1 WHERE event_kind = 'freeze_grant'");
+  const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+  // The transport double stores the actual checksummed bytes without doing
+  // domain validation. Restore must independently reject a malformed head.
+  await new SupabaseSyncAdapter().push([todoRecord]);
+  await source.closeAsync();
+
+  const destination = await device(target.client, false);
+  const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+  expect(await restoreFromRemoteBackupV2()).toMatchObject({
+    status: 'invalid',
+    reason: 'validation_failed',
+    diagnostics: [expect.stringContaining('gamification_events')],
+  });
+  expect(await destination.getAllAsync('SELECT id FROM todos')).toEqual([]);
+  expect(await readRewardHistory(destination)).toEqual([[], [], [], []]);
+  await destination.closeAsync();
+});
+
+it('rolls back feature rows and earlier reward inserts on a late cloud reward write failure', async () => {
+  const target = remote();
+  const source = await device(target.client);
+  await seedRewardHistory(source);
+  const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+  await new SupabaseSyncAdapter().push([todoRecord]);
+  await source.closeAsync();
+
+  const destination = await device(target.client, false);
+  await destination.execAsync(`CREATE TRIGGER reject_reward_badge BEFORE INSERT ON gamification_badges
+    BEGIN SELECT RAISE(ABORT, 'reward write failed'); END;`);
+  const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+  await expect(restoreFromRemoteBackupV2()).rejects.toThrow(/reward write failed/);
+  expect(await destination.getAllAsync('SELECT id FROM todos')).toEqual([]);
+  expect(await readRewardHistory(destination)).toEqual([[], [], [], []]);
+  await destination.closeAsync();
 });

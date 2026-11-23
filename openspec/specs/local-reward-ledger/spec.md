@@ -2,13 +2,17 @@
 
 ## Purpose
 
-Lock the shipped local-only reward ledger and require prior-day reconcile before streak-freeze spend so notification and command writes cannot look like a missed day.
+Define the reward ledger and require prior-day reconcile before streak-freeze spend so notification and command writes cannot look like a missed day.
 
 ## Requirements
 
-### Requirement: Reward state is local-only derived data
+### Requirement: Reward writes stay in the SQLite ledger
 
-The reward ledger (events, consumed freezes, completed quests, unlocked badges) MUST live only on the device. Reward writes MUST NOT enqueue durable backup intents, MUST NOT appear in Backup Completeness V2 or Portable Backup files, and MUST NOT count toward account-owned emptiness. A restore of user activity MUST start rewards from activity that actually survived rather than importing a remote ledger.
+The reward ledger records XP events, consumed freezes, completed quests, and
+unlocked badges. An award or freeze change MUST dirty the next snapshot and
+MUST NOT enqueue individual reward rows. Portable format 3 and cloud scope 10
+back up the ledger. Reward-only history counts as local content for account
+ownership and restore eligibility.
 
 #### Scenario: Awarding XP does not grow the outbox
 
@@ -16,11 +20,16 @@ The reward ledger (events, consumed freezes, completed quests, unlocked badges) 
 - **THEN** a `gamification_events` row exists
 - **AND** `sync_outbox` gains no row for that award
 
-#### Scenario: Restore does not import reward tables
+#### Scenario: Restore preserves reward progress
 
-- **WHEN** Restore V2 or a portable import runs on an eligible empty device
-- **THEN** no `gamification_*` tables are imported from the backup
-- **AND** subsequent rewards are computed from the restored feature rows plus new local activity
+- **WHEN** an eligible empty device restores a format 3 file or scope 10 cloud backup
+- **THEN** all four reward tables are restored in the same transaction as feature data
+- **AND** the original award receipts prevent replay and duplicate XP
+
+#### Scenario: A legacy restore has no reward history
+
+- **WHEN** an eligible empty device restores a backup from before rewards were included
+- **THEN** the ledger starts empty and imported activity does not earn XP during reconciliation
 
 ### Requirement: Awards are idempotent per action and day
 

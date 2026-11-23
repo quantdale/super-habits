@@ -139,6 +139,46 @@ async function outboxCount(db: TestDatabase): Promise<number> {
 }
 
 describe('backup completeness v2 checkpoint', () => {
+  it('captures rewards on upgrade and publishes later reward-only changes without outbox rows', async () => {
+    const { db, supabaseMock, checkpoint } = await load();
+    const { seedRewardHistory, REWARD_DAY } = await import('./helpers/rewardBackupFixture');
+    const { awardGamificationAction } = await import('@/features/gamification/gamification.data');
+    await checkpoint.runBackupMaintenance();
+    await seedRewardHistory(db);
+    // Simulate upgrades from Scope 9: the device already has reward rows,
+    // but those writers did not dirty the cloud backup when rewards changed.
+    expect(await outboxCount(db)).toBe(0);
+    expect(await checkpoint.runBackupMaintenance()).toEqual({ capturedManifest: true });
+    const first = supabaseMock.generationRemote.heads.get('user_a')!;
+    expect(await checkpoint.isBackupDirty()).toBe(false);
+
+    await awardGamificationAction({
+      kind: 'focus',
+      entityId: 'pom_1792195200000_abcdefgh',
+      todayKey: REWARD_DAY,
+    });
+    expect(await outboxCount(db)).toBe(0);
+    expect(await checkpoint.isBackupDirty()).toBe(true);
+    expect(await checkpoint.runBackupMaintenance()).toEqual({ capturedManifest: true });
+    const second = supabaseMock.generationRemote.heads.get('user_a')!;
+    expect(second.sequence).toBe(first.sequence + 1);
+    expect(
+      supabaseMock.generationRemote.generationRows(
+        'user_a',
+        second.snapshot_id,
+        'gamification_events',
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source_key: 'pom_1792195200000_abcdefgh' }),
+      ]),
+    );
+    expect(supabaseMock.upserted.some(({ entity }) => entity.startsWith('gamification_'))).toBe(
+      false,
+    );
+    await db.closeAsync();
+  });
+
   it('reports whether a manifest was captured so callers can skip redundant refreshes', async () => {
     const { checkpoint } = await load();
 

@@ -1,3 +1,4 @@
+import { BACKUP_REWARD_ENTITIES } from '@/core/backup/backup.types';
 import type * as SQLite from 'expo-sqlite';
 
 export const ACCOUNT_USER_TABLES = [
@@ -25,6 +26,7 @@ export const ACCOUNT_USER_TABLES = [
   'projects',
   'goals',
   'daily_plans',
+  ...BACKUP_REWARD_ENTITIES,
 ] as const;
 
 export type AccountUserTable = (typeof ACCOUNT_USER_TABLES)[number];

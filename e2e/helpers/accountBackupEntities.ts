@@ -70,9 +70,16 @@ const scope6 = [
 const scope7 = [...scope6] as const;
 const scope8 = [...scope7, 'todo_recurrence_series'] as const;
 const scope9 = [...scope8] as const;
+const scope10 = [
+  ...scope9,
+  'gamification_events',
+  'gamification_streak_freezes',
+  'gamification_quests',
+  'gamification_badges',
+] as const;
 
 export const BACKUP_GENERATION_ENTITY_SCOPES: Readonly<
-  Record<number, readonly BackupRestEntity[]>
+  Record<number, readonly (typeof scope10)[number][]>
 > = {
   2: scope2,
   3: scope3,
@@ -82,6 +89,7 @@ export const BACKUP_GENERATION_ENTITY_SCOPES: Readonly<
   7: scope7,
   8: scope8,
   9: scope9,
+  10: scope10,
 };
 
 export function isBackupRestEntity(name: string): name is BackupRestEntity {

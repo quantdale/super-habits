@@ -1,3 +1,4 @@
+import { appMetaKeys, getAppMetaText, setAppMetaText } from '@/core/db/appMeta';
 /**
  * Gamification persistence + canonical day facts.
  *
@@ -7,8 +8,7 @@
  *  2. read today's counts straight from the authoritative feature tables so a
  *     quest or a level is always a function of real activity.
  *
- * Every write here is local-only: nothing enqueues to the outbox, because
- * rewards are derived state rather than user-owned content. `awardGamificationAction`
+ * Reward writes mark the next backup snapshot dirty without enqueuing rows. `awardGamificationAction`
  * is idempotent on (kind, source key), so the fast path (a screen reporting a
  * completed action) and the reconciler (notification quick-actions, command
  * center, anything that wrote without telling us) can both call it safely.
@@ -389,8 +389,7 @@ async function loadFreezeState(db: Db, snapshot?: LedgerSnapshot): Promise<Strea
  * "active" predicate `streakDaysFromSnapshot` reads, so the release decision
  * and the streak reading can never disagree.
  *
- * Releasing is idempotent and local-only: freeze rows are never synced or
- * backed up. Callers that then read freeze state through a pass snapshot must
+ * Releasing is idempotent and dirties the next backup snapshot. Callers that then read freeze state through a pass snapshot must
  * treat that snapshot as stale (re-read the ledger), because the snapshot was
  * built BEFORE these rows were deleted.
  *
@@ -410,6 +409,7 @@ export async function releaseStaleFreezes(db: Db): Promise<string[]> {
   for (const row of stale) {
     await db.runAsync(`DELETE FROM gamification_streak_freezes WHERE date_key = ?`, [row.date_key]);
   }
+  await setAppMetaText(db, appMetaKeys.backupDirty, '1');
   return stale.map((row) => row.date_key);
 }
 
@@ -856,6 +856,7 @@ async function computeAward(input: {
         ...newBadges.map((badge) => badge.id),
       ].sort();
     }
+    await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
     return { award, newBadges };
   });
 
@@ -908,77 +909,93 @@ type ActivityCandidate = { kind: ActionKind; entityId: string };
  */
 async function loadActivityCandidates(db: Db, todayKey: string): Promise<ActivityCandidate[]> {
   const { startUtcIso, endUtcExclusiveIso } = getUtcIsoRangeForLocalDateKeys(todayKey, todayKey);
+  const restoredAt = await getAppMetaText(db, appMetaKeys.rewardRestoreAt);
   const [habits, todos, focus, workouts, nutrition, plans, reviews] = await Promise.all([
     // `habit_id`, not the completion row id: the reward key must match what a
     // screen passes (`habitId`), or reconcile would pay the same check-in twice.
     db.getAllAsync<{ id: string }>(
       `SELECT c.habit_id AS id FROM habit_completions c WHERE c.date_key = ? AND c.count > 0
+          AND (? IS NULL OR c.updated_at > ?)
           AND NOT EXISTS (
             SELECT 1 FROM gamification_events e
              WHERE e.event_kind = 'habit' AND e.source_key = c.date_key || ':' || c.habit_id
           )
         ORDER BY c.created_at ASC, c.id ASC LIMIT ?`,
-      [todayKey, RECONCILE_AWARD_LIMIT],
+      [todayKey, restoredAt, restoredAt, RECONCILE_AWARD_LIMIT],
     ),
     db.getAllAsync<{ id: string }>(
       `SELECT t.id FROM todos t
         WHERE t.completed = 1 AND t.deleted_at IS NULL AND t.completed_at >= ? AND t.completed_at < ?
+          AND (? IS NULL OR t.completed_at > ?)
           AND NOT EXISTS (
             SELECT 1 FROM gamification_events e
              WHERE e.event_kind = 'todo'
                AND (e.source_key = ? || ':' || t.id OR (e.source_key = t.id AND e.date_key = ?))
           )
         ORDER BY t.completed_at ASC, t.id ASC LIMIT ?`,
-      [startUtcIso, endUtcExclusiveIso, todayKey, todayKey, RECONCILE_AWARD_LIMIT],
+      [
+        startUtcIso,
+        endUtcExclusiveIso,
+        restoredAt,
+        restoredAt,
+        todayKey,
+        todayKey,
+        RECONCILE_AWARD_LIMIT,
+      ],
     ),
     db.getAllAsync<{ id: string }>(
       `SELECT f.id FROM pomodoro_sessions f
         WHERE f.session_type = 'focus' AND f.ended_at IS NOT NULL AND f.duration_seconds > 0
           AND f.started_at >= ? AND f.started_at < ?
+          AND (? IS NULL OR f.ended_at > ?)
           AND NOT EXISTS (
             SELECT 1 FROM gamification_events e
              WHERE e.event_kind = 'focus' AND e.source_key = f.id
           )
         ORDER BY f.started_at ASC, f.id ASC LIMIT ?`,
-      [startUtcIso, endUtcExclusiveIso, RECONCILE_AWARD_LIMIT],
+      [startUtcIso, endUtcExclusiveIso, restoredAt, restoredAt, RECONCILE_AWARD_LIMIT],
     ),
     db.getAllAsync<{ id: string }>(
       `SELECT w.id FROM workout_logs w WHERE w.completed_at >= ? AND w.completed_at < ?
+          AND (? IS NULL OR w.completed_at > ?)
           AND NOT EXISTS (
             SELECT 1 FROM gamification_events e
              WHERE e.event_kind = 'workout' AND e.source_key = w.id
           )
         ORDER BY w.completed_at ASC, w.id ASC LIMIT ?`,
-      [startUtcIso, endUtcExclusiveIso, RECONCILE_AWARD_LIMIT],
+      [startUtcIso, endUtcExclusiveIso, restoredAt, restoredAt, RECONCILE_AWARD_LIMIT],
     ),
     db.getFirstAsync<{ id: string }>(
       `SELECT n.id FROM calorie_entries n
         WHERE n.deleted_at IS NULL AND n.consumed_on = ?
+          AND (? IS NULL OR n.created_at > ?)
           AND NOT EXISTS (
             SELECT 1 FROM gamification_events e
              WHERE e.event_kind = 'nutrition' AND e.source_key = n.consumed_on
           ) LIMIT 1`,
-      [todayKey],
+      [todayKey, restoredAt, restoredAt],
     ),
     db.getAllAsync<{ id: string }>(
       `SELECT p.id FROM daily_plans p
         WHERE p.deleted_at IS NULL AND p.date_key = ? AND p.status IN ('committed', 'completed')
+          AND (? IS NULL OR p.updated_at > ?)
           AND NOT EXISTS (
             SELECT 1 FROM gamification_events e
              WHERE e.event_kind = 'plan' AND e.source_key = p.id
           ) LIMIT ?`,
-      [todayKey, RECONCILE_AWARD_LIMIT],
+      [todayKey, restoredAt, restoredAt, RECONCILE_AWARD_LIMIT],
     ),
     db.getAllAsync<{ id: string }>(
       `SELECT r.id FROM weekly_reviews r
         WHERE r.status = 'completed' AND r.deleted_at IS NULL
           AND r.completed_at >= ? AND r.completed_at < ?
+          AND (? IS NULL OR r.completed_at > ?)
           AND NOT EXISTS (
             SELECT 1 FROM gamification_events e
              WHERE e.event_kind = 'review' AND e.source_key = r.id
           )
         ORDER BY r.completed_at ASC, r.id ASC LIMIT ?`,
-      [startUtcIso, endUtcExclusiveIso, RECONCILE_AWARD_LIMIT],
+      [startUtcIso, endUtcExclusiveIso, restoredAt, restoredAt, RECONCILE_AWARD_LIMIT],
     ),
   ]);
 
@@ -1060,23 +1077,26 @@ export async function ensureStreakFreeze(
 ): Promise<{ savedDateKeys: string[] } | null> {
   const todayKey = options.todayKey ?? toDateKey();
   const db = await getDatabase();
-  let ledger = await readLedgerSnapshot(db);
-  const released = await releaseStaleFreezes(db);
-  if (released.length > 0) ledger = await readLedgerSnapshot(db);
-  const [streakDays, freezes] = await Promise.all([
-    loadStreakDays(db, ledger),
-    loadFreezeState(db, ledger),
-  ]);
-  const savedDateKeys = planAutoFreeze({ days: streakDays, todayKey, banked: freezes.banked });
-  if (savedDateKeys.length === 0) return null;
-  const savedAt = nowIso();
-  for (const savedDateKey of savedDateKeys) {
-    await db.runAsync(
-      `INSERT OR IGNORE INTO gamification_streak_freezes (date_key, saved_at) VALUES (?, ?)`,
-      [savedDateKey, savedAt],
-    );
-  }
-  return { savedDateKeys };
+  return withSQLiteTransaction(db, async (transactionDb) => {
+    let ledger = await readLedgerSnapshot(transactionDb);
+    const released = await releaseStaleFreezes(transactionDb);
+    if (released.length > 0) ledger = await readLedgerSnapshot(transactionDb);
+    const [streakDays, freezes] = await Promise.all([
+      loadStreakDays(transactionDb, ledger),
+      loadFreezeState(transactionDb, ledger),
+    ]);
+    const savedDateKeys = planAutoFreeze({ days: streakDays, todayKey, banked: freezes.banked });
+    if (savedDateKeys.length === 0) return null;
+    const savedAt = nowIso();
+    for (const savedDateKey of savedDateKeys) {
+      await transactionDb.runAsync(
+        `INSERT OR IGNORE INTO gamification_streak_freezes (date_key, saved_at) VALUES (?, ?)`,
+        [savedDateKey, savedAt],
+      );
+    }
+    await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
+    return { savedDateKeys };
+  });
 }
 
 /**
@@ -1111,9 +1131,7 @@ export async function runGamificationHousekeeping(
   for (let offset = GAMIFICATION_RECONCILE_LOOKBACK_DAYS - 1; offset >= 0; offset -= 1) {
     await reconcileDayAwards(db, shiftDateKey(todayKey, -offset), ledger);
   }
-  // Freeze rows whose day the pass just made active are released BEFORE freeze
-  // planning reads them, and `ensureStreakFreeze` re-reads the ledger itself,
-  // so the refreshed bank is what gets planned against (audit C #2).
-  await releaseStaleFreezes(db);
+  // Freeze planning releases rows whose day the pass made active and
+  // recalculates the bank before spending it.
   await ensureStreakFreeze({ todayKey });
 }

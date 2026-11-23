@@ -1,7 +1,8 @@
+import { readRewardBackupRows } from '@/core/backup/backupRewards';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { getLocalDatasetOwner, readImportOriginFingerprint } from '@/core/auth/account.data';
-import { BACKUP_ENTITIES } from '@/core/backup/backup.types';
+import { BACKUP_ENTITIES, BACKUP_REWARD_ENTITIES } from '@/core/backup/backup.types';
 import {
   canonicalSettingsPayloadText,
   readRecoverableSettings,
@@ -20,7 +21,7 @@ import {
   formatBytes,
 } from '@/core/portable/portableFormat';
 import { PORTABLE_V1_MAX_BYTES } from '@/core/portable/portable.types';
-import type { BackupEntity, RecoverableSettingsV2 } from '@/core/backup/backup.types';
+import type { BackupSnapshotEntity, RecoverableSettingsV2 } from '@/core/backup/backup.types';
 
 /**
  * Portable backup export — user-controlled, offline, read-only.
@@ -39,7 +40,7 @@ import type { BackupEntity, RecoverableSettingsV2 } from '@/core/backup/backup.t
  */
 
 export type PortableSnapshot = {
-  rowsByEntity: Partial<Record<BackupEntity, Record<string, unknown>[]>>;
+  rowsByEntity: Partial<Record<BackupSnapshotEntity, Record<string, unknown>[]>>;
   settings: RecoverableSettingsV2;
   ownerFingerprint: string | null;
 };
@@ -60,12 +61,15 @@ async function capturePortableSnapshot(
   db: Awaited<ReturnType<typeof getDatabase>>,
 ): Promise<PortableSnapshot> {
   return withSQLiteTransaction(db, async (transactionDb) => {
-    const rowsByEntity: Partial<Record<BackupEntity, Record<string, unknown>[]>> = {};
+    const rowsByEntity: Partial<Record<BackupSnapshotEntity, Record<string, unknown>[]>> = {};
     for (const entity of BACKUP_ENTITIES) {
       // Entity names are compile-time constants; no file input reaches SQL.
       rowsByEntity[entity] = await transactionDb.getAllAsync<Record<string, unknown>>(
         `SELECT * FROM ${entity} ORDER BY id ASC`,
       );
+    }
+    for (const entity of BACKUP_REWARD_ENTITIES) {
+      rowsByEntity[entity] = await readRewardBackupRows(transactionDb, entity);
     }
     // Theme lives in AsyncStorage and is read close to the SQLite snapshot;
     // the caller re-verifies the combined canonical settings text after the

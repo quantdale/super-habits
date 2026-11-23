@@ -14,10 +14,7 @@ import {
   computePortablePayloadChecksum,
   validatePortableBackupFile,
 } from '@/core/portable/portableFormat';
-import {
-  PORTABLE_BACKUP_FORMAT,
-  PORTABLE_BACKUP_FORMAT_VERSION,
-} from '@/core/portable/portable.types';
+import { PORTABLE_BACKUP_FORMAT } from '@/core/portable/portable.types';
 
 /**
  * Historical compatibility: a genuine Scope-5-era portable file (formatVersion
@@ -116,7 +113,7 @@ function buildGenuineScope5File(): Record<string, unknown> {
 
   const file = {
     format: PORTABLE_BACKUP_FORMAT,
-    formatVersion: PORTABLE_BACKUP_FORMAT_VERSION,
+    formatVersion: 2,
     backupSchemaVersion: BACKUP_SCHEMA_VERSION,
     backupScopeVersion: 5,
     exportedAt: '2026-08-15T00:00:00.000Z',

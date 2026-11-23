@@ -41,6 +41,17 @@ const entities = [
   'workout_schedule_overrides',
   'body_weight_entries',
 ];
+const rewardEntities = [
+  'gamification_events',
+  'gamification_streak_freezes',
+  'gamification_quests',
+  'gamification_badges',
+];
+function generationEntities(scope) {
+  if (scope === 7) return entities;
+  const featureEntities = [...entities, 'todo_recurrence_series'];
+  return scope === 10 ? [...featureEntities, ...rewardEntities] : featureEntities;
+}
 const ownerA = '11111111-1111-4111-8111-111111111111';
 const ownerB = '22222222-2222-4222-8222-222222222222';
 const literal = (value) => `'${String(value).replaceAll("'", "''")}'`;
@@ -170,11 +181,13 @@ async function productionGeneration(
     );
     return mod.exports;
   };
-  const { validateBackupRow, validateBackupGraph } = load('core/backup/backupValidators.ts');
+  const { validateBackupRow, validateBackupSnapshotRow, validateBackupGraph } = load(
+    'core/backup/backupValidators.ts',
+  );
   for (const [entity, values] of Object.entries(rows))
     for (const row of values)
       assert.deepEqual(
-        validateBackupRow(entity, row),
+        validateBackupSnapshotRow(entity, row),
         { ok: true, row },
         'production protocol fixture must satisfy actual Restore validators',
       );
@@ -185,7 +198,7 @@ async function productionGeneration(
   );
   const captureModule = load('core/backup/generations/capture.ts');
   const { capture, chunks } =
-    scopeVersion < 9
+    scopeVersion < 10
       ? captureModule.withReservedGenerationSequence(
           captureModule.captureVerifiedRows({
             ownerUserId: ownerA,
@@ -203,7 +216,7 @@ async function productionGeneration(
     Object.keys(JSON.parse(capture.manifest)[0].entities).filter(
       (key) => key !== 'user_backup_settings',
     ),
-    scopeVersion === 7 ? entities : [...entities, 'todo_recurrence_series'],
+    generationEntities(scopeVersion),
     'SQL qualification entity contract drifted from production capture',
   );
   return {
@@ -231,7 +244,7 @@ function generation(snapshotId, sequence, options = {}) {
   const chunks = [];
   const descriptions = {};
   const scopeVersion = options.scopeVersion ?? 7;
-  const captureEntities = scopeVersion === 7 ? entities : [...entities, 'todo_recurrence_series'];
+  const captureEntities = generationEntities(scopeVersion);
   for (const entity of captureEntities) {
     const all = rows[entity] ?? [];
     descriptions[entity] = { rows: all.length, checksum: sha(canonicalRows(all)) };
@@ -1068,6 +1081,7 @@ export async function qualifyBackupGenerations(options = {}) {
       '20261020090000_enforce_backup_publication_provenance.sql',
       '20261115090000_add_recoverable_todo_recurrence.sql',
       '20261115100000_add_recurring_spawn_provenance.sql',
+      '20261123140000_add_reward_snapshot_scope.sql',
     ]) {
       ok(fs.readFileSync(path.join(root, 'supabase/migrations', file), 'utf8'));
       migrations.push(file);
@@ -1078,7 +1092,7 @@ export async function qualifyBackupGenerations(options = {}) {
       content_verification_version: 1,
       sequence_reservation_version: 1,
       backup_schema_version: 2,
-      scope_version: 9,
+      scope_version: 10,
       settings_version: 5,
     });
     assert.equal(
@@ -1376,6 +1390,121 @@ export async function qualifyBackupGenerations(options = {}) {
       'historical Scope-7/8 preservation remains publishable without rewriting current recovery bytes',
     );
 
+    const rewardRows = {
+      ...currentRows,
+      gamification_events: [
+        {
+          id: 'gxp_1792195200000_abcdef12',
+          event_kind: 'freeze_grant',
+          source_key: 'freeze:7',
+          xp: 0,
+          date_key: '2026-10-17',
+          created_at: timestamp,
+        },
+      ],
+      gamification_streak_freezes: [
+        {
+          id: '2026-10-18',
+          date_key: '2026-10-18',
+          saved_at: timestamp,
+        },
+      ],
+      gamification_quests: [
+        {
+          id: '2026-10-17:focus_sprint',
+          date_key: '2026-10-17',
+          quest_id: 'focus_sprint',
+          completed_at: timestamp,
+        },
+      ],
+      gamification_badges: [
+        {
+          id: 'focus:1',
+          badge_id: 'focus:1',
+          family: 'focus',
+          tier: 1,
+          unlocked_at: timestamp,
+          date_key: '2026-10-17',
+        },
+      ],
+    };
+    const rewards = await productionGeneration(
+      'scope10_rewards',
+      reserveCurrent('scope10_rewards'),
+      rewardRows,
+      10,
+      currentHead,
+    );
+    uploadCurrent(rewards);
+    assert.equal(ok(publishCurrent(rewards), ownerA), `scope10_rewards:${rewards.sequence}`);
+    currentHead = { snapshotId: rewards.snapshotId, sequence: rewards.sequence };
+    assert.equal(
+      ok(
+        "SELECT count(*) FROM public.backup_generation_chunk WHERE entity LIKE 'gamification_%';",
+        ownerA,
+      ),
+      '4',
+    );
+    assert.equal(
+      ok(
+        "SELECT count(*) FROM public.backup_generation_chunk WHERE entity LIKE 'gamification_%';",
+        ownerB,
+      ),
+      '0',
+    );
+    checks.push('Scope 10 production capture publishes four owner-scoped reward streams');
+
+    const badRewardCases = [
+      [
+        'negative freeze XP',
+        { gamification_events: [{ ...rewardRows.gamification_events[0], xp: -1 }] },
+        /invalid reward row/,
+      ],
+      [
+        'mismatched freeze key',
+        {
+          gamification_streak_freezes: [
+            { ...rewardRows.gamification_streak_freezes[0], id: '2026-10-17' },
+          ],
+        },
+        /invalid reward row/,
+      ],
+      [
+        'duplicate reward receipt',
+        {
+          gamification_events: [
+            ...rewardRows.gamification_events,
+            { ...rewardRows.gamification_events[0], id: 'gxp_1792195200001_abcdef12' },
+          ],
+        },
+        /duplicate recovery unique key/,
+      ],
+      [
+        'broken Scope 9 spawn parent in Scope 10',
+        {
+          todos: [
+            validTodo('todo_1792195200000_abcdef12', {
+              recurrence_spawned_by_id: 'todo_1792195200001_abcdef12',
+            }),
+          ],
+        },
+        /missing or self completion-spawn parent/,
+      ],
+    ];
+    for (const [name, patch, pattern] of badRewardCases) {
+      const id = `scope10_bad_${checks.length}`;
+      const bad = generation(id, reserveCurrent(id), {
+        scopeVersion: 10,
+        rows: { ...rewardRows, ...patch },
+      });
+      uploadCurrent(bad);
+      rejected(name, publishCurrent(bad), ownerA, pattern);
+      assert.equal(
+        ok('SELECT snapshot_id FROM public.backup_generation_head;', ownerA),
+        rewards.snapshotId,
+      );
+    }
+
     const report = {
       passed: checks.length,
       checks,
@@ -1384,7 +1513,7 @@ export async function qualifyBackupGenerations(options = {}) {
       postgres: ok('SHOW server_version;'),
       limitations: [
         'Local PostgreSQL uses a minimal auth.uid()/role shim; hosted Auth/PostgREST and deployment remain separate qualification.',
-        'Historical Scope-7/8 and current Scope-9 SQL are qualified with an auth/role shim and a feature-table ALTER shell; hosted API and locale-specific saved-meal case folding remain separate qualification.',
+        'Historical Scope 7–9 and current Scope 10 SQL are qualified with an auth/role shim and a feature-table ALTER shell; hosted API and locale-specific saved-meal case folding remain separate qualification.',
       ],
     };
     fs.writeFileSync(path.join(evidence, 'report.json'), JSON.stringify(report, null, 2));

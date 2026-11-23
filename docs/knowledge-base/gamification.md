@@ -1,20 +1,28 @@
 # Gamification (XP, streaks, quests, badges)
 
-Local-only reward layer. It reads the authoritative feature tables and writes
-only to its own four tables — nothing here is synced, backed up, or counted as
-account-owned data.
+The reward engine reads activity from the feature tables and records XP,
+spent freezes, completed quests, and unlocked badges in four SQLite tables.
+Awards and freeze changes mark the next backup snapshot dirty. Individual
+reward rows stay out of the sync outbox.
 
-## Why local-only
+## Backup and restore
 
-Rewards are a **derived** view of real activity (habits, todos, focus sessions,
-workouts, meals, plans, reviews). Making them backup-scoped would let a restore
-resurrect stale reward state and would pull the ledger into account-ownership
-semantics that only exist for user-owned content. A device that never syncs
-still has the full loop; a device that restores starts earning again from the
-activity that actually survived.
+Portable format 3 and immutable cloud scope 10 capture the same four reward
+tables alongside activity and settings. Each reward entity participates in the
+snapshot's integrity checks. Cloud generations use the verified account owner
+and existing publication protocol. The mutable cloud manifest and outbox stay
+on scope 9.
 
-`tests/integration/gamification.test.ts` asserts both halves of that posture:
-the four tables exist, and no reward write enqueues a `sync_outbox` row.
+Portable formats 1 and 2, cloud scopes 7–9, and earlier cloud backups remain
+restorable. The normal empty-device rule applies, including on devices that
+contain only reward history. A successful older restore starts with an empty
+reward ledger, 0 XP, level 1, and no earned or spent freezes. It does not merge
+reward histories or award XP from activity imported by the restore. New local
+activity can earn rewards normally.
+
+Current backups write restored receipts and reward history inside the same
+SQLite transaction as the feature data. The reward engine derives XP, levels,
+and streaks from those preserved rows without replaying the original actions.
 
 ## Tables (migration 25)
 
