@@ -27,7 +27,7 @@ import { SettingsGroup, SettingsRow, SettingsSectionHeading } from './SettingsSh
 
 const PORTABLE_ACCENT = '#0f766e';
 
-export function SettingsPortableSection() {
+export function SettingsPortableSection({ onRestored }: { onRestored: () => void }) {
   const { tokens } = useAppTheme();
   const { refreshAccountState } = useAppBootstrapState();
   const [exporting, setExporting] = useState(false);
@@ -184,6 +184,7 @@ export function SettingsPortableSection() {
       // double activation can never import twice.
       const outcome = await confirmPortableImport({ file: pendingFile });
       if (outcome.status === 'restored') {
+        onRestored();
         const total = Object.values(outcome.importedCounts).reduce(
           (sum, count) => sum + (count ?? 0),
           0,
@@ -209,7 +210,7 @@ export function SettingsPortableSection() {
     } finally {
       setImporting(false);
     }
-  }, [preview, pendingFile, importing, refreshAccountState]);
+  }, [preview, pendingFile, importing, onRestored, refreshAccountState]);
 
   return (
     <ScreenSection>

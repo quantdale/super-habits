@@ -11,6 +11,7 @@ import {
   type ThemeId,
 } from '@/core/theme';
 import { enqueueBackupSettingsRecord } from '@/core/sync/syncedMutation';
+import { subscribeToRestoredTheme } from '@/core/backup/backupSettings';
 import { ThemeContext, type ResolvedTheme, type ThemeMode } from '@/core/providers/themeContext';
 
 export type { ResolvedTheme, ThemeMode } from '@/core/providers/themeContext';
@@ -29,14 +30,18 @@ const DEFAULT_SLOTS: ThemeSlots = {
   darkThemeId: DEFAULT_DARK_THEME_ID,
 };
 
+function resolveSlots(slots: Partial<Record<keyof ThemeSlots, unknown>>): ThemeSlots {
+  return {
+    lightThemeId: isThemeId(slots.lightThemeId) ? slots.lightThemeId : DEFAULT_LIGHT_THEME_ID,
+    darkThemeId: isThemeId(slots.darkThemeId) ? slots.darkThemeId : DEFAULT_DARK_THEME_ID,
+  };
+}
+
 function parseStoredSlots(raw: string | null): ThemeSlots {
   if (!raw) return DEFAULT_SLOTS;
   try {
-    const parsed = JSON.parse(raw) as Partial<Record<keyof ThemeSlots, unknown>>;
-    return {
-      lightThemeId: isThemeId(parsed.lightThemeId) ? parsed.lightThemeId : DEFAULT_LIGHT_THEME_ID,
-      darkThemeId: isThemeId(parsed.darkThemeId) ? parsed.darkThemeId : DEFAULT_DARK_THEME_ID,
-    };
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? resolveSlots(parsed) : DEFAULT_SLOTS;
   } catch {
     return DEFAULT_SLOTS;
   }
@@ -58,8 +63,23 @@ export function ThemeProvider({ children }: PropsWithChildren) {
   const [slots, setSlots] = useState<ThemeSlots>(DEFAULT_SLOTS);
 
   useEffect(() => {
+    let active = true;
+    let modeRestored = false;
+    let slotsRestored = false;
+    const unsubscribe = subscribeToRestoredTheme(({ mode: restoredMode, slots: restoredSlots }) => {
+      if (restoredMode === 'light' || restoredMode === 'dark' || restoredMode === 'system') {
+        modeRestored = true;
+        setModeState(restoredMode);
+      }
+      if (restoredSlots) {
+        slotsRestored = true;
+        setSlots(resolveSlots(restoredSlots));
+      }
+    });
+
     AsyncStorage.getItem(THEME_MODE_STORAGE_KEY)
       .then((storedValue) => {
+        if (!active || modeRestored) return;
         if (storedValue === 'light' || storedValue === 'dark' || storedValue === 'system') {
           setModeState(storedValue);
         }
@@ -68,9 +88,13 @@ export function ThemeProvider({ children }: PropsWithChildren) {
 
     AsyncStorage.getItem(THEME_SLOTS_STORAGE_KEY)
       .then((storedValue) => {
-        setSlots(parseStoredSlots(storedValue));
+        if (active && !slotsRestored) setSlots(parseStoredSlots(storedValue));
       })
       .catch(() => undefined);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {

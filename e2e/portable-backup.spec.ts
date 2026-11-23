@@ -218,6 +218,52 @@ test.describe('Portable data export & import', () => {
     expect(rows[0]?.count).toBe(0);
   });
 
+  test('applies imported theme and defaults to open Settings', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' });
+    await addTodoViaUi(page, 'Settings round trip');
+    await openSettingsScreen(page);
+
+    const html = page.locator('html');
+    await page.getByRole('button', { name: 'Dark', exact: true }).click();
+    await page.getByRole('radio', { name: 'Emerald Dark, dark theme' }).click();
+    await expect(html).toHaveAttribute('data-theme-id', 'emerald-dark');
+
+    const defaultGoal = '2000 kcal, 150g protein, 200g carbs, 65g fats.';
+    const importedGoal = '2400 kcal, 150g protein, 200g carbs, 65g fats.';
+    await expect(page.getByText(defaultGoal, { exact: true })).toBeVisible();
+    const calories = page.getByLabel('Calories (kcal)', { exact: true });
+    await calories.fill('2400');
+    await page.getByRole('button', { name: 'Save nutrition defaults' }).click();
+    await expect(page.getByText(importedGoal, { exact: true })).toBeVisible();
+    const focusMinutes = page.getByLabel('Focus minutes', { exact: true });
+    await expect(page.getByRole('button', { name: 'Save timer defaults' })).toBeEnabled();
+    await focusMinutes.fill('35');
+    await page.getByRole('button', { name: 'Save timer defaults' }).click();
+    await expect(page.getByText(/^35m focus,/)).toBeVisible();
+    const text = await exportPortableFile(page);
+
+    await clearDatabase(page);
+    await openSettingsScreen(page);
+    await expect(html).toHaveAttribute('data-theme-id', 'light');
+    await expect(page.getByText(defaultGoal, { exact: true })).toBeVisible();
+    await expect(focusMinutes).toHaveValue('25');
+
+    await page.locator(IMPORT_INPUT).setInputFiles({
+      name: 'settings-roundtrip.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(text),
+    });
+    await expect(page.getByText(/Settings: included/)).toBeVisible();
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    await expect(page.getByText(/Import complete\. 1 records were restored\./)).toBeVisible();
+
+    expect(await page.evaluate(() => localStorage.getItem('superhabits.theme.mode'))).toBe('dark');
+    await expect.soft(html).toHaveAttribute('data-theme-id', 'emerald-dark');
+    await expect.soft(page.getByText(importedGoal, { exact: true })).toBeVisible();
+    await expect.soft(calories).toHaveValue('2400');
+    await expect(focusMinutes).toHaveValue('35');
+  });
+
   test('rejects invalid JSON with a readable error', async ({ page }) => {
     await clearDatabase(page);
     await openSettingsScreen(page);
