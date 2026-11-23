@@ -6,10 +6,8 @@ import type { DraftLogWorkoutRoutine } from '@/features/command/types';
  * Command-center workout attribution.
  *
  * `executeLogWorkout` must hand out the `workout_logs` row id it just wrote as
- * the success `entityId` — never the routine id. The gamification ledger keys
- * workout awards verbatim by that id (`actionSourceKey`), so a routine id
- * would mint a foreign source key that reconcile can never match, paying the
- * same workout twice.
+ * the success `entityId`. The gamification ledger uses that id as the source
+ * key, and rejects a routine id before writing an award.
  */
 
 function buildWorkoutDraft(): DraftLogWorkoutRoutine {
@@ -79,7 +77,7 @@ describe('command-center workout logId attribution', () => {
     }
   });
 
-  it('a routine id used as the workout entityId pays a foreign key the reconcile cannot match', async () => {
+  it('rejects a routine id and reconciles the real workout log exactly once', async () => {
     const db: TestDatabase = await freshDatabase();
     try {
       const workout = await import('@/features/workout/workout.data');
@@ -92,19 +90,24 @@ describe('command-center workout logId attribution', () => {
       const completed = await workout.completeRoutine(routine.id);
       expect(completed.status).toBe('applied');
 
-      // The pre-fix shape: awarding with the routine id mints
-      // `workout:<routineId>`, which names no real log.
       const bogus = await gamification.awardGamificationAction({
         kind: 'workout',
         entityId: routine.id,
         todayKey: today,
       });
-      expect(bogus?.result.events[0]).toMatchObject({ sourceKey: routine.id });
+      expect(bogus).toBeNull();
+      expect(await countWorkoutEvents(db)).toBe(0);
 
-      // Reconcile then pays the real log as well — two events for one workout.
       const reconciled = await gamification.reconcileGamificationActivity({ todayKey: today });
       expect(reconciled.awarded).toBe(1);
-      expect(await countWorkoutEvents(db)).toBe(2);
+      expect(
+        await db.getAllAsync(
+          `SELECT source_key FROM gamification_events WHERE event_kind = 'workout'`,
+        ),
+      ).toEqual([{ source_key: completed.logId }]);
+      expect((await gamification.reconcileGamificationActivity({ todayKey: today })).awarded).toBe(
+        0,
+      );
     } finally {
       await db.closeAsync();
     }
