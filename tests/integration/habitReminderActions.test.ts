@@ -361,6 +361,41 @@ describe('habit reminder Snooze against real SQLite', () => {
     }
   });
 
+  it('does not rearm a fired snooze when the same response is replayed after restart', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-habit-snooze-'));
+    const filename = path.join(dir, 'superhabits.db');
+    try {
+      const db = await freshDatabase(filename);
+      const habits = await import('@/features/habits/habits.data');
+      const firstActions = await import('@/features/habits/habitReminderActions');
+      const habitId = await createHabit(habits);
+      const now = new Date(2026, 7, 12, 18);
+      const input = actionInput(habitId, toDateKey(now), HABIT_REMINDER_SNOOZE_ACTION);
+      const native = adapter();
+      expect(await firstActions.snoozeHabitReminderAction({ ...input, now }, native)).toMatchObject(
+        { status: 'scheduled' },
+      );
+      await db.closeAsync();
+
+      const reopened = await freshDatabase(filename);
+      try {
+        const actions = await import('@/features/habits/habitReminderActions');
+        // The replacement has already fired, so it is absent from the OS queue.
+        const afterDelivery = adapter();
+        const replay = await actions.snoozeHabitReminderAction(
+          { ...input, now: new Date(2026, 7, 12, 18, 16) },
+          afterDelivery,
+        );
+        expect(replay.status).toBe('duplicate');
+        expect(afterDelivery.scheduled).toEqual([]);
+      } finally {
+        await reopened.closeAsync();
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('deduplicates a repeated snooze response and does not cross local midnight', async () => {
     const db = await freshDatabase();
     const habits = await import('@/features/habits/habits.data');

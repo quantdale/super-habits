@@ -123,13 +123,6 @@ async function runSnooze(
   const identifier = getHabitReminderSnoozeIdentifier(input.habitId, input.dateKey);
   const now = input.now ?? new Date();
   try {
-    await claimNotificationAction({
-      actionKey: input.actionKey,
-      kind: HABIT_REMINDER_DATA_KIND,
-      actionName: 'snooze',
-      occurrenceId: input.occurrenceId,
-      processedAt: now.toISOString(),
-    });
     const habits = await listHabits();
     const habit = habits.find((candidate) => candidate.id === input.habitId);
     const parsedTime = parseHabitReminderTime(habit?.reminder_time);
@@ -188,6 +181,16 @@ async function runSnooze(
       }
       return { status: 'duplicate', identifier };
     }
+    // The OS drops a one-shot request after delivery. Keep deduplicating the
+    // original response using its durable claim once it leaves that inventory.
+    const { claimed } = await claimNotificationAction({
+      actionKey: input.actionKey,
+      kind: HABIT_REMINDER_DATA_KIND,
+      actionName: 'snooze',
+      occurrenceId: input.occurrenceId,
+      processedAt: now.toISOString(),
+    });
+    if (!claimed) return { status: 'duplicate', identifier };
     for (const stale of existing) await adapter.cancel(stale.identifier);
 
     const data: HabitReminderNotificationData = {

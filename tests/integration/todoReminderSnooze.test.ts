@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { freshDatabase, type TestDatabase } from './helpers/db';
 import {
@@ -281,4 +284,35 @@ describe('snooze lifecycle cancellation (audit F4 regression guard)', () => {
       await db.closeAsync();
     }
   });
+});
+
+it('does not rearm a fired todo snooze when the same response is replayed after restart', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-todo-snooze-'));
+  const filename = path.join(dir, 'superhabits.db');
+  try {
+    const db = await freshDatabase(filename);
+    const todos = await import('@/features/todos/todos.data');
+    const firstActions = await import('@/core/notifications/todoReminderActions');
+    const todoId = await createDueTodo(todos);
+    const input = actionInput(todoId);
+    const first = await firstActions.snoozeTodoReminderAction({ ...input, now: NOW }, adapter(db));
+    expect(first.status).toBe('scheduled');
+    await db.closeAsync();
+
+    const reopened = await freshDatabase(filename);
+    try {
+      const actions = await import('@/core/notifications/todoReminderActions');
+      const afterDelivery = adapter(reopened);
+      const replay = await actions.snoozeTodoReminderAction(
+        { ...input, now: new Date(2026, 7, 12, 12, 16) },
+        afterDelivery,
+      );
+      expect(replay.status).toBe('duplicate');
+      expect(afterDelivery.scheduled).toEqual([]);
+    } finally {
+      await reopened.closeAsync();
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

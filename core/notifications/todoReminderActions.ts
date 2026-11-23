@@ -188,16 +188,6 @@ async function runSnooze(
   const identifier = getTodoReminderSnoozeIdentifier(input.todoId);
   const now = input.now ?? new Date();
   try {
-    // Claim first: a consumed-but-unapplied snooze claim only suppresses a
-    // retry of the SAME delivered notification, which is correct.
-    await claimNotificationAction({
-      actionKey: input.actionKey,
-      kind: TODO_REMINDER_DATA_KIND,
-      actionName: 'snooze',
-      occurrenceId: input.occurrenceId,
-      processedAt: now.toISOString(),
-    });
-
     const todo = await adapter.loadTodo(input.todoId);
     const enabled = await adapter.getRemindersEnabled();
 
@@ -257,6 +247,15 @@ async function runSnooze(
       }
       return { status: 'duplicate', identifier };
     }
+    // The durable claim still exists after the snoozed request has fired.
+    const { claimed } = await claimNotificationAction({
+      actionKey: input.actionKey,
+      kind: TODO_REMINDER_DATA_KIND,
+      actionName: 'snooze',
+      occurrenceId: input.occurrenceId,
+      processedAt: now.toISOString(),
+    });
+    if (!claimed) return { status: 'duplicate', identifier };
     // Replace the base reminder with the snoozed one so it cannot also fire.
     await adapter.cancel(todoReminderIdentifier(input.todoId));
     for (const stale of existing) await adapter.cancel(stale.identifier);
