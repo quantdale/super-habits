@@ -1,6 +1,7 @@
 import { expect, test, type Page } from './fixtures';
 import { planningHubTab, sectionTab, TAB_LABELS } from './helpers/navigation';
 import { seedFixture } from './helpers/seed';
+import { clearDatabase } from './helpers/db';
 import { openCommandScreen, openSettingsScreen } from './helpers/commandObservation';
 import { layout } from '@/core/theme/designTokens';
 
@@ -41,13 +42,11 @@ import { layout } from '@/core/theme/designTokens';
  *     exception `layout.dashboardMaxWidth` 1040,
  *     `docs/ui-ux/16-playful-momentum.md` §5.6) and is horizontally centred in
  *     the remaining content area; <= 899 keeps the floating bottom bar and no
- *     sidebar. The column is located STRUCTURALLY (the centred content wrapper
- *     — `alignSelf: center` or auto side margins), never by looking for a
- *     `max-width` declaration, and the cap it is measured against is
- *     `layout.contentMaxWidth` / `layout.dashboardMaxWidth` from the tokens
- *     themselves. Deleting the `maxWidth` from `core/ui/Screen.tsx` therefore
- *     widens the measured column past the contract and fails, instead of
- *     emptying the candidate list and passing vacuously.
+ *     sidebar. The sweep locates each content region's wrapper by its
+ *     structural width declaration and measures its actual geometry. The
+ *     cap comes from `layout.contentMaxWidth` / `layout.dashboardMaxWidth`.
+ *     The pinned hero and body each have to centre within the field, and their
+ *     combined span must honour the cap.
  *  4. **Reduced motion** — with `prefers-reduced-motion: reduce` emulated, no
  *     animation is left *running* and no CSS animation is declared on the
  *     content (§5.8 allows one 120ms opacity cross-fade and forbids
@@ -568,23 +567,16 @@ type PayloadColumn = {
   textLeaves: number;
   /** Widest horizontal span the section's own content occupies, in CSS px. */
   width: number;
-  /** Horizontal centre of that span, in CSS px. */
-  centre: number;
+  /** Horizontal centre of each independent payload region, in CSS px. */
+  regionCentres: number[];
 };
 
 /**
- * Measure the width the surface's own CONTENT occupies, without looking for a
- * `max-width` declaration.
- *
- * Why: the previous version collected only elements that DECLARED a
- * `maxWidth`, so deleting the cap (or a component that stopped setting it) left
- * the candidate list empty and the cap assertion reduced over nothing — a green
- * run for an uncapped page. This measures the payload instead: every
- * interactive control plus every text leaf, minus what is legitimately outside
- * the flow (fixed overlays, controls parked behind a clipping container such
- * as To Do's swipe actions, and children of horizontal scrollers, whose content
- * is *meant* to overflow its frame). What remains is the box the user reads, so
- * a removed cap widens it past the contract and fails.
+ * Measure each in-flow payload region. Screen's pinned hero, its body, and
+ * Today's dashboard use width: 100% on their outer wrappers. Select those
+ * wrappers even when their cap or centring is broken, and include the span of
+ * any payload outside them. Measuring wrapper edges also keeps the result
+ * stable as edge-aligned controls and list rows mount or unmount.
  */
 async function measurePayloadColumn(page: Page, scopeSelector: string): Promise<PayloadColumn> {
   return page.evaluate(
@@ -628,10 +620,11 @@ async function measurePayloadColumn(page: Page, scopeSelector: string): Promise<
         return false;
       };
 
-      let left = Number.POSITIVE_INFINITY;
-      let right = Number.NEGATIVE_INFINITY;
       let controls = 0;
       let textLeaves = 0;
+
+      /** The payload nodes that are inside the flow. */
+      const payloadNodes: HTMLElement[] = [];
 
       const include = (node: HTMLElement): void => {
         if (!isRendered(node)) return;
@@ -646,8 +639,7 @@ async function measurePayloadColumn(page: Page, scopeSelector: string): Promise<
           clip.left >= -1 &&
           clip.right <= window.innerWidth + 1;
         if (parked) return;
-        left = Math.min(left, box.left);
-        right = Math.max(right, box.right);
+        payloadNodes.push(node);
       };
 
       for (const candidate of Array.from(root.querySelectorAll(interactiveSelector))) {
@@ -661,11 +653,41 @@ async function measurePayloadColumn(page: Page, scopeSelector: string): Promise<
         include(element);
       }
 
+      const regions = new Map<HTMLElement | null, { left: number; right: number }>();
+      for (const node of payloadNodes) {
+        let wrapper: HTMLElement | null = null;
+        for (
+          let ancestor = node.parentElement;
+          ancestor && ancestor !== root;
+          ancestor = ancestor.parentElement
+        ) {
+          // Chromium's style map preserves the percentage. Taking the outermost
+          // match keeps full-width cards and rows inside their own region.
+          if (ancestor.computedStyleMap().get('width')?.toString() === '100%') {
+            wrapper = ancestor;
+          }
+        }
+        if (wrapper && regions.has(wrapper)) continue;
+        const { left, right } = (wrapper ?? node).getBoundingClientRect();
+        // The null entry holds the span of all nodes outside a wrapper.
+        const previous = regions.get(wrapper);
+        regions.set(wrapper, {
+          left: Math.min(previous?.left ?? left, left),
+          right: Math.max(previous?.right ?? right, right),
+        });
+      }
+      const bounds = [...regions.values()];
+      if (bounds.length === 0) {
+        throw new Error(`v2-responsive-sweep: no in-flow payload in ${scope}`);
+      }
+      const left = Math.min(...bounds.map((region) => region.left));
+      const right = Math.max(...bounds.map((region) => region.right));
+
       return {
         controls,
         textLeaves,
-        width: Number.isFinite(left) ? Math.round((right - left) * 10) / 10 : 0,
-        centre: Number.isFinite(left) ? Math.round((left + right) * 5) / 10 : 0,
+        width: Math.round((right - left) * 10) / 10,
+        regionCentres: bounds.map((region) => Math.round((region.left + region.right) * 5) / 10),
       };
     },
     { interactiveSelector: INTERACTIVE_SELECTOR, scopeSelector },
@@ -952,10 +974,6 @@ test.describe('V2 responsive sweep', () => {
         await waitForSettledGeometry(page, panelScope(section.key));
 
         const shell = await measureShell(page);
-        // The section's own CONTENT box, located structurally: every interactive
-        // control and every text leaf the user can actually reach. It is
-        // measured WITHOUT looking for a `maxWidth` declaration, so a removed
-        // cap widens it past the contract instead of emptying a candidate list.
         const payload = await measurePayloadColumn(page, panelScope(section.key));
         // Non-vacuity: a real section always renders controls and text. A zero
         // here means the measurement scope is wrong (wrong panel, unmounted
@@ -987,8 +1005,8 @@ test.describe('V2 responsive sweep', () => {
           `${width} ${section.key}: content is no wider than ${cap}px`,
         ).toBeLessThanOrEqual(cap + 1);
         expect(
-          Math.abs(payload.centre - shell.fieldCentre),
-          `${width} ${section.key}: content is centred in the ${shell.fieldWidth}px content area`,
+          Math.max(...payload.regionCentres.map((centre) => Math.abs(centre - shell.fieldCentre))),
+          `${width} ${section.key}: each payload region is centred in the ${shell.fieldWidth}px content area`,
         ).toBeLessThanOrEqual(1.5);
 
         // Nav shell swap: >= 900 is the side rail (80px, widening to the 248px
@@ -1013,6 +1031,38 @@ test.describe('V2 responsive sweep', () => {
             `${width} ${section.key}: the bar floats at the bottom`,
           ).toBeGreaterThan(600);
         }
+      }
+    }
+
+    // An EMPTY device (fresh install) is a second content state: To Do renders
+    // its empty branch, which has no list row to span the column, and Habits
+    // renders its own empty card. The wrappers must still obey the same geometry
+    // with fewer controls mounted.
+    await clearDatabase(page);
+    for (const width of [899, 900, 1280] as const) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const section of SECTIONS) {
+        await showSection(page, section.label);
+        await waitForSettledGeometry(page, panelScope(section.key));
+        const shell = await measureShell(page);
+        const payload = await measurePayloadColumn(page, panelScope(section.key));
+        expect(
+          payload.controls,
+          `empty ${width} ${section.key}: the section renders interactive controls to measure`,
+        ).toBeGreaterThan(1);
+        expect(
+          payload.textLeaves,
+          `empty ${width} ${section.key}: the section renders text to measure`,
+        ).toBeGreaterThan(1);
+        const cap = section.key === 'overview' ? layout.dashboardMaxWidth : layout.contentMaxWidth;
+        expect(
+          payload.width,
+          `empty ${width} ${section.key}: content is no wider than ${cap}px`,
+        ).toBeLessThanOrEqual(cap + 1);
+        expect(
+          Math.max(...payload.regionCentres.map((centre) => Math.abs(centre - shell.fieldCentre))),
+          `empty ${width} ${section.key}: each payload region is centred in the ${shell.fieldWidth}px content area`,
+        ).toBeLessThanOrEqual(1.5);
       }
     }
 
