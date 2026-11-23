@@ -54,6 +54,49 @@ async function seedLedgerDays(dateKeys: readonly string[]): Promise<void> {
 }
 
 describe('gamification ledger', () => {
+  it.each(['screen', 'reconciliation'])(
+    'unlocks level five with overlapping %s awards',
+    async (secondPath) => {
+      const { todos, gamification, time, domain } = await loadModules();
+      const today = time.toDateKey();
+      const levelFiveXp = [1, 2, 3, 4].reduce(
+        (total, level) => total + domain.xpRequiredForLevel(level),
+        0,
+      );
+      const yesterday = domain.shiftDateKey(today, -1);
+      await seedLedgerDays([yesterday]);
+      await db.runAsync('UPDATE gamification_events SET xp = ? WHERE date_key = ?', [
+        levelFiveXp - 7,
+        yesterday,
+      ]);
+      // Keep the assertion about overlapping action XP independent of the quest rotation.
+      for (const { id } of domain.selectDailyQuestTemplates(today)) {
+        await db.runAsync(
+          `INSERT INTO gamification_quests (date_key, quest_id, completed_at) VALUES (?, ?, ?)`,
+          [today, id, time.nowIso()],
+        );
+      }
+      const first = await todos.addTodo({ title: 'First' });
+      const second = await todos.addTodo({ title: 'Second' });
+      await todos.completeTodo(first);
+      await todos.completeTodo(second);
+
+      const firstAward = gamification.awardGamificationAction({ kind: 'todo', entityId: first });
+      const secondAward =
+        secondPath === 'screen'
+          ? gamification.awardGamificationAction({ kind: 'todo', entityId: second })
+          : gamification.reconcileGamificationActivity();
+      const [, outcome] = await Promise.all([firstAward, secondAward]);
+
+      const snapshot = await gamification.readGamificationSnapshot();
+      expect(snapshot.level).toMatchObject({ level: 5, totalXp: levelFiveXp + 3 });
+      if (outcome && 'result' in outcome) {
+        expect(outcome.result.levelUp).toEqual({ from: 4, to: 5, title: 'Achiever' });
+      }
+      expect(snapshot.badges.find((badge) => badge.id === 'level:1')?.unlocked).toBe(true);
+    },
+  );
+
   it('awards XP for a habit check-in once, even after an undo and re-check', async () => {
     const { habits, gamification, time } = await loadModules();
     const today = time.toDateKey();

@@ -65,6 +65,16 @@ import {
 
 type Db = SQLite.SQLiteDatabase;
 
+// Passes reuse their ledger snapshot across several SQLite transactions. Keep
+// other reward writers from changing that ledger until the pass has finished.
+let rewardWriteTail: Promise<unknown> = Promise.resolve();
+
+function serializeRewardWrite<T>(write: () => Promise<T>): Promise<T> {
+  const result = rewardWriteTail.then(write);
+  rewardWriteTail = result.catch(() => undefined);
+  return result;
+}
+
 export type GamificationReadOptions = {
   /** Injectable for deterministic tests; production defaults to local today. */
   todayKey?: string;
@@ -1005,15 +1015,17 @@ export async function awardGamificationAction(
   input: AwardInput,
 ): Promise<GamificationAwardOutcome | null> {
   const todayKey = input.todayKey ?? toDateKey();
-  const db = await getDatabase();
-  const core = await computeAward({
-    ...input,
-    todayKey,
-    allowEarlierDate: true,
-    snapshot: await readLedgerSnapshot(db),
+  return serializeRewardWrite(async () => {
+    const db = await getDatabase();
+    const core = await computeAward({
+      ...input,
+      todayKey,
+      allowEarlierDate: true,
+      snapshot: await readLedgerSnapshot(db),
+    });
+    if (!core) return null;
+    return { ...core, snapshot: await readGamificationSnapshot({ todayKey }) };
   });
-  if (!core) return null;
-  return { ...core, snapshot: await readGamificationSnapshot({ todayKey }) };
 }
 
 type ActivityCandidate = { kind: ActionKind; entityId: string };
@@ -1170,10 +1182,12 @@ export async function reconcileGamificationActivity(
   options: GamificationReadOptions = {},
 ): Promise<ReconcileOutcome> {
   const todayKey = options.todayKey ?? toDateKey();
-  const db = await getDatabase();
-  const ledger = await readLedgerSnapshot(db);
-  const awarded = await reconcileDayAwards(db, todayKey, ledger);
-  return { awarded, snapshot: await readGamificationSnapshot({ todayKey }) };
+  return serializeRewardWrite(async () => {
+    const db = await getDatabase();
+    const ledger = await readLedgerSnapshot(db);
+    const awarded = await reconcileDayAwards(db, todayKey, ledger);
+    return { awarded, snapshot: await readGamificationSnapshot({ todayKey }) };
+  });
 }
 
 /**
@@ -1199,7 +1213,12 @@ export async function ensureStreakFreeze(
   options: GamificationReadOptions = {},
 ): Promise<{ savedDateKeys: string[] } | null> {
   const todayKey = options.todayKey ?? toDateKey();
-  const db = await getDatabase();
+  return serializeRewardWrite(async () =>
+    ensureStreakFreezeInternal(await getDatabase(), todayKey),
+  );
+}
+
+async function ensureStreakFreezeInternal(db: Db, todayKey: string) {
   return withSQLiteTransaction(db, async (transactionDb) => {
     let ledger = await readLedgerSnapshot(transactionDb);
     const released = await releaseStaleFreezes(transactionDb);
@@ -1246,15 +1265,15 @@ export async function runGamificationHousekeeping(
   options: GamificationReadOptions = {},
 ): Promise<void> {
   const todayKey = options.todayKey ?? toDateKey();
-  const db = await getDatabase();
-  // ONE ledger read and one quest-board memo for the whole 7-day window; every
-  // award appends to the same snapshot, so each subsequent day sees the ledger
-  // the previous day's awards produced (audit C §2 issue #3).
-  const ledger = await readLedgerSnapshot(db);
-  for (let offset = GAMIFICATION_RECONCILE_LOOKBACK_DAYS - 1; offset >= 0; offset -= 1) {
-    await reconcileDayAwards(db, shiftDateKey(todayKey, -offset), ledger);
-  }
-  // Freeze planning releases rows whose day the pass made active and
-  // recalculates the bank before spending it.
-  await ensureStreakFreeze({ todayKey });
+  return serializeRewardWrite(async () => {
+    const db = await getDatabase();
+    // ONE ledger read and one quest-board memo for the whole 7-day window; every
+    // award appends to the same snapshot, so each subsequent day sees the ledger
+    // the previous day's awards produced (audit C §2 issue #3).
+    const ledger = await readLedgerSnapshot(db);
+    for (let offset = GAMIFICATION_RECONCILE_LOOKBACK_DAYS - 1; offset >= 0; offset -= 1) {
+      await reconcileDayAwards(db, shiftDateKey(todayKey, -offset), ledger);
+    }
+    await ensureStreakFreezeInternal(db, todayKey);
+  });
 }
