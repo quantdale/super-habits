@@ -115,6 +115,13 @@ test.describe('To Do write-failure honesty', () => {
       page.getByRole('checkbox', { name: 'Mark incomplete: Blocked complete' }).first(),
     ).toBeVisible();
 
+    // The reward commits asynchronously after the Todo. Wait for its XP
+    // snapshot before queryRows navigates away and tears down the app.
+    await page.getByRole('tab', { name: 'Today', exact: true }).click();
+    await expect(
+      page.getByRole('button', { name: /^XP total [1-9]\d* — open achievements$/ }),
+    ).toBeVisible({ timeout: 15_000 });
+
     const afterRetry = await queryRows(
       page,
       `SELECT completed FROM todos WHERE title = 'Blocked complete' AND deleted_at IS NULL`,
