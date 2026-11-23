@@ -12,6 +12,7 @@ import {
   buildExerciseHistory,
   computeBodyWeightTrend,
   convertWeight,
+  exerciseHistoryKey,
   formatWorkoutTime,
 } from './workout.domain';
 import type { WorkoutPerformanceRow } from './workout.data';
@@ -63,27 +64,29 @@ export function WorkoutProgressCard({
   records,
   bodyAreas,
   onSelectExercise,
-  selectedExercise,
+  selectedExerciseKey,
   weightUnit = 'kg',
 }: {
   rows: WorkoutPerformanceRow[];
   records: PersonalRecord[];
   bodyAreas: { area: string; sets: number }[];
-  onSelectExercise: (name: string) => void;
-  selectedExercise: string | null;
+  onSelectExercise: (key: string) => void;
+  selectedExerciseKey: string | null;
   /** Display unit for exercise-history math (the user's weight unit). */
   weightUnit?: WorkoutWeightUnit;
 }) {
   const { tokens } = useAppTheme();
-  const exerciseNames = [...new Set(rows.map((row) => row.exerciseName))];
-  const selectedExerciseRows = selectedExercise
-    ? rows.filter((row) => row.exerciseName === selectedExercise)
-    : [];
-  const selectedRows = selectedExercise
-    ? rows.filter((row) => row.exerciseName === selectedExercise).slice(0, 8)
-    : [];
-  const selectedRecord = records.find((record) => record.exerciseName === selectedExercise);
-  const selectedHistory = selectedExercise
+  const rowsByExercise = new Map<string, WorkoutPerformanceRow[]>();
+  for (const row of rows) {
+    const key = exerciseHistoryKey(row);
+    const history = rowsByExercise.get(key);
+    if (history) history.push(row);
+    else rowsByExercise.set(key, [row]);
+  }
+  const selectedExerciseRows = rowsByExercise.get(selectedExerciseKey ?? '') ?? [];
+  const selectedExerciseName = selectedExerciseRows[0]?.exerciseName;
+  const selectedRecord = records.find((record) => record.exerciseKey === selectedExerciseKey);
+  const selectedHistory = selectedExerciseName
     ? buildExerciseHistory(
         selectedExerciseRows.map((row): ExerciseHistoryEntry => ({
           logId: row.logId,
@@ -116,33 +119,37 @@ export function WorkoutProgressCard({
         </Text>
       ) : (
         <View className="gap-2">
-          {records.slice(0, 5).map((record) => (
-            <Pressable
-              key={record.exerciseName}
-              onPress={() => onSelectExercise(record.exerciseName)}
-              accessibilityRole="button"
-              accessibilityLabel={`View progress for ${record.exerciseName}`}
-              className="flex-row items-center justify-between rounded-xl border px-3 py-2"
-              style={{ borderColor: tokens.border }}
-            >
-              <View className="min-w-0 flex-1">
-                <Text
-                  className="text-sm font-semibold"
-                  style={{ color: tokens.text }}
-                  numberOfLines={1}
-                >
-                  {record.exerciseName}
-                </Text>
-                <Text className="text-xs" style={{ color: tokens.textMuted }}>
-                  {formatRecord(record)}
-                </Text>
-              </View>
-              <MaterialIcons name="chevron-right" size={20} color={tokens.iconMuted} />
-            </Pressable>
-          ))}
+          {records.slice(0, 5).map((record) => {
+            const name =
+              rowsByExercise.get(record.exerciseKey)?.[0]?.exerciseName ?? record.exerciseName;
+            return (
+              <Pressable
+                key={record.exerciseKey}
+                onPress={() => onSelectExercise(record.exerciseKey)}
+                accessibilityRole="button"
+                accessibilityLabel={`View progress for ${name}`}
+                className="flex-row items-center justify-between rounded-xl border px-3 py-2"
+                style={{ borderColor: tokens.border }}
+              >
+                <View className="min-w-0 flex-1">
+                  <Text
+                    className="text-sm font-semibold"
+                    style={{ color: tokens.text }}
+                    numberOfLines={1}
+                  >
+                    {name}
+                  </Text>
+                  <Text className="text-xs" style={{ color: tokens.textMuted }}>
+                    {formatRecord(record)}
+                  </Text>
+                </View>
+                <MaterialIcons name="chevron-right" size={20} color={tokens.iconMuted} />
+              </Pressable>
+            );
+          })}
         </View>
       )}
-      {exerciseNames.length > 0 ? (
+      {rowsByExercise.size > 0 ? (
         <View className="mt-4">
           <Text
             className="mb-2 text-xs font-semibold uppercase"
@@ -151,23 +158,23 @@ export function WorkoutProgressCard({
             Exercise history
           </Text>
           <View className="flex-row flex-wrap">
-            {exerciseNames.slice(0, 12).map((name) => (
+            {[...rowsByExercise].slice(0, 12).map(([key, [latest]]) => (
               <PillChip
-                key={name}
-                label={name}
-                active={selectedExercise === name}
+                key={key}
+                label={latest.exerciseName}
+                active={selectedExerciseKey === key}
                 color={COLOR}
-                onPress={() => onSelectExercise(name)}
+                onPress={() => onSelectExercise(key)}
               />
             ))}
           </View>
-          {selectedExercise ? (
+          {selectedExerciseName ? (
             <View
               className="mt-2 rounded-xl border px-3 py-2"
               style={{ borderColor: tokens.border }}
             >
               <Text className="text-sm font-semibold" style={{ color: tokens.text }}>
-                {selectedExercise}
+                {selectedExerciseName}
               </Text>
               {selectedRecord ? (
                 <Text className="mt-1 text-xs" style={{ color: tokens.text }}>
@@ -196,7 +203,7 @@ export function WorkoutProgressCard({
                     : ''}
                 </Text>
               ) : null}
-              {selectedRows.map((row) => (
+              {selectedExerciseRows.slice(0, 8).map((row) => (
                 <Text
                   key={`${row.logId}-${row.setNumber}`}
                   className="mt-1 text-xs"

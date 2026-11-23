@@ -387,7 +387,9 @@ function isValidPerformanceSet(set: LoggedSet): set is ValidPerformanceSet {
   );
 }
 
-function exerciseHistoryKey(set: Pick<LoggedSet, 'exerciseName' | 'catalogExerciseId'>): string {
+export function exerciseHistoryKey(
+  set: Pick<LoggedSet, 'exerciseName' | 'catalogExerciseId'>,
+): string {
   return set.catalogExerciseId
     ? `catalog:${set.catalogExerciseId}`
     : `name:${set.exerciseName.trim().toLocaleLowerCase()}`;

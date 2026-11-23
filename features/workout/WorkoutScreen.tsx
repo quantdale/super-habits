@@ -522,7 +522,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
     { logId: string; exerciseCount: number }[]
   >([]);
   const [customExercises, setCustomExercises] = useState<CustomExercise[]>([]);
-  const [selectedProgressExercise, setSelectedProgressExercise] = useState<string | null>(null);
+  const [selectedProgressExerciseKey, setSelectedProgressExerciseKey] = useState<string | null>(
+    null,
+  );
   const [weekEditorVisible, setWeekEditorVisible] = useState(false);
   // The recurring-template chips write straight from the "Plan your week"
   // sheet, whose rejections must be reported INSIDE that sheet (the landing
@@ -1312,8 +1314,8 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
         rows={performanceRows}
         records={personalRecords}
         bodyAreas={bodyAreaDistribution}
-        selectedExercise={selectedProgressExercise}
-        onSelectExercise={setSelectedProgressExercise}
+        selectedExerciseKey={selectedProgressExerciseKey}
+        onSelectExercise={setSelectedProgressExerciseKey}
         weightUnit={displayWeightUnit}
       />
       <ValidationError message={historyError} />
