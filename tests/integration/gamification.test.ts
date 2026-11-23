@@ -650,6 +650,90 @@ describe('streak freeze accounting (audit C #2)', () => {
     return rows.map((row) => row.date_key);
   }
 
+  it.each(['housekeeping', 'screen award'])(
+    'bridges a missed day before computing XP in %s',
+    async (path) => {
+      const { todos, gamification, time, domain } = await loadModules();
+      const today = time.toDateKey();
+      const run = await seedRunEndingYesterday(today, domain);
+      await grantFreeze([7], run[0]);
+      const todoId = await todos.addTodo({ title: 'Back to work' });
+      await todos.completeTodo(todoId);
+
+      if (path === 'screen award') {
+        await gamification.awardGamificationAction({ kind: 'todo', entityId: todoId });
+      } else {
+        await gamification.runGamificationHousekeeping({ todayKey: today });
+      }
+
+      const yesterday = domain.shiftDateKey(today, -1);
+      expect(await freezeRows()).toEqual([yesterday]);
+      const snapshot = await gamification.readGamificationSnapshot({ todayKey: today });
+      expect(snapshot.streak).toMatchObject({ current: 8, activeToday: true });
+      expect(
+        await db.getFirstAsync(`SELECT xp FROM gamification_events WHERE event_kind = 'todo'`),
+      ).toEqual({ xp: 6 });
+    },
+  );
+
+  it('bridges yesterday when today has already earned XP', async () => {
+    const { gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    const run = await seedRunEndingYesterday(today, domain);
+    await grantFreeze([7], run[0]);
+    await seedLedgerDays([today]);
+
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+
+    expect(await freezeRows()).toEqual([domain.shiftDateKey(today, -1)]);
+    expect((await gamification.readGamificationSnapshot({ todayKey: today })).streak.current).toBe(
+      8,
+    );
+  });
+
+  it('backfills yesterday’s activity before an immediate award spends its freeze', async () => {
+    const { todos, pomodoro, gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    const run = await seedRunEndingYesterday(today, domain);
+    await grantFreeze([7], run[0]);
+    const yesterday = domain.shiftDateKey(today, -1);
+    await pomodoro.logPomodoroSession(
+      new Date(`${yesterday}T12:00:00`).toISOString(),
+      new Date(`${yesterday}T12:25:00`).toISOString(),
+      1500,
+      'focus',
+    );
+    const todoId = await todos.addTodo({ title: 'Today’s work' });
+    await todos.completeTodo(todoId);
+
+    const award = await gamification.awardGamificationAction({ kind: 'todo', entityId: todoId });
+
+    expect(award?.snapshot.streak.current).toBe(9);
+    expect(award?.snapshot.freezes).toEqual({ earned: 1, used: 0, banked: 1 });
+    expect(await freezeRows()).toEqual([]);
+  });
+
+  it('can spend a freeze just earned by a prior-day award in the same pass', async () => {
+    const { todos, pomodoro, gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    await seedLedgerDays([3, 4, 5, 6, 7, 8].map((offset) => domain.shiftDateKey(today, -offset)));
+    const twoDaysAgo = domain.shiftDateKey(today, -2);
+    await pomodoro.logPomodoroSession(
+      new Date(`${twoDaysAgo}T12:00:00`).toISOString(),
+      new Date(`${twoDaysAgo}T12:25:00`).toISOString(),
+      1500,
+      'focus',
+    );
+    const todoId = await todos.addTodo({ title: 'Today’s work' });
+    await todos.completeTodo(todoId);
+
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+
+    const snapshot = await gamification.readGamificationSnapshot({ todayKey: today });
+    expect(snapshot.streak.current).toBe(8);
+    expect(snapshot.freezes).toEqual({ earned: 1, used: 1, banked: 0 });
+  });
+
   it('counts a refunded freeze before granting another at the new milestone', async () => {
     const { todos, gamification, time, domain } = await loadModules();
     const today = time.toDateKey();
