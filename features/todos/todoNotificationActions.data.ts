@@ -12,7 +12,10 @@ import {
 } from '@/features/habits/notificationActions.data';
 import { TODO_REMINDER_DATA_KIND } from '@/lib/notificationConstants';
 import { toDateKey } from '@/lib/time';
-import type { TodoReminderSnapshot } from '@/core/notifications/todoReminderScheduler';
+import {
+  cancelTodoReminderSafely,
+  type TodoReminderSnapshot,
+} from '@/core/notifications/todoReminderScheduler';
 import {
   spawnNextRecurringTodoWithinTransaction,
   syncReminderSafely,
@@ -214,6 +217,7 @@ async function runCompleteTodoFromNotification(input: {
       : 'noop'
     : 'duplicate';
 
+  if (mutationApplied) await cancelTodoReminderSafely(input.todoId);
   if (spawnedCopy) await syncReminderSafely(spawnedCopy);
 
   if (!shouldDispatchLinkedActions || !todoTitle || !claim.linkedEventId) {

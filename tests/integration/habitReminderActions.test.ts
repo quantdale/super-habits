@@ -251,7 +251,9 @@ describe('habit reminder Snooze against real SQLite', () => {
     vi.useRealTimers();
   });
 
-  function adapter() {
+  function adapter(
+    triggerFor = (fireAt: Date): unknown => ({ type: 'date', date: fireAt.getTime() }),
+  ) {
     const scheduled: { identifier: string; fireAt: Date; data: Record<string, unknown> }[] = [];
     const cancelled: string[] = [];
     return {
@@ -265,7 +267,7 @@ describe('habit reminder Snooze against real SQLite', () => {
             ({
               identifier: item.identifier,
               content: { data: item.data },
-              trigger: { type: 'date', date: item.fireAt.getTime() },
+              trigger: triggerFor(item.fireAt),
             }) as never,
         ),
       ),
@@ -304,6 +306,94 @@ describe('habit reminder Snooze against real SQLite', () => {
       '18:00',
     );
     await db.closeAsync();
+  });
+
+  it('preserves an iOS snooze on foreground reconciliation', async () => {
+    const db = await freshDatabase();
+    try {
+      const habits = await import('@/features/habits/habits.data');
+      const { snoozeHabitReminderAction } = await import('@/features/habits/habitReminderActions');
+      const { reconcileHabitReminders } = await import('@/features/habits/habitReminders.service');
+      const habitId = await createHabit(habits);
+      const now = new Date(2026, 7, 12, 18);
+      const native = adapter(() => ({ type: 'timeInterval', repeats: false, seconds: 900 }));
+      const result = await snoozeHabitReminderAction(
+        { ...actionInput(habitId, toDateKey(now), HABIT_REMINDER_SNOOZE_ACTION), now },
+        native,
+      );
+      expect(result.status).toBe('scheduled');
+
+      await expect(
+        reconcileHabitReminders({ now, windowDays: 1, adapter: native }),
+      ).resolves.toMatchObject({ status: 'reconciled', desired: 0, cancelled: 0 });
+      expect(native.scheduled.map((item) => item.identifier)).toEqual([result.identifier]);
+    } finally {
+      await db.closeAsync();
+    }
+  });
+
+  it('cancels a pending snooze after the user disables the habit reminder', async () => {
+    const db = await freshDatabase();
+    try {
+      const habits = await import('@/features/habits/habits.data');
+      const { snoozeHabitReminderAction } = await import('@/features/habits/habitReminderActions');
+      const { reconcileHabitReminders } = await import('@/features/habits/habitReminders.service');
+      const habitId = await createHabit(habits);
+      const now = new Date(2026, 7, 12, 18);
+      const native = adapter();
+      const result = await snoozeHabitReminderAction(
+        { ...actionInput(habitId, toDateKey(now), HABIT_REMINDER_SNOOZE_ACTION), now },
+        native,
+      );
+      expect(result.status).toBe('scheduled');
+
+      await habits.updateHabit(habitId, {
+        name: 'Gym',
+        targetPerDay: 1,
+        category: 'anytime',
+        reminderTime: null,
+      });
+      await reconcileHabitReminders({ now, windowDays: 1, adapter: native });
+
+      expect(native.scheduled).toEqual([]);
+    } finally {
+      await db.closeAsync();
+    }
+  });
+
+  it('does not rearm a fired snooze when the same response is replayed after restart', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'superhabits-habit-snooze-'));
+    const filename = path.join(dir, 'superhabits.db');
+    try {
+      const db = await freshDatabase(filename);
+      const habits = await import('@/features/habits/habits.data');
+      const firstActions = await import('@/features/habits/habitReminderActions');
+      const habitId = await createHabit(habits);
+      const now = new Date(2026, 7, 12, 18);
+      const input = actionInput(habitId, toDateKey(now), HABIT_REMINDER_SNOOZE_ACTION);
+      const native = adapter();
+      expect(await firstActions.snoozeHabitReminderAction({ ...input, now }, native)).toMatchObject(
+        { status: 'scheduled' },
+      );
+      await db.closeAsync();
+
+      const reopened = await freshDatabase(filename);
+      try {
+        const actions = await import('@/features/habits/habitReminderActions');
+        // The replacement has already fired, so it is absent from the OS queue.
+        const afterDelivery = adapter();
+        const replay = await actions.snoozeHabitReminderAction(
+          { ...input, now: new Date(2026, 7, 12, 18, 16) },
+          afterDelivery,
+        );
+        expect(replay.status).toBe('duplicate');
+        expect(afterDelivery.scheduled).toEqual([]);
+      } finally {
+        await reopened.closeAsync();
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('deduplicates a repeated snooze response and does not cross local midnight', async () => {
@@ -360,6 +450,41 @@ describe('habit reminder Snooze against real SQLite', () => {
 });
 
 describe('notification action marker retention', () => {
+  it('waits for the current SQLite writer before recording a standalone snooze claim', async () => {
+    const db = await freshDatabase();
+    try {
+      const { getDatabase } = await import('@/core/db/client');
+      const { withSQLiteTransaction } = await import('@/core/db/transactions');
+      const { claimNotificationAction } =
+        await import('@/features/habits/notificationActions.data');
+      const sqliteDb = await getDatabase();
+      const entered = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const writing = withSQLiteTransaction(sqliteDb, async () => {
+        entered.resolve();
+        await release.promise;
+      });
+      await entered.promise;
+
+      const claiming = Promise.allSettled([
+        claimNotificationAction({
+          actionKey: 'queued-snooze',
+          kind: 'habit-reminder',
+          actionName: 'snooze',
+          occurrenceId: 'occurrence',
+          processedAt: NOW.toISOString(),
+        }),
+      ]);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      release.resolve();
+      await writing;
+
+      expect(await claiming).toMatchObject([{ status: 'fulfilled', value: { claimed: true } }]);
+    } finally {
+      await db.closeAsync();
+    }
+  });
+
   it('cleans old local operational markers while retaining recent markers', async () => {
     const db = await freshDatabase();
     const { claimNotificationAction, PROCESSED_NOTIFICATION_ACTION_RETENTION_MS } =

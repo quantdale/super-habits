@@ -205,6 +205,58 @@ describe('notification preference backup round-trip (settings V4)', () => {
     });
   });
 
+  it('arms the repeating reminders when startup applies interrupted restore preferences', async () => {
+    const db = await freshDatabase();
+    try {
+      const backupSettings = await import('@/core/backup/backupSettings');
+      const Notifications = await import('expo-notifications');
+      const scheduling = vi.mocked(Notifications.scheduleNotificationAsync);
+      const permissions = vi.mocked(Notifications.getPermissionsAsync);
+      const granted = {
+        granted: true,
+        status: Notifications.PermissionStatus.GRANTED,
+        expires: 'never' as const,
+        canAskAgain: true,
+      };
+      scheduling.mockClear();
+
+      // Restore committed the durable marker, but the process stopped before
+      // applying the preferences and scheduling the reminders.
+      await backupSettings.stagePendingThemeApplication(
+        db as unknown as SQLite.SQLiteDatabase,
+        {
+          notificationPreferences: {
+            todoRemindersEnabled: true,
+            dailyPlanReminderTime: { hour: 9, minute: 5 },
+            weeklyReviewReminder: { enabled: true, weekday: 0, hour: 18, minute: 30 },
+          },
+        },
+        'interrupted-restore',
+      );
+      await permissions.withImplementation(
+        async () => granted,
+        async () => {
+          expect(await backupSettings.applyPendingThemeApplication()).toBe(true);
+        },
+      );
+
+      expect(scheduling).toHaveBeenCalledWith(
+        expect.objectContaining({
+          identifier: 'daily-plan-reminder:daily',
+          trigger: expect.objectContaining({ hour: 9, minute: 5 }),
+        }),
+      );
+      expect(scheduling).toHaveBeenCalledWith(
+        expect.objectContaining({
+          identifier: 'weekly-review-reminder:weekly',
+          trigger: expect.objectContaining({ weekday: 1, hour: 18, minute: 30 }),
+        }),
+      );
+    } finally {
+      await db.closeAsync();
+    }
+  });
+
   it('keeps the V3 canonical text byte-stable when a payload carries the V4 field', async () => {
     const backupSettings = await import('@/core/backup/backupSettings');
 

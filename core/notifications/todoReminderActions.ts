@@ -9,6 +9,7 @@ import { claimNotificationAction } from '@/features/habits/notificationActions.d
 import type { LinkedActionProcessResult } from '@/core/linked-actions/linkedActions.types';
 import { TODO_REMINDER_DATA_KIND, TODO_REMINDER_DATA_VERSION } from '@/lib/notificationConstants';
 import {
+  getScheduledReminderFireAtMs,
   getTodoReminderSnoozeIdentifier,
   resolveTodoDueAt,
   todoReminderIdentifier,
@@ -152,14 +153,6 @@ function isSameLogicalSnooze(request: NotificationRequest, todoId: string): bool
   );
 }
 
-function getScheduledDateMs(request: NotificationRequest): number | null {
-  const trigger = request.trigger;
-  if (!trigger || typeof trigger !== 'object' || !('date' in trigger)) return null;
-  const value: unknown = trigger.date;
-  if (value instanceof Date) return value.getTime();
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
 let snoozeQueue: Promise<void> = Promise.resolve();
 
 /**
@@ -195,16 +188,6 @@ async function runSnooze(
   const identifier = getTodoReminderSnoozeIdentifier(input.todoId);
   const now = input.now ?? new Date();
   try {
-    // Claim first: a consumed-but-unapplied snooze claim only suppresses a
-    // retry of the SAME delivered notification, which is correct.
-    await claimNotificationAction({
-      actionKey: input.actionKey,
-      kind: TODO_REMINDER_DATA_KIND,
-      actionName: 'snooze',
-      occurrenceId: input.occurrenceId,
-      processedAt: now.toISOString(),
-    });
-
     const todo = await adapter.loadTodo(input.todoId);
     const enabled = await adapter.getRemindersEnabled();
 
@@ -232,8 +215,7 @@ async function runSnooze(
           input.occurrenceId !== expectedOccurrenceId &&
           input.occurrenceId !== legacyOccurrenceId
         ) {
-          await adapter.cancel(todoReminderIdentifier(input.todoId));
-          await adapter.cancel(identifier);
+          // Both identifiers are reused when the todo is rescheduled.
           return { status: 'noop', identifier };
         }
       }
@@ -254,7 +236,7 @@ async function runSnooze(
       isSameLogicalSnooze(request, input.todoId),
     );
     const matching = existing.find((request) => {
-      const triggerMs = getScheduledDateMs(request);
+      const triggerMs = getScheduledReminderFireAtMs(request);
       return request.identifier === identifier && triggerMs !== null && triggerMs > now.getTime();
     });
     if (matching) {
@@ -265,6 +247,15 @@ async function runSnooze(
       }
       return { status: 'duplicate', identifier };
     }
+    // The durable claim still exists after the snoozed request has fired.
+    const { claimed } = await claimNotificationAction({
+      actionKey: input.actionKey,
+      kind: TODO_REMINDER_DATA_KIND,
+      actionName: 'snooze',
+      occurrenceId: input.occurrenceId,
+      processedAt: now.toISOString(),
+    });
+    if (!claimed) return { status: 'duplicate', identifier };
     // Replace the base reminder with the snoozed one so it cannot also fire.
     await adapter.cancel(todoReminderIdentifier(input.todoId));
     for (const stale of existing) await adapter.cancel(stale.identifier);

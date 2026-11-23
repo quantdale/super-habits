@@ -798,7 +798,9 @@ export async function readPendingThemeApplication(
  * completed; false when the marker remains and must be retried (bootstrap
  * maintenance retries until it succeeds).
  */
-export async function applyPendingThemeApplication(): Promise<boolean> {
+export async function applyPendingThemeApplication(
+  options: { fromImport?: boolean } = {},
+): Promise<boolean> {
   const db = await getDatabase();
   const pending = await readPendingThemeApplication(db);
   if (!pending) return true;
@@ -830,13 +832,33 @@ export async function applyPendingThemeApplication(): Promise<boolean> {
         );
       }
     }
-    // Marker cleared only after every AsyncStorage write succeeded.
-    await setAppMetaText(db, appMetaKeys.backupPendingThemeApply, 'null');
     // These AsyncStorage writes bypass the notification-preference setters,
     // so their in-memory caches still hold the pre-restore values; invalidate
     // them here or every reader this session (schedulers, Settings UI) keeps
     // gating on the stale preference until the app restarts.
     resetNotificationPreferenceCaches();
+    if (pending.notifications) {
+      // Keep the marker until the post-restore scheduling pass has run. If
+      // startup replays it, only schedule with permission already granted.
+      const { getNotificationPermissionState } = await import('@/lib/notifications');
+      if (options.fromImport || (await getNotificationPermissionState()) === 'granted') {
+        const [
+          { reconcileTodoReminders },
+          { syncDailyPlanReminder },
+          { syncWeeklyReviewReminder },
+        ] = await Promise.all([
+          import('@/core/notifications/todoReminderScheduler'),
+          import('@/core/notifications/dailyPlanReminderScheduler'),
+          import('@/core/notifications/weeklyReviewReminderScheduler'),
+        ]);
+        await Promise.allSettled([
+          reconcileTodoReminders(),
+          syncDailyPlanReminder(),
+          syncWeeklyReviewReminder(),
+        ]);
+      }
+    }
+    await setAppMetaText(db, appMetaKeys.backupPendingThemeApply, 'null');
   } catch {
     // AsyncStorage failed; the marker stays durable for the next retry.
     return false;

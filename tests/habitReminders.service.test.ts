@@ -66,6 +66,33 @@ function requestFor(
 }
 
 describe('reconcileHabitReminders', () => {
+  it.each(['android', 'ios'])(
+    'preserves a current base reminder reported by Expo on %s',
+    async (platform) => {
+      const habits = [habit('gym')];
+      const [desired] = buildHabitReminderPlan({ habits, now: NOW, windowDays: 1 });
+      const request = requestFor(desired);
+      request.trigger = (platform === 'android'
+        ? { type: 'date', value: desired.fireAt.getTime(), repeats: false }
+        : {
+            type: 'timeInterval',
+            repeats: false,
+            seconds: 21_600,
+          }) as unknown as NotificationRequest['trigger'];
+      const fake = fakeAdapter([request]);
+
+      const result = await reconcileHabitReminders({
+        habits,
+        completions: [],
+        windowDays: 1,
+        now: NOW,
+        adapter: fake.adapter,
+      });
+
+      expect(result).toMatchObject({ preserved: 1, scheduled: 0, cancelled: 0 });
+    },
+  );
+
   it('schedules the desired window and preserves all correct entries on repeat', async () => {
     const items = buildHabitReminderPlan({ habits: [habit('gym')], now: NOW });
     const first = fakeAdapter();
@@ -129,6 +156,23 @@ describe('reconcileHabitReminders', () => {
     expect(result.scheduled).toBe(14);
     expect(result.cancelled).toBe(1);
     expect(fake.cancelled).toContain(desired[0].identifier);
+  });
+
+  it('updates the pending reminder when the habit is renamed', async () => {
+    const habits = [habit('gym')];
+    const [item] = buildHabitReminderPlan({ habits, now: NOW, windowDays: 1 });
+    const fake = fakeAdapter([requestFor(item)]);
+
+    const result = await reconcileHabitReminders({
+      habits: [{ ...habits[0], name: 'Go to the gym' }],
+      completions: [],
+      now: NOW,
+      windowDays: 1,
+      adapter: fake.adapter,
+    });
+
+    expect(result).toMatchObject({ scheduled: 1, cancelled: 1 });
+    expect(fake.scheduled).toEqual([expect.objectContaining({ title: 'Go to the gym' })]);
   });
 
   it('collapses duplicates without touching Pomodoro requests', async () => {

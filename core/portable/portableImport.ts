@@ -460,17 +460,16 @@ export async function confirmPortableImport(input: {
   // Post-commit reconciliation: apply the staged theme settings to
   // AsyncStorage (durable marker; retried on bootstrap until it succeeds),
   // then ONLY current/future reminder scheduling.
-  await applyPendingThemeApplication();
+  await applyPendingThemeApplication({ fromImport: true });
   requestHabitReminderReconciliation();
   requestWorkoutReminderReconciliation();
-  // The todo-reminder family follows the same post-import rule as Restore V2:
-  // the restored preferences are live in AsyncStorage now (caches invalidated
-  // by the apply), so reconciling here schedules reminders for the imported
-  // due-dated todos and the repeating nudges immediately instead of leaving
-  // them silent for the rest of the session.
-  void reconcileTodoReminders();
-  void syncDailyPlanReminder().catch(() => undefined);
-  void syncWeeklyReviewReminder().catch(() => undefined);
+  // Older files had no notification preferences to replay. Reconcile their
+  // imported rows using the device's existing preferences.
+  if (!('notificationPreferences' in file.settings && file.settings.notificationPreferences)) {
+    void reconcileTodoReminders();
+    void syncDailyPlanReminder().catch(() => undefined);
+    void syncWeeklyReviewReminder().catch(() => undefined);
+  }
 
   // If a durable owner now exists, enqueue the imported state for that
   // owner's cloud backup (never claims completeness; the checkpoint cycle

@@ -12,6 +12,7 @@ import { TODO_REMINDER_DATA_KIND, TODO_REMINDER_DATA_VERSION } from '@/lib/notif
 import { DATE_KEY_PATTERN } from '@/lib/time';
 import {
   computeTodoReminderFireAt,
+  getScheduledReminderFireAtMs,
   getTodoReminderSnoozeIdentifier,
   resolveTodoDueAt,
   todoReminderIdentifier,
@@ -88,7 +89,7 @@ export type TodoReminderReconciliationResult = {
 export type ReconcileTodoRemindersInput = {
   now?: Date;
   adapter?: TodoReminderNativeAdapter;
-  /** Supplies the todo inventory; defaults to all non-deleted todos. */
+  /** Supplies the todo inventory; defaults to pending, non-deleted todos. */
   loadTodos?: () => Promise<TodoReminderSnapshot[]>;
 };
 
@@ -110,13 +111,12 @@ const defaultAdapter: TodoReminderNativeAdapter = {
 async function defaultLoadTodos(): Promise<TodoReminderSnapshot[]> {
   // Dynamic import: the todos data layer calls back into this module, so a
   // static edge would create an initialization cycle.
-  const { listTodos } = await import('@/features/todos/todos.data');
-  const rows = await listTodos();
+  const { listPendingTodos } = await import('@/features/todos/todos.data');
+  const rows = await listPendingTodos();
   return rows.map((row) => ({
     id: row.id,
     title: row.title,
     dueDate: row.due_date ?? '',
-    completedAt: row.completed_at ?? null,
   }));
 }
 
@@ -141,14 +141,6 @@ function isTodoReminderRequest(request: NotificationRequest): boolean {
 
 /** Body used by every todo due-date notification (base and snooze). */
 export const TODO_REMINDER_BODY = 'This todo is due now.';
-
-function getScheduledDateMs(request: NotificationRequest): number | null {
-  const trigger = request.trigger;
-  if (!trigger || typeof trigger !== 'object' || !('date' in trigger)) return null;
-  const value: unknown = trigger.date;
-  if (value instanceof Date) return value.getTime();
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
 
 /**
  * The notification payload for one occurrence. `occurrenceId` embeds the fire
@@ -269,7 +261,7 @@ function isCorrectBaseRequest(request: NotificationRequest, item: TodoReminderPl
     data?.version === item.data.version &&
     data?.todoId === item.data.todoId &&
     data?.occurrenceId === item.data.occurrenceId &&
-    getScheduledDateMs(request) === item.fireAt.getTime()
+    getScheduledReminderFireAtMs(request) === item.fireAt.getTime()
   );
 }
 

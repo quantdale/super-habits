@@ -1,5 +1,6 @@
 import type * as SQLite from 'expo-sqlite';
 import { getDatabase } from '@/core/db/client';
+import { withSQLiteTransaction } from '@/core/db/transactions';
 import { createId } from '@/lib/id';
 
 export const PROCESSED_NOTIFICATION_ACTION_RETENTION_MS = 35 * 24 * 60 * 60 * 1000;
@@ -87,9 +88,7 @@ export async function claimNotificationAction(
   input: ClaimNotificationActionInput,
 ): Promise<NotificationActionClaim> {
   const db = await getDatabase();
-  let claim: NotificationActionClaim | null = null;
-  await db.withTransactionAsync(async () => {
-    claim = await claimNotificationActionInTransaction(db, input);
-  });
-  return claim ?? { claimed: false, linkedEventId: '', linkedActionRequired: false };
+  return withSQLiteTransaction(db, (transactionDb) =>
+    claimNotificationActionInTransaction(transactionDb, input),
+  );
 }
