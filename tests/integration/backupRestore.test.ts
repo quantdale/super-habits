@@ -169,7 +169,7 @@ function buildRecordingSupabase() {
   const rpc = vi.fn(async (name: string, args: Record<string, unknown>) =>
     generationRemote.rpc(name, args),
   );
-  return { supabase: { from, rpc }, upserted };
+  return { supabase: { from, rpc }, upserted, generationRemote };
 }
 
 function buildServingSupabase(
@@ -773,6 +773,57 @@ async function seedSourceDevice(db: TestDatabase) {
 }
 
 describe('backup completeness v2 restore', () => {
+  it('restores both habits from a certified backup with an invalid reminder time', async () => {
+    const recording = buildRecordingSupabase();
+    installSupabaseMock(recording.supabase);
+    const sourceDb = await freshDatabase();
+    const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
+    const { addHabit } = await import('@/features/habits/habits.data');
+    await setLocalDatasetOwner(sourceDb as never, 'user_a');
+    const validId = await addHabit('Read', 1, undefined, undefined, undefined, undefined, '23:59');
+    const legacyId = await addHabit('Stretch', 1);
+    await sourceDb.runAsync('UPDATE habits SET reminder_time = ? WHERE id = ?', [
+      '25:00',
+      legacyId,
+    ]);
+    const checkpoint = await import('@/core/backup/backupCheckpoint');
+    await checkpoint.runBackupMaintenance();
+    await sourceDb.closeAsync();
+
+    const { heads, generations, chunks } = recording.generationRemote;
+    const head = heads.get('user_a');
+    if (!head) throw new Error('Source backup was not published');
+    const generation = generations.get(`user_a:${head.snapshot_id}`);
+    if (!generation) throw new Error('Published generation was not recorded');
+    const remote = new Map([
+      ['backup_generation_head', [head]],
+      ['backup_generation', [generation]],
+      [
+        'backup_generation_chunk',
+        [...chunks.values()].filter((chunk) => chunk.snapshot_id === head.snapshot_id),
+      ],
+    ]);
+    installSupabaseMock(buildServingSupabase(remote).supabase);
+    const targetDb = await freshDatabase();
+    try {
+      const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+      const { listHabits } = await import('@/features/habits/habits.data');
+      const result = await restoreFromRemoteBackupV2();
+      expect(result, result.status === 'invalid' ? result.message : undefined).toMatchObject({
+        status: 'restored',
+        importedCounts: { habits: 2 },
+      });
+      expect(new Map((await listHabits()).map((habit) => [habit.id, habit.reminder_time]))).toEqual(
+        new Map([
+          [validId, '23:59'],
+          [legacyId, null],
+        ]),
+      );
+    } finally {
+      await targetDb.closeAsync();
+    }
+  });
+
   it('restores the complete scope semantically and without side effects', async () => {
     // --- Phase 1: source device publishes its backup. ---
     const recording = buildRecordingSupabase();

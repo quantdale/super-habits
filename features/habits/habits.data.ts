@@ -1444,6 +1444,8 @@ export async function applyRemoteHabits(
   rows: Habit[],
 ): Promise<void> {
   for (const row of rows) {
+    // An invalid legacy time restores as a disabled reminder.
+    const reminderTime = parseHabitReminderTime(row.reminder_time) ? row.reminder_time : null;
     const fallbackCreationDate = safeTimestampToLocalDateKey(row.created_at);
     const history = parseHabitRuleHistory(row.rule_history);
     const ruleHistory =
@@ -1472,7 +1474,7 @@ export async function applyRemoteHabits(
         row.id,
         row.name,
         row.target_per_day,
-        row.reminder_time,
+        reminderTime,
         row.category,
         row.icon,
         row.color,
