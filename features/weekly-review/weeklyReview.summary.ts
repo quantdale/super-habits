@@ -23,7 +23,7 @@ import {
   summarizeHabitWeekOccurrences,
 } from './weeklyReview.domain';
 import { listTodos } from '@/features/todos/todos.data';
-import { isValidDateKey, timestampToLocalDateKey } from '@/lib/time';
+import { isValidDateKey, timestampToLocalDateKey, toDateKey } from '@/lib/time';
 import { listHabits, getAllHabitCompletionsForRange } from '@/features/habits/habits.data';
 import { listPomodoroSessionsForDateRange } from '@/features/pomodoro/pomodoro.data';
 import {
@@ -118,7 +118,16 @@ async function summarizeHabits(week: ReviewWeek): Promise<HabitSummary> {
   // the whole window a day off for users west of UTC. Schedule-aware counts
   // (F6): each habit contributes only its actually-scheduled days, resolved
   // through the Habit Engine V2 authority — never a blind 7 days.
-  return summarizeHabitWeekOccurrences(habits, completions, listWeekDateKeys(week.startDateKey, 7));
+  //
+  // Days after today are excluded: the review can be opened mid-week, and a
+  // day that has not happened yet is not a miss (future dates MUST be excluded
+  // from consistency denominators — habit-scheduling-and-history-semantics).
+  // A past week keeps all seven days.
+  const todayKey = toDateKey();
+  const elapsedDateKeys = listWeekDateKeys(week.startDateKey, 7).filter(
+    (dateKey) => dateKey <= todayKey,
+  );
+  return summarizeHabitWeekOccurrences(habits, completions, elapsedDateKeys);
 }
 
 // ── focus (pomodoro) ─────────────────────────────────────────────────────────
