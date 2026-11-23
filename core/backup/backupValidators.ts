@@ -170,6 +170,7 @@ export function parseHabitRuleHistoryJson(
     }
     if (
       !Array.isArray(rule.weekdays) ||
+      rule.weekdays.length === 0 ||
       rule.weekdays.some((d) => !isPositiveInteger(d) || d > 7)
     ) {
       return { ok: false, error: 'rule_history weekdays must be 1..7 integers' };

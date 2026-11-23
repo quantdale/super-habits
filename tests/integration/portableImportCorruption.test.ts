@@ -3,6 +3,7 @@ import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
 
 import { portableOwnerFingerprint } from '@/lib/portableOwnerFingerprint';
+import type { PortableBackupFile } from '@/core/portable/portable.types';
 
 /**
  * Portable Data Export & Import V1 — corruption matrix + owner matrix +
@@ -117,6 +118,36 @@ async function countUserRows(db: TestDatabase): Promise<number> {
 }
 
 describe('corruption matrix', () => {
+  it('rejects a checksummed habit whose effective rule schedules no days', async () => {
+    const parsed = JSON.parse(await makeValidFile()) as PortableBackupFile;
+    const db = await freshDatabase();
+    try {
+      const { buildPortableBackupFile } = await import('@/core/portable/portableFormat');
+      const [habit] = parsed.entities.habits ?? [];
+      const file = buildPortableBackupFile({
+        exportedAt: parsed.exportedAt,
+        ...parsed.source,
+        settings: parsed.settings,
+        rowsByEntity: {
+          ...parsed.entities,
+          habits: [
+            {
+              ...habit,
+              rule_history: JSON.stringify([
+                { effective_from_date: '2026-08-01', weekdays: [], target_per_day: 1 },
+              ]),
+            },
+          ],
+        },
+      });
+      const outcome = await prepare(JSON.stringify(file));
+      expect(outcome.status).toBe('rejected');
+      expect(await countUserRows(db)).toBe(0);
+    } finally {
+      await db.closeAsync();
+    }
+  });
+
   it('rejects every corrupted input and leaves the database unchanged', async () => {
     const valid = await makeValidFile();
     const parsed = JSON.parse(valid) as Record<string, unknown>;
