@@ -627,12 +627,14 @@ describe('active workout drafts preserve performed identity', () => {
     'leaving a completed summary keeps pending recovery and does not resurrect a draft (failure=%s)',
     async (failure) => {
       const { db, workout, pending } = await fixture();
+      const endedAtIso = new Date(Date.parse(START) + pending.elapsedSeconds * 1000).toISOString();
       try {
         const persistPendingSave = vi.fn(
           screenCallback(
             'persistPendingSave',
             {
               startedAtMsRef: { current: Date.parse(START) },
+              endedAtMsRef: { current: Date.parse(endedAtIso) },
               routine: pending.routineSnapshot,
               notes: pending.notes,
               effortScale: pending.effortScale,
@@ -676,7 +678,9 @@ describe('active workout drafts preserve performed identity', () => {
           expect(setSaveError).toHaveBeenCalledOnce();
         } else {
           expect(onCancel).toHaveBeenCalledOnce();
-          expect((await workout.getWorkoutPendingSave())?.enteredSets).toEqual(ENTERED);
+          const restored = await workout.getWorkoutPendingSave();
+          expect(restored?.enteredSets).toEqual(ENTERED);
+          expect(restored?.endedAtIso).toBe(endedAtIso);
         }
       } finally {
         await db.closeAsync();

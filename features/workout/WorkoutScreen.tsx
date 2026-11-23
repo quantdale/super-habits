@@ -889,6 +889,7 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
           // every later one.
           phaseIndex: state.phaseIndex,
           startedAtMs: Date.parse(state.startedAtIso),
+          endedAtMs: state.endedAtIso ? Date.parse(state.endedAtIso) : undefined,
           elapsedSeconds: state.elapsedSeconds,
           alreadyFinished: true,
           notes: state.notes,

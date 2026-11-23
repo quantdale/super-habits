@@ -1,7 +1,7 @@
 import { test, expect, type Page } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
-import { returnToApp, runSql } from './helpers/dbHarness';
+import { queryRows, returnToApp, runSql } from './helpers/dbHarness';
 import { fillRoutineName } from './helpers/forms';
 
 /**
@@ -169,5 +169,43 @@ test.describe('Workout finish celebration (P16 trophy card)', () => {
     await expect(page.getByText('Session complete!')).toHaveCount(0);
     await expect(page.getByText('Personal best!')).toHaveCount(0);
     await page.getByText('Done', { exact: true }).click();
+  });
+
+  test('a workout recovered after midnight keeps its original completion day', async ({ page }) => {
+    // Use the browser's calendar for both times, including in non-UTC runs.
+    const beforeMidnight = await page.evaluate(() => new Date(2026, 9, 18, 23, 55).getTime());
+    const afterMidnight = await page.evaluate(() => new Date(2026, 9, 19, 0, 5).getTime());
+    await page.clock.setFixedTime(beforeMidnight);
+    await runSql(
+      page,
+      `CREATE TRIGGER e2e_fail_workout_log_insert
+       BEFORE INSERT ON workout_logs
+       BEGIN SELECT RAISE(ABORT, 'forced e2e save failure'); END;`,
+    );
+    await returnToApp(page);
+    await goToTab(page, 'workout');
+    await startSession(page, 'Late Workout', 'Press');
+    await page.getByRole('button', { name: 'Complete set 1' }).click();
+    await expect(page.getByText('Workout complete!')).toBeVisible();
+    await page.getByRole('button', { name: 'Save and finish' }).click();
+    await expect(page.getByText(/This workout could not be saved/)).toBeVisible();
+
+    await page.clock.setFixedTime(afterMidnight);
+    await runSql(page, 'DROP TRIGGER e2e_fail_workout_log_insert');
+    await returnToApp(page);
+    await goToTab(page, 'workout');
+    await page.getByRole('button', { name: 'Save finished workout' }).click();
+    await page.getByRole('button', { name: 'Save and finish' }).click();
+    await expect(page.getByText('Workout saved')).toBeVisible();
+
+    expect(
+      await queryRows(page, 'SELECT completed_at, ended_at, created_at FROM workout_logs'),
+    ).toEqual([
+      {
+        completed_at: new Date(beforeMidnight).toISOString(),
+        ended_at: new Date(beforeMidnight).toISOString(),
+        created_at: new Date(afterMidnight).toISOString(),
+      },
+    ]);
   });
 });

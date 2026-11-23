@@ -242,6 +242,7 @@ function clampPhaseIndex(index: number, length: number): number {
 export type SessionResume = {
   phaseIndex: number;
   startedAtMs: number;
+  endedAtMs?: number;
   elapsedSeconds: number;
   /** Prior-phase outcomes saved with the draft (empty for legacy drafts). */
   dispositions?: Record<number, PhaseDisposition>;
@@ -414,6 +415,13 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   // idle before starting); null when the timer never ran. A resumed session
   // replays the draft's original start so logged duration stays truthful.
   const startedAtMsRef = useRef<number | null>(resume?.startedAtMs ?? null);
+  const endedAtMsRef = useRef<number | null>(resume?.endedAtMs ?? null);
+
+  const completeSession = useCallback(() => {
+    endedAtMsRef.current ??= Date.now();
+    setIsRunning(false);
+    setIsComplete(true);
+  }, []);
 
   const currentPhase: TimerPhase | undefined = sequence[currentIndex];
 
@@ -800,6 +808,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     if (!isComplete) return;
     const startedAtMs = startedAtMsRef.current;
     if (startedAtMs === null) return;
+    const endedAtMs = endedAtMsRef.current;
     let cancelled = false;
     const preserveRecovery = async () => {
       const pendingDispositions = Object.fromEntries(
@@ -825,6 +834,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
           effortScale,
           exerciseNames: sequence.map((phase) => phase.exerciseName),
           startedAtIso: new Date(startedAtMs).toISOString(),
+          ...(endedAtMs === null ? {} : { endedAtIso: new Date(endedAtMs).toISOString() }),
           phaseIndex: currentIndexRef.current,
           elapsedSeconds: Math.max(0, elapsedSecondsRef.current),
           enteredSets: pendingEnteredSets,
@@ -900,8 +910,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
           }
           setDispositions((d) => ({ ...d, [finishedIndex]: 'completed' }));
           if (outcome.kind === 'finish-session') {
-            setIsRunning(false);
-            setIsComplete(true);
+            completeSession();
             return;
           }
           setCurrentIndex(outcome.nextIndex);
@@ -910,7 +919,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [isRunning, isComplete, sequence]);
+  }, [isRunning, isComplete, sequence, completeSession]);
 
   const handleStart = () => {
     if (startedAtMsRef.current === null) startedAtMsRef.current = Date.now();
@@ -945,8 +954,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
       nextIndex += 1;
     }
     if (nextIndex >= sequence.length) {
-      setIsRunning(false);
-      setIsComplete(true);
+      completeSession();
       return;
     }
     setCurrentIndex(nextIndex);
@@ -997,6 +1005,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     async (lastError?: string) => {
       const startedAtMs = startedAtMsRef.current;
       if (startedAtMs === null) return;
+      const endedAtMs = endedAtMsRef.current;
       await saveWorkoutPendingSave({
         routineId: routine.id,
         // `AUD-SH09-A` (review finding 2): the performed identity snapshot.
@@ -1006,6 +1015,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         effortScale,
         exerciseNames: sequence.map((phase) => phase.exerciseName),
         startedAtIso: new Date(startedAtMs).toISOString(),
+        ...(endedAtMs === null ? {} : { endedAtIso: new Date(endedAtMs).toISOString() }),
         // The live cursor, so a reopened summary re-collects every exercise the
         // user actually completed (AUD-SH04-A).
         phaseIndex: currentIndexRef.current,
@@ -1031,7 +1041,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     setIsRunning(false);
     setIsSaving(true);
     try {
-      const endedAtMs = Date.now();
+      const endedAtMs = (endedAtMsRef.current ??= Date.now());
       const startedAtMs = startedAtMsRef.current;
       // Re-assert the recovery payload before the write so a stale or missing
       // pending state cannot cost the user their summary.
@@ -1176,8 +1186,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     if (phase?.phase === 'active' && dispositionsRef.current[index] === undefined) {
       setDispositions((d) => ({ ...d, [index]: 'skipped' }));
     }
-    setIsRunning(false);
-    setIsComplete(true);
+    completeSession();
   };
 
   const handleCancel = async () => {
