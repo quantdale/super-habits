@@ -89,7 +89,7 @@ export type TodoReminderReconciliationResult = {
 export type ReconcileTodoRemindersInput = {
   now?: Date;
   adapter?: TodoReminderNativeAdapter;
-  /** Supplies the todo inventory; defaults to all non-deleted todos. */
+  /** Supplies the todo inventory; defaults to pending, non-deleted todos. */
   loadTodos?: () => Promise<TodoReminderSnapshot[]>;
 };
 
@@ -111,13 +111,12 @@ const defaultAdapter: TodoReminderNativeAdapter = {
 async function defaultLoadTodos(): Promise<TodoReminderSnapshot[]> {
   // Dynamic import: the todos data layer calls back into this module, so a
   // static edge would create an initialization cycle.
-  const { listTodos } = await import('@/features/todos/todos.data');
-  const rows = await listTodos();
+  const { listPendingTodos } = await import('@/features/todos/todos.data');
+  const rows = await listPendingTodos();
   return rows.map((row) => ({
     id: row.id,
     title: row.title,
     dueDate: row.due_date ?? '',
-    completedAt: row.completed_at ?? null,
   }));
 }
 
