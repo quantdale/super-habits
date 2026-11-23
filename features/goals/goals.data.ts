@@ -114,12 +114,15 @@ export async function updateGoal(id: string, updates: GoalUpdate): Promise<void>
   await runBackupMutation<void>({
     db,
     mutate: async (transactionDb, enqueue) => {
-      // In-transaction status read (F6): completed_at enter/leave transitions
-      // key off transactional state, not a pre-transaction snapshot.
-      const existing = await transactionDb.getFirstAsync<Pick<Goal, 'status' | 'completed_at'>>(
-        `SELECT status, completed_at FROM goals WHERE id = ? AND deleted_at IS NULL`,
-        [id],
-      );
+      // In-transaction state read (F6): the create-vs-update decision, the
+      // completed_at enter/leave transitions, and whether the Goal's Project
+      // actually MOVES must all key off transactional state, not a
+      // pre-transaction snapshot that concurrent writes can invalidate.
+      const existing = await transactionDb.getFirstAsync<
+        Pick<Goal, 'status' | 'completed_at' | 'project_id'>
+      >(`SELECT status, completed_at, project_id FROM goals WHERE id = ? AND deleted_at IS NULL`, [
+        id,
+      ]);
       // Write contract: a missing or soft-deleted goal must reject, not
       // silently succeed — otherwise a stale editor reports success while the
       // edit is discarded (and a deleted goal can never be resurrected).
@@ -167,8 +170,19 @@ export async function updateGoal(id: string, updates: GoalUpdate): Promise<void>
       }
 
       let changed = false;
-      // H9: validate the target Project and reconcile linked children atomically.
-      if (updates.projectId !== undefined) {
+      // H9: validate the target Project and reconcile linked children atomically
+      // — but ONLY when the Goal's Project actually moves.
+      //
+      // `GoalDetailView` submits its whole draft on every save, including the
+      // stored `projectId`, so an edit that only renames the Goal (or changes
+      // its progress/status/horizon) used to re-run the child reconciliation
+      // below with the UNCHANGED value. A Goal without a Project imposes none
+      // (association contract rule 5), so that "no-op" write pulled every
+      // linked Todo/Habit out of its independently chosen Project as a side
+      // effect of an unrelated edit. Reconciling only a real move keeps rules 2
+      // and 4 intact (an explicit Goal still aligns its children) while making
+      // an unchanged `projectId` mean exactly what it says.
+      if (updates.projectId !== undefined && updates.projectId !== existing.project_id) {
         const nextProjectId = updates.projectId;
         if (nextProjectId !== null) {
           const project = await transactionDb.getFirstAsync<{ id: string }>(
