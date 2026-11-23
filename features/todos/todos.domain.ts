@@ -36,9 +36,23 @@ export function getTodayDateKey(reference: Date = new Date()): string {
  *
  * Completion state matters here, unlike the due-date branch: a COMPLETED
  * undated row must not cover its series, or finishing today's copy would
- * suppress every future copy of the chain forever.
+ * suppress every future copy of the chain forever. A keyless COMPLETED row
+ * therefore covers only the local day named by its `completed_at` instant —
+ * the day it was actually handled — and nothing beyond it.
  *
- * activeTodos: all non-deleted todos (completed and pending)
+ * `recurrence_date_key` is the ORIGINAL occurrence date and is never assigned
+ * at completion, so this derivation is the only "handled day" source for
+ * undated occurrences. It cannot be confused with an occurrence date the user
+ * set (or cleared) through the visible due date.
+ *
+ * Explicit user deletions cover exactly one day, so loading the screen cannot
+ * undo a deletion. A dated row keeps covering the day it is dated for. A row
+ * whose visible due date was cleared has no date left to name, so the tombstone
+ * records the day the deletion happened (stamped from the tombstone instant at
+ * WRITE time, never re-derived here) — otherwise a stale creation-day key
+ * would cover the wrong day and the same-day rollover would resurrect the row.
+ * Automatic undo retractions do not cover their day.
+ * activeTodos: live todos plus user-deleted occurrences and active series
  * todayKey: today's date key
  */
 export function findMissingRecurrenceIds(
@@ -47,7 +61,9 @@ export function findMissingRecurrenceIds(
     recurrence: string | null;
     due_date: string | null;
     completed: 0 | 1;
+    completed_at?: string | null;
     deleted_at: string | null;
+    recurrence_touched?: 0 | 1;
   }[],
   todayKey: string,
 ): string[] {
@@ -60,10 +76,31 @@ export function findMissingRecurrenceIds(
 
   const coveredToday = new Set<string>();
   for (const t of activeTodos) {
-    if (!t.recurrence_id || t.deleted_at !== null) continue;
+    if (!t.recurrence_id) continue;
+    if (t.deleted_at !== null) {
+      if (t.recurrence_touched === 1 && t.due_date === todayKey) {
+        coveredToday.add(t.recurrence_id);
+      }
+      continue;
+    }
     // Dated coverage is unchanged (a completed row due today still covers).
-    if (t.due_date === todayKey || (t.due_date === null && t.completed === 0)) {
+    if (t.due_date === todayKey) {
       coveredToday.add(t.recurrence_id);
+      continue;
+    }
+    // Pending undated rows cover their series outright.
+    if (t.due_date === null && t.completed === 0) {
+      coveredToday.add(t.recurrence_id);
+      continue;
+    }
+    // A handled undated occurrence covers exactly the local day it was
+    // completed on. Without a persisted occurrence key this instant is the
+    // only honest source for "the day this row already answered for".
+    if (t.due_date === null && t.completed === 1 && t.completed_at) {
+      const handledAt = new Date(t.completed_at);
+      if (!Number.isNaN(handledAt.getTime()) && toDateKey(handledAt) === todayKey) {
+        coveredToday.add(t.recurrence_id);
+      }
     }
   }
 

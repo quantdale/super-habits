@@ -40,7 +40,9 @@ type MissingRecurrenceRow = {
   recurrence: string | null;
   due_date: string | null;
   completed: 0 | 1;
+  completed_at?: string | null;
   deleted_at: string | null;
+  recurrence_touched?: 0 | 1;
 };
 
 describe('findMissingRecurrenceIds', () => {
@@ -129,6 +131,112 @@ describe('findMissingRecurrenceIds', () => {
         due_date: null,
         completed: 1,
         deleted_at: null,
+      },
+    ];
+    expect(findMissingRecurrenceIds(todos, '2025-01-02')).toEqual(['rec_001']);
+  });
+
+  it('a keyless COMPLETED undated instance covers only its own completion day', () => {
+    // Undated occurrences never persist an occurrence key: their handled day is
+    // derived from the completion instant in the LOCAL calendar. The day it was
+    // completed must stay covered (a same-day reload cannot append a duplicate),
+    // and every later day must still roll over.
+    const completedAt = new Date(2025, 0, 2, 9, 30).toISOString();
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: null,
+        completed: 1,
+        completed_at: completedAt,
+        deleted_at: null,
+      },
+    ];
+    expect(findMissingRecurrenceIds(todos, '2025-01-02')).toEqual([]);
+    expect(findMissingRecurrenceIds(todos, '2025-01-03')).toEqual(['rec_001']);
+  });
+
+  it('derives the handled day from the completion instant in local calendar terms', () => {
+    // 23:30 local on Jan 2 is already Jan 3 in UTC east of the line and still
+    // Jan 2 in UTC west of it: only the local calendar decides the covered day.
+    const completedAt = new Date(2025, 0, 2, 23, 30).toISOString();
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: null,
+        completed: 1,
+        completed_at: completedAt,
+        deleted_at: null,
+      },
+    ];
+    expect(findMissingRecurrenceIds(todos, '2025-01-02')).toEqual([]);
+    expect(findMissingRecurrenceIds(todos, '2025-01-03')).toEqual(['rec_001']);
+  });
+
+  it('a DATED original occurrence keeps covering only its own date', () => {
+    // The ORIGINAL occurrence date is not an edit surface: a completed row still
+    // covers exactly the day it is dated for, never the day it was handled.
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: '2025-01-01',
+        completed: 1,
+        completed_at: new Date(2025, 0, 2, 9, 30).toISOString(),
+        deleted_at: null,
+      },
+    ];
+    expect(findMissingRecurrenceIds(todos, '2025-01-02')).toEqual(['rec_001']);
+  });
+
+  it('a user-deleted occurrence covers the day its tombstone names', () => {
+    // Delete must stick: the tombstone answer for the day it was made on. A row
+    // whose visible due date was cleared has its key stamped for that day at
+    // write time (see removeTodoWithinTransaction), so the same-day reload
+    // cannot respawn the copy the user just removed.
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: '2025-01-02',
+        completed: 0,
+        deleted_at: new Date(2025, 0, 2, 9, 30).toISOString(),
+        recurrence_touched: 1,
+      },
+    ];
+    expect(findMissingRecurrenceIds(todos, '2025-01-02')).toEqual([]);
+    // Only that day is skipped; the chain still rolls over afterwards.
+    expect(findMissingRecurrenceIds(todos, '2025-01-03')).toEqual(['rec_001']);
+  });
+
+  it('a tombstone whose stored occurrence day is not today does not mask today', () => {
+    // The regression this guards: an UNRESOLVED stale key (creation day) would
+    // leave today uncovered and let the rollover resurrect a deleted task.
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: '2025-01-01',
+        completed: 0,
+        deleted_at: new Date(2025, 0, 2, 9, 30).toISOString(),
+        recurrence_touched: 1,
+      },
+    ];
+    expect(findMissingRecurrenceIds(todos, '2025-01-02')).toEqual(['rec_001']);
+  });
+
+  it('an automatic undo retraction never covers its day', () => {
+    // Retractions leave recurrence_touched untouched, so a rollover may spawn a
+    // fresh copy of the same series again (the user did not delete it).
+    const todos: MissingRecurrenceRow[] = [
+      {
+        recurrence_id: 'rec_001',
+        recurrence: 'daily',
+        due_date: '2025-01-02',
+        completed: 0,
+        deleted_at: new Date(2025, 0, 2, 9, 30).toISOString(),
+        recurrence_touched: 0,
       },
     ];
     expect(findMissingRecurrenceIds(todos, '2025-01-02')).toEqual(['rec_001']);
