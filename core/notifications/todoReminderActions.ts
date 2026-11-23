@@ -232,8 +232,7 @@ async function runSnooze(
           input.occurrenceId !== expectedOccurrenceId &&
           input.occurrenceId !== legacyOccurrenceId
         ) {
-          await adapter.cancel(todoReminderIdentifier(input.todoId));
-          await adapter.cancel(identifier);
+          // Both identifiers are reused when the todo is rescheduled.
           return { status: 'noop', identifier };
         }
       }

@@ -204,6 +204,33 @@ describe('todo reminder Snooze against real SQLite', () => {
     expect(result.status).toBe('noop');
     expect(native.scheduled).toHaveLength(0);
   });
+
+  it('leaves the new due-date reminder armed when an old delivered notification is snoozed', async () => {
+    const todos = await import('@/features/todos/todos.data');
+    const todoId = await createDueTodo(todos);
+    const oldDelivery = actionInput(todoId);
+    await todos.updateTodo(todoId, { dueDate: '2026-08-14' });
+    const native = adapter(db);
+    const newFireAt = new Date(2026, 7, 14, 9);
+    const replacement = {
+      identifier: todoReminderIdentifier(todoId),
+      fireAt: newFireAt,
+      data: {
+        kind: 'todo-reminder',
+        version: 1,
+        todoId,
+        occurrenceId: `${todoReminderIdentifier(todoId)}:${newFireAt.getTime()}`,
+        snoozed: false,
+      },
+    };
+    native.scheduled.push(replacement);
+
+    const result = await snoozeTodoReminderAction({ ...oldDelivery, now: NOW }, native);
+
+    expect(result.status).toBe('noop');
+    expect(native.scheduled).toEqual([replacement]);
+    expect(native.cancelled).toEqual([]);
+  });
 });
 
 describe('snooze lifecycle cancellation (audit F4 regression guard)', () => {
