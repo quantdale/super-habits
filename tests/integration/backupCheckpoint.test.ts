@@ -144,6 +144,16 @@ describe('backup completeness v2 checkpoint', () => {
     const { seedRewardHistory, REWARD_DAY } = await import('./helpers/rewardBackupFixture');
     const { awardGamificationAction } = await import('@/features/gamification/gamification.data');
     await checkpoint.runBackupMaintenance();
+    // This session already exists on the upgraded device. Include it in the
+    // first snapshot so only the reward changes between generations.
+    const focusId = 'pom_1792195200000_abcdefgh';
+    const startedAt = new Date(`${REWARD_DAY}T10:00:00`).toISOString();
+    const endedAt = new Date(`${REWARD_DAY}T10:25:00`).toISOString();
+    await db.runAsync(
+      `INSERT INTO pomodoro_sessions (id, started_at, ended_at, duration_seconds, session_type, created_at)
+       VALUES (?, ?, ?, 1500, 'focus', ?)`,
+      [focusId, startedAt, endedAt, endedAt],
+    );
     await seedRewardHistory(db);
     // Simulate upgrades from Scope 9: the device already has reward rows,
     // but those writers did not dirty the cloud backup when rewards changed.
@@ -154,7 +164,7 @@ describe('backup completeness v2 checkpoint', () => {
 
     await awardGamificationAction({
       kind: 'focus',
-      entityId: 'pom_1792195200000_abcdefgh',
+      entityId: focusId,
       todayKey: REWARD_DAY,
     });
     expect(await outboxCount(db)).toBe(0);
@@ -168,11 +178,7 @@ describe('backup completeness v2 checkpoint', () => {
         second.snapshot_id,
         'gamification_events',
       ),
-    ).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ source_key: 'pom_1792195200000_abcdefgh' }),
-      ]),
-    );
+    ).toEqual(expect.arrayContaining([expect.objectContaining({ source_key: focusId })]));
     expect(supabaseMock.upserted.some(({ entity }) => entity.startsWith('gamification_'))).toBe(
       false,
     );
