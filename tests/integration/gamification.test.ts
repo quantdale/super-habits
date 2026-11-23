@@ -650,6 +650,32 @@ describe('streak freeze accounting (audit C #2)', () => {
     return rows.map((row) => row.date_key);
   }
 
+  it('counts a refunded freeze before granting another at the new milestone', async () => {
+    const { todos, gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    const yesterday = domain.shiftDateKey(today, -1);
+    const run = Array.from({ length: 364 }, (_, idx) => domain.shiftDateKey(today, -idx - 2));
+    await seedLedgerDays(run);
+    await grantFreeze([7, 30, 100], run[0]);
+    await db.runAsync(
+      `INSERT INTO gamification_streak_freezes (date_key, saved_at) VALUES (?, ?)`,
+      [yesterday, time.nowIso()],
+    );
+    // Clock is today; the todo is a previously saved action on the frozen day.
+    const todoId = await todos.addTodo({ title: 'Completion from yesterday' });
+    await todos.completeTodo(todoId);
+    await db.runAsync(`UPDATE todos SET completed_at = ? WHERE id = ?`, [
+      new Date(`${yesterday}T12:00:00`).toISOString(),
+      todoId,
+    ]);
+
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+
+    const snapshot = await gamification.readGamificationSnapshot({ todayKey: today });
+    expect(snapshot.streak.current).toBe(365);
+    expect(snapshot.freezes).toEqual({ earned: 3, used: 0, banked: 3 });
+  });
+
   it('earns a freeze at the milestone, spends it on the miss, and stops at MAX_BANKED_FREEZES', async () => {
     const { gamification, time, domain } = await loadModules();
     const today = time.toDateKey();

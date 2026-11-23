@@ -455,28 +455,30 @@ async function loadFreezeState(db: Db, snapshot?: LedgerSnapshot): Promise<Strea
  * "active" predicate `streakDaysFromSnapshot` reads, so the release decision
  * and the streak reading can never disagree.
  *
- * Releasing is idempotent and dirties the next backup snapshot. Callers that then read freeze state through a pass snapshot must
- * treat that snapshot as stale (re-read the ledger), because the snapshot was
- * built BEFORE these rows were deleted.
- *
- * Returns the released date keys (oldest first) so callers can report/log it.
+ * Include the day of a just-verified award so its refund counts before
+ * deciding whether the same award has room to grant a freeze. The refund
+ * dirties the next backup in the transaction that changes the ledger.
  */
-export async function releaseStaleFreezes(db: Db): Promise<string[]> {
+async function releaseStaleFreezes(
+  db: Db,
+  snapshot: LedgerSnapshot,
+  awardingDateKey?: string,
+): Promise<void> {
   const stale = await db.getAllAsync<{ date_key: string }>(
     `SELECT f.date_key
        FROM gamification_streak_freezes f
-      WHERE EXISTS (
+      WHERE f.date_key = ? OR EXISTS (
               SELECT 1 FROM gamification_events e
                WHERE e.date_key = f.date_key AND e.xp > 0
-            )
-      ORDER BY f.date_key ASC`,
+            )`,
+    [awardingDateKey ?? null],
   );
-  if (stale.length === 0) return [];
+  if (stale.length === 0) return;
   for (const row of stale) {
     await db.runAsync(`DELETE FROM gamification_streak_freezes WHERE date_key = ?`, [row.date_key]);
+    if (snapshot.frozenDateKeys.delete(row.date_key)) snapshot.freezesUsed -= 1;
   }
   await setAppMetaText(db, appMetaKeys.backupDirty, '1');
-  return stale.map((row) => row.date_key);
 }
 
 async function loadRecordedMilestones(
@@ -925,6 +927,7 @@ async function computeAward(input: {
       if (legacy) return null;
     }
 
+    await releaseStaleFreezes(transactionDb, snapshot, todayKey);
     const [facts, freezes, completedQuestIds, milestones, dayCompletion] = await Promise.all([
       loadDayFacts(transactionDb, todayKey, snapshot),
       loadFreezeState(transactionDb, snapshot),
@@ -948,10 +951,6 @@ async function computeAward(input: {
     });
 
     await insertEvents(transactionDb, award);
-    // A freeze spent on this day before its real activity existed is now
-    // unnecessary: release it in the same transaction that records the winning
-    // activity, so the bank cap and the grant budget stay honest (audit C #2).
-    await releaseStaleFreezes(transactionDb);
     const completedAt = nowIso();
     for (const questId of award.completedQuestIds) {
       await transactionDb.runAsync(
@@ -1203,11 +1202,8 @@ export async function reconcileGamificationActivity(
  * ledger already counts as active or frozen, so an unbounded absence cannot
  * retroactively resurrect a dead run.
  *
- * Freeze rows whose day has since become active are released FIRST, and the
- * ledger snapshot is re-read when that happened, so planning spends from the
- * current bank rather than a snapshot that still counts a stale freeze as
- * spent (audit C #2). The release is a no-op for a correct ledger, so the
- * common path still takes exactly one snapshot read.
+ * Freeze rows whose day has since become active are released before planning
+ * spends from the current bank (audit C #2).
  */
 export async function ensureStreakFreeze(
   options: GamificationReadOptions = {},
@@ -1220,9 +1216,8 @@ export async function ensureStreakFreeze(
 
 async function ensureStreakFreezeInternal(db: Db, todayKey: string) {
   return withSQLiteTransaction(db, async (transactionDb) => {
-    let ledger = await readLedgerSnapshot(transactionDb);
-    const released = await releaseStaleFreezes(transactionDb);
-    if (released.length > 0) ledger = await readLedgerSnapshot(transactionDb);
+    const ledger = await readLedgerSnapshot(transactionDb);
+    await releaseStaleFreezes(transactionDb, ledger);
     const [streakDays, freezes] = await Promise.all([
       loadStreakDays(transactionDb, ledger),
       loadFreezeState(transactionDb, ledger),
