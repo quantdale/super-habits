@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
-import { queryRows, returnToApp } from './helpers/dbHarness';
+import { queryRows, returnToApp, runSql } from './helpers/dbHarness';
 import { fillRoutineName } from './helpers/forms';
 
 async function tomorrowDateKey(page: Parameters<typeof goToTab>[0]): Promise<string> {
@@ -421,6 +421,35 @@ test.describe('Workout Gym V2', () => {
     await expect(detail.getByText('Treadmill Walk', { exact: true }).first()).toBeVisible();
     await expect(detail.getByText(/3.2 distance/)).toBeVisible();
     await expect(detail.getByText(/pace 7.5/)).toBeVisible();
+  });
+
+  test('keeps the entered duration when the work timer completes a set', async ({ page }) => {
+    await runSql(
+      page,
+      `INSERT INTO workout_routines (id, name, created_at, updated_at)
+       VALUES ('wrk_timed', 'Timed session', '2026-10-18T09:00:00.000Z', '2026-10-18T09:00:00.000Z');
+       INSERT INTO routine_exercises
+         (id, routine_id, name, sort_order, created_at, updated_at, catalog_exercise_id, modality)
+       VALUES ('ex_timed', 'wrk_timed', 'Plank', 0, '2026-10-18T09:00:00.000Z',
+               '2026-10-18T09:00:00.000Z', 'builtin_plank', 'timed');
+       INSERT INTO routine_exercise_sets
+         (id, exercise_id, set_number, active_seconds, rest_seconds, created_at, updated_at)
+       VALUES ('eset_timed', 'ex_timed', 1, 2, 0, '2026-10-18T09:00:00.000Z',
+               '2026-10-18T09:00:00.000Z');`,
+    );
+    await returnToApp(page);
+    await goToTab(page, 'workout');
+    await page.getByRole('button', { name: 'Open Timed session routine' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Start workout' }).click();
+    await page.getByRole('textbox', { name: 'Duration (seconds)' }).fill('3');
+    await page.getByRole('button', { name: 'Start', exact: true }).click();
+    await expect(page.getByText('Workout complete!')).toBeVisible();
+    await page.getByRole('button', { name: 'Save and finish' }).click();
+    await expect(page.getByText('Workout saved')).toBeVisible();
+
+    expect(
+      await queryRows(page, 'SELECT completed, duration_seconds FROM workout_session_sets'),
+    ).toEqual([{ completed: 1, duration_seconds: 3 }]);
   });
 
   test('tracks body weight and an optional goal locally', async ({ page }) => {

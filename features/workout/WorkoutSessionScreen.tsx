@@ -364,9 +364,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     const phase = sequence[resumedIndex];
     if (!phase) return 0;
     const saved = Math.round(resume?.remainingSeconds ?? NaN);
-    return Number.isFinite(saved) && saved > 0
-      ? Math.min(saved, phase.durationSeconds)
-      : phase.durationSeconds;
+    if (!Number.isFinite(saved) || saved <= 0) return phase.durationSeconds;
+    // The rest controls can intentionally extend the original prescription.
+    return phase.phase === 'rest' ? saved : Math.min(saved, phase.durationSeconds);
   });
   const [isRunning, setIsRunning] = useState(false);
   // A session whose save did NOT commit re-opens directly on the summary
@@ -376,7 +376,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   const [isComplete, setIsComplete] = useState(resume?.alreadyFinished === true);
   // Active-time tick counter; the persisted duration is this counter for
   // resumed sessions (wall-clock would include time the app was closed) and
-  // real timestamps (startedAtMsRef → handleFinish) otherwise.
+  // the actual start and end timestamps otherwise.
   const [elapsedSeconds, setElapsedSeconds] = useState(() =>
     Math.max(0, Math.round(resume?.elapsedSeconds ?? 0)),
   );
@@ -900,13 +900,17 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
           }
           const autoDurationSeconds = outcome.autoEnterDurationSeconds;
           if (autoDurationSeconds !== undefined) {
-            setEnteredSets((values) => ({
-              ...values,
-              [finishedIndex]: {
-                ...(values[finishedIndex] ?? { weight: '', reps: '' }),
-                duration: String(autoDurationSeconds),
-              },
-            }));
+            setEnteredSets((values) => {
+              const entered = values[finishedIndex];
+              if (parseOptionalMeasurement(entered?.duration) !== null) return values;
+              return {
+                ...values,
+                [finishedIndex]: {
+                  ...(entered ?? { weight: '', reps: '' }),
+                  duration: String(autoDurationSeconds),
+                },
+              };
+            });
           }
           setDispositions((d) => ({ ...d, [finishedIndex]: 'completed' }));
           if (outcome.kind === 'finish-session') {
