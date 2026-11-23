@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { addLocalDays, toDateKey } from '@/lib/time';
 import { freshDatabase, type TestDatabase } from './helpers/db';
 
 vi.mock('expo-constants', () => ({ default: { expoConfig: { version: '1.0.0' } } }));
@@ -44,7 +45,6 @@ async function readRuleHistory(db: TestDatabase, habitId: string): Promise<strin
  */
 async function editWithoutScheduleChange(habitId: string, count = EDIT_COUNT): Promise<void> {
   const habits = await import('@/features/habits/habits.data');
-  const { addLocalDays, toDateKey } = await import('@/lib/time');
   const createdOn = toDateKey();
   for (let index = 0; index < count; index += 1) {
     await habits.updateHabit(habitId, {
@@ -108,4 +108,58 @@ describe('habit rule history growth', () => {
       await target.closeAsync();
     }
   });
+});
+
+describe('portable recovery of long habit histories', () => {
+  it.each(['rule_history', 'lifecycle_history'] as const)(
+    'restores writer-produced %s that exceeds 50,000 characters',
+    async (column) => {
+      const source = await freshDatabase();
+      const habits = await import('@/features/habits/habits.data');
+      const id = await habits.addHabit('Long-running habit', 1);
+      const firstDay = toDateKey();
+      for (let day = 1; day <= 720; day += 1) {
+        if (column === 'rule_history') {
+          await habits.updateHabit(id, {
+            name: 'Long-running habit',
+            targetPerDay: day % 2 === 1 ? 2 : 1,
+            category: 'anytime',
+            effectiveFromDate: addLocalDays(firstDay, day),
+          });
+        } else {
+          await habits.pauseHabit(id, addLocalDays(firstDay, 2 * day - 1));
+          await habits.resumeHabit(id, addLocalDays(firstDay, 2 * day));
+        }
+      }
+
+      const [original] = await habits.listHabits();
+      expect(original[column]?.length).toBeGreaterThan(50_000);
+      const { exportPortableBackup } = await import('@/core/portable/portableExport');
+      const exported = await exportPortableBackup();
+      await source.closeAsync();
+      if (!exported.ok) throw new Error(exported.error);
+
+      const target = await freshDatabase();
+      try {
+        const { preparePortableImport, confirmPortableImport } =
+          await import('@/core/portable/portableImport');
+        const prepared = await preparePortableImport({
+          fileName: exported.fileName,
+          text: exported.json,
+        });
+        expect(
+          prepared.status,
+          prepared.status === 'ready' ? undefined : JSON.stringify(prepared),
+        ).toBe('ready');
+        if (prepared.status !== 'ready') throw new Error('Import was rejected');
+        await expect(confirmPortableImport({ file: prepared.file })).resolves.toMatchObject({
+          status: 'restored',
+        });
+        const restored = await import('@/features/habits/habits.data');
+        expect(await restored.listHabits()).toEqual([original]);
+      } finally {
+        await target.closeAsync();
+      }
+    },
+  );
 });

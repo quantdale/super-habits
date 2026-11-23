@@ -58,6 +58,10 @@ const WORKOUT_TEXT_MAX_LENGTH = 100 * 1024 * 1024;
 // WHOLE backup file, so recovery must accept every writer-valid value.
 const RAW_NAME_RECOVERY_TEXT_LENGTH = 100 * 1024 * 1024;
 
+// Schedule and lifecycle writers retain their full histories. Match the
+// portable file ceiling so a long history fits whenever its export does.
+const HABIT_HISTORY_MAX_LENGTH = 100 * 1024 * 1024;
+
 const STRING_LIMITS: Record<string, number> = {
   title: 500,
   name: 300,
@@ -147,7 +151,7 @@ function foldAsciiCase(value: string): string {
 export function parseHabitRuleHistoryJson(
   value: unknown,
 ): { ok: true; history: unknown[] } | { ok: false; error: string } {
-  if (typeof value !== 'string' || value.length > 50_000) {
+  if (typeof value !== 'string' || value.length > HABIT_HISTORY_MAX_LENGTH) {
     return { ok: false, error: 'rule_history must be a bounded JSON string' };
   }
   let parsed: unknown;
@@ -205,7 +209,7 @@ export function parseHabitLifecycleHistoryJson(
   value: unknown,
 ): { ok: true; history: unknown[] } | { ok: false; error: string } {
   if (value === null) return { ok: true, history: [] };
-  if (typeof value !== 'string' || value.length > 50_000) {
+  if (typeof value !== 'string' || value.length > HABIT_HISTORY_MAX_LENGTH) {
     return { ok: false, error: 'lifecycle_history must be a bounded JSON string or null' };
   }
   let parsed: unknown;
