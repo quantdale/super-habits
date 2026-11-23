@@ -19,7 +19,13 @@ import { withSQLiteTransaction } from '@/core/db/transactions';
 import type { Habit } from '@/core/db/types';
 import { buildDayCompletions, habitCreationDateKey } from '@/features/habits/habits.domain';
 import { createId } from '@/lib/id';
-import { getUtcIsoRangeForLocalDateKeys, nowIso, toDateKey } from '@/lib/time';
+import {
+  getUtcIsoRangeForLocalDateKeys,
+  isValidDateKey,
+  nowIso,
+  timestampToLocalDateKey,
+  toDateKey,
+} from '@/lib/time';
 import type * as SQLite from 'expo-sqlite';
 import {
   actionSourceKey,
@@ -721,6 +727,56 @@ type AwardCore = {
   celebration: Celebration | null;
 };
 
+const ACTION_TIMESTAMP_QUERIES = {
+  todo: `SELECT completed_at AS stamp FROM todos
+         WHERE id = ? AND completed = 1 AND deleted_at IS NULL`,
+  focus: `SELECT started_at AS stamp FROM pomodoro_sessions
+          WHERE id = ? AND session_type = 'focus' AND ended_at IS NOT NULL AND duration_seconds > 0`,
+  workout: `SELECT completed_at AS stamp FROM workout_logs WHERE id = ?`,
+  review: `SELECT completed_at AS stamp FROM weekly_reviews
+           WHERE id = ? AND status = 'completed' AND deleted_at IS NULL`,
+};
+
+/** Confirm the action still exists and use the same date as reconciliation. */
+async function readActionDateKey(
+  db: Db,
+  kind: ActionKind,
+  entityId: string,
+  requestedDateKey: string,
+): Promise<string | null> {
+  switch (kind) {
+    case 'habit': {
+      const row = await db.getFirstAsync<{ date_key: string }>(
+        `SELECT date_key FROM habit_completions WHERE habit_id = ? AND date_key = ? AND count > 0`,
+        [entityId, requestedDateKey],
+      );
+      return row?.date_key ?? null;
+    }
+    case 'nutrition': {
+      const row = await db.getFirstAsync<{ date_key: string }>(
+        `SELECT consumed_on AS date_key FROM calorie_entries
+          WHERE consumed_on = ? AND deleted_at IS NULL LIMIT 1`,
+        [entityId],
+      );
+      return row?.date_key ?? null;
+    }
+    case 'plan': {
+      const row = await db.getFirstAsync<{ date_key: string }>(
+        `SELECT date_key FROM daily_plans
+          WHERE id = ? AND deleted_at IS NULL AND status IN ('committed', 'completed')`,
+        [entityId],
+      );
+      return row?.date_key ?? null;
+    }
+    default: {
+      const row = await db.getFirstAsync<{ stamp: string | null }>(ACTION_TIMESTAMP_QUERIES[kind], [
+        entityId,
+      ]);
+      return row?.stamp ? timestampToLocalDateKey(row.stamp) : null;
+    }
+  }
+}
+
 /**
  * The award itself, without reading back a snapshot.
  *
@@ -734,9 +790,10 @@ async function computeAward(input: {
   kind: ActionKind;
   entityId?: string;
   todayKey: string;
+  allowEarlierDate?: boolean;
   snapshot: LedgerSnapshot;
 }): Promise<AwardCore | null> {
-  const { todayKey, snapshot } = input;
+  const { todayKey: requestedDateKey, snapshot } = input;
   const db = await getDatabase();
 
   let entityId = input.entityId;
@@ -758,27 +815,28 @@ async function computeAward(input: {
     ) {
       return null;
     }
-    const candidate = (await loadActivityCandidates(db, todayKey)).find(
+    const candidate = (await loadActivityCandidates(db, requestedDateKey)).find(
       (entry) => entry.kind === input.kind,
     );
     if (!candidate) return null;
     entityId = candidate.entityId;
   }
-  const sourceKey = actionSourceKey(input.kind, entityId, todayKey);
-
-  // Everything the reward math reads is derived from feature activity plus the
-  // ledger BEFORE this write: feature counts today, and the ledger as the pass
-  // has observed it.
-  const [facts, freezes, completedQuestIds, milestones, dayCompletion] = await Promise.all([
-    loadDayFacts(db, todayKey, snapshot),
-    loadFreezeState(db, snapshot),
-    loadCompletedQuestIds(db, todayKey, snapshot),
-    loadRecordedMilestones(db, snapshot),
-    loadDayCompletion(db, todayKey, snapshot),
-  ]);
-  const streakDays = streakDaysFromSnapshot(snapshot);
-
   const outcome = await withSQLiteTransaction(db, async (transactionDb) => {
+    // Recheck inside the writer transaction: the reported action might have
+    // been undone, deleted, or moved to another local day since it was read.
+    const todayKey = await readActionDateKey(transactionDb, input.kind, entityId, requestedDateKey);
+    const earliestDateKey = input.allowEarlierDate
+      ? shiftDateKey(requestedDateKey, 1 - GAMIFICATION_RECONCILE_LOOKBACK_DAYS)
+      : requestedDateKey;
+    if (
+      todayKey === null ||
+      !isValidDateKey(todayKey) ||
+      todayKey < earliestDateKey ||
+      todayKey > requestedDateKey
+    ) {
+      return null;
+    }
+    const sourceKey = actionSourceKey(input.kind, entityId, todayKey);
     const existing = await transactionDb.getFirstAsync<{ id: string }>(
       `SELECT id FROM gamification_events WHERE event_kind = ? AND source_key = ?`,
       [input.kind, sourceKey],
@@ -800,6 +858,13 @@ async function computeAward(input: {
       if (legacy) return null;
     }
 
+    const [facts, freezes, completedQuestIds, milestones, dayCompletion] = await Promise.all([
+      loadDayFacts(transactionDb, todayKey, snapshot),
+      loadFreezeState(transactionDb, snapshot),
+      loadCompletedQuestIds(transactionDb, todayKey, snapshot),
+      loadRecordedMilestones(transactionDb, snapshot),
+      loadDayCompletion(transactionDb, todayKey, snapshot),
+    ]);
     const award = computeActionReward({
       kind: input.kind,
       sourceKey,
@@ -808,7 +873,7 @@ async function computeAward(input: {
       xpBefore: snapshot.totalXp,
       facts,
       quests: buildDailyQuests({ dateKey: todayKey, facts, completedQuestIds }),
-      streakDays,
+      streakDays: streakDaysFromSnapshot(snapshot),
       recordedStreakMilestones: milestones.streak,
       recordedFreezeMilestones: milestones.freeze,
       freezes,
@@ -886,6 +951,7 @@ export async function awardGamificationAction(
   const core = await computeAward({
     ...input,
     todayKey,
+    allowEarlierDate: true,
     snapshot: await readLedgerSnapshot(db),
   });
   if (!core) return null;

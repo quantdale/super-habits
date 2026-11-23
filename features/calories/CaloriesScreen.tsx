@@ -653,7 +653,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         },
         { maintainSavedMeal: false },
       );
-      recordAction('nutrition');
+      recordAction('nutrition', surfaceDateKey);
       await refresh();
     },
     [surfaceDateKey, recordAction, refresh],
@@ -738,7 +738,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
 
         resetCalorieForm();
         setEntryModalVisible(false);
-        recordAction('nutrition');
+        recordAction('nutrition', editingEntryId ? entryDateKey : surfaceDateKey);
         await refresh();
       } catch (error) {
         const message =
