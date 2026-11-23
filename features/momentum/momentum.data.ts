@@ -84,13 +84,20 @@ export async function getMomentumGarden(
            AND completed_at IS NOT NULL
            AND completed_at >= ?
            AND completed_at < ?
-         ORDER BY completed_at ASC
+         ORDER BY completed_at DESC
          LIMIT ?`,
       [startUtcIso, endUtcExclusiveIso, MOMENTUM_LIMITS.queryRowsPerTimestampSource],
     ),
     // Only habits with a positive completion in the requested window can
     // contribute to this read model. This keeps the canonical scheduler's
-    // bulk input bounded without issuing a query per habit.
+    // bulk input bounded. Rank each habit by its latest completion date and
+    // use the same habit ID tie-breaker as the capped completion query.
+    //
+    // Every capped source below is `ORDER BY … DESC LIMIT n`: a cap must keep
+    // the NEWEST facts of the window (the days the Garden is about), not the
+    // oldest ones. Ascending order truncated the wrong end — a heavy window
+    // dropped today's session while stale days kept their growth, so Overview's
+    // Today card could read "no contributions" right after a real workout.
     //
     // Deliberately NO `h.deleted_at IS NULL` filter (F3 canonical history rule,
     // the same one Progress's unjoined `countHabitCompletions` and the
@@ -103,15 +110,12 @@ export async function getMomentumGarden(
     db.getAllAsync<Habit>(
       `SELECT h.*
          FROM habits h
-         WHERE EXISTS (
-             SELECT 1
-             FROM habit_completions hc
-             WHERE hc.habit_id = h.id
-               AND hc.date_key >= ?
-               AND hc.date_key <= ?
-               AND hc.count > 0
-           )
-         ORDER BY h.created_at ASC
+         JOIN habit_completions hc ON hc.habit_id = h.id
+         WHERE hc.date_key >= ?
+           AND hc.date_key <= ?
+           AND hc.count > 0
+         GROUP BY h.id
+         ORDER BY MAX(hc.date_key) DESC, h.id ASC
          LIMIT ?`,
       [window.startKey, window.endKey, MOMENTUM_LIMITS.queryRowsPerHabitSource],
     ),
@@ -121,7 +125,7 @@ export async function getMomentumGarden(
          WHERE date_key >= ?
            AND date_key <= ?
            AND count > 0
-         ORDER BY date_key ASC, habit_id ASC
+         ORDER BY date_key DESC, habit_id ASC
          LIMIT ?`,
       [window.startKey, window.endKey, MOMENTUM_LIMITS.queryRowsPerHabitCompletionSource],
     ),
@@ -133,7 +137,7 @@ export async function getMomentumGarden(
            AND duration_seconds > 0
            AND started_at >= ?
            AND started_at < ?
-         ORDER BY started_at ASC
+         ORDER BY started_at DESC
          LIMIT ?`,
       [startUtcIso, endUtcExclusiveIso, MOMENTUM_LIMITS.queryRowsPerTimestampSource],
     ),
@@ -142,7 +146,7 @@ export async function getMomentumGarden(
          FROM workout_logs
          WHERE completed_at >= ?
            AND completed_at < ?
-         ORDER BY completed_at ASC
+         ORDER BY completed_at DESC
          LIMIT ?`,
       [startUtcIso, endUtcExclusiveIso, MOMENTUM_LIMITS.queryRowsPerTimestampSource],
     ),
@@ -166,7 +170,7 @@ export async function getMomentumGarden(
            AND completed_at IS NOT NULL
            AND completed_at >= ?
            AND completed_at < ?
-         ORDER BY completed_at ASC
+         ORDER BY completed_at DESC
          LIMIT ?`,
       [startUtcIso, endUtcExclusiveIso, MOMENTUM_LIMITS.queryRowsPerTimestampSource],
     ),
@@ -178,7 +182,7 @@ export async function getMomentumGarden(
            AND completed_at IS NOT NULL
            AND completed_at >= ?
            AND completed_at < ?
-         ORDER BY completed_at ASC
+         ORDER BY completed_at DESC
          LIMIT ?`,
       [startUtcIso, endUtcExclusiveIso, MOMENTUM_LIMITS.queryRowsPerTimestampSource],
     ),
@@ -190,7 +194,7 @@ export async function getMomentumGarden(
            AND completed_at IS NOT NULL
            AND completed_at >= ?
            AND completed_at < ?
-         ORDER BY completed_at ASC
+         ORDER BY completed_at DESC
          LIMIT ?`,
       [startUtcIso, endUtcExclusiveIso, MOMENTUM_LIMITS.queryRowsPerTimestampSource],
     ),
@@ -202,7 +206,7 @@ export async function getMomentumGarden(
            AND completed_at IS NOT NULL
            AND completed_at >= ?
            AND completed_at < ?
-         ORDER BY completed_at ASC
+         ORDER BY completed_at DESC
          LIMIT ?`,
       [startUtcIso, endUtcExclusiveIso, MOMENTUM_LIMITS.queryRowsPerTimestampSource],
     ),
