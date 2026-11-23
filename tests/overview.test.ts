@@ -175,14 +175,31 @@ describe('shapePlanProgressSummary', () => {
 
 describe('shapeHabitsSummary', () => {
   const today = '2026-03-10'; // a Tuesday
-  const everyDayHistory = JSON.stringify([
-    { effective_from_date: '2026-01-01', weekdays: [1, 2, 3, 4, 5, 6, 7], target_per_day: 2 },
-  ]);
+  const everyDayHistory = (target: number) =>
+    JSON.stringify([
+      {
+        effective_from_date: '2026-01-01',
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        target_per_day: target,
+      },
+    ]);
 
   it('builds rings for scheduled habits with today counts capped at target', () => {
     const habits = [
-      { id: 'h1', name: 'Water', color: '#00f', target_per_day: 2, rule_history: everyDayHistory },
-      { id: 'h2', name: 'Read', color: '#0f0', target_per_day: 1, rule_history: everyDayHistory },
+      {
+        id: 'h1',
+        name: 'Water',
+        color: '#00f',
+        target_per_day: 2,
+        rule_history: everyDayHistory(2),
+      },
+      {
+        id: 'h2',
+        name: 'Read',
+        color: '#0f0',
+        target_per_day: 1,
+        rule_history: everyDayHistory(1),
+      },
     ];
     const completions = [
       { habit_id: 'h1', date_key: today, count: 5 },
@@ -218,7 +235,7 @@ describe('shapeHabitsSummary', () => {
       name: `Habit ${i + 1}`,
       color: '#00f',
       target_per_day: 1,
-      rule_history: everyDayHistory,
+      rule_history: everyDayHistory(1),
     }));
     const completions = [
       { habit_id: 'h7', date_key: today, count: 1 },
@@ -240,7 +257,7 @@ describe('shapeHabitsSummary', () => {
         name: 'Active',
         color: '#00f',
         target_per_day: 1,
-        rule_history: everyDayHistory,
+        rule_history: everyDayHistory(1),
         status: 'active' as const,
       },
       {
@@ -248,7 +265,7 @@ describe('shapeHabitsSummary', () => {
         name: 'Paused',
         color: '#0f0',
         target_per_day: 1,
-        rule_history: everyDayHistory,
+        rule_history: everyDayHistory(1),
         status: 'paused' as const,
       },
       {
@@ -256,7 +273,7 @@ describe('shapeHabitsSummary', () => {
         name: 'Archived',
         color: '#f00',
         target_per_day: 1,
-        rule_history: everyDayHistory,
+        rule_history: everyDayHistory(1),
         status: 'archived' as const,
       },
       {
@@ -264,7 +281,7 @@ describe('shapeHabitsSummary', () => {
         name: 'Legacy',
         color: '#000',
         target_per_day: 1,
-        rule_history: everyDayHistory,
+        rule_history: everyDayHistory(1),
       },
     ];
     // Completions for paused/archived on today must not count as completed.

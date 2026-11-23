@@ -1,9 +1,9 @@
 import { test, expect } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
-import { returnToApp } from './helpers/dbHarness';
+import { queryRows, returnToApp } from './helpers/dbHarness';
 import { seedSql } from './helpers/seed';
-import { advanceToNextDay, installClock } from './helpers/clock';
+import { advanceToNextDay, installClock, setLocalTime } from './helpers/clock';
 
 /**
  * Habits check-in day-strip selection across a local-midnight rollover while
@@ -69,5 +69,59 @@ test.describe('Habits day strip rollover', () => {
     await expect(page.getByText('0 of 1 done today')).toBeVisible();
     const newTodayPill = page.getByRole('button', { name: /^Tuesday, today:/ });
     await expect(newTodayPill).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('releases a selected day that becomes future after a clock rewind', async ({ page }) => {
+    await page.getByRole('button', { name: /^Sunday: 0 of 1 scheduled habits complete/ }).click();
+    await expect(page.getByText('0 of 1 done on Sun 2')).toBeVisible();
+
+    // Local Saturday Aug 1. The selected Sunday is now outside the strip.
+    await setLocalTime(page, new Date(Date.UTC(2026, 7, 1, 3)));
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    const currentDay = page.getByRole('button', { name: /^Saturday, today:/ });
+    await expect(currentDay).toBeVisible();
+    await expect(currentDay).toHaveAttribute('aria-pressed', 'true');
+    const checkIn = page.getByRole('checkbox', { name: 'Drink water: 0 of 1 today. Check in.' });
+    await checkIn.click();
+    await expect(page.getByText('1 of 1 done today')).toBeVisible();
+
+    await advanceToNextDay(page, { days: 2 });
+    await expect(page.getByRole('button', { name: /^Monday, today:/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(await queryRows(page, 'SELECT date_key, count FROM habit_completions')).toEqual([
+      { date_key: '2026-08-01', count: 1 },
+    ]);
+  });
+
+  test('editing a habit after a clock rewind uses the target effective today', async ({ page }) => {
+    await seedSql(
+      page,
+      `UPDATE habits SET target_per_day = 2, rule_history =
+        '[{"effective_from_date":"2026-07-01","weekdays":[1,2,3,4,5,6,7],"target_per_day":1},{"effective_from_date":"2026-08-04","weekdays":[1,2,3,4,5,6,7],"target_per_day":2}]'
+        WHERE id = 'habit_rollover_1';`,
+    );
+    await returnToApp(page);
+    await goToTab(page, 'habits');
+    await expect(
+      page.getByRole('checkbox', { name: 'Drink water: 0 of 1 today. Check in.' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Open Drink water details' }).click();
+    await page.getByRole('dialog').getByRole('tab', { name: 'Settings', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Edit habit', exact: true }).click();
+    const editor = page.getByRole('dialog').filter({ hasText: 'Edit Habit' });
+    await expect(editor.getByLabel('Target per day', { exact: true })).toHaveValue('1');
+    await editor.getByLabel('Habit name').fill('Drink more water');
+    await editor.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await expect(editor).toBeHidden();
+    await expect(
+      page.getByRole('checkbox', { name: 'Drink more water: 0 of 1 today. Check in.' }),
+    ).toBeVisible();
+
+    await advanceToNextDay(page);
+    await expect(
+      page.getByRole('button', { name: 'Drink more water: 0 of 2 today. Add one.' }),
+    ).toBeVisible();
   });
 });

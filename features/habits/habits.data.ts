@@ -16,7 +16,13 @@ import type {
 } from '@/core/linked-actions/linkedActions.types';
 import { createId } from '@/lib/id';
 import { assertHabitWrite } from '@/lib/validation';
-import { addLocalDays, nowIso, timestampToLocalDateKey, toDateKey } from '@/lib/time';
+import {
+  addLocalDays,
+  DATE_KEY_PATTERN,
+  nowIso,
+  timestampToLocalDateKey,
+  toDateKey,
+} from '@/lib/time';
 import { runBackupMutation, runSyncedMutation } from '@/core/sync/syncedMutation';
 import {
   buildTransactionalSourceEvent,
@@ -1018,13 +1024,19 @@ async function applyHabitUpdateWithinTransaction(
   );
   if (!existing) return false;
 
-  const effectiveFromDate = updates.effectiveFromDate ?? timestampToLocalDateKey(now);
+  const requestedDate = updates.effectiveFromDate ?? timestampToLocalDateKey(now);
+  if (!DATE_KEY_PATTERN.test(requestedDate)) {
+    throw new Error(`Invalid habit rule effective date: ${requestedDate}`);
+  }
   const fallbackCreationDate = safeTimestampToLocalDateKey(existing.created_at);
   const history = parseHabitRuleHistory(existing.rule_history);
   const normalizedHistory =
     history.length > 0
       ? history
       : buildInitialHabitRule(fallbackCreationDate, existing.target_per_day);
+  // A clock rewind must not extend the history before its first occurrence.
+  const firstEffectiveDate = normalizedHistory[0].effective_from_date;
+  const effectiveFromDate = requestedDate < firstEffectiveDate ? firstEffectiveDate : requestedDate;
   const currentRule = getHabitRuleForDate(
     normalizedHistory,
     effectiveFromDate,

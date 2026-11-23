@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   buildDayCompletions,
   getHabitRuleForDate,
@@ -6,6 +6,7 @@ import {
   type HabitWeekday,
 } from '@/features/habits/habits.domain';
 import { toDateKey } from '@/lib/time';
+import { shapeHabitsSummary } from '@/features/overview/overview.domain';
 import { freshDatabase } from './helpers/db';
 import { saveTodoRules } from './helpers/linkedActionRules';
 
@@ -240,6 +241,78 @@ describe('real SQLite habit scheduling persistence', () => {
     expect(targetApplied.reason).toBe('already_satisfied');
 
     await db.closeAsync();
+  });
+
+  it('shows the effective target on Today after the local clock moves back', async () => {
+    const db = await freshDatabase();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const habits = await import('@/features/habits/habits.data');
+      vi.setSystemTime(new Date(2026, 7, 3, 12));
+      const earlier = toDateKey();
+      const id = await habits.addHabit('Read', 1);
+      await habits.incrementHabit(id);
+      vi.setSystemTime(new Date(2026, 7, 4, 12));
+      await habits.updateHabit(id, { name: 'Read', targetPerDay: 2, category: 'anytime' });
+      vi.setSystemTime(new Date(2026, 7, 3, 12));
+
+      const summary = shapeHabitsSummary(
+        await habits.listHabits(),
+        await habits.getAllHabitCompletionsForRange(earlier, earlier),
+        earlier,
+      );
+      expect(summary).toMatchObject({
+        scheduledToday: 1,
+        completedToday: 1,
+        rings: [{ id, count: 1, target: 1 }],
+      });
+    } finally {
+      vi.useRealTimers();
+      await db.closeAsync();
+    }
+  });
+
+  it('excludes a historically paused habit from Today after the local clock moves back', async () => {
+    const db = await freshDatabase();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const habits = await import('@/features/habits/habits.data');
+      vi.setSystemTime(new Date(2026, 7, 3, 12));
+      const id = await habits.addHabit('Read', 1);
+      const pauseDay = toDateKey();
+      await habits.pauseHabit(id);
+      vi.setSystemTime(new Date(2026, 7, 4, 12));
+      await habits.resumeHabit(id);
+      vi.setSystemTime(new Date(2026, 7, 3, 12));
+
+      const summary = shapeHabitsSummary(await habits.listHabits(), [], pauseDay);
+      expect(summary).toEqual({ scheduledToday: 0, completedToday: 0, rings: [] });
+    } finally {
+      vi.useRealTimers();
+      await db.closeAsync();
+    }
+  });
+
+  it('keeps an edit after a clock rewind from creating a pre-creation occurrence', async () => {
+    const db = await freshDatabase();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const habits = await import('@/features/habits/habits.data');
+      vi.setSystemTime(new Date(2026, 7, 4, 12));
+      const id = await habits.addHabit('Read', 1, 'anytime', undefined, undefined, [1, 2]);
+      vi.setSystemTime(new Date(2026, 7, 3, 12));
+      await habits.updateHabit(id, { name: 'Read more', targetPerDay: 2, category: 'anytime' });
+      const [updated] = await habits.listHabits();
+
+      expect(updated.name).toBe('Read more');
+      expect(parseHabitRuleHistory(updated.rule_history)).toEqual([
+        { effective_from_date: '2026-08-04', target_per_day: 2, weekdays: [1, 2] },
+      ]);
+      await expect(habits.incrementHabit(id)).resolves.toMatchObject({ count: 0 });
+    } finally {
+      vi.useRealTimers();
+      await db.closeAsync();
+    }
   });
 });
 
