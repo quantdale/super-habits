@@ -99,4 +99,40 @@ describe('habit threshold concurrency', () => {
     ).toEqual({ count: 1 });
     await db.closeAsync();
   });
+
+  it('does not record a check-in that loses the writer race to archiving', async () => {
+    const { db, habits, habitId } = await seedThresholdCase(1);
+    const day = toDateKey();
+    try {
+      const [archived, incremented] = await Promise.all([
+        habits.archiveHabit(habitId, day),
+        habits.incrementHabit(habitId, day),
+      ]);
+
+      expect(archived).toBe(true);
+      expect(incremented.count).toBe(0);
+      expect(await habits.getCompletionHistory(habitId)).toEqual([]);
+    } finally {
+      await db.closeAsync();
+    }
+  });
+
+  it('checks the target within the same write as a racing schedule edit', async () => {
+    const { db, habits, habitId } = await seedThresholdCase(1);
+    const day = toDateKey();
+    try {
+      const [, incremented] = await Promise.all([
+        habits.updateHabit(habitId, { name: 'Read', targetPerDay: 2, category: 'anytime' }),
+        habits.incrementHabit(habitId, day),
+      ]);
+
+      expect(incremented.count).toBe(1);
+      expect(incremented.linkedActions.matchedRuleCount).toBe(0);
+      expect(
+        await db.getFirstAsync('SELECT COUNT(*) AS count FROM linked_action_executions'),
+      ).toEqual({ count: 0 });
+    } finally {
+      await db.closeAsync();
+    }
+  });
 });
