@@ -415,6 +415,41 @@ describe('habit reminder Snooze against real SQLite', () => {
 });
 
 describe('notification action marker retention', () => {
+  it('waits for the current SQLite writer before recording a standalone snooze claim', async () => {
+    const db = await freshDatabase();
+    try {
+      const { getDatabase } = await import('@/core/db/client');
+      const { withSQLiteTransaction } = await import('@/core/db/transactions');
+      const { claimNotificationAction } =
+        await import('@/features/habits/notificationActions.data');
+      const sqliteDb = await getDatabase();
+      const entered = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const writing = withSQLiteTransaction(sqliteDb, async () => {
+        entered.resolve();
+        await release.promise;
+      });
+      await entered.promise;
+
+      const claiming = Promise.allSettled([
+        claimNotificationAction({
+          actionKey: 'queued-snooze',
+          kind: 'habit-reminder',
+          actionName: 'snooze',
+          occurrenceId: 'occurrence',
+          processedAt: NOW.toISOString(),
+        }),
+      ]);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      release.resolve();
+      await writing;
+
+      expect(await claiming).toMatchObject([{ status: 'fulfilled', value: { claimed: true } }]);
+    } finally {
+      await db.closeAsync();
+    }
+  });
+
   it('cleans old local operational markers while retaining recent markers', async () => {
     const db = await freshDatabase();
     const { claimNotificationAction, PROCESSED_NOTIFICATION_ACTION_RETENTION_MS } =
