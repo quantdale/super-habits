@@ -937,17 +937,16 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
   // Post-restore reconciliation: apply the staged theme settings to
   // AsyncStorage (durable marker; retried on bootstrap until it succeeds),
   // then ONLY current/future reminder scheduling.
-  await applyPendingThemeApplication();
+  await applyPendingThemeApplication({ fromImport: true });
   requestHabitReminderReconciliation();
   requestWorkoutReminderReconciliation();
-  // The todo-reminder family follows the same post-restore rule. The restored
-  // preferences are live in AsyncStorage now (and the caches just invalidated),
-  // so reconciling here is what schedules reminders for the restored due-dated
-  // todos and the repeating nudges immediately — the foreground-refresh pass
-  // alone would leave them silent for the rest of the session.
-  void reconcileTodoReminders();
-  void syncDailyPlanReminder().catch(() => undefined);
-  void syncWeeklyReviewReminder().catch(() => undefined);
+  // Older backups did not include notification preferences. Reconcile their
+  // imported rows using the device's existing preferences.
+  if (!normalizedSettings.notificationPreferences) {
+    void reconcileTodoReminders();
+    void syncDailyPlanReminder().catch(() => undefined);
+    void syncWeeklyReviewReminder().catch(() => undefined);
+  }
 
   const importedCounts = Object.fromEntries(
     BACKUP_ENTITIES.map((entity) => [entity, (rowsByEntity[entity] ?? []).length]),
