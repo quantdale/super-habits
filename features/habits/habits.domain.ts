@@ -471,11 +471,13 @@ export function formatHabitSchedule(weekdays: readonly number[]): string {
 }
 
 function buildDateKeysBetween(startDateKey: string, endDateKey: string): string[] {
-  if (startDateKey > endDateKey) return [];
+  if (!isDateKey(endDateKey) || startDateKey > endDateKey) return [];
   const result: string[] = [];
   const cursor = dateKeyToLocalDate(startDateKey);
   const end = dateKeyToLocalDate(endDateKey);
-  while (cursor <= end) {
+  // A skipped midnight can leave the cursor at 01:00 on later days. Include
+  // the final local date even when the cursor is past its start of day.
+  while (cursor <= end || toDateKey(cursor) === endDateKey) {
     result.push(toDateKey(cursor));
     cursor.setDate(cursor.getDate() + 1);
   }

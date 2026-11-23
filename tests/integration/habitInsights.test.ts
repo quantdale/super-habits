@@ -1,9 +1,43 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { calculateHabitProgressInsights } from '@/features/habits/habitInsights.domain';
 import { toDateKey } from '@/lib/time';
 import { freshDatabase } from './helpers/db';
 
 describe('real SQLite habit progress insight loading', () => {
+  it('includes today in streaks after a DST transition that skips local midnight', async () => {
+    const db = await freshDatabase();
+    vi.stubEnv('TZ', 'America/Santiago');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const habits = await import('@/features/habits/habits.data');
+      vi.setSystemTime(new Date(2026, 8, 5, 12));
+      const id = await habits.addHabit('Read', 1);
+      expect(new Date(2026, 8, 6).getHours()).toBe(1);
+
+      for (const day of [5, 6, 7]) {
+        vi.setSystemTime(new Date(2026, 8, day, 12));
+        await expect(habits.incrementHabit(id)).resolves.toMatchObject({ count: 1 });
+      }
+
+      const [habit] = await habits.listHabits();
+      const history = await habits.getCompletionHistory(id);
+      expect(history.map((row) => row.date_key)).toEqual([
+        '2026-09-05',
+        '2026-09-06',
+        '2026-09-07',
+      ]);
+      expect(calculateHabitProgressInsights(habit, history, toDateKey())).toMatchObject({
+        currentStreak: 3,
+        longestStreak: 3,
+        totalCompletedOccurrences: 3,
+      });
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+      await db.closeAsync();
+    }
+  });
+
   it('reads active completion history once and excludes deleted habits from the shared list', async () => {
     const db = await freshDatabase();
     const habits = await import('@/features/habits/habits.data');
