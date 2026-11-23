@@ -9,6 +9,7 @@ import { claimNotificationAction } from '@/features/habits/notificationActions.d
 import type { LinkedActionProcessResult } from '@/core/linked-actions/linkedActions.types';
 import { TODO_REMINDER_DATA_KIND, TODO_REMINDER_DATA_VERSION } from '@/lib/notificationConstants';
 import {
+  getScheduledReminderFireAtMs,
   getTodoReminderSnoozeIdentifier,
   resolveTodoDueAt,
   todoReminderIdentifier,
@@ -152,14 +153,6 @@ function isSameLogicalSnooze(request: NotificationRequest, todoId: string): bool
   );
 }
 
-function getScheduledDateMs(request: NotificationRequest): number | null {
-  const trigger = request.trigger;
-  if (!trigger || typeof trigger !== 'object' || !('date' in trigger)) return null;
-  const value: unknown = trigger.date;
-  if (value instanceof Date) return value.getTime();
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
 let snoozeQueue: Promise<void> = Promise.resolve();
 
 /**
@@ -253,7 +246,7 @@ async function runSnooze(
       isSameLogicalSnooze(request, input.todoId),
     );
     const matching = existing.find((request) => {
-      const triggerMs = getScheduledDateMs(request);
+      const triggerMs = getScheduledReminderFireAtMs(request);
       return request.identifier === identifier && triggerMs !== null && triggerMs > now.getTime();
     });
     if (matching) {

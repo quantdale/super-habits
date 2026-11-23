@@ -143,6 +143,30 @@ beforeEach(() => {
 });
 
 describe('reconcileTodoReminders', () => {
+  it.each(['android', 'ios'])(
+    'keeps a live base reminder reported by Expo on %s',
+    async (platform) => {
+      await setTodoRemindersEnabled(true);
+      const live = todoRequest('todo_1', DUE_MS);
+      live.trigger = (platform === 'android'
+        ? { type: 'date', value: DUE_MS, repeats: false }
+        : {
+            type: 'timeInterval',
+            repeats: false,
+            seconds: 21_600,
+          }) as unknown as NotificationRequest['trigger'];
+      const env = harness([live]);
+
+      const result = await reconcileTodoReminders({
+        now: NOW,
+        adapter: env.adapter,
+        loadTodos: async () => [pendingTodo('todo_1')],
+      });
+
+      expect(result).toMatchObject({ scheduled: 0, cancelled: 0 });
+    },
+  );
+
   it('toggle-off cancels every todo-reminder request and never touches other namespaces', async () => {
     await setTodoRemindersEnabled(false);
     const env = harness([

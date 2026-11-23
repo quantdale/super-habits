@@ -32,6 +32,7 @@ export type HabitReminderNotificationData = {
   dateKey: string;
   occurrenceId: string;
   time: string;
+  fireAtMs: number;
   snoozed?: boolean;
 };
 
@@ -202,6 +203,7 @@ export function buildHabitReminderPlan({
         occurrenceId: getHabitReminderIdentifier(habit.id, dateKey),
         snoozed: false,
         time: canonicalTime,
+        fireAtMs: fireAt.getTime(),
       };
       plan.push({
         identifier: getHabitReminderIdentifier(habit.id, dateKey),

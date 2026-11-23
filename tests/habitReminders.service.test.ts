@@ -66,6 +66,33 @@ function requestFor(
 }
 
 describe('reconcileHabitReminders', () => {
+  it.each(['android', 'ios'])(
+    'preserves a current base reminder reported by Expo on %s',
+    async (platform) => {
+      const habits = [habit('gym')];
+      const [desired] = buildHabitReminderPlan({ habits, now: NOW, windowDays: 1 });
+      const request = requestFor(desired);
+      request.trigger = (platform === 'android'
+        ? { type: 'date', value: desired.fireAt.getTime(), repeats: false }
+        : {
+            type: 'timeInterval',
+            repeats: false,
+            seconds: 21_600,
+          }) as unknown as NotificationRequest['trigger'];
+      const fake = fakeAdapter([request]);
+
+      const result = await reconcileHabitReminders({
+        habits,
+        completions: [],
+        windowDays: 1,
+        now: NOW,
+        adapter: fake.adapter,
+      });
+
+      expect(result).toMatchObject({ preserved: 1, scheduled: 0, cancelled: 0 });
+    },
+  );
+
   it('schedules the desired window and preserves all correct entries on repeat', async () => {
     const items = buildHabitReminderPlan({ habits: [habit('gym')], now: NOW });
     const first = fakeAdapter();

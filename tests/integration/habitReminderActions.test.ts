@@ -251,7 +251,9 @@ describe('habit reminder Snooze against real SQLite', () => {
     vi.useRealTimers();
   });
 
-  function adapter() {
+  function adapter(
+    triggerFor = (fireAt: Date): unknown => ({ type: 'date', date: fireAt.getTime() }),
+  ) {
     const scheduled: { identifier: string; fireAt: Date; data: Record<string, unknown> }[] = [];
     const cancelled: string[] = [];
     return {
@@ -265,7 +267,7 @@ describe('habit reminder Snooze against real SQLite', () => {
             ({
               identifier: item.identifier,
               content: { data: item.data },
-              trigger: { type: 'date', date: item.fireAt.getTime() },
+              trigger: triggerFor(item.fireAt),
             }) as never,
         ),
       ),
@@ -304,6 +306,30 @@ describe('habit reminder Snooze against real SQLite', () => {
       '18:00',
     );
     await db.closeAsync();
+  });
+
+  it('preserves an iOS snooze on foreground reconciliation', async () => {
+    const db = await freshDatabase();
+    try {
+      const habits = await import('@/features/habits/habits.data');
+      const { snoozeHabitReminderAction } = await import('@/features/habits/habitReminderActions');
+      const { reconcileHabitReminders } = await import('@/features/habits/habitReminders.service');
+      const habitId = await createHabit(habits);
+      const now = new Date(2026, 7, 12, 18);
+      const native = adapter(() => ({ type: 'timeInterval', repeats: false, seconds: 900 }));
+      const result = await snoozeHabitReminderAction(
+        { ...actionInput(habitId, toDateKey(now), HABIT_REMINDER_SNOOZE_ACTION), now },
+        native,
+      );
+      expect(result.status).toBe('scheduled');
+
+      await expect(
+        reconcileHabitReminders({ now, windowDays: 1, adapter: native }),
+      ).resolves.toMatchObject({ status: 'reconciled', desired: 0, cancelled: 0 });
+      expect(native.scheduled.map((item) => item.identifier)).toEqual([result.identifier]);
+    } finally {
+      await db.closeAsync();
+    }
   });
 
   it('deduplicates a repeated snooze response and does not cross local midnight', async () => {

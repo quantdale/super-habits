@@ -12,6 +12,7 @@ import { TODO_REMINDER_DATA_KIND, TODO_REMINDER_DATA_VERSION } from '@/lib/notif
 import { DATE_KEY_PATTERN } from '@/lib/time';
 import {
   computeTodoReminderFireAt,
+  getScheduledReminderFireAtMs,
   getTodoReminderSnoozeIdentifier,
   resolveTodoDueAt,
   todoReminderIdentifier,
@@ -142,14 +143,6 @@ function isTodoReminderRequest(request: NotificationRequest): boolean {
 /** Body used by every todo due-date notification (base and snooze). */
 export const TODO_REMINDER_BODY = 'This todo is due now.';
 
-function getScheduledDateMs(request: NotificationRequest): number | null {
-  const trigger = request.trigger;
-  if (!trigger || typeof trigger !== 'object' || !('date' in trigger)) return null;
-  const value: unknown = trigger.date;
-  if (value instanceof Date) return value.getTime();
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
 /**
  * The notification payload for one occurrence. `occurrenceId` embeds the fire
  * time so each reschedule opens a fresh claim namespace for notification
@@ -269,7 +262,7 @@ function isCorrectBaseRequest(request: NotificationRequest, item: TodoReminderPl
     data?.version === item.data.version &&
     data?.todoId === item.data.todoId &&
     data?.occurrenceId === item.data.occurrenceId &&
-    getScheduledDateMs(request) === item.fireAt.getTime()
+    getScheduledReminderFireAtMs(request) === item.fireAt.getTime()
   );
 }
 

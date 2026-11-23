@@ -24,6 +24,7 @@ import {
 } from '@/features/habits/habits.domain';
 import { getAllHabitCompletionsForRange, listHabits } from '@/features/habits/habits.data';
 import { toDateKey } from '@/lib/time';
+import { getScheduledReminderFireAtMs } from '@/core/notifications/reminderPlanning';
 import {
   requestHabitReminderReconciliation,
   setHabitReminderReconciliationHandler,
@@ -93,18 +94,6 @@ function getLogicalKey(request: NotificationRequest): string | null {
   return null;
 }
 
-function getScheduledDateMs(request: NotificationRequest): number | null {
-  const trigger = request.trigger;
-  if (!trigger || typeof trigger !== 'object' || !('type' in trigger)) {
-    return null;
-  }
-  const triggerType: unknown = trigger.type;
-  if (triggerType !== 'date' || !('date' in trigger)) return null;
-  const value: unknown = trigger.date;
-  if (value instanceof Date) return value.getTime();
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
 function isCorrectScheduledRequest(
   request: NotificationRequest,
   item: HabitReminderPlanItem,
@@ -118,7 +107,7 @@ function isCorrectScheduledRequest(
     data?.dateKey === item.data.dateKey &&
     data?.occurrenceId === item.data.occurrenceId &&
     data?.time === item.data.time &&
-    getScheduledDateMs(request) === item.fireAt.getTime()
+    getScheduledReminderFireAtMs(request) === item.fireAt.getTime()
   );
 }
 
@@ -146,7 +135,7 @@ function isValidSnoozeRequest(
   // Snoozing a paused/archived habit would reschedule a reminder the planner
   // no longer wants; treat it as invalid so reconciliation cancels it.
   if ((habit.status ?? 'active') !== 'active') return false;
-  const fireAtMs = getScheduledDateMs(request);
+  const fireAtMs = getScheduledReminderFireAtMs(request);
   if (
     fireAtMs === null ||
     fireAtMs <= now.getTime() ||

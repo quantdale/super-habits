@@ -6,6 +6,7 @@
  */
 
 import { isValidDateKey, parseLocalDateKey } from '@/lib/time';
+import type { NotificationRequest } from 'expo-notifications';
 
 export type TimeOfDay = { hour: number; minute: number };
 
@@ -13,6 +14,27 @@ export const TODO_REMINDER_DEFAULT_LEAD_MINUTES = 0;
 
 /** Fixed (non-cumulative) snooze delay for todo due-date reminders. */
 export const TODO_REMINDER_SNOOZE_MINUTES = 15;
+
+/** Read the absolute fire time of a one-shot reminder from Expo's inventory. */
+export function getScheduledReminderFireAtMs(request: NotificationRequest): number | null {
+  const trigger: unknown = request.trigger;
+  if (!trigger || typeof trigger !== 'object' || !('type' in trigger)) return null;
+  let timestamp: unknown;
+  if (trigger.type === 'date') {
+    // Android Expo serializes DateTrigger.timestamp as value.
+    timestamp = 'value' in trigger ? trigger.value : 'date' in trigger ? trigger.date : null;
+    if (timestamp instanceof Date) timestamp = timestamp.getTime();
+  } else if (trigger.type === 'timeInterval' && 'repeats' in trigger && trigger.repeats === false) {
+    // iOS exposes the original interval, which cannot tell us when it started.
+    // Use the absolute instant carried with the reminder when it was scheduled.
+    const data = request.content.data;
+    timestamp = data?.fireAtMs;
+    if (timestamp === undefined && typeof data?.dueAt === 'string') {
+      timestamp = Date.parse(data.dueAt);
+    }
+  }
+  return typeof timestamp === 'number' && Number.isFinite(timestamp) ? timestamp : null;
+}
 
 /** Parses a strict local `HH:mm` (24h) string. Returns null when malformed. */
 export function parseTimeOfDay(value: string | null | undefined): TimeOfDay | null {

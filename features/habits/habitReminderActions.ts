@@ -31,6 +31,7 @@ import {
   completeHabitFromNotification,
 } from '@/features/habits/habits.data';
 import { toDateKey } from '@/lib/time';
+import { getScheduledReminderFireAtMs } from '@/core/notifications/reminderPlanning';
 
 export type HabitReminderActionNativeAdapter = {
   getPermissionState: () => Promise<NotificationPermissionState>;
@@ -64,18 +65,6 @@ const defaultActionAdapter: HabitReminderActionNativeAdapter = {
 function getNotificationData(request: NotificationRequest): Record<string, unknown> | null {
   const data = request.content.data;
   return data && typeof data === 'object' ? data : null;
-}
-
-function getTriggerDate(request: NotificationRequest): Date | null {
-  const trigger = request.trigger;
-  if (!trigger || typeof trigger !== 'object' || !('date' in trigger)) {
-    return null;
-  }
-  if (!('date' in trigger)) return null;
-  const value: unknown = trigger.date;
-  const timestamp = value instanceof Date ? value.getTime() : value;
-  if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) return null;
-  return new Date(timestamp);
 }
 
 function isSameLogicalSnooze(request: NotificationRequest, habitId: string, dateKey: string) {
@@ -184,12 +173,12 @@ async function runSnooze(
       isSameLogicalSnooze(request, input.habitId, input.dateKey),
     );
     const matching = existing.find((request) => {
-      const triggerDate = getTriggerDate(request);
+      const triggerMs = getScheduledReminderFireAtMs(request);
       return (
         request.identifier === identifier &&
-        triggerDate !== null &&
-        triggerDate.getTime() > now.getTime() &&
-        toDateKey(triggerDate) === input.dateKey
+        triggerMs !== null &&
+        triggerMs > now.getTime() &&
+        toDateKey(new Date(triggerMs)) === input.dateKey
       );
     });
     if (matching) {
@@ -208,6 +197,7 @@ async function runSnooze(
       dateKey: input.dateKey,
       occurrenceId: getHabitReminderIdentifier(input.habitId, input.dateKey),
       time: formatConfiguredTime(habit!.reminder_time),
+      fireAtMs: fireAt.getTime(),
       snoozed: true,
     };
     await adapter.schedule({
