@@ -46,6 +46,17 @@ const THEME_SLOTS_STORAGE_KEY = 'superhabits.theme.slots.v2';
 
 export const THEME_MODES = ['light', 'dark', 'system'] as const;
 
+type RestoredTheme = RecoverableSettingsV5['theme'];
+const restoredThemeListeners = new Set<(theme: RestoredTheme) => void>();
+
+/** Subscribe mounted UI to theme settings applied by import or restore. */
+export function subscribeToRestoredTheme(listener: (theme: RestoredTheme) => void): () => void {
+  restoredThemeListeners.add(listener);
+  return () => {
+    restoredThemeListeners.delete(listener);
+  };
+}
+
 /** Pomodoro presets + active preset id as carried in the recoverable payload. */
 export type RecoverablePomodoroPresets = {
   presets: PomodoroPreset[];
@@ -826,9 +837,14 @@ export async function applyPendingThemeApplication(): Promise<boolean> {
     // them here or every reader this session (schedulers, Settings UI) keeps
     // gating on the stale preference until the app restarts.
     resetNotificationPreferenceCaches();
-    return true;
   } catch {
     // AsyncStorage failed; the marker stays durable for the next retry.
     return false;
   }
+  if (pending.mode !== null || pending.slots !== null) {
+    for (const listener of restoredThemeListeners) {
+      listener({ mode: pending.mode, slots: pending.slots });
+    }
+  }
+  return true;
 }

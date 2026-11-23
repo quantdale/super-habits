@@ -198,6 +198,11 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
     }
   }, []);
 
+  const reloadRestoredDefaults = useCallback(() => {
+    void loadPomodoroDefaults();
+    void loadCalorieDefaults();
+  }, [loadPomodoroDefaults, loadCalorieDefaults]);
+
   useEffect(() => {
     if (!visible) return;
     // These are asynchronous external-data loads. Starting them in a
@@ -249,6 +254,7 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
             count,
           })),
         );
+        reloadRestoredDefaults();
       }
       await loadRestorePreview({ preserveError: true });
     } catch (err) {
@@ -415,7 +421,7 @@ export function SettingsScreen({ visible, onRequestClose }: SettingsScreenProps)
         onResendAccountRecovery={resendAccountRecovery}
       />
 
-      <SettingsPortableSection />
+      <SettingsPortableSection onRestored={reloadRestoredDefaults} />
 
       <SettingsCommandSection onOpenCommandCenter={() => openCommandCenter('overview')} />
 
