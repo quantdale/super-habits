@@ -7,6 +7,7 @@ import { saveTodoRules } from './helpers/linkedActionRules';
 import { toDateKey } from '@/lib/time';
 import {
   getTodoReminderActionKey,
+  getTodoReminderSnoozeIdentifier,
   todoReminderIdentifier,
 } from '@/core/notifications/reminderPlanning';
 import { TODO_REMINDER_MARK_DONE_ACTION } from '@/lib/notificationConstants';
@@ -65,6 +66,31 @@ describe('todo reminder Mark done against real SQLite', () => {
       ),
     ).toMatchObject({ n: 1 });
     await db.closeAsync();
+  });
+
+  it('cancels both reminders when Mark done completes a todo', async () => {
+    const db = await freshDatabase();
+    try {
+      const Notifications = await import('expo-notifications');
+      const todos = await import('@/features/todos/todos.data');
+      const { completeTodoFromNotification } =
+        await import('@/features/todos/todoNotificationActions.data');
+      const todoId = await createTodo(todos, 'Laundry', { dueDate: toDateKey(NOW) });
+      vi.mocked(Notifications.cancelScheduledNotificationAsync).mockClear();
+      const input = actionInput(todoId, String(new Date(2026, 7, 12, 9).getTime()));
+
+      expect(await completeTodoFromNotification({ ...input, now: NOW })).toMatchObject({
+        status: 'applied',
+      });
+      expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledWith(
+        todoReminderIdentifier(todoId),
+      );
+      expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledWith(
+        getTodoReminderSnoozeIdentifier(todoId),
+      );
+    } finally {
+      await db.closeAsync();
+    }
   });
 
   type NoopPrepare = (
