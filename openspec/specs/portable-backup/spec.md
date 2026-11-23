@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the user-controlled, file-based Portable Data Export & Import V1
+Defines the user-controlled, file-based Portable Data Export & Import
 capability: a versioned, integrity-protected, self-contained JSON backup file
 that can be exported offline and imported atomically onto an eligible empty
 installation after full validation, preview, and explicit confirmation.
@@ -15,11 +15,12 @@ Completeness V2) and never requires Supabase or Auth.
 
 The app SHALL export the complete recoverable user scope into ONE
 self-contained JSON file with envelope fields `format =
-"superhabits-portable-backup"`, `formatVersion` (currently 1),
+"superhabits-portable-backup"`, `formatVersion` (currently 3),
+`backupScopeVersion` (currently 10),
 `backupSchemaVersion` (the domain backup schema version, currently 2),
 `exportedAt` (ISO-8601), `source {appVersion, platform, ownerFingerprint}`,
-`entities` (the 21 recoverable entity arrays — the canonical list is
-`BACKUP_ENTITIES` in `core/backup/backup.types.ts`), `settings` (the recoverable
+`entities` (the recoverable entity arrays listed in `BACKUP_SNAPSHOT_ENTITIES`
+in `core/backup/backup.types.ts`), `settings` (the recoverable
 settings allowlist payload), and `integrity {entities, settings,
 payloadChecksum}`. The file SHALL use the `.json` extension and MIME
 `application/json`, SHALL contain no executable content and no arbitrary SQL,
@@ -33,8 +34,8 @@ user UUIDs, `sync_outbox` rows, or raw internal `app_meta` values.
   routines/exercises/sets, workout logs, session exercises, pomodoro
   sessions, linked action rules, weekly reviews, projects, goals, daily plans,
   custom exercises, weekly workout plans, schedule overrides, body weight
-  entries, and recoverable settings,
-- **THEN** the file contains `entities` arrays for all 21 entities with
+  entries, reward history, and recoverable settings,
+- **THEN** the file contains `entities` arrays for all 26 entities with
   every active and soft-deleted row, `settings` matching the recoverable
   settings snapshot, and a `payloadChecksum` that verifies against the
   documented canonical payload text.
@@ -93,8 +94,15 @@ Portable import SHALL be allowed only when the destination is semantically
 empty per the complete user-data inventory used by Recoverable Account V1 /
 Restore V2 (no user rows, active or deleted, in ANY user-owned table; no
 pending or unowned outbox work). Import SHALL NOT merge. A device containing
-only pomodoro history or only workout history is NOT empty. The emptiness
+only pomodoro, workout, or reward history is NOT empty. The emptiness
 guard SHALL be re-verified inside the import transaction.
+
+#### Scenario: Import a file written before reward history was recoverable
+
+- **WHEN** a valid format 1 or 2 file is imported on an empty device
+- **THEN** activity and settings are restored and reward history starts empty,
+  with level 1, 0 XP, and no earned or spent freezes
+- **AND** importing historical activity does not award XP.
 
 #### Scenario: Populated device cannot import
 

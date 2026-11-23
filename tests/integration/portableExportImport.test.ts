@@ -1,7 +1,12 @@
+import { REWARD_DAY, readRewardHistory, seedRewardHistory } from './helpers/rewardBackupFixture';
 import { describe, expect, it, vi } from 'vitest';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
-import { BACKUP_SCOPE_VERSION, type BackupEntity } from '@/core/backup/backup.types';
+import {
+  BACKUP_SCOPE_VERSION,
+  BACKUP_SNAPSHOT_SCOPE_VERSION,
+  type BackupEntity,
+} from '@/core/backup/backup.types';
 import { PORTABLE_BACKUP_FORMAT_VERSION } from '@/core/portable/portable.types';
 import type { HabitReminderPlanItem } from '@/features/habits/habitReminders.domain';
 
@@ -449,7 +454,7 @@ describe('portable export', () => {
     expect(parsed.format).toBe('superhabits-portable-backup');
     expect(parsed.formatVersion).toBe(PORTABLE_BACKUP_FORMAT_VERSION);
     expect(parsed.backupSchemaVersion).toBe(2);
-    expect(parsed.backupScopeVersion).toBe(BACKUP_SCOPE_VERSION);
+    expect(parsed.backupScopeVersion).toBe(BACKUP_SNAPSHOT_SCOPE_VERSION);
     expect(typeof parsed.exportedAt).toBe('string');
     expect(result.fileName).toMatch(/^superhabits-backup-.*\.json$/);
     expect(result.byteLength).toBeGreaterThan(1000);
@@ -970,4 +975,164 @@ describe('portable import — cloud backup interaction', () => {
 
     await targetDb.closeAsync();
   }, 60000);
+});
+
+it('preserves the reward ledger through a portable export and import', async () => {
+  const source = await freshDatabase();
+  await seedRewardHistory(source);
+  const { readGamificationSnapshot } = await import('@/features/gamification/gamification.data');
+  const snapshot = await readGamificationSnapshot({ todayKey: REWARD_DAY });
+  expect(snapshot.totalXp).toBe(181);
+  expect(snapshot.freezes).toMatchObject({ earned: 1, used: 1, banked: 0 });
+  const history = await readRewardHistory(source);
+  const { exportPortableBackup } = await import('@/core/portable/portableExport');
+  const exported = await exportPortableBackup();
+  if (!exported.ok) throw new Error(exported.error);
+  await source.closeAsync();
+
+  const destination = await freshDatabase();
+  const { preparePortableImport, confirmPortableImport } =
+    await import('@/core/portable/portableImport');
+  const preview = await preparePortableImport({ fileName: exported.fileName, text: exported.json });
+  if (preview.status !== 'ready') throw new Error(JSON.stringify(preview));
+  expect((await confirmPortableImport({ file: preview.file })).status).toBe('restored');
+  expect(await readRewardHistory(destination)).toEqual(history);
+  const restored = await import('@/features/gamification/gamification.data');
+  expect(await restored.readGamificationSnapshot({ todayKey: REWARD_DAY })).toEqual(snapshot);
+  expect(
+    await restored.awardGamificationAction({
+      kind: 'focus',
+      entityId: 'pom_1792195200000_00000017',
+      todayKey: '2026-10-17',
+    }),
+  ).toBeNull();
+  expect(await readRewardHistory(destination)).toEqual(history);
+  await destination.closeAsync();
+});
+
+it('restores the previous portable format with an empty ledger and does not replay its activity', async () => {
+  const db = await freshDatabase();
+  const { BACKUP_ENTITIES } = await import('@/core/backup/backup.types');
+  const { buildPortableBackupFile, computePortablePayloadChecksum } =
+    await import('@/core/portable/portableFormat');
+  const { nowIso, toDateKey } = await import('@/lib/time');
+  const timestamp = nowIso();
+  const todo = {
+    id: 'todo_1792195200000_abcdefgh',
+    title: 'Completed before backup',
+    completed: 1,
+    priority: 'normal',
+    sort_order: 0,
+    created_at: timestamp,
+    updated_at: timestamp,
+    completed_at: timestamp,
+    notes: null,
+    due_date: null,
+    recurrence: null,
+    recurrence_id: null,
+    deleted_at: null,
+  };
+  const file = buildPortableBackupFile({
+    exportedAt: timestamp,
+    appVersion: '1.0.0',
+    platform: 'web',
+    ownerFingerprint: null,
+    rowsByEntity: { todos: [todo] },
+    settings: {},
+  });
+  file.formatVersion = 2;
+  file.backupScopeVersion = BACKUP_SCOPE_VERSION;
+  file.entities = Object.fromEntries(
+    BACKUP_ENTITIES.map((entity) => [entity, file.entities[entity]]),
+  );
+  file.integrity.entities = Object.fromEntries(
+    BACKUP_ENTITIES.map((entity) => [entity, file.integrity.entities[entity]]),
+  );
+  file.integrity.payloadChecksum = computePortablePayloadChecksum(file, {
+    entities: BACKUP_ENTITIES,
+  });
+
+  const { preparePortableImport, confirmPortableImport } =
+    await import('@/core/portable/portableImport');
+  const input = { fileName: 'scope-9.json', text: JSON.stringify(file) };
+  const prepared = await preparePortableImport(input);
+  if (prepared.status !== 'ready') throw new Error(JSON.stringify(prepared));
+  expect((await confirmPortableImport({ file: prepared.file })).status).toBe('restored');
+  expect(await db.getFirstAsync('SELECT completed FROM todos')).toEqual({ completed: 1 });
+  const { readGamificationSnapshot, runGamificationHousekeeping } =
+    await import('@/features/gamification/gamification.data');
+  const todayKey = toDateKey(new Date(timestamp));
+  await runGamificationHousekeeping({ todayKey });
+  expect(await readRewardHistory(db)).toEqual([[], [], [], []]);
+  expect(await readGamificationSnapshot({ todayKey })).toMatchObject({
+    totalXp: 0,
+    level: { level: 1 },
+    freezes: { earned: 0, used: 0, banked: 0 },
+  });
+  await db.closeAsync();
+});
+
+it('rejects a checksummed malformed reward row without importing feature rows', async () => {
+  const db = await freshDatabase();
+  const { buildPortableBackupFile } = await import('@/core/portable/portableFormat');
+  const timestamp = '2026-10-17T12:00:00.000Z';
+  const file = buildPortableBackupFile({
+    exportedAt: timestamp,
+    appVersion: '1.0.0',
+    platform: 'web',
+    ownerFingerprint: null,
+    rowsByEntity: {
+      todos: [
+        {
+          id: 'todo_1792195200000_abcdefgh',
+          title: 'Untouched',
+          completed: 0,
+          priority: 'normal',
+          sort_order: 0,
+          created_at: timestamp,
+          updated_at: timestamp,
+          notes: null,
+          due_date: null,
+          recurrence: null,
+          recurrence_id: null,
+          deleted_at: null,
+        },
+      ],
+      gamification_streak_freezes: [
+        { id: '2026-10-17', date_key: '2026-10-18', saved_at: timestamp },
+      ],
+    },
+    settings: {},
+  });
+  const { confirmPortableImport } = await import('@/core/portable/portableImport');
+  expect(await confirmPortableImport({ file })).toMatchObject({
+    status: 'blocked',
+    reason: 'invalid',
+    diagnostics: [expect.stringContaining('gamification_streak_freezes')],
+  });
+  expect(await countRows(db, 'todos')).toBe(0);
+  expect(await readRewardHistory(db)).toEqual([[], [], [], []]);
+  await db.closeAsync();
+});
+
+it('preserves reward-only local data when a portable import is blocked as nonempty', async () => {
+  const db = await freshDatabase();
+  await seedRewardHistory(db);
+  const history = await readRewardHistory(db);
+  const { buildPortableBackupFile } = await import('@/core/portable/portableFormat');
+  const file = buildPortableBackupFile({
+    exportedAt: '2026-10-17T12:00:00.000Z',
+    appVersion: '1.0.0',
+    platform: 'web',
+    ownerFingerprint: null,
+    rowsByEntity: {},
+    settings: {},
+  });
+  const { confirmPortableImport } = await import('@/core/portable/portableImport');
+  expect(await confirmPortableImport({ file })).toMatchObject({
+    status: 'blocked',
+    reason: 'local_data_present',
+  });
+  expect(await readRewardHistory(db)).toEqual(history);
+  await db.closeAsync();
 });

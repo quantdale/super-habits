@@ -833,8 +833,16 @@ describe('core/sync/restore.coordinator', () => {
       .filter(
         (entry) => entry.sql === 'INSERT OR REPLACE INTO app_meta (key, value) VALUES (?, ?)',
       );
-    // owner binding + binding state + restore signature + restore timestamp.
-    expect(metaWrites).toHaveLength(4);
+    expect(metaWrites.map((entry) => entry.params[0])).toEqual(
+      expect.arrayContaining([
+        'account.owner_user_id',
+        'account.owner_binding_state',
+        'last_restore_signature',
+        'last_restore_at',
+        'gamification.restore_at',
+      ]),
+    );
+    expect(metaWrites).toHaveLength(5);
   });
 
   it('rejects malformed remote rows as invalid instead of importing them', async () => {

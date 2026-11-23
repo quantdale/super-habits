@@ -38,7 +38,7 @@ file when a release actually ships rather than letting it drift.
 | Sections      | Today, To Do, Habits, Focus, Workout, Calories (single-page shell), plus Settings / Plan / Weekly Review / Add / Level & Achievements overlays                 |
 | Persistence   | SQLite (OPFS on web, WAL on native), schema 25, append-only migrations                                                                                         |
 | Backup        | One-way push backup (Backup Completeness V2 + Restore V2) and Portable Backup V1                                                                               |
-| Gamification  | Local-only reward ledger: XP/levels, streaks + freezes, 3 rotating daily quests, 36 badge tiers, celebration overlay, haptics + synthesized tones              |
+| Gamification  | Reward ledger: XP/levels, streaks + freezes, 3 rotating daily quests, 36 badge tiers, celebration overlay, haptics + synthesized tones                         |
 | Themes        | 14 registered themes (6 light / 8 dark), WCAG AA verified                                                                                                      |
 | Design system | **Pop**: Nunito type via `core/ui/Text`, bottom tab bar / wide-screen side rail shell, per-section hues, tactile motion (`docs/ui-ux/12-pop-design-system.md`) |
 | Targets       | Web PWA (Vercel), iOS, Android                                                                                                                                 |
@@ -263,8 +263,8 @@ git push origin v1.0.0`) only with explicit release intent.
   and `expo-haptics` remain on their SDK-matched versions.
 - **Sync wording**: remote backup stays "one-way push backup", never "full
   two-way sync".
-- **Gamification is local-only**: no reward state is synced or backed up, so a
-  restore starts rewards from the activity that survived. See
+- **Reward history**: portable exports and immutable cloud backups preserve XP,
+  streak freezes, quests, and badges. See
   `docs/knowledge-base/gamification.md`.
 - **`android/` is a local prebuild output** (`/android` is gitignored), so
   native splash/permission resources are regenerated from `app.json` at build

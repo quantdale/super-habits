@@ -68,6 +68,30 @@ export const BACKUP_ENTITIES = [
 export type BackupEntity = (typeof BACKUP_ENTITIES)[number];
 
 /**
+ * Scope 10 is the portable and immutable cloud snapshot scope. Scope 9
+ * remains the mutable cloud manifest and backfill contract.
+ */
+export const BACKUP_SNAPSHOT_SCOPE_VERSION = 10;
+
+export const BACKUP_REWARD_COLUMNS = {
+  gamification_events: ['id', 'event_kind', 'source_key', 'date_key', 'xp', 'created_at'],
+  gamification_streak_freezes: ['id', 'date_key', 'saved_at'],
+  gamification_quests: ['id', 'date_key', 'quest_id', 'completed_at'],
+  gamification_badges: ['id', 'badge_id', 'family', 'tier', 'unlocked_at', 'date_key'],
+} as const;
+
+export type BackupRewardEntity = keyof typeof BACKUP_REWARD_COLUMNS;
+export type BackupSnapshotEntity = BackupEntity | BackupRewardEntity;
+export type BackupRewardRows = Partial<Record<BackupRewardEntity, Record<string, unknown>[]>>;
+
+export const BACKUP_REWARD_ENTITIES = Object.keys(BACKUP_REWARD_COLUMNS) as BackupRewardEntity[];
+export const BACKUP_SNAPSHOT_ENTITIES = [...BACKUP_ENTITIES, ...BACKUP_REWARD_ENTITIES];
+
+export function isBackupRewardEntity(entity: BackupSnapshotEntity): entity is BackupRewardEntity {
+  return Object.prototype.hasOwnProperty.call(BACKUP_REWARD_COLUMNS, entity);
+}
+
+/**
  * Entities that ride the durable outbox but are not local tables:
  * - `user_backup_settings` — synthetic id `settings`, payload built from the
  *   allowlisted settings snapshot at push time (outbox coalescing means the
@@ -376,6 +400,8 @@ export const BACKUP_ENTITY_COLUMNS: Record<BackupEntity, readonly string[]> = {
     'deleted_at',
   ],
 };
+
+export const BACKUP_SNAPSHOT_COLUMNS = { ...BACKUP_ENTITY_COLUMNS, ...BACKUP_REWARD_COLUMNS };
 
 /**
  * Historical Portable V1 canonical columns, snapshotted exactly as they were

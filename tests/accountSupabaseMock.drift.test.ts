@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { Route } from '@playwright/test';
 import {
   BACKUP_ENTITIES,
-  BACKUP_SCOPE_VERSION,
+  BACKUP_SNAPSHOT_ENTITIES,
+  BACKUP_SNAPSHOT_SCOPE_VERSION,
   BACKUP_SYNTHETIC_ENTITIES,
   resolveBackupScope,
 } from '@/core/backup/backup.types';
@@ -24,6 +25,10 @@ describe('account backup REST boundary drift guard', () => {
     'frozen generation Scope %s exactly matches production',
     (version, names) => {
       expect(new Set(names).size).toBe(names.length);
+      if (Number(version) === BACKUP_SNAPSHOT_SCOPE_VERSION) {
+        expect([...names].sort()).toEqual([...BACKUP_SNAPSHOT_ENTITIES].sort());
+        return;
+      }
       const resolved = resolveBackupScope({
         backupScopeVersion: Number(version),
         entityMetadata: Object.fromEntries(names.map((name) => [name, {}])),
@@ -34,9 +39,9 @@ describe('account backup REST boundary drift guard', () => {
   );
 
   it('requires a current generation scope entry when production advances', () => {
-    expect([...(BACKUP_GENERATION_ENTITY_SCOPES[BACKUP_SCOPE_VERSION] ?? [])].sort()).toEqual(
-      [...BACKUP_ENTITIES].sort(),
-    );
+    expect(
+      [...(BACKUP_GENERATION_ENTITY_SCOPES[BACKUP_SNAPSHOT_SCOPE_VERSION] ?? [])].sort(),
+    ).toEqual([...BACKUP_SNAPSHOT_ENTITIES].sort());
   });
 
   it('recognizes weekly_reviews (added by Weekly Review V1)', () => {

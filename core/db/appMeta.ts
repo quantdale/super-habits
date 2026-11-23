@@ -87,6 +87,8 @@ export const appMetaKeys = {
   backupBackfillStatus: defineTextKey('backup.backfill_status', 'sync'),
   backupBackfillDoneEntities: defineJsonKey('backup.backfill_done_entities', 'sync'),
   backupDirty: defineTextKey('backup.dirty', 'sync'),
+  rewardRestoreAt: defineTextKey('gamification.restore_at', 'sync'),
+  backupRewardSnapshotScope: defineTextKey('backup.reward_snapshot_scope', 'sync'),
   backupPendingManifest: defineJsonKey('backup.pending_manifest', 'sync'),
   /**
    * Durable generation capture state (`AUD-SH02-A`/`B`).

@@ -1,4 +1,23 @@
-import { BACKUP_ENTITY_COLUMNS, type BackupEntity } from '@/core/backup/backup.types';
+import {
+  BACKUP_ENTITY_COLUMNS,
+  BACKUP_REWARD_COLUMNS,
+  BACKUP_REWARD_ENTITIES,
+  isBackupRewardEntity,
+  type BackupEntity,
+  type BackupRewardRows,
+  type BackupSnapshotEntity,
+} from '@/core/backup/backup.types';
+import {
+  BADGE_FAMILY_DEFINITIONS,
+  streakMilestoneXp,
+} from '@/features/gamification/gamification.domain';
+import {
+  DAILY_QUEST_POOL,
+  STREAK_FREEZE_GRANT_MILESTONES,
+  STREAK_MILESTONES,
+  STREAK_MULTIPLIER_STEPS,
+  XP_AWARDS,
+} from '@/features/gamification/gamification.types';
 import {
   LINKED_ACTION_DIRECTION_POLICIES,
   LINKED_ACTION_EFFECT_TYPES_BY_TARGET_ENTITY,
@@ -72,7 +91,7 @@ function isIsoTimestamp(value: unknown): boolean {
   return Number.isFinite(parsed);
 }
 
-function isDateKey(value: unknown): boolean {
+function isDateKey(value: unknown): value is string {
   if (typeof value !== 'string' || !DATE_KEY_PATTERN.test(value)) return false;
   const [year, month, day] = value.split('-').map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
@@ -920,6 +939,131 @@ export function validateBackupRow(entity: BackupEntity, input: unknown): Validat
     if (error) errors.push(error);
   }
   return errors.length > 0 ? { ok: false, errors } : { ok: true, row: input };
+}
+
+const REWARD_QUEST_IDS = new Set(DAILY_QUEST_POOL.map(({ id }) => id));
+const REWARD_BADGE_FAMILIES = new Set<string>(BADGE_FAMILY_DEFINITIONS.map(({ family }) => family));
+
+function isRewardTimestamp(value: unknown): boolean {
+  return (
+    typeof value === 'string' && isIsoTimestamp(value) && new Date(value).toISOString() === value
+  );
+}
+
+function isRewardEvent(row: Record<string, unknown>, date: string): boolean {
+  const { id, event_kind: kind, source_key: source, xp } = row;
+  if (
+    typeof id !== 'string' ||
+    !/^gxp_-?\d+_[a-z0-9]{8}$/.test(id) ||
+    typeof source !== 'string' ||
+    source.length === 0 ||
+    !isRewardTimestamp(row.created_at)
+  )
+    return false;
+
+  switch (kind) {
+    case 'freeze_grant':
+      return xp === 0 && STREAK_FREEZE_GRANT_MILESTONES.some((day) => source === `freeze:${day}`);
+    case 'streak_milestone':
+      return STREAK_MILESTONES.some(
+        (day) => source === `streak:${day}` && xp === streakMilestoneXp(day),
+      );
+    case 'quest':
+      return (
+        xp === XP_AWARDS.quest &&
+        source.startsWith(`${date}:`) &&
+        REWARD_QUEST_IDS.has(source.slice(11))
+      );
+    case 'perfect_day':
+      return source === date && xp === XP_AWARDS.perfect_day;
+    case 'nutrition':
+      return source === date && isActionXp(kind, xp);
+    case 'habit':
+      return source.startsWith(`${date}:`) && source.length > 11 && isActionXp(kind, xp);
+    case 'todo':
+      // Older installs used a bare todo identity. Keep the original receipt.
+      return isActionXp(kind, xp);
+    case 'focus':
+    case 'workout':
+    case 'plan':
+    case 'review':
+      return isActionXp(kind, xp);
+    default:
+      return false;
+  }
+}
+
+function isActionXp(kind: keyof typeof XP_AWARDS, xp: unknown): boolean {
+  return STREAK_MULTIPLIER_STEPS.some(
+    ({ multiplier }) => xp === Math.round(XP_AWARDS[kind] * multiplier),
+  );
+}
+
+export function validateBackupSnapshotRow(
+  entity: BackupSnapshotEntity,
+  row: unknown,
+): ValidationResult {
+  if (!isBackupRewardEntity(entity)) {
+    return validateBackupRow(entity, row);
+  }
+  const columns = BACKUP_REWARD_COLUMNS[entity];
+  if (
+    !isRecord(row) ||
+    Object.keys(row).length !== columns.length ||
+    columns.some((column) => !Object.prototype.hasOwnProperty.call(row, column)) ||
+    !isDateKey(row.date_key)
+  ) {
+    return { ok: false, errors: ['invalid reward columns or date_key'] };
+  }
+  let valid: boolean;
+  switch (entity) {
+    case 'gamification_events':
+      valid = isRewardEvent(row, row.date_key);
+      break;
+    case 'gamification_streak_freezes':
+      valid = row.id === row.date_key && isRewardTimestamp(row.saved_at);
+      break;
+    case 'gamification_quests':
+      valid =
+        typeof row.quest_id === 'string' &&
+        REWARD_QUEST_IDS.has(row.quest_id) &&
+        row.id === `${row.date_key}:${row.quest_id}` &&
+        isRewardTimestamp(row.completed_at);
+      break;
+    case 'gamification_badges':
+      valid =
+        typeof row.family === 'string' &&
+        REWARD_BADGE_FAMILIES.has(row.family) &&
+        typeof row.tier === 'number' &&
+        [1, 2, 3, 4].includes(row.tier) &&
+        row.id === row.badge_id &&
+        row.badge_id === `${row.family}:${row.tier}` &&
+        isRewardTimestamp(row.unlocked_at);
+      break;
+    default:
+      valid = false;
+  }
+  return valid ? { ok: true, row } : { ok: false, errors: ['invalid reward row'] };
+}
+
+/** Reward history need not reference live feature rows. Enforce SQLite's unique keys. */
+export function validateRewardBackupKeys(rows: BackupRewardRows): string[] {
+  const errors: string[] = [];
+  const receipts = new Set<string>();
+  for (const entity of BACKUP_REWARD_ENTITIES) {
+    const ids = new Set<unknown>();
+    for (const row of rows[entity] ?? []) {
+      if (ids.has(row.id)) errors.push(`${entity}: duplicate reward id`);
+      ids.add(row.id);
+      if (entity === 'gamification_events') {
+        const receipt = JSON.stringify([row.event_kind, row.source_key]);
+        if (receipts.has(receipt)) errors.push(`${entity}: duplicate reward receipt`);
+        receipts.add(receipt);
+      }
+      if (errors.length >= 50) return errors;
+    }
+  }
+  return errors;
 }
 
 /** Duplicate-key and dependency-graph validation across a full prefetched backup. */

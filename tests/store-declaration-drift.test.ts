@@ -9,7 +9,7 @@ import {
   WEEKLY_REVIEW_REMINDER_CHANNEL_ID,
 } from '@/lib/notificationConstants';
 import { HABIT_REMINDER_CHANNEL_ID } from '@/lib/notifications';
-import { BACKUP_ENTITIES } from '@/core/backup/backup.types';
+import { BACKUP_ENTITIES, BACKUP_SNAPSHOT_ENTITIES } from '@/core/backup/backup.types';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const appJsonPath = resolve(repositoryRoot, 'app.json');
@@ -452,11 +452,16 @@ describe('store declaration drift guard', () => {
     expect(declarations).toMatch(/provider.*retention/i);
   });
 
-  it('keeps reward state outside the backed-up scope in release copy', () => {
-    expect(BACKUP_ENTITIES).not.toContain('gamification_events');
-    expect(BACKUP_ENTITIES).not.toContain('gamification_badges');
-    expect(BACKUP_ENTITIES).not.toContain('gamification_quests');
-    expect(BACKUP_ENTITIES).not.toContain('gamification_streak_freezes');
+  it('discloses reward history in portable and enabled cloud backups while keeping it out of the outbox', () => {
+    for (const entity of [
+      'gamification_events',
+      'gamification_badges',
+      'gamification_quests',
+      'gamification_streak_freezes',
+    ]) {
+      expect(BACKUP_ENTITIES).not.toContain(entity);
+      expect(BACKUP_SNAPSHOT_ENTITIES).toContain(entity);
+    }
 
     for (const text of [
       releaseText('privacy-policy.md'),
@@ -464,8 +469,8 @@ describe('store declaration drift guard', () => {
       releaseText('store-data-declarations.md'),
       releaseText('release-notes-1.0.0.md'),
     ]) {
-      expect(text).toMatch(/rewards?.{0,120}local-only/i);
-      expect(text).toMatch(/never uploaded(?:,| or) backed up/i);
+      expect(text).toMatch(/reward history.{0,120}portable exports.{0,80}cloud backups/i);
+      expect(text).not.toMatch(/never uploaded(?:,| or) backed up/i);
     }
   });
 

@@ -1,3 +1,5 @@
+import { notifyRewardRestore } from '@/core/backup/rewardRestoreSignal';
+import { applyRewardBackupRows } from './backupRewards';
 import { appMetaKeys, setAppMetaJson, setAppMetaText } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
 import {
@@ -25,6 +27,11 @@ import {
 } from './generations/generationFormat';
 import {
   BACKUP_ENTITIES,
+  BACKUP_REWARD_ENTITIES,
+  BACKUP_SNAPSHOT_ENTITIES,
+  BACKUP_SNAPSHOT_SCOPE_VERSION,
+  type BackupRewardRows,
+  type BackupSnapshotEntity,
   BACKUP_SCHEMA_VERSION,
   BACKUP_SETTINGS_VERSION,
   BACKUP_SCOPE_VERSION,
@@ -35,7 +42,12 @@ import {
   type RemoteBackupManifestRow,
   type RemoteUserBackupSettingsRow,
 } from '@/core/backup/backup.types';
-import { validateBackupGraph, validateBackupRow } from '@/core/backup/backupValidators';
+import {
+  validateBackupGraph,
+  validateBackupRow,
+  validateBackupSnapshotRow,
+  validateRewardBackupKeys,
+} from '@/core/backup/backupValidators';
 import { projectCertifiedBackupRows } from '@/core/backup/backupProjection';
 import {
   applyRecoverableSettingsToSqlite,
@@ -161,7 +173,7 @@ export type RestoreV2Result =
       status: 'restored';
       restoredAt: string;
       generation: number;
-      importedCounts: Record<BackupEntity, number>;
+      importedCounts: Record<BackupSnapshotEntity, number>;
     }
   | {
       /** No manifest exists for this owner — the legacy V1 path handles it. */
@@ -342,6 +354,7 @@ async function fetchPublishedGenerationRows(ownerUserId: string): Promise<{
   snapshotId: string;
   rowsByEntity: Map<string, Record<string, unknown>[]>;
   manifest: BackupManifest;
+  rewards: BackupRewardRows | null;
   settingsRow: RemoteUserBackupSettingsRow;
 } | null> {
   if (!supabase) return null;
@@ -406,10 +419,14 @@ async function fetchPublishedGenerationRows(ownerUserId: string): Promise<{
   // Adapt its verified content to the common row/graph/import pipeline; legacy
   // manifests continue using their original checksums, unchanged.
   const generationEntities = BACKUP_ENTITIES.filter((entity) => entity in parsedManifest.entities);
-  const generationColumns = backupEntityColumnsForScope(parsedManifest.scopeVersion);
+  const includesRewards = parsedManifest.scopeVersion === BACKUP_SNAPSHOT_SCOPE_VERSION;
+  // Adapt the feature rows to the existing mutable-scope pipeline. Reward
+  // chunks have already been checksummed against the immutable manifest.
+  const featureScope = includesRewards ? BACKUP_SCOPE_VERSION : parsedManifest.scopeVersion;
+  const generationColumns = backupEntityColumnsForScope(featureScope);
   const manifest: BackupManifest = {
     backupSchemaVersion: parsedManifest.backupSchemaVersion,
-    backupScopeVersion: parsedManifest.scopeVersion,
+    backupScopeVersion: featureScope,
     generation: parsedManifest.sequence,
     completedAt: parsedManifest.capturedAt,
     entityMetadata: Object.fromEntries(
@@ -428,6 +445,11 @@ async function fetchPublishedGenerationRows(ownerUserId: string): Promise<{
     snapshotId: headRow.snapshot_id,
     rowsByEntity: decoded.rowsByEntity,
     manifest,
+    rewards: includesRewards
+      ? Object.fromEntries(
+          BACKUP_REWARD_ENTITIES.map((entity) => [entity, decoded.rowsByEntity.get(entity) ?? []]),
+        )
+      : null,
     settingsRow: {
       user_id: ownerUserId,
       settings_version: parsedManifest.settingsVersion,
@@ -682,6 +704,14 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
       }
     }
   }
+  const rewards = published?.rewards ?? {};
+  for (const entity of BACKUP_REWARD_ENTITIES) {
+    for (const row of rewards[entity] ?? []) {
+      const validation = validateBackupSnapshotRow(entity, row);
+      if (!validation.ok) diagnostics.push(`${entity}: ${validation.errors.join('; ')}`);
+    }
+  }
+  diagnostics.push(...validateRewardBackupKeys(rewards));
   if (diagnostics.length > 0) {
     return {
       status: 'invalid',
@@ -866,6 +896,15 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
       await apply(transactionDb, certifiedRows[entity] ?? []);
     }
 
+    await applyRewardBackupRows(transactionDb, rewards, restoredAt);
+    if (published?.rewards) {
+      await setAppMetaText(
+        transactionDb,
+        appMetaKeys.backupRewardSnapshotScope,
+        String(BACKUP_SNAPSHOT_SCOPE_VERSION),
+      );
+    }
+
     // Settings: the payload was fetched and integrity-verified ABOVE, before
     // this transaction began. SQLite-backed settings join the transaction
     // directly; theme (AsyncStorage) is staged durably here and applied after
@@ -934,6 +973,8 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     };
   }
 
+  notifyRewardRestore();
+
   // Post-restore reconciliation: apply the staged theme settings to
   // AsyncStorage (durable marker; retried on bootstrap until it succeeds),
   // then ONLY current/future reminder scheduling.
@@ -949,9 +990,10 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
   void syncDailyPlanReminder().catch(() => undefined);
   void syncWeeklyReviewReminder().catch(() => undefined);
 
+  const importedRows = { ...rowsByEntity, ...rewards };
   const importedCounts = Object.fromEntries(
-    BACKUP_ENTITIES.map((entity) => [entity, (rowsByEntity[entity] ?? []).length]),
-  ) as Record<BackupEntity, number>;
+    BACKUP_SNAPSHOT_ENTITIES.map((entity) => [entity, (importedRows[entity] ?? []).length]),
+  ) as Record<BackupSnapshotEntity, number>;
 
   return { status: 'restored', restoredAt, generation: manifest.generation, importedCounts };
 }
@@ -961,7 +1003,11 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
  * about the whole backup scope, so every recoverable entity is named; an
  * unfamiliar key falls back to itself rather than being dropped.
  */
-const RESTORED_ENTITY_LABELS: Partial<Record<BackupEntity, string>> = {
+const RESTORED_ENTITY_LABELS: Partial<Record<BackupSnapshotEntity, string>> = {
+  gamification_events: 'Reward history',
+  gamification_streak_freezes: 'Streak freezes used',
+  gamification_quests: 'Completed quests',
+  gamification_badges: 'Unlocked badges',
   todos: 'Todos',
   habits: 'Habits',
   habit_completions: 'Habit history',
@@ -997,10 +1043,10 @@ const RESTORED_ENTITY_LABELS: Partial<Record<BackupEntity, string>> = {
  * @returns rows for entities that actually restored anything, plus the total
  */
 export function describeRestoredCounts(
-  counts: Partial<Record<BackupEntity, number>> | Record<string, number> | null | undefined,
-): { entity: BackupEntity; label: string; count: number }[] {
+  counts: Partial<Record<BackupSnapshotEntity, number>> | Record<string, number> | null | undefined,
+): { entity: BackupSnapshotEntity; label: string; count: number }[] {
   if (!counts) return [];
-  return BACKUP_ENTITIES.filter((entity) => (counts[entity] ?? 0) > 0).map((entity) => ({
+  return BACKUP_SNAPSHOT_ENTITIES.filter((entity) => (counts[entity] ?? 0) > 0).map((entity) => ({
     entity,
     label: RESTORED_ENTITY_LABELS[entity] ?? entity,
     count: counts[entity] ?? 0,
@@ -1009,7 +1055,7 @@ export function describeRestoredCounts(
 
 /** Total records restored across every entity, for the summary line. */
 export function totalRestoredCount(
-  counts: Partial<Record<BackupEntity, number>> | Record<string, number> | null | undefined,
+  counts: Partial<Record<BackupSnapshotEntity, number>> | Record<string, number> | null | undefined,
 ): number {
   if (!counts) return 0;
   return Object.values(counts).reduce<number>((sum, count) => sum + (Number(count) || 0), 0);

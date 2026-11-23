@@ -100,14 +100,13 @@ test.describe('Portable data export & import', () => {
     // Envelope contract + entity content of the downloaded file.
     const file = JSON.parse(text) as Record<string, unknown>;
     expect(file.format).toBe('superhabits-portable-backup');
-    expect(file.formatVersion).toBe(2);
+    expect(file.formatVersion).toBe(3);
     expect(file.backupSchemaVersion).toBe(2);
-    // Scope 9 includes canonical series (8) and exact completion-spawn parents,
-    // while retaining the complete Gym V2 identity/planning/history metadata.
-    expect(file.backupScopeVersion).toBe(9);
+    // Scope 10 adds reward history to the complete Scope 9 feature dataset.
+    expect(file.backupScopeVersion).toBe(10);
     expect(typeof file.exportedAt).toBe('string');
     const entities = file.entities as Record<string, unknown[]>;
-    expect(Object.keys(entities)).toHaveLength(22);
+    expect(Object.keys(entities)).toHaveLength(26);
     expect(entities.todos).toHaveLength(1);
     expect(entities.todos[0]).toMatchObject({
       title: 'Portable export todo',
@@ -190,6 +189,54 @@ test.describe('Portable data export & import', () => {
     await goToTab(page, 'todos');
     await expect(page.getByText('Alpha task', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Beta task', { exact: true }).first()).toBeVisible();
+  });
+
+  test('restores XP and an earned-and-spent streak freeze in Achievements', async ({ page }) => {
+    const focusEvents = Array.from({ length: 7 }, (_, index) => {
+      const date = `2026-10-${11 + index}`;
+      const xp = [15, 15, 17, 17, 17, 17, 18][index];
+      return `('gxp_1792195200000_0000001${index}','focus','pom_1792195200000_0000001${index}','${date}',${xp},'${date}T12:00:00.000Z')`;
+    });
+    await queryRows(
+      page,
+      `INSERT INTO gamification_events VALUES ${focusEvents.join(',')},
+      ('gxp_1792195200000_00000021','streak_milestone','streak:3','2026-10-13',15,'2026-10-13T12:00:00.000Z'),
+      ('gxp_1792195200000_00000022','streak_milestone','streak:7','2026-10-17',35,'2026-10-17T12:00:00.000Z'),
+      ('gxp_1792195200000_00000023','freeze_grant','freeze:7','2026-10-17',0,'2026-10-17T12:00:00.000Z')`,
+    );
+    await queryRows(
+      page,
+      "INSERT INTO gamification_streak_freezes VALUES ('2026-10-18','2026-10-19T12:00:00.000Z')",
+    );
+    await returnToApp(page);
+
+    async function expectRewards(xp: string, freezes: string) {
+      await goToTab(page, 'overview');
+      await page.getByRole('button', { name: /Level & Streaks card — open achievements/ }).click();
+      const dialog = page.getByRole('dialog');
+      await expect(
+        dialog.getByText('Total XP', { exact: true }).locator('..').getByText(xp, { exact: true }),
+      ).toBeVisible();
+      await expect(dialog.getByText(freezes, { exact: true })).toBeVisible();
+      await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+    }
+
+    await expectRewards('166', '0 of 1 earned streak freezes available');
+    await openSettingsScreen(page);
+    const text = await exportPortableFile(page);
+    await clearDatabase(page);
+    await expectRewards('0', '0 of 0 earned streak freezes available');
+    await openSettingsScreen(page);
+    await page.locator(IMPORT_INPUT).setInputFiles({
+      name: 'reward-roundtrip.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(text),
+    });
+    await expect(page.getByText(/Integrity: Verified/)).toBeVisible();
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    await expect(page.getByText(/Import complete/)).toBeVisible();
+    await page.getByRole('button', { name: 'Close settings', exact: true }).click();
+    await expectRewards('166', '0 of 1 earned streak freezes available');
   });
 
   test('rejects a corrupt file and leaves the database unchanged', async ({ page }) => {

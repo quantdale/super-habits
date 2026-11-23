@@ -15,7 +15,7 @@ Welcome to super-habits 1.0.0 — your calm, offline-first companion for habits,
 • Today dashboard, To Do with projects and recurring tasks, Habits with streaks and 52-week heatmap
 • Focus timer with presets, Gym workout workspace with guided sessions, Calories with Form/Diary views
 • Local database and offline use without signup; no ads or cross-app tracking
-• One-way backup when configured + portable export; local-only rewards (XP, badges)
+• One-way backup when configured and portable export both preserve rewards
 
 First public release. English UI.
 ```
@@ -51,9 +51,9 @@ is no feed or advertising.
   and progression.
 - **Calories** — a Form/Diary split with macro targets, saved meals, day
   copy, and yearly trends.
-- **Local rewards** — XP and levels, streaks with freezes, rotating daily
-  quests, 36 badge tiers, and a celebration overlay. Rewards are intentionally
-  local-only: they are never uploaded, backed up, or tied to an account.
+- **Rewards** — XP and levels, streaks with freezes, rotating daily quests,
+  36 badge tiers, and a celebration overlay. Reward history is included in
+  portable exports and enabled cloud backups.
 - **Design** — the Pop visual system: Nunito type throughout, chunky rounded
   surfaces, a colour per section, tactile motion that honours reduced motion,
   and 14 verified themes (6 light / 8 dark).
@@ -76,8 +76,8 @@ is no feed or advertising.
 - The interface ships in English only.
 - Remote backup is push-and-restore, not continuous two-way sync; conflicting
   edits are not merged.
-- Local rewards restart from whatever activity survived a restore, because
-  reward state is deliberately not backed up.
+- Backups written before reward history was included restore with an empty
+  reward ledger.
 - Native reminders depend on the operating system's notification permissions
   and battery policies.
 

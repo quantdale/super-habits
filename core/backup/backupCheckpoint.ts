@@ -19,6 +19,7 @@ import {
   BACKUP_MANIFEST_RECORD_ID,
   BACKUP_SCHEMA_VERSION,
   BACKUP_SCOPE_VERSION,
+  BACKUP_SNAPSHOT_SCOPE_VERSION,
   BACKUP_SETTINGS_RECORD_ID,
   BACKUP_SETTINGS_VERSION,
   type BackupEntity,
@@ -396,7 +397,17 @@ async function runMaintenanceCycle(options?: {
 export async function isBackupDirty(db?: SQLite.SQLiteDatabase): Promise<boolean> {
   const database = db ?? (await getDatabase());
   const value = await getAppMetaText(database, appMetaKeys.backupDirty);
-  return value === '1';
+  if (value === '1') return true;
+  // Upgrade a previously complete Scope 9 device even if it has no pending edits.
+  const scope = await getAppMetaText(database, appMetaKeys.backupRewardSnapshotScope);
+  if (scope === String(BACKUP_SNAPSHOT_SCOPE_VERSION)) return false;
+  const rewards = await database.getFirstAsync(
+    `SELECT 1 WHERE EXISTS(SELECT 1 FROM gamification_events)
+       OR EXISTS(SELECT 1 FROM gamification_streak_freezes)
+       OR EXISTS(SELECT 1 FROM gamification_quests)
+       OR EXISTS(SELECT 1 FROM gamification_badges)`,
+  );
+  return rewards != null;
 }
 
 export { readPendingManifest, readLastCompleteGeneration };

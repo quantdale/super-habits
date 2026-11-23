@@ -1,5 +1,5 @@
 import type {
-  BackupEntity,
+  BackupSnapshotEntity,
   EntityIntegrityMetadata,
   RecoverableSettingsV2,
   RecoverableSettingsV3,
@@ -24,7 +24,7 @@ import type {
 export const PORTABLE_BACKUP_FORMAT = 'superhabits-portable-backup';
 
 /** Current portable envelope version (independent of the domain schema). */
-export const PORTABLE_BACKUP_FORMAT_VERSION = 2;
+export const PORTABLE_BACKUP_FORMAT_VERSION = 3;
 
 /**
  * Portable V1 file size contract — the SINGLE bound shared by export and
@@ -54,7 +54,7 @@ export type PortableSourceInfo = {
 
 export type PortableIntegrity = {
   /** Per-entity row count + deterministic SHA-256 (reuse `checksumRows`). */
-  entities: Partial<Record<BackupEntity, EntityIntegrityMetadata>>;
+  entities: Partial<Record<BackupSnapshotEntity, EntityIntegrityMetadata>>;
   /** Canonical checksum of the recoverable settings payload + contract version. */
   settings: { version: number; checksum: string };
   /**
@@ -80,14 +80,14 @@ export type PortableBackupFile = {
   exportedAt: string;
   source: PortableSourceInfo;
   /** All recoverable entities for this file's scope; rows are stored sorted by id. */
-  entities: Partial<Record<BackupEntity, Record<string, unknown>[]>>;
+  entities: Partial<Record<BackupSnapshotEntity, Record<string, unknown>[]>>;
   /** Recoverable settings allowlist payload (calorie goal, pomodoro, theme, V4 preferences). */
   settings: RecoverableSettingsV2 | RecoverableSettingsV3 | RecoverableSettingsV5;
   integrity: PortableIntegrity;
 };
 
 /** Human-readable domain labels for the import preview (no raw table names). */
-export const PORTABLE_DOMAIN_LABELS: Record<BackupEntity, string> = {
+export const PORTABLE_DOMAIN_LABELS: Record<BackupSnapshotEntity, string> = {
   todos: 'Todos',
   todo_recurrence_series: 'Recurring task series',
   habits: 'Habits',
@@ -110,6 +110,10 @@ export const PORTABLE_DOMAIN_LABELS: Record<BackupEntity, string> = {
   workout_weekly_plan: 'Weekly workout plan',
   workout_schedule_overrides: 'Workout date overrides',
   body_weight_entries: 'Body-weight history',
+  gamification_events: 'Reward history',
+  gamification_streak_freezes: 'Streak freezes used',
+  gamification_quests: 'Completed quests',
+  gamification_badges: 'Unlocked badges',
 };
 
 /** Import-eligibility owner verdicts surfaced in the preview. */
@@ -130,7 +134,7 @@ export type PortableImportEligibility = {
 export type PortableImportPreview = {
   fileName: string;
   exportedAt: string | null;
-  counts: Partial<Record<BackupEntity, number>>;
+  counts: Partial<Record<BackupSnapshotEntity, number>>;
   totalRows: number;
   settingsIncluded: boolean;
   integrityVerified: boolean;
@@ -158,7 +162,7 @@ export type PortableImportResult =
   | {
       status: 'restored';
       importedAt: string;
-      importedCounts: Partial<Record<BackupEntity, number>>;
+      importedCounts: Partial<Record<BackupSnapshotEntity, number>>;
     }
   | {
       status: 'blocked';

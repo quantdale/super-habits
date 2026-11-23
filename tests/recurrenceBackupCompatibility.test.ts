@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   BACKUP_ENTITIES,
+  BACKUP_REWARD_ENTITIES,
+  BACKUP_SNAPSHOT_SCOPE_VERSION,
   BACKUP_SCOPE_VERSION,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V6_ENTITY_SET,
   KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET,
@@ -17,7 +19,7 @@ import { checksumRows } from '@/lib/checksum';
 import { parseManifestRow } from '@/core/backup/legacySnapshot';
 
 const ISO = '2026-11-15T00:00:00.000Z';
-function fileForScope(scope = BACKUP_SCOPE_VERSION) {
+function fileForScope(scope = BACKUP_SNAPSHOT_SCOPE_VERSION) {
   const file = buildPortableBackupFile({
     exportedAt: ISO,
     appVersion: '1.0.0',
@@ -57,17 +59,24 @@ function fileForScope(scope = BACKUP_SCOPE_VERSION) {
     },
     settings: {},
   });
-  if (scope !== BACKUP_SCOPE_VERSION) {
+  if (scope !== BACKUP_SNAPSHOT_SCOPE_VERSION) {
+    file.formatVersion = 2;
     file.backupScopeVersion = scope;
+    for (const entity of BACKUP_REWARD_ENTITIES) {
+      delete file.entities[entity];
+      delete file.integrity.entities[entity];
+    }
     if (scope < 8) {
       delete file.entities.todo_recurrence_series;
       delete file.integrity.entities.todo_recurrence_series;
     }
     const columns = backupEntityColumnsForScope(scope);
     const historicalEntities =
-      scope === 8
-        ? KNOWN_HISTORICAL_BACKUP_SCOPE_V8_ENTITY_SET
-        : KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET;
+      scope === BACKUP_SCOPE_VERSION
+        ? BACKUP_ENTITIES
+        : scope === 8
+          ? KNOWN_HISTORICAL_BACKUP_SCOPE_V8_ENTITY_SET
+          : KNOWN_HISTORICAL_BACKUP_SCOPE_V7_ENTITY_SET;
     for (const entity of historicalEntities) {
       file.entities[entity] = (file.entities[entity] ?? []).map((row) =>
         Object.fromEntries(Object.entries(row).filter(([key]) => columns[entity].includes(key))),
@@ -176,7 +185,7 @@ describe('recoverable recurring-series scope compatibility', () => {
   });
 
   it('requires the explicit Scope-9 stamp rather than inferring new columns from old entity names', () => {
-    const file = fileForScope();
+    const file = fileForScope(9);
     expect(resolveBackupScope({ entityMetadata: file.integrity.entities })?.scope).toBe(8);
     expect(
       resolveBackupScope({ backupScopeVersion: 9, entityMetadata: file.integrity.entities })?.scope,

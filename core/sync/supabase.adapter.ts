@@ -50,7 +50,7 @@ import {
   BACKUP_SETTINGS_RECORD_ID,
   BACKUP_SETTINGS_VERSION,
   BACKUP_SCHEMA_VERSION,
-  BACKUP_SCOPE_VERSION,
+  BACKUP_SNAPSHOT_SCOPE_VERSION,
   type BackupManifest,
 } from '@/core/backup/backup.types';
 import { canonicalizeSettingsPayload } from '@/core/backup/backupSettings';
@@ -185,7 +185,7 @@ export class SupabaseSyncAdapter implements SyncAdapter {
       versions.content_verification_version !== 1 ||
       versions.sequence_reservation_version !== 1 ||
       versions.backup_schema_version !== BACKUP_SCHEMA_VERSION ||
-      versions.scope_version !== BACKUP_SCOPE_VERSION ||
+      versions.scope_version !== BACKUP_SNAPSHOT_SCOPE_VERSION ||
       versions.settings_version !== BACKUP_SETTINGS_VERSION
     ) {
       throw new Error(

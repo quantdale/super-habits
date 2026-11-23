@@ -1,3 +1,4 @@
+import { subscribeToRewardRestore } from '@/core/backup/rewardRestoreSignal';
 import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from 'react';
 import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import {
@@ -121,10 +122,10 @@ export function GamificationProvider({ children }: PropsWithChildren) {
     [showCelebration],
   );
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (runHousekeeping = true) => {
     try {
       const now = Date.now();
-      if (now - lastHousekeepingRef.current >= HOUSEKEEPING_MIN_INTERVAL_MS) {
+      if (runHousekeeping && now - lastHousekeepingRef.current >= HOUSEKEEPING_MIN_INTERVAL_MS) {
         lastHousekeepingRef.current = now;
         await runGamificationHousekeeping();
       }
@@ -142,6 +143,7 @@ export function GamificationProvider({ children }: PropsWithChildren) {
   // it is also the repository pattern for "load on become-active" without a
   // setState-in-effect body.
   useActiveForegroundRefresh(true, refresh, dayGeneration);
+  useEffect(() => subscribeToRewardRestore(() => void refresh(false)), [refresh]);
 
   const recordAction = useCallback(
     (kind: ActionKind, entityId?: string) => {
