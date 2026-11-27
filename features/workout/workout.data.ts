@@ -1828,6 +1828,11 @@ export type WorkoutSessionDraft = {
   routineSnapshot?: RoutineWithExercises;
   notes?: string;
   effortScale?: WorkoutEffortScale;
+  /** The weight unit the entered measurements were TYPED in. A kg ↔ lb
+   *  preference change between Start and Resume must never reinterpret the raw
+   *  digits (100 entered as kg is not 100 lb). Absent only in legacy drafts,
+   *  which keep the live preference (the pre-existing behaviour). */
+  weightUnit?: WorkoutWeightUnit;
   /** ISO timestamp of the session's first Start press. */
   startedAtIso: string;
   /** Index into the routine's timer-phase sequence. */
@@ -1957,6 +1962,9 @@ function normalizeWorkoutSessionDraft(value: unknown): WorkoutSessionDraft | nul
     candidate.effortScale === 'rir' ||
     candidate.effortScale === 'rpe'
       ? { effortScale: candidate.effortScale }
+      : {}),
+    ...(candidate.weightUnit === 'kg' || candidate.weightUnit === 'lb'
+      ? { weightUnit: candidate.weightUnit }
       : {}),
     startedAtIso: candidate.startedAtIso,
     phaseIndex: candidate.phaseIndex,

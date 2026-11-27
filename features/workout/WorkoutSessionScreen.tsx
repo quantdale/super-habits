@@ -248,6 +248,9 @@ export type SessionResume = {
   dispositions?: Record<number, PhaseDisposition>;
   /** Entered measurements saved with the draft (absent for legacy drafts). */
   enteredSets?: Record<number, EnteredSetValues>;
+  /** The unit the resumed measurements were typed in (drafts written before
+   *  this field existed keep the live preference). */
+  weightUnit?: WorkoutWeightUnit;
   /** Seconds left on the resumed phase when the draft was written. */
   remainingSeconds?: number;
   /** Session-local added sets by engine exercise index, replayed on resume. */
@@ -282,8 +285,10 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   const [persistedRestDefault, setPersistedRestDefault] = useState<number | null>(null);
   const [effortScale, setEffortScale] = useState<WorkoutEffortScale>(resume?.effortScale ?? 'off');
   // The user's weight unit (same resolution as the body-weight modal): stamped
-  // on logged sets so history never fabricates 'kg' for an lb user.
-  const [weightUnit, setWeightUnit] = useState<WorkoutWeightUnit>('kg');
+  // on logged sets so history never fabricates 'kg' for an lb user. A resumed
+  // session adopts the unit its draft was written in, so a preference change
+  // while the session sat paused cannot reinterpret the typed numbers.
+  const [weightUnit, setWeightUnit] = useState<WorkoutWeightUnit>(resume?.weightUnit ?? 'kg');
   // The engine exercises, mapped once. The live sequence composes these
   // with any session-local added sets — the routine template is never written.
   const baseExercises = useMemo(() => buildSessionExerciseInputs(routine), [routine]);
@@ -307,7 +312,8 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
           setRestDefault(seconds);
           setPersistedRestDefault(seconds);
           if (!resume?.effortScale) setEffortScale(preferences.effortScale);
-          setWeightUnit(preferences.goalWeight?.unit ?? 'kg');
+          // Never relabel a resumed draft's numbers: its unit wins.
+          if (!resume?.weightUnit) setWeightUnit(preferences.goalWeight?.unit ?? 'kg');
         }
       },
     );
@@ -329,7 +335,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     return () => {
       cancelled = true;
     };
-  }, [resume?.effortScale]);
+  }, [resume?.effortScale, resume?.weightUnit]);
 
   const handleAdjustRestDefault = (delta: number) => {
     // Session-local only: future workouts are unaffected until the user
@@ -611,6 +617,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         effortScale,
         startedAtIso: new Date(startedAtMs).toISOString(),
         phaseIndex,
+        // The unit the user is typing in right now: a resume replays the digits
+        // in exactly that unit, whatever the preference has become since.
+        weightUnit,
         elapsedAdjustSeconds: elapsedSecondsRef.current,
         ...(Object.keys(draftDispositions).length > 0 ? { dispositions: draftDispositions } : {}),
         ...(Object.keys(draftEnteredSets).length > 0 ? { enteredSets: draftEnteredSets } : {}),
@@ -634,7 +643,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
           }
         });
     },
-    [routine, addedSets, notes, effortScale],
+    [routine, addedSets, notes, effortScale, weightUnit],
   );
 
   const clearDraft = useCallback(() => {

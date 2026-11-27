@@ -815,6 +815,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
           elapsedSeconds: state.elapsedAdjustSeconds ?? 0,
           notes: state.notes,
           effortScale: state.effortScale,
+          // The unit those measurements were typed in; without it a preference
+          // change between Start and Resume relabels 100 kg as 100 lb.
+          ...(state.weightUnit ? { weightUnit: state.weightUnit } : {}),
           ...(Object.keys(dispositions).length > 0 ? { dispositions } : {}),
           ...(Object.keys(enteredSets).length > 0 ? { enteredSets } : {}),
           ...(typeof state.remainingSeconds === 'number'
