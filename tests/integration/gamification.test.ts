@@ -943,3 +943,61 @@ describe('streak freeze accounting (audit C #2)', () => {
     expect(await freezeRows()).toEqual([]);
   });
 });
+
+describe('foreground award vs concurrent housekeeping pass (#277 regression)', () => {
+  it('keeps the badge celebration when a housekeeping pass is already queued', async () => {
+    const { habits, gamification, time } = await loadModules();
+    const today = time.toDateKey();
+    const habitId = await habits.addHabit('Morning run', 1);
+    await habits.incrementHabit(habitId, today);
+
+    // A section switch queues the background pass first (fresh provider), and
+    // the user's check-off reports the same action while that pass is still
+    // running. The pass must not silently consume the foreground award.
+    const pass = gamification.runGamificationHousekeeping({ todayKey: today });
+    const award = gamification.awardGamificationAction({ kind: 'habit', entityId: habitId });
+    const [, outcome] = await Promise.all([pass, award]);
+
+    expect(outcome).not.toBeNull();
+    expect(outcome?.newBadges.map((badge) => badge.id)).toContain('perfect_days:1');
+    expect(outcome?.celebration?.tier).toBe('badge');
+    // Exactly one award and one badge row: no double payment.
+    expect(
+      (await db.getAllAsync(`SELECT id FROM gamification_events WHERE event_kind = 'habit'`))
+        .length,
+    ).toBe(1);
+    expect(await db.getAllAsync(`SELECT badge_id FROM gamification_badges`)).toEqual([
+      { badge_id: 'perfect_days:1' },
+    ]);
+  });
+
+  it('serves a foreground award before a queued housekeeping pass finishes', async () => {
+    const { habits, gamification, time } = await loadModules();
+    const today = time.toDateKey();
+    const habitId = await habits.addHabit('Evening walk', 1);
+    await habits.incrementHabit(habitId, today);
+
+    const settled: string[] = [];
+    const first = gamification
+      .runGamificationHousekeeping({ todayKey: today })
+      .then(() => settled.push('first pass'));
+    const second = gamification
+      .runGamificationHousekeeping({ todayKey: today })
+      .then(() => settled.push('second pass'));
+    const award = gamification
+      .awardGamificationAction({ kind: 'habit', entityId: habitId })
+      .then((outcome) => {
+        settled.push('award');
+        return outcome;
+      });
+    const [, , outcome] = await Promise.all([first, second, award]);
+
+    // The screen's award does not wait behind every queued backfill pass.
+    expect(settled.indexOf('award')).toBeLessThan(settled.indexOf('second pass'));
+    expect(outcome?.celebration).not.toBeNull();
+    expect(
+      (await db.getAllAsync(`SELECT id FROM gamification_events WHERE event_kind = 'habit'`))
+        .length,
+    ).toBe(1);
+  });
+});

@@ -66,13 +66,77 @@ import {
 type Db = SQLite.SQLiteDatabase;
 
 // Passes reuse their ledger snapshot across several SQLite transactions. Keep
-// other reward writers from changing that ledger until the pass has finished.
-let rewardWriteTail: Promise<unknown> = Promise.resolve();
+// other reward writers from changing that ledger while a pass holds it.
+// Foreground awards (a screen reporting what the user just did) are served
+// before queued background passes, and a running housekeeping pass yields to
+// them between its steps and re-reads the ledger afterwards. A foreground award
+// never waits for a whole multi-day backfill, so its XP, badge and celebration
+// land while the user is still looking at the screen.
+type RewardWritePriority = 'foreground' | 'background';
 
-function serializeRewardWrite<T>(write: () => Promise<T>): Promise<T> {
-  const result = rewardWriteTail.then(write);
-  rewardWriteTail = result.catch(() => undefined);
-  return result;
+let rewardLockHeld = false;
+const foregroundWaiters: (() => void)[] = [];
+const backgroundWaiters: (() => void)[] = [];
+
+function acquireRewardLock(priority: RewardWritePriority, front = false): Promise<void> {
+  if (!rewardLockHeld) {
+    rewardLockHeld = true;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const queue = priority === 'foreground' ? foregroundWaiters : backgroundWaiters;
+    if (front) queue.unshift(resolve);
+    else queue.push(resolve);
+  });
+}
+
+function releaseRewardLock(): void {
+  const next = foregroundWaiters.shift() ?? backgroundWaiters.shift();
+  if (next) next();
+  else rewardLockHeld = false;
+}
+
+async function serializeRewardWrite<T>(
+  write: () => Promise<T>,
+  priority: RewardWritePriority = 'background',
+): Promise<T> {
+  await acquireRewardLock(priority);
+  try {
+    return await write();
+  } finally {
+    releaseRewardLock();
+  }
+}
+
+/**
+ * Let queued foreground awards run in the middle of a background pass.
+ * Returns true when the lock was handed over, so the pass must re-read any
+ * ledger snapshot it holds.
+ */
+async function yieldRewardLockToForeground(): Promise<boolean> {
+  if (foregroundWaiters.length === 0) return false;
+  releaseRewardLock();
+  await acquireRewardLock('background', true);
+  return true;
+}
+
+// Foreground awards waiting in the serialized queue. A housekeeping or
+// reconcile pass queued ahead of one must leave that action to it: otherwise
+// the pass pays the action silently and the screen's own award finds it
+// already paid, losing the celebration and badge feedback for the user.
+const pendingForegroundAwards = new Map<string, number>();
+
+function foregroundAwardKey(kind: ActionKind, entityId: string): string {
+  return `${kind}:${entityId}`;
+}
+
+function claimForegroundAward(key: string): () => void {
+  pendingForegroundAwards.set(key, (pendingForegroundAwards.get(key) ?? 0) + 1);
+  return () => {
+    const remaining = (pendingForegroundAwards.get(key) ?? 1) - 1;
+    if (remaining > 0) pendingForegroundAwards.set(key, remaining);
+    else pendingForegroundAwards.delete(key);
+  };
 }
 
 export type GamificationReadOptions = {
@@ -1038,6 +1102,10 @@ export async function awardGamificationAction(
   input: AwardInput,
 ): Promise<GamificationAwardOutcome | null> {
   const todayKey = input.todayKey ?? toDateKey();
+  const release =
+    input.entityId === undefined
+      ? () => undefined
+      : claimForegroundAward(foregroundAwardKey(input.kind, input.entityId));
   return serializeRewardWrite(async () => {
     const db = await getDatabase();
     const core = await computeAward({
@@ -1048,7 +1116,7 @@ export async function awardGamificationAction(
     });
     if (!core) return null;
     return { ...core, snapshot: await readGamificationSnapshot({ todayKey }) };
-  });
+  }, 'foreground').finally(release);
 }
 
 type ActivityCandidate = { kind: ActionKind; entityId: string };
@@ -1184,6 +1252,10 @@ async function reconcileDayAwards(
   let awarded = 0;
   for (const candidate of candidates) {
     if (awarded >= RECONCILE_AWARD_LIMIT) break;
+    // The queued foreground award pays this action with its feedback.
+    if (pendingForegroundAwards.has(foregroundAwardKey(candidate.kind, candidate.entityId))) {
+      continue;
+    }
     const outcome = await computeAward({
       kind: candidate.kind,
       entityId: candidate.entityId,
@@ -1270,9 +1342,17 @@ export async function runGamificationHousekeeping(
   const todayKey = options.todayKey ?? toDateKey();
   return serializeRewardWrite(async () => {
     const db = await getDatabase();
-    const ledger = await readLedgerSnapshot(db);
-    await reconcileEarlierActivity(db, todayKey, ledger);
+    let ledger = await readLedgerSnapshot(db);
+    const yieldToForeground = async () => {
+      if (await yieldRewardLockToForeground()) ledger = await readLedgerSnapshot(db);
+    };
+    for (let offset = GAMIFICATION_RECONCILE_LOOKBACK_DAYS - 1; offset > 0; offset -= 1) {
+      await yieldToForeground();
+      await reconcileDayAwards(db, shiftDateKey(todayKey, -offset), ledger);
+    }
+    await yieldToForeground();
     await ensureStreakFreezeInternal(db, todayKey, ledger);
+    await yieldToForeground();
     await reconcileDayAwards(db, todayKey, ledger);
   });
 }
