@@ -120,6 +120,9 @@ async function yieldRewardLockToForeground(): Promise<boolean> {
   return true;
 }
 
+/** A pass's hook to let waiting foreground awards run between its awards. */
+type PassYield = () => Promise<void>;
+
 // Foreground awards waiting in the serialized queue. A housekeeping or
 // reconcile pass queued ahead of one must leave that action to it: otherwise
 // the pass pays the action silently and the screen's own award finds it
@@ -979,10 +982,14 @@ async function computeAward(input: {
     entityId = candidate.entityId;
   }
   const yesterday = shiftDateKey(requestedDateKey, -1);
+  // Backfilling the lookback only matters when a banked freeze could be spent
+  // on yesterday's gap. Without one, skip the multi-day scan so the screen's
+  // award commits while the user is still on it; housekeeping still backfills.
   const mayNeedFreeze =
     input.allowEarlierDate &&
     !snapshot.activeDateKeys.has(yesterday) &&
-    !snapshot.frozenDateKeys.has(yesterday);
+    !snapshot.frozenDateKeys.has(yesterday) &&
+    freezeStateFromSnapshot(snapshot).banked > 0;
   let preparedFreezeDate: string | undefined;
   if (mayNeedFreeze) {
     const dateKey = await readUnpaidActionDateKey(
@@ -1247,11 +1254,13 @@ async function reconcileDayAwards(
   db: Db,
   dateKey: string,
   snapshot: LedgerSnapshot,
+  passYield?: PassYield,
 ): Promise<number> {
   const candidates = await loadActivityCandidates(db, dateKey);
   let awarded = 0;
   for (const candidate of candidates) {
     if (awarded >= RECONCILE_AWARD_LIMIT) break;
+    await passYield?.();
     // The queued foreground award pays this action with its feedback.
     if (pendingForegroundAwards.has(foregroundAwardKey(candidate.kind, candidate.entityId))) {
       continue;
@@ -1342,17 +1351,22 @@ export async function runGamificationHousekeeping(
   const todayKey = options.todayKey ?? toDateKey();
   return serializeRewardWrite(async () => {
     const db = await getDatabase();
-    let ledger = await readLedgerSnapshot(db);
-    const yieldToForeground = async () => {
-      if (await yieldRewardLockToForeground()) ledger = await readLedgerSnapshot(db);
+    const ledger = await readLedgerSnapshot(db);
+    // After a foreground award ran, refresh the pass's snapshot in place so
+    // every later step (and the rest of the current day) sees its writes.
+    const yieldToForeground: PassYield = async () => {
+      if (!(await yieldRewardLockToForeground())) return;
+      const fresh = await readLedgerSnapshot(db);
+      for (const key of Object.keys(ledger) as (keyof LedgerSnapshot)[]) delete ledger[key];
+      Object.assign(ledger, fresh);
     };
     for (let offset = GAMIFICATION_RECONCILE_LOOKBACK_DAYS - 1; offset > 0; offset -= 1) {
       await yieldToForeground();
-      await reconcileDayAwards(db, shiftDateKey(todayKey, -offset), ledger);
+      await reconcileDayAwards(db, shiftDateKey(todayKey, -offset), ledger, yieldToForeground);
     }
     await yieldToForeground();
     await ensureStreakFreezeInternal(db, todayKey, ledger);
     await yieldToForeground();
-    await reconcileDayAwards(db, todayKey, ledger);
+    await reconcileDayAwards(db, todayKey, ledger, yieldToForeground);
   });
 }
