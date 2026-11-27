@@ -11,7 +11,8 @@ import { useCommandCenter } from '@/features/command/commandCenterContext';
 import { useAppNavigation } from '@/core/providers/navigationContext';
 import { addTodo, removeTodo } from '@/features/todos/todos.data';
 import { addHabit, deleteHabit } from '@/features/habits/habits.data';
-import { addCalorieEntry, deleteCalorieEntry } from '@/features/calories/calories.data';
+import { deleteCalorieEntry } from '@/features/calories/calories.data';
+import { submitQuickCaptureCalorie } from '@/features/quick-capture/quickCaptureCalorie.submit';
 import { addProject, listProjects, softDeleteProject } from '@/features/projects/projects.data';
 import { addGoal, listGoals, softDeleteGoal } from '@/features/goals/goals.data';
 import { PROJECT_COLORS } from '@/features/projects/projects.types';
@@ -237,7 +238,11 @@ export function QuickCaptureOverlay() {
           return;
         }
         const capturedFood = title.trim();
-        const entryId = await addCalorieEntry({
+        // One-off quick log, not a saved-meal "use": the catalog must stay
+        // untouched (`maintainSavedMeal: false` in the submit helper), or
+        // logging a food that shares a saved meal's name would rewrite that
+        // meal's macros and bump its use count.
+        const entryId = await submitQuickCaptureCalorie({
           foodName: capturedFood,
           calories: cal,
           mealType,
