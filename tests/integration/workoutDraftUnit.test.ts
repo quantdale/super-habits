@@ -128,3 +128,72 @@ describe('a draft remembers the weight unit its values were entered in', () => {
     }
   });
 });
+
+describe('a rest adjustment is checkpointed immediately (lead 2)', () => {
+  it('writes the extended remaining time to the draft without a phase transition', async () => {
+    const { db, workout, domain, routine } = await fixture();
+    try {
+      // The session sits in the REST phase after set 1, at the prescribed 60s.
+      await workout.saveWorkoutSessionDraft({
+        routineId: routine.id,
+        routineSnapshot: routine,
+        startedAtIso: START,
+        phaseIndex: 1, // sequence: [active 0, rest 1]
+        remainingSeconds: 60,
+        dispositions: { '0': 'completed' },
+        enteredSets: { '0': { weight: '80', reps: '8' } },
+        weightUnit: 'kg',
+      });
+      const save = vi.fn(async (draft: unknown) =>
+        workout.saveWorkoutSessionDraft(
+          draft as Parameters<typeof workout.saveWorkoutSessionDraft>[0],
+        ),
+      );
+      // ONE shared ref, exactly like the screen: the adjust closure writes it
+      // and `persistDraft` reads it.
+      const remainingRef = { current: 60 };
+      const currentIndexRef = { current: 1 };
+      const persistDraft = screenCallback(
+        'persistDraft',
+        {
+          routine,
+          notes: '',
+          effortScale: 'off',
+          weightUnit: 'kg',
+          startedAtMsRef: { current: Date.parse(START) },
+          draftClearGenerationRef: { current: 0 },
+          dispositionsRef: { current: { 0: 'completed' } },
+          enteredSetsRef: { current: { 0: { weight: '80', reps: '8' } } },
+          elapsedSecondsRef: { current: 30 },
+          remainingRef,
+          addedSets: {},
+          saveWorkoutSessionDraft: save,
+          clearWorkoutSessionDraft: workout.clearWorkoutSessionDraft,
+        },
+        'WorkoutSessionScreen',
+      );
+      const setRemaining = vi.fn();
+      const adjust = screenCallback(
+        'handleAdjustRemaining',
+        { remainingRef, setRemaining, persistDraft, currentIndexRef },
+        'WorkoutSessionScreen',
+      );
+      await adjust(15);
+      await save.mock.results[0]?.value;
+
+      // The tap's own value is already durable: a reload right now restores the
+      // extension instead of the prescribed 60s.
+      const draft = await workout.getWorkoutSessionDraft();
+      expect(draft?.remainingSeconds).toBe(75);
+      expect(remainingRef.current).toBe(75);
+      expect(setRemaining).toHaveBeenCalled();
+      // Nothing else about the session was lost by the checkpoint.
+      expect(draft?.dispositions).toEqual({ '0': 'completed' });
+      expect(draft?.enteredSets).toEqual({ '0': { weight: '80', reps: '8' } });
+      expect(draft?.weightUnit).toBe('kg');
+      void domain;
+    } finally {
+      await db.closeAsync();
+    }
+  });
+});

@@ -1177,8 +1177,17 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   };
 
   const handleAdjustRemaining = (delta: number) => {
-    remainingRef.current = Math.max(1, remainingRef.current + delta);
-    setRemaining((prev) => Math.max(1, prev + delta));
+    const next = Math.max(1, remainingRef.current + delta);
+    // One computed value for BOTH ref and state: the draft checkpoint below
+    // reads `remainingRef`, so they must never disagree.
+    remainingRef.current = next;
+    setRemaining(() => next);
+    // Rest extension is user-authored session state (like a measurement edit),
+    // so it is checkpointed IMMEDIATELY. Before this, an adjustment lived only
+    // in React state until the next phase transition: a reload (or a
+    // background kill) right after tapping "+15s" restored the prescribed rest
+    // length and silently dropped the extension.
+    void persistDraft(currentIndexRef.current);
   };
 
   const handleFinishEarly = () => {
