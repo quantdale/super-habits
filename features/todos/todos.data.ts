@@ -387,7 +387,54 @@ type RecurringInstanceInput = {
   priority: TodoPriority;
   recurrenceId: string;
   dueDate: string;
+  /**
+   * Project/Goal the new instance inherits. Undefined (the normal case) means
+   * "inherit from the series' latest live instance" — see
+   * `resolveRecurringInstanceAssociation`.
+   */
+  projectId?: string | null;
+  goalId?: string | null;
 };
+
+/** Resolved, guaranteed-consistent association for a new series instance. */
+async function resolveRecurringInstanceAssociation(
+  tx: SQLite.SQLiteDatabase,
+  requested: { projectId: string | null; goalId: string | null },
+): Promise<{ projectId: string | null; goalId: string | null }> {
+  const projectLive = async (id: string | null): Promise<boolean> => {
+    if (!id) return false;
+    const row = await tx.getFirstAsync<{ id: string }>(
+      `SELECT id FROM projects WHERE id = ? AND deleted_at IS NULL`,
+      [id],
+    );
+    return row !== null && row !== undefined;
+  };
+  let projectId = requested.projectId;
+  let goalId = requested.goalId;
+
+  // Hierarchical consistency (association contract rule 2/5): a Project-backed
+  // Goal pins the instance's Project; a standalone Goal imposes none.
+  if (goalId) {
+    const goal = await tx.getFirstAsync<{ project_id: string | null }>(
+      `SELECT project_id FROM goals WHERE id = ? AND deleted_at IS NULL`,
+      [goalId],
+    );
+    if (goal === null || goal === undefined) {
+      goalId = null;
+    } else if (goal.project_id !== null) {
+      // Non-null only when the Goal's own Project still exists: a tombstoned
+      // parent must never be re-pinned onto a fresh row.
+      projectId = (await projectLive(goal.project_id)) ? goal.project_id : null;
+      if (projectId === null) goalId = null;
+    }
+  }
+
+  // Rule 1: a requested Project must exist and be active, otherwise the copy
+  // would carry a dangling reference.
+  if (projectId && !(await projectLive(projectId))) projectId = null;
+
+  return { projectId, goalId };
+}
 
 async function insertRecurringInstanceWithinTransaction(
   tx: SQLite.SQLiteDatabase,
@@ -400,6 +447,29 @@ async function insertRecurringInstanceWithinTransaction(
   const resolved = await ensureRecurringSeries(tx, input.recurrenceId, input, now, enqueue);
   if (!resolved.series) return { createdSeries: resolved.created, copy: null };
   const template = resolved.series;
+  // A series instance is the same work on another day, so its Project/Goal is
+  // inherited rather than dropped: without this, completing a linked recurring
+  // todo made the Project/Goal rollups read the recurring task as finished
+  // forever, and the association was unrecoverable (the only pending row of the
+  // series carried none). An explicit input wins; otherwise the series' latest
+  // live instance supplies the pair, validated against live parents.
+  let association = {
+    projectId: input.projectId ?? null,
+    goalId: input.goalId ?? null,
+  };
+  if (input.projectId === undefined && input.goalId === undefined) {
+    const source = await tx.getFirstAsync<{
+      project_id: string | null;
+      goal_id: string | null;
+    }>(
+      `SELECT project_id, goal_id FROM todos
+        WHERE recurrence_id = ? AND deleted_at IS NULL
+        ORDER BY created_at DESC, rowid DESC LIMIT 1`,
+      [input.recurrenceId],
+    );
+    association = { projectId: source?.project_id ?? null, goalId: source?.goal_id ?? null };
+  }
+  association = await resolveRecurringInstanceAssociation(tx, association);
   const order =
     sortOrder ??
     ((
@@ -412,8 +482,8 @@ async function insertRecurringInstanceWithinTransaction(
     `INSERT INTO todos
        (id, title, notes, completed, completed_at, due_date, priority,
         sort_order, recurrence, recurrence_id, recurrence_date_key,
-        recurrence_spawned_by_id, created_at, updated_at, deleted_at)
-     SELECT ?, ?, ?, 0, NULL, ?, ?, ?, 'daily', ?, ?, ?, ?, ?, NULL
+        recurrence_spawned_by_id, project_id, goal_id, created_at, updated_at, deleted_at)
+     SELECT ?, ?, ?, 0, NULL, ?, ?, ?, 'daily', ?, ?, ?, ?, ?, ?, ?, NULL
      WHERE NOT EXISTS (
        SELECT 1 FROM todos WHERE recurrence_id = ? AND recurrence_date_key = ?
          AND (deleted_at IS NULL OR recurrence_touched = 1)
@@ -428,6 +498,8 @@ async function insertRecurringInstanceWithinTransaction(
       input.recurrenceId,
       input.dueDate,
       spawnedById,
+      association.projectId,
+      association.goalId,
       now,
       now,
       input.recurrenceId,
