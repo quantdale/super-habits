@@ -61,6 +61,37 @@ describe('parseQuickCapture — due dates', () => {
     expect(r.title).toBe('Buy 4 apples');
   });
 
+  it('recognizes date tokens that end a clause with punctuation', () => {
+    // A trailing period/comma is ordinary punctuation, not part of the token:
+    // `tomorrow.` used to fail the `(?=\s|$)` boundary, so the capture
+    // silently kept a due date in its title and saved no due date at all.
+    expect(parseQuickCapture('Buy milk tomorrow.', { now: NOW })).toMatchObject({
+      title: 'Buy milk',
+      dueDateKey: '2026-08-21',
+    });
+    expect(parseQuickCapture('Buy milk, today.', { now: NOW })).toMatchObject({
+      title: 'Buy milk',
+      dueDateKey: '2026-08-20',
+    });
+    expect(parseQuickCapture('Gym on friday.', { now: NOW })).toMatchObject({
+      title: 'Gym',
+      dueDateKey: '2026-08-21',
+    });
+    expect(parseQuickCapture('Pay rent next monday!', { now: NOW })).toMatchObject({
+      title: 'Pay rent',
+      dueDateKey: '2026-08-24',
+    });
+    expect(parseQuickCapture('File taxes 2026-09-01.', { now: NOW })).toMatchObject({
+      title: 'File taxes',
+      dueDateKey: '2026-09-01',
+    });
+    // A trailing question mark is the same clause boundary.
+    expect(parseQuickCapture('Call mom tomorrow?', { now: NOW })).toMatchObject({
+      title: 'Call mom',
+      dueDateKey: '2026-08-21',
+    });
+  });
+
   it('does not read ordinary words as bare weekday abbreviations', () => {
     // "sun", "sat", "wed" are common English words; consuming them as a
     // weekday token silently rewrites the title AND invents a due date.
@@ -197,6 +228,24 @@ describe('parseQuickCapture — priority', () => {
     const r = parseQuickCapture('Urgently deliver package', { now: NOW });
     expect(r.priority).toBe('normal');
     expect(r.title).toBe('Urgently deliver package');
+  });
+
+  it('still reads `!urgent`/`urgent` when the clause ends in punctuation', () => {
+    // `!urgent.` is the same token with a period after it; the strict
+    // whitespace/end boundary dropped both the flag and the token, so the
+    // capture saved a normal-priority todo titled "Fix leak !urgent.".
+    expect(parseQuickCapture('Fix leak !urgent.', { now: NOW })).toMatchObject({
+      title: 'Fix leak',
+      priority: 'urgent',
+    });
+    expect(parseQuickCapture('Call bank urgent.', { now: NOW })).toMatchObject({
+      title: 'Call bank',
+      priority: 'urgent',
+    });
+    expect(parseQuickCapture('Someday desk !low.', { now: NOW })).toMatchObject({
+      title: 'Someday desk',
+      priority: 'low',
+    });
   });
 });
 
