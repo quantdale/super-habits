@@ -131,6 +131,26 @@ describe('parseQuickCapture — due dates', () => {
     });
   });
 
+  it('consumes a stacked "the coming <weekday>" phrase instead of stranding "the"', () => {
+    // "the coming friday" is ONE date phrase — the same class as "next monday"
+    // above. The qualifier regex only allowed a single next/this/coming word,
+    // so "the coming friday" consumed just "friday" and left "the" stranded at
+    // the front of the captured Todo's title.
+    expect(parseQuickCapture('the coming friday call mom', { now: NOW })).toMatchObject({
+      title: 'call mom',
+      dueDateKey: '2026-08-21',
+    });
+    expect(parseQuickCapture('Call mom on the coming friday', { now: NOW })).toMatchObject({
+      title: 'Call mom',
+      dueDateKey: '2026-08-21',
+    });
+    // The article alone is never a date token.
+    expect(parseQuickCapture('Return the book', { now: NOW })).toMatchObject({
+      title: 'Return the book',
+      dueDateKey: null,
+    });
+  });
+
   it('consumes qualifiers in abbreviated weekday forms too', () => {
     // Unambiguous abbreviations match bare and with qualifiers…
     expect(parseQuickCapture('Standup next fri', { now: NOW })).toMatchObject({

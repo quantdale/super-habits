@@ -40,6 +40,18 @@ const WEEKDAYS = [
  */
 const AMBIGUOUS_WEEKDAY_ABBREVIATIONS = new Set(['sun', 'wed', 'sat']);
 
+/**
+ * One qualifier word of a weekday date phrase, e.g. `on `, `next `,
+ * `the coming `, `this coming `.
+ *
+ * English stacks these ("the coming friday", "this coming tuesday"), and the
+ * date phrase is the whole stack: consuming only the last word stranded "the"
+ * or "this" at the front of the captured title ("the call mom"). The article
+ * only counts as part of a qualifier phrase — never bare — so "the friday" and
+ * "the next cake" stay title text.
+ */
+const WEEKDAY_QUALIFIER_PHRASE = `(?:the\\s+)?(?:on|next|this|coming)\\s+`;
+
 function nextWeekdayKey(targetDow: number, today: Date): string {
   const d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   let addDays = (targetDow - d.getDay() + 7) % 7;
@@ -183,15 +195,12 @@ export function parseQuickCapture(
           // Full names always count ("friday", "on friday"); a leading
           // "next/this/coming" qualifier is part of the date phrase and is
           // consumed with it, so the title never keeps a stranded "next".
-          new RegExp(`(^|\\s)(?:on\\s+)?(?:(?:next|this|coming)\\s+)?${fullName}(?=\\s|$)`, 'i'),
+          new RegExp(`(^|\\s)(?:${WEEKDAY_QUALIFIER_PHRASE})*${fullName}(?=\\s|$)`, 'i'),
           // Unambiguous abbreviations count bare ("fri"); ambiguous ones only
           // with a qualifier ("on sat", "next sat").
           AMBIGUOUS_WEEKDAY_ABBREVIATIONS.has(abbreviation)
-            ? new RegExp(`(^|\\s)(?:(?:on|next|this|coming)\\s+)+${abbreviation}(?=\\s|$)`, 'i')
-            : new RegExp(
-                `(^|\\s)(?:on\\s+)?(?:(?:next|this|coming)\\s+)?${abbreviation}(?=\\s|$)`,
-                'i',
-              ),
+            ? new RegExp(`(^|\\s)(?:${WEEKDAY_QUALIFIER_PHRASE})+${abbreviation}(?=\\s|$)`, 'i')
+            : new RegExp(`(^|\\s)(?:${WEEKDAY_QUALIFIER_PHRASE})*${abbreviation}(?=\\s|$)`, 'i'),
         ];
         const pattern = patterns.find((candidate) => candidate.test(text));
         if (pattern) {
