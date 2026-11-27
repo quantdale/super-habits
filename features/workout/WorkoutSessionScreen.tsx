@@ -248,6 +248,9 @@ export type SessionResume = {
   dispositions?: Record<number, PhaseDisposition>;
   /** Entered measurements saved with the draft (absent for legacy drafts). */
   enteredSets?: Record<number, EnteredSetValues>;
+  /** The unit the resumed measurements were typed in (drafts written before
+   *  this field existed keep the live preference). */
+  weightUnit?: WorkoutWeightUnit;
   /** Seconds left on the resumed phase when the draft was written. */
   remainingSeconds?: number;
   /** Session-local added sets by engine exercise index, replayed on resume. */
@@ -282,8 +285,10 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   const [persistedRestDefault, setPersistedRestDefault] = useState<number | null>(null);
   const [effortScale, setEffortScale] = useState<WorkoutEffortScale>(resume?.effortScale ?? 'off');
   // The user's weight unit (same resolution as the body-weight modal): stamped
-  // on logged sets so history never fabricates 'kg' for an lb user.
-  const [weightUnit, setWeightUnit] = useState<WorkoutWeightUnit>('kg');
+  // on logged sets so history never fabricates 'kg' for an lb user. A resumed
+  // session adopts the unit its draft was written in, so a preference change
+  // while the session sat paused cannot reinterpret the typed numbers.
+  const [weightUnit, setWeightUnit] = useState<WorkoutWeightUnit>(resume?.weightUnit ?? 'kg');
   // The engine exercises, mapped once. The live sequence composes these
   // with any session-local added sets — the routine template is never written.
   const baseExercises = useMemo(() => buildSessionExerciseInputs(routine), [routine]);
@@ -307,7 +312,8 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
           setRestDefault(seconds);
           setPersistedRestDefault(seconds);
           if (!resume?.effortScale) setEffortScale(preferences.effortScale);
-          setWeightUnit(preferences.goalWeight?.unit ?? 'kg');
+          // Never relabel a resumed draft's numbers: its unit wins.
+          if (!resume?.weightUnit) setWeightUnit(preferences.goalWeight?.unit ?? 'kg');
         }
       },
     );
@@ -319,7 +325,12 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     ])
       .then(([rows, outcomes, prefs]) => {
         if (!cancelled) {
-          setPreviousLookup(buildPreviousSetLookup(rows, prefs.goalWeight?.unit ?? 'kg'));
+          // History defaults land in the SESSION's unit: a resumed draft keeps
+          // the unit it was typed in, so its unentered sets must not be seeded
+          // in a preference unit that changed while it sat paused.
+          setPreviousLookup(
+            buildPreviousSetLookup(rows, resume?.weightUnit ?? prefs.goalWeight?.unit ?? 'kg'),
+          );
           setRecentSetOutcomes(outcomes);
         }
       })
@@ -329,7 +340,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     return () => {
       cancelled = true;
     };
-  }, [resume?.effortScale]);
+  }, [resume?.effortScale, resume?.weightUnit]);
 
   const handleAdjustRestDefault = (delta: number) => {
     // Session-local only: future workouts are unaffected until the user
@@ -611,6 +622,9 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         effortScale,
         startedAtIso: new Date(startedAtMs).toISOString(),
         phaseIndex,
+        // The unit the user is typing in right now: a resume replays the digits
+        // in exactly that unit, whatever the preference has become since.
+        weightUnit,
         elapsedAdjustSeconds: elapsedSecondsRef.current,
         ...(Object.keys(draftDispositions).length > 0 ? { dispositions: draftDispositions } : {}),
         ...(Object.keys(draftEnteredSets).length > 0 ? { enteredSets: draftEnteredSets } : {}),
@@ -634,7 +648,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
           }
         });
     },
-    [routine, addedSets, notes, effortScale],
+    [routine, addedSets, notes, effortScale, weightUnit],
   );
 
   const clearDraft = useCallback(() => {
@@ -832,6 +846,8 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
           routineSnapshot: routine,
           notes,
           effortScale,
+          // The unit the measurements were typed in rides the recovery payload.
+          weightUnit,
           exerciseNames: sequence.map((phase) => phase.exerciseName),
           startedAtIso: new Date(startedAtMs).toISOString(),
           ...(endedAtMs === null ? {} : { endedAtIso: new Date(endedAtMs).toISOString() }),
@@ -855,7 +871,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     return () => {
       cancelled = true;
     };
-  }, [isComplete, clearDraft, routine, sequence, addedSets, notes, effortScale]);
+  }, [isComplete, clearDraft, routine, sequence, addedSets, notes, effortScale, weightUnit]);
 
   const updateEnteredValues = (index: number, patch: Partial<EnteredSetValues>) => {
     setEnteredSets((prev) => {
@@ -1017,6 +1033,8 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         routineSnapshot: routine,
         notes,
         effortScale,
+        // The unit the measurements were typed in rides the recovery payload.
+        weightUnit,
         exerciseNames: sequence.map((phase) => phase.exerciseName),
         startedAtIso: new Date(startedAtMs).toISOString(),
         ...(endedAtMs === null ? {} : { endedAtIso: new Date(endedAtMs).toISOString() }),
@@ -1037,7 +1055,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         ...(lastError ? { lastError } : {}),
       });
     },
-    [routine, sequence, addedSets, notes, effortScale],
+    [routine, sequence, addedSets, notes, effortScale, weightUnit],
   );
 
   const handleFinish = async () => {
@@ -1168,8 +1186,17 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
   };
 
   const handleAdjustRemaining = (delta: number) => {
-    remainingRef.current = Math.max(1, remainingRef.current + delta);
-    setRemaining((prev) => Math.max(1, prev + delta));
+    const next = Math.max(1, remainingRef.current + delta);
+    // One computed value for BOTH ref and state: the draft checkpoint below
+    // reads `remainingRef`, so they must never disagree.
+    remainingRef.current = next;
+    setRemaining(() => next);
+    // Rest extension is user-authored session state (like a measurement edit),
+    // so it is checkpointed IMMEDIATELY. Before this, an adjustment lived only
+    // in React state until the next phase transition: a reload (or a
+    // background kill) right after tapping "+15s" restored the prescribed rest
+    // length and silently dropped the extension.
+    void persistDraft(currentIndexRef.current);
   };
 
   const handleFinishEarly = () => {
