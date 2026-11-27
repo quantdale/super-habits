@@ -20,6 +20,7 @@ import type { Habit } from '@/core/db/types';
 import { buildDayCompletions, habitCreationDateKey } from '@/features/habits/habits.domain';
 import { createId } from '@/lib/id';
 import {
+  dateKeyToLocalDate,
   getUtcIsoRangeForLocalDateKeys,
   isValidDateKey,
   nowIso,
@@ -102,6 +103,55 @@ const RECONCILE_AWARD_LIMIT = 25;
  * (kind, source key) index makes repeated passes no-ops.
  */
 export const GAMIFICATION_RECONCILE_LOOKBACK_DAYS = 7;
+
+function reconcileWindowStart(dateKey: string): string {
+  return shiftDateKey(dateKey, 1 - GAMIFICATION_RECONCILE_LOOKBACK_DAYS);
+}
+
+/**
+ * Which local day a stored workout log is rewarded on — ONE rule, shared by
+ * the direct award, the workout quest/day facts and reconciliation candidates.
+ *
+ * A workout earns on its FINISH day (`completed_at`), which is the day it
+ * really happened, even when the save lands after midnight. The one exception
+ * is the existing catch-up window: a save more than
+ * `GAMIFICATION_RECONCILE_LOOKBACK_DAYS` after the finish is outside the
+ * lookback that could ever have paid it, so it earns on its SAVE day
+ * (`created_at`) instead — a reward for real work is never silently dropped.
+ * Both stamps live on the log row, and the log id stays the reward identity, so
+ * a retry/reload of the same save can never move the day or double-award.
+ */
+function workoutRewardDateKey(completedAt: string | null, createdAt: string | null): string | null {
+  if (!completedAt) return null;
+  const finishDay = timestampToLocalDateKey(completedAt);
+  if (!isValidDateKey(finishDay)) return null;
+  if (!createdAt) return finishDay;
+  const saveDay = timestampToLocalDateKey(createdAt);
+  if (!isValidDateKey(saveDay)) return finishDay;
+  return finishDay < reconcileWindowStart(saveDay) ? saveDay : finishDay;
+}
+
+// The same reward-day rule feeds workout quest counts and reconciliation
+// candidates, so the day a log COUNTS for and the day it is PAID on can never
+// disagree. Branch 1: finished on this day, saved before its catch-up window
+// closed. Branch 2: saved on this day, finished BEFORE that day's window
+// opened, so this save day is its reward day. Params: start/end of the day, the
+// first save outside the finish-day branch's window, then the same start/end
+// plus the earliest finish the save-day branch still credits here.
+const WORKOUT_REWARD_DAY_FILTER = `(
+  (w.completed_at >= ? AND w.completed_at < ? AND w.created_at < ?)
+  OR (w.created_at >= ? AND w.created_at < ? AND w.completed_at < ?)
+)`;
+
+function workoutRewardDayParams(dateKey: string): string[] {
+  const start = dateKeyToLocalDate(dateKey).toISOString();
+  const end = dateKeyToLocalDate(shiftDateKey(dateKey, 1)).toISOString();
+  const firstLateSave = dateKeyToLocalDate(
+    shiftDateKey(dateKey, GAMIFICATION_RECONCILE_LOOKBACK_DAYS),
+  ).toISOString();
+  const earliestFinish = dateKeyToLocalDate(reconcileWindowStart(dateKey)).toISOString();
+  return [start, end, firstLateSave, start, end, earliestFinish];
+}
 
 type HabitScheduleRead = Pick<
   Habit,
@@ -313,8 +363,8 @@ async function loadDayFacts(
       ),
       readCount(
         db,
-        `SELECT COUNT(*) AS value FROM workout_logs WHERE completed_at >= ? AND completed_at < ?`,
-        [startUtcIso, endUtcExclusiveIso],
+        `SELECT COUNT(*) AS value FROM workout_logs w WHERE ${WORKOUT_REWARD_DAY_FILTER}`,
+        workoutRewardDayParams(todayKey),
       ),
       readCount(
         db,
@@ -732,7 +782,6 @@ const ACTION_TIMESTAMP_QUERIES = {
          WHERE id = ? AND completed = 1 AND deleted_at IS NULL`,
   focus: `SELECT started_at AS stamp FROM pomodoro_sessions
           WHERE id = ? AND session_type = 'focus' AND ended_at IS NOT NULL AND duration_seconds > 0`,
-  workout: `SELECT completed_at AS stamp FROM workout_logs WHERE id = ?`,
   review: `SELECT completed_at AS stamp FROM weekly_reviews
            WHERE id = ? AND status = 'completed' AND deleted_at IS NULL`,
 };
@@ -767,6 +816,14 @@ async function readActionDateKey(
         [entityId],
       );
       return row?.date_key ?? null;
+    }
+    case 'workout': {
+      const row = await db.getFirstAsync<{ completed_at: string; created_at: string }>(
+        `SELECT completed_at, created_at FROM workout_logs WHERE id = ?`,
+        [entityId],
+      );
+      if (!row) return null;
+      return workoutRewardDateKey(row.completed_at, row.created_at);
     }
     default: {
       const row = await db.getFirstAsync<{ stamp: string | null }>(ACTION_TIMESTAMP_QUERIES[kind], [
@@ -826,7 +883,7 @@ async function computeAward(input: {
     // been undone, deleted, or moved to another local day since it was read.
     const todayKey = await readActionDateKey(transactionDb, input.kind, entityId, requestedDateKey);
     const earliestDateKey = input.allowEarlierDate
-      ? shiftDateKey(requestedDateKey, 1 - GAMIFICATION_RECONCILE_LOOKBACK_DAYS)
+      ? reconcileWindowStart(requestedDateKey)
       : requestedDateKey;
     if (
       todayKey === null ||
@@ -1022,14 +1079,14 @@ async function loadActivityCandidates(db: Db, todayKey: string): Promise<Activit
       [startUtcIso, endUtcExclusiveIso, restoredAt, restoredAt, RECONCILE_AWARD_LIMIT],
     ),
     db.getAllAsync<{ id: string }>(
-      `SELECT w.id FROM workout_logs w WHERE w.completed_at >= ? AND w.completed_at < ?
-          AND (? IS NULL OR w.completed_at > ?)
+      `SELECT w.id FROM workout_logs w WHERE ${WORKOUT_REWARD_DAY_FILTER}
+          AND (? IS NULL OR w.created_at > ?)
           AND NOT EXISTS (
             SELECT 1 FROM gamification_events e
              WHERE e.event_kind = 'workout' AND e.source_key = w.id
           )
         ORDER BY w.completed_at ASC, w.id ASC LIMIT ?`,
-      [startUtcIso, endUtcExclusiveIso, restoredAt, restoredAt, RECONCILE_AWARD_LIMIT],
+      [...workoutRewardDayParams(todayKey), restoredAt, restoredAt, RECONCILE_AWARD_LIMIT],
     ),
     db.getFirstAsync<{ id: string }>(
       `SELECT n.id FROM calorie_entries n

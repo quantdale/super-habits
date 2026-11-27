@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { freshDatabase } from './helpers/db';
 import type { TestDatabase } from './helpers/db';
 
@@ -151,4 +151,132 @@ describe('workout gamification attribution', () => {
     expect(await gamification.awardGamificationAction({ kind: 'workout' })).toBeNull();
     expect(await countWorkoutEvents()).toBe(0);
   });
+});
+
+describe('late workout rewards', () => {
+  const finishDay = '2026-10-12';
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 12, 23, 50));
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    await db.closeAsync();
+  });
+
+  async function prepareFinishedWorkout() {
+    const { workout } = await loadModules();
+    const routineId = await createRoutine();
+    const input = {
+      routineId,
+      startedAt: new Date(2026, 9, 12, 23, 30).toISOString(),
+      endedAt: new Date().toISOString(),
+      exercises: [{ exerciseName: 'Squat', setsCompleted: 1 }],
+    };
+    return async (day: number) => {
+      vi.setSystemTime(new Date(2026, 9, day, 0, 10));
+      const result = await workout.logWorkoutSession(input);
+      expect(result.status).toBe('applied');
+      const { logId } = result;
+      if (!logId) throw new Error('Workout was not saved');
+      return logId;
+    };
+  }
+
+  it('credits the finish day for XP, streak, quest and perfect day after midnight', async () => {
+    const { gamification } = await loadModules();
+    const habits = await import('@/features/habits/habits.data');
+    const habitId = await habits.addHabit('Read', 1);
+    await habits.incrementHabit(habitId);
+    const save = await prepareFinishedWorkout();
+    const logId = await save(13);
+
+    const award = await gamification.awardGamificationAction({ kind: 'workout', entityId: logId });
+    expect(award?.result.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'workout', sourceKey: logId, dateKey: finishDay }),
+        expect.objectContaining({
+          kind: 'quest',
+          sourceKey: `${finishDay}:move_body`,
+          dateKey: finishDay,
+        }),
+        expect.objectContaining({ kind: 'perfect_day', dateKey: finishDay }),
+      ]),
+    );
+    expect(award?.snapshot.streak).toMatchObject({ current: 1, activeToday: false });
+    expect(award?.snapshot.week.slice(-2)).toMatchObject([
+      { dateKey: finishDay, active: true },
+      { dateKey: '2026-10-13', active: false },
+    ]);
+    expect(award?.snapshot.todayFacts).toMatchObject({ workouts: 0, xpEarned: 0 });
+
+    expect(await save(13)).toBe(logId);
+    expect(
+      await gamification.awardGamificationAction({ kind: 'workout', entityId: logId }),
+    ).toBeNull();
+    await gamification.runGamificationHousekeeping();
+    expect(await db.getAllAsync('SELECT id FROM workout_logs')).toEqual([{ id: logId }]);
+    expect(await countWorkoutEvents()).toBe(1);
+    expect(
+      await db.getAllAsync("SELECT id FROM gamification_events WHERE date_key = '2026-10-13'"),
+    ).toEqual([]);
+  });
+
+  it.each(['reported', 'reconciled'])(
+    'credits the save day outside the window when %s',
+    async (path) => {
+      const { gamification } = await loadModules();
+      const save = await prepareFinishedWorkout();
+      const logId = await save(20);
+      const saveDay = '2026-10-20';
+
+      if (path === 'reported') {
+        await gamification.awardGamificationAction({ kind: 'workout', entityId: logId });
+      } else {
+        // The app may reopen the next day before any reward was written.
+        vi.setSystemTime(new Date(2026, 9, 21, 0, 10));
+        await gamification.runGamificationHousekeeping();
+        vi.setSystemTime(new Date(2026, 9, 20, 0, 10));
+      }
+      expect(
+        await db.getAllAsync(
+          "SELECT source_key, date_key FROM gamification_events WHERE event_kind = 'workout'",
+        ),
+      ).toEqual([{ source_key: logId, date_key: saveDay }]);
+      expect(await db.getAllAsync('SELECT quest_id, date_key FROM gamification_quests')).toEqual([
+        { quest_id: 'move_body', date_key: saveDay },
+      ]);
+      expect(await gamification.readGamificationSnapshot()).toMatchObject({
+        streak: { current: 1, activeToday: true },
+        todayFacts: { workouts: 1 },
+      });
+      expect(
+        (await gamification.readGamificationSnapshot({ todayKey: finishDay })).todayFacts.workouts,
+      ).toBe(0);
+
+      vi.setSystemTime(new Date(2026, 9, 21, 0, 10));
+      await gamification.runGamificationHousekeeping();
+      expect(await countWorkoutEvents()).toBe(1);
+    },
+  );
+
+  it.each([
+    { savedOn: 18, rewardDay: finishDay },
+    { savedOn: 19, rewardDay: '2026-10-19' },
+  ])(
+    'credits $rewardDay when saved on October $savedOn at the window boundary',
+    async ({ savedOn, rewardDay }) => {
+      const { gamification } = await loadModules();
+      const save = await prepareFinishedWorkout();
+      const logId = await save(savedOn);
+
+      const award = await gamification.awardGamificationAction({
+        kind: 'workout',
+        entityId: logId,
+      });
+      expect(award?.result.events[0]).toMatchObject({ kind: 'workout', dateKey: rewardDay });
+    },
+  );
 });
