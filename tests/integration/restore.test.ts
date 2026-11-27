@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Todo } from '@/core/db/types';
+import type { CalorieEntry, Todo } from '@/core/db/types';
 import type { TestDatabase } from './helpers/db';
 import { freshDatabase } from './helpers/db';
 
@@ -230,6 +230,55 @@ describe('in-transaction re-check abort path', () => {
       expect(meta).toBeNull();
     }
     await db.closeAsync();
+  });
+});
+
+describe('legacy calorie restore page overlap', () => {
+  it('rejects a repeated calorie id before writing any rows or restore markers', async () => {
+    const first: CalorieEntry = {
+      id: 'cal_99999',
+      food_name: 'Oats',
+      calories: 300,
+      protein: 10,
+      carbs: 50,
+      fats: 5,
+      fiber: 4,
+      meal_type: 'breakfast',
+      consumed_on: '2026-06-01',
+      created_at: '2026-06-01T00:00:00.000Z',
+      updated_at: '2026-06-01T00:00:00.000Z',
+      deleted_at: null,
+    };
+    const rows = Array.from({ length: 1_000 }, (_, index) => ({
+      ...first,
+      id: `cal_${100_000 + index}`,
+    }));
+    let caloriePages = 0;
+    const { db, coordinator } = await load(
+      { ...AVAILABLE_REMOTE_TODOS, calorie_entries: rows },
+      {
+        onRange: (entity) => {
+          // An insert sorted before the first page shifts the old boundary row
+          // into the next offset page, as can happen against a mutable backup.
+          if (entity === 'calorie_entries' && ++caloriePages === 2) rows.unshift(first);
+        },
+      },
+    );
+
+    try {
+      const outcome = await coordinator.restoreFromRemoteBackup();
+      expect(outcome).toMatchObject({
+        status: 'invalid',
+        diagnostics: ['calorie_entries duplicate id: cal_100999'],
+      });
+      expect(await db.getAllAsync('SELECT id FROM calorie_entries')).toEqual([]);
+      expect(await db.getAllAsync('SELECT id FROM todos')).toEqual([]);
+      expect(
+        await db.getAllAsync("SELECT value FROM app_meta WHERE key = 'last_restore_at'"),
+      ).toEqual([]);
+    } finally {
+      await db.closeAsync();
+    }
   });
 });
 
