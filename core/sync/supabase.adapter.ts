@@ -35,11 +35,7 @@ import {
   PUBLICATION_PROVENANCE_VERSION,
 } from '@/core/backup/generations/generationProtocol';
 import type { SyncAdapter, SyncRecord } from '@/core/sync/sync.engine';
-import {
-  EntityBatchPushError,
-  SyncPushPartialFailureError,
-  type SyncRecordFailure,
-} from '@/core/sync/syncErrors';
+import { SyncPushPartialFailureError, type SyncRecordFailure } from '@/core/sync/syncErrors';
 import { getSupabaseAuthUserId, supabase } from '@/lib/supabase';
 import {
   BACKUP_ENTITIES,
@@ -503,6 +499,7 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     // push each entity independently and collect failures instead of
     // aborting the whole batch on the first error.
     for (const [entity, entityRecords] of byEntity) {
+      let rowFailures: ReadonlyMap<string, Error>;
       try {
         if (!isSyncableEntity(entity)) {
           throw new Error(`Unknown entity in queue: ${entity}`);
@@ -564,39 +561,32 @@ export class SupabaseSyncAdapter implements SyncAdapter {
             );
           }
           const hardDeleteIdSet = new Set(hardDeleteIds);
-          const remainingIds = ids.filter((id) => !hardDeleteIdSet.has(id));
-          if (remainingIds.length === 0) continue;
-          await this.upsertEntityRows(client, db, entity, remainingIds, currentUserId);
-          continue;
+          rowFailures = await this.upsertEntityRows(
+            client,
+            db,
+            entity,
+            ids.filter((id) => !hardDeleteIdSet.has(id)),
+            currentUserId,
+          );
+        } else {
+          rowFailures = await this.upsertEntityRows(client, db, entity, ids, currentUserId);
         }
-
-        await this.upsertEntityRows(client, db, entity, ids, currentUserId);
       } catch (error) {
         const failure = error instanceof Error ? error : new Error(String(error));
-        // `AUD-SH03-B`: only the records whose OWN batch failed are reported. A
-        // batch that already stored is acknowledged, so its records are REMOVED
-        // from the outbox instead of being retried — or terminally blocked — for
-        // a failure they never experienced. The audited probe stored 250 Todos,
-        // failed the second batch, and saw all 251 reported as permanent
-        // failures.
-        const acknowledged =
-          error instanceof EntityBatchPushError
-            ? new Set(error.acknowledgedIds)
-            : new Set<string>();
-        const batchFailed =
-          error instanceof EntityBatchPushError
-            ? error.failedIds
-            : new Set(entityRecords.map((record) => record.id));
-        for (const record of entityRecords) {
-          if (acknowledged.has(record.id) && !batchFailed.has(record.id)) {
-            succeededRecords.push(record);
-            continue;
-          }
-          failedRecords.push(record);
-          failures.push({ record, error: failure, code: postgrestCodeOf(failure) });
-        }
-        errorMessages.push(failure.message);
+        rowFailures = new Map(entityRecords.map((record) => [record.id, failure]));
       }
+
+      if (rowFailures.size === 0) continue;
+      for (const record of entityRecords) {
+        const failure = rowFailures.get(record.id);
+        if (!failure) {
+          succeededRecords.push(record);
+          continue;
+        }
+        failedRecords.push(record);
+        failures.push({ record, error: failure, code: postgrestCodeOf(failure) });
+      }
+      errorMessages.push(...new Set([...rowFailures.values()].map((failure) => failure.message)));
     }
 
     if (failedRecords.length > 0) {
@@ -615,7 +605,8 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     entity: (typeof BACKUP_ENTITIES)[number],
     ids: string[],
     currentUserId: string,
-  ): Promise<void> {
+  ): Promise<ReadonlyMap<string, Error>> {
+    if (ids.length === 0) return new Map();
     const placeholders = ids.map(() => '?').join(', ');
     const sql = `SELECT * FROM ${entity} WHERE id IN (${placeholders})`;
 
@@ -648,92 +639,34 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     // every statement comfortably inside both, and a failure now names only the
     // batch that failed.
     const writeBatches = boundedBackupRequests(payloadRows, writeBatchRows(this.serverRowCap));
-    /**
-     * Ids whose batch stored AND was read back (`AUD-SH03-B`, review finding 9).
-     *
-     * A write must not be acknowledged merely because the statement returned no
-     * error: `upsert` can report success while storing nothing for this owner,
-     * and a LATER batch failing must not short-circuit verification of the
-     * earlier ones. So each batch is verified immediately after it is written,
-     * and only a verified batch contributes acknowledged ids.
-     */
-    const acknowledgedIds: string[] = [];
+    const failures = new Map<string, Error>();
     for (const [batchIndex, batch] of writeBatches.entries()) {
-      const { error } = await client.from(entity).upsert(batch, {
-        onConflict: 'id',
-      });
       const batchIds = batch.flatMap((row) => {
-        // SAFETY: every payload row is a projected entity row plus `user_id`, so
-        // `id` is present as a string for entity tables; the guard keeps the
-        // synthetic records defensive.
         const id = (row as Record<string, unknown>).id;
         return typeof id === 'string' ? [id] : [];
       });
-      if (error) {
-        const failedIds = new Set(batchIds);
-        // A failed batch must not implicate the batches that already stored AND
-        // verified.
-        throw new EntityBatchPushError(
-          `Supabase upsert failed for ${entity} (batch ${batchIndex + 1}/${writeBatches.length}, ${batch.length} row(s)): ${error.message}`,
-          acknowledgedIds,
-          failedIds,
-        );
-      }
-      // Verify THIS batch before acknowledging it. Reusing the full-id-set
-      // verification here would be wrong — an unverified earlier batch must not
-      // be acknowledged just because a later one is fine.
-      //
-      // Review finding 10: a THROWN read-back must not lose the ids this entity
-      // already verified. `verifyEntityRows` can throw (network error, malformed
-      // response), and letting that escape carried no `acknowledgedIds` — the
-      // outer handler then reported every record as failed, so 250 verified rows
-      // were retried even though they had stored. The throw is converted into the
-      // same `EntityBatchPushError` shape so the verified prefix survives every
-      // later failure path.
-      let confirmed: Set<string>;
+      const batchLabel = `${entity} (batch ${batchIndex + 1}/${writeBatches.length})`;
       try {
-        confirmed = await this.verifyEntityRows(client, entity, batchIds, currentUserId);
-      } catch (verifyError) {
-        throw new EntityBatchPushError(
-          `Supabase batch verification errored for ${entity} (batch ${
-            batchIndex + 1
-          }/${writeBatches.length}): ${
-            verifyError instanceof Error ? verifyError.message : String(verifyError)
-          }`,
-          acknowledgedIds,
-          new Set(batchIds),
-        );
-      }
-      const outcome = compareVerifiedIds(batchIds, confirmed, { serverCap: this.serverRowCap });
-      if (!outcome.ok) {
-        const detail =
-          outcome.reason === 'truncated'
-            ? `read-back was truncated: ${outcome.detail}`
-            : `${outcome.missing.length} of ${batchIds.length} row(s) were not stored for this owner (${describeMissingIds(outcome.missing)})`;
-        throw new EntityBatchPushError(
-          `Supabase batch verification failed for ${entity} (batch ${batchIndex + 1}/${writeBatches.length}): ${detail}`,
-          acknowledgedIds,
-          new Set(batchIds),
-        );
-      }
-      acknowledgedIds.push(...batchIds);
-    }
+        const { error } = await client.from(entity).upsert(batch, { onConflict: 'id' });
+        if (error) throw new Error(`Supabase upsert failed for ${batchLabel}: ${error.message}`);
 
-    // Verification happens PER BATCH, inside the loop above, before any batch is
-    // acknowledged. That replaced the single whole-entity read-back this method
-    // used to run at the end:
-    //
-    //   - a whole-entity read-back of 1,001 rows is silently truncated by the
-    //     server's `max_rows` cap (AUD-SH08-A), which produced the audited false
-    //     failure of 1,001 correctly-stored rows;
-    //   - acknowledging earlier batches BEFORE verifying them meant a later
-    //     batch failure skipped verification entirely and silently removed
-    //     unstored work from the outbox (review finding 9).
-    //
-    // Both are avoided by verifying each batch with its own bounded, paginated
-    // read-back and only then contributing its ids to the acknowledged set. There
-    // is deliberately NO second whole-entity verification here: it would re-read
-    // rows already proven and would reintroduce the unbounded query.
+        // Acknowledge each batch only after verifying its rows. Process the
+        // other batches even when this one fails so they get their own result.
+        const confirmed = await this.verifyEntityRows(client, entity, batchIds, currentUserId);
+        const outcome = compareVerifiedIds(batchIds, confirmed, { serverCap: this.serverRowCap });
+        if (!outcome.ok) {
+          const detail =
+            outcome.reason === 'truncated'
+              ? `read-back was truncated: ${outcome.detail}`
+              : `${outcome.missing.length} of ${batchIds.length} row(s) were not stored for this owner (${describeMissingIds(outcome.missing)})`;
+          throw new Error(`Supabase batch verification failed for ${batchLabel}: ${detail}`);
+        }
+      } catch (error) {
+        const failure = error instanceof Error ? error : new Error(String(error));
+        for (const id of batchIds) failures.set(id, failure);
+      }
+    }
+    return failures;
   }
 
   private async pushSettingsSnapshot(
