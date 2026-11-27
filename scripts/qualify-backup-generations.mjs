@@ -385,7 +385,19 @@ export async function qualifyBackupGenerations(options = {}) {
   try {
     const initialized = spawnSync(
       exe('initdb'),
-      ['-D', data, '-U', 'audit_owner', '-A', 'trust', '--no-locale', '-E', 'UTF8', '--no-sync'],
+      [
+        '-D',
+        data,
+        '-U',
+        'audit_owner',
+        '-A',
+        'trust',
+        '--locale-provider=builtin',
+        '--builtin-locale=C.UTF-8',
+        '-E',
+        'UTF8',
+        '--no-sync',
+      ],
       { encoding: 'utf8', windowsHide: true, timeout: 30000 },
     );
     assert.equal(initialized.status, 0, `initdb: ${initialized.stderr ?? initialized.error}`);
@@ -1114,7 +1126,7 @@ export async function qualifyBackupGenerations(options = {}) {
       't',
     );
     checks.push(
-      'Scope-9 capability, series RLS/ACL reset, and unchanged pinned provenance wrapper',
+      'Scope-10 capability, series RLS/ACL reset, and unchanged pinned provenance wrapper',
     );
     ok(
       `INSERT INTO public.todo_recurrence_series(id,title,created_at,updated_at) VALUES('rec_owned','Series',${literal(timestamp)},${literal(timestamp)});`,
@@ -1505,6 +1517,60 @@ export async function qualifyBackupGenerations(options = {}) {
       );
     }
 
+    const mealSnapshotId = 'scope10_unicode_meal_names';
+    const unicodeMeals = await productionGeneration(
+      mealSnapshotId,
+      reserveCurrent(mealSnapshotId),
+      {
+        ...rewardRows,
+        saved_meals: [
+          { ...meal, food_name: 'Éclair' },
+          { ...meal, id: 'smeal_2', food_name: 'éclair' },
+        ],
+      },
+      10,
+      currentHead,
+    );
+    uploadCurrent(unicodeMeals);
+    rejected(
+      'predecessor verifier rejects SQLite-distinct Unicode meal names',
+      publishCurrent(unicodeMeals),
+      ownerA,
+      /duplicate recovery unique key/,
+    );
+
+    const mealIdentityMigration = '20261127080000_fix_backup_generation_saved_meal_identity.sql';
+    ok(fs.readFileSync(path.join(root, 'supabase/migrations', mealIdentityMigration), 'utf8'));
+    migrations.push(mealIdentityMigration);
+    assert.equal(
+      ok('SELECT snapshot_id FROM public.backup_generation_head;', ownerA),
+      currentHead.snapshotId,
+    );
+    assert.equal(
+      ok(`SELECT has_function_privilege('authenticated',
+           'public.backup_generation_publish_v1(text,bigint,integer,text)', 'EXECUTE')
+        OR has_function_privilege('anon',
+           'public.backup_generation_publish_v1(text,bigint,integer,text)', 'EXECUTE');`),
+      'f',
+    );
+    const duplicateMealId = 'scope10_ascii_duplicate_meal';
+    const asciiDuplicate = generation(duplicateMealId, reserveCurrent(duplicateMealId), {
+      scopeVersion: 10,
+      rows: { saved_meals: [meal, { ...meal, id: 'smeal_2', food_name: 'MEAL' }] },
+    });
+    uploadCurrent(asciiDuplicate);
+    rejected(
+      'successor verifier still rejects ASCII case duplicates',
+      publishCurrent(asciiDuplicate),
+      ownerA,
+      /duplicate recovery unique key/,
+    );
+    assert.equal(
+      ok(publishCurrent(unicodeMeals), ownerA),
+      `${unicodeMeals.snapshotId}:${unicodeMeals.sequence}`,
+    );
+    checks.push('Scope 10 accepts saved-meal names which SQLite NOCASE treats as distinct');
+
     const report = {
       passed: checks.length,
       checks,
@@ -1513,7 +1579,7 @@ export async function qualifyBackupGenerations(options = {}) {
       postgres: ok('SHOW server_version;'),
       limitations: [
         'Local PostgreSQL uses a minimal auth.uid()/role shim; hosted Auth/PostgREST and deployment remain separate qualification.',
-        'Historical Scope 7–9 and current Scope 10 SQL are qualified with an auth/role shim and a feature-table ALTER shell; hosted API and locale-specific saved-meal case folding remain separate qualification.',
+        'The feature-table ALTER shell and Unicode fixture verify immutable publication. Mutable saved-meal index behavior requires separate qualification.',
       ],
     };
     fs.writeFileSync(path.join(evidence, 'report.json'), JSON.stringify(report, null, 2));
