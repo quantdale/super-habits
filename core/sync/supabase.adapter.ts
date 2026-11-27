@@ -91,6 +91,9 @@ type SyncableEntity = (typeof SYNCABLE_ENTITIES)[number];
 
 const SYNCABLE_TABLES = new Set<string>(SYNCABLE_ENTITIES);
 
+// A unique or check constraint can reject an entire statement over one row.
+const ROW_CONSTRAINT_REJECTIONS = new Set(['23505', '23514']);
+
 function collectRecordsByEntity(records: SyncRecord[]): Map<string, SyncRecord[]> {
   const map = new Map<string, SyncRecord[]>();
   for (const r of records) {
@@ -645,15 +648,24 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     // batch that failed.
     const writeBatches = boundedBackupRequests(payloadRows, writeBatchRows(this.serverRowCap));
     const failures = new Map<string, Error>();
-    for (const [batchIndex, batch] of writeBatches.entries()) {
+    const pushBatch = async (batch: (typeof writeBatches)[number], batchLabel: string) => {
       const batchIds = batch.flatMap((row) => {
         const id = (row as Record<string, unknown>).id;
         return typeof id === 'string' ? [id] : [];
       });
-      const batchLabel = `${entity} (batch ${batchIndex + 1}/${writeBatches.length})`;
       try {
         const { error } = await client.from(entity).upsert(batch, { onConflict: 'id' });
-        if (error) throw new Error(`Supabase upsert failed for ${batchLabel}: ${error.message}`);
+        if (error) {
+          if (batch.length > 1 && ROW_CONSTRAINT_REJECTIONS.has(error.code)) {
+            // The statement failed atomically. Halve only a rejected batch so
+            // healthy rows can still be verified and retired from the outbox.
+            const midpoint = Math.floor(batch.length / 2);
+            await pushBatch(batch.slice(0, midpoint), batchLabel);
+            await pushBatch(batch.slice(midpoint), batchLabel);
+            return;
+          }
+          throw new Error(`Supabase upsert failed for ${batchLabel}: ${error.message}`);
+        }
 
         // Acknowledge each batch only after verifying its rows. Process the
         // other batches even when this one fails so they get their own result.
@@ -670,6 +682,9 @@ export class SupabaseSyncAdapter implements SyncAdapter {
         const failure = error instanceof Error ? error : new Error(String(error));
         for (const id of batchIds) failures.set(id, failure);
       }
+    };
+    for (const [index, batch] of writeBatches.entries()) {
+      await pushBatch(batch, `${entity} (batch ${index + 1}/${writeBatches.length})`);
     }
     return failures;
   }
