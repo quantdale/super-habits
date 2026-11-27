@@ -15,6 +15,13 @@
  * Each Todo mutation still goes through canonical domain APIs (addTodo /
  * updateTodo) so that Linked Actions, recurrence, and sync semantics are
  * preserved. The review record itself is saved idempotently by week_key.
+ *
+ * The receipt model is read-then-write, so it is only sound when two runs for
+ * the SAME week cannot interleave: a run that resolves receipts before the
+ * previous run has committed its review row sees no receipt at all and re-creates
+ * every commitment. `executeWeeklyReview` therefore chains runs per week key
+ * (see `serializeByWeek`) instead of letting a double tap on `Confirm & Save`,
+ * a retry press, or a second activation fan out into duplicate Todos.
  */
 import type { WeeklyReviewDraft, WeeklyReviewSummaryV1 } from './weeklyReview.types';
 import { getWeeklyReviewByWeekKey, saveWeeklyReview } from './weeklyReview.data';
@@ -41,11 +48,46 @@ export type ExecutionResult = {
 };
 
 /**
+ * Process-local FIFO for one week's review executions.
+ *
+ * A double tap on `Confirm & Save` (the disabled state needs a render), the
+ * `Retry failed commitments` press, or any other second activation can enter
+ * the executor while the previous run is still awaiting its data-layer
+ * transactions. Because receipt resolution reads the PRIOR review row before
+ * creating anything, an interleaved run resolves no receipts and creates a
+ * second copy of every commitment — one review row (idempotent by week_key)
+ * with duplicated Todos, which reads like success on the summary surface.
+ *
+ * Chaining is scoped to the reachable window: SQLite admits a single writer,
+ * and on web a second tab cannot even open the database (OPFS origin lock, see
+ * `core/storage/dbOwnership.ts`), so every concurrent activation for the same
+ * week arrives in this one process. Different weeks stay independent.
+ */
+const executionTails = new Map<string, Promise<unknown>>();
+
+function serializeByWeek<T>(weekKey: string, task: () => Promise<T>): Promise<T> {
+  const previous = executionTails.get(weekKey) ?? Promise.resolve();
+  const current = previous.then(task);
+  // A rejected run must not poison the queue or leave an unhandled tail.
+  executionTails.set(
+    weekKey,
+    current.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return current;
+}
+
+/**
  * Execute a confirmed weekly review:
  * 1. Create new Todo commitments (idempotently — see module docstring)
  * 2. Reschedule/leave/carry-forward existing Todos
  * 3. Persist the completed review record (the durable receipt: its
  *    plan_payload records each commitment's createdTodoId for future retries)
+ *
+ * Runs for the same week are serialized, so a second activation re-reads the
+ * review row the first one committed and recognises its receipts.
  *
  * Item-level creation failures do not abort the run: remaining commitments are
  * still processed and the review is still saved so the receipts recorded in
@@ -53,6 +95,13 @@ export type ExecutionResult = {
  * per-item results.
  */
 export async function executeWeeklyReview(input: {
+  summary: WeeklyReviewSummaryV1;
+  draft: WeeklyReviewDraft;
+}): Promise<ExecutionResult> {
+  return serializeByWeek(input.summary.week.weekKey, () => runWeeklyReview(input));
+}
+
+async function runWeeklyReview(input: {
   summary: WeeklyReviewSummaryV1;
   draft: WeeklyReviewDraft;
 }): Promise<ExecutionResult> {
