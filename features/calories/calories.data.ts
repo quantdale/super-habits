@@ -187,7 +187,7 @@ export async function addCalorieEntry(
         'INSERT INTO calorie_entries (id, food_name, calories, protein, carbs, fats, fiber, meal_type, consumed_on, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
         [
           id,
-          input.foodName,
+          input.foodName.trim(),
           input.calories,
           input.protein ?? 0,
           input.carbs ?? 0,
@@ -324,7 +324,7 @@ export async function updateCalorieEntry(
       WHERE id = ?
         AND deleted_at IS NULL`,
         [
-          updates.foodName,
+          updates.foodName.trim(),
           calories,
           updates.protein,
           updates.carbs,
@@ -397,7 +397,7 @@ export async function upsertSavedMeal(input: {
          RETURNING id`,
         [
           createId('smeal'),
-          input.foodName,
+          input.foodName.trim(),
           input.calories,
           input.protein,
           input.carbs,
@@ -627,6 +627,7 @@ export async function addCalorieEntryFromLinkedAction(input: {
     };
   }
 
+  const foodName = input.foodName.trim();
   const now = nowIso();
   const outcome = await runSyncedMutation({
     db,
@@ -654,7 +655,7 @@ export async function addCalorieEntryFromLinkedAction(input: {
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
         [
           input.id,
-          input.foodName,
+          foodName,
           input.calories,
           input.protein,
           input.carbs,
@@ -666,17 +667,9 @@ export async function addCalorieEntryFromLinkedAction(input: {
           now,
         ],
       );
-      return { changed: true, value: { id: input.id, food_name: input.foodName } };
+      return { changed: true, value: { id: input.id, food_name: foodName } };
     },
   });
-  if (!outcome.changed) {
-    return {
-      status: 'applied',
-      targetLabel: outcome.value.food_name,
-      producedEntityType: 'calorie_log',
-      producedEntityId: outcome.value.id,
-    };
-  }
   // Automated one-off logging never maintains the saved-meal catalog: a
   // linked-action log is not an explicit "save this meal" choice, so it must
   // not create/update a saved_meals row or inflate use_count. Replay
@@ -684,9 +677,9 @@ export async function addCalorieEntryFromLinkedAction(input: {
 
   return {
     status: 'applied',
-    targetLabel: input.foodName,
+    targetLabel: outcome.value.food_name,
     producedEntityType: 'calorie_log',
-    producedEntityId: input.id,
+    producedEntityId: outcome.value.id,
   };
 }
 

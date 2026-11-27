@@ -201,6 +201,7 @@ export function validateCalorieComputedKcal(kcal: number): string | null {
   if (kcal < 0) return 'Calories cannot be negative.';
   if (kcal > 9999) return 'Calories cannot exceed 9999 kcal.';
   if (kcal === 0) return 'Enter macro amounts so calories are greater than zero.';
+  if (!Number.isInteger(kcal)) return 'Calories must be a whole number.';
   return null;
 }
 

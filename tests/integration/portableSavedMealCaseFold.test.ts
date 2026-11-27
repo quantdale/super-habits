@@ -107,6 +107,30 @@ describe('writer-valid saved meal catalog survives backup round-trip (real SQLit
     await targetDb.closeAsync();
   }, 60000);
 
+  it('round-trips a name with outer whitespace through the calorie and saved-meal writers', async () => {
+    const db = await freshDatabase();
+    const { addCalorieEntry, upsertSavedMeal } = await import('@/features/calories/calories.data');
+    const foodName = `${' '.repeat(300)}Oatmeal\u00a0`;
+    const nutrition = { calories: 200, protein: 4, carbs: 20, fats: 10, fiber: 1 };
+    await addCalorieEntry({ ...nutrition, foodName, mealType: 'breakfast' });
+    await upsertSavedMeal({ ...nutrition, foodName: 'oatmeal', mealType: 'breakfast' });
+
+    const { exportPortableBackup } = await import('@/core/portable/portableExport');
+    const { validatePortableBackupFile } = await import('@/core/portable/portableFormat');
+    const exported = await exportPortableBackup();
+    if (!exported.ok) throw new Error(exported.error);
+    const validated = validatePortableBackupFile(JSON.parse(exported.json));
+    expect(validated.ok ? [] : validated.errors).toEqual([]);
+
+    expect(await db.getAllAsync('SELECT food_name FROM calorie_entries')).toEqual([
+      { food_name: 'Oatmeal' },
+    ]);
+    expect(await db.getAllAsync('SELECT food_name, use_count FROM saved_meals')).toEqual([
+      { food_name: 'Oatmeal', use_count: 2 },
+    ]);
+    await db.closeAsync();
+  });
+
   it('still rejects a saved-meal catalog SQLite itself considers duplicated', async () => {
     const { validateBackupGraph } = await import('@/core/backup/backupValidators');
     const base = {
