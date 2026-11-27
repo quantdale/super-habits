@@ -291,6 +291,41 @@ describe('parseQuickCapture — project/goal mentions', () => {
     expect(r.title).toBe('#unknown thing');
   });
 
+  it('matches BOTH a #project and an @goal mention, in either order', () => {
+    // Both markers are one kind of leading token; the parser used to match the
+    // project mention first and then re-test `text[0]` for '@' — so a capture
+    // that led with `@goal #project …` kept the `#project` text in its title and
+    // saved projectId = null (the user's chosen project was silently dropped).
+    const goalFirst = parseQuickCapture('@fitness #work run 5k', {
+      projects: PROJECTS,
+      goals: GOALS,
+      now: NOW,
+    });
+    expect(goalFirst).toMatchObject({
+      title: 'run 5k',
+      projectId: 'p2',
+      matchedProjectName: 'Work',
+      goalId: 'g2',
+      matchedGoalName: 'Fitness',
+    });
+
+    const projectFirst = parseQuickCapture('#work @fitness run 5k', {
+      projects: PROJECTS,
+      goals: GOALS,
+      now: NOW,
+    });
+    expect(projectFirst).toMatchObject({
+      title: 'run 5k',
+      projectId: 'p2',
+      goalId: 'g2',
+    });
+
+    // A repeated marker is not a second mention: the leftovers stay title text.
+    expect(
+      parseQuickCapture('#work #work ship release', { projects: PROJECTS, goals: GOALS, now: NOW }),
+    ).toMatchObject({ title: '#work ship release', projectId: 'p2' });
+  });
+
   it('combines mentions, priority and due date', () => {
     const r = parseQuickCapture('#work urgent ship release tomorrow', {
       projects: PROJECTS,

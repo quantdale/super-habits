@@ -161,7 +161,11 @@ export function parseQuickCapture(
   let matchedProjectName: string | null = null;
   let matchedGoalName: string | null = null;
 
-  // Leading project/goal mentions.
+  // Leading project/goal mentions. Both markers are matched independently:
+  // ownership of the leading-strip used to be order-dependent (a capture that
+  // led with `@goal #project …` matched only the goal and saved
+  // projectId = null with `#project` still in the title). Repeated markers of
+  // the same kind keep their leftovers as title text.
   const projectMatch = matchMention(text, '#', options.projects ?? []);
   if (projectMatch) {
     projectId = projectMatch.id;
@@ -173,6 +177,23 @@ export function parseQuickCapture(
     goalId = goalMatch.id;
     matchedGoalName = goalMatch.matchedName;
     text = goalMatch.rest.trim();
+  }
+  if (projectId === null && goalMatch) {
+    // `@goal #project …`: the goal mention was leading, so the project mention
+    // now sits at the front and has to be consumed too.
+    const trailingProjectMatch = matchMention(text, '#', options.projects ?? []);
+    if (trailingProjectMatch) {
+      projectId = trailingProjectMatch.id;
+      matchedProjectName = trailingProjectMatch.matchedName;
+      text = trailingProjectMatch.rest.trim();
+    }
+  } else if (goalId === null && projectMatch) {
+    const trailingGoalMatch = matchMention(text, '@', options.goals ?? []);
+    if (trailingGoalMatch) {
+      goalId = trailingGoalMatch.id;
+      matchedGoalName = trailingGoalMatch.matchedName;
+      text = trailingGoalMatch.rest.trim();
+    }
   }
 
   // Priority tokens. Punctuation closing the token (`!urgent.`, `urgent,`) is
