@@ -7,6 +7,7 @@ import {
   setLocalDatasetOwner,
   inspectLocalAccountDataState,
 } from '@/core/auth/account.data';
+import { RestoreAuthChangedError, watchRestoreSession } from '@/core/auth/restoreSession';
 import { withSQLiteTransaction } from '@/core/db/transactions';
 import { requestHabitReminderReconciliation } from '@/core/notifications/habitReminderSignals';
 import { requestWorkoutReminderReconciliation } from '@/core/notifications/workoutReminderSignals';
@@ -178,6 +179,7 @@ export type RestoreV2Result =
   | {
       /** No manifest exists for this owner — the legacy V1 path handles it. */
       status: 'legacy';
+      ownerUserId: string;
     }
   | {
       status: 'blocked';
@@ -537,6 +539,23 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
     };
   }
 
+  const session = watchRestoreSession(ownerUserId);
+  try {
+    const result = await restoreBackupForOwner(ownerUserId, session.assertCurrent);
+    if (result.status === 'legacy') session.assertCurrent();
+    return result;
+  } catch (error) {
+    if (!(error instanceof RestoreAuthChangedError)) throw error;
+    return { status: 'invalid', reason: 'auth_changed', message: error.message, diagnostics: [] };
+  } finally {
+    session.close();
+  }
+}
+
+async function restoreBackupForOwner(
+  ownerUserId: string,
+  assertCurrentSession: () => void,
+): Promise<RestoreV2Result> {
   const db = await getDatabase();
   const localOwner = await getLocalDatasetOwner(db);
   if (localOwner && localOwner !== ownerUserId) {
@@ -584,7 +603,7 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
       // with most of the dataset silently missing.
       const probe = await probeV2TablesPresent(ownerUserId);
       if (probe.kind === 'absent') {
-        return { status: 'legacy' };
+        return { status: 'legacy', ownerUserId };
       }
       if (probe.kind === 'present') {
         return {
@@ -629,7 +648,7 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
   }
   if (!published && !manifestRow) {
     // Legacy V1 backup (or no backup): the V1 coordinator path handles it.
-    return { status: 'legacy' };
+    return { status: 'legacy', ownerUserId };
   }
 
   const manifest = published?.manifest ?? parseManifestRow(manifestRow);
@@ -870,20 +889,15 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
   }
 
   // Re-verify identity immediately before the import transaction.
+  assertCurrentSession();
   const refreshedOwnerUserId = await getSupabaseAuthUserId();
-  if (!refreshedOwnerUserId || refreshedOwnerUserId !== ownerUserId) {
-    return {
-      status: 'invalid',
-      reason: 'auth_changed',
-      message: 'The authenticated owner changed during restore; restore aborted.',
-      diagnostics: [],
-    };
-  }
+  if (refreshedOwnerUserId !== ownerUserId) throw new RestoreAuthChangedError();
 
   const restoredAt = nowIso();
   let localRowsAppeared = false;
   let ownerChanged = false;
   await withSQLiteTransaction(db, async (transactionDb) => {
+    assertCurrentSession();
     // Re-verify complete emptiness and owner INSIDE the transaction: local
     // rows written between the preview and this point must abort the import.
     const transactionState = await inspectLocalAccountDataState(transactionDb);
@@ -961,9 +975,12 @@ export async function restoreFromRemoteBackupV2(): Promise<RestoreV2Result> {
         settingsPayload: normalizedSettings,
       });
     }
-    if (!transactionOwner) {
+    // A verified restore owns its settings as well as its entity rows. Even
+    // a settings-only backup makes the owner permanent on this device.
+    if (!transactionOwner || transactionState.ownerBindingProvisional) {
       await setLocalDatasetOwner(transactionDb, ownerUserId);
     }
+    assertCurrentSession();
   });
 
   if (localRowsAppeared) {

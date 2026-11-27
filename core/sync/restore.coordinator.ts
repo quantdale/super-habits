@@ -3,6 +3,7 @@ import { applyRewardBackupRows } from '@/core/backup/backupRewards';
 import { withSQLiteTransaction } from '@/core/db/transactions';
 import { appMetaKeys, getAppMetaText, setAppMetaText } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
+import { RestoreAuthChangedError, watchRestoreSession } from '@/core/auth/restoreSession';
 import {
   getLocalDatasetOwner,
   setLocalDatasetOwner,
@@ -506,6 +507,34 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
   // v2Result.status === 'legacy' → run the V1 path.
 
   const ownerUserId = await getCurrentRemoteUserId();
+  if (ownerUserId !== v2Result.ownerUserId) {
+    return restoreAuthChanged(new RestoreAuthChangedError());
+  }
+
+  const session = watchRestoreSession(ownerUserId);
+  try {
+    return await restoreLegacyBackupForOwner(ownerUserId, session.assertCurrent);
+  } catch (error) {
+    if (!(error instanceof RestoreAuthChangedError)) throw error;
+    return restoreAuthChanged(error);
+  } finally {
+    session.close();
+  }
+}
+
+async function restoreAuthChanged(error: RestoreAuthChangedError): Promise<RestoreExecutionResult> {
+  return {
+    status: 'invalid',
+    message: error.message,
+    diagnostics: [],
+    preview: await buildRestorePreview(null),
+  };
+}
+
+async function restoreLegacyBackupForOwner(
+  ownerUserId: string,
+  assertCurrentSession: () => void,
+): Promise<RestoreExecutionResult> {
   const preview = await buildRestorePreview(ownerUserId);
   if (preview.eligibility.kind !== 'empty_device') {
     return {
@@ -523,7 +552,7 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
   }
 
   const refreshedOwnerUserId = await getCurrentRemoteUserId();
-  if (!ownerUserId || refreshedOwnerUserId !== ownerUserId) {
+  if (refreshedOwnerUserId !== ownerUserId) {
     throw new Error('[restore] Authenticated owner changed or is unavailable; restore aborted.');
   }
 
@@ -565,6 +594,9 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
     };
   }
 
+  assertCurrentSession();
+  if ((await getCurrentRemoteUserId()) !== ownerUserId) throw new RestoreAuthChangedError();
+
   const restoredAt = nowIso();
 
   let localRowsAppeared = false;
@@ -578,6 +610,7 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
   // a standalone metadata write could join and be erased by that rollback, and
   // cache publications happened before the commit they describe.
   await withSQLiteTransaction(db, async (transactionDb) => {
+    assertCurrentSession();
     // Re-verify complete emptiness (ALL user tables, not only synced tables)
     // inside the transaction: local rows written between the eligibility
     // preview and this point must abort the import.
@@ -603,6 +636,7 @@ export async function restoreFromRemoteBackup(): Promise<RestoreExecutionResult>
     if (!transactionOwner) {
       await setLocalDatasetOwner(transactionDb, ownerUserId);
     }
+    assertCurrentSession();
   });
 
   if (ownerChanged) {

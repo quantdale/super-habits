@@ -41,6 +41,14 @@ export function withSQLiteWriter<T>(db: SQLite.SQLiteDatabase, task: () => Promi
   return current;
 }
 
+/** Whether the caller supplied a live transaction capability from the writer. */
+export function isSQLiteTransactionScope(db: SQLite.SQLiteDatabase): boolean {
+  const scope = transactionScopes.get(db);
+  if (!scope) return false;
+  assertActiveScope(scope);
+  return true;
+}
+
 export function assertSQLiteTransactionRoot(db: SQLite.SQLiteDatabase): void {
   const scope = transactionScopes.get(db);
   if (!scope) return;
