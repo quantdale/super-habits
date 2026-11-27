@@ -208,4 +208,61 @@ test.describe('Workout finish celebration (P16 trophy card)', () => {
       },
     ]);
   });
+
+  for (const { label, saveDate, rewardDay } of [
+    { label: 'credits the finish day after midnight', saveDate: 13, rewardDay: '2026-10-12' },
+    {
+      label: 'credits the save day outside the catch-up window',
+      saveDate: 20,
+      rewardDay: '2026-10-20',
+    },
+  ]) {
+    test(`late workout XP ${label}`, async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      const finishTime = await page.evaluate(() => new Date(2026, 9, 12, 23, 50).getTime());
+      const saveTime = await page.evaluate(
+        (day) => new Date(2026, 9, day, 0, 10).getTime(),
+        saveDate,
+      );
+      await page.clock.setFixedTime(finishTime);
+      await startSession(page, 'Late workout reward', 'Press');
+      await page.getByRole('button', { name: 'Complete set 1' }).click();
+      await expect(page.getByText('Workout complete!')).toBeVisible();
+      await page.clock.setFixedTime(saveTime);
+      await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+      await page.getByRole('button', { name: 'Save and finish' }).click();
+      await expect(page.getByText('Workout saved')).toBeVisible();
+      await page.getByText('Done', { exact: true }).click();
+
+      // Ledger truth FIRST, straight from SQLite: the save happened later than
+      // the finish, and the WHOLE reward (XP plus the quest/perfect-day rows
+      // that ride it) belongs to `rewardDay` — never to the stray save day.
+      expect(await queryRows(page, 'SELECT completed_at, created_at FROM workout_logs')).toEqual([
+        {
+          completed_at: new Date(finishTime).toISOString(),
+          created_at: new Date(saveTime).toISOString(),
+        },
+      ]);
+      expect(
+        await queryRows(
+          page,
+          "SELECT date_key FROM gamification_events WHERE event_kind = 'workout'",
+        ),
+      ).toEqual([{ date_key: rewardDay }]);
+      expect(
+        await queryRows(page, 'SELECT DISTINCT date_key FROM gamification_events WHERE xp > 0'),
+      ).toEqual([{ date_key: rewardDay }]);
+
+      // ...and the persisted ledger is what the Today header renders: the chips
+      // read the same rows after a reload.
+      await returnToApp(page);
+      await page.getByRole('tab', { name: 'Today', exact: true }).click();
+      await expect(
+        page.getByRole('button', { name: /^XP total [1-9]\d* — open achievements$/ }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: 'Streak 1 days — open achievements' }),
+      ).toBeVisible();
+    });
+  }
 });
