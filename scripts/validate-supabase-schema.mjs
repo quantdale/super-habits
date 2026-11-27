@@ -120,6 +120,13 @@ const spawnMigrationName = migrationNames.find((name) =>
 );
 if (!spawnMigrationName) failures.push('missing completion-spawn provenance migration');
 const spawnMigration = spawnMigrationName ? read(`supabase/migrations/${spawnMigrationName}`) : '';
+const rewardMigrationName = migrationNames.find((name) =>
+  name.endsWith('_add_reward_snapshot_scope.sql'),
+);
+if (!rewardMigrationName) failures.push('missing reward snapshot scope migration');
+const rewardMigration = rewardMigrationName
+  ? read(`supabase/migrations/${rewardMigrationName}`)
+  : '';
 const fixture = read('simulation/backend/schema.sql');
 
 // A local SQLite REAL stores an eight-byte JavaScript number, while remote
@@ -1149,7 +1156,7 @@ expectPlanningRejection(unsafeGlobalDateUniqueness, 'global date uniqueness + an
 // stayed green. The checks below pin the FINAL post-chain state, which is what
 // a freshly-migrated project actually serves.
 const generationMigrationNames = migrationNames.filter((name) =>
-  /_backup_generation|_verify_and_reserve_backup_generations|_enforce_backup_publication_provenance|_add_recoverable_todo_recurrence|_add_recurring_spawn_provenance/.test(
+  /_backup_generation|_verify_and_reserve_backup_generations|_enforce_backup_publication_provenance|_add_recoverable_todo_recurrence|_add_recurring_spawn_provenance|_add_reward_snapshot_scope/.test(
     name,
   ),
 );
@@ -1158,11 +1165,12 @@ if (generationMigrationNames.length < 6) {
     `expected >= 6 backup-generation migration files, found ${generationMigrationNames.length}`,
   );
 }
-const generationSource = generationMigrationNames
-  .map((name) => read(`supabase/migrations/${name}`))
-  .join(String.fromCharCode(10));
+const generationSources = generationMigrationNames.map((name) =>
+  read(`supabase/migrations/${name}`),
+);
+const generationSource = generationSources.join(String.fromCharCode(10));
 // Provenance remains authoritative for the public RPC wrappers; the additive
-// recurrence migration owns the current capability and private content verifier.
+// reward migration owns the current capability and private content verifier.
 const publicationMigration =
   migrationNames.find((name) => name.endsWith('_enforce_backup_publication_provenance.sql')) ?? '';
 const publicationSource = publicationMigration
@@ -1354,30 +1362,28 @@ for (const fn of ['publish_backup_generation', 'reserve_backup_generation_sequen
   }
 }
 // Definitions that pin search_path next to the definer marker. Per-FUNCTION
-// binding: every SECURITY DEFINER function in the provenance migration must
+// binding: every SECURITY DEFINER function in the generation migrations must
 // pin search_path (in its own definition block or via ALTER FUNCTION) — a
 // single surviving pin must not mask an unpinned definer sibling.
-const definerSources = [publicationSource, recurrenceMigration, spawnMigration];
-for (const source of definerSources)
-  for (const block of source.split(/(?=CREATE (OR REPLACE )?FUNCTION)/i)) {
-    if (!/CREATE (OR REPLACE )?FUNCTION/i.test(block) || !/SECURITY DEFINER/i.test(block)) continue;
-    const nameMatch = block.match(/CREATE (OR REPLACE )?FUNCTION\s+(?:public\.)?([a-z0-9_]+)/i);
-    const fnName = nameMatch ? nameMatch[1] : '<unnamed>';
-    // Comment-stripped (final review P1: a commented-out pin must not count),
-    // and the ALTER fallback is LINE-bound to this function's name (a sibling's
-    // pin on a later line must not vouch for this one).
-    const blockWithoutComments = block.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
-    const pinnedInBlock = /SET search_path\s*=/i.test(blockWithoutComments);
+for (const source of generationSources) {
+  const sourceWithoutComments = source.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const block of sourceWithoutComments.split(/(?=CREATE (?:OR REPLACE )?FUNCTION)/i)) {
+    const header = block.split(/\bAS\s+\$/i, 1)[0];
+    const nameMatch = header.match(/^CREATE (?:OR REPLACE )?FUNCTION\s+(?:public\.)?([a-z0-9_]+)/i);
+    if (!nameMatch || !/SECURITY DEFINER/i.test(header)) continue;
+    const fnName = nameMatch[1];
+    const pinnedInBlock = /SET search_path\s*=/i.test(header);
     const pinnedByAlter = new RegExp(
       `ALTER FUNCTION[^\\n;]*${fnName}[^\\n;]*SET search_path`,
       'i',
-    ).test(source);
+    ).test(sourceWithoutComments);
     if (!pinnedInBlock && !pinnedByAlter) {
       failures.push(
         `generation definer function ${fnName} must pin search_path (SECURITY DEFINER without SET search_path is a privilege-escalation primitive)`,
       );
     }
   }
+}
 req('provenance migration present', publicationSource, 'SECURITY DEFINER');
 req('provenance migration pins search_path', publicationSource, 'SET search_path = pg_catalog');
 // The retired v1 publisher must stay revoked — it was replaced precisely because
@@ -1504,6 +1510,22 @@ try {
   failures.push('spawn row-validation contract is missing or malformed');
 }
 
+const clientSnapshotScope = read('core/backup/backup.types.ts').match(
+  /^export const BACKUP_SNAPSHOT_SCOPE_VERSION = (\d+);/m,
+)?.[1];
+const rewardCapabilityDefinition = rewardMigration.match(
+  /CREATE OR REPLACE FUNCTION public\.backup_generation_capabilities\(\)[\s\S]*?\$\$;/,
+)?.[0];
+const rewardCapabilityScope = rewardCapabilityDefinition?.match(/'scope_version',\s*(\d+)/)?.[1];
+if (!clientSnapshotScope || rewardCapabilityScope !== clientSnapshotScope)
+  failures.push('reward capability scope must match the client snapshot scope');
+requireText('reward historical scope fence', rewardMigration, /scope_version NOT IN \(7,8,9,10\)/);
+requireText(
+  'reward private verifier revoke',
+  rewardMigration,
+  /REVOKE ALL ON FUNCTION public\.backup_generation_validate_reward_row\(text,jsonb\),\s*public\.backup_generation_publish_v1\(text,bigint,integer,text\) FROM PUBLIC,\s*anon,\s*authenticated/,
+);
+
 // Negative coverage: prove the generation checks actually reject unsafe
 // variants instead of passing vacuously on any input.
 function expectGenerationRejection(badSource, label) {
@@ -1544,7 +1566,7 @@ if (failures.length > 0) {
   console.log(
     `Supabase schema contract PASS (${migrationNames.length} migration files; ` +
       `4 owner-scoped sync tables; ${backupTables.length} owner-scoped backup tables; ` +
-      'planning + weekly_reviews + workout_session_sets scope-V5 + Gym V2 scope-V6/7 + Todo recurrence/spawn provenance scope-V8/9 closure; ' +
+      'planning + weekly_reviews + workout_session_sets scope-V5 + Gym V2 scope-V6/7 + Todo recurrence/spawn provenance scope-V8/9 + reward snapshots scope-V10; ' +
       'private AI quota RPC). Static source validation only — NOT hosted certification: ' +
       'applied migrations, live pg_policies/ACLs and PostgREST exposure are verified ' +
       'only by a hosted audit.',
