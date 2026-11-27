@@ -41,16 +41,20 @@ const WEEKDAYS = [
 const AMBIGUOUS_WEEKDAY_ABBREVIATIONS = new Set(['sun', 'wed', 'sat']);
 
 /**
- * One qualifier word of a weekday date phrase, e.g. `on `, `next `,
- * `the coming `, `this coming `.
+ * The qualifier of a weekday date phrase: `on `, `next `, `this `, `coming `,
+ * `the coming `, `this coming `, optionally after `on ` (`on next `,
+ * `on the coming `).
  *
  * English stacks these ("the coming friday", "this coming tuesday"), and the
  * date phrase is the whole stack: consuming only the last word stranded "the"
- * or "this" at the front of the captured title ("the call mom"). The article
- * only counts as part of a qualifier phrase — never bare — so "the friday" and
- * "the next cake" stay title text.
+ * or "this" at the front of the captured title ("the call mom"). Only these
+ * grammatical combinations count, so an ordinary title word in front of a date
+ * phrase stays title text ("Turn this on friday" keeps "Turn this"), and a bare
+ * article never does ("the friday", "the next cake").
  */
-const WEEKDAY_QUALIFIER_PHRASE = `(?:the\\s+)?(?:on|next|this|coming)\\s+`;
+const WEEKDAY_QUALIFIER_PHRASE =
+  `(?:on\\s+(?:(?:the|this)\\s+coming\\s+|next\\s+|this\\s+|coming\\s+)?` +
+  `|(?:the|this)\\s+coming\\s+|next\\s+|this\\s+|coming\\s+)`;
 
 /**
  * Clause boundary around a recognized token.
@@ -59,15 +63,18 @@ const WEEKDAY_QUALIFIER_PHRASE = `(?:the\\s+)?(?:on|next|this|coming)\\s+`;
  * captures: `Buy milk tomorrow.` saved a todo titled "Buy milk tomorrow." with
  * NO due date, and `Fix leak !urgent.` saved a normal-priority todo titled
  * "Fix leak !urgent.". Punctuation is a clause boundary, not part of a date or
- * priority token, so a token may start after `,`/`;`/`:` and ends at a
- * punctuation mark, whitespace, or the end of the input.
+ * priority token, so a token may start after `,`/`;`/`:` and ends at
+ * punctuation that itself closes the clause (followed by whitespace or the end
+ * of the input), whitespace, or the end of the input. Punctuation INSIDE a word
+ * is not a boundary: `Read today.com` and `Archive 2026-09-01.csv` are names,
+ * not dates.
  *
  * Both boundaries CONSUME their match, so the token replacement takes the
  * punctuation with it (`!urgent.` → gone, `today.` → gone) instead of leaving a
  * stranded '.' behind in the captured title.
  */
 const LEAD = `(^|[\\s,;:]+)`;
-const TAIL = `(?:[.,!?;:]|\\s|$)`;
+const TAIL = `(?:[.,!?;:]+(?=\\s|$)|\\s|$)`;
 
 function nextWeekdayKey(targetDow: number, today: Date): string {
   const d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -239,12 +246,12 @@ export function parseQuickCapture(
           // Full names always count ("friday", "on friday"); a leading
           // "next/this/coming" qualifier is part of the date phrase and is
           // consumed with it, so the title never keeps a stranded "next".
-          new RegExp(`${LEAD}(?:${WEEKDAY_QUALIFIER_PHRASE})*${fullName}${TAIL}`, 'i'),
+          new RegExp(`${LEAD}(?:${WEEKDAY_QUALIFIER_PHRASE})?${fullName}${TAIL}`, 'i'),
           // Unambiguous abbreviations count bare ("fri"); ambiguous ones only
           // with a qualifier ("on sat", "next sat").
           AMBIGUOUS_WEEKDAY_ABBREVIATIONS.has(abbreviation)
-            ? new RegExp(`${LEAD}(?:${WEEKDAY_QUALIFIER_PHRASE})+${abbreviation}${TAIL}`, 'i')
-            : new RegExp(`${LEAD}(?:${WEEKDAY_QUALIFIER_PHRASE})*${abbreviation}${TAIL}`, 'i'),
+            ? new RegExp(`${LEAD}${WEEKDAY_QUALIFIER_PHRASE}${abbreviation}${TAIL}`, 'i')
+            : new RegExp(`${LEAD}(?:${WEEKDAY_QUALIFIER_PHRASE})?${abbreviation}${TAIL}`, 'i'),
         ];
         const pattern = patterns.find((candidate) => candidate.test(text));
         if (pattern) {

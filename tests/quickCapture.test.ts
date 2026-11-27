@@ -92,6 +92,24 @@ describe('parseQuickCapture — due dates', () => {
     });
   });
 
+  it('keeps punctuation inside a name: a filename or domain is not a date', () => {
+    // Only punctuation that closes the clause is a boundary; `today.com` and
+    // `2026-09-01.csv` are names, and consuming them would rewrite the title
+    // AND invent a due date.
+    expect(parseQuickCapture('Read today.com', { now: NOW })).toMatchObject({
+      title: 'Read today.com',
+      dueDateKey: null,
+    });
+    expect(parseQuickCapture('Archive 2026-09-01.csv', { now: NOW })).toMatchObject({
+      title: 'Archive 2026-09-01.csv',
+      dueDateKey: null,
+    });
+    expect(parseQuickCapture('Open urgent.txt', { now: NOW })).toMatchObject({
+      title: 'Open urgent.txt',
+      priority: 'normal',
+    });
+  });
+
   it('does not read ordinary words as bare weekday abbreviations', () => {
     // "sun", "sat", "wed" are common English words; consuming them as a
     // weekday token silently rewrites the title AND invents a due date.
@@ -173,6 +191,16 @@ describe('parseQuickCapture — due dates', () => {
     });
     expect(parseQuickCapture('Call mom on the coming friday', { now: NOW })).toMatchObject({
       title: 'Call mom',
+      dueDateKey: '2026-08-21',
+    });
+    // Only grammatical qualifier stacks count: a title word in front of a
+    // date phrase stays in the title.
+    expect(parseQuickCapture('Turn this on friday', { now: NOW })).toMatchObject({
+      title: 'Turn this',
+      dueDateKey: '2026-08-21',
+    });
+    expect(parseQuickCapture('Gym this coming friday', { now: NOW })).toMatchObject({
+      title: 'Gym',
       dueDateKey: '2026-08-21',
     });
     // The article alone is never a date token.
