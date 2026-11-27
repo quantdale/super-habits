@@ -8,6 +8,7 @@ import {
 } from '@/core/db/appMeta';
 import { getLocalDatasetOwner } from '@/core/auth/account.data';
 import { withSQLiteTransaction } from '@/core/db/transactions';
+import { withSQLiteWriter } from '@/core/db/sqliteWriter';
 import {
   captureCurrentGeneration,
   captureVerifiedRows,
@@ -610,7 +611,11 @@ export class SupabaseSyncAdapter implements SyncAdapter {
     const placeholders = ids.map(() => '?').join(', ');
     const sql = `SELECT * FROM ${entity} WHERE id IN (${placeholders})`;
 
-    const rows = await db.getAllAsync<Record<string, unknown>>(sql, ids);
+    // On web, unrelated reads on the base handle can see a writer's
+    // uncommitted changes. Release the writer gate before any network I/O.
+    const rows = await withSQLiteWriter(db, () =>
+      db.getAllAsync<Record<string, unknown>>(sql, ids),
+    );
     const selectedIds = new Set(
       rows.flatMap((row) => (typeof row.id === 'string' ? [row.id] : [])),
     );
