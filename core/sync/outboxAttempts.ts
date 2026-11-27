@@ -43,6 +43,8 @@ export type OutboxBlockedState = {
 };
 
 export type OutboxAttemptEntry = {
+  /** Durable revision that earned this retry history, absent on legacy entries. */
+  revision?: number;
   attempts: number;
   firstFailureAt: string;
   lastFailureAt: string;
