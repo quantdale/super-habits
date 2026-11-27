@@ -234,7 +234,10 @@ async function fetchManifestRow(ownerUserId: string): Promise<RemoteBackupManife
     .eq('user_id', ownerUserId)
     .limit(1);
   if (result.error) {
-    throw new Error(`[restore] Failed to fetch backup manifest: ${result.error.message}`);
+    throw Object.assign(
+      new Error(`[restore] Failed to fetch backup manifest: ${result.error.message}`),
+      { code: result.error.code },
+    );
   }
   const row = (result.data?.[0] ?? null) as RemoteBackupManifestRow | null;
   return row;
@@ -258,7 +261,10 @@ async function fetchRemoteRecoverableSettings(
     .eq('user_id', ownerUserId)
     .limit(1);
   if (result.error) {
-    throw new Error(`[restore] Failed to fetch user_backup_settings: ${result.error.message}`);
+    throw Object.assign(
+      new Error(`[restore] Failed to fetch user_backup_settings: ${result.error.message}`),
+      { code: result.error.code },
+    );
   }
   return (result.data?.[0] ?? null) as RemoteUserBackupSettingsRow | null;
 }
@@ -275,6 +281,8 @@ async function fetchRemoteRecoverableSettings(
  * most of the dataset missing (harden-silent-failure-certification 1.2).
  */
 export function isMissingV2RemoteTableError(error: unknown): boolean {
+  const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+  if (code === 'PGRST205' || code === '42P01') return true;
   const message = error instanceof Error ? error.message : String(error);
   if (message.trim().length === 0) return false;
   return (
@@ -358,20 +366,22 @@ async function fetchPublishedGenerationRows(ownerUserId: string): Promise<{
   settingsRow: RemoteUserBackupSettingsRow;
 } | null> {
   if (!supabase) return null;
-  let head;
-  try {
-    head = await supabase
-      .from('backup_generation_head')
-      .select('snapshot_id, sequence')
-      .eq('user_id', ownerUserId)
-      .limit(1);
-  } catch (error) {
-    if (isMissingV2RemoteTableError(error)) return null;
-    throw error;
-  }
+  const head = await supabase
+    .from('backup_generation_head')
+    .select('snapshot_id, sequence')
+    .eq('user_id', ownerUserId)
+    .limit(1);
   if (!head) throw new Error('[restore] Published-head inspection returned no response.');
   if (head.error) {
-    if (isMissingV2RemoteTableError(new Error(head.error.message))) return null;
+    // PostgREST reports a missing table with a structured code. A generic
+    // proxy 404 leaves the published head unknown, so mutable rows are unsafe.
+    if (
+      head.error.code === 'PGRST205' ||
+      (head.error.code === '42P01' &&
+        /relation "(?:public\.)?backup_generation_head" does not exist/i.test(head.error.message))
+    ) {
+      return null;
+    }
     throw new Error(`[restore] Published-head inspection failed: ${head.error.message}`);
   }
   const headRow = head.data?.[0] as { snapshot_id: string; sequence: number } | undefined;

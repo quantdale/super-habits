@@ -40,6 +40,8 @@ function makeFixture(): { root: string; script: string } {
     cpSync(join(repoRoot, rel), join(root, rel), { recursive: true });
   }
   cpSync(join(repoRoot, schemaScriptRel), join(root, schemaScriptRel));
+  const backupTypes = 'core/backup/backup.types.ts';
+  cpSync(join(repoRoot, backupTypes), join(root, backupTypes));
   return { root, script: join(root, schemaScriptRel) };
 }
 
@@ -102,6 +104,34 @@ describe('backup generation protocol schema guard (hermetic mutation suite)', ()
       // The fixture run agrees with the repository run — mutations below are
       // therefore testing the real guard, not a degraded copy.
       expect(runValidator(join(repoRoot, schemaScriptRel)).ok).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('FAILS when the final reward capability scope disagrees with the client snapshot scope', () => {
+    const { root, script } = makeFixture();
+    try {
+      mutateFile(root, '_add_reward_snapshot_scope', (source) =>
+        source.replace("'scope_version', 10", "'scope_version', 9"),
+      );
+      const result = runValidator(script);
+      expect(result.ok, result.output).toBe(false);
+      expect(result.output).toMatch(/reward capability scope/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('FAILS when the Scope 10 private verifier loses its search_path pin', () => {
+    const { root, script } = makeFixture();
+    try {
+      mutateFile(root, '_add_reward_snapshot_scope', (source) =>
+        source.replace('SECURITY DEFINER SET search_path = pg_catalog', 'SECURITY DEFINER'),
+      );
+      const result = runValidator(script);
+      expect(result.ok, result.output).toBe(false);
+      expect(result.output).toMatch(/backup_generation_publish_v1 must pin search_path/);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

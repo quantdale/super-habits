@@ -36,6 +36,7 @@ function remote() {
   let capabilityProtocol = 2;
   let capabilityScope = BACKUP_SNAPSHOT_SCOPE_VERSION;
   let failManifestRead = false;
+  let headReadError: { code: string; message: string } | undefined;
   let raceNextPublish = false;
   let loseAcknowledgement = false;
   let loseAcknowledgementThenNewerHead = false;
@@ -126,10 +127,13 @@ function remote() {
                 Number(a.ordinal ?? 0) - Number(b.ordinal ?? 0),
             );
         };
-        const answer = (from: number, to: number) =>
-          failManifestRead && entity === 'backup_manifest'
-            ? { data: null, error: { message: 'mutable manifest unavailable' } }
-            : { data: rows().slice(from, to + 1), error: null };
+        const answer = (from: number, to: number) => {
+          if (entity === 'backup_generation_head' && headReadError)
+            return { data: null, error: headReadError };
+          if (failManifestRead && entity === 'backup_manifest')
+            return { data: null, error: { message: 'mutable manifest unavailable' } };
+          return { data: rows().slice(from, to + 1), error: null };
+        };
         const query = {
           eq: vi.fn((column: string, value: unknown) => {
             filters.push([column, value]);
@@ -167,6 +171,9 @@ function remote() {
     },
     setFailManifestRead: (value: boolean) => {
       failManifestRead = value;
+    },
+    failHeadRead: (error: { code: string; message: string }) => {
+      headReadError = error;
     },
     raceNextPublish: () => {
       raceNextPublish = true;
@@ -256,6 +263,54 @@ const todoRecord = {
 };
 
 describe('review R3: actual capture → publication → restore contracts', () => {
+  it('refuses a generic head 404 instead of restoring a valid older mutable backup', async () => {
+    const target = remote();
+    const source = await device(target.client);
+    const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+    await new SupabaseSyncAdapter().push([todoRecord]);
+    await source.runAsync("UPDATE todos SET title = 'Older mutable recovery point'");
+    await seedLegacy(source, target, 7);
+    await source.closeAsync();
+    target.failHeadRead({ code: '404', message: 'Not Found' });
+    target.client.from.mockClear();
+
+    const destination = await device(target.client, false);
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    try {
+      expect(await restoreFromRemoteBackupV2()).toMatchObject({
+        status: 'invalid',
+        reason: 'fetch_failed',
+        message: expect.stringContaining('Published-head inspection failed'),
+      });
+      expect(target.client.from).not.toHaveBeenCalledWith('backup_manifest');
+      expect(await destination.getAllAsync('SELECT title FROM todos')).toEqual([]);
+    } finally {
+      await destination.closeAsync();
+    }
+  });
+
+  it('restores a legacy backup when PostgREST reports the head table is absent', async () => {
+    const target = remote();
+    const source = await device(target.client);
+    await seedLegacy(source, target, 7);
+    await source.closeAsync();
+    target.failHeadRead({
+      code: 'PGRST205',
+      message: "Could not find the table 'public.backup_generation_head' in the schema cache",
+    });
+
+    const destination = await device(target.client, false);
+    const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+    try {
+      expect(await restoreFromRemoteBackupV2()).toMatchObject({ status: 'restored' });
+      expect(await destination.getAllAsync('SELECT title FROM todos')).toEqual([
+        { title: 'Original' },
+      ]);
+    } finally {
+      await destination.closeAsync();
+    }
+  });
+
   it.each(['restore', 'cutover'] as const)(
     'does not apply unsigned future settings during legacy %s',
     async (mode) => {
