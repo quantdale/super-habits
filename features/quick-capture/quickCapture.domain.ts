@@ -40,6 +40,42 @@ const WEEKDAYS = [
  */
 const AMBIGUOUS_WEEKDAY_ABBREVIATIONS = new Set(['sun', 'wed', 'sat']);
 
+/**
+ * The qualifier of a weekday date phrase: `on `, `next `, `this `, `coming `,
+ * `the coming `, `this coming `, optionally after `on ` (`on next `,
+ * `on the coming `).
+ *
+ * English stacks these ("the coming friday", "this coming tuesday"), and the
+ * date phrase is the whole stack: consuming only the last word stranded "the"
+ * or "this" at the front of the captured title ("the call mom"). Only these
+ * grammatical combinations count, so an ordinary title word in front of a date
+ * phrase stays title text ("Turn this on friday" keeps "Turn this"), and a bare
+ * article never does ("the friday", "the next cake").
+ */
+const WEEKDAY_QUALIFIER_PHRASE =
+  `(?:on\\s+(?:(?:the|this)\\s+coming\\s+|next\\s+|this\\s+|coming\\s+)?` +
+  `|(?:the|this)\\s+coming\\s+|next\\s+|this\\s+|coming\\s+)`;
+
+/**
+ * Clause boundary around a recognized token.
+ *
+ * The old boundary was `(\s|$)`, which is not what punctuation does in real
+ * captures: `Buy milk tomorrow.` saved a todo titled "Buy milk tomorrow." with
+ * NO due date, and `Fix leak !urgent.` saved a normal-priority todo titled
+ * "Fix leak !urgent.". Punctuation is a clause boundary, not part of a date or
+ * priority token, so a token may start after `,`/`;`/`:` and ends at
+ * punctuation that itself closes the clause (followed by whitespace or the end
+ * of the input), whitespace, or the end of the input. Punctuation INSIDE a word
+ * is not a boundary: `Read today.com` and `Archive 2026-09-01.csv` are names,
+ * not dates.
+ *
+ * Both boundaries CONSUME their match, so the token replacement takes the
+ * punctuation with it (`!urgent.` → gone, `today.` → gone) instead of leaving a
+ * stranded '.' behind in the captured title.
+ */
+const LEAD = `(^|[\\s,;:]+)`;
+const TAIL = `(?:[.,!?;:]+(?=\\s|$)|\\s|$)`;
+
 function nextWeekdayKey(targetDow: number, today: Date): string {
   const d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   let addDays = (targetDow - d.getDay() + 7) % 7;
@@ -132,7 +168,11 @@ export function parseQuickCapture(
   let matchedProjectName: string | null = null;
   let matchedGoalName: string | null = null;
 
-  // Leading project/goal mentions.
+  // Leading project/goal mentions. Both markers are matched independently:
+  // ownership of the leading-strip used to be order-dependent (a capture that
+  // led with `@goal #project …` matched only the goal and saved
+  // projectId = null with `#project` still in the title). Repeated markers of
+  // the same kind keep their leftovers as title text.
   const projectMatch = matchMention(text, '#', options.projects ?? []);
   if (projectMatch) {
     projectId = projectMatch.id;
@@ -145,36 +185,59 @@ export function parseQuickCapture(
     matchedGoalName = goalMatch.matchedName;
     text = goalMatch.rest.trim();
   }
+  if (projectId === null && goalMatch) {
+    // `@goal #project …`: the goal mention was leading, so the project mention
+    // now sits at the front and has to be consumed too.
+    const trailingProjectMatch = matchMention(text, '#', options.projects ?? []);
+    if (trailingProjectMatch) {
+      projectId = trailingProjectMatch.id;
+      matchedProjectName = trailingProjectMatch.matchedName;
+      text = trailingProjectMatch.rest.trim();
+    }
+  } else if (goalId === null && projectMatch) {
+    const trailingGoalMatch = matchMention(text, '@', options.goals ?? []);
+    if (trailingGoalMatch) {
+      goalId = trailingGoalMatch.id;
+      matchedGoalName = trailingGoalMatch.matchedName;
+      text = trailingGoalMatch.rest.trim();
+    }
+  }
 
-  // Priority tokens.
-  const urgentToken = /(^|\s)!?urgent(?=\s|$)/i.exec(text);
+  // Priority tokens. Punctuation closing the token (`!urgent.`, `urgent,`) is
+  // consumed with it, so the title never keeps a stranded '.' or '!'. A word
+  // that merely CONTAINS the token (`Urgently`) cannot match: the tail
+  // boundary requires punctuation, whitespace, or end of input.
+  const urgentPattern = new RegExp(`${LEAD}!?urgent${TAIL}`, 'i');
+  const urgentToken = urgentPattern.exec(text);
   if (urgentToken) {
     priority = 'urgent';
     text = text.replace(urgentToken[0], ' ');
   }
-  const lowToken = /(^|\s)!low(?=\s|$)/i.exec(text);
+  const lowPattern = new RegExp(`${LEAD}!low${TAIL}`, 'i');
+  const lowToken = lowPattern.exec(text);
   if (lowToken) {
     priority = 'low';
     text = text.replace(lowToken[0], ' ');
   }
 
   // Explicit date key.
-  const dateToken = /(^|\s)(\d{4}-\d{2}-\d{2})(?=\s|$)/.exec(text);
+  const dateToken = new RegExp(`${LEAD}(\\d{4}-\\d{2}-\\d{2})${TAIL}`).exec(text);
   if (dateToken && isValidDateKey(dateToken[2])) {
     dueDateKey = dateToken[2];
     text = text.replace(dateToken[0], ' ');
   }
 
   if (dueDateKey === null) {
-    const lower = normalize(text);
-    if (/(^|\s)(today|tod)(?=\s|$)/.test(lower)) {
+    const todayPattern = new RegExp(`${LEAD}(today|tod)${TAIL}`, 'i');
+    const tomorrowPattern = new RegExp(`${LEAD}(tomorrow|tmr|tmrw)${TAIL}`, 'i');
+    if (todayPattern.test(text)) {
       dueDateKey = toDateKey(now);
-      text = text.replace(/(^|\s)(today|tod)(?=\s|$)/i, ' ');
-    } else if (/(^|\s)(tomorrow|tmr|tmrw)(?=\s|$)/.test(lower)) {
+      text = text.replace(todayPattern, ' ');
+    } else if (tomorrowPattern.test(text)) {
       const t = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       t.setDate(t.getDate() + 1);
       dueDateKey = toDateKey(t);
-      text = text.replace(/(^|\s)(tomorrow|tmr|tmrw)(?=\s|$)/i, ' ');
+      text = text.replace(tomorrowPattern, ' ');
     } else {
       for (let i = 0; i < WEEKDAYS.length; i++) {
         const fullName = WEEKDAYS[i];
@@ -183,15 +246,12 @@ export function parseQuickCapture(
           // Full names always count ("friday", "on friday"); a leading
           // "next/this/coming" qualifier is part of the date phrase and is
           // consumed with it, so the title never keeps a stranded "next".
-          new RegExp(`(^|\\s)(?:on\\s+)?(?:(?:next|this|coming)\\s+)?${fullName}(?=\\s|$)`, 'i'),
+          new RegExp(`${LEAD}(?:${WEEKDAY_QUALIFIER_PHRASE})?${fullName}${TAIL}`, 'i'),
           // Unambiguous abbreviations count bare ("fri"); ambiguous ones only
           // with a qualifier ("on sat", "next sat").
           AMBIGUOUS_WEEKDAY_ABBREVIATIONS.has(abbreviation)
-            ? new RegExp(`(^|\\s)(?:(?:on|next|this|coming)\\s+)+${abbreviation}(?=\\s|$)`, 'i')
-            : new RegExp(
-                `(^|\\s)(?:on\\s+)?(?:(?:next|this|coming)\\s+)?${abbreviation}(?=\\s|$)`,
-                'i',
-              ),
+            ? new RegExp(`${LEAD}${WEEKDAY_QUALIFIER_PHRASE}${abbreviation}${TAIL}`, 'i')
+            : new RegExp(`${LEAD}(?:${WEEKDAY_QUALIFIER_PHRASE})?${abbreviation}${TAIL}`, 'i'),
         ];
         const pattern = patterns.find((candidate) => candidate.test(text));
         if (pattern) {

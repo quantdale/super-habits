@@ -61,6 +61,55 @@ describe('parseQuickCapture — due dates', () => {
     expect(r.title).toBe('Buy 4 apples');
   });
 
+  it('recognizes date tokens that end a clause with punctuation', () => {
+    // A trailing period/comma is ordinary punctuation, not part of the token:
+    // `tomorrow.` used to fail the `(?=\s|$)` boundary, so the capture
+    // silently kept a due date in its title and saved no due date at all.
+    expect(parseQuickCapture('Buy milk tomorrow.', { now: NOW })).toMatchObject({
+      title: 'Buy milk',
+      dueDateKey: '2026-08-21',
+    });
+    expect(parseQuickCapture('Buy milk, today.', { now: NOW })).toMatchObject({
+      title: 'Buy milk',
+      dueDateKey: '2026-08-20',
+    });
+    expect(parseQuickCapture('Gym on friday.', { now: NOW })).toMatchObject({
+      title: 'Gym',
+      dueDateKey: '2026-08-21',
+    });
+    expect(parseQuickCapture('Pay rent next monday!', { now: NOW })).toMatchObject({
+      title: 'Pay rent',
+      dueDateKey: '2026-08-24',
+    });
+    expect(parseQuickCapture('File taxes 2026-09-01.', { now: NOW })).toMatchObject({
+      title: 'File taxes',
+      dueDateKey: '2026-09-01',
+    });
+    // A trailing question mark is the same clause boundary.
+    expect(parseQuickCapture('Call mom tomorrow?', { now: NOW })).toMatchObject({
+      title: 'Call mom',
+      dueDateKey: '2026-08-21',
+    });
+  });
+
+  it('keeps punctuation inside a name: a filename or domain is not a date', () => {
+    // Only punctuation that closes the clause is a boundary; `today.com` and
+    // `2026-09-01.csv` are names, and consuming them would rewrite the title
+    // AND invent a due date.
+    expect(parseQuickCapture('Read today.com', { now: NOW })).toMatchObject({
+      title: 'Read today.com',
+      dueDateKey: null,
+    });
+    expect(parseQuickCapture('Archive 2026-09-01.csv', { now: NOW })).toMatchObject({
+      title: 'Archive 2026-09-01.csv',
+      dueDateKey: null,
+    });
+    expect(parseQuickCapture('Open urgent.txt', { now: NOW })).toMatchObject({
+      title: 'Open urgent.txt',
+      priority: 'normal',
+    });
+  });
+
   it('does not read ordinary words as bare weekday abbreviations', () => {
     // "sun", "sat", "wed" are common English words; consuming them as a
     // weekday token silently rewrites the title AND invents a due date.
@@ -131,6 +180,36 @@ describe('parseQuickCapture — due dates', () => {
     });
   });
 
+  it('consumes a stacked "the coming <weekday>" phrase instead of stranding "the"', () => {
+    // "the coming friday" is ONE date phrase — the same class as "next monday"
+    // above. The qualifier regex only allowed a single next/this/coming word,
+    // so "the coming friday" consumed just "friday" and left "the" stranded at
+    // the front of the captured Todo's title.
+    expect(parseQuickCapture('the coming friday call mom', { now: NOW })).toMatchObject({
+      title: 'call mom',
+      dueDateKey: '2026-08-21',
+    });
+    expect(parseQuickCapture('Call mom on the coming friday', { now: NOW })).toMatchObject({
+      title: 'Call mom',
+      dueDateKey: '2026-08-21',
+    });
+    // Only grammatical qualifier stacks count: a title word in front of a
+    // date phrase stays in the title.
+    expect(parseQuickCapture('Turn this on friday', { now: NOW })).toMatchObject({
+      title: 'Turn this',
+      dueDateKey: '2026-08-21',
+    });
+    expect(parseQuickCapture('Gym this coming friday', { now: NOW })).toMatchObject({
+      title: 'Gym',
+      dueDateKey: '2026-08-21',
+    });
+    // The article alone is never a date token.
+    expect(parseQuickCapture('Return the book', { now: NOW })).toMatchObject({
+      title: 'Return the book',
+      dueDateKey: null,
+    });
+  });
+
   it('consumes qualifiers in abbreviated weekday forms too', () => {
     // Unambiguous abbreviations match bare and with qualifiers…
     expect(parseQuickCapture('Standup next fri', { now: NOW })).toMatchObject({
@@ -178,6 +257,24 @@ describe('parseQuickCapture — priority', () => {
     expect(r.priority).toBe('normal');
     expect(r.title).toBe('Urgently deliver package');
   });
+
+  it('still reads `!urgent`/`urgent` when the clause ends in punctuation', () => {
+    // `!urgent.` is the same token with a period after it; the strict
+    // whitespace/end boundary dropped both the flag and the token, so the
+    // capture saved a normal-priority todo titled "Fix leak !urgent.".
+    expect(parseQuickCapture('Fix leak !urgent.', { now: NOW })).toMatchObject({
+      title: 'Fix leak',
+      priority: 'urgent',
+    });
+    expect(parseQuickCapture('Call bank urgent.', { now: NOW })).toMatchObject({
+      title: 'Call bank',
+      priority: 'urgent',
+    });
+    expect(parseQuickCapture('Someday desk !low.', { now: NOW })).toMatchObject({
+      title: 'Someday desk',
+      priority: 'low',
+    });
+  });
 });
 
 describe('parseQuickCapture — project/goal mentions', () => {
@@ -220,6 +317,41 @@ describe('parseQuickCapture — project/goal mentions', () => {
     expect(r.projectId).toBeNull();
     expect(r.goalId).toBeNull();
     expect(r.title).toBe('#unknown thing');
+  });
+
+  it('matches BOTH a #project and an @goal mention, in either order', () => {
+    // Both markers are one kind of leading token; the parser used to match the
+    // project mention first and then re-test `text[0]` for '@' — so a capture
+    // that led with `@goal #project …` kept the `#project` text in its title and
+    // saved projectId = null (the user's chosen project was silently dropped).
+    const goalFirst = parseQuickCapture('@fitness #work run 5k', {
+      projects: PROJECTS,
+      goals: GOALS,
+      now: NOW,
+    });
+    expect(goalFirst).toMatchObject({
+      title: 'run 5k',
+      projectId: 'p2',
+      matchedProjectName: 'Work',
+      goalId: 'g2',
+      matchedGoalName: 'Fitness',
+    });
+
+    const projectFirst = parseQuickCapture('#work @fitness run 5k', {
+      projects: PROJECTS,
+      goals: GOALS,
+      now: NOW,
+    });
+    expect(projectFirst).toMatchObject({
+      title: 'run 5k',
+      projectId: 'p2',
+      goalId: 'g2',
+    });
+
+    // A repeated marker is not a second mention: the leftovers stay title text.
+    expect(
+      parseQuickCapture('#work #work ship release', { projects: PROJECTS, goals: GOALS, now: NOW }),
+    ).toMatchObject({ title: '#work ship release', projectId: 'p2' });
   });
 
   it('combines mentions, priority and due date', () => {
