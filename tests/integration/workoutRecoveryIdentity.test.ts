@@ -641,6 +641,8 @@ describe('active workout drafts preserve performed identity', () => {
               routine: pending.routineSnapshot,
               notes: pending.notes,
               effortScale: pending.effortScale,
+              // The unit the measurements were typed in rides the recovery payload.
+              weightUnit: 'kg',
               sequence: [],
               addedSets: pending.addedSets,
               currentIndexRef: { current: pending.phaseIndex },
@@ -684,6 +686,7 @@ describe('active workout drafts preserve performed identity', () => {
           const restored = await workout.getWorkoutPendingSave();
           expect(restored?.enteredSets).toEqual(ENTERED);
           expect(restored?.endedAtIso).toBe(endedAtIso);
+          expect(restored?.weightUnit).toBe('kg');
         }
       } finally {
         await db.closeAsync();

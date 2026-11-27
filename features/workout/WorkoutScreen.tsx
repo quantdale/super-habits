@@ -899,6 +899,9 @@ export function WorkoutScreen({ isActive }: { isActive: boolean }) {
           alreadyFinished: true,
           notes: state.notes,
           effortScale: state.effortScale,
+          // Saved in the unit the measurements were typed in, never relabelled by
+          // a preference change since the summary was reached.
+          ...(state.weightUnit ? { weightUnit: state.weightUnit } : {}),
           ...(Object.keys(dispositions).length > 0 ? { dispositions } : {}),
           ...(Object.keys(enteredSets).length > 0 ? { enteredSets } : {}),
           ...(state.addedSets

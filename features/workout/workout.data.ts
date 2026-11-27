@@ -2098,6 +2098,10 @@ export type WorkoutPendingSave = {
   routineSnapshot?: RoutineWithExercises;
   notes?: string;
   effortScale?: WorkoutEffortScale;
+  /** The weight unit the entered measurements were typed in. Recovery must
+   *  save them in THIS unit, whatever the preference has become since. Absent
+   *  only in payloads written before it was recorded (live preference). */
+  weightUnit?: WorkoutWeightUnit;
   /** Last save error surfaced to the user, for an honest resume message. */
   lastError?: string;
   /** When this recovery state was last written. */
@@ -2265,6 +2269,9 @@ function normalizeWorkoutPendingSave(value: unknown): WorkoutPendingSave | null 
     candidate.effortScale === 'rir' ||
     candidate.effortScale === 'rpe'
       ? { effortScale: candidate.effortScale }
+      : {}),
+    ...(candidate.weightUnit === 'kg' || candidate.weightUnit === 'lb'
+      ? { weightUnit: candidate.weightUnit }
       : {}),
     routineName:
       typeof candidate.routineName === 'string' && candidate.routineName.length > 0

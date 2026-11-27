@@ -846,6 +846,8 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
           routineSnapshot: routine,
           notes,
           effortScale,
+          // The unit the measurements were typed in rides the recovery payload.
+          weightUnit,
           exerciseNames: sequence.map((phase) => phase.exerciseName),
           startedAtIso: new Date(startedAtMs).toISOString(),
           ...(endedAtMs === null ? {} : { endedAtIso: new Date(endedAtMs).toISOString() }),
@@ -869,7 +871,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     return () => {
       cancelled = true;
     };
-  }, [isComplete, clearDraft, routine, sequence, addedSets, notes, effortScale]);
+  }, [isComplete, clearDraft, routine, sequence, addedSets, notes, effortScale, weightUnit]);
 
   const updateEnteredValues = (index: number, patch: Partial<EnteredSetValues>) => {
     setEnteredSets((prev) => {
@@ -1031,6 +1033,8 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         routineSnapshot: routine,
         notes,
         effortScale,
+        // The unit the measurements were typed in rides the recovery payload.
+        weightUnit,
         exerciseNames: sequence.map((phase) => phase.exerciseName),
         startedAtIso: new Date(startedAtMs).toISOString(),
         ...(endedAtMs === null ? {} : { endedAtIso: new Date(endedAtMs).toISOString() }),
@@ -1051,7 +1055,7 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
         ...(lastError ? { lastError } : {}),
       });
     },
-    [routine, sequence, addedSets, notes, effortScale],
+    [routine, sequence, addedSets, notes, effortScale, weightUnit],
   );
 
   const handleFinish = async () => {
