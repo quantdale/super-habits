@@ -325,7 +325,12 @@ export function WorkoutSessionScreen({ routine, onFinish, onCancel, resume }: Pr
     ])
       .then(([rows, outcomes, prefs]) => {
         if (!cancelled) {
-          setPreviousLookup(buildPreviousSetLookup(rows, prefs.goalWeight?.unit ?? 'kg'));
+          // History defaults land in the SESSION's unit: a resumed draft keeps
+          // the unit it was typed in, so its unentered sets must not be seeded
+          // in a preference unit that changed while it sat paused.
+          setPreviousLookup(
+            buildPreviousSetLookup(rows, resume?.weightUnit ?? prefs.goalWeight?.unit ?? 'kg'),
+          );
           setRecentSetOutcomes(outcomes);
         }
       })
