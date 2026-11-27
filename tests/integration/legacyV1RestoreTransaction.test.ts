@@ -33,6 +33,8 @@ import { freshDatabase, type TestDatabase } from './helpers/db';
 
 const stamp = '2026-11-14T00:00:00.000Z';
 const OWNER = 'legacy_remote_owner';
+const OTHER_OWNER = 'another_owner';
+const OTHER_TODO_ID = 'todo_1785000000002_abcdef56';
 const LEGACY_TODO_IDS = ['todo_1785000000000_abcdef12', 'todo_1785000000001_abcdef34'] as const;
 
 /** Deterministic in-transaction interleaving points for the tests below. */
@@ -42,7 +44,13 @@ const interleave = vi.hoisted(() => ({
 }));
 
 /** Minimal legacy (manifest-less) remote: two todos, no V2 tables. */
-function installLegacyRemote() {
+function installLegacyRemote(
+  options: {
+    currentOwner?: () => string | null;
+    onBackupRowsReceived?: () => void;
+    onV2Probe?: () => void;
+  } = {},
+) {
   const tables: Record<string, Record<string, unknown>[]> = {
     todos: LEGACY_TODO_IDS.map((id, index) => ({
       id,
@@ -62,9 +70,12 @@ function installLegacyRemote() {
     calorie_entries: [],
     workout_routines: [],
   };
+  if (options.onV2Probe) {
+    tables.todos.push({ ...tables.todos[0], id: OTHER_TODO_ID, user_id: OTHER_OWNER });
+  }
   const client = {
     from: vi.fn((entity: string) => ({
-      select: (_columns: string, options?: { head?: boolean; count?: string }) => {
+      select: (_columns: string, queryOptions?: { head?: boolean; count?: string }) => {
         let rows = tables[entity] ?? [];
         const query = {
           eq: (column: string, value: unknown) => {
@@ -77,6 +88,7 @@ function installLegacyRemote() {
           },
           order: () => query,
           limit: async (count: number) => {
+            if (entity === 'user_backup_settings') options.onV2Probe?.();
             if (
               entity === 'backup_manifest' ||
               entity === 'user_backup_settings' ||
@@ -93,14 +105,15 @@ function installLegacyRemote() {
             }
             return {
               data: rows.slice(0, count),
-              ...(options?.count === 'exact' ? { count: rows.length } : {}),
+              ...(queryOptions?.count === 'exact' ? { count: rows.length } : {}),
               error: null,
             };
           },
-          range: async (from: number, to: number) => ({
-            data: rows.slice(from, to + 1),
-            error: null,
-          }),
+          range: async (from: number, to: number) => {
+            const data = rows.slice(from, to + 1);
+            if (entity === 'todos') options.onBackupRowsReceived?.();
+            return { data, error: null };
+          },
         };
         return query;
       },
@@ -109,7 +122,7 @@ function installLegacyRemote() {
   vi.doMock('@/lib/supabase', () => ({
     supabase: client,
     isRemoteEnabled: () => true,
-    getSupabaseAuthUserId: async () => OWNER,
+    getSupabaseAuthUserId: async () => (options.currentOwner ? options.currentOwner() : OWNER),
     getSupabaseSessionUserId: async () => OWNER,
     setRemoteMode: vi.fn(),
     ensureAnonymousSession: async () => undefined,
@@ -318,4 +331,82 @@ describe('legacy V1 restore — the owner cache follows the commit boundary', ()
       await db.closeAsync();
     }
   }, 30_000);
+});
+
+describe('legacy V1 restore — account changes', () => {
+  it.each([null, OTHER_OWNER])(
+    'aborts if the current account becomes %s while rows arrive',
+    async (nextOwner) => {
+      let owner: string | null = OWNER;
+      installLegacyRemote({
+        currentOwner: () => owner,
+        onBackupRowsReceived: () => {
+          owner = nextOwner;
+        },
+      });
+      const db = await freshDatabase();
+      try {
+        const { appMetaKeys } = await import('@/core/db/appMeta');
+        const { restoreFromRemoteBackup } = await import('@/core/sync/restore.coordinator');
+
+        await expect(restoreFromRemoteBackup()).resolves.toMatchObject({
+          status: 'invalid',
+          message: expect.stringMatching(/authenticated owner changed/i),
+        });
+        expect(await legacyRemoteRowsPresent(db)).toEqual([]);
+        expect(await readMeta(db, appMetaKeys.accountOwnerUserId.key)).toBeNull();
+        expect(await readMeta(db, appMetaKeys.lastRestoreAt.key)).toBeNull();
+      } finally {
+        await db.closeAsync();
+      }
+    },
+  );
+
+  it('does not switch to another account’s backup after the V2 capability check', async () => {
+    let owner = OWNER;
+    installLegacyRemote({
+      currentOwner: () => owner,
+      onV2Probe: () => {
+        owner = OTHER_OWNER;
+      },
+    });
+    const db = await freshDatabase();
+    try {
+      const { getLocalDatasetOwner } = await import('@/core/auth/account.data');
+      const { restoreFromRemoteBackup } = await import('@/core/sync/restore.coordinator');
+
+      await expect(restoreFromRemoteBackup()).resolves.toMatchObject({
+        status: 'invalid',
+        message: expect.stringMatching(/authenticated owner changed/i),
+      });
+      expect(await db.getAllAsync('SELECT id FROM todos')).toEqual([]);
+      expect(await getLocalDatasetOwner(db as never)).toBeNull();
+    } finally {
+      await db.closeAsync();
+    }
+  });
+
+  it('cannot replace a provisional account after its restore fills the device', async () => {
+    installLegacyRemote();
+    const db = await freshDatabase();
+    try {
+      const {
+        bindProvisionalLocalDatasetOwner,
+        replaceProvisionalLocalDatasetOwner,
+        getLocalDatasetOwner,
+      } = await import('@/core/auth/account.data');
+      const { restoreFromRemoteBackup } = await import('@/core/sync/restore.coordinator');
+      await bindProvisionalLocalDatasetOwner(db as never, OWNER);
+
+      await expect(restoreFromRemoteBackup()).resolves.toMatchObject({ status: 'restored' });
+      await expect(
+        replaceProvisionalLocalDatasetOwner(db as never, 'another_owner'),
+      ).rejects.toThrow(/owner.*conflict/i);
+
+      expect(await getLocalDatasetOwner(db as never)).toBe(OWNER);
+      expect(await legacyRemoteRowsPresent(db)).toEqual([...LEGACY_TODO_IDS]);
+    } finally {
+      await db.closeAsync();
+    }
+  });
 });

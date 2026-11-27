@@ -2,7 +2,11 @@ import type * as SQLite from 'expo-sqlite';
 import { appMetaKeys, getAppMetaText, setAppMetaText } from '@/core/db/appMeta';
 import { getDatabase } from '@/core/db/client';
 import { withSQLiteTransaction } from '@/core/db/transactions';
-import { afterSQLiteCommit, withSQLiteWriter } from '@/core/db/sqliteWriter';
+import {
+  afterSQLiteCommit,
+  isSQLiteTransactionScope,
+  withSQLiteWriter,
+} from '@/core/db/sqliteWriter';
 import {
   ACCOUNT_USER_TABLES,
   type AccountUserTable,
@@ -289,37 +293,45 @@ export async function claimOwnerBindingOnFirstContent(db: SQLite.SQLiteDatabase)
 
 /**
  * Replaces a PROVISIONAL owner binding with another account. Never applies to
- * permanent bindings or populated datasets — callers must have already
- * verified the device is pristine. By default the replacement is permanent
- * (verified recovered account); pass `keepProvisional` when a fresh temporary
- * anonymous session takes over a pristine device.
+ * permanent bindings or populated datasets. Rechecks emptiness inside the
+ * transaction, since the caller may have waited for remote auth. Pass
+ * `keepProvisional` for a new temporary anonymous session. Recovery uses the
+ * default permanent binding.
  */
 export async function replaceProvisionalLocalDatasetOwner(
   db: SQLite.SQLiteDatabase,
   userId: string,
   options: { keepProvisional?: boolean } = {},
 ): Promise<void> {
-  // AUD-SH01-B: replacement is another ownership path, so the same precondition
-  // applies — a protected imported dataset is not claimable by a replacement.
-  // `keepProvisional` marks the temporary-anonymous variant, whose fingerprint
-  // can never match a protected origin.
-  await assertImportOriginAllowsBinding(db, userId, {
-    candidateIsAnonymous: options.keepProvisional === true,
-  });
-  const current = await getLocalDatasetOwner(db);
-  if (current && current !== userId) {
-    const provisional = await getLocalDatasetOwnerProvisional(db);
-    if (!provisional) {
+  const replace = async (transactionDb: SQLite.SQLiteDatabase) => {
+    await assertImportOriginAllowsBinding(transactionDb, userId, {
+      candidateIsAnonymous: options.keepProvisional === true,
+    });
+
+    const local = await inspectLocalAccountDataState(transactionDb);
+    if (local.ownerBinding === userId && !local.ownerBindingProvisional) return;
+    // A restore or a first local write may have committed while Auth was in
+    // flight. Decide on the same SQLite transaction that changes the binding.
+    if (!isEmptyForAccountReplacement(local)) {
       throw new Error('LOCAL_DATASET_OWNER_CONFLICT');
     }
+
+    await setAppMetaText(transactionDb, appMetaKeys.accountOwnerUserId, userId);
+    await setAppMetaText(
+      transactionDb,
+      appMetaKeys.accountOwnerBindingState,
+      options.keepProvisional ? 'provisional' : 'permanent',
+    );
+    afterSQLiteCommit(transactionDb, () =>
+      primeLocalDatasetOwner(userId, options.keepProvisional === true),
+    );
+  };
+
+  if (isSQLiteTransactionScope(db)) {
+    await replace(db);
+  } else {
+    await withSQLiteTransaction(db, replace);
   }
-  await setAppMetaText(db, appMetaKeys.accountOwnerUserId, userId);
-  await setAppMetaText(
-    db,
-    appMetaKeys.accountOwnerBindingState,
-    options.keepProvisional ? 'provisional' : 'permanent',
-  );
-  afterSQLiteCommit(db, () => primeLocalDatasetOwner(userId, options.keepProvisional === true));
 }
 
 export async function inspectLocalAccountDataState(

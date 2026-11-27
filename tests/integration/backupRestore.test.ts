@@ -267,7 +267,10 @@ function buildServingSupabase(
 }
 
 function installSupabaseMock(
-  supabase: { from: ReturnType<typeof vi.fn> },
+  supabase: {
+    from: ReturnType<typeof vi.fn>;
+    auth?: { onAuthStateChange: ReturnType<typeof vi.fn> };
+  },
   overrides: { remoteEnabled?: boolean; authUserId?: string } = {},
 ) {
   const remoteEnabled = overrides.remoteEnabled ?? true;
@@ -329,13 +332,15 @@ function remoteFromUpserts(upserted: UpsertCall[]): Map<string, Record<string, u
  * Phase 1 helper: build a real source device, publish its backup to the
  * recording stub, and return the captured remote material.
  */
-async function publishSourceBackup(): Promise<Map<string, Record<string, unknown>[]>> {
+async function publishSourceBackup(
+  seed: (db: TestDatabase) => Promise<unknown> = seedSourceDevice,
+): Promise<Map<string, Record<string, unknown>[]>> {
   const recording = buildRecordingSupabase();
   installSupabaseMock(recording.supabase);
   const sourceDb = await freshDatabase();
   const { setLocalDatasetOwner } = await import('@/core/auth/account.data');
   await setLocalDatasetOwner(sourceDb as never, 'user_a');
-  await seedSourceDevice(sourceDb);
+  await seed(sourceDb);
   const checkpoint = await import('@/core/backup/backupCheckpoint');
   await checkpoint.runBackupMaintenance();
   await sourceDb.closeAsync();
@@ -375,6 +380,99 @@ async function expectZeroImportedRows(db: TestDatabase): Promise<void> {
   );
   expect(goal?.value ?? null).toBeNull();
 }
+
+describe('backup completeness v2 restore — account changes', () => {
+  it('keeps the owner of a settings-only restore when another account becomes active', async () => {
+    const remote = await publishSourceBackup(async () => {
+      const { setCalorieGoal } = await import('@/features/calories/calories.data');
+      await setCalorieGoal({ calories: 2000, protein: 150, carbs: 200, fats: 70 });
+    });
+    installSupabaseMock(buildServingSupabase(remote).supabase);
+    const targetDb = await freshDatabase();
+    try {
+      const {
+        bindProvisionalLocalDatasetOwner,
+        inspectLocalAccountDataState,
+        replaceProvisionalLocalDatasetOwner,
+      } = await import('@/core/auth/account.data');
+      const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+      await bindProvisionalLocalDatasetOwner(targetDb as never, 'user_a');
+
+      await expect(restoreFromRemoteBackupV2()).resolves.toMatchObject({ status: 'restored' });
+      await expect(inspectLocalAccountDataState(targetDb as never)).resolves.toMatchObject({
+        hasUserData: false,
+        pendingOutboxCount: 0,
+        ownerBinding: 'user_a',
+      });
+      await expect(
+        replaceProvisionalLocalDatasetOwner(targetDb as never, 'user_b'),
+      ).rejects.toThrow('LOCAL_DATASET_OWNER_CONFLICT');
+      const { getCalorieGoal } = await import('@/features/calories/calories.data');
+      expect((await getCalorieGoal()).calories).toBe(2000);
+    } finally {
+      await targetDb.closeAsync();
+    }
+  });
+
+  it.each([
+    { event: 'SIGNED_OUT', userId: null, afterWrite: false, expected: 'invalid' },
+    { event: 'SIGNED_IN', userId: 'user_b', afterWrite: true, expected: 'invalid' },
+    { event: 'TOKEN_REFRESHED', userId: 'user_a', afterWrite: true, expected: 'restored' },
+  ])(
+    'reports $expected on $event afterWrite=$afterWrite',
+    async ({ event, userId, afterWrite, expected }) => {
+      const remote = await publishSourceBackup();
+      const serving = buildServingSupabase(remote);
+      let changeSession: () => void = () => undefined;
+      const unsubscribe = vi.fn();
+      const onAuthStateChange = vi.fn(
+        (callback: (event: string, session: { user: { id: string } } | null) => void) => {
+          changeSession = () => callback(event, userId === null ? null : { user: { id: userId } });
+          return { data: { subscription: { unsubscribe } } };
+        },
+      );
+      installSupabaseMock({ ...serving.supabase, auth: { onAuthStateChange } });
+      const targetDb = await freshDatabase();
+      if (afterWrite) {
+        const originalRun = targetDb.runAsync.bind(targetDb);
+        targetDb.runAsync = async (sql, params) => {
+          const result = await originalRun(sql, params);
+          if (sql.includes('INSERT OR REPLACE INTO todos')) changeSession();
+          return result;
+        };
+      } else {
+        const originalTransaction = targetDb.withTransactionAsync.bind(targetDb);
+        targetDb.withTransactionAsync = async (task) => {
+          changeSession();
+          await originalTransaction(task);
+        };
+      }
+      try {
+        const { appMetaKeys, getAppMetaText } = await import('@/core/db/appMeta');
+        const { restoreFromRemoteBackupV2 } = await import('@/core/backup/backupRestore');
+
+        const result = await restoreFromRemoteBackupV2();
+        expect(result.status).toBe(expected);
+        if (expected === 'invalid') {
+          expect(result).toMatchObject({ status: 'invalid', reason: 'auth_changed' });
+          await expectZeroImportedRows(targetDb);
+          expect(
+            await getAppMetaText(targetDb as never, appMetaKeys.accountOwnerUserId),
+          ).toBeNull();
+          expect(await getAppMetaText(targetDb as never, appMetaKeys.lastRestoreAt)).toBeNull();
+        } else {
+          expect(await getAppMetaText(targetDb as never, appMetaKeys.accountOwnerUserId)).toBe(
+            'user_a',
+          );
+        }
+        if (expected === 'invalid') expect(unsubscribe).toHaveBeenCalledOnce();
+      } finally {
+        await targetDb.closeAsync();
+      }
+    },
+    20_000,
+  );
+});
 
 describe('backup completeness v2 restore — settings integrity (closure)', () => {
   it('blocks on a settings fetch error ({data: null, error: {...}}) and leaves the device untouched', async () => {
