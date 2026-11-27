@@ -9,6 +9,7 @@ import { SectionLabel } from '@/core/ui/SectionLabel';
 import { PlanningDisclosure } from '@/features/planning-hub/PlanningDisclosure';
 import { radius, spacing } from '@/core/theme/designTokens';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { buildWeeklyReviewSummary } from './weeklyReview.summary';
 import {
   validateReviewDraft,
@@ -176,7 +177,18 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
   const [applyStatus, setApplyStatus] = useState<'idle' | 'applying' | 'applied' | 'error'>('idle');
   const [applyMessage, setApplyMessage] = useState<string | null>(null);
 
-  const week = useMemo(() => getReviewWeek(), []);
+  // The review week is derived from the LOCAL calendar day, and the modal stays
+  // mounted across a day rollover (a tab left open overnight, or a review kept
+  // open past midnight): deriving it once per mount kept the whole flow pointed
+  // at LAST week while the shell had already rolled over. `dayGeneration`
+  // (bumped by the app-wide rollover provider) re-derives the week, which the
+  // load effect below then keys off.
+  const dayGeneration = useDayRolloverGeneration();
+  const week = useMemo(
+    () => getReviewWeek(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dayGeneration is an intentional extra dep: it re-derives the week at local midnight even though getReviewWeek reads the clock rather than a tracked value.
+    [dayGeneration],
+  );
 
   useEffect(() => {
     let cancelled = false;
