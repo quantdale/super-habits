@@ -25,8 +25,9 @@
 //
 // Precache manifest: CORE_SHELL_URLS is hand-maintained; everything else
 // index.html references (hashed entry JS/CSS, fonts, favicon) is discovered
-// and warmed at install by precacheShell(). Boot-critical URLs fail the install
-// loudly instead of silently producing an offline-dead shell.
+// and warmed at install along with the scripts and WASM required by SQLite.
+// Missing or invalid boot-critical assets fail the install so a usable worker
+// can stay in control.
 
 const CACHE_VERSION = '__SUPERHABITS_CACHE_VERSION__';
 const CACHE_NAME = `superhabits-shell-${CACHE_VERSION}`;
@@ -63,9 +64,9 @@ const WARMABLE_ASSET_EXTENSIONS = [
   '.wasm',
 ];
 
-/** Entry JS/CSS must be cached or the warmed shell cannot boot offline. */
+/** Entry JS/CSS and SQLite's worker and WASM are required for offline boot. */
 function isBootCriticalAsset(url) {
-  return /\.js($|\?)/i.test(url) || /\.css($|\?)/i.test(url);
+  return /\.(js|css|wasm)($|\?)/i.test(url);
 }
 
 /** Same-origin absolute paths referenced by index.html (src/href attributes). */
@@ -96,23 +97,38 @@ async function precacheShell() {
   // the network dropped during the update.
   const indexResponse =
     (await cache.match('/index.html', { cacheName: CACHE_NAME })) ?? (await fetch('/index.html'));
-  const assets = extractIndexReferencedAssets(await indexResponse.text()).filter(
-    (url) => !CORE_SHELL_URLS.includes(url),
-  );
-  await Promise.all(
-    assets.map(async (url) => {
-      const response = await fetch(url, { cache: 'no-store' });
-      if (!response.ok) {
-        if (isBootCriticalAsset(url)) {
-          throw new Error(`[sw] precache failed for ${url}: HTTP ${response.status}`);
-        }
-        // Fonts/images are best-effort; the runtime handler caches them on
-        // first use.
-        return;
+  const warming = new Set(CORE_SHELL_URLS);
+
+  async function warmAsset(url) {
+    if (warming.has(url)) return;
+    warming.add(url);
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) {
+      if (isBootCriticalAsset(url)) {
+        throw new Error(`[sw] precache failed for ${url}: HTTP ${response.status}`);
       }
-      await cache.put(url, response);
-    }),
-  );
+      return;
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (isBootCriticalAsset(url) && /^text\/html(?:\s*;|$)/i.test(contentType ?? '')) {
+      throw new Error(`[sw] precache expected a boot asset at ${url}, received HTML`);
+    }
+
+    if (/\.js($|\?)/i.test(url)) {
+      // Metro emits the hashed worker URL in the entry bundle and the WASM
+      // URL inside that worker. Neither URL is referenced directly by HTML.
+      const source = await response.clone().text();
+      const dependencies = source.matchAll(
+        /['"](\/_expo\/static\/js\/web\/worker-[a-f0-9]+\.js|\/assets\/[^'"\s]+\.wasm)['"]/g,
+      );
+      await Promise.all(Array.from(dependencies, ([, dependency]) => warmAsset(dependency)));
+    }
+
+    await cache.put(url, response);
+  }
+
+  await Promise.all(extractIndexReferencedAssets(await indexResponse.text()).map(warmAsset));
 }
 
 self.addEventListener('install', (event) => {
@@ -160,6 +176,10 @@ self.addEventListener('fetch', (event) => {
   // fetch stack directly (including Playwright's route interception).
   if (url.origin !== self.location.origin) return;
 
+  // The root is the same app shell with or without a query string. Resolve it
+  // by the precached URL so a launch link can open offline and stays on this
+  // worker's shell while a newer deployment is waiting.
+  const cacheKey = event.request.mode === 'navigate' && url.pathname === '/' ? '/' : event.request;
   let cacheWrite = Promise.resolve();
   const response = (async () => {
     // Explicit cacheName: during the install/waiting window two generations
@@ -167,7 +187,7 @@ self.addEventListener('fetch', (event) => {
     // Cache Storage can be unavailable (quota/private mode); that must not
     // prevent an otherwise usable network response.
     const cached = await caches
-      .match(event.request, { cacheName: CACHE_NAME })
+      .match(cacheKey, { cacheName: CACHE_NAME })
       .catch(() => undefined);
     if (cached) return cached;
     const fetched = await fetch(event.request);
@@ -177,7 +197,7 @@ self.addEventListener('fetch', (event) => {
       const cloned = fetched.clone();
       cacheWrite = caches
         .open(CACHE_NAME)
-        .then((cache) => cache.put(event.request, cloned))
+        .then((cache) => cache.put(cacheKey, cloned))
         .catch(() => undefined);
     }
     return fetched;
