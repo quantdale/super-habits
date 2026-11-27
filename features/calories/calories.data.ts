@@ -187,7 +187,7 @@ export async function addCalorieEntry(
         'INSERT INTO calorie_entries (id, food_name, calories, protein, carbs, fats, fiber, meal_type, consumed_on, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)',
         [
           id,
-          input.foodName,
+          input.foodName.trim(),
           input.calories,
           input.protein ?? 0,
           input.carbs ?? 0,
@@ -269,46 +269,48 @@ export async function updateCalorieEntry(
   const macrosAllZero =
     updates.protein === 0 && updates.carbs === 0 && updates.fats === 0 && updates.fiber === 0;
   const db = await getDatabase();
-  // Explicit kcal is a fallback, never an override: it stands in exactly when
-  // the macros cannot derive it (all-zero "Quick add" rows) or when the edit
-  // leaves the stored row's macros untouched (explicit-kcal rows like
-  // "500 calories … 20g protein"). A macro change recomputes kcal as usual.
-  let keepExplicitKcal = macrosAllZero && updates.calories !== undefined;
-  if (updates.calories !== undefined && !keepExplicitKcal) {
-    const stored = await db.getFirstAsync<
-      Pick<CalorieEntry, 'protein' | 'carbs' | 'fats' | 'fiber'>
-    >(
-      'SELECT protein, carbs, fats, fiber FROM calorie_entries WHERE id = ? AND deleted_at IS NULL',
-      [id],
-    );
-    keepExplicitKcal =
-      stored !== null &&
-      stored.protein === updates.protein &&
-      stored.carbs === updates.carbs &&
-      stored.fats === updates.fats &&
-      stored.fiber === updates.fiber;
-  }
-  const calories =
-    keepExplicitKcal && updates.calories !== undefined
-      ? updates.calories
-      : kcalFromMacros(updates.protein, updates.carbs, updates.fats, updates.fiber);
-  // Same write contract as the add path (kcal is recomputed from macros,
-  // except when the explicit value above stands in for the untouched macros).
-  assertCalorieEntryWrite({
-    foodName: updates.foodName,
-    protein: updates.protein,
-    carbs: updates.carbs,
-    fats: updates.fats,
-    fiber: updates.fiber,
-    calories,
-    mealType: updates.mealType,
-  });
   const now = nowIso();
   const dayMove = updates.consumedOn !== undefined ? ', consumed_on = ?' : '';
   const result = await runSyncedMutation<'updated' | 'not_found'>({
     db,
     record: { entity: 'calorie_entries', id, updatedAt: now, operation: 'update' },
     mutate: async (transactionDb) => {
+      // Check the macros inside the write transaction so a queued edit
+      // compares against the preceding committed row.
+      // Explicit kcal is a fallback, never an override: it stands in exactly when
+      // the macros cannot derive it (all-zero "Quick add" rows) or when the edit
+      // leaves the stored row's macros untouched (explicit-kcal rows like
+      // "500 calories … 20g protein"). A macro change recomputes kcal as usual.
+      let keepExplicitKcal = macrosAllZero && updates.calories !== undefined;
+      if (updates.calories !== undefined && !keepExplicitKcal) {
+        const stored = await transactionDb.getFirstAsync<
+          Pick<CalorieEntry, 'protein' | 'carbs' | 'fats' | 'fiber'>
+        >(
+          'SELECT protein, carbs, fats, fiber FROM calorie_entries WHERE id = ? AND deleted_at IS NULL',
+          [id],
+        );
+        keepExplicitKcal =
+          stored !== null &&
+          stored.protein === updates.protein &&
+          stored.carbs === updates.carbs &&
+          stored.fats === updates.fats &&
+          stored.fiber === updates.fiber;
+      }
+      const calories =
+        keepExplicitKcal && updates.calories !== undefined
+          ? updates.calories
+          : kcalFromMacros(updates.protein, updates.carbs, updates.fats, updates.fiber);
+      // Same write contract as the add path (kcal is recomputed from macros,
+      // except when the explicit value above stands in for the untouched macros).
+      assertCalorieEntryWrite({
+        foodName: updates.foodName,
+        protein: updates.protein,
+        carbs: updates.carbs,
+        fats: updates.fats,
+        fiber: updates.fiber,
+        calories,
+        mealType: updates.mealType,
+      });
       const update = await transactionDb.runAsync(
         `UPDATE calorie_entries SET
         food_name = ?,
@@ -322,7 +324,7 @@ export async function updateCalorieEntry(
       WHERE id = ?
         AND deleted_at IS NULL`,
         [
-          updates.foodName,
+          updates.foodName.trim(),
           calories,
           updates.protein,
           updates.carbs,
@@ -395,7 +397,7 @@ export async function upsertSavedMeal(input: {
          RETURNING id`,
         [
           createId('smeal'),
-          input.foodName,
+          input.foodName.trim(),
           input.calories,
           input.protein,
           input.carbs,
@@ -625,6 +627,7 @@ export async function addCalorieEntryFromLinkedAction(input: {
     };
   }
 
+  const foodName = input.foodName.trim();
   const now = nowIso();
   const outcome = await runSyncedMutation({
     db,
@@ -652,7 +655,7 @@ export async function addCalorieEntryFromLinkedAction(input: {
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
         [
           input.id,
-          input.foodName,
+          foodName,
           input.calories,
           input.protein,
           input.carbs,
@@ -664,17 +667,9 @@ export async function addCalorieEntryFromLinkedAction(input: {
           now,
         ],
       );
-      return { changed: true, value: { id: input.id, food_name: input.foodName } };
+      return { changed: true, value: { id: input.id, food_name: foodName } };
     },
   });
-  if (!outcome.changed) {
-    return {
-      status: 'applied',
-      targetLabel: outcome.value.food_name,
-      producedEntityType: 'calorie_log',
-      producedEntityId: outcome.value.id,
-    };
-  }
   // Automated one-off logging never maintains the saved-meal catalog: a
   // linked-action log is not an explicit "save this meal" choice, so it must
   // not create/update a saved_meals row or inflate use_count. Replay
@@ -682,9 +677,9 @@ export async function addCalorieEntryFromLinkedAction(input: {
 
   return {
     status: 'applied',
-    targetLabel: input.foodName,
+    targetLabel: outcome.value.food_name,
     producedEntityType: 'calorie_log',
-    producedEntityId: input.id,
+    producedEntityId: outcome.value.id,
   };
 }
 

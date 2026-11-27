@@ -1,9 +1,10 @@
 import { test, expect } from './fixtures';
 import { goToTab } from './helpers/navigation';
 import { clearDatabase } from './helpers/db';
-import { installClock, setLocalTime } from './helpers/clock';
+import { advanceToNextDay, installClock, setLocalTime } from './helpers/clock';
 import { queryRows, returnToApp } from './helpers/dbHarness';
 import { browserLocalDateKeyOffset } from './helpers/browserDate';
+import { seedSql } from './helpers/seed';
 
 /**
  * Backwards clock / timezone move with an explicitly selected historical day.
@@ -77,4 +78,43 @@ test.describe('Calories backwards clock move', () => {
     );
     expect(Number(future[0]?.n ?? -1)).toBe(0);
   });
+});
+
+test('deleting a previous-day entry after midnight keeps the new day visible', async ({ page }) => {
+  await installClock(page, START);
+  await goToTab(page, 'calories');
+  await clearDatabase(page);
+  const oldDay = await browserLocalDateKeyOffset(page, 0);
+  const newDay = await browserLocalDateKeyOffset(page, 1);
+  const timestamp = START.toISOString();
+  await seedSql(
+    page,
+    `INSERT INTO calorie_entries
+       (id, food_name, calories, protein, carbs, fats, fiber, meal_type, consumed_on, created_at, updated_at)
+     VALUES
+       ('cal_1', 'Late dinner', 300, 20, 30, 10, 3, 'dinner', '${oldDay}', '${timestamp}', '${timestamp}'),
+       ('cal_2', 'Morning oats', 450, 15, 75, 10, 5, 'breakfast', '${newDay}', '${timestamp}', '${timestamp}');`,
+  );
+  await goToTab(page, 'calories');
+
+  await page.getByLabel('Delete Late dinner').click();
+  const dialog = page.getByRole('dialog', { name: 'Delete entry' });
+  await expect(dialog).toBeVisible();
+
+  await advanceToNextDay(page);
+  const panel = page.locator('#sh-section-panel-calories');
+  await expect(panel.getByText('Today · 450 of 2,000 kcal logged')).toBeVisible();
+  await expect(panel.getByText('2 days logged · 375 kcal average · last 52 weeks')).toBeVisible();
+
+  await dialog.getByRole('button', { name: 'Delete entry' }).click();
+  // Wait for the post-delete refresh to publish its updated history.
+  await expect(panel.getByText('1 day logged · 450 kcal average · last 52 weeks')).toBeVisible();
+  await expect(panel.getByText('Today · 450 of 2,000 kcal logged')).toBeVisible();
+  await expect(page.getByLabel('Daily log').getByText('Morning oats')).toBeVisible();
+
+  const rows = await queryRows(
+    page,
+    'SELECT id, consumed_on FROM calorie_entries WHERE deleted_at IS NULL ORDER BY id',
+  );
+  expect(rows).toEqual([{ id: 'cal_2', consumed_on: newDay }]);
 });

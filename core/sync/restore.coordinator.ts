@@ -22,7 +22,7 @@ import {
   isDeviceEmptyForRestore,
   restoreFromRemoteBackupV2,
 } from '@/core/backup/backupRestore';
-import { validateBackupRow } from '@/core/backup/backupValidators';
+import { validateBackupGraph, validateBackupRow } from '@/core/backup/backupValidators';
 import {
   readActiveBackupGenerationConflict,
   type BackupGenerationConflict,
@@ -585,11 +585,16 @@ async function restoreLegacyBackupForOwner(
       }
     }
   }
-  if (validationErrors.length > 0) {
+  // A mutable legacy backup can repeat a calorie id across offset pages.
+  // The importer replaces by id, so accepting the repeat overstates recovery.
+  const diagnostics = validationErrors.length
+    ? validationErrors
+    : validateBackupGraph({ calorie_entries: calorieEntries });
+  if (diagnostics.length > 0) {
     return {
       status: 'invalid',
       message: 'The remote backup contains malformed rows and was not imported.',
-      diagnostics: validationErrors.slice(0, 50),
+      diagnostics: diagnostics.slice(0, 50),
       preview: await getRestorePreview(),
     };
   }

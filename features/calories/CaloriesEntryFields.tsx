@@ -15,6 +15,7 @@ type MealOption = {
 
 type CaloriesEntryFieldsProps = {
   fieldIdPrefix: string;
+  allowFractionalMacros?: boolean;
   food: string;
   protein: string;
   carbs: string;
@@ -36,6 +37,7 @@ type CaloriesEntryFieldsProps = {
 
 export function CaloriesEntryFields({
   fieldIdPrefix,
+  allowFractionalMacros = false,
   food,
   protein,
   carbs,
@@ -55,6 +57,7 @@ export function CaloriesEntryFields({
   footer,
 }: CaloriesEntryFieldsProps) {
   const { tokens } = useAppTheme();
+  const macroKeyboard = allowFractionalMacros ? 'numeric' : 'number-pad';
 
   return (
     <>
@@ -74,7 +77,7 @@ export function CaloriesEntryFields({
             accessibilityLabel={`Calories ${fieldIdPrefix === 'cal-edit' ? 'edit' : 'entry'} protein`}
             value={protein}
             onChangeText={onProteinChange}
-            unsignedInteger
+            keyboardType={macroKeyboard}
           />
         </View>
         <View className="min-w-[140px] grow basis-[22%]">
@@ -84,7 +87,7 @@ export function CaloriesEntryFields({
             accessibilityLabel={`Calories ${fieldIdPrefix === 'cal-edit' ? 'edit' : 'entry'} carbs`}
             value={carbs}
             onChangeText={onCarbsChange}
-            unsignedInteger
+            keyboardType={macroKeyboard}
           />
         </View>
         <View className="min-w-[140px] grow basis-[22%]">
@@ -94,7 +97,7 @@ export function CaloriesEntryFields({
             accessibilityLabel={`Calories ${fieldIdPrefix === 'cal-edit' ? 'edit' : 'entry'} fat`}
             value={fats}
             onChangeText={onFatsChange}
-            unsignedInteger
+            keyboardType={macroKeyboard}
           />
         </View>
         <View className="min-w-[140px] grow basis-[22%]">
@@ -104,7 +107,7 @@ export function CaloriesEntryFields({
             accessibilityLabel={`Calories ${fieldIdPrefix === 'cal-edit' ? 'edit' : 'entry'} fiber`}
             value={fiber}
             onChangeText={onFiberChange}
-            unsignedInteger
+            keyboardType={macroKeyboard}
             placeholder="0"
           />
         </View>

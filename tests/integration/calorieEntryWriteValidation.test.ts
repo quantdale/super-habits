@@ -62,6 +62,26 @@ describe('calorie entry write validation (real SQLite)', () => {
     expect(count?.count).toBe(0);
   });
 
+  it('rejects fractional kcal before either the ledger or saved-meal catalog is written', async () => {
+    db = await freshDatabase();
+    const { addCalorieEntry, upsertSavedMeal } = await import('@/features/calories/calories.data');
+    const entry = {
+      foodName: 'Fractional energy',
+      calories: 250.5,
+      protein: 12.5,
+      carbs: 0,
+      fats: 0,
+      fiber: 0,
+      mealType: 'lunch',
+    } as const;
+
+    await expect(addCalorieEntry(entry)).rejects.toThrow('Calories must be a whole number.');
+    await expect(upsertSavedMeal(entry)).rejects.toThrow('Calories must be a whole number.');
+    expect(await db.getAllAsync('SELECT * FROM calorie_entries')).toEqual([]);
+    expect(await db.getAllAsync('SELECT * FROM saved_meals')).toEqual([]);
+    expect(await db.getAllAsync('SELECT * FROM sync_outbox')).toEqual([]);
+  });
+
   it('rejects an invalid update without mutating the existing row', async () => {
     db = await freshDatabase();
     const calories = await import('@/features/calories/calories.data');

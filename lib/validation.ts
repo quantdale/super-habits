@@ -1,4 +1,4 @@
-import { parseNumericInput } from './numericInput';
+import { parseNumericInput, type NumericInputOptions } from './numericInput';
 import { isValidDateKey, toDateKey } from './time';
 
 export function validateTodoTitle(title: string): string | null {
@@ -119,6 +119,7 @@ export function validateCalorieEntry(
   carbs: string,
   fats: string,
   fiber: string,
+  macroInputOptions?: NumericInputOptions,
 ): string | null {
   const foodError = validateCalorieFoodName(foodName);
   if (foodError) return foodError;
@@ -132,13 +133,8 @@ export function validateCalorieEntry(
   for (const [raw, label] of macros) {
     const macroError = validateCalorieMacroValue(Number(raw.trim()), label);
     if (macroError) return macroError;
-    // Whole-gram contract: the entry form submits macros through
-    // `parseNumericInput` (integer-only) and falls back to 0 for anything it
-    // cannot parse — so decimal text that passed the value check above would
-    // be SILENTLY stored as 0 and vanish from every total. Reject it here,
-    // while the user still sees the field. Empty stays valid (= 0, the form's
-    // historic contract); the check matches the submit parser exactly.
-    if (raw.trim() !== '' && parseNumericInput(raw) === null) {
+    // Match the draft parser so an unsupported input never becomes zero on save.
+    if (raw.trim() !== '' && parseNumericInput(raw, macroInputOptions) === null) {
       return `${label} must be a whole number.`;
     }
   }
@@ -201,6 +197,7 @@ export function validateCalorieComputedKcal(kcal: number): string | null {
   if (kcal < 0) return 'Calories cannot be negative.';
   if (kcal > 9999) return 'Calories cannot exceed 9999 kcal.';
   if (kcal === 0) return 'Enter macro amounts so calories are greater than zero.';
+  if (!Number.isInteger(kcal)) return 'Calories must be a whole number.';
   return null;
 }
 

@@ -196,4 +196,45 @@ test.describe('Calories diary day navigation', () => {
     );
     expect(rows).toEqual([{ id: `cal_e2e_${seededKey}`, consumed_on: today }]);
   });
+  test('moving a fractional-macro entry preserves its macros and explicit energy', async ({
+    page,
+  }) => {
+    const yesterday = await browserLocalDateKeyOffset(page, -1);
+    const today = await browserLocalDateKeyOffset(page, 0);
+    const created = isoAtLocal(yesterday, 9);
+    await seedSql(
+      page,
+      `INSERT INTO calorie_entries
+         (id, food_name, calories, protein, carbs, fats, fiber, meal_type, consumed_on, created_at, updated_at)
+       VALUES ('cal_1', 'Fractional oats', 350, 12.5, 20.5, 8.5, 3.5, 'breakfast',
+         '${yesterday}', '${created}', '${created}');`,
+    );
+    await goToTab(page, 'calories');
+    await page.getByRole('button', { name: 'Previous day', exact: true }).click();
+    await page.getByLabel('Edit Fractional oats').click();
+
+    const dialog = page.getByRole('dialog', { name: 'Edit entry' });
+    await dialog.getByLabel('Consumed date').fill(today);
+    await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByLabel('Daily log').getByText('Fractional oats')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Next day', exact: true }).click();
+    await expect(page.getByText('Today · 350 of 2,000 kcal logged')).toBeVisible();
+    const rows = await queryRows(
+      page,
+      'SELECT id, consumed_on, calories, protein, carbs, fats, fiber FROM calorie_entries WHERE deleted_at IS NULL',
+    );
+    expect(rows).toEqual([
+      {
+        id: 'cal_1',
+        consumed_on: today,
+        calories: 350,
+        protein: 12.5,
+        carbs: 20.5,
+        fats: 8.5,
+        fiber: 3.5,
+      },
+    ]);
+  });
 });
