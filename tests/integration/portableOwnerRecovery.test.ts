@@ -289,6 +289,8 @@ describe('imported-owner recovery — real SQLite end to end', () => {
 
   it('B: wrong account is signed out fail-closed and never binds the imported dataset', async () => {
     const { targetDb, file } = await importOwnerBackedFile();
+    const { addTodo } = await import('@/features/todos/todos.data');
+    await addTodo({ title: 'Offline edit before owner recovery' });
 
     const currentAuth = {
       value: auth({
@@ -333,6 +335,8 @@ describe('imported-owner recovery — real SQLite end to end', () => {
     const { inspectLocalAccountDataState } = await import('@/core/auth/account.data');
     const local = await inspectLocalAccountDataState(targetDb as never);
     expect(local.ownerBinding).toBeNull();
+    expect(local.unownedOutboxCount).toBe(1);
+    expect(local.outboxOwnerIds).toEqual([]);
     expect(local.hasUserData).toBe(true);
     const origin = await targetDb.getFirstAsync<{ value: string }>(
       "SELECT value FROM app_meta WHERE key = 'portable.last_import_owner_fingerprint'",
@@ -342,6 +346,17 @@ describe('imported-owner recovery — real SQLite end to end', () => {
       'SELECT * FROM todos ORDER BY id ASC',
     );
     expect(afterRows).toEqual(beforeRows);
+
+    // After sign-out the source-account form must stay available even with
+    // pending local edits. No account may claim them without matching origin.
+    await expect(coordinator.refresh()).resolves.toMatchObject({
+      canRecoverImportedOwner: true,
+      canRecoverExisting: false,
+    });
+    await expect(coordinator.requestRecovery('owner-a@example.com')).resolves.toMatchObject({
+      ok: true,
+      status: 'sign_in_pending',
+    });
 
     await targetDb.closeAsync();
   }, 90000);

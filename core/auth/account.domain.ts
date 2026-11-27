@@ -40,6 +40,9 @@ export type AccountDecision = {
   message: string;
 };
 
+const IMPORTED_OWNER_RECOVERY_MESSAGE =
+  'This device’s dataset was imported from another device’s backup. Sign in with the account that created it to resume remote backup.';
+
 const hasLocalContent = (local: LocalAccountDataState): boolean =>
   local.hasUserData || local.pendingOutboxCount > 0 || local.ownerBinding !== null;
 
@@ -286,10 +289,11 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
       shouldCreateAnonymous: false,
       canRecoverExisting: false,
       canRecoverOwner: false,
-      canRecoverImportedOwner: false,
+      canRecoverImportedOwner,
       canProtect: false,
-      message:
-        'Pending local backup work has no owner evidence. Remote backup is paused until the original account is identified.',
+      message: canRecoverImportedOwner
+        ? IMPORTED_OWNER_RECOVERY_MESSAGE
+        : 'Pending local backup work has no owner evidence. Remote backup is paused until the original account is identified.',
     };
   }
 
@@ -352,7 +356,7 @@ export function decideAccountState(input: AccountDecisionInput): AccountDecision
       canProtect: false,
       message: local.hasUserData
         ? importedDataset
-          ? 'This device’s dataset was imported from another device’s backup. Sign in with the account that created it to resume remote backup.'
+          ? IMPORTED_OWNER_RECOVERY_MESSAGE
           : 'This local dataset has no recoverable owner evidence. Remote backup is paused.'
         : 'Pending backup work needs the account that created it before remote backup can resume.',
     };
