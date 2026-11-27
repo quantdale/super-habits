@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SECTION_COLORS } from '@/constants/sectionColors';
@@ -82,6 +82,7 @@ const COLOR = SECTION_COLORS.calories;
 const CALORIES_VIEW_MODE_STORAGE_KEY = 'superhabits.calories.viewMode';
 /** Food name for kcal-only quick-add entries written through the normal create path. */
 const QUICK_ADD_FOOD_NAME = 'Quick add';
+const EDIT_MACRO_INPUT = { allowDecimal: true };
 
 type CaloriesViewMode = 'form' | 'diary';
 
@@ -276,6 +277,13 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     setFrequentFoods(buildFrequentFoods(windowEntries));
   }, [beginRefresh, surfaceDateKey]);
 
+  // A mutation may finish after navigation or midnight. Refresh the day
+  // currently on screen while keeping the mutation targeted at its original row/day.
+  const refreshAfterMutation = useRef(refresh);
+  useLayoutEffect(() => {
+    refreshAfterMutation.current = refresh;
+  }, [refresh]);
+
   useActiveForegroundRefresh(isActive, refresh, dayGeneration);
 
   useEffect(() => {
@@ -399,32 +407,23 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     () => (historyOpen ? buildCalorieHeatmapDays(summary364, goal.calories, 365) : null),
     [historyOpen, summary364, goal.calories],
   );
-  const computedKcal = useMemo(
-    () =>
-      kcalFromMacros(
-        parseNumericInput(protein) ?? 0,
-        parseNumericInput(carbs) ?? 0,
-        parseNumericInput(fats) ?? 0,
-        parseNumericInput(fiber) ?? 0,
-      ),
-    [protein, carbs, fats, fiber],
+  // Existing rows can contain fractional grams from command or linked-action
+  // logs. Use the same parsed values for the preview, validation and update.
+  const macroInputOptions = editingEntryId ? EDIT_MACRO_INPUT : undefined;
+  const draftMacros = useMemo(
+    () => ({
+      protein: parseNumericInput(protein, macroInputOptions) ?? 0,
+      carbs: parseNumericInput(carbs, macroInputOptions) ?? 0,
+      fats: parseNumericInput(fats, macroInputOptions) ?? 0,
+      fiber: parseNumericInput(fiber, macroInputOptions) ?? 0,
+    }),
+    [protein, carbs, fats, fiber, macroInputOptions],
   );
-  /**
-   * Effective kcal for the entry form and edit modal: the edited row's (or
-   * prefilled meal's) stored kcal while the macro fields still match its
-   * source — this covers kcal-only rows, explicit-kcal rows the macro sum
-   * cannot derive, and ordinary derived rows alike. Once any macro is edited
-   * the value is computed from the draft macros as usual.
-   */
   const effectiveKcal = useMemo(() => {
-    if (kcalSource === null) return computedKcal;
-    return resolveEntryKcal(kcalSource, {
-      protein: parseNumericInput(protein) ?? 0,
-      carbs: parseNumericInput(carbs) ?? 0,
-      fats: parseNumericInput(fats) ?? 0,
-      fiber: parseNumericInput(fiber) ?? 0,
-    });
-  }, [kcalSource, computedKcal, protein, carbs, fats, fiber]);
+    if (kcalSource) return resolveEntryKcal(kcalSource, draftMacros);
+    const { protein, carbs, fats, fiber } = draftMacros;
+    return kcalFromMacros(protein, carbs, fats, fiber);
+  }, [kcalSource, draftMacros]);
   /**
    * Pre-submit consumed-date validation for the edit modal (mirrors
    * `assertConsumableDateKey`): the error surfaces as soon as the date
@@ -580,9 +579,9 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         setEntryModalVisible(false);
         resetCalorieForm();
       }
-      await refresh();
+      await refreshAfterMutation.current();
     },
-    [confirm, editingEntryId, refresh, resetCalorieForm],
+    [confirm, editingEntryId, resetCalorieForm],
   );
 
   const toggleMealGroup = useCallback((meal: MealType) => {
@@ -622,9 +621,9 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         // The copy is all-or-nothing: a failure left the selected day intact.
         setCopyStatus('Copy failed. Nothing was changed.');
       }
-      await refresh();
+      await refreshAfterMutation.current();
     },
-    [refresh, surfaceDateKey],
+    [surfaceDateKey],
   );
 
   /**
@@ -654,13 +653,13 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         { maintainSavedMeal: false },
       );
       recordAction('nutrition', surfaceDateKey);
-      await refresh();
+      await refreshAfterMutation.current();
     },
-    [surfaceDateKey, recordAction, refresh],
+    [surfaceDateKey, recordAction],
   );
 
   const handleSubmit = () => {
-    const entryError = validateCalorieEntry(food, protein, carbs, fats, fiber);
+    const entryError = validateCalorieEntry(food, protein, carbs, fats, fiber, macroInputOptions);
     if (entryError) {
       setCalorieError(entryError);
       return;
@@ -689,18 +688,10 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
     setIsSavingEntry(true);
     void (async () => {
       try {
-        const proteinN = parseNumericInput(protein) ?? 0;
-        const carbsN = parseNumericInput(carbs) ?? 0;
-        const fatsN = parseNumericInput(fats) ?? 0;
-        const fiberN = parseNumericInput(fiber) ?? 0;
-
         if (editingEntryId) {
           const updateResult = await updateCalorieEntry(editingEntryId, {
             foodName: food.trim(),
-            protein: proteinN,
-            carbs: carbsN,
-            fats: fatsN,
-            fiber: fiberN,
+            ...draftMacros,
             mealType,
             consumedOn: entryDateKey,
             // The effective kcal the modal displayed: kept while the macros
@@ -714,7 +705,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           const editError = calorieEditSaveError(updateResult);
           if (editError) {
             setCalorieError(editError);
-            await refresh();
+            await refreshAfterMutation.current();
             return;
           }
         } else {
@@ -727,10 +718,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
           await addCalorieEntry({
             foodName: food.trim(),
             calories: effectiveKcal,
-            protein: proteinN,
-            carbs: carbsN,
-            fats: fatsN,
-            fiber: fiberN,
+            ...draftMacros,
             mealType,
             consumedOn: surfaceDateKey,
           });
@@ -739,7 +727,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         resetCalorieForm();
         setEntryModalVisible(false);
         recordAction('nutrition', editingEntryId ? entryDateKey : surfaceDateKey);
-        await refresh();
+        await refreshAfterMutation.current();
       } catch (error) {
         const message =
           error instanceof Error
@@ -993,7 +981,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         }}
         onClose={() => setSearchSheetVisible(false)}
         onDeleted={() => {
-          void refresh();
+          void refreshAfterMutation.current();
         }}
       />
 
@@ -1058,6 +1046,7 @@ export function CaloriesScreen({ isActive }: { isActive: boolean }) {
         ) : null}
         <CaloriesEntryFields
           fieldIdPrefix="cal-edit"
+          allowFractionalMacros={editingEntryId !== null}
           food={food}
           protein={protein}
           carbs={carbs}
