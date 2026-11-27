@@ -62,7 +62,6 @@ function installLegacyRemote() {
     calorie_entries: [],
     workout_routines: [],
   };
-  const missingTable = { data: null, error: { message: 'relation does not exist' } };
   const client = {
     from: vi.fn((entity: string) => ({
       select: (_columns: string, options?: { head?: boolean; count?: string }) => {
@@ -84,7 +83,13 @@ function installLegacyRemote() {
               entity === 'backup_generation_head' ||
               entity === 'backup_generation'
             ) {
-              return missingTable;
+              return {
+                data: null,
+                error: {
+                  code: 'PGRST205',
+                  message: `Could not find the table 'public.${entity}' in the schema cache`,
+                },
+              };
             }
             return {
               data: rows.slice(0, count),
