@@ -316,7 +316,6 @@ export function planAutoFreeze(input: {
   if (budget <= 0) return [];
   const byDate = new Map(input.days.map((day) => [day.dateKey, day]));
   const safeToday = safeDateKey(input.todayKey);
-  if (byDate.get(safeToday)?.active) return [];
 
   const gap: string[] = [];
   for (let offset = 1; offset <= budget + 1; offset += 1) {

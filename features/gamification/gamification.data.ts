@@ -65,6 +65,83 @@ import {
 
 type Db = SQLite.SQLiteDatabase;
 
+// Passes reuse their ledger snapshot across several SQLite transactions. Keep
+// other reward writers from changing that ledger while a pass holds it.
+// Foreground awards (a screen reporting what the user just did) are served
+// before queued background passes, and a running housekeeping pass yields to
+// them between its steps and re-reads the ledger afterwards. A foreground award
+// never waits for a whole multi-day backfill, so its XP, badge and celebration
+// land while the user is still looking at the screen.
+type RewardWritePriority = 'foreground' | 'background';
+
+let rewardLockHeld = false;
+const foregroundWaiters: (() => void)[] = [];
+const backgroundWaiters: (() => void)[] = [];
+
+function acquireRewardLock(priority: RewardWritePriority, front = false): Promise<void> {
+  if (!rewardLockHeld) {
+    rewardLockHeld = true;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const queue = priority === 'foreground' ? foregroundWaiters : backgroundWaiters;
+    if (front) queue.unshift(resolve);
+    else queue.push(resolve);
+  });
+}
+
+function releaseRewardLock(): void {
+  const next = foregroundWaiters.shift() ?? backgroundWaiters.shift();
+  if (next) next();
+  else rewardLockHeld = false;
+}
+
+async function serializeRewardWrite<T>(
+  write: () => Promise<T>,
+  priority: RewardWritePriority = 'background',
+): Promise<T> {
+  await acquireRewardLock(priority);
+  try {
+    return await write();
+  } finally {
+    releaseRewardLock();
+  }
+}
+
+/**
+ * Let queued foreground awards run in the middle of a background pass.
+ * Returns true when the lock was handed over, so the pass must re-read any
+ * ledger snapshot it holds.
+ */
+async function yieldRewardLockToForeground(): Promise<boolean> {
+  if (foregroundWaiters.length === 0) return false;
+  releaseRewardLock();
+  await acquireRewardLock('background', true);
+  return true;
+}
+
+/** A pass's hook to let waiting foreground awards run between its awards. */
+type PassYield = () => Promise<void>;
+
+// Foreground awards waiting in the serialized queue. A housekeeping or
+// reconcile pass queued ahead of one must leave that action to it: otherwise
+// the pass pays the action silently and the screen's own award finds it
+// already paid, losing the celebration and badge feedback for the user.
+const pendingForegroundAwards = new Map<string, number>();
+
+function foregroundAwardKey(kind: ActionKind, entityId: string): string {
+  return `${kind}:${entityId}`;
+}
+
+function claimForegroundAward(key: string): () => void {
+  pendingForegroundAwards.set(key, (pendingForegroundAwards.get(key) ?? 0) + 1);
+  return () => {
+    const remaining = (pendingForegroundAwards.get(key) ?? 1) - 1;
+    if (remaining > 0) pendingForegroundAwards.set(key, remaining);
+    else pendingForegroundAwards.delete(key);
+  };
+}
+
 export type GamificationReadOptions = {
   /** Injectable for deterministic tests; production defaults to local today. */
   todayKey?: string;
@@ -178,9 +255,8 @@ async function readCount(
  *
  * Housekeeping used to re-read the whole ledger for EVERY award and for
  * several aggregates (7 lookback days x up to 25 awards x 2 full scans +
- * ~10 aggregate COUNT(*)s each). The ledger only ever grows during a pass, so
- * one read plus a local append per award is behaviourally identical and turns
- * that into a single scan (audit C §2 issue #3).
+ * ~10 aggregate COUNT(*)s each). One read plus updates as awards and freezes
+ * change the ledger turns that into a single scan (audit C §2 issue #3).
  *
  * Append-only is enforced, not assumed: an already-paid action is still
  * detected by the per-award `SELECT` inside the write transaction, which stays
@@ -401,16 +477,7 @@ async function loadDayFacts(
 }
 
 /**
- * Every day the user was active, plus the days a freeze saved, oldest-first
- * for streak math. Falls back to reading the ledger when no pass snapshot is
- * in hand.
- */
-async function loadStreakDays(db: Db, snapshot?: LedgerSnapshot): Promise<StreakDay[]> {
-  return streakDaysFromSnapshot(snapshot ?? (await readLedgerSnapshot(db)));
-}
-
-/**
- * Freeze accounting for a pass, from the snapshot when one is in hand.
+ * Freeze accounting for a pass.
  *
  * Freeze rows are counted exactly as stored. The ledger does not clamp `used`
  * to `earned` (audit C #2: a silent clamp both hid the invariant violation and
@@ -418,16 +485,8 @@ async function loadStreakDays(db: Db, snapshot?: LedgerSnapshot): Promise<Streak
  * MAX_BANKED_FREEZES instead, and `releaseStaleFreezes` frees a row that a
  * backfilled/restored/synced activity day has since made unnecessary.
  */
-async function loadFreezeState(db: Db, snapshot?: LedgerSnapshot): Promise<StreakFreezeState> {
-  if (snapshot)
-    return streakFreezeState({ earned: snapshot.freezesEarned, used: snapshot.freezesUsed });
-  const [earned, used] = await Promise.all([
-    readCount(db, `SELECT COUNT(*) AS value FROM gamification_events WHERE event_kind = ?`, [
-      FREEZE_GRANT_EVENT_KIND,
-    ]),
-    readCount(db, `SELECT COUNT(*) AS value FROM gamification_streak_freezes`),
-  ]);
-  return streakFreezeState({ earned, used });
+function freezeStateFromSnapshot(snapshot: LedgerSnapshot): StreakFreezeState {
+  return streakFreezeState({ earned: snapshot.freezesEarned, used: snapshot.freezesUsed });
 }
 
 /**
@@ -445,28 +504,30 @@ async function loadFreezeState(db: Db, snapshot?: LedgerSnapshot): Promise<Strea
  * "active" predicate `streakDaysFromSnapshot` reads, so the release decision
  * and the streak reading can never disagree.
  *
- * Releasing is idempotent and dirties the next backup snapshot. Callers that then read freeze state through a pass snapshot must
- * treat that snapshot as stale (re-read the ledger), because the snapshot was
- * built BEFORE these rows were deleted.
- *
- * Returns the released date keys (oldest first) so callers can report/log it.
+ * Include the day of a just-verified award so its refund counts before
+ * deciding whether the same award has room to grant a freeze. The refund
+ * dirties the next backup in the transaction that changes the ledger.
  */
-export async function releaseStaleFreezes(db: Db): Promise<string[]> {
+async function releaseStaleFreezes(
+  db: Db,
+  snapshot: LedgerSnapshot,
+  awardingDateKey?: string,
+): Promise<void> {
   const stale = await db.getAllAsync<{ date_key: string }>(
     `SELECT f.date_key
        FROM gamification_streak_freezes f
-      WHERE EXISTS (
+      WHERE f.date_key = ? OR EXISTS (
               SELECT 1 FROM gamification_events e
                WHERE e.date_key = f.date_key AND e.xp > 0
-            )
-      ORDER BY f.date_key ASC`,
+            )`,
+    [awardingDateKey ?? null],
   );
-  if (stale.length === 0) return [];
+  if (stale.length === 0) return;
   for (const row of stale) {
     await db.runAsync(`DELETE FROM gamification_streak_freezes WHERE date_key = ?`, [row.date_key]);
+    if (snapshot.frozenDateKeys.delete(row.date_key)) snapshot.freezesUsed -= 1;
   }
   await setAppMetaText(db, appMetaKeys.backupDirty, '1');
-  return stale.map((row) => row.date_key);
 }
 
 async function loadRecordedMilestones(
@@ -651,9 +712,8 @@ export async function readGamificationSnapshot(
   // the badge counters and today's XP together.
   const ledger = await readLedgerSnapshot(db);
   const streakDays = streakDaysFromSnapshot(ledger);
-  const [facts, freezes, completedQuestIds, badgeIds, dayCompletion] = await Promise.all([
+  const [facts, completedQuestIds, badgeIds, dayCompletion] = await Promise.all([
     loadDayFacts(db, todayKey, ledger),
-    loadFreezeState(db, ledger),
     loadCompletedQuestIds(db, todayKey, ledger),
     loadBadgeIds(db, ledger),
     loadDayCompletion(db, todayKey, ledger),
@@ -667,7 +727,7 @@ export async function readGamificationSnapshot(
     xpToday: facts.xpEarned,
     level,
     streak,
-    freezes,
+    freezes: freezeStateFromSnapshot(ledger),
     quests: buildDailyQuests({ dateKey: todayKey, facts, completedQuestIds }),
     badges: badgeStates(stats, badgeIds),
     todayFacts: facts,
@@ -715,6 +775,11 @@ function absorbAward(
   dateKey: string,
 ): void {
   for (const event of result.events) {
+    if (event.kind === FREEZE_GRANT_EVENT_KIND) {
+      snapshot.freezesEarned += 1;
+      const milestone = Number.parseInt(event.sourceKey.split(':')[1] ?? '', 10);
+      if (Number.isFinite(milestone)) snapshot.milestones.freeze.push(milestone);
+    }
     if (event.xp <= 0) continue;
     snapshot.activeDateKeys.add(event.dateKey);
     snapshot.activeEvents.push({ date_key: event.dateKey, xp: event.xp });
@@ -724,11 +789,6 @@ function absorbAward(
     if (event.kind === STREAK_MILESTONE_EVENT_KIND) {
       const milestone = Number.parseInt(event.sourceKey.split(':')[1] ?? '', 10);
       if (Number.isFinite(milestone)) snapshot.milestones.streak.push(milestone);
-    }
-    if (event.kind === FREEZE_GRANT_EVENT_KIND) {
-      snapshot.freezesEarned += 1;
-      const milestone = Number.parseInt(event.sourceKey.split(':')[1] ?? '', 10);
-      if (Number.isFinite(milestone)) snapshot.milestones.freeze.push(milestone);
     }
   }
   // An award that completes the day (or the first perfect-day event) changes
@@ -834,14 +894,57 @@ async function readActionDateKey(
   }
 }
 
+async function readUnpaidActionDateKey(
+  db: Db,
+  kind: ActionKind,
+  entityId: string,
+  requestedDateKey: string,
+  allowEarlierDate = false,
+): Promise<string | null> {
+  const todayKey = await readActionDateKey(db, kind, entityId, requestedDateKey);
+  const earliestDateKey = allowEarlierDate
+    ? reconcileWindowStart(requestedDateKey)
+    : requestedDateKey;
+  if (
+    todayKey === null ||
+    !isValidDateKey(todayKey) ||
+    todayKey < earliestDateKey ||
+    todayKey > requestedDateKey
+  ) {
+    return null;
+  }
+  const sourceKey = actionSourceKey(kind, entityId, todayKey);
+  const existing = await db.getFirstAsync<{ id: string }>(
+    `SELECT id FROM gamification_events WHERE event_kind = ? AND source_key = ?`,
+    [kind, sourceKey],
+  );
+  if (existing) return null;
+
+  // Upgrade compatibility: an earlier build keyed todo awards by the bare
+  // todo id, and those rows survive. Without this check the first reconcile
+  // after the update would pay the same completion again under the new
+  // day-qualified key. The row's own `date_key` bounds the suppression to the
+  // day it already paid for, so a genuine later-day re-completion still earns
+  // (`legacyActionSourceKeys` documents why only `todo` has a legacy form).
+  for (const legacyKey of legacyActionSourceKeys(kind, entityId)) {
+    const legacy = await db.getFirstAsync<{ id: string }>(
+      `SELECT id FROM gamification_events
+        WHERE event_kind = ? AND source_key = ? AND date_key = ?`,
+      [kind, legacyKey, todayKey],
+    );
+    if (legacy) return null;
+  }
+  return todayKey;
+}
+
 /**
  * The award itself, without reading back a snapshot.
  *
  * `ledger` lets a backfill pass share one ledger read and one quest-board
  * memo across its awards. It is only safe to pass because a pass never mutates
- * the ledger behind this function's back: every insert goes through
- * `applyAward`, which appends to the same snapshot. An already-paid action is
- * still detected by the authoritative `SELECT` inside the write transaction.
+ * the ledger behind this function's back: the public entry points serialize
+ * reward writers, and each award updates the shared snapshot. An already-paid
+ * action is still detected by the authoritative check inside the transaction.
  */
 async function computeAward(input: {
   kind: ActionKind;
@@ -878,46 +981,52 @@ async function computeAward(input: {
     if (!candidate) return null;
     entityId = candidate.entityId;
   }
+  const yesterday = shiftDateKey(requestedDateKey, -1);
+  // Backfilling the lookback only matters when a banked freeze could be spent
+  // on yesterday's gap. Without one, skip the multi-day scan so the screen's
+  // award commits while the user is still on it; housekeeping still backfills.
+  const mayNeedFreeze =
+    input.allowEarlierDate &&
+    !snapshot.activeDateKeys.has(yesterday) &&
+    !snapshot.frozenDateKeys.has(yesterday) &&
+    freezeStateFromSnapshot(snapshot).banked > 0;
+  let preparedFreezeDate: string | undefined;
+  if (mayNeedFreeze) {
+    const dateKey = await readUnpaidActionDateKey(
+      db,
+      input.kind,
+      entityId,
+      requestedDateKey,
+      input.allowEarlierDate,
+    );
+    if (!dateKey) return null;
+    // Backfill only before an award for today. A backdated screen report
+    // keeps its activity day, and reconciliation cannot claim this award.
+    if (dateKey === requestedDateKey) {
+      await reconcileEarlierActivity(db, requestedDateKey, snapshot);
+      preparedFreezeDate = dateKey;
+    }
+  }
+
   const outcome = await withSQLiteTransaction(db, async (transactionDb) => {
     // Recheck inside the writer transaction: the reported action might have
     // been undone, deleted, or moved to another local day since it was read.
-    const todayKey = await readActionDateKey(transactionDb, input.kind, entityId, requestedDateKey);
-    const earliestDateKey = input.allowEarlierDate
-      ? reconcileWindowStart(requestedDateKey)
-      : requestedDateKey;
-    if (
-      todayKey === null ||
-      !isValidDateKey(todayKey) ||
-      todayKey < earliestDateKey ||
-      todayKey > requestedDateKey
-    ) {
-      return null;
-    }
-    const sourceKey = actionSourceKey(input.kind, entityId, todayKey);
-    const existing = await transactionDb.getFirstAsync<{ id: string }>(
-      `SELECT id FROM gamification_events WHERE event_kind = ? AND source_key = ?`,
-      [input.kind, sourceKey],
+    const todayKey = await readUnpaidActionDateKey(
+      transactionDb,
+      input.kind,
+      entityId,
+      requestedDateKey,
+      input.allowEarlierDate,
     );
-    if (existing) return null;
+    if (!todayKey) return null;
+    const sourceKey = actionSourceKey(input.kind, entityId, todayKey);
 
-    // Upgrade compatibility: an earlier build keyed todo awards by the bare
-    // todo id, and those rows survive. Without this check the first reconcile
-    // after the update would pay the same completion again under the new
-    // day-qualified key. The row's own `date_key` bounds the suppression to the
-    // day it already paid for, so a genuine later-day re-completion still earns
-    // (`legacyActionSourceKeys` documents why only `todo` has a legacy form).
-    for (const legacyKey of legacyActionSourceKeys(input.kind, entityId)) {
-      const legacy = await transactionDb.getFirstAsync<{ id: string }>(
-        `SELECT id FROM gamification_events
-          WHERE event_kind = ? AND source_key = ? AND date_key = ?`,
-        [input.kind, legacyKey, todayKey],
-      );
-      if (legacy) return null;
+    await releaseStaleFreezes(transactionDb, snapshot, todayKey);
+    if (todayKey === preparedFreezeDate) {
+      await spendStreakFreezes(transactionDb, todayKey, snapshot);
     }
-
-    const [facts, freezes, completedQuestIds, milestones, dayCompletion] = await Promise.all([
+    const [facts, completedQuestIds, milestones, dayCompletion] = await Promise.all([
       loadDayFacts(transactionDb, todayKey, snapshot),
-      loadFreezeState(transactionDb, snapshot),
       loadCompletedQuestIds(transactionDb, todayKey, snapshot),
       loadRecordedMilestones(transactionDb, snapshot),
       loadDayCompletion(transactionDb, todayKey, snapshot),
@@ -933,15 +1042,11 @@ async function computeAward(input: {
       streakDays: streakDaysFromSnapshot(snapshot),
       recordedStreakMilestones: milestones.streak,
       recordedFreezeMilestones: milestones.freeze,
-      freezes,
+      freezes: freezeStateFromSnapshot(snapshot),
       dayCompletion,
     });
 
     await insertEvents(transactionDb, award);
-    // A freeze spent on this day before its real activity existed is now
-    // unnecessary: release it in the same transaction that records the winning
-    // activity, so the bank cap and the grant budget stay honest (audit C #2).
-    await releaseStaleFreezes(transactionDb);
     const completedAt = nowIso();
     for (const questId of award.completedQuestIds) {
       await transactionDb.runAsync(
@@ -997,23 +1102,28 @@ async function computeAward(input: {
  * Reward one real action and read back the snapshot the rewarding surface
  * renders.
  *
- * See `computeAward` for the id and idempotency contracts; this wrapper only
- * adds the fresh read model. A backfill pass awards many actions through
- * `computeAward` and takes ONE snapshot when it ends.
+ * See `computeAward` for the id and idempotency contracts. A backfill pass
+ * awards many actions through `computeAward` and takes one snapshot when it ends.
  */
 export async function awardGamificationAction(
   input: AwardInput,
 ): Promise<GamificationAwardOutcome | null> {
   const todayKey = input.todayKey ?? toDateKey();
-  const db = await getDatabase();
-  const core = await computeAward({
-    ...input,
-    todayKey,
-    allowEarlierDate: true,
-    snapshot: await readLedgerSnapshot(db),
-  });
-  if (!core) return null;
-  return { ...core, snapshot: await readGamificationSnapshot({ todayKey }) };
+  const release =
+    input.entityId === undefined
+      ? () => undefined
+      : claimForegroundAward(foregroundAwardKey(input.kind, input.entityId));
+  return serializeRewardWrite(async () => {
+    const db = await getDatabase();
+    const core = await computeAward({
+      ...input,
+      todayKey,
+      allowEarlierDate: true,
+      snapshot: await readLedgerSnapshot(db),
+    });
+    if (!core) return null;
+    return { ...core, snapshot: await readGamificationSnapshot({ todayKey }) };
+  }, 'foreground').finally(release);
 }
 
 type ActivityCandidate = { kind: ActionKind; entityId: string };
@@ -1144,11 +1254,17 @@ async function reconcileDayAwards(
   db: Db,
   dateKey: string,
   snapshot: LedgerSnapshot,
+  passYield?: PassYield,
 ): Promise<number> {
   const candidates = await loadActivityCandidates(db, dateKey);
   let awarded = 0;
   for (const candidate of candidates) {
     if (awarded >= RECONCILE_AWARD_LIMIT) break;
+    await passYield?.();
+    // The queued foreground award pays this action with its feedback.
+    if (pendingForegroundAwards.has(foregroundAwardKey(candidate.kind, candidate.entityId))) {
+      continue;
+    }
     const outcome = await computeAward({
       kind: candidate.kind,
       entityId: candidate.entityId,
@@ -1170,91 +1286,87 @@ export async function reconcileGamificationActivity(
   options: GamificationReadOptions = {},
 ): Promise<ReconcileOutcome> {
   const todayKey = options.todayKey ?? toDateKey();
-  const db = await getDatabase();
-  const ledger = await readLedgerSnapshot(db);
-  const awarded = await reconcileDayAwards(db, todayKey, ledger);
-  return { awarded, snapshot: await readGamificationSnapshot({ todayKey }) };
+  return serializeRewardWrite(async () => {
+    const db = await getDatabase();
+    const ledger = await readLedgerSnapshot(db);
+    const awarded = await reconcileDayAwards(db, todayKey, ledger);
+    return { awarded, snapshot: await readGamificationSnapshot({ todayKey }) };
+  });
 }
 
-/**
- * Spend banked freezes on the trailing missed days, if the run behind the gap
- * is still alive. Called on foreground/day rollover; the resulting rows are what
- * make the streak survive a miss.
- *
- * Every missed day the bank can cover is spent, not just yesterday: a user who
- * returns after a two- or three-day absence still holds the freeze they earned,
- * and burning only one of them (then leaving the rest banked with the streak
- * already broken) made the grant unspendable. `planAutoFreeze` bounds the spend
- * by both `MAX_BANKED_FREEZES` and the bank, and stops at the first day the
- * ledger already counts as active or frozen, so an unbounded absence cannot
- * retroactively resurrect a dead run.
- *
- * Freeze rows whose day has since become active are released FIRST, and the
- * ledger snapshot is re-read when that happened, so planning spends from the
- * current bank rather than a snapshot that still counts a stale freeze as
- * spent (audit C #2). The release is a no-op for a correct ledger, so the
- * common path still takes exactly one snapshot read.
- */
+/** Spend banked freezes inside the caller's transaction. */
+async function spendStreakFreezes(db: Db, todayKey: string, snapshot: LedgerSnapshot) {
+  const savedDateKeys = planAutoFreeze({
+    days: streakDaysFromSnapshot(snapshot),
+    todayKey,
+    banked: freezeStateFromSnapshot(snapshot).banked,
+  });
+  if (savedDateKeys.length === 0) return null;
+  const savedAt = nowIso();
+  for (const dateKey of savedDateKeys) {
+    await db.runAsync(
+      `INSERT INTO gamification_streak_freezes (date_key, saved_at) VALUES (?, ?)`,
+      [dateKey, savedAt],
+    );
+    snapshot.frozenDateKeys.add(dateKey);
+    snapshot.freezesUsed += 1;
+  }
+  await setAppMetaText(db, appMetaKeys.backupDirty, '1');
+  return { savedDateKeys };
+}
+
+/** Refund stale freezes and save a live streak across a covered gap. */
+async function ensureStreakFreezeInternal(db: Db, todayKey: string, snapshot?: LedgerSnapshot) {
+  return withSQLiteTransaction(db, async (transactionDb) => {
+    const ledger = snapshot ?? (await readLedgerSnapshot(transactionDb));
+    await releaseStaleFreezes(transactionDb, ledger);
+    return spendStreakFreezes(transactionDb, todayKey, ledger);
+  });
+}
+
 export async function ensureStreakFreeze(
   options: GamificationReadOptions = {},
 ): Promise<{ savedDateKeys: string[] } | null> {
   const todayKey = options.todayKey ?? toDateKey();
-  const db = await getDatabase();
-  return withSQLiteTransaction(db, async (transactionDb) => {
-    let ledger = await readLedgerSnapshot(transactionDb);
-    const released = await releaseStaleFreezes(transactionDb);
-    if (released.length > 0) ledger = await readLedgerSnapshot(transactionDb);
-    const [streakDays, freezes] = await Promise.all([
-      loadStreakDays(transactionDb, ledger),
-      loadFreezeState(transactionDb, ledger),
-    ]);
-    const savedDateKeys = planAutoFreeze({ days: streakDays, todayKey, banked: freezes.banked });
-    if (savedDateKeys.length === 0) return null;
-    const savedAt = nowIso();
-    for (const savedDateKey of savedDateKeys) {
-      await transactionDb.runAsync(
-        `INSERT OR IGNORE INTO gamification_streak_freezes (date_key, saved_at) VALUES (?, ?)`,
-        [savedDateKey, savedAt],
-      );
-    }
-    await setAppMetaText(transactionDb, appMetaKeys.backupDirty, '1');
-    return { savedDateKeys };
-  });
+  return serializeRewardWrite(async () =>
+    ensureStreakFreezeInternal(await getDatabase(), todayKey),
+  );
+}
+
+async function reconcileEarlierActivity(db: Db, todayKey: string, snapshot: LedgerSnapshot) {
+  for (let offset = GAMIFICATION_RECONCILE_LOOKBACK_DAYS - 1; offset > 0; offset -= 1) {
+    await reconcileDayAwards(db, shiftDateKey(todayKey, -offset), snapshot);
+  }
 }
 
 /**
  * One housekeeping pass in the only order that cannot misclassify a real
  * action as a missed day: award unrewarded feature activity across the bounded
- * lookback (oldest first), THEN let freeze planning look at the ledger those
- * awards produced.
- *
- * The lookback is bounded to GAMIFICATION_RECONCILE_LOOKBACK_DAYS local days.
- * The original today+yesterday window was the failure mode: a notification
- * completion written before midnight and opened after it (or any offline day
- * beyond one) was permanently unpaid. A per-day pass keeps the award cap
- * scoped to each day and the ledger's unique source key keeps replays cheap;
- * an unbounded scan would rewrite historical streaks, so the window stays
- * fixed and small.
- *
- * Order matters three times over: award first (so real activity is never
- * mistaken for a miss), then release freezes whose day turned out active (so a
- * spent freeze goes back to the bank instead of consuming the grant budget
- * forever, audit C #2), then plan a new freeze last (so the release cannot hand
- * back capacity that is immediately double-spent).
+ * lookback (oldest first), freeze any remaining missed days, then award today's
+ * actions using the protected streak. All three steps share one ledger read.
  */
 export async function runGamificationHousekeeping(
   options: GamificationReadOptions = {},
 ): Promise<void> {
   const todayKey = options.todayKey ?? toDateKey();
-  const db = await getDatabase();
-  // ONE ledger read and one quest-board memo for the whole 7-day window; every
-  // award appends to the same snapshot, so each subsequent day sees the ledger
-  // the previous day's awards produced (audit C §2 issue #3).
-  const ledger = await readLedgerSnapshot(db);
-  for (let offset = GAMIFICATION_RECONCILE_LOOKBACK_DAYS - 1; offset >= 0; offset -= 1) {
-    await reconcileDayAwards(db, shiftDateKey(todayKey, -offset), ledger);
-  }
-  // Freeze planning releases rows whose day the pass made active and
-  // recalculates the bank before spending it.
-  await ensureStreakFreeze({ todayKey });
+  return serializeRewardWrite(async () => {
+    const db = await getDatabase();
+    const ledger = await readLedgerSnapshot(db);
+    // After a foreground award ran, refresh the pass's snapshot in place so
+    // every later step (and the rest of the current day) sees its writes.
+    const yieldToForeground: PassYield = async () => {
+      if (!(await yieldRewardLockToForeground())) return;
+      const fresh = await readLedgerSnapshot(db);
+      for (const key of Object.keys(ledger) as (keyof LedgerSnapshot)[]) delete ledger[key];
+      Object.assign(ledger, fresh);
+    };
+    for (let offset = GAMIFICATION_RECONCILE_LOOKBACK_DAYS - 1; offset > 0; offset -= 1) {
+      await yieldToForeground();
+      await reconcileDayAwards(db, shiftDateKey(todayKey, -offset), ledger, yieldToForeground);
+    }
+    await yieldToForeground();
+    await ensureStreakFreezeInternal(db, todayKey, ledger);
+    await yieldToForeground();
+    await reconcileDayAwards(db, todayKey, ledger, yieldToForeground);
+  });
 }

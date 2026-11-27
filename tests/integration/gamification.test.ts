@@ -54,6 +54,49 @@ async function seedLedgerDays(dateKeys: readonly string[]): Promise<void> {
 }
 
 describe('gamification ledger', () => {
+  it.each(['screen', 'reconciliation'])(
+    'unlocks level five with overlapping %s awards',
+    async (secondPath) => {
+      const { todos, gamification, time, domain } = await loadModules();
+      const today = time.toDateKey();
+      const levelFiveXp = [1, 2, 3, 4].reduce(
+        (total, level) => total + domain.xpRequiredForLevel(level),
+        0,
+      );
+      const yesterday = domain.shiftDateKey(today, -1);
+      await seedLedgerDays([yesterday]);
+      await db.runAsync('UPDATE gamification_events SET xp = ? WHERE date_key = ?', [
+        levelFiveXp - 7,
+        yesterday,
+      ]);
+      // Keep the assertion about overlapping action XP independent of the quest rotation.
+      for (const { id } of domain.selectDailyQuestTemplates(today)) {
+        await db.runAsync(
+          `INSERT INTO gamification_quests (date_key, quest_id, completed_at) VALUES (?, ?, ?)`,
+          [today, id, time.nowIso()],
+        );
+      }
+      const first = await todos.addTodo({ title: 'First' });
+      const second = await todos.addTodo({ title: 'Second' });
+      await todos.completeTodo(first);
+      await todos.completeTodo(second);
+
+      const firstAward = gamification.awardGamificationAction({ kind: 'todo', entityId: first });
+      const secondAward =
+        secondPath === 'screen'
+          ? gamification.awardGamificationAction({ kind: 'todo', entityId: second })
+          : gamification.reconcileGamificationActivity();
+      const [, outcome] = await Promise.all([firstAward, secondAward]);
+
+      const snapshot = await gamification.readGamificationSnapshot();
+      expect(snapshot.level).toMatchObject({ level: 5, totalXp: levelFiveXp + 3 });
+      if (outcome && 'result' in outcome) {
+        expect(outcome.result.levelUp).toEqual({ from: 4, to: 5, title: 'Achiever' });
+      }
+      expect(snapshot.badges.find((badge) => badge.id === 'level:1')?.unlocked).toBe(true);
+    },
+  );
+
   it('awards XP for a habit check-in once, even after an undo and re-check', async () => {
     const { habits, gamification, time } = await loadModules();
     const today = time.toDateKey();
@@ -607,6 +650,116 @@ describe('streak freeze accounting (audit C #2)', () => {
     return rows.map((row) => row.date_key);
   }
 
+  it.each(['housekeeping', 'screen award'])(
+    'bridges a missed day before computing XP in %s',
+    async (path) => {
+      const { todos, gamification, time, domain } = await loadModules();
+      const today = time.toDateKey();
+      const run = await seedRunEndingYesterday(today, domain);
+      await grantFreeze([7], run[0]);
+      const todoId = await todos.addTodo({ title: 'Back to work' });
+      await todos.completeTodo(todoId);
+
+      if (path === 'screen award') {
+        await gamification.awardGamificationAction({ kind: 'todo', entityId: todoId });
+      } else {
+        await gamification.runGamificationHousekeeping({ todayKey: today });
+      }
+
+      const yesterday = domain.shiftDateKey(today, -1);
+      expect(await freezeRows()).toEqual([yesterday]);
+      const snapshot = await gamification.readGamificationSnapshot({ todayKey: today });
+      expect(snapshot.streak).toMatchObject({ current: 8, activeToday: true });
+      expect(
+        await db.getFirstAsync(`SELECT xp FROM gamification_events WHERE event_kind = 'todo'`),
+      ).toEqual({ xp: 6 });
+    },
+  );
+
+  it('bridges yesterday when today has already earned XP', async () => {
+    const { gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    const run = await seedRunEndingYesterday(today, domain);
+    await grantFreeze([7], run[0]);
+    await seedLedgerDays([today]);
+
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+
+    expect(await freezeRows()).toEqual([domain.shiftDateKey(today, -1)]);
+    expect((await gamification.readGamificationSnapshot({ todayKey: today })).streak.current).toBe(
+      8,
+    );
+  });
+
+  it('backfills yesterday’s activity before an immediate award spends its freeze', async () => {
+    const { todos, pomodoro, gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    const run = await seedRunEndingYesterday(today, domain);
+    await grantFreeze([7], run[0]);
+    const yesterday = domain.shiftDateKey(today, -1);
+    await pomodoro.logPomodoroSession(
+      new Date(`${yesterday}T12:00:00`).toISOString(),
+      new Date(`${yesterday}T12:25:00`).toISOString(),
+      1500,
+      'focus',
+    );
+    const todoId = await todos.addTodo({ title: 'Today’s work' });
+    await todos.completeTodo(todoId);
+
+    const award = await gamification.awardGamificationAction({ kind: 'todo', entityId: todoId });
+
+    expect(award?.snapshot.streak.current).toBe(9);
+    expect(award?.snapshot.freezes).toEqual({ earned: 1, used: 0, banked: 1 });
+    expect(await freezeRows()).toEqual([]);
+  });
+
+  it('can spend a freeze just earned by a prior-day award in the same pass', async () => {
+    const { todos, pomodoro, gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    await seedLedgerDays([3, 4, 5, 6, 7, 8].map((offset) => domain.shiftDateKey(today, -offset)));
+    const twoDaysAgo = domain.shiftDateKey(today, -2);
+    await pomodoro.logPomodoroSession(
+      new Date(`${twoDaysAgo}T12:00:00`).toISOString(),
+      new Date(`${twoDaysAgo}T12:25:00`).toISOString(),
+      1500,
+      'focus',
+    );
+    const todoId = await todos.addTodo({ title: 'Today’s work' });
+    await todos.completeTodo(todoId);
+
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+
+    const snapshot = await gamification.readGamificationSnapshot({ todayKey: today });
+    expect(snapshot.streak.current).toBe(8);
+    expect(snapshot.freezes).toEqual({ earned: 1, used: 1, banked: 0 });
+  });
+
+  it('counts a refunded freeze before granting another at the new milestone', async () => {
+    const { todos, gamification, time, domain } = await loadModules();
+    const today = time.toDateKey();
+    const yesterday = domain.shiftDateKey(today, -1);
+    const run = Array.from({ length: 364 }, (_, idx) => domain.shiftDateKey(today, -idx - 2));
+    await seedLedgerDays(run);
+    await grantFreeze([7, 30, 100], run[0]);
+    await db.runAsync(
+      `INSERT INTO gamification_streak_freezes (date_key, saved_at) VALUES (?, ?)`,
+      [yesterday, time.nowIso()],
+    );
+    // Clock is today; the todo is a previously saved action on the frozen day.
+    const todoId = await todos.addTodo({ title: 'Completion from yesterday' });
+    await todos.completeTodo(todoId);
+    await db.runAsync(`UPDATE todos SET completed_at = ? WHERE id = ?`, [
+      new Date(`${yesterday}T12:00:00`).toISOString(),
+      todoId,
+    ]);
+
+    await gamification.runGamificationHousekeeping({ todayKey: today });
+
+    const snapshot = await gamification.readGamificationSnapshot({ todayKey: today });
+    expect(snapshot.streak.current).toBe(365);
+    expect(snapshot.freezes).toEqual({ earned: 3, used: 0, banked: 3 });
+  });
+
   it('earns a freeze at the milestone, spends it on the miss, and stops at MAX_BANKED_FREEZES', async () => {
     const { gamification, time, domain } = await loadModules();
     const today = time.toDateKey();
@@ -788,5 +941,63 @@ describe('streak freeze accounting (audit C #2)', () => {
 
     expect(second.freezes).toEqual(first.freezes);
     expect(await freezeRows()).toEqual([]);
+  });
+});
+
+describe('foreground award vs concurrent housekeeping pass (#277 regression)', () => {
+  it('keeps the badge celebration when a housekeeping pass is already queued', async () => {
+    const { habits, gamification, time } = await loadModules();
+    const today = time.toDateKey();
+    const habitId = await habits.addHabit('Morning run', 1);
+    await habits.incrementHabit(habitId, today);
+
+    // A section switch queues the background pass first (fresh provider), and
+    // the user's check-off reports the same action while that pass is still
+    // running. The pass must not silently consume the foreground award.
+    const pass = gamification.runGamificationHousekeeping({ todayKey: today });
+    const award = gamification.awardGamificationAction({ kind: 'habit', entityId: habitId });
+    const [, outcome] = await Promise.all([pass, award]);
+
+    expect(outcome).not.toBeNull();
+    expect(outcome?.newBadges.map((badge) => badge.id)).toContain('perfect_days:1');
+    expect(outcome?.celebration?.tier).toBe('badge');
+    // Exactly one award and one badge row: no double payment.
+    expect(
+      (await db.getAllAsync(`SELECT id FROM gamification_events WHERE event_kind = 'habit'`))
+        .length,
+    ).toBe(1);
+    expect(await db.getAllAsync(`SELECT badge_id FROM gamification_badges`)).toEqual([
+      { badge_id: 'perfect_days:1' },
+    ]);
+  });
+
+  it('serves a foreground award before a queued housekeeping pass finishes', async () => {
+    const { habits, gamification, time } = await loadModules();
+    const today = time.toDateKey();
+    const habitId = await habits.addHabit('Evening walk', 1);
+    await habits.incrementHabit(habitId, today);
+
+    const settled: string[] = [];
+    const first = gamification
+      .runGamificationHousekeeping({ todayKey: today })
+      .then(() => settled.push('first pass'));
+    const second = gamification
+      .runGamificationHousekeeping({ todayKey: today })
+      .then(() => settled.push('second pass'));
+    const award = gamification
+      .awardGamificationAction({ kind: 'habit', entityId: habitId })
+      .then((outcome) => {
+        settled.push('award');
+        return outcome;
+      });
+    const [, , outcome] = await Promise.all([first, second, award]);
+
+    // The screen's award does not wait behind every queued backfill pass.
+    expect(settled.indexOf('award')).toBeLessThan(settled.indexOf('second pass'));
+    expect(outcome?.celebration).not.toBeNull();
+    expect(
+      (await db.getAllAsync(`SELECT id FROM gamification_events WHERE event_kind = 'habit'`))
+        .length,
+    ).toBe(1);
   });
 });
