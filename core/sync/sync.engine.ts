@@ -203,13 +203,28 @@ export class SyncEngine {
     }
     if (status) this.status = { ...status, blockedEntities: status.blockedEntities ?? [] };
     if (ledger) {
+      const pendingRevisions = new Map(
+        outbox.map((record) => [dedupeKey(record), record.revision]),
+      );
+      const currentLedger = Object.fromEntries(
+        Object.entries(ledger).filter(
+          ([key, entry]) =>
+            pendingRevisions.has(key) &&
+            (entry.revision === undefined || entry.revision === pendingRevisions.get(key)),
+        ),
+      );
       // AUD-SH03-C: a durable ledger written by the pre-fix accounting may hold
       // verdicts that transient noise produced. Repair them into a bounded
       // re-probe (never a silent drop, never an unbounded retry) and persist the
       // repaired ledger so the repair happens once per entry.
-      const repaired = repairLegacyBlockedEntries(ledger, new Date().toISOString());
+      const repaired = repairLegacyBlockedEntries(currentLedger, new Date().toISOString());
       this.attemptLedger = repaired.ledger;
-      if (repaired.reprobedKeys.length > 0) this.persistAttemptLedger();
+      if (
+        repaired.reprobedKeys.length > 0 ||
+        Object.keys(currentLedger).length !== Object.keys(ledger).length
+      ) {
+        this.persistAttemptLedger();
+      }
     }
     this.refreshBlockedEntities();
   }
@@ -299,7 +314,18 @@ export class SyncEngine {
    * issuing a second asynchronous snapshot write.
    */
   enqueuePrepared(record: PreparedSyncRecord, options?: { durablyPersisted?: boolean }): void {
+    const key = dedupeKey(record);
+    const previousRevision = this.revisions.get(key);
+    if (previousRevision !== undefined && previousRevision > record.revision) return;
     this.replaceOrAppend(record, record.revision);
+    if (previousRevision !== undefined && previousRevision < record.revision) {
+      const ledger = clearOutboxAttempt(this.attemptLedger, record);
+      if (ledger !== this.attemptLedger) {
+        this.attemptLedger = ledger;
+        this.persistAttemptLedger();
+        this.refreshBlockedEntities();
+      }
+    }
     if (options?.durablyPersisted) return;
     const revision = record.revision;
     const snapshot = this.queue.map((queued) => this.bareRecord(queued));
@@ -362,6 +388,7 @@ export class SyncEngine {
       for (const record of snapshot) ledger = clearOutboxAttempt(ledger, record);
       this.attemptLedger = ledger;
       this.persistAttemptLedger();
+      this.refreshBlockedEntities();
       this.recordSuccess();
     } catch (error) {
       const failedRecords =
@@ -381,6 +408,10 @@ export class SyncEngine {
           throw persistenceError;
         }
       }
+      const currentFailures = snapshotWithRevisions.filter((record) => {
+        const key = dedupeKey(record);
+        return failedKeys.has(key) && this.revisions.get(key) === record.revision;
+      });
       // Anything not reported as failed succeeded and should stay dropped;
       // only the actually-failed records go back, ahead of anything enqueued
       // while this flush was in flight. Records that reached the TERMINAL state
@@ -393,9 +424,10 @@ export class SyncEngine {
       // entity look permanently broken — and both were blocked.
       const nowIso = new Date().toISOString();
       let ledger = this.attemptLedger;
+      for (const record of succeeded) ledger = clearOutboxAttempt(ledger, record);
       const newlyBlocked: string[] = [];
       let lastFailureClass: OutboxFailureClass = 'transient';
-      for (const failed of failedRecords) {
+      for (const failed of currentFailures) {
         const recordError =
           error instanceof SyncPushPartialFailureError
             ? error.failureFor(failed)
@@ -405,29 +437,22 @@ export class SyncEngine {
         const failureClass = classifyOutboxFailure(recordError);
         lastFailureClass = failureClass;
         const applied = applyOutboxFailure(ledger, failed, failureClass, nowIso);
+        const key = outboxAttemptKey(failed);
         ledger = applied.ledger;
-        if (applied.blockedNow) newlyBlocked.push(outboxAttemptKey(failed));
+        ledger[key] = { ...ledger[key], revision: failed.revision };
+        if (applied.blockedNow) newlyBlocked.push(key);
       }
       const currentKeys = new Set(this.queue.map(dedupeKey));
-      const retryRecords = failedRecords.filter(
+      const retryRecords = currentFailures.filter(
         (record) => !currentKeys.has(dedupeKey(record)) && !isBlockedIn(ledger, record),
       );
-      const terminal = failedRecords.filter(
-        (record) => !currentKeys.has(dedupeKey(record)) && isBlockedIn(ledger, record),
-      );
-      this.queue = [...retryRecords, ...this.queue];
-      for (const failed of retryRecords) {
-        const original = snapshotWithRevisions.find(
-          (record) => dedupeKey(record) === dedupeKey(failed),
-        );
-        if (original) this.revisions.set(dedupeKey(failed), original.revision ?? 0);
-      }
+      this.queue = [...retryRecords.map((record) => this.bareRecord(record)), ...this.queue];
       this.attemptLedger = ledger;
       this.persistAttemptLedger();
       this.refreshBlockedEntities();
-      if (terminal.length > 0 || newlyBlocked.length > 0) {
+      if (newlyBlocked.length > 0) {
         console.warn(
-          `[sync] ${newlyBlocked.length} outbox record(s) can never push and are now blocked (${lastFailureClass}): ${[...new Set([...newlyBlocked, ...terminal.map(dedupeKey)])].join(', ')}. They stay out of the retry queue and are reported in backup status.`,
+          `[sync] ${newlyBlocked.length} outbox record(s) can never push and are now blocked (${lastFailureClass}): ${newlyBlocked.join(', ')}. They stay out of the retry queue and are reported in backup status.`,
         );
       }
       this.recordFailure(error);

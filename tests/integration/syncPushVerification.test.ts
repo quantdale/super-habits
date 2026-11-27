@@ -26,6 +26,7 @@ const upserted: UpsertCall[] = [];
 const readBacks: ReadBackCall[] = [];
 /** Ids the remote pretends to have stored; anything else is a silent skip. */
 let storeable: (entity: string, id: string, userId: string) => boolean = () => true;
+let beforeUpsert: ((entity: string) => Promise<void>) | undefined;
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -43,6 +44,7 @@ vi.mock('@/lib/supabase', () => ({
     })),
     from: vi.fn((entity: string) => ({
       upsert: vi.fn(async (rows: Record<string, unknown>[]) => {
+        await beforeUpsert?.(entity);
         const rowList = Array.isArray(rows) ? rows : [rows];
         upserted.push({ entity, rows: rowList });
         // The remote answers 200 either way: a foreign-owner conflict is a
@@ -191,5 +193,68 @@ describe('push verification rejects a silently skipped write', () => {
     // The read-back is additive and bounded, never one request per row.
     expect(todoReadBacks[0]?.ids.length).toBe(todoUpserts[0]?.rows.length);
     await db.closeAsync();
+  });
+});
+
+describe('sync projection respects the local transaction boundary', () => {
+  it('uploads the committed habit name when another SQLite writer rolls back an edit', async () => {
+    upserted.length = 0;
+    readBacks.length = 0;
+    storeable = () => true;
+
+    const { db } = await seedOneTodo();
+    const { addHabit } = await import('@/features/habits/habits.data');
+    const { getDatabase } = await import('@/core/db/client');
+    const { withSQLiteTransaction } = await import('@/core/db/transactions');
+    const { syncEngine } = await import('@/core/sync/sync.engine');
+    const habitId = await addHabit('Committed habit', 1);
+    const todoRequestStarted = Promise.withResolvers<void>();
+    const respondToTodoRequest = Promise.withResolvers<void>();
+    const editReady = Promise.withResolvers<void>();
+    const rollBack = Promise.withResolvers<void>();
+    beforeUpsert = async (entity) => {
+      if (entity !== 'todos') return;
+      todoRequestStarted.resolve();
+      await respondToTodoRequest.promise;
+    };
+
+    const syncDb = await getDatabase();
+    const flush = syncEngine.flush();
+    try {
+      await todoRequestStarted.promise;
+      const edit = withSQLiteTransaction(syncDb, async (tx) => {
+        await tx.runAsync('UPDATE habits SET name = ? WHERE id = ?', ['Rolled-back edit', habitId]);
+        editReady.resolve();
+        await rollBack.promise;
+        throw new Error('simulated write failure');
+      });
+      const editRejected = expect(edit).rejects.toThrow('simulated write failure');
+      await editReady.promise;
+      respondToTodoRequest.resolve();
+
+      // The mocked response and ungated SQLite reads can finish while the
+      // write is open. A serialized read waits for the rollback instead.
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      rollBack.resolve();
+      await editRejected;
+      await flush;
+
+      const uploadedNames = upserted
+        .filter((call) => call.entity === 'habits')
+        .flatMap((call) => call.rows.map((row) => row.name));
+      expect(uploadedNames).toEqual(['Committed habit']);
+      expect(await db.getFirstAsync('SELECT name FROM habits WHERE id = ?', [habitId])).toEqual({
+        name: 'Committed habit',
+      });
+      expect(
+        await db.getFirstAsync('SELECT id FROM sync_outbox WHERE id = ?', [habitId]),
+      ).toBeNull();
+    } finally {
+      beforeUpsert = undefined;
+      respondToTodoRequest.resolve();
+      rollBack.resolve();
+      await flush.catch(() => undefined);
+      await db.closeAsync();
+    }
   });
 });

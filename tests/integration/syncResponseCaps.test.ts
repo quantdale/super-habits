@@ -43,6 +43,8 @@ let overTruncateAt: number | null = null;
 let failUpsertBatchFrom: number | null = null;
 /** Whether the fake remote advertises immutable generation storage (`AUD-SH02-A`). */
 let generationSupport = true;
+let rejectedTodoId: string | null = null;
+let rejectedTodoConstraintCode: string | undefined;
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -68,6 +70,14 @@ vi.mock('@/lib/supabase', () => ({
         const entityBatchIndex = upsertBatches.filter((batch) => batch.entity === entity).length;
         if (failUpsertBatchFrom !== null && entityBatchIndex >= failUpsertBatchFrom) {
           return { error: { message: 'simulated permanent rejection (batch failure)' } };
+        }
+        if (rowList.some((row) => row.id === rejectedTodoId)) {
+          return {
+            error: {
+              code: rejectedTodoConstraintCode,
+              message: 'new row violates check constraint "todo_test"',
+            },
+          };
         }
         const table = stored.get(entity) ?? new Map<string, Record<string, unknown>>();
         for (const row of rowList) table.set(String(row.id), row);
@@ -386,4 +396,73 @@ describe('AUD-SH03-B: a failed batch does not implicate a stored batch', () => {
     expect(failure.failedRecords.length).toBe(300 - SYNC_WRITE_BATCH_ROWS);
     await db.closeAsync();
   }, 60000);
+});
+
+describe('isolated persistent failures do not strand later batches', () => {
+  it('stores a healthy later batch and blocks only the rejected batch', async () => {
+    stored.clear();
+    upsertBatches.length = 0;
+    serverCap = 1000;
+    notStored = new Set();
+    overTruncateAt = null;
+
+    // Use a small write cap to exercise three different requests in one flush.
+    const ids = await seedTodos(19);
+    const { db } = currentSeed!;
+    rejectedTodoId = ids[9];
+    try {
+      const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+      const { SyncEngine } = await import('@/core/sync/sync.engine');
+      const { SqliteSyncPersistence } = await import('@/core/sync/syncPersistence');
+      const { OUTBOX_BLOCK_ATTEMPT_BOUND } = await import('@/core/sync/outboxAttempts');
+      const store = new SqliteSyncPersistence();
+      const engine = new SyncEngine(new SupabaseSyncAdapter({ serverRowCap: 10 }), store);
+      for (const record of enqueueAll(ids)) engine.enqueue(record);
+
+      for (let attempt = 0; attempt < OUTBOX_BLOCK_ATTEMPT_BOUND; attempt++) {
+        await expect(engine.flush()).rejects.toThrow(/violates check constraint/);
+      }
+
+      expect(stored.get('todos')?.has(ids[18]), 'healthy third batch reached the server').toBe(
+        true,
+      );
+      expect((await store.loadOutbox()).map((record) => record.id)).toEqual(ids.slice(9, 18));
+      expect(engine.getBlockedKeys()).toEqual(ids.slice(9, 18).map((id) => `todos:${id}`));
+    } finally {
+      rejectedTodoId = null;
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      await db.closeAsync();
+    }
+  });
+
+  it('retains only the row that fails a row-specific constraint', async () => {
+    stored.clear();
+    upsertBatches.length = 0;
+    serverCap = 1000;
+    notStored = new Set();
+    overTruncateAt = null;
+
+    const ids = await seedTodos(3);
+    const { db } = currentSeed!;
+    rejectedTodoId = ids[1];
+    rejectedTodoConstraintCode = '23514';
+    try {
+      const { SupabaseSyncAdapter } = await import('@/core/sync/supabase.adapter');
+      const { SyncEngine } = await import('@/core/sync/sync.engine');
+      const { SqliteSyncPersistence } = await import('@/core/sync/syncPersistence');
+      const store = new SqliteSyncPersistence();
+      const engine = new SyncEngine(new SupabaseSyncAdapter(), store);
+      for (const record of enqueueAll(ids)) engine.enqueue(record);
+
+      await expect(engine.flush()).rejects.toThrow(/violates check constraint/);
+
+      expect([...(stored.get('todos')?.keys() ?? [])]).toEqual([ids[0], ids[2]]);
+      expect((await store.loadOutbox()).map((record) => record.id)).toEqual([ids[1]]);
+    } finally {
+      rejectedTodoId = null;
+      rejectedTodoConstraintCode = undefined;
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      await db.closeAsync();
+    }
+  });
 });

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { freshDatabase } from './helpers/db';
 
 /**
@@ -83,4 +83,71 @@ describe('SQLite outbox durable partial-failure removal (PA-02)', () => {
 
     expect(seen).toEqual([['habits']]);
   });
+});
+
+describe('outbox retry evidence belongs to the attempted revision', () => {
+  it.each(['in the same process', 'after restart'])(
+    'does not strand a replacement delete after an offline failure %s',
+    async (mode) => {
+      const db = await freshDatabase();
+      try {
+        const { SqliteSyncPersistence } = await import('@/core/sync/syncPersistence');
+        const { SyncEngine } = await import('@/core/sync/sync.engine');
+        const { OUTBOX_BLOCK_ATTEMPT_BOUND } = await import('@/core/sync/outboxAttempts');
+        const store = new SqliteSyncPersistence();
+        const record = {
+          entity: 'saved_meals',
+          id: 'smeal_replaced',
+          updatedAt: '2026-11-27T09:00:00.000Z',
+          operation: 'update' as const,
+        };
+        let pushError: string | null = 'Missing local rows for saved_meals: smeal_replaced';
+        const adapter = {
+          async push() {
+            if (pushError) throw new Error(pushError);
+          },
+          pull: async () => [],
+        };
+        let engine = new SyncEngine(adapter, store);
+        engine.enqueue(record);
+        for (let attempt = 0; attempt < OUTBOX_BLOCK_ATTEMPT_BOUND; attempt++) {
+          await expect(engine.flush()).rejects.toThrow('Missing local rows');
+        }
+        await vi.waitFor(async () => {
+          expect(
+            (await store.loadAttemptLedger())['saved_meals:smeal_replaced']?.blocked,
+          ).toMatchObject({ class: 'missing_local_row' });
+        });
+        expect(engine.isBlocked(record)).toBe(true);
+
+        const deletion = engine.prepare({
+          ...record,
+          operation: 'delete',
+          // Clock adjustments do not make this transaction an older intent.
+          updatedAt: '2026-11-27T08:00:00.000Z',
+        });
+        await store.upsertOutbox(deletion, deletion.revision);
+        if (mode === 'after restart') {
+          // Simulate an interruption after SQLite committed the delete intent
+          // and before it was published to the process-local queue.
+          engine = new SyncEngine(adapter, store);
+          await engine.hydrate();
+        } else {
+          engine.enqueuePrepared(deletion, { durablyPersisted: true });
+        }
+
+        pushError = 'network offline';
+        await expect(engine.flush()).rejects.toThrow('network offline');
+        expect(engine.getPendingCount()).toBe(1);
+        expect(engine.isBlocked(deletion)).toBe(false);
+
+        pushError = null;
+        await engine.flush();
+        expect(await store.loadOutbox()).toEqual([]);
+        expect(engine.getStatus().blockedEntities).toEqual([]);
+      } finally {
+        await db.closeAsync();
+      }
+    },
+  );
 });

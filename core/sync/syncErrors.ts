@@ -77,24 +77,3 @@ export class SyncPushPartialFailureError extends Error {
     )?.code;
   }
 }
-
-/**
- * A bounded-write batch failed after earlier batches of the SAME entity already
- * stored (`AUD-SH03-B`).
- *
- * Carries both sets so the caller can acknowledge the stored ids and report only
- * the truly-failed ones. Without this the adapter had a single aggregate error
- * per entity, and every record inherited it.
- */
-export class EntityBatchPushError extends Error {
-  constructor(
-    message: string,
-    /** Ids whose earlier batch already stored. */
-    public readonly acknowledgedIds: readonly string[],
-    /** Ids in the batch that failed. */
-    public readonly failedIds: ReadonlySet<string>,
-  ) {
-    super(message);
-    this.name = 'EntityBatchPushError';
-  }
-}
