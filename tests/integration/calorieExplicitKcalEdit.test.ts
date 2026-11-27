@@ -117,4 +117,34 @@ describe('explicit kcal survives macro-preserving edits (real SQLite)', () => {
     );
     expect(updated?.calories).toBe(250);
   });
+  it('compares macros against the preceding committed edit when edits overlap', async () => {
+    const db = await freshDatabase();
+    const { addCalorieEntry, updateCalorieEntry, listCalorieEntries } =
+      await import('@/features/calories/calories.data');
+    const id = await addCalorieEntry({
+      foodName: 'Chicken bowl',
+      protein: 20,
+      calories: 500,
+      mealType: 'lunch',
+    });
+    const edits = {
+      foodName: 'Chicken bowl',
+      protein: 20,
+      carbs: 0,
+      fats: 0,
+      fiber: 0,
+      mealType: 'lunch',
+      calories: 500,
+    } as const;
+
+    await expect(
+      Promise.all([
+        updateCalorieEntry(id, { ...edits, protein: 30 }),
+        updateCalorieEntry(id, edits),
+      ]),
+    ).resolves.toEqual(['updated', 'updated']);
+
+    expect(await listCalorieEntries()).toMatchObject([{ id, protein: 20, calories: 80 }]);
+    await db.closeAsync();
+  });
 });
