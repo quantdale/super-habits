@@ -35,6 +35,7 @@ import {
   planningToneText,
 } from '@/features/planning-hub/planningHub.visual';
 import type {
+  ReviewWeek,
   WeeklyReviewSummaryV1,
   WeeklyReviewDraft,
   WeeklyTodoDecision,
@@ -184,13 +185,19 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
   // (bumped by the app-wide rollover provider) re-derives the week, which the
   // load effect below then keys off.
   const dayGeneration = useDayRolloverGeneration();
-  const week = useMemo(
+  const liveWeek = useMemo(
     () => getReviewWeek(),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- dayGeneration is an intentional extra dep: it re-derives the week at local midnight even though getReviewWeek reads the clock rather than a tracked value.
     [dayGeneration],
   );
+  // After a successful save, keep this surface pointed at the week that was
+  // actually written. A later midnight must not rewrite the success copy or
+  // re-seed carry-forward / retry actions for the new week.
+  const [savedWeek, setSavedWeek] = useState<ReviewWeek | null>(null);
+  const week = savedWeek ?? liveWeek;
 
   useEffect(() => {
+    if (savedWeek) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -219,7 +226,7 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [week.weekKey]);
+  }, [week.weekKey, savedWeek]);
 
   const currentStepIndex = step === 'done' ? STEP_ORDER.length : STEP_ORDER.indexOf(step);
   const canGoBack = currentStepIndex > 0 && step !== 'done';
@@ -235,6 +242,10 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
 
   const handleConfirm = useCallback(async () => {
     if (!summary || executing) return;
+    // Confirm must wait until the loaded summary is the current live week.
+    // Otherwise executeWeeklyReview persists summary.week, which can still be
+    // last week while draft.weekKey has already rolled over.
+    if (summary.week.weekKey !== week.weekKey) return;
     const draft: WeeklyReviewDraft = {
       weekKey: week.weekKey,
       todoDecisions,
@@ -252,6 +263,7 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
     setExecuting(true);
     try {
       const result = await executeWeeklyReview({ summary, draft });
+      setSavedWeek(summary.week);
       setExecutionResult(result);
       setStep('done');
     } catch (e) {
@@ -377,7 +389,13 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
     />
   );
 
-  if (loading) {
+  // An unfinished review whose summary is still last week's must not render
+  // Confirm (executeWeeklyReview persists summary.week, not draft.weekKey).
+  // Treat that mismatch as loading so the button is gone until the new week
+  // has loaded, and so a failed reload cannot confirm against the stale row.
+  const summaryMatchesWeek = summary?.week.weekKey === week.weekKey;
+  const waitingForCurrentWeek = !savedWeek && !error && !summaryMatchesWeek;
+  if (loading || waitingForCurrentWeek) {
     return (
       <Screen scroll>
         <View style={{ alignItems: 'center', paddingVertical: spacing.xxxl }}>
@@ -647,7 +665,7 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
             <Button
               label={executing ? 'Saving…' : 'Confirm & Save'}
               onPress={handleConfirmPress}
-              disabled={executing}
+              disabled={executing || summary.week.weekKey !== week.weekKey}
               color={planningPrimaryFace('sky')}
             />
           ) : canGoForward ? (
