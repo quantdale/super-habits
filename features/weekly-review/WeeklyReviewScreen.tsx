@@ -646,6 +646,8 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
           )}
           {step === 'confirm' && (
             <ConfirmStep
+              startDateKey={week.startDateKey}
+              endDateKey={week.endDateKey}
               todoDecisions={todoDecisions}
               priorities={priorities}
               newCommitments={newCommitments}
@@ -1223,6 +1225,8 @@ function ReflectionStep({
 }
 
 function ConfirmStep({
+  startDateKey,
+  endDateKey,
   todoDecisions,
   priorities,
   newCommitments,
@@ -1230,6 +1234,8 @@ function ConfirmStep({
   validationErrors,
   saveError,
 }: {
+  startDateKey: string;
+  endDateKey: string;
   todoDecisions: WeeklyTodoDecision[];
   priorities: WeeklyPriorityDraft[];
   newCommitments: NewTodoCommitmentDraft[];
@@ -1253,9 +1259,14 @@ function ConfirmStep({
 
   return (
     <View style={{ gap: spacing.md }}>
-      <Text variant="titleLg" style={{ color: tokens.text }}>
-        Review changes
-      </Text>
+      <View style={{ gap: spacing.xs }}>
+        <Text variant="titleLg" style={{ color: tokens.text }}>
+          Review changes
+        </Text>
+        <Text variant="caption" tone="muted">
+          {startDateKey} – {endDateKey}
+        </Text>
+      </View>
 
       {validationErrors.length > 0 && (
         <View
