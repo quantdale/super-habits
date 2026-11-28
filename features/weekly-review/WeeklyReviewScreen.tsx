@@ -190,31 +190,32 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- dayGeneration is an intentional extra dep: it re-derives the week at local midnight even though getReviewWeek reads the clock rather than a tracked value.
     [dayGeneration],
   );
-  // After a successful save, keep this surface pointed at the week that was
-  // actually written. A later midnight must not rewrite the success copy or
-  // re-seed carry-forward / retry actions for the new week.
+  // Freeze the target week at the start of a save (not only after it
+  // resolves). A midnight during the write, or on the completion screen,
+  // must not rewrite the success copy or re-seed carry-forward / retry
+  // actions for the new week. Rollover retargets only an unfinished review.
   const [savedWeek, setSavedWeek] = useState<ReviewWeek | null>(null);
   const week = savedWeek ?? liveWeek;
 
   useEffect(() => {
-    if (savedWeek) return;
+    if (savedWeek || executing) return;
     let cancelled = false;
     void (async () => {
       try {
         const sum = await buildWeeklyReviewSummary();
         if (cancelled) return;
-        setSummary(sum);
-        const existing = await getWeeklyReviewByWeekKey(week.weekKey);
+        const existing = await getWeeklyReviewByWeekKey(sum.week.weekKey);
         if (cancelled) return;
-        setExistingReview(!!existing);
-
-        // Initialize todo decisions for incomplete todos in the week
+        // Publish the summary and its decisions together. Setting the summary
+        // first would clear waitingForCurrentWeek and re-enable Confirm while
+        // todoDecisions still belonged to the previous week.
         const decisions: WeeklyTodoDecision[] = sum.todos.carryForwardCandidates.map((t) => ({
           todoId: t.id,
           action: 'carry_forward' as const,
         }));
+        setSummary(sum);
+        setExistingReview(!!existing);
         setTodoDecisions(decisions);
-
         setLoading(false);
       } catch (e) {
         if (!cancelled) {
@@ -226,7 +227,7 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [week.weekKey, savedWeek]);
+  }, [week.weekKey, savedWeek, executing]);
 
   const currentStepIndex = step === 'done' ? STEP_ORDER.length : STEP_ORDER.indexOf(step);
   const canGoBack = currentStepIndex > 0 && step !== 'done';
@@ -260,10 +261,12 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
     }
     setValidationErrors([]);
     setSaveError(null);
+    // Freeze before the write so a rollover during the await cannot swap
+    // summary or todoDecisions, or retarget retry / carry-forward apply.
+    setSavedWeek(summary.week);
     setExecuting(true);
     try {
       const result = await executeWeeklyReview({ summary, draft });
-      setSavedWeek(summary.week);
       setExecutionResult(result);
       setStep('done');
     } catch (e) {
