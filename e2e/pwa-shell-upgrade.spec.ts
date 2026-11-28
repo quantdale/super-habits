@@ -173,18 +173,21 @@ test.describe('real two-build shell upgrade', () => {
     });
     await page.getByText('Update available', { exact: true }).waitFor({ timeout: 60_000 });
     const banner = page.getByRole('button', { name: 'Apply app update' });
-    const before = await getLoadCount(page);
-    await banner.click();
-    await page.waitForFunction(
-      (previous) => Number(sessionStorage.getItem('__pwa_shell_b_loads') ?? '0') > previous,
-      before,
-      { timeout: 60_000 },
-    );
-    await waitForDbReady(page);
-
-    // Offline after apply: the precached build-B shell still boots.
+    // Block network requests before applying so build B cannot warm missing
+    // assets through either the page or the dedicated SQLite worker.
+    await context.route('**/*', (route) => route.abort('internetdisconnected'));
     await context.setOffline(true);
     try {
+      const before = await getLoadCount(page);
+      await banner.click();
+      await page.waitForFunction(
+        (previous) => Number(sessionStorage.getItem('__pwa_shell_b_loads') ?? '0') > previous,
+        before,
+        { timeout: 60_000 },
+      );
+      await waitForDbReady(page);
+
+      // The same shell must remain bootable on a subsequent offline launch.
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.getByRole('tab', { name: 'Today', exact: true }).first().waitFor({
         timeout: 60_000,

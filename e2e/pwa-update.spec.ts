@@ -104,6 +104,80 @@ test.describe('PWA update lifecycle', () => {
     await expect(pill).toBeHidden();
   });
 
+  test('installation rejects a script URL that falls through to the HTML shell', async ({
+    page,
+    context,
+  }) => {
+    // A missing asset can receive a 200 HTML response from the SPA rewrite.
+    let servedHtmlFallback = false;
+    await context.route(/\/_expo\/static\/js\/web\/entry-[^/]+\.js$/, (route) => {
+      servedHtmlFallback = true;
+      return route.fulfill({
+        contentType: 'text/html',
+        body: '<!doctype html><title>App shell</title>',
+      });
+    });
+    await page.goto('/privacy.html');
+    const installedState = await page.evaluate(async () => {
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      const worker = registration.installing ?? registration.active;
+      if (!worker) return 'redundant';
+      return new Promise<ServiceWorkerState>((resolve) => {
+        const onStateChange = () => {
+          if (worker.state !== 'redundant' && worker.state !== 'activated') return;
+          worker.removeEventListener('statechange', onStateChange);
+          resolve(worker.state);
+        };
+        worker.addEventListener('statechange', onStateChange);
+        onStateChange();
+      });
+    });
+    expect(servedHtmlFallback).toBe(true);
+    expect(installedState).toBe('redundant');
+  });
+
+  test('the installed shell opens its database on the first offline launch', async ({
+    page,
+    context,
+  }) => {
+    // Install from a static same-origin page so an online app boot cannot
+    // warm the SQLite worker and WASM in the browser cache before the test.
+    await page.goto('/privacy.html');
+    await page.evaluate(() => navigator.serviceWorker.register('/sw.js').then(() => undefined));
+    await waitForControlled(page);
+
+    // A dedicated worker can use its own network stack. Block actual server
+    // requests as well, while leaving Cache Storage responses untouched.
+    await context.route('**/*', (route) => route.abort('internetdisconnected'));
+    await context.setOffline(true);
+    try {
+      await page.goto('/');
+      await waitForDbReady(page);
+      await waitForShell(page);
+    } finally {
+      await context.setOffline(false);
+    }
+  });
+
+  test('an offline launch through a fresh root query uses the cached shell', async ({
+    page,
+    context,
+  }) => {
+    await page.goto('/');
+    await waitForControlled(page);
+    await waitForDbReady(page);
+
+    await context.setOffline(true);
+    try {
+      await page.goto('/?source=offline-launch');
+      await waitForDbReady(page);
+      await waitForShell(page);
+      expect(new URL(page.url()).search).toBe('?source=offline-launch');
+    } finally {
+      await context.setOffline(false);
+    }
+  });
+
   test('first visit claims control without reloading or showing the banner', async ({ page }) => {
     // Audit AREA 9 F1 regression: clients.claim() on first visit dispatches
     // controllerchange; the app must neither reload nor show the banner.
