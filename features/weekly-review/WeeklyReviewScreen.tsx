@@ -9,6 +9,7 @@ import { SectionLabel } from '@/core/ui/SectionLabel';
 import { PlanningDisclosure } from '@/features/planning-hub/PlanningDisclosure';
 import { radius, spacing } from '@/core/theme/designTokens';
 import { useAppTheme } from '@/core/providers/themeContext';
+import { useDayRolloverGeneration } from '@/core/providers/dayRolloverContext';
 import { buildWeeklyReviewSummary } from './weeklyReview.summary';
 import {
   validateReviewDraft,
@@ -34,6 +35,7 @@ import {
   planningToneText,
 } from '@/features/planning-hub/planningHub.visual';
 import type {
+  ReviewWeek,
   WeeklyReviewSummaryV1,
   WeeklyReviewDraft,
   WeeklyTodoDecision,
@@ -176,26 +178,44 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
   const [applyStatus, setApplyStatus] = useState<'idle' | 'applying' | 'applied' | 'error'>('idle');
   const [applyMessage, setApplyMessage] = useState<string | null>(null);
 
-  const week = useMemo(() => getReviewWeek(), []);
+  // The review week is derived from the LOCAL calendar day, and the modal stays
+  // mounted across a day rollover (a tab left open overnight, or a review kept
+  // open past midnight): deriving it once per mount kept the whole flow pointed
+  // at LAST week while the shell had already rolled over. `dayGeneration`
+  // (bumped by the app-wide rollover provider) re-derives the week, which the
+  // load effect below then keys off.
+  const dayGeneration = useDayRolloverGeneration();
+  const liveWeek = useMemo(
+    () => getReviewWeek(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dayGeneration is an intentional extra dep: it re-derives the week at local midnight even though getReviewWeek reads the clock rather than a tracked value.
+    [dayGeneration],
+  );
+  // Freeze the target week at the start of a save (not only after it
+  // resolves). A midnight during the write, or on the completion screen,
+  // must not rewrite the success copy or re-seed carry-forward / retry
+  // actions for the new week. Rollover retargets only an unfinished review.
+  const [savedWeek, setSavedWeek] = useState<ReviewWeek | null>(null);
+  const week = savedWeek ?? liveWeek;
 
   useEffect(() => {
+    if (savedWeek || executing) return;
     let cancelled = false;
     void (async () => {
       try {
         const sum = await buildWeeklyReviewSummary();
         if (cancelled) return;
-        setSummary(sum);
-        const existing = await getWeeklyReviewByWeekKey(week.weekKey);
+        const existing = await getWeeklyReviewByWeekKey(sum.week.weekKey);
         if (cancelled) return;
-        setExistingReview(!!existing);
-
-        // Initialize todo decisions for incomplete todos in the week
+        // Publish the summary and its decisions together. Setting the summary
+        // first would clear waitingForCurrentWeek and re-enable Confirm while
+        // todoDecisions still belonged to the previous week.
         const decisions: WeeklyTodoDecision[] = sum.todos.carryForwardCandidates.map((t) => ({
           todoId: t.id,
           action: 'carry_forward' as const,
         }));
+        setSummary(sum);
+        setExistingReview(!!existing);
         setTodoDecisions(decisions);
-
         setLoading(false);
       } catch (e) {
         if (!cancelled) {
@@ -207,7 +227,7 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [week.weekKey]);
+  }, [week.weekKey, savedWeek, executing]);
 
   const currentStepIndex = step === 'done' ? STEP_ORDER.length : STEP_ORDER.indexOf(step);
   const canGoBack = currentStepIndex > 0 && step !== 'done';
@@ -223,6 +243,10 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
 
   const handleConfirm = useCallback(async () => {
     if (!summary || executing) return;
+    // Confirm must wait until the loaded summary is the current live week.
+    // Otherwise executeWeeklyReview persists summary.week, which can still be
+    // last week while draft.weekKey has already rolled over.
+    if (summary.week.weekKey !== week.weekKey) return;
     const draft: WeeklyReviewDraft = {
       weekKey: week.weekKey,
       todoDecisions,
@@ -237,6 +261,9 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
     }
     setValidationErrors([]);
     setSaveError(null);
+    // Freeze before the write so a rollover during the await cannot swap
+    // summary or todoDecisions, or retarget retry / carry-forward apply.
+    setSavedWeek(summary.week);
     setExecuting(true);
     try {
       const result = await executeWeeklyReview({ summary, draft });
@@ -365,7 +392,13 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
     />
   );
 
-  if (loading) {
+  // An unfinished review whose summary is still last week's must not render
+  // Confirm (executeWeeklyReview persists summary.week, not draft.weekKey).
+  // Treat that mismatch as loading so the button is gone until the new week
+  // has loaded, and so a failed reload cannot confirm against the stale row.
+  const summaryMatchesWeek = summary?.week.weekKey === week.weekKey;
+  const waitingForCurrentWeek = !savedWeek && !error && !summaryMatchesWeek;
+  if (loading || waitingForCurrentWeek) {
     return (
       <Screen scroll>
         <View style={{ alignItems: 'center', paddingVertical: spacing.xxxl }}>
@@ -616,6 +649,8 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
           )}
           {step === 'confirm' && (
             <ConfirmStep
+              startDateKey={week.startDateKey}
+              endDateKey={week.endDateKey}
               todoDecisions={todoDecisions}
               priorities={priorities}
               newCommitments={newCommitments}
@@ -635,7 +670,7 @@ export function WeeklyReviewScreen({ onClose }: { onClose: () => void }) {
             <Button
               label={executing ? 'Saving…' : 'Confirm & Save'}
               onPress={handleConfirmPress}
-              disabled={executing}
+              disabled={executing || summary.week.weekKey !== week.weekKey}
               color={planningPrimaryFace('sky')}
             />
           ) : canGoForward ? (
@@ -1193,6 +1228,8 @@ function ReflectionStep({
 }
 
 function ConfirmStep({
+  startDateKey,
+  endDateKey,
   todoDecisions,
   priorities,
   newCommitments,
@@ -1200,6 +1237,8 @@ function ConfirmStep({
   validationErrors,
   saveError,
 }: {
+  startDateKey: string;
+  endDateKey: string;
   todoDecisions: WeeklyTodoDecision[];
   priorities: WeeklyPriorityDraft[];
   newCommitments: NewTodoCommitmentDraft[];
@@ -1223,9 +1262,14 @@ function ConfirmStep({
 
   return (
     <View style={{ gap: spacing.md }}>
-      <Text variant="titleLg" style={{ color: tokens.text }}>
-        Review changes
-      </Text>
+      <View style={{ gap: spacing.xs }}>
+        <Text variant="titleLg" style={{ color: tokens.text }}>
+          Review changes
+        </Text>
+        <Text variant="caption" tone="muted">
+          {startDateKey} – {endDateKey}
+        </Text>
+      </View>
 
       {validationErrors.length > 0 && (
         <View
